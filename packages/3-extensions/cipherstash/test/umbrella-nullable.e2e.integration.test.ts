@@ -1,21 +1,21 @@
 /**
- * Nullable umbrella end-to-end against PGlite — cipherstash plan.md
- * § T3.7 (AC-UMB4).
+ * Nullable umbrella end-to-end against PGlite — pins AC-UMB4
+ * (canonical AC list lives in the package`s `DEVELOPING.md §
+ * Acceptance criteria → Umbrella round-trips`).
  *
- * Sibling to `umbrella.e2e.integration.test.ts` (T3.5 + T3.6 search +
- * read-side bulk-call counting). Reuses the same synthetic-EQL-bundle
- * approach but flips the `email` column to `nullable: true` so the
- * mixed-null insert / null-check query / encrypted-equality query /
- * read-side `decryptAll` round-trip can all be exercised on the same
- * fixture.
+ * Sibling to `umbrella.e2e.integration.test.ts` (search + read-side
+ * bulk-call counting on the non-nullable variant). Reuses the same
+ * synthetic-EQL-bundle approach but flips the `email` column to
+ * `nullable: true` so the mixed-null insert / null-check query /
+ * encrypted-equality query / read-side `decryptAll` round-trip can
+ * all be exercised on the same fixture.
  *
- * AC-UMB4 from `projects/cipherstash-integration/project-1/spec.md`:
- *
- * > Nullable variant: `email: EncryptedString({ equality: true })?`
- * > round-trips correctly with a mix of null and non-null rows. A
- * > query using `email.isNull()` lowers to `WHERE email IS NULL`
- * > directly via `NullCheckExpr` (not an `eql_v2.eq` call); the
- * > operator registry is not consulted.
+ * AC-UMB4 (paraphrased): the nullable variant
+ * `email: EncryptedString({ equality: true })?` round-trips correctly
+ * with a mix of null and non-null rows; `email.isNull()` lowers to
+ * `WHERE email IS NULL` directly via `NullCheckExpr` (not an
+ * `eql_v2.eq` call); the operator registry is not consulted on null
+ * checks.
  *
  * Phases pinned by the single test in this file:
  *

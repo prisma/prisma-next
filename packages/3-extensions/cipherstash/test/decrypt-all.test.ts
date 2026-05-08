@@ -1,8 +1,8 @@
 /**
- * `decryptAll` — read-side bulk-decrypt walker (M3 R2 T3.4).
+ * `decryptAll` — read-side bulk-decrypt walker.
  *
- * Pins AC-DEC1..4 from `projects/cipherstash-integration/project-1/
- * specs/envelope-codec-extension.spec.md`:
+ * Pins AC-DEC1..4 (canonical AC list lives in the package`s
+ * `DEVELOPING.md § Acceptance criteria → decryptAll walker`):
  *
  *   - **AC-DEC1**: walks recursively (objects, arrays, nested envelopes)
  *     and decrypts every `EncryptedString` it finds.
