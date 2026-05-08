@@ -23,12 +23,8 @@ import {
 } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
 import { and, shorthandToWhereExpr } from './filters';
-import {
-  compileInsertReturning,
-  compileSelect,
-  compileUpdateCount,
-  compileUpdateReturning,
-} from './query-plan';
+import { compileInsertReturning, compileSelect, compileUpdateReturning } from './query-plan';
+import { compileUpdateCount } from './query-plan-mutations';
 import {
   createRelationMutator,
   isRelationMutationCallback,

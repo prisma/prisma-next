@@ -10,9 +10,9 @@ import {
   compileInsertCountSplit,
   compileInsertReturning,
   compileInsertReturningSplit,
-  compileUpdateCount,
   compileUpsertReturning,
 } from '../src/query-plan';
+import { compileUpdateCount } from '../src/query-plan-mutations';
 import { withReturningCapability } from './collection-fixtures';
 import { getTestContract } from './helpers';
 

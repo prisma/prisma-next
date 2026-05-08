@@ -8,7 +8,6 @@ export {
   compileInsertCountSplit,
   compileInsertReturning,
   compileInsertReturningSplit,
-  compileUpdateCount,
   compileUpdateReturning,
   compileUpsertReturning,
 } from './query-plan-mutations';
