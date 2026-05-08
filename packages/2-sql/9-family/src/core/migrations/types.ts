@@ -326,6 +326,7 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
 
 export type SqlMigrationRunnerErrorCode =
   | 'DESTINATION_CONTRACT_MISMATCH'
+  | 'LEGACY_MARKER_SHAPE'
   | 'MARKER_ORIGIN_MISMATCH'
   | 'POLICY_VIOLATION'
   | 'PRECHECK_FAILED'

@@ -25,7 +25,6 @@ import {
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
   ensurePrismaContractSchemaStatement,
-  migrateMarkerSchemaStatements,
   type SqlStatement,
 } from './statement-builders';
 
@@ -106,7 +105,10 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     let committed = false;
     try {
       await this.acquireLock(driver, lockKey);
-      await this.ensureControlTables(driver);
+      const ensureResult = await this.ensureControlTables(driver);
+      if (!ensureResult.ok) {
+        return ensureResult;
+      }
       const existingMarker = await this.family.readMarker({ driver });
 
       // Validate plan origin matches existing marker (needs marker from DB)
@@ -272,16 +274,49 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
 
   private async ensureControlTables(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-  ): Promise<void> {
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     await this.executeStatement(driver, ensurePrismaContractSchemaStatement);
-    await this.executeStatement(driver, ensureMarkerTableStatement);
-    // Idempotent promotion of legacy single-row markers to per-space
-    // shape; no-op on fresh or already-migrated databases. See
-    // `specs/framework-mechanism.spec.md § 2`.
-    for (const stmt of migrateMarkerSchemaStatements) {
-      await this.executeStatement(driver, stmt);
+    // Pre-1.0 zero-range guardrail: detect a pre-cleanup single-row
+    // marker table (no `space` column) and surface a structured failure
+    // rather than silently auto-migrating it to the per-space shape.
+    // See `specs/framework-mechanism.spec.md § 2`.
+    const legacyDetection = await this.detectLegacyMarkerShape(driver);
+    if (!legacyDetection.ok) {
+      return legacyDetection;
     }
+    await this.executeStatement(driver, ensureMarkerTableStatement);
     await this.executeStatement(driver, ensureLedgerTableStatement);
+    return okVoid();
+  }
+
+  private async detectLegacyMarkerShape(
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
+    const result = await driver.query<{ column_name: string }>(
+      `select column_name
+         from information_schema.columns
+        where table_schema = 'prisma_contract'
+          and table_name = 'marker'`,
+    );
+    if (result.rows.length === 0) {
+      return okVoid();
+    }
+    const columns = new Set(result.rows.map((row) => row.column_name));
+    if (columns.has('space')) {
+      return okVoid();
+    }
+    return runnerFailure(
+      'LEGACY_MARKER_SHAPE',
+      'Legacy marker-table shape detected on prisma_contract.marker (no `space` column). ' +
+        'Prisma Next is in pre-1.0; the previous transitional auto-migration to the per-space-row schema has been removed. ' +
+        'Drop `prisma_contract.marker` and re-run `dbInit` to reinitialise from a clean baseline.',
+      {
+        meta: {
+          table: 'prisma_contract.marker',
+          columns: [...columns].sort(),
+        },
+      },
+    );
   }
 
   private async runExpectationSteps(

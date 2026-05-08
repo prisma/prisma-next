@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 import {
   buildMergeMarkerStatements,
   ensureMarkerTableStatement,
-  migrateMarkerSchemaStatements,
 } from '../../src/core/migrations/statement-builders';
 
 describe('ensureMarkerTableStatement', () => {
@@ -22,34 +21,6 @@ describe('ensureMarkerTableStatement', () => {
 
   test('does not declare a legacy `id smallint` primary-key column', () => {
     expect(ensureMarkerTableStatement.sql).not.toMatch(/id\s+smallint/i);
-  });
-});
-
-describe('migrateMarkerSchemaStatements', () => {
-  test('exposes a non-empty array of idempotent ALTER statements', () => {
-    expect(Array.isArray(migrateMarkerSchemaStatements)).toBe(true);
-    expect(migrateMarkerSchemaStatements.length).toBeGreaterThan(0);
-  });
-
-  test('adds the `space` column with `if not exists` guard', () => {
-    const joined = migrateMarkerSchemaStatements.map((s) => s.sql).join('\n');
-    expect(joined).toMatch(/add column if not exists space\s+text/i);
-  });
-
-  test("backfills existing rows to space='app'", () => {
-    const joined = migrateMarkerSchemaStatements.map((s) => s.sql).join('\n');
-    expect(joined).toMatch(/update prisma_contract\.marker[\s\S]*space\s*=\s*'app'/i);
-  });
-
-  test('drops the legacy `id` column with `if exists` guard', () => {
-    const joined = migrateMarkerSchemaStatements.map((s) => s.sql).join('\n');
-    expect(joined).toMatch(/drop column if exists id/i);
-  });
-
-  test('repoints the primary-key constraint to (space) only when not already keyed by space', () => {
-    const joined = migrateMarkerSchemaStatements.map((s) => s.sql).join('\n');
-    expect(joined).toMatch(/marker_pkey/);
-    expect(joined).toMatch(/primary key\s*\(\s*space\s*\)/i);
   });
 });
 

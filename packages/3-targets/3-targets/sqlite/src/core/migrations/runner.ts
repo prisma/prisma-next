@@ -24,7 +24,7 @@ import {
   buildWriteMarkerStatements,
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
-  migrateMarkerSchemaSqlite,
+  MARKER_TABLE_NAME,
   readMarkerStatement,
   type SqlStatement,
 } from './statement-builders';
@@ -70,7 +70,10 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       await this.beginExclusiveTransaction(driver);
       let committed = false;
       try {
-        await this.ensureControlTables(driver);
+        const ensureResult = await this.ensureControlTables(driver);
+        if (!ensureResult.ok) {
+          return ensureResult;
+        }
         const existingMarker = await this.readMarker(driver);
 
         const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
@@ -264,15 +267,45 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
 
   private async ensureControlTables(
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
-  ): Promise<void> {
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
+    // Pre-1.0 zero-range guardrail: detect a pre-cleanup single-row
+    // marker table (no `space` column) and surface a structured failure
+    // rather than silently rebuilding the table into the per-space
+    // shape. See `specs/framework-mechanism.spec.md § 2`.
+    const legacyDetection = await this.detectLegacyMarkerShape(driver);
+    if (!legacyDetection.ok) {
+      return legacyDetection;
+    }
     await this.executeStatement(driver, ensureMarkerTableStatement);
-    // Idempotent promotion of legacy single-row markers to per-space
-    // shape; no-op on fresh or already-migrated databases. SQLite
-    // requires PRAGMA-driven detection + rebuild-table for the PK
-    // change, so the migration is imperative rather than a static SQL
-    // statement list. See `specs/framework-mechanism.spec.md § 2`.
-    await migrateMarkerSchemaSqlite(driver);
     await this.executeStatement(driver, ensureLedgerTableStatement);
+    return okVoid();
+  }
+
+  private async detectLegacyMarkerShape(
+    driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
+    const tableInfo = await driver.query<{ name: string }>(
+      `PRAGMA table_info("${MARKER_TABLE_NAME}")`,
+    );
+    if (tableInfo.rows.length === 0) {
+      return okVoid();
+    }
+    const columns = new Set(tableInfo.rows.map((row) => row.name));
+    if (columns.has('space')) {
+      return okVoid();
+    }
+    return runnerFailure(
+      'LEGACY_MARKER_SHAPE',
+      `Legacy marker-table shape detected on ${MARKER_TABLE_NAME} (no \`space\` column). ` +
+        'Prisma Next is in pre-1.0; the previous transitional auto-migration to the per-space-row schema has been removed. ' +
+        `Drop \`${MARKER_TABLE_NAME}\` and re-run \`dbInit\` to reinitialise from a clean baseline.`,
+      {
+        meta: {
+          table: MARKER_TABLE_NAME,
+          columns: [...columns].sort(),
+        },
+      },
+    );
   }
 
   private async readMarker(
