@@ -63,9 +63,11 @@ type ResolveFields<
   TContract extends MongoContract,
 > = {
   -readonly [K in keyof Shape & string]: Shape[K] extends ModelArrayField<infer ModelName>
-    ? TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>
-      ? ModelName extends string & keyof TContract['models']
-        ? Array<InferModelRow<TContract, ModelName>>
+    ? IsConcreteContract<TContract> extends true
+      ? TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>
+        ? ModelName extends string & keyof TContract['models']
+          ? Array<InferModelRow<TContract, ModelName>>
+          : unknown[]
         : unknown[]
       : unknown[]
     : Shape[K]['codecId'] extends keyof CodecTypes
