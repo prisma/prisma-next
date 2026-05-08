@@ -250,6 +250,7 @@ export async function seed(db: Db) {
       ...p,
       image: { url: `/images/products/${p.code.toLowerCase()}.jpg` },
       embedding: null,
+      status: 'active',
     })),
   );
 

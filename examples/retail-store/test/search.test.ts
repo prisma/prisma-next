@@ -18,6 +18,7 @@ describe('product search and pagination', () => {
         price: { amount: 79.99, currency: 'USD' },
         image: { url: '/img/1.jpg' },
         embedding: null,
+        status: 'active',
       },
       {
         name: 'Slim Fit Chinos',
@@ -30,6 +31,7 @@ describe('product search and pagination', () => {
         price: { amount: 59.99, currency: 'USD' },
         image: { url: '/img/2.jpg' },
         embedding: null,
+        status: 'active',
       },
       {
         name: 'Leather Crossbody Bag',
@@ -42,6 +44,7 @@ describe('product search and pagination', () => {
         price: { amount: 149.99, currency: 'USD' },
         image: { url: '/img/3.jpg' },
         embedding: null,
+        status: 'active',
       },
       {
         name: 'Trail Running Shoes',
@@ -54,6 +57,7 @@ describe('product search and pagination', () => {
         price: { amount: 109.99, currency: 'USD' },
         image: { url: '/img/4.jpg' },
         embedding: null,
+        status: 'active',
       },
     ]);
   }

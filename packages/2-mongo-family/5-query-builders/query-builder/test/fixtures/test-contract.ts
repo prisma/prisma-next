@@ -29,7 +29,7 @@ export type TestContract = MongoContract & {
           readonly nullable: true;
         };
         readonly tags: {
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/array@1' };
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
           readonly nullable: false;
           readonly many: true;
         };
@@ -170,7 +170,7 @@ export const testContractJson = {
         amount: { type: { kind: 'scalar', codecId: 'mongo/double@1' }, nullable: false },
         customerId: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false },
         notes: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: true },
-        tags: { type: { kind: 'scalar', codecId: 'mongo/array@1' }, nullable: false, many: true },
+        tags: { type: { kind: 'scalar', codecId: 'mongo/string@1' }, nullable: false, many: true },
       },
       relations: {},
       storage: { collection: 'orders' },

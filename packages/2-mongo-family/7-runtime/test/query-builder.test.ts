@@ -214,7 +214,14 @@ describe('pipeline builder integration', () => {
 
       const plan = p
         .from('orders')
-        .lookup({ from: 'users', localField: '_id', foreignField: 'orderId', as: 'assignees' })
+        .lookup((from) =>
+          from('users')
+            .on((local, foreign) => ({
+              local: local._id,
+              foreign: foreign.orderId,
+            }))
+            .as('assignees'),
+        )
         .unwind('assignees')
         .project((f) => ({
           department: 1 as const,

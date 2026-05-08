@@ -60,6 +60,7 @@ describe('aggregation pipelines', { timeout: timeouts.spinUpMongoMemoryServer },
         price: { amount: 10 + i, currency: 'USD' },
         image: { url: `/img${i}.jpg` },
         embedding: null,
+        status: 'active',
       })),
     );
 

@@ -360,12 +360,14 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
 
       const plan = orders()
         .match((f) => f.productName.eq('Laptop'))
-        .lookup({
-          from: 'products',
-          localField: 'productName',
-          foreignField: 'name',
-          as: 'productDetails',
-        })
+        .lookup((from) =>
+          from('products')
+            .on((local, foreign) => ({
+              local: local.productName,
+              foreign: foreign.name,
+            }))
+            .as('productDetails'),
+        )
         .build();
 
       const results = await exec(plan);
@@ -650,12 +652,14 @@ describeWithMongoDB('Pipeline builder integration (mongoQuery DSL)', (ctx) => {
       await seed();
 
       const plan = orders()
-        .lookup({
-          from: 'products',
-          localField: 'productName',
-          foreignField: 'name',
-          as: 'product',
-        })
+        .lookup((from) =>
+          from('products')
+            .on((local, foreign) => ({
+              local: local.productName,
+              foreign: foreign.name,
+            }))
+            .as('product'),
+        )
         .pipe(new MongoMatchStage(MongoFieldFilter.eq('status', 'shipped')))
         .build();
 

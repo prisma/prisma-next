@@ -14,10 +14,19 @@ export type {
   ObjectExpression,
 } from '../field-accessor';
 export { createFieldAccessor } from '../field-accessor';
+export type {
+  LookupBuilder,
+  LookupBuilderWithKey,
+  LookupFrom,
+  LookupOnResult,
+  LookupResult,
+  ModelOf,
+} from '../lookup-builder';
 export type { FindAndModifyEnabled, UpdateEnabled } from '../markers';
 export type { QueryRoot } from '../query';
 export { mongoQuery } from '../query';
 export type {
+  ModelArrayField,
   ModelNestedShape,
   NestedDocShape,
   ObjectField,

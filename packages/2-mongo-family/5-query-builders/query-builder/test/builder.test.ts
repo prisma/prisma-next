@@ -9,6 +9,7 @@ import {
   MongoFieldFilter,
   MongoGroupStage,
   MongoLimitStage,
+  MongoLookupStage,
   MongoMatchStage,
   MongoProjectStage,
   MongoReplaceRootStage,
@@ -21,6 +22,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { acc } from '../src/accumulator-helpers';
 import { fn } from '../src/expression-helpers';
+import type { LookupOnResult } from '../src/lookup-builder';
 import { mongoQuery } from '../src/query';
 import type { TContract } from './fixtures/test-contract';
 import { testContractJson } from './fixtures/test-contract';
@@ -262,15 +264,88 @@ describe('PipelineChain', () => {
   });
 
   describe('lookup()', () => {
-    it('throws for unknown root', () => {
+    it('appends a MongoLookupStage with the resolved foreign collection / fields / as', () => {
+      const plan = createOrdersBuilder()
+        .lookup((from) =>
+          from('users')
+            .on((local, foreign) => ({
+              local: local.customerId,
+              foreign: foreign._id,
+            }))
+            .as('customer'),
+        )
+        .build();
+      const pipeline = plan.command.pipeline;
+      expect(pipeline).toHaveLength(1);
+      expect(pipeline[0]).toBeInstanceOf(MongoLookupStage);
+      const stage = pipeline[0] as MongoLookupStage;
+      expect(stage.from).toBe('users');
+      expect(stage.localField).toBe('customerId');
+      expect(stage.foreignField).toBe('_id');
+      expect(stage.as).toBe('customer');
+    });
+
+    // AC-5 / TC-6: structural equivalence — the new chained-callback shape
+    // emits the same MongoLookupStage as a hand-rolled construction with
+    // equivalent inputs. Pinning this prevents drift in the wire-level
+    // command shape (NFR6).
+    it('emits a MongoLookupStage structurally equal to direct construction (AC-5 TC-6)', () => {
+      const plan = createOrdersBuilder()
+        .lookup((from) =>
+          from('users')
+            .on((local, foreign) => ({
+              local: local.customerId,
+              foreign: foreign._id,
+            }))
+            .as('customer'),
+        )
+        .build();
+      const builderStage = plan.command.pipeline[0] as MongoLookupStage;
+      const referenceStage = new MongoLookupStage({
+        from: 'users',
+        localField: 'customerId',
+        foreignField: '_id',
+        as: 'customer',
+      });
+      expect(builderStage).toEqual(referenceStage);
+    });
+
+    it('throws for unknown root at runtime', () => {
       expect(() =>
-        createOrdersBuilder().lookup({
-          from: 'nonexistent' as 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'items',
-        }),
+        createOrdersBuilder().lookup((from) =>
+          // The cast is needed because Contract.roots: Record<string, string>
+          // does not preserve literal keys under intersection (see
+          // TML-2400); the runtime guard catches the bad root regardless.
+          from('nonexistent' as 'users')
+            .on((local, foreign) => ({
+              local: local.customerId,
+              foreign: foreign._id,
+            }))
+            .as('items'),
+        ),
       ).toThrow('lookup() unknown root: "nonexistent"');
+    });
+
+    // AC-2 runtime backstop: compile-time gating via LookupOnResult's
+    // LeafExpression already rejects non-leaf returns at the type level
+    // (covered in builder.test-d.ts), but a defensive runtime guard
+    // catches callers that bypass typing by casting.
+    it('throws when on() returns a non-leaf expression at runtime', () => {
+      expect(() =>
+        createOrdersBuilder().lookup((from) =>
+          from('users')
+            .on(
+              (_local, foreign) =>
+                // Bypass the type system — a real call site cannot do
+                // this without the cast (covered by AC-2 type test).
+                ({
+                  local: { _path: '' } as unknown as LookupOnResult['local'],
+                  foreign: foreign._id,
+                }) satisfies LookupOnResult,
+            )
+            .as('customer'),
+        ),
+      ).toThrow(/leaf field reference/i);
     });
   });
 

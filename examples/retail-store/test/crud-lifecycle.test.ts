@@ -24,6 +24,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
       price: { amount: 49.99, currency: 'USD' },
       image: { url: '/test.jpg' },
       embedding: null,
+      status: 'active',
     });
 
     expect(product._id).toBeDefined();
