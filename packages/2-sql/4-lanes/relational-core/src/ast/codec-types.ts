@@ -222,10 +222,24 @@ export type DescriptorCodecInput<D> =
     ? In
     : never;
 
-export type DescriptorCodecTraits<D> =
-  DescriptorResolvedCodec<D> extends BaseCodec<string, infer TTraits, unknown, unknown>
-    ? TTraits[number] & CodecTrait
-    : never;
+/**
+ * Resolve the trait union for a descriptor `D`.
+ *
+ * Reads `traits` directly off the descriptor — concrete descriptor classes
+ * declare `override readonly traits = [...] as const`, which preserves the
+ * literal trait tuple at the descriptor type. Reading from the resolved
+ * codec instance (`CodecImpl<…, TTraits, …>`) would lose the literal
+ * because `Codec` carries `TTraits` only on its optional phantom slot
+ * (`readonly [codecTraitsPhantom]?: TTraits`); class-form codecs
+ * extending `CodecImpl` have no required structural site that pins
+ * `TTraits`, so a descriptor-keyed extractor reading from the codec
+ * instance would widen to the broad `CodecTrait` union.
+ */
+export type DescriptorCodecTraits<D> = D extends {
+  readonly traits: infer TTraits extends readonly CodecTrait[];
+}
+  ? TTraits[number] & CodecTrait
+  : never;
 
 /**
  * Project a record of {@link AnyCodecDescriptor}s keyed by scalar name
