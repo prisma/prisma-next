@@ -20,11 +20,10 @@
  *    + `ColumnHelperForStrict` (every SQLite codec's resolved type is
  *    well-defined).
  *
- * The legacy `mkCodec` / `defineCodec` forms in `codecs.ts` remain
- * during M0 Phase B for compatibility with downstream consumers
- * (legacy `byScalar` / `codecDescriptorDefinitions` /
- * `codecDescriptorList` exports). The class form is the M0 target
- * shape; both coexist until Phase C collapses to descriptor-only.
+ * After TML-2357 M0 Phase C this is the canonical source of SQLite codec
+ * metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec`
+ * carriers (and the parallel `byScalar` / `codecDescriptorDefinitions`
+ * collection exports) retired with the deletion sweep.
  *
  * Audit: every SQLite codec is non-parameterized and parameter-stateless;
  * `factory()` takes no params (`P = void`) and returns a fresh codec

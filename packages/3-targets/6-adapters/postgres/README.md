@@ -311,7 +311,7 @@ table('event', (t) =>
 ## Exports
 
 - `./adapter`: Adapter implementation (`createPostgresAdapter`)
-- `./codec-types`: PostgreSQL codec types (`CodecTypes`, `JsonValue`, `dataTypes`)
+- `./codec-types`: PostgreSQL codec types (`CodecTypes`, `JsonValue`)
 - `./column-types`: Column type descriptors and authoring helpers (`jsonColumn`, `jsonbColumn`, `enumType`, `enumColumn`, `textColumn`, `int4Column`, etc.)
 - `./types`: PostgreSQL-specific types
 - `./control`: Control-plane entry point (adapter descriptor)

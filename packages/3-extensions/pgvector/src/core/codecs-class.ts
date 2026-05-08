@@ -21,9 +21,9 @@
  *    (`vector(1536)`) at emit/verify time from `nativeType` +
  *    `typeParams`.
  *
- * The legacy `mkCodec` / `defineCodec` exports in `codecs.ts` remain
- * during M0 Phase B for compatibility with downstream consumers; both
- * forms coexist until Phase C.
+ * After TML-2357 M0 Phase C this is the canonical source of pgvector codec
+ * metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec`
+ * carriers retired with the deletion sweep.
  *
  * Audit: `length` is parameter-stateless at the runtime level — the
  * encode/decode conversions don't thread the dimension into their

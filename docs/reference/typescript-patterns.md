@@ -302,7 +302,7 @@ Use `Record<never, never>` for empty object types without index signatures:
 **❌ WRONG: `{}` can be problematic**
 
 ```typescript
-type CodecDefBuilder<
+type CodecMap<
   ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = {}
 > = {
   // ...
@@ -312,7 +312,7 @@ type CodecDefBuilder<
 **✅ CORRECT: `Record<never, never>` is explicit empty type**
 
 ```typescript
-type CodecDefBuilder<
+type CodecMap<
   ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>
 > = {
   // ...
@@ -327,7 +327,7 @@ When extracting literal types from codecs, use mapped types that extract keys (w
 
 ```typescript
 // Extract the Id type from a Codec by using the key in a mapped type
-type ExtractDataTypes<
+type ExtractCodecIds<
   ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> }
 > = {
   readonly [K in keyof ScalarNames]: ScalarNames[K] extends Codec<infer Id>

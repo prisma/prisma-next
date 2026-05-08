@@ -161,12 +161,13 @@ export interface ContractCodecRegistry {
 }
 
 /**
- * Registry interface for codecs organized by ID and by contract scalar type.
+ * Registry interface for codecs organized by namespaced id.
  *
- * The registry allows looking up codecs by their namespaced ID or by the
- * contract scalar types they handle. Multiple codecs may handle the same
- * scalar type; ordering in byScalar reflects preference (adapter first,
- * then packs, then app overrides).
+ * The registry allows looking up codecs by their namespaced ID. After
+ * TML-2357 M0 Phase C the legacy scalar-name-keyed `byScalar` lookup
+ * retired with the carrier deletion sweep — codec-id is the single
+ * dispatch key (with adapter-first / packs / app-overrides registration
+ * preference enforced at compose time).
  */
 export interface CodecRegistry {
   get(id: string): Codec<string> | undefined;

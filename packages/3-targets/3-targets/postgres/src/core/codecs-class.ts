@@ -19,11 +19,11 @@
  *    (and `ColumnHelperForStrict` where the resolved codec type is
  *    well-defined).
  *
- * The legacy `mkCodec` / `defineCodec` forms in `codecs.ts` remain during
- * M0 Phase B for compatibility with downstream consumers (legacy
- * `byScalar`/`codecDescriptorDefinitions`/`codecDescriptorList` exports).
- * The class form is the M2 target shape; both coexist until Phase C
- * collapses to descriptor-only.
+ * After TML-2357 M0 Phase C this is the canonical source of Postgres codec
+ * metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec`
+ * carriers (and the parallel `byScalar`/`codecDescriptorDefinitions`/
+ * `codecDescriptorList` collection exports) retired with the deletion
+ * sweep.
  *
  * Audit (parameterized codecs): every parameterized codec in this file
  * is **parameter-stateless** — the params (`length`, `precision`,
@@ -915,10 +915,9 @@ pgIntervalColumn satisfies ColumnHelperForStrict<PgIntervalDescriptor>;
 // ---------------------------------------------------------------------------
 // pg/enum@1 — values-parameterized, JSON-safe (string). `values` is
 // JSON-only metadata for the renderOutputType emit path; the codec is
-// parameter-stateless. Note: the legacy `mkCodec` form does not declare
-// a `paramsSchema`; we declare one here so the descriptor surface is
-// consistent (validators are JSON-boundary metadata; the schema accepts
-// optional `values` to match the legacy `defineCodec` shape).
+// parameter-stateless. The descriptor declares a `paramsSchema` so the
+// descriptor surface is consistent across all codec ids (validators are
+// JSON-boundary metadata; the schema accepts optional `values`).
 // ---------------------------------------------------------------------------
 
 const enumParamsSchema = arktype({

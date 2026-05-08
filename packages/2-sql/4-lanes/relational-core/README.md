@@ -91,66 +91,64 @@ flowchart TD
 - Defines `SqlQueryPlan<Row>` interface for SQL query plans produced by lanes before lowering
 - Per [ADR 205](../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Execution%20metadata%20lives%20on%20AST.md), codec IDs travel on `ProjectionItem.codecId` (output) and `ParamRef.codecId` (parameters) on the AST itself, not on plan-level descriptor lists
 
-### Codec Factory (`ast/codec-types.ts` via `exports/ast.ts`)
+### Codec authoring (class form)
 
-- `mkCodec({...})` is the SQL-side factory for constructing `Codec` values. It accepts `encode` and `decode` author functions in **either sync or async form** with no annotations; the constructed codec exposes Promise-returning query-time methods regardless of which form was used. Both `encode` and `decode` are required so `TInput` and `TWire` are always covered by an explicit author function — the factory installs no identity fallback.
-- Build-time methods (`encodeJson`, `decodeJson`, `renderOutputType?`) are synchronous and pass through unchanged.
-- This is the only public entry point for SQL codecs. There is no separate `codecSync` / `codecAsync` factory and no per-codec async marker on the resulting value.
+Codec authors extend the framework `CodecImpl` (and pair the codec with a `CodecDescriptorImpl` registration) per [ADR 208 — Higher-order codecs for parameterized types](../../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md). Each codec class declares the four conversion methods (`encode`, `decode`, `encodeJson`, `decodeJson`); the descriptor class declares static metadata (`codecId`, `traits`, `targetTypes`, `meta`, `paramsSchema`, optional `renderOutputType`) and a `factory` returning a per-instance codec.
+
+- Query-time methods (`encode` / `decode`) are typed as `Promise<…>`-returning at the public boundary; sync method bodies are accepted via TypeScript bivariance and the runtime always awaits.
+- Build-time methods (`encodeJson` / `decodeJson` / `renderOutputType?`) stay synchronous so contract validation and client construction stay synchronous.
+- Both `encode` and `decode` must be implemented — there is no identity-default fallback.
 
 ```ts
-// Sync authoring:
-const textCodec = mkCodec({
-  typeId: 'pg/text@1',
-  targetTypes: ['text'],
-  encode: (v: string) => v,
-  decode: (w: string) => w,
-  encodeJson: (v: string) => v,
-  decodeJson: (j: string) => j as string,
-});
+// Non-parameterized codec (P = void) — see packages/3-targets/3-targets/postgres/src/core/codecs-class.ts
+// for the production form.
+import {
+  CodecDescriptorImpl,
+  CodecImpl,
+  voidParamsSchema,
+  type CodecCallContext,
+  type CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
 
-// Async authoring (e.g. KMS-backed encryption): same factory, same shape.
-const secretCodec = mkCodec({
-  typeId: 'pg/secret@1',
-  targetTypes: ['text'],
-  encode: async (v: string) => encrypt(v, await getKey()),
-  decode: async (w: string) => decrypt(w, await getKey()),
-  encodeJson: (v: string) => v,
-  decodeJson: (j: string) => j as string,
-});
+class PgTextCodec extends CodecImpl<'pg/text@1', readonly ['equality'], string, string> {
+  override readonly id = 'pg/text@1';
+  override readonly traits = ['equality'] as const;
+  encode(v: string, _ctx: CodecCallContext): Promise<string> { return Promise.resolve(v); }
+  decode(w: string, _ctx: CodecCallContext): Promise<string> { return Promise.resolve(w); }
+  encodeJson(v: string) { return v; }
+  decodeJson(j: unknown) { return j as string; }
+}
+
+class PgTextDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = 'pg/text@1';
+  override readonly traits = ['equality'] as const;
+  override readonly targetTypes = ['text'] as const;
+  override readonly paramsSchema = voidParamsSchema;
+  override readonly factory = () => (_ctx: CodecInstanceContext) => new PgTextCodec();
+}
 ```
 
 #### Codec call context (`ctx`)
 
-Codecs receive a second `ctx` options argument; you may ignore it. The runtime allocates one `SqlCodecCallContext` per `runtime.execute(plan, { signal })` call and threads the same reference to every codec dispatch site as a non-optional argument — when no `signal` is supplied the runtime still threads an empty `{}`, never `undefined`. The internal `Codec` interface declares the parameter as required (`encode(value, ctx: SqlCodecCallContext)` / `decode(wire, ctx: SqlCodecCallContext)`); single-arg author functions `(value) => …` continue to compile via TypeScript's bivariance for trailing parameters, so codec ergonomics are unchanged.
+Codecs receive a second `ctx` options argument; you may ignore it. The runtime allocates one `SqlCodecCallContext` per `runtime.execute(plan, { signal })` call and threads the same reference to every codec dispatch site as a non-optional argument — when no `signal` is supplied the runtime still threads an empty `{}`, never `undefined`. The internal `Codec` interface declares the parameter as required (`encode(value, ctx: SqlCodecCallContext)` / `decode(wire, ctx: SqlCodecCallContext)`); single-arg method bodies continue to compile via TypeScript's bivariance for trailing parameters, so codec ergonomics are unchanged.
 
 - **`ctx.signal`** — the same `AbortSignal` reference at every codec call in one execute. Forward it to network SDKs so aborted queries stop talking to the underlying service.
 - **`ctx.column`** (decode-side only) — `{ table, name }` for cells the runtime can resolve to a single column ref; `undefined` for aggregate aliases, computed projections, and other unresolvable cells. Encode-side `ctx.column` is always `undefined` (encode-time column enrichment is the middleware's domain).
 
 ```ts
 // Forward ctx.signal to a network call so aborted queries stop the SDK.
-const kmsSecretCodec = mkCodec({
-  typeId: 'pg/kms-secret@1',
-  targetTypes: ['text'],
-  encode: async (v: string, ctx) =>
-    kms.encrypt({ plaintext: v }, { signal: ctx?.signal }),
-  decode: async (w: string, ctx) =>
-    kms.decrypt({ ciphertext: w }, { signal: ctx?.signal }),
-  encodeJson: (v: string) => v,
-  decodeJson: (j: string) => j as string,
-});
-
-// Use ctx.column on decode to construct an envelope value carrying (table, name).
-const envelopeCodec = mkCodec({
-  typeId: 'pg/envelope@1',
-  targetTypes: ['text'],
-  encode: async (v: string) => v,
-  decode: async (w: string, ctx) => ({
-    value: w,
-    column: ctx?.column,
-  }),
-  encodeJson: (v: string) => v,
-  decodeJson: (j: string) => j as string,
-});
+class PgKmsSecretCodec extends CodecImpl<'pg/kms-secret@1', readonly [], string, string> {
+  override readonly id = 'pg/kms-secret@1';
+  override readonly traits = [] as const;
+  override async encode(v: string, ctx: SqlCodecCallContext): Promise<string> {
+    return kms.encrypt({ plaintext: v }, { signal: ctx.signal });
+  }
+  override async decode(w: string, ctx: SqlCodecCallContext): Promise<string> {
+    return kms.decrypt({ ciphertext: w }, { signal: ctx.signal });
+  }
+  encodeJson(v: string) { return v; }
+  decodeJson(j: unknown) { return j as string; }
+}
 ```
 
 Codec bodies that ignore `ctx.signal` complete in the background (cooperative cancellation); aborts still surface to the caller as `RUNTIME.ABORTED` with `details.phase ∈ { 'encode', 'decode', 'stream' }`.

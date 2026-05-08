@@ -270,7 +270,7 @@ describe('builder integration', () => {
     expectTypeOf(builderContract.models.User.fields).toHaveProperty('createdAt');
   });
 
-  it('supports type option with dataTypes constants', () => {
+  it('supports type option with column-type constants', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresPack,
