@@ -102,7 +102,7 @@ const APP_PROFILE_HASH = profileHash('sha256:cipherstash-e2e-app-profile-v1');
 const APP_TABLE = 'User';
 const APP_FIELD = 'email';
 const ADD_SEARCH_CONFIG_INVARIANT_ID =
-  `cipherstash-codec:${APP_TABLE}.${APP_FIELD}:add-search-config@v1` as const;
+  `cipherstash-codec:${APP_TABLE}.${APP_FIELD}:add-search-config:match@v1` as const;
 
 const appContract: Contract<SqlStorage> = {
   target: 'postgres',
@@ -118,7 +118,7 @@ const appContract: Contract<SqlStorage> = {
             codecId: CIPHERSTASH_STRING_CODEC_ID,
             nativeType: EQL_V2_ENCRYPTED_TYPE,
             nullable: false,
-            typeParams: { searchable: true },
+            typeParams: { freeTextSearch: true },
           },
         },
         primaryKey: { columns: ['id'] },
@@ -199,10 +199,10 @@ function buildSyntheticEqlBundleSql(): string {
       VALUES (p_table, p_column, p_index, p_cast_as);
     $$;`,
     `CREATE OR REPLACE FUNCTION "${EQL_V2_SCHEMA}".remove_search_config(
-      p_table text, p_column text
+      p_table text, p_column text, p_index text
     ) RETURNS void LANGUAGE sql AS $$
       DELETE FROM public."${EQL_V2_CONFIGURATION_TABLE}"
-      WHERE "table" = p_table AND "column" = p_column;
+      WHERE "table" = p_table AND "column" = p_column AND index_name = p_index;
     $$;`,
   ].join('\n');
 }

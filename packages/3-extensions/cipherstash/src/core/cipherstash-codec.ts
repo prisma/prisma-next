@@ -9,29 +9,34 @@
  * the user's structural ops by the SQL planner
  * (`planFieldEventOperations` in `@prisma-next/family-sql/control`).
  *
- * Trigger condition: a field uses the `cipherstash:string@1` codec.
- * The planner already dispatches per `(table, field)` based on the
- * field's `codecId` (new field for `'added'` / `'altered'`, prior
- * field for `'dropped'`), so this hook only fires when a cipherstash
- * field is involved. Whether the field also carries `searchable: true`
- * in `typeParams` decides whether any DDL is needed:
+ * Trigger: a field uses the `cipherstash:string@1` codec. The planner
+ * already dispatches per `(table, field)` based on the field's
+ * `codecId` (new field for `'added'` / `'altered'`, prior field for
+ * `'dropped'`), so this hook only fires when a cipherstash field is
+ * involved. Per field the hook emits **one `add_search_config@v1` op
+ * per enabled flag** in `typeParams` (and one `remove_search_config@v1`
+ * op per previously-enabled flag on drop / altered-off).
  *
- * - `'added'`, `searchable: true`        → emit `add_search_config`.
- * - `'added'`, `searchable !== true`     → no-op (column-type change
- *                                          handled by the user's
- *                                          structural op).
- * - `'dropped'`, was `searchable: true`  → emit `remove_search_config`.
- * - `'dropped'`, was `searchable !== true` → no-op.
- * - `'altered'`, both searchable, other  → rotate (single op carrying
- *   typeParams differ                      `remove` + `add` SQL).
- * - `'altered'`, only new searchable     → emit `add_search_config`.
- * - `'altered'`, only prior searchable   → emit `remove_search_config`.
- * - `'altered'`, neither searchable      → no-op.
+ * Flag → EQL index mapping:
  *
- * `invariantId` template: `cipherstash-codec:<table>.<field>:<action>@v1`
- * with `<action>` one of `add-search-config` / `remove-search-config`
- * / `rotate-search-config`. Stable across regenerations because every
- * input is deterministic.
+ *   - `equality: true`        → `'unique'` index
+ *   - `freeTextSearch: true`  → `'match'`  index
+ *
+ * One op per flag (rather than a single multi-statement op per field)
+ * keeps each op independently invertible by a paired
+ * `remove_search_config@v1` op carrying the same index name, and the
+ * op-graph stays per-flag granular for diffing.
+ *
+ * `'altered'` events decompose into per-flag deltas:
+ *   - flag flipped on  → emit `add_search_config:<index>@v1`.
+ *   - flag flipped off → emit `remove_search_config:<index>@v1`.
+ *   - flag unchanged   → no op.
+ *
+ * `invariantId` template:
+ *   `cipherstash-codec:<table>.<field>:<action>:<index>@v1`
+ *   `<action>` ∈ `'add-search-config' | 'remove-search-config'`,
+ *   `<index>` ∈ `'unique' | 'match'`.
+ * Stable across regenerations because every input is deterministic.
  */
 
 import type {
@@ -43,20 +48,24 @@ import { CIPHERSTASH_STRING_CODEC_ID } from './constants';
 
 type Op = SqlMigrationPlanOperation<unknown>;
 
-/**
- * Default index name. Cipherstash's EQL bundle ships several index
- * shapes (`match`, `unique`, `ore`, …); R2 wires a single conservative
- * default that gives every searchable column a usable index. Callers
- * needing finer control can author per-column ops manually until the
- * codec accepts a per-field index-mode parameter.
- */
-const DEFAULT_INDEX_NAME = 'match';
+type FlagName = 'equality' | 'freeTextSearch';
+type IndexName = 'unique' | 'match';
+
+const FLAG_TO_INDEX: Readonly<Record<FlagName, IndexName>> = {
+  equality: 'unique',
+  freeTextSearch: 'match',
+};
+
+const ALL_FLAGS: ReadonlyArray<FlagName> = ['equality', 'freeTextSearch'];
 
 /** Mirrors `eql_v2.add_search_config(table, column, index_name, cast_as)`. */
 const DEFAULT_CAST_AS = 'text';
 
-function isSearchable(typeParams: Readonly<Record<string, unknown>> | undefined): boolean {
-  return typeParams !== undefined && typeParams['searchable'] === true;
+function isEnabled(
+  typeParams: Readonly<Record<string, unknown>> | undefined,
+  flag: FlagName,
+): boolean {
+  return typeParams !== undefined && typeParams[flag] === true;
 }
 
 /**
@@ -69,81 +78,57 @@ function sqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-function addSearchConfigSql(tableName: string, fieldName: string): string {
-  return `SELECT eql_v2.add_search_config(${sqlLiteral(tableName)}, ${sqlLiteral(fieldName)}, ${sqlLiteral(DEFAULT_INDEX_NAME)}, ${sqlLiteral(DEFAULT_CAST_AS)});`;
+function addSearchConfigSql(tableName: string, fieldName: string, indexName: IndexName): string {
+  return `SELECT eql_v2.add_search_config(${sqlLiteral(tableName)}, ${sqlLiteral(fieldName)}, ${sqlLiteral(indexName)}, ${sqlLiteral(DEFAULT_CAST_AS)});`;
 }
 
-function removeSearchConfigSql(tableName: string, fieldName: string): string {
-  return `SELECT eql_v2.remove_search_config(${sqlLiteral(tableName)}, ${sqlLiteral(fieldName)});`;
+function removeSearchConfigSql(tableName: string, fieldName: string, indexName: IndexName): string {
+  return `SELECT eql_v2.remove_search_config(${sqlLiteral(tableName)}, ${sqlLiteral(fieldName)}, ${sqlLiteral(indexName)});`;
 }
 
-function invariantId(tableName: string, fieldName: string, action: string): string {
-  return `cipherstash-codec:${tableName}.${fieldName}:${action}@v1`;
+function invariantId(
+  tableName: string,
+  fieldName: string,
+  action: string,
+  indexName: IndexName,
+): string {
+  return `cipherstash-codec:${tableName}.${fieldName}:${action}:${indexName}@v1`;
 }
 
-function buildAddOp(tableName: string, fieldName: string): Op {
+function buildAddOp(tableName: string, fieldName: string, indexName: IndexName): Op {
   return {
-    id: `cipherstash-codec.${tableName}.${fieldName}.add-search-config`,
-    label: `Register cipherstash search config for ${tableName}.${fieldName}`,
+    id: `cipherstash-codec.${tableName}.${fieldName}.add-search-config.${indexName}`,
+    label: `Register cipherstash search config (${indexName}) for ${tableName}.${fieldName}`,
     operationClass: 'additive',
-    invariantId: invariantId(tableName, fieldName, 'add-search-config'),
+    invariantId: invariantId(tableName, fieldName, 'add-search-config', indexName),
     target: { id: 'postgres' },
     precheck: [],
     execute: [
       {
-        description: `Register cipherstash search config for ${tableName}.${fieldName}`,
-        sql: addSearchConfigSql(tableName, fieldName),
+        description: `Register cipherstash ${indexName} search config for ${tableName}.${fieldName}`,
+        sql: addSearchConfigSql(tableName, fieldName, indexName),
       },
     ],
     postcheck: [],
   };
 }
 
-function buildRemoveOp(tableName: string, fieldName: string): Op {
+function buildRemoveOp(tableName: string, fieldName: string, indexName: IndexName): Op {
   return {
-    id: `cipherstash-codec.${tableName}.${fieldName}.remove-search-config`,
-    label: `Remove cipherstash search config for ${tableName}.${fieldName}`,
+    id: `cipherstash-codec.${tableName}.${fieldName}.remove-search-config.${indexName}`,
+    label: `Remove cipherstash search config (${indexName}) for ${tableName}.${fieldName}`,
     operationClass: 'destructive',
-    invariantId: invariantId(tableName, fieldName, 'remove-search-config'),
+    invariantId: invariantId(tableName, fieldName, 'remove-search-config', indexName),
     target: { id: 'postgres' },
     precheck: [],
     execute: [
       {
-        description: `Remove cipherstash search config for ${tableName}.${fieldName}`,
-        sql: removeSearchConfigSql(tableName, fieldName),
+        description: `Remove cipherstash ${indexName} search config for ${tableName}.${fieldName}`,
+        sql: removeSearchConfigSql(tableName, fieldName, indexName),
       },
     ],
     postcheck: [],
   };
-}
-
-function buildRotateOp(tableName: string, fieldName: string): Op {
-  return {
-    id: `cipherstash-codec.${tableName}.${fieldName}.rotate-search-config`,
-    label: `Rotate cipherstash search config for ${tableName}.${fieldName}`,
-    operationClass: 'widening',
-    invariantId: invariantId(tableName, fieldName, 'rotate-search-config'),
-    target: { id: 'postgres' },
-    precheck: [],
-    execute: [
-      {
-        description: `Drop existing cipherstash search config for ${tableName}.${fieldName}`,
-        sql: removeSearchConfigSql(tableName, fieldName),
-      },
-      {
-        description: `Re-register cipherstash search config for ${tableName}.${fieldName}`,
-        sql: addSearchConfigSql(tableName, fieldName),
-      },
-    ],
-    postcheck: [],
-  };
-}
-
-function paramsDiffer(
-  prior: Readonly<Record<string, unknown>> | undefined,
-  next: Readonly<Record<string, unknown>> | undefined,
-): boolean {
-  return JSON.stringify(prior ?? {}) !== JSON.stringify(next ?? {});
 }
 
 /**
@@ -159,33 +144,45 @@ function onFieldEvent(
 
   if (event === 'added') {
     if (newField === undefined) return [];
-    return isSearchable(newField.typeParams) ? [buildAddOp(tableName, fieldName)] : [];
+    const ops: Op[] = [];
+    for (const flag of ALL_FLAGS) {
+      if (isEnabled(newField.typeParams, flag)) {
+        ops.push(buildAddOp(tableName, fieldName, FLAG_TO_INDEX[flag]));
+      }
+    }
+    return ops;
   }
 
   if (event === 'dropped') {
     if (priorField === undefined) return [];
-    return isSearchable(priorField.typeParams) ? [buildRemoveOp(tableName, fieldName)] : [];
+    const ops: Op[] = [];
+    for (const flag of ALL_FLAGS) {
+      if (isEnabled(priorField.typeParams, flag)) {
+        ops.push(buildRemoveOp(tableName, fieldName, FLAG_TO_INDEX[flag]));
+      }
+    }
+    return ops;
   }
 
   if (priorField === undefined || newField === undefined) return [];
-  const priorSearchable = isSearchable(priorField.typeParams);
-  const newSearchable = isSearchable(newField.typeParams);
-
-  if (priorSearchable && newSearchable) {
-    return paramsDiffer(priorField.typeParams, newField.typeParams)
-      ? [buildRotateOp(tableName, fieldName)]
-      : [];
+  const ops: Op[] = [];
+  for (const flag of ALL_FLAGS) {
+    const before = isEnabled(priorField.typeParams, flag);
+    const after = isEnabled(newField.typeParams, flag);
+    if (after && !before) {
+      ops.push(buildAddOp(tableName, fieldName, FLAG_TO_INDEX[flag]));
+    } else if (before && !after) {
+      ops.push(buildRemoveOp(tableName, fieldName, FLAG_TO_INDEX[flag]));
+    }
   }
-  if (newSearchable) return [buildAddOp(tableName, fieldName)];
-  if (priorSearchable) return [buildRemoveOp(tableName, fieldName)];
-  return [];
+  return ops;
 }
 
 /**
  * The DDL type for an `Encrypted<string>` column is always
- * `eql_v2_encrypted` regardless of any `searchable` typeParams: the
+ * `eql_v2_encrypted` regardless of any `typeParams` flags: the
  * search-config wiring is delivered by the codec hook's
- * `add_search_config` op (a separate row in `eql_v2_configuration`),
+ * `add_search_config` ops (separate rows in `eql_v2_configuration`),
  * not by the column type itself. Returning `nativeType` unchanged
  * tells the planner "no expansion required" — see
  * `expandParameterizedTypeSql` in
