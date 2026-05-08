@@ -301,6 +301,45 @@ describe('resolved row types', () => {
     }>();
   });
 
+  it('lookup() resolves nested value-object fields on the foreign model recursively', () => {
+    const plan = mongoQuery<TContract>({ contractJson })
+      .from('orders')
+      .lookup((from) =>
+        from('customers')
+          .on((local, foreign) => ({
+            local: local.customerId,
+            foreign: foreign._id,
+          }))
+          .as('customer'),
+      )
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<{
+      _id: string;
+      status: string;
+      amount: number;
+      customerId: string;
+      notes: string | null;
+      tags: unknown[];
+      customer: Array<{
+        _id: string;
+        name: string;
+        address: {
+          street: string;
+          city: string;
+          zip: string | null;
+          geo: { lat: number; lng: number };
+        };
+        workAddress: {
+          street: string;
+          city: string;
+          zip: string | null;
+          geo: { lat: number; lng: number };
+        } | null;
+        stats: { visits: number; lastSeen: Date | null };
+      }>;
+    }>();
+  });
+
   it('replaceRoot() resolves to the new shape with concrete types', () => {
     type NewShape = {
       readonly x: { readonly codecId: 'mongo/string@1'; readonly nullable: false };

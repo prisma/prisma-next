@@ -1,4 +1,9 @@
-import type { MongoContract } from '@prisma-next/mongo-contract';
+import type {
+  InferModelRow,
+  MongoContract,
+  MongoContractWithTypeMaps,
+  MongoTypeMaps,
+} from '@prisma-next/mongo-contract';
 import type { MongoAggAccumulator, MongoAggExpr } from '@prisma-next/mongo-query-ast/execution';
 import type { ModelArrayField } from './resolve-path';
 
@@ -49,11 +54,18 @@ export type ModelToDocShape<
  *
  * The optional `TContract` parameter exists so the resolver can detect
  * `ModelArrayField<ModelName>` — the marker variant produced by
- * `lookup()` for "an array of foreign-model rows" — and resolve it to
- * `ResolveRow<ModelToDocShape<TContract, ModelName>, CodecTypes,
- * TContract>[]`. When the contract is not threaded through, the variant
- * falls back to `unknown[]` (preserving the legacy resolver shape for
- * call sites that do not need lookup-row resolution).
+ * `lookup()` for "an array of foreign-model rows" — and resolve it via
+ * `InferModelRow<TContract, ModelName>` from `@prisma-next/mongo-contract`,
+ * which walks scalar / valueObject / union field kinds (handling nested
+ * value-objects and `many: true`) using the contract's `valueObjects`
+ * registry and the type-map's codec output types. This is the same
+ * resolver an ORM consumer would use for the same model, so the lookup
+ * row is shape-equivalent to a direct read of the foreign collection.
+ *
+ * When the contract is not threaded through (or lacks the type-map
+ * phantom), the variant falls back to `unknown[]` — preserving the
+ * legacy resolver shape for call sites that do not need lookup-row
+ * resolution.
  */
 export type ResolveRow<
   Shape extends DocShape,
@@ -61,8 +73,10 @@ export type ResolveRow<
   TContract extends MongoContract = MongoContract,
 > = {
   -readonly [K in keyof Shape & string]: Shape[K] extends ModelArrayField<infer ModelName>
-    ? ModelName extends keyof TContract['models'] & string
-      ? ResolveRow<ModelToDocShape<TContract, ModelName>, CodecTypes, TContract>[]
+    ? TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>
+      ? ModelName extends string & keyof TContract['models']
+        ? Array<InferModelRow<TContract, ModelName>>
+        : unknown[]
       : unknown[]
     : Shape[K]['codecId'] extends keyof CodecTypes
       ? Shape[K]['nullable'] extends true
