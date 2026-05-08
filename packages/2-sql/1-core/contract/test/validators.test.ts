@@ -681,6 +681,57 @@ describe('SQL contract validators', () => {
       expect(errors[1]).toContain('duplicate index definition');
     });
 
+    it('rejects duplicate columns inside key, unique, and index definitions', () => {
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table(
+              {
+                id: col('int4', 'pg/int4@1'),
+                email: col('text', 'pg/text@1'),
+              },
+              {
+                pk: pk('id', 'id'),
+                uniques: [unique('email', 'email')],
+                indexes: [index('email', 'email')],
+              },
+            ),
+          },
+        },
+      }).storage;
+
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(3);
+      expect(errors[0]).toContain('primary key');
+      expect(errors[0]).toContain('duplicate column "id"');
+      expect(errors[1]).toContain('unique constraint');
+      expect(errors[1]).toContain('duplicate column "email"');
+      expect(errors[2]).toContain('index');
+      expect(errors[2]).toContain('duplicate column "email"');
+    });
+
+    it('rejects nullable primary-key columns', () => {
+      const s = createContract<SqlStorage>({
+        storage: {
+          tables: {
+            user: table(
+              {
+                id: col('int4', 'pg/int4@1', true),
+              },
+              {
+                pk: pk('id'),
+              },
+            ),
+          },
+        },
+      }).storage;
+
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('primary key column "id"');
+      expect(errors[0]).toContain('NOT NULL');
+    });
+
     it('rejects duplicate foreign key definitions within the same table', () => {
       const s = createContract<SqlStorage>({
         storage: {

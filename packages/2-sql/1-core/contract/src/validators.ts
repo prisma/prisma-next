@@ -139,6 +139,17 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function findDuplicateValue(values: readonly string[]): string | undefined {
+  const seen = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) {
+      return value;
+    }
+    seen.add(value);
+  }
+  return undefined;
+}
+
 function isContractFieldType(value: unknown): boolean {
   if (!isPlainRecord(value)) return false;
   const kind = value['kind'];
@@ -293,6 +304,8 @@ export function validateSqlContract<T extends Contract<SqlStorage>>(value: unkno
  * Currently checks:
  * - duplicate named primary key / unique / index / foreign key objects within a table
  * - duplicate unique, index, or foreign key declarations within a table
+ * - duplicate columns within primary key / unique / index definitions
+ * - nullable columns in primary key definitions
  * - `setNull` referential action on a non-nullable FK column (would fail at runtime)
  * - `setDefault` referential action on a non-nullable FK column without a DEFAULT (would fail at runtime)
  */
@@ -325,8 +338,33 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
       }
     }
 
+    if (table.primaryKey) {
+      const duplicateColumn = findDuplicateValue(table.primaryKey.columns);
+      if (duplicateColumn !== undefined) {
+        errors.push(
+          `Table "${tableName}": primary key contains duplicate column "${duplicateColumn}"`,
+        );
+      }
+
+      for (const columnName of table.primaryKey.columns) {
+        const column = table.columns[columnName];
+        if (column?.nullable === true) {
+          errors.push(
+            `Table "${tableName}": primary key column "${columnName}" is nullable; primary key columns must be NOT NULL`,
+          );
+        }
+      }
+    }
+
     const seenUniqueDefinitions = new Set<string>();
     for (const unique of table.uniques) {
+      const duplicateColumn = findDuplicateValue(unique.columns);
+      if (duplicateColumn !== undefined) {
+        errors.push(
+          `Table "${tableName}": unique constraint contains duplicate column "${duplicateColumn}"`,
+        );
+      }
+
       const signature = JSON.stringify({ columns: unique.columns });
       if (seenUniqueDefinitions.has(signature)) {
         errors.push(
@@ -339,6 +377,11 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
 
     const seenIndexDefinitions = new Set<string>();
     for (const index of table.indexes) {
+      const duplicateColumn = findDuplicateValue(index.columns);
+      if (duplicateColumn !== undefined) {
+        errors.push(`Table "${tableName}": index contains duplicate column "${duplicateColumn}"`);
+      }
+
       const signature = JSON.stringify({
         columns: index.columns,
         using: index.using ?? null,

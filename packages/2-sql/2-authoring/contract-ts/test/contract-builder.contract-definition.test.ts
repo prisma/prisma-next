@@ -356,6 +356,8 @@ describe('shared contract definition lowering', () => {
           },
         ],
       }),
-    ).toThrow('Model "User" uses nullable field "id" in its identity.');
+    ).toThrow(
+      /Contract semantic validation failed:.*primary key column "id".*primary key columns must be NOT NULL/,
+    );
   });
 });

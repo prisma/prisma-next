@@ -239,20 +239,6 @@ export function buildSqlContractFromDefinition(
       }
     }
 
-    if (semanticModel.id) {
-      const fieldsByColumnName = new Map(
-        semanticModel.fields.map((field) => [field.columnName, field]),
-      );
-      for (const columnName of semanticModel.id.columns) {
-        const field = fieldsByColumnName.get(columnName);
-        if (field?.nullable) {
-          throw new Error(
-            `Model "${semanticModel.modelName}" uses nullable field "${field.fieldName}" in its identity.`,
-          );
-        }
-      }
-    }
-
     const foreignKeys = (semanticModel.foreignKeys ?? []).map((fk) => {
       const targetModel = assertKnownTargetModel(
         modelsByName,

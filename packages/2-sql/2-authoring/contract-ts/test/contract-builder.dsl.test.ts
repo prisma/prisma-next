@@ -450,6 +450,52 @@ describe('contract DSL authoring surface', () => {
     });
   });
 
+  it('rejects duplicate identity columns from .attributes(...) through storage semantics', () => {
+    const User = model('User', {
+      fields: {
+        id: field.column(textColumn),
+      },
+    })
+      .attributes(({ fields, constraints }) => ({
+        id: constraints.id([fields.id, fields.id]),
+      }))
+      .sql({ table: 'app_user' });
+
+    expect(() =>
+      defineTestContract({
+        models: {
+          User,
+        },
+      }),
+    ).toThrow(/Contract semantic validation failed:.*primary key.*duplicate column "id"/);
+  });
+
+  it('rejects duplicate unique and index columns through storage semantics', () => {
+    const User = model('User', {
+      fields: {
+        id: field.column(textColumn),
+        email: field.column(textColumn),
+      },
+    })
+      .attributes(({ fields, constraints }) => ({
+        uniques: [constraints.unique([fields.email, fields.email])],
+      }))
+      .sql(({ cols, constraints }) => ({
+        table: 'app_user',
+        indexes: [constraints.index([cols.email, cols.email])],
+      }));
+
+    expect(() =>
+      defineTestContract({
+        models: {
+          User,
+        },
+      }),
+    ).toThrow(
+      /Contract semantic validation failed:.*unique constraint.*duplicate column "email".*index.*duplicate column "email"/,
+    );
+  });
+
   it.each([
     {
       label: 'hasMany',
