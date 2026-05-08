@@ -252,21 +252,35 @@ Both are exported from `@prisma-next/framework-components/codec`.
 
 ## Aliases
 
-Aliasing a codec under a new id (e.g. Postgres's `pgCharCodec` aliasing
-`sqlCharCodec`) is a **descriptor-level** operation, not an instance-
-level one. The alias descriptor delegates to the base descriptor's
-factory and rewrites the resolved codec's `id`. This avoids the
-prototype-stripping bug that the legacy object-spread pattern
-(`{ ...baseCodec, id }`) hit on class-instance bases.
+Aliasing a codec under a new id (e.g. Postgres's `pgCharDescriptor`
+aliasing the SQL-base `sqlCharDescriptor`) is a **descriptor-level**
+operation, not an instance-level one. There is no `aliasCodec` helper:
+aliases are expressed as plain class inheritance from the base
+descriptor with the alias's metadata overridden.
 
-The Postgres adapter ships a small file-local `aliasCodec` helper that
-derives codec instances via
-`Object.create(Object.getPrototypeOf(baseCodec))` + `Object.assign`
-+ `Object.defineProperty(_, 'id', ...)`; aliases are authored as
-`class extends CodecDescriptorImpl<P>` declarations whose factory wraps
-the base's factory. See
-`packages/3-targets/3-targets/postgres/src/core/codecs.ts` for the
-canonical pattern.
+```ts
+// SQL base — relational-core/src/ast/sql-codecs.ts
+class SqlCharDescriptor extends CodecDescriptorImpl<LengthParams> { /* … */ }
+export const sqlCharDescriptor = new SqlCharDescriptor();
+
+// Postgres alias — target-postgres/src/core/codecs.ts
+class PgCharDescriptor extends SqlCharDescriptor {
+  override readonly codecId = 'pg/char@1';
+  override readonly targetTypes = ['char'] as const;
+}
+export const pgCharDescriptor = new PgCharDescriptor();
+```
+
+Inherited overrides do the heavy lifting: the alias inherits
+`paramsSchema`, `traits`, and `factory` from the base. Because
+`CodecImpl.id` proxies through `this.descriptor.codecId`, instances
+produced by `pgCharDescriptor.factory(params)(ctx)` automatically report
+the alias's id without prototype-stripping (the legacy `{ ...base, id }`
+spread pattern lost the prototype on class-instance bases — descriptor-
+class inheritance never spreads, so the bug is structurally avoided).
+
+See [packages/3-targets/3-targets/postgres/src/core/codecs.ts](../../packages/3-targets/3-targets/postgres/src/core/codecs.ts)
+(`pgCharDescriptor`, `pgVarcharDescriptor`) for the canonical pattern.
 
 ## Heterogeneous storage at the runtime layer
 
