@@ -2,6 +2,8 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { executePerSpaceDbApply } from '@prisma-next/cli/control-api';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { CodecControlHooks } from '@prisma-next/family-sql/control';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
@@ -363,6 +365,99 @@ describe(
       );
       expect(helperTables.rows.length).toBe(1);
       expect(helperCols.rows.map((c) => c.name).sort()).toEqual(['id', 'note']);
+    });
+
+    it('fires the codec onFieldEvent hook on app-space field add through the per-space db init flow (M2 R1 wiring still flows through T2.3)', async () => {
+      const tmpDir = createTmpDir();
+      const { migrationsDir } = await setupBaselinePinned(tmpDir);
+
+      const HOOKED_CODEC = 'cs/string@1';
+      const hookFiredFor: string[] = [];
+      const hooks: CodecControlHooks = {
+        onFieldEvent: (event, ctx) => {
+          hookFiredFor.push(`${event}:${ctx.tableName}.${ctx.fieldName}`);
+          return [
+            {
+              id: `codec.${event}.${ctx.tableName}.${ctx.fieldName}`,
+              label: `${event} hook on ${ctx.tableName}.${ctx.fieldName}`,
+              operationClass: 'additive',
+              invariantId: `cs:${ctx.tableName}.${ctx.fieldName}@${event}`,
+              target: { id: 'sqlite' },
+              precheck: [],
+              execute: [
+                {
+                  description: 'codec side-effect (no-op for test)',
+                  sql: 'SELECT 1',
+                },
+              ],
+              postcheck: [],
+            },
+          ];
+        },
+      };
+
+      // Override the app contract's `email` codec to one that has a
+      // hook attached. The hook returns an additional op; we then
+      // verify the planner inlined it into the executed plan.
+      const hookedAppContract: Contract<SqlStorage> = {
+        ...appContract,
+        storage: {
+          ...appContract.storage,
+          storageHash: coreHash('sha256:app-with-hooked-email'),
+          tables: {
+            user: {
+              ...appContract.storage.tables['user']!,
+              columns: {
+                ...appContract.storage.tables['user']!.columns,
+                email: {
+                  nativeType: 'text',
+                  codecId: HOOKED_CODEC,
+                  nullable: false,
+                },
+              },
+            },
+          },
+        },
+        profileHash: profileHash('sha256:app-with-hooked-email'),
+      };
+
+      const codecHookComponent: TargetBoundComponentDescriptor<'sql', 'sqlite'> = {
+        kind: 'adapter',
+        id: 'test-codec-hook',
+        familyId: 'sql',
+        targetId: 'sqlite',
+        version: '0.0.0-test',
+        types: { codecTypes: { controlPlaneHooks: { [HOOKED_CODEC]: hooks } } },
+      } as TargetBoundComponentDescriptor<'sql', 'sqlite'>;
+
+      const result = await executePerSpaceDbApply({
+        driver: testDb!.driver,
+        familyInstance,
+        contract: hookedAppContract,
+        mode: 'apply',
+        migrations: sqliteTargetDescriptor.migrations,
+        frameworkComponents: [...frameworkComponents, codecHookComponent],
+        migrationsDir,
+        extensionContractSpaces: [{ id: EXT_SPACE_ID }],
+        policy: { allowedOperationClasses: ['additive'] },
+        action: 'dbInit',
+      });
+
+      if (!result.ok) {
+        throw new Error(`Expected ok but got failure: ${JSON.stringify(result.failure, null, 2)}`);
+      }
+      expect(result.ok).toBe(true);
+
+      // The codec hook fired for the new `email` field added in the
+      // app-space contract.
+      expect(hookFiredFor).toContain('added:user.email');
+
+      // The codec-emitted op was included in the aggregate operations
+      // surfaced to the caller (proves the codec hook flows through
+      // `executePerSpaceDbApply` → planner.plan → `frameworkComponents`,
+      // i.e. the M2 R1 wiring still works under the per-space surface).
+      const ids = result.value.plan.operations.map((op) => op.id);
+      expect(ids).toContain('codec.added.user.email');
     });
 
     it('rolls back ALL spaces and preserves pre-execution markers when any space fails (locks AM4-rollback CLI half)', async () => {
