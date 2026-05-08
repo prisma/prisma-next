@@ -53,12 +53,14 @@ const leaderboard = db.query
   }))
   // type: { _id: ObjectId, postCount: number, latestPost: Date | null }
   .sort({ postCount: -1 })
-  .lookup({
-    from: 'users',
-    localField: '_id',
-    foreignField: '_id',
-    as: 'author',
-  })
+  .lookup((from) =>
+    from('users')
+      .on((local, foreign) => ({
+        local: local._id,
+        foreign: foreign._id,
+      }))
+      .as('author'),
+  )
   // type: { _id: ObjectId, postCount: number, latestPost: Date | null, author: User[] }
   .build();
 
@@ -70,7 +72,7 @@ Each link in the chain produces a precise downstream row type:
 - `.from('posts')` enters the `posts` root with the `Post` document shape.
 - `.group(...)` rewrites the document to the grouped shape — `_id` is whatever expression was returned (here `f.authorId`), and the named fields (`postCount`, `latestPost`) take the type of the accumulator that produced them.
 - `.sort({ postCount: -1 })` is keyed by the grouped shape; the type system rejects sorts on fields that no longer exist after the group.
-- `.lookup({ ... as: 'author' })` adds an `author: User[]` array to the row — `localField`/`foreignField` are checked against the source and target collection shapes.
+- `.lookup((from) => from('users').on((local, foreign) => ({...})).as('author'))` adds an `author: User[]` array to the row. `local.<field>` and `foreign.<field>` are property-access errors when the field does not exist on the local pipeline shape or the foreign model. The chained inner shape is what makes `foreign` resolve to the foreign model's `FieldAccessor` narrowly — see the package README's [Typed `lookup`](../../packages/2-mongo-family/5-query-builders/query-builder/README.md) section for the API reference.
 - `.build()` materialises the chain as a `MongoQueryPlan`; `runtime.execute(...)` returns an `AsyncIterableResult` that resolves to `Row[]` when awaited.
 
 ## How the runtime is composed
