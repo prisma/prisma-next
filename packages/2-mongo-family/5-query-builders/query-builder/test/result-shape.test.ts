@@ -25,7 +25,7 @@ describe('contractModelToMongoResultShape', () => {
     expect(shape.fields['tags']).toEqual({
       kind: 'array',
       nullable: false,
-      element: { kind: 'leaf', codecId: 'mongo/array@1', nullable: false },
+      element: { kind: 'leaf', codecId: 'mongo/string@1', nullable: false },
     });
   });
 

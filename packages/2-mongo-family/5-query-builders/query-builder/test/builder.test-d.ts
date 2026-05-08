@@ -16,7 +16,7 @@ type OrderRow = {
   amount: number;
   customerId: string;
   notes: string | null;
-  tags: unknown[];
+  tags: string[];
 };
 
 describe('builder shape tests', () => {
@@ -199,7 +199,7 @@ describe('resolved row types', () => {
       amount: number;
       customerId: string;
       notes: string | null;
-      tags: unknown[];
+      tags: string[];
       fullName: string;
       doubled: number;
     }>();
@@ -291,7 +291,7 @@ describe('resolved row types', () => {
       amount: number;
       customerId: string;
       notes: string | null;
-      tags: unknown[];
+      tags: string[];
       customer: Array<{
         _id: string;
         firstName: string;
@@ -319,7 +319,7 @@ describe('resolved row types', () => {
       amount: number;
       customerId: string;
       notes: string | null;
-      tags: unknown[];
+      tags: string[];
       customer: Array<{
         _id: string;
         name: string;
@@ -337,6 +337,70 @@ describe('resolved row types', () => {
         } | null;
         stats: { visits: number; lastSeen: Date | null };
       }>;
+    }>();
+  });
+
+  it('entry-point query resolves value-object fields recursively (model-origin brand)', () => {
+    const plan = mongoQuery<TContract>({ contractJson }).from('customers').build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<{
+      _id: string;
+      name: string;
+      address: {
+        street: string;
+        city: string;
+        zip: string | null;
+        geo: { lat: number; lng: number };
+      };
+      workAddress: {
+        street: string;
+        city: string;
+        zip: string | null;
+        geo: { lat: number; lng: number };
+      } | null;
+      stats: { visits: number; lastSeen: Date | null };
+    }>();
+  });
+
+  it('addFields() preserves model-origin resolution and adds the new fields on top', () => {
+    const plan = mongoQuery<TContract>({ contractJson })
+      .from('customers')
+      .addFields((f) => ({
+        upperName: fn.concat(f.name, fn.literal('!')),
+      }))
+      .build();
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<{
+      _id: string;
+      name: string;
+      address: {
+        street: string;
+        city: string;
+        zip: string | null;
+        geo: { lat: number; lng: number };
+      };
+      workAddress: {
+        street: string;
+        city: string;
+        zip: string | null;
+        geo: { lat: number; lng: number };
+      } | null;
+      stats: { visits: number; lastSeen: Date | null };
+      upperName: string;
+    }>();
+  });
+
+  it('group() drops model-origin resolution (legitimate shape replacement)', () => {
+    const plan = mongoQuery<TContract>({ contractJson })
+      .from('customers')
+      .group((f) => ({
+        _id: f.name,
+        count: acc.count(),
+      }))
+      .build();
+    // After group, row type is the projected shape — no value-object resolution
+    // because the row is no longer model-rooted.
+    expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<{
+      _id: string;
+      count: number;
     }>();
   });
 

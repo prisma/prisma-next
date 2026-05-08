@@ -44,6 +44,40 @@ export interface ModelArrayField<ModelName extends string> extends DocField {
 }
 
 /**
+ * Phantom-symbol brand placed on `ModelToDocShape`'s output (and inherited
+ * through shape-extending stages like `addFields`, `match`, `lookup`) so
+ * `ResolveRow` can route value-object resolution through `InferModelRow`
+ * — which walks the contract's `valueObjects` registry and resolves
+ * nested types — instead of falling through the codec-lookup branch to
+ * `unknown`.
+ *
+ * The brand is keyed on a `unique symbol` rather than a string so it is
+ * invisible to every `keyof Shape & string` walk in the package
+ * (`SortSpec`, `ProjectedShape`, `GroupedDocShape`, the field accessor's
+ * `Object.keys` iteration, etc.). Field accessors do not surface a
+ * `__modelOrigin` autocomplete entry; sorts cannot key on it; projections
+ * cannot reference it.
+ *
+ * Shape-extending stages preserve the brand because intersection types
+ * (`Shape & NewFields`) carry through symbol-keyed properties. Shape-
+ * replacing stages (`replaceRoot`, `group`, `project`) construct fresh
+ * `DocShape`s from scratch, naturally dropping the brand — which is the
+ * intended behaviour, since those stages legitimately leave model
+ * territory.
+ */
+export declare const ModelOriginBrand: unique symbol;
+export type ModelOriginBrand = typeof ModelOriginBrand;
+
+/**
+ * Brand carrier — a Shape whose row type should be resolved via
+ * `InferModelRow<TContract, ModelName>` rather than the per-field codec
+ * walk. Use as `ModelToDocShape<TC, ModelName> & ModelOriginBranded<ModelName>`.
+ */
+export type ModelOriginBranded<ModelName extends string> = {
+  readonly [ModelOriginBrand]?: ModelName;
+};
+
+/**
  * Document shape that carries nested value-object sub-shapes.
  *
  * Structurally identical to a flat `DocShape` (`Record<string, DocField>`),

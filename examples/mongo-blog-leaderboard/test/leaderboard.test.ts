@@ -56,7 +56,7 @@ describe('mongo-blog-leaderboard', { timeout: timeouts.spinUpMongoMemoryServer }
   it('returns an empty leaderboard when there are no posts', async () => {
     const runtime = await db.runtime();
     const rows = await getAuthorLeaderboard(db, runtime);
-    rows[0]?.latestPost;
+    rows[0]?.author[0]?.address;
     expect(rows).toEqual([]);
   });
 });
