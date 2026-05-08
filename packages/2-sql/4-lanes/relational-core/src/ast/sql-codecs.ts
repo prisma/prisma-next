@@ -3,10 +3,10 @@
  * six SQL base codecs (`sql/char@1`, `sql/varchar@1`, `sql/int@1`,
  * `sql/float@1`, `sql/text@1`, `sql/timestamp@1`).
  *
- * The class-form codec implementations live in `sql-codecs-class.ts`
+ * The codec implementations live in `sql-codecs-class.ts`
  * (TML-2357). This module retains only the conversion
- * helpers + emit-path renderers the class methods compose with — keeping
- * a single source of truth for non-trivial conversions while the class
+ * helpers + emit-path renderers the codec methods compose with — keeping
+ * a single source of truth for non-trivial conversions while the codec
  * methods provide the framework-required `Promise<…>` boundary.
  */
 

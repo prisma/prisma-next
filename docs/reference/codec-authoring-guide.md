@@ -193,7 +193,7 @@ class ArktypeJsonDescriptor extends CodecDescriptorImpl<ArktypeJsonTypeParams> {
   }
 }
 
-export const arktypeJsonDescriptorClass = new ArktypeJsonDescriptor();
+export const arktypeJsonDescriptor = new ArktypeJsonDescriptor();
 
 export function arktypeJsonColumn<S extends Type<unknown>>(
   schema: S,
@@ -202,8 +202,8 @@ export function arktypeJsonColumn<S extends Type<unknown>>(
   // (runtime rehydration) at the column-author site.
   const params: ArktypeJsonTypeParams = { expression: schema.expression, jsonIr: schema.json };
   return column(
-    (_ctx) => new ArktypeJsonCodecClass<S['infer']>(arktypeJsonDescriptorClass, schema),
-    arktypeJsonDescriptorClass.codecId,
+    (_ctx) => new ArktypeJsonCodecClass<S['infer']>(arktypeJsonDescriptor, schema),
+    arktypeJsonDescriptor.codecId,
     params,
   );
 }
@@ -328,7 +328,7 @@ The class hierarchy isn't load-bearing for variance preservation
 - **Parameterized codec with literal preservation** (pgvector):
   `packages/3-extensions/pgvector/src/core/codecs.ts`.
 - **Parameterized codec with typed schema** (arktype-json):
-  `packages/3-extensions/arktype-json/src/core/arktype-json-codec-class.ts`.
+  `packages/3-extensions/arktype-json/src/core/arktype-json-codec.ts`.
 
 ## Pitfalls
 

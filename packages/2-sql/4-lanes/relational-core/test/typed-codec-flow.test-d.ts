@@ -2,7 +2,7 @@
  * Constructive type tests at the descriptor round-trip layer
  * (TML-2357).
  *
- * The class-form descriptor surface is the canonical path from a
+ * The descriptor surface is the canonical path from a
  * `CodecDescriptor<P>` instance to its resolved `Codec` shape. These
  * tests pin that round-trip end-to-end at the SQL base codec layer:
  * given a concrete descriptor, the resolved codec exactly equals

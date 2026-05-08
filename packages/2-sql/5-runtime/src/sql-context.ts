@@ -263,7 +263,7 @@ function validateTypeParams(
  * Collect every {@link CodecDescriptor} contributed by the SQL stack and
  * partition into "parameterized" vs "non-parameterized" by reference-
  * equality with the framework-supplied {@link voidParamsSchema}. Every
- * non-parameterized class-form descriptor falls back to the singleton
+ * non-parameterized descriptor falls back to the singleton
  * `voidParamsSchema` for `paramsSchema`; parameterized descriptors author
  * their own
  * `paramsSchema`, so the singleton check classifies them as

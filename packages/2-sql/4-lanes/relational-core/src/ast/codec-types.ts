@@ -37,7 +37,7 @@ export interface SqlColumnRef {
  * ref. Encode call sites currently leave `column` undefined (encode-time
  * column context is the middleware's domain).
  *
- * SQL codec authors writing class-form codec methods observe this type
+ * SQL codec authors writing codec methods observe this type
  * via {@link SqlCodec}. The framework codec dispatch surface (and Mongo)
  * sees only the base `CodecCallContext`.
  */
@@ -215,7 +215,7 @@ export type DescriptorCodecInput<D> =
  * literal trait tuple at the descriptor type. Reading from the resolved
  * codec instance (`CodecImpl<…, TTraits, …>`) would lose the literal
  * because `Codec` carries `TTraits` only on its optional phantom slot
- * (`readonly [codecTraitsPhantom]?: TTraits`); class-form codecs
+ * (`readonly [codecTraitsPhantom]?: TTraits`); codecs
  * extending `CodecImpl` have no required structural site that pins
  * `TTraits`, so a descriptor-keyed extractor reading from the codec
  * instance would widen to the broad `CodecTrait` union.

@@ -1,5 +1,5 @@
 /**
- * Class-based form of the six SQL base codecs (TML-2357).
+ * The six SQL base codecs (TML-2357).
  *
  * Each codec ships as three artifacts:
  *

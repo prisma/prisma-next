@@ -1,5 +1,5 @@
 /**
- * Type tests for the class-based SQL base codecs (TML-2357).
+ * Type tests for the SQL base codecs (TML-2357).
  *
  * Mirrors the framework-level pattern from
  * `packages/1-framework/1-core/framework-components/test/codec.types.test-d.ts`.

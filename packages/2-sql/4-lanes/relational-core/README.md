@@ -100,7 +100,7 @@ Codec authors extend the framework `CodecImpl` (and pair the codec with a `Codec
 - Both `encode` and `decode` must be implemented — there is no identity-default fallback.
 
 ```ts
-// Non-parameterized codec (P = void) — see packages/3-targets/3-targets/postgres/src/core/codecs-class.ts
+// Non-parameterized codec (P = void) — see packages/3-targets/3-targets/postgres/src/core/codecs.ts
 // for the production form.
 import {
   CodecDescriptorImpl,
