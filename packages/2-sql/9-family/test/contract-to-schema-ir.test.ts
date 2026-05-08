@@ -67,7 +67,6 @@ describe('contractToSchemaIR', () => {
 
     expect(result).toEqual<SqlSchemaIR>({
       tables: {},
-      dependencies: [],
     });
   });
 
@@ -461,7 +460,6 @@ describe('contractToSchemaIR', () => {
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
-    expect(result.dependencies).toEqual([]);
     expect(result.tables['T']!.columns['embedding']!.nativeType).toBe('vector');
     expect((result.annotations as Record<string, unknown>)?.['pg']).toMatchObject({
       storageTypes: {
@@ -506,88 +504,6 @@ describe('contractToSchemaIR', () => {
       },
     });
     expect((result.annotations as Record<string, unknown>)?.['pg']).toBeUndefined();
-  });
-
-  it('sets dependencies to empty array', () => {
-    const storage: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: { id: col({ nativeType: 'text' }) },
-        }),
-      },
-    };
-
-    const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
-    expect(result.dependencies).toEqual([]);
-  });
-
-  it('deduplicates dependency IDs from framework components', () => {
-    const storage: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: { id: col({ nativeType: 'text' }) },
-        }),
-      },
-    };
-
-    const frameworkComponents = [
-      {
-        kind: 'extension',
-        id: 'dep-a',
-        familyId: 'sql',
-        targetId: 'postgres',
-        version: '0.0.0-test',
-        databaseDependencies: {
-          init: [
-            { id: 'postgres.extension.vector', label: 'vector', install: [] },
-            { id: 'postgres.extension.vector', label: 'vector duplicate', install: [] },
-          ],
-        },
-      },
-    ] as unknown as NonNullable<
-      Omit<
-        Parameters<typeof contractToSchemaIRImpl>[1],
-        'annotationNamespace'
-      >['frameworkComponents']
-    >;
-
-    const result = contractToSchemaIR(wrap(storage), { frameworkComponents });
-    expect(result.dependencies).toEqual([{ id: 'postgres.extension.vector' }]);
-  });
-
-  it('throws for empty dependency IDs from framework components', () => {
-    const storage: SqlStorage = {
-      storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables: {
-        T: table({
-          columns: { id: col({ nativeType: 'text' }) },
-        }),
-      },
-    };
-
-    const frameworkComponents = [
-      {
-        kind: 'extension',
-        id: 'dep-a',
-        familyId: 'sql',
-        targetId: 'postgres',
-        version: '0.0.0-test',
-        databaseDependencies: {
-          init: [{ id: '', label: 'invalid', install: [] }],
-        },
-      },
-    ] as unknown as NonNullable<
-      Omit<
-        Parameters<typeof contractToSchemaIRImpl>[1],
-        'annotationNamespace'
-      >['frameworkComponents']
-    >;
-
-    expect(() => contractToSchemaIR(wrap(storage), { frameworkComponents })).toThrow(
-      'Dependency id must be a non-empty string',
-    );
   });
 
   it('handles unique constraints without names', () => {

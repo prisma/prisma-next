@@ -28,7 +28,6 @@ describe('buildSchemaLookupMap', () => {
         user: makeTable({ name: 'user' }),
         post: makeTable({ name: 'post' }),
       },
-      dependencies: [],
     };
     const map = buildSchemaLookupMap(schema);
     expect(map.size).toBe(2);
@@ -43,7 +42,6 @@ describe('buildSchemaLookupMap', () => {
           uniques: [{ columns: ['email'] }, { columns: ['tenant', 'slug'] }],
         }),
       },
-      dependencies: [],
     };
     const lookup = buildSchemaLookupMap(schema).get('user')!;
     expect(lookup.uniqueKeys.has('email')).toBe(true);
@@ -60,7 +58,6 @@ describe('buildSchemaLookupMap', () => {
           ],
         }),
       },
-      dependencies: [],
     };
     const lookup = buildSchemaLookupMap(schema).get('user')!;
     expect(lookup.indexKeys.has('created_at')).toBe(true);
@@ -78,7 +75,6 @@ describe('buildSchemaLookupMap', () => {
           ],
         }),
       },
-      dependencies: [],
     };
     const lookup = buildSchemaLookupMap(schema).get('post')!;
     expect(lookup.fkKeys.has('author_id|user|id')).toBe(true);
@@ -93,7 +89,6 @@ describe('hasUniqueConstraint', () => {
         indexes: [{ columns: ['tenant', 'slug'], unique: true }],
       }),
     },
-    dependencies: [],
   };
   const lookup = buildSchemaLookupMap(schema).get('user')!;
 
@@ -122,7 +117,6 @@ describe('hasIndex', () => {
         indexes: [{ columns: ['created_at'], unique: false }],
       }),
     },
-    dependencies: [],
   };
   const lookup = buildSchemaLookupMap(schema).get('user')!;
 
@@ -153,7 +147,6 @@ describe('hasForeignKey', () => {
         ],
       }),
     },
-    dependencies: [],
   };
   const lookup = buildSchemaLookupMap(schema).get('post')!;
 

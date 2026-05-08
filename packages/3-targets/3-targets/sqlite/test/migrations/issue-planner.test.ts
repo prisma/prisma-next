@@ -25,7 +25,7 @@ function makeContract(
   };
 }
 
-const emptySchema: SqlSchemaIR = { tables: {}, dependencies: [] };
+const emptySchema: SqlSchemaIR = { tables: {} };
 
 const baseCtx = {
   codecHooks: new Map(),
@@ -540,7 +540,6 @@ describe('planIssues — emission order and bucketing', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
 
     const issues: SchemaIssue[] = [

@@ -696,9 +696,8 @@ export class RenameTypeCall extends PostgresOpFactoryCallNode {
  * Laundered pre-built operation.
  *
  * Wraps an already-materialized `SqlMigrationPlanOperation` — typically one
- * produced by a SQL-family method, a codec control hook, or a component
- * `databaseDependencies.init` declaration — so the planner can carry it
- * alongside IR nodes without reverse-engineering it into a
+ * produced by a SQL-family method or a codec control hook — so the planner
+ * can carry it alongside IR nodes without reverse-engineering it into a
  * structured call class. Doubles as the user-facing escape hatch for raw
  * migrations: authors can pass a full op shape to `rawSql({...})`.
  *

@@ -52,7 +52,6 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [{ columns: ['email'], unique: true, name: 'user_email_idx' }], // Has unique index
           },
         },
-        dependencies: [],
       };
 
       const result = planner.plan({
@@ -108,7 +107,6 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [{ columns: ['email'], unique: true, name: 'user_email_idx' }], // Has unique index
           },
         },
-        dependencies: [],
       };
 
       const result = planner.plan({
@@ -162,7 +160,6 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [], // No indexes
           },
         },
-        dependencies: [],
       };
 
       const result = planner.plan({
@@ -218,7 +215,6 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
             indexes: [{ columns: ['email'], unique: false, name: 'user_email_idx' }], // Different name
           },
         },
-        dependencies: [],
       };
 
       const result = planner.plan({

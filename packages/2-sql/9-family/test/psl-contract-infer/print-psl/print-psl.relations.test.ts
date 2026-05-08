@@ -41,7 +41,6 @@ describe('printPsl', () => {
           indexes: [{ columns: ['user_id'], unique: false }],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -100,7 +99,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -170,7 +168,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -224,7 +221,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -290,7 +286,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -366,7 +361,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -430,7 +424,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -486,7 +479,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
 
     const result = printPslFromSql(schemaIR);
@@ -545,7 +537,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
 
     const result = printPslFromSql(schemaIR);

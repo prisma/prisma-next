@@ -43,7 +43,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -111,7 +110,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -165,7 +163,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -200,7 +197,6 @@ describe('printPsl', () => {
           indexes: [{ columns: ['category', 'type'], unique: false }],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -238,7 +234,6 @@ describe('printPsl', () => {
           ],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -276,7 +271,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -310,7 +304,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -350,7 +343,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
 
     expect(() => printPslFromSql(schemaIR)).toThrowErrorMatchingInlineSnapshot(`
@@ -384,7 +376,6 @@ describe('printPsl', () => {
           },
         },
       },
-      dependencies: [],
     };
 
     expect(() => printPslFromSql(schemaIR)).toThrowErrorMatchingInlineSnapshot(`
@@ -412,7 +403,6 @@ describe('printPsl', () => {
           },
         },
       },
-      dependencies: [],
     };
 
     expect(() => printPslFromSql(schemaIR)).toThrowErrorMatchingInlineSnapshot(`

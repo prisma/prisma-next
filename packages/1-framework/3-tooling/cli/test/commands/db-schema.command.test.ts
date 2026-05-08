@@ -70,7 +70,6 @@ const schemaIR = {
       indexes: [],
     },
   },
-  dependencies: [],
 } as const;
 
 const schemaView = {
