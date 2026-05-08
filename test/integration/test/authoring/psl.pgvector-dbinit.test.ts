@@ -1,4 +1,4 @@
-import { existsSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient, enrichContract } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
@@ -6,6 +6,8 @@ import { emit } from '@prisma-next/emitter';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
+import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
@@ -13,6 +15,36 @@ import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createIntegrationTestDir } from '../utils/cli-test-helpers';
+
+/**
+ * Materialise pgvector's pinned contract-space artefacts under
+ * `<projectRoot>/migrations/pgvector/...` so the per-space db init
+ * flow (sub-spec § 6) can read its head ref + baseline migration.
+ *
+ * pgvector moved from `databaseDependencies.init` to a contract space
+ * in the extension-contract-spaces project (M4); db init now requires
+ * a `migrationsDir` whenever any extension publishes a contract space
+ * because the apply path reads the user repo, not the descriptor.
+ */
+async function materialisePgvectorPinnedArtefacts(projectRoot: string): Promise<string> {
+  const migrationsDir = join(projectRoot, 'migrations');
+  mkdirSync(migrationsDir, { recursive: true });
+  const space = pgvector.contractSpace;
+  if (!space) {
+    throw new Error('pgvector descriptor must declare a contractSpace');
+  }
+  const baseline = space.migrations[0];
+  if (!baseline) {
+    throw new Error('pgvector contract-space must ship at least one baseline migration');
+  }
+  await emitPinnedSpaceArtefacts(migrationsDir, 'pgvector', {
+    contract: space.contractJson,
+    contractDts: '// rendered .d.ts for pgvector contract space\nexport interface Contract {}\n',
+    headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
+  });
+  await writeExtensionMigrationPackage(join(migrationsDir, 'pgvector'), baseline);
+  return migrationsDir;
+}
 
 describe(
   'authoring: PSL → emit → dbInit / dbUpdate',
@@ -100,12 +132,14 @@ model Document {
 }
 `);
 
+        const migrationsDir = await materialisePgvectorPinnedArtefacts(testDir);
+
         await withDevDatabase(async ({ connectionString }) => {
           await withPgvectorControlClient(connectionString, async (client) => {
             const plan = await client.dbInit({
               contract: emittedContract,
               mode: 'plan',
-              migrationsDir: join(testDir, 'migrations'),
+              migrationsDir,
             });
             expect(plan.ok).toBe(true);
             if (!plan.ok) {
@@ -123,7 +157,7 @@ model Document {
             const apply = await client.dbInit({
               contract: emittedContract,
               mode: 'apply',
-              migrationsDir: join(testDir, 'migrations'),
+              migrationsDir,
             });
             if (!apply.ok) {
               throw new Error(
@@ -149,12 +183,14 @@ model Document {
 }
 `);
 
+        const migrationsDir = await materialisePgvectorPinnedArtefacts(testDir);
+
         await withDevDatabase(async ({ connectionString }) => {
           await withPgvectorControlClient(connectionString, async (client) => {
             const init = await client.dbInit({
               contract: emittedContract,
               mode: 'apply',
-              migrationsDir: join(testDir, 'migrations'),
+              migrationsDir,
             });
             if (!init.ok) {
               throw new Error(
@@ -178,7 +214,7 @@ model Document {
             const update = await client.dbUpdate({
               contract: emittedContract,
               mode: 'apply',
-              migrationsDir: join(testDir, 'migrations'),
+              migrationsDir,
             });
             if (!update.ok) {
               throw new Error(
