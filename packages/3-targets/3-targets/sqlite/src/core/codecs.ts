@@ -242,11 +242,22 @@ export class SqliteDatetimeCodec extends CodecImpl<
   string,
   Date
 > {
+  // Reject `Invalid Date` (NaN-time) at every decode ingress so consumers
+  // never receive a Date object whose downstream operations silently
+  // produce NaN. Mirrors F35's stricter ISO-8601 validation on the
+  // postgres timestamp helpers.
+  private parseDate(value: string): Date {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new TypeError(`sqlite/datetime@1 value must be a valid ISO-8601 string: ${value}`);
+    }
+    return date;
+  }
   async encode(value: Date, _ctx: CodecCallContext): Promise<string> {
     return value.toISOString();
   }
   async decode(wire: string, _ctx: CodecCallContext): Promise<Date> {
-    return new Date(wire);
+    return this.parseDate(wire);
   }
   encodeJson(value: Date): JsonValue {
     return value.toISOString();
@@ -255,7 +266,7 @@ export class SqliteDatetimeCodec extends CodecImpl<
     if (typeof json !== 'string') {
       throw new TypeError('sqlite/datetime@1 contract value must be an ISO-8601 string');
     }
-    return new Date(json);
+    return this.parseDate(json);
   }
 }
 
