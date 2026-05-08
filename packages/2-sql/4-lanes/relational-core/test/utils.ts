@@ -2,28 +2,18 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { Adapter, LoweredStatement, SelectAst } from '../src/exports/ast';
-import { buildCodecRegistry } from '../src/exports/ast';
 import type { ExecutionContext } from '../src/exports/query-lane-context';
 
 /**
  * Creates a stub adapter for testing.
  * This helper DRYs up the common pattern of adapter creation in tests.
- *
- * The codec registry is captured once in the closure so repeated
- * `profile.codecs()` calls return the same instance — codecs registered
- * via one call are visible to later calls. Returning a fresh empty
- * registry per call would make tests order-dependent.
  */
 export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> {
-  const codecRegistry = buildCodecRegistry([]);
   return {
     profile: {
       id: 'stub-profile',
       target: 'postgres',
       capabilities: {},
-      codecs() {
-        return codecRegistry;
-      },
       readMarkerStatement: () => ({ sql: '', params: [] }),
       parseMarkerRow: () => {
         throw new Error('stub adapter does not implement parseMarkerRow');
@@ -46,14 +36,11 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
 export function createTestContext<TContract extends Contract<SqlStorage>>(
   contract: TContract,
 ): ExecutionContext<TContract> {
-  const codecRegistry = buildCodecRegistry([]);
-
   return {
     contract,
-    codecs: codecRegistry,
     contractCodecs: {
       forColumn: () => undefined,
-      forCodecId: (id) => codecRegistry.get(id),
+      forCodecId: () => undefined,
     },
     codecDescriptors: {
       descriptorFor: () => undefined,

@@ -2,7 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationRegistry } from '@prisma-next/sql-operations';
-import type { CodecRegistry, ContractCodecRegistry } from './ast/codec-types';
+import type { ContractCodecRegistry } from './ast/codec-types';
 
 /**
  * Codec-id-keyed accessor for descriptor metadata. The unified read API
@@ -74,14 +74,6 @@ export type MutationDefaultsOptions = {
 export interface ExecutionContext<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly contract: TContract;
   /**
-   * Codec registry indexed by codec id. Source of shared, non-
-   * parameterized codec instances; consulted by the `forCodecId`
-   * fallback for refs-less call sites whose codec id is non-
-   * parameterized (parameterized codec ids always go through
-   * `forColumn` after refs validation).
-   */
-  readonly codecs: CodecRegistry;
-  /**
    * Contract-bound codec registry built once at context-construction
    * time by walking the contract's columns and resolving each through
    * its descriptor's factory. The dispatch path (`encodeParam` /
@@ -89,7 +81,9 @@ export interface ExecutionContext<TContract extends Contract<SqlStorage> = Contr
    * call sites; `forCodecId(codecId)` is the refs-less fallback,
    * permitted only for non-parameterized codec ids (the builder-
    * pipeline validator pass enforces refs on every parameterized
-   * `ParamRef`).
+   * `ParamRef`). Pre-populated with one canonical instance per
+   * non-parameterized descriptor so `forCodecId` covers refs-less
+   * codec ids that no contract column declares.
    */
   readonly contractCodecs: ContractCodecRegistry;
   /**

@@ -25,13 +25,11 @@ import type {
   Adapter,
   AnyQueryAst,
   Codec,
-  CodecRegistry,
   ContractCodecRegistry,
   LoweredStatement,
   SqlCodecInstanceContext,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
-import { buildCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { buildCodecDescriptorRegistry } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type {
   AppliedMutationDefault,
@@ -416,7 +414,6 @@ function isResolvedCodec(candidate: unknown): candidate is Codec {
 function buildContractCodecRegistry(
   contract: Contract<SqlStorage>,
   codecDescriptors: CodecDescriptorRegistry,
-  legacyCodecRegistry: CodecRegistry,
   types: TypeHelperRegistry,
   parameterizedDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): ContractCodecRegistry {
@@ -432,6 +429,55 @@ function buildContractCodecRegistry(
   // defensive guard for non-parameterized columns whose `byCodecId`
   // entry is unique by construction.
   const ambiguousCodecIds = new Set<string>();
+
+  // Pre-populate `byCodecId` with non-parameterized descriptor
+  // instances. Refs-less encode/decode call sites (computed projections
+  // without a column ref, transient builder ParamRefs) resolve through
+  // `forCodecId(id)` and need a representative instance for codec ids
+  // that no contract column declares. Non-parameterized descriptors'
+  // factories are constant — every call yields the same shared codec —
+  // so a single materialization is correct.
+  for (const descriptor of codecDescriptors.values()) {
+    if (descriptor.isParameterized) continue;
+    const ctx: SqlCodecInstanceContext = {
+      name: `<shared:${descriptor.codecId}>`,
+      usedAt: [],
+    };
+    const voidFactory = descriptor.factory as unknown as (
+      params: undefined,
+    ) => (ctx: SqlCodecInstanceContext) => Codec;
+    byCodecId.set(descriptor.codecId, voidFactory(undefined)(ctx));
+  }
+
+  // Representative instances for parameterized descriptors whose
+  // factory tolerates `factory(undefined)` (e.g. pgvector — the
+  // factory ignores its params and returns the same shared codec).
+  // Used as the last-resort fallback in `forCodecId` for refs-less
+  // call sites whose codec id has no contract column the walk could
+  // resolve through (e.g. `cosineSimilarity(col, [literal])` builds
+  // an inline `ParamRef` without column refs). Stored separately so
+  // column-bound walk results don't trip the ambiguity check, and
+  // consulted only when `byCodecId` has no column-bound entry.
+  // Descriptors whose factory needs real params (arktype-json) raise
+  // and are skipped — the per-column dispatch path materializes
+  // those lazily when refs are populated.
+  const parameterizedRepresentatives = new Map<string, Codec>();
+  for (const descriptor of codecDescriptors.values()) {
+    if (!descriptor.isParameterized) continue;
+    const ctx: SqlCodecInstanceContext = {
+      name: `<shared:${descriptor.codecId}>`,
+      usedAt: [],
+    };
+    const factory = descriptor.factory as unknown as (
+      params: unknown,
+    ) => (ctx: SqlCodecInstanceContext) => Codec;
+    try {
+      parameterizedRepresentatives.set(descriptor.codecId, factory(undefined)(ctx));
+    } catch {
+      // Parameterized descriptor whose factory requires real params;
+      // refs-less fallback for this codec id is unavailable.
+    }
+  }
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
@@ -521,11 +567,11 @@ function buildContractCodecRegistry(
       // Codec-id-only fallback for refs-less sites. The validator pass
       // (`validateParamRefRefs`) enforces refs on every parameterized
       // `ParamRef` before encode, so this path is only legitimately
-      // reachable for non-parameterized codec ids. Prefer the
-      // contract-walk-derived shared codec; fall back to the legacy
-      // `codecRegistry.get` for parameterized codec ids whose contracts
-      // don't have a typeRef/typeParams column the walk could resolve
-      // through.
+      // reachable for non-parameterized codec ids. The map is
+      // pre-populated with every non-parameterized descriptor's
+      // canonical instance and overlaid with column-resolved instances
+      // from the contract walk; parameterized codec ids without a
+      // typeRef/typeParams-bound column never reach this map.
       //
       // Reject ambiguous parameterized fallbacks: if the contract walk
       // resolved more than one distinct codec instance under this id
@@ -540,7 +586,7 @@ function buildContractCodecRegistry(
           { codecId },
         );
       }
-      return byCodecId.get(codecId) ?? legacyCodecRegistry.get(codecId);
+      return byCodecId.get(codecId) ?? parameterizedRepresentatives.get(codecId);
     },
   };
 
@@ -738,41 +784,6 @@ export function createExecutionContext<
   const { all: allCodecDescriptors, parameterized: parameterizedCodecDescriptors } =
     collectCodecDescriptors(contributors);
 
-  // Materialize the runtime codec view by calling
-  // `descriptor.factory(undefined)(ctx)` once per descriptor. For non-
-  // parameterized descriptors the factory is constant — every call
-  // yields the same shared codec. For parameterized descriptors whose
-  // factory tolerates `undefined` (pgvector's factory ignores its
-  // params and returns the same shared codec), the materialization
-  // produces a representative codec instance the `forCodecId` fallback
-  // can hand out for refs-less call sites (the AC-5 carve-out path for
-  // parameter encoding); descriptors whose factory needs real params
-  // (arktype-json) raise — skip them and let the per-column dispatch
-  // path handle materialization lazily.
-  const codecs: Codec<string>[] = [];
-  for (const descriptor of allCodecDescriptors) {
-    const ctx: SqlCodecInstanceContext = {
-      name: `<shared:${descriptor.codecId}>`,
-      usedAt: [],
-    };
-    // The descriptor's `P` is heterogeneous; for non-parameterized
-    // descriptors it's `void` and runtime value is `undefined`, for
-    // parameterized descriptors `undefined` may be tolerated (pgvector)
-    // or raise (arktype-json — needs `jsonIr`). The cast narrows the
-    // family-agnostic `CodecInstanceContext` to the SQL extension
-    // supplied at this call site (contravariant input narrow is safe).
-    const factory = descriptor.factory as unknown as (
-      params: unknown,
-    ) => (ctx: SqlCodecInstanceContext) => Codec;
-    try {
-      codecs.push(factory(undefined)(ctx));
-    } catch {
-      // Parameterized descriptor whose factory needs real params; skip
-      // here and let the per-column dispatch path materialize lazily.
-    }
-  }
-  const codecRegistry = buildCodecRegistry(codecs);
-
   const queryOperationRegistry = createSqlOperationRegistry();
   for (const contributor of contributors) {
     for (const op of contributor.queryOperations?.() ?? []) {
@@ -793,14 +804,12 @@ export function createExecutionContext<
   const contractCodecs = buildContractCodecRegistry(
     contract,
     codecDescriptors,
-    codecRegistry,
     types,
     parameterizedCodecDescriptors,
   );
 
   return {
     contract,
-    codecs: codecRegistry,
     contractCodecs,
     codecDescriptors,
     queryOperations: queryOperationRegistry,

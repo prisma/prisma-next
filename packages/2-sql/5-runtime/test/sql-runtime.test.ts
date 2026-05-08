@@ -7,15 +7,9 @@ import {
   type RuntimeExtensionInstance,
 } from '@prisma-next/framework-components/execution';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type {
-  Codec,
-  CodecRegistry,
-  SqlDriver,
-  SqlExecuteRequest,
-} from '@prisma-next/sql-relational-core/ast';
+import type { Codec, SqlDriver, SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
-  buildCodecRegistry,
   ColumnRef,
   LiteralExpr,
   ParamRef,
@@ -37,7 +31,7 @@ import { createExecutionContext, createSqlExecutionStack } from '../src/sql-cont
 import { createRuntime, withTransaction } from '../src/sql-runtime';
 import { createAsyncSecretCodec, decryptSecret } from './seeded-secret-codec';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecRegistry } from './utils';
+import { descriptorsFromCodecs } from './utils';
 
 const runtimeSecretSeed = 'sql-runtime-secret';
 
@@ -66,8 +60,10 @@ interface DriverMockSpies {
 
 type MockSqlDriver = SqlDriver & { __spies: DriverMockSpies };
 
-function createStubCodecs(extraCodecs: readonly Codec<string>[] = []): CodecRegistry {
-  return buildCodecRegistry([
+function createStubCodecs(
+  extraCodecs: readonly Codec<string>[] = [],
+): ReadonlyArray<Codec<string>> {
+  return [
     defineTestCodec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
@@ -75,7 +71,7 @@ function createStubCodecs(extraCodecs: readonly Codec<string>[] = []): CodecRegi
       decode: (w: number) => w,
     }),
     ...extraCodecs,
-  ]);
+  ];
 }
 
 function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
@@ -83,13 +79,11 @@ function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
   return {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    __codecs: codecs,
     profile: {
       id: 'test-profile',
       target: 'postgres',
       capabilities: {},
-      codecs() {
-        return codecs;
-      },
       readMarkerStatement() {
         return {
           sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where id = $1',
@@ -178,14 +172,14 @@ function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
 function createTestAdapterDescriptor(
   adapter: ReturnType<typeof createStubAdapter>,
 ): SqlRuntimeAdapterDescriptor<'postgres'> {
-  const codecRegistry = adapter.profile.codecs();
+  const codecRegistry = adapter.__codecs;
   return {
     kind: 'adapter',
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => descriptorsFromCodecRegistry(codecRegistry),
+    codecs: () => descriptorsFromCodecs(codecRegistry),
     create() {
       return Object.assign(
         { familyId: 'sql' as const, targetId: 'postgres' as const },

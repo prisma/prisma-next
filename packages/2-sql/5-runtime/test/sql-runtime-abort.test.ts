@@ -9,13 +9,11 @@ import {
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Codec,
-  CodecRegistry,
   SqlCodecCallContext,
   SqlDriver,
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import {
-  buildCodecRegistry,
   ColumnRef,
   ProjectionItem,
   SelectAst,
@@ -32,7 +30,7 @@ import type {
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecRegistry } from './utils';
+import { descriptorsFromCodecs } from './utils';
 
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
@@ -60,8 +58,8 @@ function deferred<T>(): {
   return { promise, resolve, reject };
 }
 
-function createStubCodecs(extras: readonly Codec<string>[] = []): CodecRegistry {
-  return buildCodecRegistry([...extras]);
+function createStubCodecs(extras: readonly Codec<string>[] = []): ReadonlyArray<Codec<string>> {
+  return [...extras];
 }
 
 interface DriverOptions {
@@ -104,13 +102,11 @@ function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
   return {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    __codecs: codecs,
     profile: {
       id: 'test-profile',
       target: 'postgres',
       capabilities: {},
-      codecs() {
-        return codecs;
-      },
       readMarkerStatement() {
         return { sql: 'select 1', params: [] };
       },
@@ -138,14 +134,14 @@ function createTestSetup(extras: readonly Codec<string>[] = [], driverOptions?: 
     },
   };
 
-  const codecRegistry = adapter.profile.codecs();
+  const codecRegistry = adapter.__codecs;
   const adapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres'> = {
     kind: 'adapter',
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => descriptorsFromCodecRegistry(codecRegistry),
+    codecs: () => descriptorsFromCodecs(codecRegistry),
     create() {
       return Object.assign(
         { familyId: 'sql' as const, targetId: 'postgres' as const },

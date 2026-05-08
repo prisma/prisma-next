@@ -278,9 +278,6 @@ describe('ContractCodecRegistry', () => {
     const codecById = context.contractCodecs.forCodecId('test/scalar@1');
     expect(codecById).toBeDefined();
     expect(codecById?.id).toBe('test/scalar@1');
-    // The codec-id fallback returns the same instance the legacy
-    // CodecRegistry.get(id) returns for non-parameterized codecs.
-    expect(codecById).toBe(context.codecs.get('test/scalar@1'));
   });
 
   it('forCodecId returns undefined for an unknown codec id', () => {

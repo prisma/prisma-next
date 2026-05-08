@@ -1,10 +1,8 @@
-import type { JsonValue } from '@prisma-next/contract/types';
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
-import type { CodecRegistry, CodecTrait } from '@prisma-next/sql-relational-core/ast';
+import type { CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
   BinaryExpr,
-  buildCodecRegistry,
   ColumnRef,
   ExistsExpr,
   ListExpression,
@@ -20,7 +18,6 @@ import {
 import { describe, expect, it } from 'vitest';
 import { createModelAccessor } from '../src/model-accessor';
 import { getTestContext, getTestContract } from './helpers';
-import { defineTestCodec } from './test-codec';
 
 describe('createModelAccessor', () => {
   const context = getTestContext();
@@ -44,19 +41,6 @@ describe('createModelAccessor', () => {
     expect(actual).toEqual(
       new BinaryExpr(op, ColumnRef.of(table, column), paramRef(table, column, value)),
     );
-  }
-
-  function makeRegistry(entries: Record<string, readonly CodecTrait[]>): CodecRegistry {
-    const codecs = Object.entries(entries).map(([id, traits]) =>
-      defineTestCodec({
-        typeId: id,
-        targetTypes: [],
-        traits,
-        encode: (v: JsonValue) => v,
-        decode: (v: JsonValue) => v,
-      }),
-    );
-    return buildCodecRegistry(codecs);
   }
 
   function makeDescriptors(
@@ -487,9 +471,8 @@ describe('createModelAccessor', () => {
 
   describe('runtime trait-gating', () => {
     it('only creates equality methods when codec has equality trait', () => {
-      const codecs = makeRegistry({ 'pg/int4@1': ['equality'] });
       const codecDescriptors = makeDescriptors({ 'pg/int4@1': ['equality'] });
-      const accessor = createModelAccessor({ ...context, codecs, codecDescriptors }, 'Post');
+      const accessor = createModelAccessor({ ...context, codecDescriptors }, 'Post');
       const field = accessor['id'] as unknown as Record<string, unknown>;
 
       expect(typeof field['eq']).toBe('function');
@@ -509,13 +492,10 @@ describe('createModelAccessor', () => {
     });
 
     it('creates all methods when codec has all relevant traits', () => {
-      const codecs = makeRegistry({
-        'pg/text@1': ['equality', 'order', 'textual'],
-      });
       const codecDescriptors = makeDescriptors({
         'pg/text@1': ['equality', 'order', 'textual'],
       });
-      const accessor = createModelAccessor({ ...context, codecs, codecDescriptors }, 'User');
+      const accessor = createModelAccessor({ ...context, codecDescriptors }, 'User');
       const field = accessor['name'] as unknown as Record<string, unknown>;
 
       for (const method of [
@@ -538,9 +518,8 @@ describe('createModelAccessor', () => {
     });
 
     it('throws when relation shorthand filter targets a field without equality trait', () => {
-      const codecs = makeRegistry({ 'pg/int4@1': ['order'] });
       const codecDescriptors = makeDescriptors({ 'pg/int4@1': ['order'] });
-      const accessor = createModelAccessor({ ...context, codecs, codecDescriptors }, 'Post');
+      const accessor = createModelAccessor({ ...context, codecDescriptors }, 'Post');
 
       expect(() => accessor['comments']!.some({ postId: 42 })).toThrow(
         /does not support equality comparisons/,
@@ -631,10 +610,9 @@ describe('createModelAccessor', () => {
         'pg/int4@1': ['equality'],
         'pg/bool@1': ['equality', 'boolean'],
       };
-      const codecs = makeRegistry(traitsByCodec);
       const codecDescriptors = makeDescriptors(traitsByCodec);
 
-      const ctx = { ...context, queryOperations, codecs, codecDescriptors };
+      const ctx = { ...context, queryOperations, codecDescriptors };
       const user = createModelAccessor(ctx, 'User');
       const post = createModelAccessor(ctx, 'Post');
 

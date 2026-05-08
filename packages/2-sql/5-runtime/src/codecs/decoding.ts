@@ -6,7 +6,6 @@ import {
 import type {
   AnyQueryAst,
   Codec,
-  CodecRegistry,
   ContractCodecRegistry,
   ProjectionItem,
   SqlCodecCallContext,
@@ -50,13 +49,13 @@ function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> 
  * length, schema validators, etc.).
  *
  * The wrong-instance risk for parameterized codecs that F22 originally
- * flagged is closed off structurally rather than by an early throw on
- * column-lookup miss:
+ * flagged is closed off structurally:
  *
- * 1. `extractCodecLookup` (post-F19) skips parameterized descriptors
- *    so the legacy registry cannot hand out a representative.
- * 2. `buildContractCodecRegistry`'s `forCodecId` rejects ambiguous
- *    parameterized fallbacks (`ambiguousCodecIds`).
+ * 1. `buildContractCodecRegistry` pre-populates `byCodecId` with one
+ *    canonical instance per non-parameterized descriptor; parameterized
+ *    descriptors are intentionally absent.
+ * 2. `forCodecId` rejects ambiguous parameterized fallbacks
+ *    (`ambiguousCodecIds`).
  * 3. The non-ambiguous parameterized case stores the column-correct
  *    per-instance codec under `byCodecId`, so the fall-through still
  *    resolves to the right instance.
@@ -70,7 +69,6 @@ function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> 
  */
 function resolveProjectionCodec(
   item: ProjectionItem,
-  registry: CodecRegistry,
   contractCodecs: ContractCodecRegistry | undefined,
 ): Codec | undefined {
   if (contractCodecs) {
@@ -83,16 +81,13 @@ function resolveProjectionCodec(
     }
   }
   if (item.codecId) {
-    const fromContract = contractCodecs?.forCodecId(item.codecId);
-    if (fromContract) return fromContract;
-    return registry.get(item.codecId);
+    return contractCodecs?.forCodecId(item.codecId);
   }
   return undefined;
 }
 
 function buildDecodeContext(
   plan: SqlExecutionPlan,
-  registry: CodecRegistry,
   contractCodecs: ContractCodecRegistry | undefined,
 ): DecodeContext {
   if (!isAstBackedPlan(plan)) {
@@ -122,7 +117,7 @@ function buildDecodeContext(
   for (const item of projection) {
     aliases.push(item.alias);
 
-    const codec = resolveProjectionCodec(item, registry, contractCodecs);
+    const codec = resolveProjectionCodec(item, contractCodecs);
     if (codec) {
       codecs.set(item.alias, codec);
     }
@@ -290,14 +285,13 @@ async function decodeField(
 export async function decodeRow(
   row: Record<string, unknown>,
   plan: SqlExecutionPlan,
-  registry: CodecRegistry,
   rowCtx: SqlCodecCallContext,
   contractCodecs?: ContractCodecRegistry,
 ): Promise<Record<string, unknown>> {
   checkAborted(rowCtx, 'decode');
   const signal = rowCtx.signal;
 
-  const decodeCtx = buildDecodeContext(plan, registry, contractCodecs);
+  const decodeCtx = buildDecodeContext(plan, contractCodecs);
 
   const aliases = decodeCtx.aliases ?? Object.keys(row);
 

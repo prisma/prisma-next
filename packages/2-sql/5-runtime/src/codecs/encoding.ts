@@ -5,7 +5,6 @@ import {
 } from '@prisma-next/framework-components/runtime';
 import {
   type Codec,
-  type CodecRegistry,
   type ContractCodecRegistry,
   collectOrderedParamRefs,
   type ParamRefBindingRefs,
@@ -35,18 +34,17 @@ const NO_METADATA: ParamMetadata = Object.freeze({
  * `(table, column)` pair, encoding the column's typeParams (e.g.
  * `vector(1024)` vs. `vector(1536)`).
  *
- * On a column-lookup miss the resolver falls through to `forCodecId`,
- * but the wrong-instance risk F22 originally flagged is closed off
- * structurally rather than via an early throw:
+ * On a column-lookup miss the resolver falls through to `forCodecId`.
+ * The wrong-instance risk F22 originally flagged is closed off
+ * structurally:
  *
- * 1. `extractCodecLookup` (post-F19) skips parameterized descriptors
- *    when materializing the legacy `byId` map, so the legacy registry
- *    cannot return a representative parameterized instance.
- * 2. `buildContractCodecRegistry`'s `forCodecId` rejects ambiguous
- *    parameterized fallbacks (`ambiguousCodecIds`) — if the contract
- *    walk resolved more than one distinct instance under a single
- *    parameterized id, the call throws rather than binding to whichever
- *    landed first.
+ * 1. `buildContractCodecRegistry` pre-populates `byCodecId` with one
+ *    canonical instance per non-parameterized descriptor; parameterized
+ *    descriptors are intentionally absent from this pre-population.
+ * 2. `forCodecId` rejects ambiguous parameterized fallbacks
+ *    (`ambiguousCodecIds`) — if the contract walk resolved more than
+ *    one distinct instance under a single parameterized id, the call
+ *    throws rather than binding to whichever landed first.
  * 3. For the non-ambiguous parameterized case (a single column with
  *    that id), `byCodecId` stores the column-correct per-instance
  *    codec, so the fall-through still resolves to the right instance.
@@ -59,7 +57,6 @@ const NO_METADATA: ParamMetadata = Object.freeze({
  */
 function resolveParamCodec(
   metadata: ParamMetadata,
-  registry: CodecRegistry,
   contractCodecs: ContractCodecRegistry | undefined,
 ): Codec | undefined {
   if (!metadata.codecId) return undefined;
@@ -67,9 +64,7 @@ function resolveParamCodec(
     const byColumn = contractCodecs.forColumn(metadata.refs.table, metadata.refs.column);
     if (byColumn) return byColumn;
   }
-  const fromContract = contractCodecs?.forCodecId(metadata.codecId);
-  if (fromContract) return fromContract;
-  return registry.get(metadata.codecId);
+  return contractCodecs?.forCodecId(metadata.codecId);
 }
 
 function paramLabel(metadata: ParamMetadata, paramIndex: number): string {
@@ -115,7 +110,6 @@ export async function encodeParam(
     readonly refs?: ParamRefBindingRefs;
   },
   paramIndex: number,
-  registry: CodecRegistry,
   ctx: SqlCodecCallContext,
   contractCodecs?: ContractCodecRegistry,
 ): Promise<unknown> {
@@ -123,7 +117,6 @@ export async function encodeParam(
     value,
     { codecId: paramRef.codecId, name: paramRef.name, refs: paramRef.refs },
     paramIndex,
-    registry,
     ctx,
     contractCodecs,
   );
@@ -133,7 +126,6 @@ async function encodeParamValue(
   value: unknown,
   metadata: ParamMetadata,
   paramIndex: number,
-  registry: CodecRegistry,
   ctx: SqlCodecCallContext,
   contractCodecs: ContractCodecRegistry | undefined,
 ): Promise<unknown> {
@@ -141,7 +133,7 @@ async function encodeParamValue(
     return null;
   }
 
-  const codec = resolveParamCodec(metadata, registry, contractCodecs);
+  const codec = resolveParamCodec(metadata, contractCodecs);
   if (!codec) {
     return value;
   }
@@ -174,7 +166,6 @@ async function encodeParamValue(
  */
 export async function encodeParams(
   plan: SqlExecutionPlan,
-  registry: CodecRegistry,
   ctx: SqlCodecCallContext,
   contractCodecs?: ContractCodecRegistry,
 ): Promise<readonly unknown[]> {
@@ -200,14 +191,7 @@ export async function encodeParams(
 
   const tasks: Promise<unknown>[] = new Array(paramCount);
   for (let i = 0; i < paramCount; i++) {
-    tasks[i] = encodeParamValue(
-      plan.params[i],
-      metadata[i] ?? NO_METADATA,
-      i,
-      registry,
-      ctx,
-      contractCodecs,
-    );
+    tasks[i] = encodeParamValue(plan.params[i], metadata[i] ?? NO_METADATA, i, ctx, contractCodecs);
   }
 
   const settled = await raceAgainstAbort(Promise.all(tasks), signal, 'encode');

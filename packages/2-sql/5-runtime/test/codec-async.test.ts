@@ -6,7 +6,6 @@ import {
   AndExpr,
   type AnyExpression,
   BinaryExpr,
-  buildCodecRegistry,
   ColumnRef,
   ParamRef,
   ProjectionItem,
@@ -20,6 +19,7 @@ import { decodeRow } from '../src/codecs/decoding';
 import { encodeParams } from '../src/codecs/encoding';
 import { createAsyncSecretCodec, decryptSecret, encryptSecret } from './seeded-secret-codec';
 import { defineTestCodec } from './test-codec';
+import { buildTestContractCodecs } from './utils';
 
 // =============================================================================
 // Shared helpers — AST-backed plans (ADR 205)
@@ -117,7 +117,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
     const dB = deferred<string>();
     const callOrder: string[] = [];
 
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/async-a@1',
         targetTypes: ['text'],
@@ -145,7 +145,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
         },
         decode: (wire: number) => wire,
       }),
-    ]);
+    ];
 
     const plan = buildAstPlan({
       params: [
@@ -155,7 +155,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
       ],
     });
 
-    const promise = encodeParams(plan, registry, {});
+    const promise = encodeParams(plan, {}, buildTestContractCodecs(registry));
 
     expect(callOrder).toEqual(['encode-a-start', 'encode-b-start', 'encode-sync']);
 
@@ -167,20 +167,20 @@ describe('encodeParams — async, concurrent dispatch', () => {
   });
 
   it('always awaits codec.encode (no Promise leaks into the driver)', async () => {
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/async@1',
         targetTypes: ['text'],
         encode: async (value: string) => `wire:${value}`,
         decode: async (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const plan = buildAstPlan({
       params: [{ value: 'hello', codecId: 'test/async@1' }],
     });
 
-    const result = await encodeParams(plan, registry, {});
+    const result = await encodeParams(plan, {}, buildTestContractCodecs(registry));
     const first = result[0];
     expect(typeof (first as { then?: unknown } | null | undefined)?.then).toBe('undefined');
     expect(first).toBe('wire:hello');
@@ -188,7 +188,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
 
   it('wraps encode failures in RUNTIME.ENCODE_FAILED with { label, codec, paramIndex } and cause', async () => {
     const cause = new Error('boom');
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/explody@1',
         targetTypes: ['text'],
@@ -197,13 +197,13 @@ describe('encodeParams — async, concurrent dispatch', () => {
         },
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const plan = buildAstPlan({
       params: [{ value: 'bad', codecId: 'test/explody@1', name: 'pname' }],
     });
 
-    await expect(encodeParams(plan, registry, {})).rejects.toMatchObject({
+    await expect(encodeParams(plan, {}, buildTestContractCodecs(registry))).rejects.toMatchObject({
       code: 'RUNTIME.ENCODE_FAILED',
       category: 'RUNTIME',
       severity: 'error',
@@ -217,7 +217,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
   });
 
   it('uses param[<i>] label when ParamRef has no name', async () => {
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/explody@1',
         targetTypes: ['text'],
@@ -226,20 +226,20 @@ describe('encodeParams — async, concurrent dispatch', () => {
         },
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const plan = buildAstPlan({
       params: [{ value: 'x', codecId: 'test/explody@1' }],
     });
 
-    await expect(encodeParams(plan, registry, {})).rejects.toMatchObject({
+    await expect(encodeParams(plan, {}, buildTestContractCodecs(registry))).rejects.toMatchObject({
       code: 'RUNTIME.ENCODE_FAILED',
       details: { label: 'param[0]' },
     });
   });
 
   it('returns null for null/undefined parameter values without invoking the codec', async () => {
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/sync@1',
         targetTypes: ['text'],
@@ -248,7 +248,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
         },
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const plan = buildAstPlan({
       params: [
@@ -257,21 +257,21 @@ describe('encodeParams — async, concurrent dispatch', () => {
       ],
     });
 
-    const result = await encodeParams(plan, registry, {});
+    const result = await encodeParams(plan, {}, buildTestContractCodecs(registry));
     expect([...result]).toEqual([null, null]);
   });
 
   it('passes through values when no codec is registered for the ParamRef.codecId', async () => {
-    const registry = buildCodecRegistry([]);
+    const registry: ReadonlyArray<Codec<string>> = [];
     const plan = buildAstPlan({
       params: [{ value: 'raw', codecId: 'test/missing@1' }],
     });
-    const result = await encodeParams(plan, registry, {});
+    const result = await encodeParams(plan, {}, buildTestContractCodecs(registry));
     expect([...result]).toEqual(['raw']);
   });
 
   it('passes parameters through unchanged for raw plans (no AST, no codec encoding)', async () => {
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/should-not-run@1',
         targetTypes: ['text'],
@@ -280,22 +280,22 @@ describe('encodeParams — async, concurrent dispatch', () => {
         },
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const plan = buildRawPlan(['Alice', 42]);
-    const result = await encodeParams(plan, registry, {});
+    const result = await encodeParams(plan, {}, buildTestContractCodecs(registry));
     expect([...result]).toEqual(['Alice', 42]);
   });
 
   it('encodes a fully-typed AST-backed plan without throwing', async () => {
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/passthrough@1',
         targetTypes: ['text'],
         encode: (value: string) => `wire:${value}`,
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const plan = buildAstPlan({
       params: [
@@ -304,7 +304,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
       ],
     });
 
-    const encoded = await encodeParams(plan, registry, {});
+    const encoded = await encodeParams(plan, {}, buildTestContractCodecs(registry));
     expect([...encoded]).toEqual(['wire:x', 'wire:y']);
   });
 });
@@ -319,7 +319,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     const dB = deferred<string>();
     const callOrder: string[] = [];
 
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/slow-a@1',
         targetTypes: ['text'],
@@ -347,7 +347,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
           return w * 2;
         },
       }),
-    ]);
+    ];
 
     const plan = buildAstPlan({
       projections: [
@@ -358,7 +358,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     });
 
     const row = { a: 'A', b: 'B', n: 21 };
-    const promise = decodeRow(row, plan, registry, {});
+    const promise = decodeRow(row, plan, {}, buildTestContractCodecs(registry));
 
     expect(callOrder).toEqual(['decode-a-start', 'decode-b-start', 'decode-sync']);
 
@@ -370,20 +370,20 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   });
 
   it('always awaits codec.decode and yields plain values (no Promise leaks)', async () => {
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/async@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
         decode: async (w: string) => `decoded:${w}`,
       }),
-    ]);
+    ];
 
     const plan = buildAstPlan({
       projections: [{ alias: 'name', codecId: 'test/async@1' }],
     });
 
-    const result = await decodeRow({ name: 'alice' }, plan, registry, {});
+    const result = await decodeRow({ name: 'alice' }, plan, {}, buildTestContractCodecs(registry));
     expect(typeof (result['name'] as { then?: unknown } | null)?.then).toBe('undefined');
     expect(result['name']).toBe('decoded:alice');
   });
@@ -396,7 +396,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     // inline error gets wrapped in the standard `RUNTIME.DECODE_FAILED`
     // envelope by `wrapDecodeFailure` with the original validation
     // error attached on `cause`.
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec<'pg/inline-validating-json@1', readonly [], string, JsonValue>({
         typeId: 'pg/inline-validating-json@1',
         targetTypes: ['jsonb'],
@@ -413,7 +413,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
           return parsed as JsonValue;
         },
       }),
-    ]);
+    ];
 
     const plan = buildAstPlan({
       projections: [
@@ -425,12 +425,20 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       ],
     });
 
-    const ok = await decodeRow({ metadata: '{"name":"alice"}' }, plan, registry, {});
+    const ok = await decodeRow(
+      { metadata: '{"name":"alice"}' },
+      plan,
+      {},
+      buildTestContractCodecs(registry),
+    );
     expect(ok['metadata']).toEqual({ name: 'alice' });
 
-    const rejection = (await decodeRow({ metadata: '{"age":30}' }, plan, registry, {}).catch(
-      (e: unknown) => e,
-    )) as Error & { code?: string; cause?: { code?: string } };
+    const rejection = (await decodeRow(
+      { metadata: '{"age":30}' },
+      plan,
+      {},
+      buildTestContractCodecs(registry),
+    ).catch((e: unknown) => e)) as Error & { code?: string; cause?: { code?: string } };
     expect(rejection.code).toBe('RUNTIME.DECODE_FAILED');
     expect(rejection.cause).toBeDefined();
     expect((rejection.cause as { code?: string }).code).toBe(
@@ -440,7 +448,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
 
   it('wraps decode failures in RUNTIME.DECODE_FAILED with { table, column, codec } and cause', async () => {
     const cause = new Error('boom');
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/explody@1',
         targetTypes: ['text'],
@@ -449,7 +457,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
           throw cause;
         },
       }),
-    ]);
+    ];
 
     const plan = buildAstPlan({
       projections: [
@@ -461,7 +469,9 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       ],
     });
 
-    await expect(decodeRow({ explody: 'wire' }, plan, registry, {})).rejects.toMatchObject({
+    await expect(
+      decodeRow({ explody: 'wire' }, plan, {}, buildTestContractCodecs(registry)),
+    ).rejects.toMatchObject({
       code: 'RUNTIME.DECODE_FAILED',
       category: 'RUNTIME',
       severity: 'error',
@@ -475,7 +485,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   });
 
   it('passes wire values through for raw plans (no AST, no codec decoding)', async () => {
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/should-not-run@1',
         targetTypes: ['text'],
@@ -484,20 +494,27 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
           throw new Error('raw plans must skip codec decoding');
         },
       }),
-    ]);
+    ];
 
     const plan = buildRawPlan();
-    const result = await decodeRow({ id: 1, email: 'a@b.com' }, plan, registry, {});
+    const result = await decodeRow(
+      { id: 1, email: 'a@b.com' },
+      plan,
+      {},
+      buildTestContractCodecs(registry),
+    );
     expect(result).toEqual({ id: 1, email: 'a@b.com' });
   });
 
   it('throws RUNTIME.DECODE_FAILED for AST-backed plan when row is missing a projection alias', async () => {
-    const registry = buildCodecRegistry([]);
+    const registry: ReadonlyArray<Codec<string>> = [];
     const plan = buildAstPlan({
       projections: [{ alias: 'id' }, { alias: 'email' }],
     });
 
-    await expect(decodeRow({ id: 1 }, plan, registry, {})).rejects.toMatchObject({
+    await expect(
+      decodeRow({ id: 1 }, plan, {}, buildTestContractCodecs(registry)),
+    ).rejects.toMatchObject({
       code: 'RUNTIME.DECODE_FAILED',
       details: {
         alias: 'email',
@@ -508,7 +525,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   });
 
   it('preserves wire null for AST-backed plans (distinct from missing alias)', async () => {
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/should-not-run@1',
         targetTypes: ['text'],
@@ -517,12 +534,12 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
           throw new Error('codec must not be invoked for null wire values');
         },
       }),
-    ]);
+    ];
     const plan = buildAstPlan({
       projections: [{ alias: 'id', codecId: 'test/should-not-run@1' }],
     });
 
-    const result = await decodeRow({ id: null }, plan, registry, {});
+    const result = await decodeRow({ id: null }, plan, {}, buildTestContractCodecs(registry));
     expect(result).toEqual({ id: null });
   });
 
@@ -539,7 +556,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
         decode,
       });
 
-    const registry = buildCodecRegistry([
+    const registry = [
       buildCodec(
         'sync@1',
         (v) => v,
@@ -550,7 +567,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
         (v) => v,
         async (w) => `async:${String(w)}`,
       ),
-    ]);
+    ];
 
     const plan = buildAstPlan({
       projections: [
@@ -559,7 +576,12 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       ],
     });
 
-    const result = await decodeRow({ syncCol: 'a', asyncCol: 'b' }, plan, registry, {});
+    const result = await decodeRow(
+      { syncCol: 'a', asyncCol: 'b' },
+      plan,
+      {},
+      buildTestContractCodecs(registry),
+    );
     expect(result).toEqual({ syncCol: 'sync:a', asyncCol: 'async:b' });
   });
 });
@@ -575,15 +597,13 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
     'encodeParams encrypts plaintext via async codec.encode (no Promise leaks)',
     { timeout: timeouts.databaseOperation },
     async () => {
-      const registry = buildCodecRegistry([
-        createAsyncSecretCodec({ typeId: 'pg/secret@1', seed }),
-      ]);
+      const registry = [createAsyncSecretCodec({ typeId: 'pg/secret@1', seed })];
 
       const plan = buildAstPlan({
         params: [{ value: 'Alice', codecId: 'pg/secret@1', name: 'secret' }],
       });
 
-      const result = await encodeParams(plan, registry, {});
+      const result = await encodeParams(plan, {}, buildTestContractCodecs(registry));
       const wire = result[0];
       expect(typeof wire).toBe('string');
       expect(wire).not.toBe('Alice');
@@ -595,9 +615,7 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
     'decodeRow decrypts ciphertext via async codec.decode and yields plain values',
     { timeout: timeouts.databaseOperation },
     async () => {
-      const registry = buildCodecRegistry([
-        createAsyncSecretCodec({ typeId: 'pg/secret@1', seed }),
-      ]);
+      const registry = [createAsyncSecretCodec({ typeId: 'pg/secret@1', seed })];
 
       const wire = await encryptSecret('top-secret', seed);
       const plan = buildAstPlan({
@@ -610,13 +628,13 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
         ],
       });
 
-      const result = await decodeRow({ secret: wire }, plan, registry, {});
+      const result = await decodeRow({ secret: wire }, plan, {}, buildTestContractCodecs(registry));
       expect(result['secret']).toBe('top-secret');
     },
   );
 
   it('decode failures from async crypto are wrapped in RUNTIME.DECODE_FAILED with cause', async () => {
-    const registry = buildCodecRegistry([createAsyncSecretCodec({ typeId: 'pg/secret@1', seed })]);
+    const registry = [createAsyncSecretCodec({ typeId: 'pg/secret@1', seed })];
 
     const plan = buildAstPlan({
       projections: [
@@ -628,9 +646,12 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
       ],
     });
 
-    const rejection = await decodeRow({ secret: 'bad-payload' }, plan, registry, {}).catch(
-      (e: unknown) => e,
-    );
+    const rejection = await decodeRow(
+      { secret: 'bad-payload' },
+      plan,
+      {},
+      buildTestContractCodecs(registry),
+    ).catch((e: unknown) => e);
     expect(rejection).toBeInstanceOf(Error);
     const err = rejection as Error & {
       code?: string;

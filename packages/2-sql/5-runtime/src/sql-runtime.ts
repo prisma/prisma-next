@@ -17,7 +17,6 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
   AnyQueryAst,
-  CodecRegistry,
   ContractCodecRegistry,
   LoweredStatement,
   SqlCodecCallContext,
@@ -139,7 +138,6 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   private readonly driver: SqlDriver<unknown>;
   private readonly familyAdapter: RuntimeFamilyAdapter<Contract<SqlStorage>>;
-  private readonly codecRegistry: CodecRegistry;
   private readonly contractCodecs: ContractCodecRegistry;
   private readonly codecDescriptors: CodecDescriptorRegistry;
   private readonly sqlCtx: SqlMiddlewareContext;
@@ -178,7 +176,6 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.adapter = adapter;
     this.driver = driver;
     this.familyAdapter = new SqlFamilyAdapter(context.contract, adapter.profile);
-    this.codecRegistry = context.codecs;
     this.contractCodecs = context.contractCodecs;
     this.codecDescriptors = context.codecDescriptors;
     this.sqlCtx = sqlCtx;
@@ -213,7 +210,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     const lowered = lowerSqlPlan(this.adapter, this.contract, plan);
     return Object.freeze({
       ...lowered,
-      params: await encodeParams(lowered, this.codecRegistry, ctx, this.contractCodecs),
+      params: await encodeParams(lowered, ctx, this.contractCodecs),
     });
   }
 
@@ -284,7 +281,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         }
         exec = Object.freeze({
           ...plan,
-          params: await encodeParams(plan, self.codecRegistry, codecCtx, self.contractCodecs),
+          params: await encodeParams(plan, codecCtx, self.contractCodecs),
         });
       } else {
         exec = await self.lower(await self.runBeforeCompile(plan), codecCtx);
@@ -333,13 +330,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
             if (next.done) {
               break;
             }
-            const decodedRow = await decodeRow(
-              next.value,
-              exec,
-              self.codecRegistry,
-              codecCtx,
-              self.contractCodecs,
-            );
+            const decodedRow = await decodeRow(next.value, exec, codecCtx, self.contractCodecs);
             yield decodedRow as Row;
           }
         } finally {

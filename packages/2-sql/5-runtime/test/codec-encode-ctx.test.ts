@@ -3,7 +3,7 @@ import {
   AndExpr,
   type AnyExpression,
   BinaryExpr,
-  buildCodecRegistry,
+  type Codec,
   ColumnRef,
   ParamRef,
   SelectAst,
@@ -14,6 +14,7 @@ import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import { encodeParam, encodeParams } from '../src/codecs/encoding';
 import { defineTestCodec } from './test-codec';
+import { buildTestContractCodecs } from './utils';
 
 const TEST_HASH = coreHash('sha256:test');
 
@@ -69,7 +70,7 @@ function deferred<T>(): {
 describe('encodeParams — SqlCodecCallContext threading', () => {
   it('forwards the same ctx instance to every per-param codec.encode', async () => {
     const observed: (SqlCodecCallContext | undefined)[] = [];
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/observe@1',
         targetTypes: ['text'],
@@ -79,7 +80,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
         },
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const p = buildPlan([
       { value: 'a', codecId: 'test/observe@1', name: 'p0' },
@@ -89,7 +90,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
 
     const controller = new AbortController();
     const ctx: SqlCodecCallContext = { signal: controller.signal };
-    await encodeParams(p, registry, ctx);
+    await encodeParams(p, ctx, buildTestContractCodecs(registry));
 
     expect(observed).toHaveLength(3);
     for (const seen of observed) {
@@ -99,7 +100,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
 
   it('leaves ctx.column undefined on encode call sites (encode-time column-context is the middleware domain)', async () => {
     let observed: SqlCodecCallContext | undefined;
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/observe-column@1',
         targetTypes: ['text'],
@@ -109,35 +110,42 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
         },
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const p = buildPlan([{ value: 'x', codecId: 'test/observe-column@1' }]);
 
-    await encodeParams(p, registry, { signal: new AbortController().signal });
+    await encodeParams(
+      p,
+      { signal: new AbortController().signal },
+      buildTestContractCodecs(registry),
+    );
     expect(observed?.column).toBeUndefined();
   });
 
   it('regression — omitting ctx is bit-for-bit identical to today (no-ctx case)', async () => {
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/passthrough@1',
         targetTypes: ['text'],
         encode: (value: string) => `wire:${value}`,
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const p = buildPlan([
       { value: 'x', codecId: 'test/passthrough@1' },
       { value: 'y', codecId: 'test/passthrough@1' },
     ]);
 
-    expect(await encodeParams(p, registry, {})).toEqual(['wire:x', 'wire:y']);
+    expect(await encodeParams(p, {}, buildTestContractCodecs(registry))).toEqual([
+      'wire:x',
+      'wire:y',
+    ]);
   });
 
   it('already-aborted signal at entry short-circuits before any codec call', async () => {
     let callCount = 0;
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/counter@1',
         targetTypes: ['text'],
@@ -147,7 +155,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
         },
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const p = buildPlan([
       { value: 'a', codecId: 'test/counter@1' },
@@ -158,7 +166,9 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
     const reason = new Error('user cancelled');
     controller.abort(reason);
 
-    await expect(encodeParams(p, registry, { signal: controller.signal })).rejects.toMatchObject({
+    await expect(
+      encodeParams(p, { signal: controller.signal }, buildTestContractCodecs(registry)),
+    ).rejects.toMatchObject({
       code: 'RUNTIME.ABORTED',
       details: { phase: 'encode' },
       cause: reason,
@@ -167,13 +177,13 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
   });
 
   it('already-aborted signal short-circuits even for empty param lists', async () => {
-    const registry = buildCodecRegistry([]);
+    const registry: ReadonlyArray<Codec<string>> = [];
     const controller = new AbortController();
     const reason = new Error('encode short-circuit');
     controller.abort(reason);
 
     await expect(
-      encodeParams(buildPlan([]), registry, { signal: controller.signal }),
+      encodeParams(buildPlan([]), { signal: controller.signal }, buildTestContractCodecs(registry)),
     ).rejects.toMatchObject({
       code: 'RUNTIME.ABORTED',
       details: { phase: 'encode' },
@@ -183,20 +193,24 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
 
   it('mid-encode abort surfaces RUNTIME.ABORTED { phase: encode } via abortable race', async () => {
     const release = deferred<string>();
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/blocking@1',
         targetTypes: ['text'],
         encode: (value: string) => release.promise.then((suffix) => `${value}:${suffix}`),
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const p = buildPlan([{ value: 'v', codecId: 'test/blocking@1' }]);
 
     const controller = new AbortController();
     const reason = new Error('mid-encode abort');
-    const promise = encodeParams(p, registry, { signal: controller.signal });
+    const promise = encodeParams(
+      p,
+      { signal: controller.signal },
+      buildTestContractCodecs(registry),
+    );
 
     // Let the codec start, then abort.
     queueMicrotask(() => controller.abort(reason));
@@ -214,7 +228,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
 
   it('passes through RUNTIME.ENCODE_FAILED when the codec body throws before the runtime sees the abort (no double-wrap)', async () => {
     const cause = new Error('codec specific failure');
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/explody@1',
         targetTypes: ['text'],
@@ -223,12 +237,12 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
         },
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const p = buildPlan([{ value: 'x', codecId: 'test/explody@1' }]);
 
     await expect(
-      encodeParams(p, registry, { signal: new AbortController().signal }),
+      encodeParams(p, { signal: new AbortController().signal }, buildTestContractCodecs(registry)),
     ).rejects.toMatchObject({
       code: 'RUNTIME.ENCODE_FAILED',
       cause,
@@ -239,7 +253,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
 describe('encodeParam — ctx forwarded to codec.encode', () => {
   it('forwards ctx (signal) to a codec body that accepts (value, ctx)', async () => {
     let observedSignal: AbortSignal | undefined;
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/single-cell@1',
         targetTypes: ['text'],
@@ -249,18 +263,22 @@ describe('encodeParam — ctx forwarded to codec.encode', () => {
         },
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const controller = new AbortController();
-    await encodeParam('x', { codecId: 'test/single-cell@1' }, 0, registry, {
-      signal: controller.signal,
-    });
+    await encodeParam(
+      'x',
+      { codecId: 'test/single-cell@1' },
+      0,
+      { signal: controller.signal },
+      buildTestContractCodecs(registry),
+    );
 
     expect(observedSignal).toBe(controller.signal);
   });
 
   it('null/undefined values still bypass the codec when ctx is provided', async () => {
-    const registry = buildCodecRegistry([
+    const registry = [
       defineTestCodec({
         typeId: 'test/never@1',
         targetTypes: ['text'],
@@ -269,14 +287,20 @@ describe('encodeParam — ctx forwarded to codec.encode', () => {
         },
         decode: (wire: string) => wire,
       }),
-    ]);
+    ];
 
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
     await expect(
-      encodeParam(null, { codecId: 'test/never@1' }, 0, registry, ctx),
+      encodeParam(null, { codecId: 'test/never@1' }, 0, ctx, buildTestContractCodecs(registry)),
     ).resolves.toBeNull();
     await expect(
-      encodeParam(undefined, { codecId: 'test/never@1' }, 0, registry, ctx),
+      encodeParam(
+        undefined,
+        { codecId: 'test/never@1' },
+        0,
+        ctx,
+        buildTestContractCodecs(registry),
+      ),
     ).resolves.toBeNull();
   });
 });

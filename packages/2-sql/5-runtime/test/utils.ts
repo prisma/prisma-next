@@ -16,11 +16,11 @@ import { generateId } from '@prisma-next/ids/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
-  CodecRegistry,
+  Codec,
+  ContractCodecRegistry,
   LoweredStatement,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { buildCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
@@ -135,21 +135,41 @@ export async function writeTestContractMarker(
  * derived from the adapter's codec registry.
  */
 /**
- * Synthesize `CodecDescriptor`s from a legacy {@link CodecRegistry} of
- * non-parameterized codec instances. The production synthesis bridge
- * was retired under TML-2357; this test-only equivalent lets the
- * existing `createTestAdapterDescriptor` pattern keep wrapping a raw
- * `Adapter` (whose `profile.codecs()` still returns a `CodecRegistry`)
- * into the descriptor-list shape that `SqlStaticContributions.codecs:`
- * now expects. The legacy `Codec` instances carry `traits`/
- * `targetTypes`/`meta` via the SQL family extension; the structural
- * narrow reads those fields directly.
+ * Build a {@link ContractCodecRegistry} from a codec array for tests
+ * that exercise `encodeParam(s)` / `decodeRow` in isolation. The
+ * production runtime builds `ContractCodecRegistry` from contract walk
+ * + descriptor list and never goes through this helper; tests use it
+ * to wire a hand-built codec set into the surface those functions
+ * consume in production.
  */
-export function descriptorsFromCodecRegistry(
-  registry: CodecRegistry,
+export function buildTestContractCodecs(
+  codecs: ReadonlyArray<Codec<string>>,
+): ContractCodecRegistry {
+  const byId = new Map<string, Codec<string>>();
+  for (const codec of codecs) {
+    byId.set(codec.id, codec);
+  }
+  return {
+    forColumn: () => undefined,
+    forCodecId: (codecId) => byId.get(codecId),
+  };
+}
+
+/**
+ * Synthesize `CodecDescriptor`s from a codec array of non-parameterized
+ * codec instances. Test-only: the production synthesis bridge was
+ * retired under TML-2357. Lets the existing `createTestAdapterDescriptor`
+ * pattern keep wrapping a stub `Adapter` (whose `__codecs` slot still
+ * exposes the codec set) into the descriptor-list shape that
+ * `SqlStaticContributions.codecs:` now expects. The `Codec` instances
+ * carry `traits`/`targetTypes`/`meta` via the SQL family extension; the
+ * structural narrow reads those fields directly.
+ */
+export function descriptorsFromCodecs(
+  codecs: ReadonlyArray<Codec<string>>,
 ): ReadonlyArray<CodecDescriptor> {
   const descriptors: CodecDescriptor[] = [];
-  for (const instance of registry.values()) {
+  for (const instance of codecs) {
     const legacy = instance as {
       readonly traits?: readonly CodecTrait[];
       readonly targetTypes?: readonly string[];
@@ -169,9 +189,9 @@ export function descriptorsFromCodecRegistry(
 }
 
 export function createTestAdapterDescriptor(
-  adapter: Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
+  adapter: StubAdapter,
 ): SqlRuntimeAdapterDescriptor<'postgres'> {
-  const descriptors = descriptorsFromCodecRegistry(adapter.profile.codecs());
+  const descriptors = descriptorsFromCodecs(adapter.__codecs);
   return {
     kind: 'adapter' as const,
     id: 'test-adapter',
@@ -212,7 +232,7 @@ export function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgr
  */
 export function createTestContext<TContract extends Contract<SqlStorage>>(
   contract: TContract,
-  adapter: Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
+  adapter: StubAdapter,
   options?: {
     extensionPacks?: ReadonlyArray<SqlRuntimeExtensionDescriptor<'postgres'>>;
   },
@@ -247,17 +267,29 @@ export function createTestStackInstance(options?: {
 }
 
 /**
+ * Stub-adapter type augments the public {@link Adapter} surface with a
+ * `__codecs` slot that exposes the test stub's runtime codec set to
+ * descriptor-shaping helpers (`createTestAdapterDescriptor`). Production
+ * adapters do not declare this slot — runtime codecs flow through the
+ * descriptor list from `SqlRuntimeAdapterDescriptor.codecs()` — so the
+ * augmentation is intentionally test-only.
+ */
+export type StubAdapter = Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> & {
+  readonly __codecs: ReadonlyArray<Codec<string>>;
+};
+
+/**
  * Creates a stub adapter for testing.
  * This helper DRYs up the common pattern of adapter creation in tests.
  *
  * The stub adapter includes simple codecs for common test types (pg/int4@1, pg/text@1, pg/timestamptz@1)
  * to enable type inference in tests without requiring the postgres adapter package.
  */
-export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> {
+export function createStubAdapter(): StubAdapter {
   // Stub codecs for common test types — match the codec IDs used in
   // test contracts (pg/int4@1, pg/text@1, pg/timestamptz@1) without
   // importing from the postgres adapter package.
-  const codecRegistry = buildCodecRegistry([
+  const codecs: ReadonlyArray<Codec<string>> = [
     defineTestCodec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
@@ -283,16 +315,14 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
         return new Date(json);
       },
     }),
-  ]);
+  ];
 
   return {
+    __codecs: codecs,
     profile: {
       id: 'stub-profile',
       target: 'postgres',
       capabilities: {},
-      codecs() {
-        return codecRegistry;
-      },
       readMarkerStatement() {
         return {
           sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where id = $1',

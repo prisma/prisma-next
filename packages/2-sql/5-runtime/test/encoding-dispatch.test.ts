@@ -1,8 +1,7 @@
-import {
-  buildCodecRegistry,
-  type Codec,
-  type ContractCodecRegistry,
-  type SqlCodecCallContext,
+import type {
+  Codec,
+  ContractCodecRegistry,
+  SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { encodeParam } from '../src/codecs/encoding';
@@ -44,7 +43,6 @@ describe('encodeParam — column-aware dispatch', () => {
       },
     };
 
-    const registry = buildCodecRegistry([]);
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
 
     const wireDoc = await encodeParam(
@@ -55,7 +53,6 @@ describe('encodeParam — column-aware dispatch', () => {
         refs: { table: 'Doc', column: 'embedding' },
       },
       0,
-      registry,
       ctx,
       contractCodecs,
     );
@@ -71,7 +68,6 @@ describe('encodeParam — column-aware dispatch', () => {
         refs: { table: 'Page', column: 'embedding' },
       },
       0,
-      registry,
       ctx,
       contractCodecs,
     );
@@ -102,14 +98,12 @@ describe('encodeParam — column-aware dispatch', () => {
       },
     };
 
-    const registry = buildCodecRegistry([]);
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
 
     const wire = await encodeParam(
       'hello',
       { codecId: 'test/scalar@1', name: 'p0' },
       0,
-      registry,
       ctx,
       contractCodecs,
     );
@@ -135,7 +129,6 @@ describe('encodeParam — column-aware dispatch', () => {
       forCodecId: () => fallbackCodec,
     };
 
-    const registry = buildCodecRegistry([]);
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
 
     const wire = await encodeParam(
@@ -146,7 +139,6 @@ describe('encodeParam — column-aware dispatch', () => {
         refs: { table: 'Doc', column: 'embedding' },
       },
       0,
-      registry,
       ctx,
       contractCodecs,
     );
@@ -170,7 +162,6 @@ describe('encodeParam — column-aware dispatch', () => {
       forCodecId: () => codec,
     };
 
-    const registry = buildCodecRegistry([]);
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
 
     const result = await encodeParam(
@@ -181,7 +172,6 @@ describe('encodeParam — column-aware dispatch', () => {
         refs: { table: 'Doc', column: 'embedding' },
       },
       0,
-      registry,
       ctx,
       contractCodecs,
     );

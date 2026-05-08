@@ -1,19 +1,11 @@
-import type {
-  AnyCodecDescriptor,
-  CodecInstanceContext,
-  CodecLookup,
-} from '@prisma-next/framework-components/codec';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   Adapter,
   AdapterProfile,
   AnyQueryAst,
-  Codec,
-  CodecRegistry,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
-import { buildCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
-import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
@@ -42,25 +34,6 @@ class PostgresAdapterImpl
   readonly targetId = 'postgres' as const;
 
   readonly profile: AdapterProfile<'postgres'>;
-  private readonly codecRegistry: CodecRegistry = (() => {
-    // Materialize a canonical codec instance per descriptor.
-    // Parameterized postgres codecs are parameter-stateless at runtime
-    // (params only inform emit-path metadata + renderOutputType), so a
-    // single instance per codec id is sufficient for the adapter's
-    // runtime encode/decode path. The descriptors come from the
-    // package-scoped `postgresCodecRegistry`.
-    const synthCtx: CodecInstanceContext = { name: 'postgres-builtin-adapter' };
-    const codecs: Codec<string>[] = [];
-    for (const descriptor of postgresCodecRegistry.values()) {
-      const factory = (
-        descriptor as AnyCodecDescriptor & {
-          factory: (params: unknown) => (ctx: CodecInstanceContext) => Codec<string>;
-        }
-      ).factory(undefined);
-      codecs.push(factory(synthCtx));
-    }
-    return buildCodecRegistry(codecs);
-  })();
   private readonly codecLookup: CodecLookup;
 
   constructor(options?: PostgresAdapterOptions) {
@@ -69,7 +42,6 @@ class PostgresAdapterImpl
       id: options?.profileId ?? 'postgres/default@1',
       target: 'postgres',
       capabilities: defaultCapabilities,
-      codecs: () => this.codecRegistry,
       readMarkerStatement: () => ({
         sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where id = $1',
         params: [1],

@@ -23,9 +23,6 @@ const testProfile: AdapterProfile = {
   id: 'test/default@1',
   target: 'postgres',
   capabilities: {},
-  codecs: () => {
-    throw new Error('not needed in test');
-  },
   readMarkerStatement: () => ({
     sql: 'SELECT core_hash, profile_hash FROM prisma_contract.marker WHERE id = $1',
     params: [1],

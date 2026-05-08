@@ -286,15 +286,11 @@ describe('Postgres adapter', () => {
     expect(sql).toContain('WHERE FALSE');
   });
 
-  it('exposes profile metadata: codecs registry, capabilities, and readMarkerStatement', () => {
+  it('exposes profile metadata: capabilities and readMarkerStatement', () => {
     expect(adapter.profile.target).toBe('postgres');
     expect(adapter.profile.id).toBe('postgres/default@1');
     expect(adapter.profile.capabilities['postgres']).toMatchObject({ lateral: true });
     expect(adapter.profile.capabilities['sql']).toMatchObject({ returning: true });
-
-    const codecs = adapter.profile.codecs();
-    expect(codecs.get('pg/text@1')).toBeDefined();
-    expect(codecs.has('pg/jsonb@1')).toBe(true);
 
     const marker = adapter.profile.readMarkerStatement();
     expect(marker.sql).toContain('from prisma_contract.marker');
