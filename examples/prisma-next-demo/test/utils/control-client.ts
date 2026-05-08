@@ -49,11 +49,22 @@ export function createPrismaNextControlClient(options: TestControlClientOptions)
 export async function initTestDatabase(options: {
   readonly connection: string;
   readonly contract: unknown;
+  /**
+   * On-disk migrations directory. The demo app does not declare any
+   * extension contract spaces, so the per-space `db init` flow runs
+   * with the n=1 (app-only) resolver list and does not actually read
+   * from this path — but `migrationsDir` is required by the API.
+   */
+  readonly migrationsDir?: string;
 }): Promise<void> {
   const client = createPrismaNextControlClient({ connection: options.connection });
 
   try {
-    const initResult = await client.dbInit({ contract: options.contract, mode: 'apply' });
+    const initResult = await client.dbInit({
+      contract: options.contract,
+      mode: 'apply',
+      migrationsDir: options.migrationsDir ?? '/tmp/__prisma-next-test-migrations',
+    });
     if (!initResult.ok) {
       throw new Error(
         `dbInit failed: ${initResult.failure.summary}\n\n${JSON.stringify(initResult.failure, null, 2)}`,

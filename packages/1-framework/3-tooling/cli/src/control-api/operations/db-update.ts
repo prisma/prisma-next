@@ -3,16 +3,12 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
-  MigrationPlannerResult,
-  MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
-import { hasOperationPreview } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { notOk, ok } from '@prisma-next/utils/result';
-import type { DbUpdateResult, DbUpdateSuccess, OnControlProgress } from '../types';
+import { notOk } from '@prisma-next/utils/result';
+import type { DbUpdateResult, OnControlProgress } from '../types';
 import { executePerSpaceDbApply, type PerSpaceExtensionInput } from './db-apply-per-space';
-import { createOperationCallbacks, stripOperations } from './migration-helpers';
 
 // F12: db update allows additive, widening, and destructive operations.
 const DB_UPDATE_POLICY = {
@@ -21,7 +17,11 @@ const DB_UPDATE_POLICY = {
 
 /**
  * Options for the executeDbUpdate operation.
- * Config-agnostic: receives pre-resolved driver, family, contract, and migrations capability.
+ *
+ * `db update` always routes through {@link executePerSpaceDbApply} so
+ * the single-space and multi-space behaviours share one loop.
+ * {@link migrationsDir} is required; {@link extensionContractSpaces}
+ * defaults to an empty list (n=1 app-only resolver path).
  */
 export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
@@ -36,19 +36,15 @@ export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId exte
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly acceptDataLoss?: boolean;
   /**
-   * On-disk migrations directory the per-space wiring reads pinned
-   * artefacts from. Required when {@link extensionContractSpaces} is
-   * non-empty; ignored otherwise.
+   * On-disk migrations directory the per-space flow reads pinned
+   * artefacts from.
    *
-   * @see specs/framework-mechanism.spec.md § 6 — `db update` per-space.
+   * @see projects/extension-contract-spaces/specs/m2-orchestrator-consolidation-spec.md
+   *   § "One-path `db init`" (the same property holds for `db update`).
    */
-  readonly migrationsDir?: string;
+  readonly migrationsDir: string;
   /**
-   * Declared extension contract spaces. When non-empty, `db update`
-   * routes through the per-space flow (extension graphs walked from
-   * `currentMarker → pinnedHeadRef.hash`, app-space synthesised from
-   * contract IR, all applied in a single transaction). When empty,
-   * today's single-space flow is preserved unchanged.
+   * Declared extension contract spaces. Defaults to an empty list.
    */
   readonly extensionContractSpaces?: ReadonlyArray<PerSpaceExtensionInput>;
   /** Optional progress callback for observing operation progress. */
@@ -56,12 +52,13 @@ export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId exte
 }
 
 /**
- * Executes the db update operation: introspect → plan → (optionally) apply → marker.
+ * Execute `db update` against the configured contract.
  *
- * db update is a pure reconciliation command: it introspects the live schema, plans the diff
- * to the destination contract, and applies operations. The marker is bookkeeping only — written
- * after apply so that `verify` and `db init` can reference it, but never read or validated
- * by db update itself. The runner creates the marker table if it does not exist.
+ * Always routes through {@link executePerSpaceDbApply}. Destructive
+ * operations require either `acceptDataLoss: true` or a prior
+ * `mode: 'plan'` invocation that surfaces the destructive ops; the
+ * gate is implemented here at the orchestrator level so the per-space
+ * applier remains policy-agnostic.
  */
 export async function executeDbUpdate<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbUpdateOptions<TFamilyId, TTargetId>,
@@ -74,58 +71,23 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     migrations,
     frameworkComponents,
     migrationsDir,
-    extensionContractSpaces,
+    extensionContractSpaces = [],
+    acceptDataLoss,
     onProgress,
   } = options;
 
-  // Per-space `db update` (sub-spec § 6): when at least one extension
-  // declares a `contractSpace`, fan out across (extensions
-  // alphabetically + app-space) inside a single transaction. Fresh
-  // databases initialise every space; already-initialised databases
-  // advance only the marker rows whose `pinnedHeadRef.hash` has moved.
-  if (extensionContractSpaces && extensionContractSpaces.length > 0) {
-    if (!migrationsDir) {
-      throw new Error(
-        'executeDbUpdate: `migrationsDir` is required when `extensionContractSpaces` is non-empty.',
-      );
-    }
-    if (mode === 'apply' && !options.acceptDataLoss) {
-      // Plan once with the per-space flow and surface destructive ops
-      // so the user can re-run with `-y`. Single-space `db update`
-      // performs this gate after planning; we mirror the contract by
-      // running plan-mode first and inspecting the aggregate.
-      const planResult = (await executePerSpaceDbApply<TFamilyId, TTargetId>({
-        driver,
-        familyInstance,
-        contract,
-        mode: 'plan',
-        migrations,
-        frameworkComponents,
-        migrationsDir,
-        extensionContractSpaces,
-        policy: DB_UPDATE_POLICY,
-        action: 'dbUpdate',
-        ...ifDefined('onProgress', onProgress),
-      })) as DbUpdateResult;
-      if (!planResult.ok) return planResult;
-      const destructiveOps = planResult.value.plan.operations
-        .filter((op) => op.operationClass === 'destructive')
-        .map((op) => ({ id: op.id, label: op.label }));
-      if (destructiveOps.length > 0) {
-        return notOk({
-          code: 'DESTRUCTIVE_CHANGES',
-          summary: `Planned ${destructiveOps.length} destructive operation(s) that require confirmation`,
-          why: 'Destructive operations require confirmation — re-run with -y to accept',
-          conflicts: undefined,
-          meta: { destructiveOperations: destructiveOps },
-        });
-      }
-    }
-    const result = (await executePerSpaceDbApply<TFamilyId, TTargetId>({
+  // Apply mode without `acceptDataLoss` first plans across every
+  // declared space and rejects if any destructive op is in the
+  // aggregate plan. Mirrors the legacy single-space `db update`
+  // contract — destructive changes surface to the user before any
+  // writes — but evaluated against the cross-space plan so the
+  // confirmation gate is consistent regardless of cardinality.
+  if (mode === 'apply' && !acceptDataLoss) {
+    const planResult = (await executePerSpaceDbApply<TFamilyId, TTargetId>({
       driver,
       familyInstance,
       contract,
-      mode,
+      mode: 'plan',
       migrations,
       frameworkComponents,
       migrationsDir,
@@ -134,93 +96,8 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
       action: 'dbUpdate',
       ...ifDefined('onProgress', onProgress),
     })) as DbUpdateResult;
-    return result;
-  }
-
-  const planner = migrations.createPlanner(familyInstance);
-  const runner = migrations.createRunner(familyInstance);
-
-  const introspectSpanId = 'introspect';
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanStart',
-    spanId: introspectSpanId,
-    label: 'Introspecting database schema',
-  });
-  const schemaIR = await familyInstance.introspect({ driver });
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanEnd',
-    spanId: introspectSpanId,
-    outcome: 'ok',
-  });
-
-  const policy = DB_UPDATE_POLICY;
-
-  const planSpanId = 'plan';
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanStart',
-    spanId: planSpanId,
-    label: 'Planning migration',
-  });
-  const plannerResult: MigrationPlannerResult = await planner.plan({
-    contract,
-    schema: schemaIR,
-    policy,
-    // `db update` reconciles against the live introspected schema; there is
-    // no prior contract to derive a "from" identity from. The required
-    // `fromContract: null` makes that structural fact visible at the call
-    // site (vs. silently letting the planner default to a baseline plan).
-    fromContract: null,
-    frameworkComponents,
-  });
-  if (plannerResult.kind === 'failure') {
-    onProgress?.({
-      action: 'dbUpdate',
-      kind: 'spanEnd',
-      spanId: planSpanId,
-      outcome: 'error',
-    });
-    return notOk({
-      code: 'PLANNING_FAILED',
-      summary: 'Migration planning failed due to conflicts',
-      conflicts: plannerResult.conflicts,
-      why: undefined,
-      meta: undefined,
-    });
-  }
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanEnd',
-    spanId: planSpanId,
-    outcome: 'ok',
-  });
-
-  const migrationPlan = plannerResult.plan;
-
-  if (mode === 'plan') {
-    const preview = hasOperationPreview(familyInstance)
-      ? familyInstance.toOperationPreview(migrationPlan.operations)
-      : undefined;
-    const result: DbUpdateSuccess = {
-      mode: 'plan',
-      plan: {
-        operations: stripOperations(migrationPlan.operations),
-        ...ifDefined('preview', preview),
-      },
-      destination: {
-        storageHash: migrationPlan.destination.storageHash,
-        ...ifDefined('profileHash', migrationPlan.destination.profileHash),
-      },
-      summary: `Planned ${migrationPlan.operations.length} operation(s)`,
-    };
-    return ok(result);
-  }
-
-  // When applying, require explicit acceptance for destructive operations
-  if (!options.acceptDataLoss) {
-    const destructiveOps = migrationPlan.operations
+    if (!planResult.ok) return planResult;
+    const destructiveOps = planResult.value.plan.operations
       .filter((op) => op.operationClass === 'destructive')
       .map((op) => ({ id: op.id, label: op.label }));
     if (destructiveOps.length > 0) {
@@ -234,79 +111,18 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     }
   }
 
-  const applySpanId = 'apply';
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanStart',
-    spanId: applySpanId,
-    label: 'Applying migration plan',
-  });
-
-  const callbacks = createOperationCallbacks(onProgress, 'dbUpdate', applySpanId);
-
-  const runnerResult: MigrationRunnerResult = await runner.execute({
-    plan: migrationPlan,
+  const result = (await executePerSpaceDbApply<TFamilyId, TTargetId>({
     driver,
-    destinationContract: contract,
-    policy,
-    ...(callbacks ? { callbacks } : {}),
-    // db update plans and applies from a single introspection pass, so per-operation pre/postchecks
-    // and idempotency probes are intentionally disabled to avoid redundant roundtrips.
-    executionChecks: {
-      prechecks: false,
-      postchecks: false,
-      idempotencyChecks: false,
-    },
+    familyInstance,
+    contract,
+    mode,
+    migrations,
     frameworkComponents,
-  });
-
-  if (!runnerResult.ok) {
-    onProgress?.({
-      action: 'dbUpdate',
-      kind: 'spanEnd',
-      spanId: applySpanId,
-      outcome: 'error',
-    });
-    return notOk({
-      code: 'RUNNER_FAILED',
-      summary: runnerResult.failure.summary,
-      why: runnerResult.failure.why,
-      meta: runnerResult.failure.meta,
-      conflicts: undefined,
-    });
-  }
-
-  const execution = runnerResult.value;
-  onProgress?.({
+    migrationsDir,
+    extensionContractSpaces,
+    policy: DB_UPDATE_POLICY,
     action: 'dbUpdate',
-    kind: 'spanEnd',
-    spanId: applySpanId,
-    outcome: 'ok',
-  });
-
-  const result: DbUpdateSuccess = {
-    mode: 'apply',
-    plan: {
-      operations: stripOperations(migrationPlan.operations),
-    },
-    destination: {
-      storageHash: migrationPlan.destination.storageHash,
-      ...ifDefined('profileHash', migrationPlan.destination.profileHash),
-    },
-    execution: {
-      operationsPlanned: execution.operationsPlanned,
-      operationsExecuted: execution.operationsExecuted,
-    },
-    marker: migrationPlan.destination.profileHash
-      ? {
-          storageHash: migrationPlan.destination.storageHash,
-          profileHash: migrationPlan.destination.profileHash,
-        }
-      : { storageHash: migrationPlan.destination.storageHash },
-    summary:
-      execution.operationsExecuted === 0
-        ? 'Database already matches contract, signature updated'
-        : `Applied ${execution.operationsExecuted} operation(s), signature updated`,
-  };
-  return ok(result);
+    ...ifDefined('onProgress', onProgress),
+  })) as DbUpdateResult;
+  return result;
 }

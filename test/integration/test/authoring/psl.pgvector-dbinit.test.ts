@@ -102,7 +102,11 @@ model Document {
 
         await withDevDatabase(async ({ connectionString }) => {
           await withPgvectorControlClient(connectionString, async (client) => {
-            const plan = await client.dbInit({ contract: emittedContract, mode: 'plan' });
+            const plan = await client.dbInit({
+              contract: emittedContract,
+              mode: 'plan',
+              migrationsDir: join(testDir, 'migrations'),
+            });
             expect(plan.ok).toBe(true);
             if (!plan.ok) {
               throw new Error(`dbInit plan failed: ${plan.failure.summary}`);
@@ -116,7 +120,11 @@ model Document {
             expect(ddl).toContain('vector(1536)');
             expect(ddl).not.toContain('"vector(1536)"');
 
-            const apply = await client.dbInit({ contract: emittedContract, mode: 'apply' });
+            const apply = await client.dbInit({
+              contract: emittedContract,
+              mode: 'apply',
+              migrationsDir: join(testDir, 'migrations'),
+            });
             if (!apply.ok) {
               throw new Error(
                 `dbInit apply failed: ${apply.failure.summary}\n\n${JSON.stringify(apply.failure, null, 2)}`,
@@ -143,7 +151,11 @@ model Document {
 
         await withDevDatabase(async ({ connectionString }) => {
           await withPgvectorControlClient(connectionString, async (client) => {
-            const init = await client.dbInit({ contract: emittedContract, mode: 'apply' });
+            const init = await client.dbInit({
+              contract: emittedContract,
+              mode: 'apply',
+              migrationsDir: join(testDir, 'migrations'),
+            });
             if (!init.ok) {
               throw new Error(
                 `dbInit apply failed: ${init.failure.summary}\n\n${JSON.stringify(init.failure, null, 2)}`,
@@ -163,7 +175,11 @@ model Document {
           });
 
           await withPgvectorControlClient(connectionString, async (client) => {
-            const update = await client.dbUpdate({ contract: emittedContract, mode: 'apply' });
+            const update = await client.dbUpdate({
+              contract: emittedContract,
+              mode: 'apply',
+              migrationsDir: join(testDir, 'migrations'),
+            });
             if (!update.ok) {
               throw new Error(
                 `dbUpdate apply failed: ${update.failure.summary}\n\n${JSON.stringify(update.failure, null, 2)}`,

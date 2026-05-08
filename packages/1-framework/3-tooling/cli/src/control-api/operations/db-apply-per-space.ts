@@ -324,11 +324,14 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
   }
 
   // Apply-mode: route through `runner.executeAcrossSpaces` for atomic
-  // multi-space transaction with rollback on any failure.
+  // multi-space transaction with rollback on any failure. Every
+  // `db init` / `db update` walks this path now (the n=1 app-only
+  // case calls `executeAcrossSpaces` with a single per-space input),
+  // so the capability check fires unconditionally.
   if (!hasMultiSpaceRunner(runner)) {
     return buildExtensionPathFailure(action, {
       spaceId: '<runner>',
-      why: `Runner for target "${appPlan.targetId}" does not implement \`executeAcrossSpaces\`. Per-space \`${action === 'dbInit' ? 'db init' : 'db update'}\` requires multi-space-capable runners (today: every SQL family runner).`,
+      why: `Runner for target "${appPlan.targetId}" does not implement \`executeAcrossSpaces\`. \`${action === 'dbInit' ? 'db init' : 'db update'}\` requires multi-space-capable runners (today: every SQL family runner).`,
     });
   }
 

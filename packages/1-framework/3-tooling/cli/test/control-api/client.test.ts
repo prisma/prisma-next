@@ -662,6 +662,7 @@ describe('ControlClient progress emission', () => {
         introspect: async () => ({ tables: {}, dependencies: [] }),
         validateContract: (ir: unknown) => ir as Contract,
         readMarker: async () => ({ storageHash: 'sha256:origin' }),
+        readAllMarkers: async () => new Map(),
       } as unknown as ControlFamilyInstance<string, unknown>;
 
       const mockFamilyWithMarker = {
@@ -675,6 +676,7 @@ describe('ControlClient progress emission', () => {
           plan: () => ({
             kind: 'success',
             plan: {
+              targetId: 'postgres',
               destination: { storageHash: 'sha256:dest' },
               operations: [
                 {
@@ -693,6 +695,14 @@ describe('ControlClient progress emission', () => {
           execute: async () => ({
             ok: true,
             value: { operationsPlanned: 1, operationsExecuted: 1 },
+          }),
+          executeAcrossSpaces: async () => ({
+            ok: true,
+            value: {
+              perSpaceResults: [
+                { space: 'app', value: { operationsPlanned: 1, operationsExecuted: 1 } },
+              ],
+            },
           }),
         }),
       };
@@ -731,6 +741,8 @@ describe('ControlClient progress emission', () => {
         contract: {},
         mode: 'apply',
         connection: 'postgres://test',
+        migrationsDir: '/tmp/__test-client-migrations',
+        acceptDataLoss: true,
         onProgress: (event) => events.push(event),
       });
 
@@ -768,6 +780,7 @@ describe('ControlClient progress emission', () => {
         introspect: async () => ({ tables: {}, dependencies: [] }),
         validateContract: (ir: unknown) => ir as Contract,
         readMarker: async () => null,
+        readAllMarkers: async () => new Map(),
       } as unknown as ControlFamilyInstance<string, unknown>;
 
       const noMarkerFamily = {
@@ -787,6 +800,7 @@ describe('ControlClient progress emission', () => {
         contract: {},
         mode: 'plan',
         connection: 'postgres://test',
+        migrationsDir: '/tmp/__test-client-migrations',
       });
 
       expect(result.ok).toBe(true);
@@ -809,6 +823,7 @@ describe('ControlClient progress emission', () => {
         contract: {},
         mode: 'plan',
         connection: 'postgres://test',
+        migrationsDir: '/tmp/__test-client-migrations',
       });
 
       await client.close();
