@@ -13,10 +13,12 @@ import {
 } from '../utils/cli-errors';
 import type { MigrationCommandOptions } from '../utils/command-helpers';
 import {
+  resolveMigrationPaths,
   sanitizeErrorMessage,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import { runContractSpaceVerifierPrecheck } from '../utils/contract-space-verifier-precheck';
 import {
   formatMigrationApplyOutput,
   formatMigrationJson,
@@ -111,7 +113,23 @@ async function executeDbInitCommand(
   if (!ctxResult.ok) {
     return ctxResult;
   }
-  const { client, contractJson, dbConnection, onProgress, contractPathAbsolute } = ctxResult.value;
+  const { client, config, contractJson, dbConnection, onProgress, contractPathAbsolute } =
+    ctxResult.value;
+
+  // Per-space layout precheck (sub-spec § 4): catches the
+  // `declaredButUnmigrated` / `orphanPinnedDir` cases at the CLI surface
+  // before any database connection. Marker-row checks (`orphanMarker`,
+  // `hashMismatch`, `invariantsMismatch`) are decidable only after the
+  // runner reads markers per-space — deferred to the M2 R3 wiring slice.
+  const { migrationsDir } = resolveMigrationPaths(options.config, config);
+  const precheckResult = await runContractSpaceVerifierPrecheck({
+    migrationsDir,
+    extensionPacks: config.extensionPacks ?? [],
+  });
+  if (!precheckResult.ok) {
+    await client.close();
+    return notOk(precheckResult.failure);
+  }
 
   try {
     // Call dbInit with connection and progress callback
