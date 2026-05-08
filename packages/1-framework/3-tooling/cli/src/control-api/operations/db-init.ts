@@ -12,6 +12,7 @@ import { APP_SPACE_ID, hasOperationPreview } from '@prisma-next/framework-compon
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbInitResult, DbInitSuccess, OnControlProgress } from '../types';
+import { executePerSpaceDbApply, type PerSpaceExtensionInput } from './db-apply-per-space';
 import { createOperationCallbacks, stripOperations } from './migration-helpers';
 
 /**
@@ -28,6 +29,22 @@ export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extend
     ControlFamilyInstance<TFamilyId, unknown>
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
+  /**
+   * On-disk migrations directory the per-space wiring reads pinned
+   * artefacts from. Required when {@link extensionContractSpaces} is
+   * non-empty; ignored otherwise.
+   *
+   * @see specs/framework-mechanism.spec.md § 6 — `db init` per-space.
+   */
+  readonly migrationsDir?: string;
+  /**
+   * Declared extension contract spaces. When non-empty, `db init` routes
+   * through the per-space flow (extension graphs walked from
+   * `currentMarker → pinnedHeadRef.hash`, app-space synthesised from
+   * contract IR, all applied in a single transaction). When empty,
+   * today's single-space flow is preserved unchanged.
+   */
+  readonly extensionContractSpaces?: ReadonlyArray<PerSpaceExtensionInput>;
   /** Optional progress callback for observing operation progress */
   readonly onProgress?: OnControlProgress;
 }
@@ -45,8 +62,50 @@ export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extend
 export async function executeDbInit<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbInitOptions<TFamilyId, TTargetId>,
 ): Promise<DbInitResult> {
-  const { driver, familyInstance, contract, mode, migrations, frameworkComponents, onProgress } =
-    options;
+  const {
+    driver,
+    familyInstance,
+    contract,
+    mode,
+    migrations,
+    frameworkComponents,
+    migrationsDir,
+    extensionContractSpaces,
+    onProgress,
+  } = options;
+
+  // Per-space `db init` (sub-spec § 6): when at least one extension
+  // declares a `contractSpace`, fan out across (extensions
+  // alphabetically + app-space) inside a single transaction via
+  // `runner.executeAcrossSpaces` so a failure on any space rolls back
+  // every space's writes (AM4-rollback CLI-level half).
+  //
+  // Falls back to today's single-space path when no extension contract
+  // spaces are declared, preserving existing behaviour for projects
+  // that don't load schema-contributing extensions.
+  if (extensionContractSpaces && extensionContractSpaces.length > 0) {
+    if (!migrationsDir) {
+      throw new Error(
+        'executeDbInit: `migrationsDir` is required when `extensionContractSpaces` is non-empty.',
+      );
+    }
+    const result = await executePerSpaceDbApply<TFamilyId, TTargetId>({
+      driver,
+      familyInstance,
+      contract,
+      mode,
+      migrations,
+      frameworkComponents,
+      migrationsDir,
+      extensionContractSpaces,
+      // db init is additive-only; per-space flow uses the same policy
+      // as the single-space path so error messages line up.
+      policy: { allowedOperationClasses: ['additive'] },
+      action: 'dbInit',
+      ...ifDefined('onProgress', onProgress),
+    });
+    return result as DbInitResult;
+  }
 
   // Create planner and runner from target migrations capability
   const planner = migrations.createPlanner(familyInstance);

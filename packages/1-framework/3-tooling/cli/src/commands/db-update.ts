@@ -14,6 +14,7 @@ import {
 } from '../utils/cli-errors';
 import type { MigrationCommandOptions } from '../utils/command-helpers';
 import {
+  resolveMigrationPaths,
   sanitizeErrorMessage,
   setCommandDescriptions,
   setCommandExamples,
@@ -80,7 +81,9 @@ async function executeDbUpdateCommand(
   if (!ctxResult.ok) {
     return ctxResult;
   }
-  const { client, contractJson, dbConnection, onProgress, contractPathAbsolute } = ctxResult.value;
+  const { client, config, contractJson, dbConnection, onProgress, contractPathAbsolute } =
+    ctxResult.value;
+  const { migrationsDir } = resolveMigrationPaths(options.config, config);
 
   try {
     // Call dbUpdate with connection and progress callback
@@ -88,6 +91,7 @@ async function executeDbUpdateCommand(
       contract: contractJson,
       mode: options.dryRun ? 'plan' : 'apply',
       connection: dbConnection,
+      migrationsDir,
       ...(flags.yes ? { acceptDataLoss: true } : {}),
       onProgress,
     });

@@ -426,6 +426,75 @@ export interface MigrationRunner<
 }
 
 // ============================================================================
+// Multi-space runner protocol (extension contract spaces, TML-2397)
+// ============================================================================
+
+/**
+ * Per-space input for {@link MultiSpaceCapableRunner.executeAcrossSpaces}.
+ *
+ * Mirrors the single-space `MigrationRunner.execute` options, extended with a
+ * required `space` identifier. Each entry's `driver` must reference the same
+ * connection the outer transaction is opened on (typically the same value as
+ * the top-level `driver` on `executeAcrossSpaces`).
+ *
+ * Family-specific runners (e.g. the SQL family's `SqlMigrationRunner`) define
+ * a richer per-space option shape that is structurally compatible with this
+ * one — additional optional fields (e.g. SQL's `strictVerification`,
+ * `schemaName`, `callbacks`) are tolerated by the underlying runner without
+ * affecting cross-target wiring.
+ *
+ * @see specs/framework-mechanism.spec.md § 4 — Runner.
+ */
+export interface MultiSpaceRunnerPerSpaceOptions<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
+  readonly space: string;
+  readonly plan: MigrationPlan;
+  readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
+  readonly destinationContract: unknown;
+  readonly policy: MigrationOperationPolicy;
+  readonly executionChecks?: MigrationRunnerExecutionChecks;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
+}
+
+export interface MultiSpaceRunnerSuccessValue {
+  readonly perSpaceResults: ReadonlyArray<{
+    readonly space: string;
+    readonly value: MigrationRunnerSuccessValue;
+  }>;
+}
+
+export interface MultiSpaceRunnerFailure extends MigrationRunnerFailure {
+  /** Identifier of the space whose plan caused the rollback. */
+  readonly failingSpace: string;
+}
+
+export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiSpaceRunnerFailure>;
+
+/**
+ * Optional capability for runners that can apply a list of per-space plans
+ * inside a single outer transaction. A failure on any space rolls back every
+ * space's writes — the AM4-rollback guarantee.
+ *
+ * Today's only implementer is the SQL family (`SqlMigrationRunner`); Mongo
+ * per-space is a non-goal per the project spec. The capability is declared
+ * at the framework layer so CLI utilities can route through it without
+ * importing the SQL family directly.
+ *
+ * @see specs/framework-mechanism.spec.md § 4 — Runner; § "R4 design choice".
+ */
+export interface MultiSpaceCapableRunner<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
+  executeAcrossSpaces(options: {
+    readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
+    readonly perSpaceOptions: ReadonlyArray<MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>>;
+  }): Promise<MultiSpaceRunnerResult>;
+}
+
+// ============================================================================
 // Target Migrations Capability
 // ============================================================================
 
