@@ -25,11 +25,12 @@
  * metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec`
  * carriers retired with the deletion sweep.
  *
- * Audit: `length` is parameter-stateless at the runtime level — the
- * encode/decode conversions don't thread the dimension into their
- * behaviour. `length` only informs the emit-path `renderOutputType`
- * and the bounds check in `paramsSchema`. The factory ignores params
- * and constructs a fresh codec from `this`.
+ * Audit: `length` threads into the runtime codec via the constructor
+ * so encode/decode/encodeJson/decodeJson can enforce the declared
+ * dimension at every ingress path. Without this, `vector(3)` and
+ * `vector(1536)` would produce codecs with identical behaviour and a
+ * dimension-mismatched value would round-trip undetected — that's the
+ * dispatch-correctness symptom F22 / F26 also touch (cluster closure).
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
@@ -80,13 +81,27 @@ export class PgVectorCodec extends CodecImpl<
   string,
   number[]
 > {
-  async encode(value: number[], _ctx: CodecCallContext): Promise<string> {
+  readonly length: number;
+
+  constructor(descriptor: AnyCodecDescriptor, length: number) {
+    super(descriptor);
+    this.length = length;
+  }
+
+  assertVector(value: unknown): asserts value is number[] {
     if (!Array.isArray(value)) {
       throw new Error('Vector value must be an array of numbers');
     }
     if (!value.every((v) => typeof v === 'number')) {
       throw new Error('Vector value must contain only numbers');
     }
+    if (value.length !== this.length) {
+      throw new Error(`Vector length mismatch: expected ${this.length}, got ${value.length}`);
+    }
+  }
+
+  async encode(value: number[], _ctx: CodecCallContext): Promise<string> {
+    this.assertVector(value);
     return `[${value.join(',')}]`;
   }
 
@@ -98,24 +113,28 @@ export class PgVectorCodec extends CodecImpl<
       throw new Error(`Invalid vector format: expected "[...]", got "${wire}"`);
     }
     const content = wire.slice(1, -1).trim();
-    if (content === '') {
-      return [];
-    }
-    return content.split(',').map((v) => {
-      const num = Number.parseFloat(v.trim());
-      if (Number.isNaN(num)) {
-        throw new Error(`Invalid vector value: "${v}" is not a number`);
-      }
-      return num;
-    });
+    const parsed =
+      content === ''
+        ? []
+        : content.split(',').map((v) => {
+            const num = Number.parseFloat(v.trim());
+            if (Number.isNaN(num)) {
+              throw new Error(`Invalid vector value: "${v}" is not a number`);
+            }
+            return num;
+          });
+    this.assertVector(parsed);
+    return parsed;
   }
 
   encodeJson(value: number[]): JsonValue {
+    this.assertVector(value);
     return value;
   }
 
   decodeJson(json: JsonValue): number[] {
-    return json as number[];
+    this.assertVector(json);
+    return json;
   }
 }
 
@@ -128,8 +147,8 @@ export class PgVectorDescriptor extends CodecDescriptorImpl<VectorParams> {
   override renderOutputType(params: VectorParams): string {
     return `Vector<${params.length}>`;
   }
-  override factory(_params: VectorParams): (ctx: CodecInstanceContext) => PgVectorCodec {
-    return () => new PgVectorCodec(this);
+  override factory(params: VectorParams): (ctx: CodecInstanceContext) => PgVectorCodec {
+    return () => new PgVectorCodec(this, params.length);
   }
 }
 

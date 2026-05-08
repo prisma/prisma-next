@@ -30,22 +30,32 @@ const NO_METADATA: ParamMetadata = Object.freeze({
  *
  * Column-aware dispatch (AC-5): when `metadata.refs` is populated by a
  * column-bound construction site, prefer
- * `contractCodecs.forColumn(refs.table, refs.column)` — this resolves
+ * `contractCodecs.forColumn(refs.table, refs.column)` — that returns
  * the per-instance codec the contract walk materialized for the
- * `(table, column)` pair, which is required for parameterized codec ids
- * shared by multiple columns with distinct typeParams (e.g.
+ * `(table, column)` pair, encoding the column's typeParams (e.g.
  * `vector(1024)` vs. `vector(1536)`).
  *
- * Refs-less fallback for non-parameterized codecs: ParamRefs constructed
- * outside a column-bound site (literals, transient builder state) carry
- * a non-parameterized `codecId` whose dispatch is ambiguity-free. The
- * `forCodecId` codec-id-keyed lookup is safe here because every column
- * sharing the codec id resolves to the same shared codec instance.
+ * On a column-lookup miss the resolver falls through to `forCodecId`,
+ * but the wrong-instance risk F22 originally flagged is closed off
+ * structurally rather than via an early throw:
  *
- * For parameterized codec ids without refs the
- * {@link import('@prisma-next/sql-relational-core/ast').validateParamRefRefs}
- * pass already raised a clear diagnostic before encode runs; this path
- * is defense-in-depth.
+ * 1. `extractCodecLookup` (post-F19) skips parameterized descriptors
+ *    when materializing the legacy `byId` map, so the legacy registry
+ *    cannot return a representative parameterized instance.
+ * 2. `buildContractCodecRegistry`'s `forCodecId` rejects ambiguous
+ *    parameterized fallbacks (`ambiguousCodecIds`) — if the contract
+ *    walk resolved more than one distinct instance under a single
+ *    parameterized id, the call throws rather than binding to whichever
+ *    landed first.
+ * 3. For the non-ambiguous parameterized case (a single column with
+ *    that id), `byCodecId` stores the column-correct per-instance
+ *    codec, so the fall-through still resolves to the right instance.
+ *
+ * Refs-less fallback: ParamRefs constructed outside a column-bound
+ * site (literals, transient builder state) carry a non-parameterized
+ * `codecId` whose dispatch is ambiguity-free. The validator pass
+ * (`validateParamRefRefs`) already enforced refs on every parameterized
+ * ParamRef before encode runs.
  */
 function resolveParamCodec(
   metadata: ParamMetadata,

@@ -41,19 +41,32 @@ function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> 
 /**
  * Resolve the per-cell codec for a projection item.
  *
- * Phase B: when a `(table, column)` ref is available for the projection,
- * prefer `contractCodecs.forColumn(table, column)` — that's the per-
- * instance resolved codec materialized from the codec descriptor's
- * factory at context-construction time (carries any per-instance state
- * such as the compiled JSON-Schema validator). When the projection
- * resolves to a non-`column-ref` expression (computed projections, raw
- * SQL aliases) but still carries a codec id (ADR 205 stamps every
- * `ProjectionItem` with the producer's codec id), fall back to the
- * codec-id-keyed `forCodecId(codecId)` lookup, which itself falls back
- * to the legacy `CodecRegistry` for codec ids the contract walk
- * couldn't resolve.
+ * When a `(table, column)` ref is available — either implicit on a
+ * `column-ref` expression or carried explicitly via `item.refs` for
+ * column-bound non-`column-ref` projections — prefer
+ * `contractCodecs.forColumn(table, column)`: that returns the per-
+ * instance codec materialized from the descriptor's factory for that
+ * column, encoding any per-instance state (typeParams like vector
+ * length, schema validators, etc.).
  *
- * Codec-registry-unification spec § AC-4.
+ * The wrong-instance risk for parameterized codecs that F22 originally
+ * flagged is closed off structurally rather than by an early throw on
+ * column-lookup miss:
+ *
+ * 1. `extractCodecLookup` (post-F19) skips parameterized descriptors
+ *    so the legacy registry cannot hand out a representative.
+ * 2. `buildContractCodecRegistry`'s `forCodecId` rejects ambiguous
+ *    parameterized fallbacks (`ambiguousCodecIds`).
+ * 3. The non-ambiguous parameterized case stores the column-correct
+ *    per-instance codec under `byCodecId`, so the fall-through still
+ *    resolves to the right instance.
+ *
+ * The `forCodecId` fallback otherwise covers projections that are
+ * *not* column-bound (computed projections, raw SQL aliases) but still
+ * carry a `codecId` (ADR 205 stamps every `ProjectionItem` with the
+ * producer's codec id).
+ *
+ * Codec-registry-unification spec § AC-4 / AC-5.
  */
 function resolveProjectionCodec(
   item: ProjectionItem,

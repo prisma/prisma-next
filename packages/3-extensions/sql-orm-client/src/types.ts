@@ -19,6 +19,7 @@ import {
 import type { Expression } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { ComputeColumnJsType, RuntimeScope } from '@prisma-next/sql-relational-core/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { RowSelection } from './collection-internal-types';
 
 // ---------------------------------------------------------------------------
@@ -289,8 +290,31 @@ type FieldOperations<
 // COMPARISON_METHODS_META — single source of truth for traits + factories
 // ---------------------------------------------------------------------------
 
+/**
+ * Resolve the unique column ref carried by `left` so its surrounding
+ * `ParamRef` can dispatch through `forColumn`. The previous
+ * implementation only matched bare `column-ref` expressions, which lost
+ * refs the moment the expression got wrapped (`upper(f.id)`,
+ * `BinaryExpr`, function-call expressions, etc.) — and column-aware
+ * dispatch (AC-5) silently degraded for any predicate that touched a
+ * computed column.
+ *
+ * Walking via `collectColumnRefs()` and accepting only a single
+ * unambiguous ref gives `eq(upper(f.id), value)` and friends correct
+ * dispatch without inventing refs for ambiguous shapes (e.g.
+ * `eq(concat(f.firstName, f.lastName), value)` returns `undefined` and
+ * falls through to the codec-id path, which is correct for non-
+ * parameterized comparisons).
+ */
 function refsFromLeft(left: AnyExpression): { table: string; column: string } | undefined {
-  return left.kind === 'column-ref' ? { table: left.table, column: left.column } : undefined;
+  if (left.kind === 'column-ref') {
+    return { table: left.table, column: left.column };
+  }
+  const columnRefs = left.collectColumnRefs();
+  if (columnRefs.length !== 1) return undefined;
+  const single = columnRefs[0];
+  if (!single) return undefined;
+  return { table: single.table, column: single.column };
 }
 
 function param(
@@ -300,8 +324,8 @@ function param(
 ): ParamRef {
   if (codecId === undefined && refs === undefined) return ParamRef.of(value);
   return ParamRef.of(value, {
-    ...(codecId !== undefined ? { codecId } : {}),
-    ...(refs !== undefined ? { refs } : {}),
+    ...ifDefined('codecId', codecId),
+    ...ifDefined('refs', refs),
   });
 }
 
