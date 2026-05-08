@@ -1,9 +1,13 @@
-import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
+import type {
+  AnyCodecDescriptor,
+  Codec,
+  CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
 import {
-  sqlCharDescriptor,
-  sqlFloatDescriptor,
-  sqlIntDescriptor,
-  sqlVarcharDescriptor,
+  SQL_CHAR_CODEC_ID,
+  SQL_FLOAT_CODEC_ID,
+  SQL_INT_CODEC_ID,
+  SQL_VARCHAR_CODEC_ID,
 } from '@prisma-next/sql-relational-core/ast';
 import {
   SQLITE_BIGINT_CODEC_ID,
@@ -14,50 +18,40 @@ import {
   SQLITE_REAL_CODEC_ID,
   SQLITE_TEXT_CODEC_ID,
 } from '@prisma-next/target-sqlite/codec-ids';
-import {
-  sqliteBigintDescriptor,
-  sqliteBlobDescriptor,
-  sqliteDatetimeDescriptor,
-  sqliteIntegerDescriptor,
-  sqliteJsonDescriptor,
-  sqliteRealDescriptor,
-  sqliteTextDescriptor,
-} from '@prisma-next/target-sqlite/codecs';
+import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
 import { describe, expect, it } from 'vitest';
 
 const SYNTH_CTX: CodecInstanceContext = { name: 'test' };
 
-const descriptorByScalar = {
-  text: sqliteTextDescriptor,
-  integer: sqliteIntegerDescriptor,
-  real: sqliteRealDescriptor,
-  blob: sqliteBlobDescriptor,
-  datetime: sqliteDatetimeDescriptor,
-  json: sqliteJsonDescriptor,
-  bigint: sqliteBigintDescriptor,
-  // SQL base codecs (inherited via the contributor's `codecs:` slot)
-  char: sqlCharDescriptor,
-  varchar: sqlVarcharDescriptor,
-  int: sqlIntDescriptor,
-  float: sqlFloatDescriptor,
+const codecIdByScalar = {
+  text: SQLITE_TEXT_CODEC_ID,
+  integer: SQLITE_INTEGER_CODEC_ID,
+  real: SQLITE_REAL_CODEC_ID,
+  blob: SQLITE_BLOB_CODEC_ID,
+  datetime: SQLITE_DATETIME_CODEC_ID,
+  json: SQLITE_JSON_CODEC_ID,
+  bigint: SQLITE_BIGINT_CODEC_ID,
+  // SQL base codecs are also registered via the contributor's
+  // `codecs:` slot, so the package-scoped registry resolves them.
+  char: SQL_CHAR_CODEC_ID,
+  varchar: SQL_VARCHAR_CODEC_ID,
+  int: SQL_INT_CODEC_ID,
+  float: SQL_FLOAT_CODEC_ID,
 } as const;
 
-type ScalarName = keyof typeof descriptorByScalar;
+type ScalarName = keyof typeof codecIdByScalar;
 
-function codecForScalar<S extends ScalarName>(
-  scalar: S,
-): ReturnType<ReturnType<(typeof descriptorByScalar)[S]['factory']>> {
+function codecForScalar(scalar: ScalarName): Codec {
+  const codecId = codecIdByScalar[scalar];
+  const descriptor = sqliteCodecRegistry.descriptorFor(codecId);
+  if (!descriptor) {
+    throw new Error(`No descriptor registered for codec id ${codecId}`);
+  }
   // Codec runtime is per-instance-stateless for every codec under test;
   // pass `undefined as never` to satisfy parameterized descriptors
   // (SQL char/varchar/int/float carry typed param shapes).
-  const descriptor = descriptorByScalar[scalar] as unknown as {
-    factory: (
-      params: never,
-    ) => (
-      ctx: CodecInstanceContext,
-    ) => ReturnType<ReturnType<(typeof descriptorByScalar)[S]['factory']>>;
-  };
-  return descriptor.factory(undefined as never)(SYNTH_CTX);
+  const factory = (descriptor as AnyCodecDescriptor).factory(undefined as never);
+  return factory(SYNTH_CTX) as Codec;
 }
 
 describe('SQLite codecs', () => {
@@ -135,7 +129,7 @@ describe('SQLite codecs', () => {
     });
 
     it('decodes ISO8601 string to Date', async () => {
-      const result = await codec.decode('2024-01-15T10:30:00.000Z', {});
+      const result = (await codec.decode('2024-01-15T10:30:00.000Z', {})) as Date;
       expect(result).toBeInstanceOf(Date);
       expect(result.toISOString()).toBe('2024-01-15T10:30:00.000Z');
     });
@@ -143,12 +137,12 @@ describe('SQLite codecs', () => {
     it('round-trips dates', async () => {
       const date = new Date('2024-06-15T23:59:59.999Z');
       const wire = await codec.encode(date, {});
-      const decoded = await codec.decode(wire, {});
+      const decoded = (await codec.decode(wire, {})) as Date;
       expect(decoded.getTime()).toBe(date.getTime());
     });
 
     it('handles date without timezone (treated as UTC by Date constructor)', async () => {
-      const result = await codec.decode('2024-01-15T10:30:00', {});
+      const result = (await codec.decode('2024-01-15T10:30:00', {})) as Date;
       expect(result).toBeInstanceOf(Date);
     });
   });
@@ -217,7 +211,7 @@ describe('SQLite codecs', () => {
 
   describe('codec definitions structure', () => {
     it('has all expected codecs', () => {
-      const keys = Object.keys(descriptorByScalar);
+      const keys = Object.keys(codecIdByScalar);
       expect(keys).toContain('text');
       expect(keys).toContain('integer');
       expect(keys).toContain('real');

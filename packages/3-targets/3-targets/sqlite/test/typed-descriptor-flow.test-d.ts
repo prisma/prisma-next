@@ -7,7 +7,7 @@
 import type { AnyCodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
 import { expectTypeOf, test } from 'vitest';
 import {
-  codecDescriptorClassList,
+  codecDescriptors,
   type SqliteDatetimeDescriptor,
   type SqliteIntegerDescriptor,
   sqliteDatetimeDescriptor,
@@ -19,12 +19,12 @@ import type { CodecTypes } from '../src/exports/codec-types';
 // Heterogeneous descriptor storage narrows to AnyCodecDescriptor.
 // ---------------------------------------------------------------------------
 
-test('codecDescriptorClassList narrows to readonly AnyCodecDescriptor[]', () => {
-  expectTypeOf(codecDescriptorClassList).toEqualTypeOf<readonly AnyCodecDescriptor[]>();
+test('codecDescriptors narrows to readonly AnyCodecDescriptor[]', () => {
+  expectTypeOf(codecDescriptors).toEqualTypeOf<readonly AnyCodecDescriptor[]>();
 });
 
 test('list entries extend AnyCodecDescriptor', () => {
-  expectTypeOf<(typeof codecDescriptorClassList)[number]>().toExtend<AnyCodecDescriptor>();
+  expectTypeOf<(typeof codecDescriptors)[number]>().toExtend<AnyCodecDescriptor>();
 });
 
 // ---------------------------------------------------------------------------
