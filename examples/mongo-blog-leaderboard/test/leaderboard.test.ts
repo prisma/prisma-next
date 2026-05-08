@@ -48,7 +48,7 @@ describe('mongo-blog-leaderboard', { timeout: timeouts.spinUpMongoMemoryServer }
 
     const top = rows[0];
     if (!top) throw new Error('Expected top entry');
-    const topAuthor = (top.author as Array<{ name: string }>)[0];
+    const topAuthor = top.author[0];
     expect(topAuthor?.name).toBe('Alice Chen');
     expect(top.latestPost?.toISOString()).toBe(new Date('2026-04-05').toISOString());
   });
@@ -56,6 +56,7 @@ describe('mongo-blog-leaderboard', { timeout: timeouts.spinUpMongoMemoryServer }
   it('returns an empty leaderboard when there are no posts', async () => {
     const runtime = await db.runtime();
     const rows = await getAuthorLeaderboard(db, runtime);
+    rows[0]?.latestPost;
     expect(rows).toEqual([]);
   });
 });

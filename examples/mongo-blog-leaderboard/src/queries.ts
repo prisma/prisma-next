@@ -19,12 +19,14 @@ export async function getAuthorLeaderboard(db: Db, runtime: Runtime) {
       latestPost: acc.max(f.createdAt),
     }))
     .sort({ postCount: -1 })
-    .lookup({
-      from: 'users',
-      localField: '_id',
-      foreignField: '_id',
-      as: 'author',
-    })
+    .lookup((from) =>
+      from('users')
+        .on((local, foreign) => ({
+          local: local._id,
+          foreign: foreign._id,
+        }))
+        .as('author'),
+    )
     .build();
 
   return runtime.execute(leaderboard);
