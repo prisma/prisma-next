@@ -13,6 +13,49 @@ import type { PostgresColumnDefault } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
 import postgresAdapterDescriptor from '../../src/exports/control';
 
+/**
+ * Synthetic stand-in for the legacy pgvector `databaseDependencies.init`
+ * descriptor. pgvector itself migrated to the contract-space mechanism
+ * in TML-2397 / M4 (project: extension-contract-spaces, T4.2) and no
+ * longer carries `databaseDependencies`. These planner tests still
+ * need a `databaseDependencies` provider to exercise the planner's
+ * `extension.vector` op-emission path; this descriptor provides that
+ * same shape (the planner's behaviour is what's under test, not
+ * pgvector specifically). The whole `databaseDependencies` mechanism
+ * is removed in M5 — at which point this descriptor and the
+ * extension-install ops it drives also go away.
+ */
+const pgvectorLegacyDependency: ComponentDatabaseDependency<unknown> = {
+  id: 'postgres.extension.vector',
+  label: 'Enable extension "vector"',
+  install: [
+    {
+      id: 'extension.vector',
+      label: 'Enable extension "vector"',
+      operationClass: 'additive',
+      target: {
+        id: 'postgres',
+        details: { schema: 'public', objectType: 'extension', name: 'vector' },
+      },
+      precheck: [],
+      execute: [
+        { description: 'create extension "vector"', sql: 'CREATE EXTENSION IF NOT EXISTS vector' },
+      ],
+      postcheck: [],
+    },
+  ],
+};
+
+const pgvectorLegacyDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
+  kind: 'extension',
+  id: 'pgvector',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.0-test',
+  databaseDependencies: { init: [pgvectorLegacyDependency] },
+  create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
+};
+
 type PostgresStorageColumn = Omit<StorageColumn, 'default'> & {
   readonly default?: PostgresColumnDefault;
 };
@@ -92,7 +135,7 @@ const emptySchema: SqlSchemaIR = {
 describe('PostgresMigrationPlanner - when database is empty', () => {
   it('builds additive plan for empty schema with database dependencies', () => {
     const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [pgvectorDescriptor];
+    const frameworkComponents = [pgvectorLegacyDescriptor];
 
     const result = planner.plan({
       contract,
@@ -159,7 +202,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     // must produce the install op for both `db init` and `migration plan`
     // policies.
     const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [pgvectorDescriptor];
+    const frameworkComponents = [pgvectorLegacyDescriptor];
 
     const result = planner.plan({
       contract,
@@ -202,7 +245,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       ],
     };
     const frameworkComponents = [
-      pgvectorDescriptor,
+      pgvectorLegacyDescriptor,
       createFrameworkComponentWithDependencies([mysqlDependency]),
     ];
 
@@ -373,7 +416,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('skips dependency install when dependency already satisfied', () => {
     const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [pgvectorDescriptor];
+    const frameworkComponents = [pgvectorLegacyDescriptor];
     const schemaWithExtension: SqlSchemaIR = {
       tables: {},
       dependencies: [{ id: 'postgres.extension.vector' }],
@@ -437,7 +480,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('still plans additive fixes when schema contains extra tables', () => {
     const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [pgvectorDescriptor];
+    const frameworkComponents = [pgvectorLegacyDescriptor];
     const nonEmptySchema: SqlSchemaIR = {
       tables: {
         existing: {
@@ -480,7 +523,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('ignores extra tables when they are unrelated to the contract', () => {
     const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [pgvectorDescriptor];
+    const frameworkComponents = [pgvectorLegacyDescriptor];
     const nonEmptySchema: SqlSchemaIR = {
       tables: {
         users: {
