@@ -307,11 +307,7 @@ describe('PipelineChain', () => {
         foreignField: '_id',
         as: 'customer',
       });
-      expect(builderStage.from).toBe(referenceStage.from);
-      expect(builderStage.localField).toBe(referenceStage.localField);
-      expect(builderStage.foreignField).toBe(referenceStage.foreignField);
-      expect(builderStage.as).toBe(referenceStage.as);
-      expect(builderStage.kind).toBe(referenceStage.kind);
+      expect(builderStage).toEqual(referenceStage);
     });
 
     it('throws for unknown root at runtime', () => {
