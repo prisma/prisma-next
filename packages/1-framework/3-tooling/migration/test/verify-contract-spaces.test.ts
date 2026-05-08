@@ -12,6 +12,15 @@ import {
 describe('listPinnedSpaceDirectories', () => {
   let projectMigrationsDir: string;
 
+  async function makeMigrationDir(name: string): Promise<void> {
+    await mkdir(join(projectMigrationsDir, name), { recursive: true });
+    await writeFile(join(projectMigrationsDir, name, 'migration.json'), '{}');
+  }
+
+  async function makePinnedSpaceDir(name: string): Promise<void> {
+    await mkdir(join(projectMigrationsDir, name), { recursive: true });
+  }
+
   beforeEach(async () => {
     projectMigrationsDir = await mkdtemp(join(tmpdir(), 'list-pinned-'));
   });
@@ -25,17 +34,36 @@ describe('listPinnedSpaceDirectories', () => {
     expect(await listPinnedSpaceDirectories(missing)).toEqual([]);
   });
 
-  it('skips timestamp-prefixed migration directories (app-space migrations)', async () => {
-    await mkdir(join(projectMigrationsDir, '20260101T0000_baseline'));
-    await mkdir(join(projectMigrationsDir, '20260507T1100_add_users'));
+  it('excludes timestamp-shaped migration directories that contain migration.json', async () => {
+    await makeMigrationDir('20260101T0000_baseline');
+    await makeMigrationDir('20260507T1100_add_users');
 
     expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual([]);
   });
 
+  it('excludes a space-id-shaped directory when it contains migration.json', async () => {
+    // The directory name happens to look like a space id, but the
+    // presence of `migration.json` is the structural marker — users may
+    // freely name their migration directories.
+    await makeMigrationDir('cipherstash');
+
+    expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual([]);
+  });
+
+  it('includes a timestamp-shaped directory with no migration.json (verifier no longer trusts the name)', async () => {
+    await makePinnedSpaceDir('20260101T0000_baseline');
+    await makePinnedSpaceDir('cipherstash');
+
+    expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual([
+      '20260101T0000_baseline',
+      'cipherstash',
+    ]);
+  });
+
   it('returns extension-space subdirectories sorted alphabetically', async () => {
-    await mkdir(join(projectMigrationsDir, 'pgvector'));
-    await mkdir(join(projectMigrationsDir, 'cipherstash'));
-    await mkdir(join(projectMigrationsDir, 'audit'));
+    await makePinnedSpaceDir('pgvector');
+    await makePinnedSpaceDir('cipherstash');
+    await makePinnedSpaceDir('audit');
 
     expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual([
       'audit',
@@ -44,11 +72,11 @@ describe('listPinnedSpaceDirectories', () => {
     ]);
   });
 
-  it('returns extension dirs alongside skipping migration dirs', async () => {
-    await mkdir(join(projectMigrationsDir, '20260101T0000_baseline'));
-    await mkdir(join(projectMigrationsDir, 'cipherstash'));
-    await mkdir(join(projectMigrationsDir, '20260507T1100_add_users'));
-    await mkdir(join(projectMigrationsDir, 'pgvector'));
+  it('returns pinned-space dirs alongside skipping migration dirs', async () => {
+    await makeMigrationDir('20260101T0000_baseline');
+    await makePinnedSpaceDir('cipherstash');
+    await makeMigrationDir('20260507T1100_add_users');
+    await makePinnedSpaceDir('pgvector');
 
     expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual([
       'cipherstash',
@@ -58,7 +86,7 @@ describe('listPinnedSpaceDirectories', () => {
 
   it('skips files (only directory entries are reported)', async () => {
     await writeFile(join(projectMigrationsDir, 'cipherstash'), 'i am a file');
-    await mkdir(join(projectMigrationsDir, 'pgvector'));
+    await makePinnedSpaceDir('pgvector');
 
     expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual(['pgvector']);
   });
@@ -66,7 +94,7 @@ describe('listPinnedSpaceDirectories', () => {
   it('skips dot-prefixed directories', async () => {
     await mkdir(join(projectMigrationsDir, '.git'));
     await mkdir(join(projectMigrationsDir, '.tmp'));
-    await mkdir(join(projectMigrationsDir, 'cipherstash'));
+    await makePinnedSpaceDir('cipherstash');
 
     expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual(['cipherstash']);
   });

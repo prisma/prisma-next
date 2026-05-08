@@ -1,14 +1,7 @@
-import { readdir } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import { join } from 'pathe';
+import { MANIFEST_FILE } from './io';
 import { APP_SPACE_ID } from './space-layout';
-
-/**
- * `YYYYMMDDTHHmm_<slug>` — see {@link import('./io').formatMigrationDirName}.
- * App-space migration directories under `<projectRoot>/migrations/`
- * always start with this prefix; pinned per-space subdirectories never
- * do (their names are space-id-shaped, `[a-z][a-z0-9_-]{0,63}`).
- */
-const MIGRATION_DIR_PATTERN = /^\d{8}T\d{4}_/;
 
 function hasErrnoCode(error: unknown, code: string): boolean {
   return error instanceof Error && (error as { code?: string }).code === code;
@@ -17,8 +10,11 @@ function hasErrnoCode(error: unknown, code: string): boolean {
 /**
  * List the per-space pinned subdirectories under
  * `<projectRoot>/migrations/`. Returns space-id directory names (sorted
- * alphabetically) — i.e. anything that is a directory, not dot-prefixed,
- * and not shaped like an app-space migration directory name.
+ * alphabetically) — i.e. any non-dot-prefixed subdirectory whose root
+ * does **not** contain a `migration.json` manifest. The manifest is the
+ * structural marker of a user-authored migration directory (see
+ * `readMigrationsDir` in `./io`); directory names themselves belong to
+ * the user and are not part of the contract.
  *
  * Returns `[]` if the migrations directory does not exist (greenfield
  * project).
@@ -43,13 +39,27 @@ export async function listPinnedSpaceDirectories(
     throw error;
   }
 
-  const candidates = entries
+  const namedCandidates = entries
     .filter((e) => e.isDirectory)
     .map((e) => e.name)
     .filter((name) => !name.startsWith('.'))
-    .filter((name) => !MIGRATION_DIR_PATTERN.test(name));
+    .sort();
 
-  return candidates.sort();
+  const manifestChecks = await Promise.all(
+    namedCandidates.map(async (name) => {
+      try {
+        await stat(join(projectMigrationsDir, name, MANIFEST_FILE));
+        return { name, isMigrationDir: true };
+      } catch (error) {
+        if (hasErrnoCode(error, 'ENOENT')) {
+          return { name, isMigrationDir: false };
+        }
+        throw error;
+      }
+    }),
+  );
+
+  return manifestChecks.filter((c) => !c.isMigrationDir).map((c) => c.name);
 }
 
 /**
