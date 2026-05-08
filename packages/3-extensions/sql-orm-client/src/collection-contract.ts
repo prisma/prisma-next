@@ -337,25 +337,6 @@ export function resolvePrimaryKeyColumn(
   return pkColumn;
 }
 
-// Pick a single trivial column to project in RETURNING when the result is only
-// used to count affected rows. Prefers the first primary-key column (always
-// non-null) so the wire payload stays minimal; falls back to any storage column
-// for id-less tables. Avoids the default "RETURNING every column" expansion.
-export function pickCountReturningColumn(
-  contract: Contract<SqlStorage>,
-  tableName: string,
-): string {
-  const table = contract.storage.tables[tableName];
-  if (!table) {
-    throw new Error(`Unknown table "${tableName}"`);
-  }
-  const firstColumn = getPrimaryKeyColumns(contract, tableName)[0] ?? Object.keys(table.columns)[0];
-  if (firstColumn === undefined) {
-    throw new Error(`Cannot pick a returning column for table "${tableName}": no columns.`);
-  }
-  return firstColumn;
-}
-
 export function assertReturningCapability(contract: Contract<SqlStorage>, action: string): void {
   if (hasContractCapability(contract, 'returning')) {
     return;

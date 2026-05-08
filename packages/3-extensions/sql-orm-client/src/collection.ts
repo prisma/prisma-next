@@ -18,9 +18,9 @@ import {
   assertReturningCapability,
   getColumnToFieldMap,
   getFieldToColumnMap,
+  getPrimaryKeyColumns,
   isToOneCardinality,
   type PolymorphismInfo,
-  pickCountReturningColumn,
   resolveFieldToColumn,
   resolveIncludeRelation,
   resolveModelTableName,
@@ -1120,12 +1120,14 @@ export class Collection<
 
     applyUpdateDefaults(this.ctx, this.tableName, mappedData);
 
+    // Project a single non-null column so the RETURNING payload stays minimal;
+    // the result is only consumed to count affected rows.
     const compiled = compileUpdateReturning(
       this.contract,
       this.tableName,
       mappedData,
       this.state.filters,
-      [pickCountReturningColumn(this.contract, this.tableName)],
+      [this.#returningColumnForCount()],
     );
     let count = 0;
     for await (const _row of executeQueryPlan<Record<string, unknown>>(
@@ -1177,8 +1179,9 @@ export class Collection<
   ): Promise<number> {
     assertReturningCapability(this.contract, 'deleteCount()');
 
+    // Single-column RETURNING; rows are only counted, not consumed.
     const compiled = compileDeleteReturning(this.contract, this.tableName, this.state.filters, [
-      pickCountReturningColumn(this.contract, this.tableName),
+      this.#returningColumnForCount(),
     ]);
     let count = 0;
     for await (const _row of executeQueryPlan<Record<string, unknown>>(
@@ -1188,6 +1191,16 @@ export class Collection<
       count++;
     }
     return count;
+  }
+
+  #returningColumnForCount(): string {
+    const tableColumns = this.contract.storage.tables[this.tableName]?.columns ?? {};
+    const column =
+      getPrimaryKeyColumns(this.contract, this.tableName)[0] ?? Object.keys(tableColumns)[0];
+    if (column === undefined) {
+      throw new Error(`Table "${this.tableName}" has no columns for count RETURNING.`);
+    }
+    return column;
   }
 
   #buildUpsertConflictCriterion(
