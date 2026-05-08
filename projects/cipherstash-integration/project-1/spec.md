@@ -1,6 +1,6 @@
 # Project 1 — Searchable-encryption MVP
 
-> Project 1 of the [cipherstash-integration umbrella](../spec.md). The umbrella has three components: this project (Project 1, MVP), [Project 2](../project-2/spec.md) (planner-driven DDL + expanded surface), and [`sql-raw-factory`](../sql-raw-factory/spec.md) (public `raw\`...\`` factory). See the umbrella plan for sequencing.
+> Project 1 of the [cipherstash-integration umbrella](../spec.md). The umbrella has three components: this project (Project 1, MVP), [Project 2](../project-2/spec.md) (expanded type/operator surface), and [`sql-raw-factory`](../sql-raw-factory/spec.md) (public `raw\`...\`` factory). See the umbrella plan for sequencing.
 
 # Summary
 
@@ -122,12 +122,12 @@ The Project 1/Project 2 cleavage is on two axes:
 
 **Out of scope: anything not exercised end-to-end.** Per the project's "ship only what's tested end-to-end" principle, every shipped surface must have a passing integration test against live Postgres + EQL. This explicitly excludes:
 
-- **Other column types** — `EncryptedNumber`, `EncryptedDate`, `EncryptedBoolean`, `EncryptedJson` ship in Project 2 alongside their planner integration. Adding them to Project 1's PSL constructor surface without their codec round-trip + search operator + migration test coverage would create "this constructor exists but breaks at runtime" failure modes.
+- **Other column types** — `EncryptedNumber`, `EncryptedDate`, `EncryptedBoolean`, `EncryptedJson` ship in Project 2; each instantiates Project 1's pattern (envelope + codec + PSL constructor + TS factory + parity test + operator lowering + end-to-end test). Adding them to Project 1's PSL constructor surface without their full pattern coverage would create "this constructor exists but breaks at runtime" failure modes.
 - **Other operator families** — `orderAndRange` (`gt`/`gte`/`lt`/`lte`), `searchableJson`. Project 2.
 
 **Out of scope: hand-authored migration factories.** Originally a Project 1 feature; superseded by TML-2397's codec lifecycle hook. Users no longer write `cipherstash.addSearchConfig(...)` calls in `migration.ts`; the codec hook emits the equivalent op automatically when the user adds / drops / alters an `Encrypted<string>` column with `searchable: true` typeParams.
 
-**Out of scope: planner-driven per-column DDL beyond the lifecycle hook.** Project 2 makes `dbInit` / `dbUpdate` plan additional cipherstash-specific transformations (e.g. type-changes between `Encrypted<string>` and a plain `string`). Project 1 covers added / dropped / typeParams-altered only — sufficient for the MVP slice.
+**Edge cases of the codec hook deferred to Project 2.** The hook covers added / dropped / typeParams-altered for `Encrypted<string>`. Cross-type transitions (e.g. flipping a column from plain `string` to `Encrypted<string>` with rows in place — which requires re-encrypting existing data) and mode-flag downgrade policy (warn vs error vs silent drop when a search index is removed and downstream consumers may exist) are Project 2 concerns that apply across all encrypted types, not Project-1-specific.
 
 **Other non-goals:**
 
