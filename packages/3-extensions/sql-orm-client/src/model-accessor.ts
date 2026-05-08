@@ -65,16 +65,8 @@ export function createModelAccessor<
     existing.push(op);
   }
 
-  // Iterate every registered descriptor (not the method-keyed `entries()`
-  // view) so multiple ops can share a method name and each dispatch to
-  // its own set of codecs — e.g. postgres's trait-gated `ilike` covers
-  // text columns while cipherstash's codec-id-targeted `ilike` covers
-  // `cipherstash/string@1`. Codec-id-targeted ops registered after a
-  // built-in shadow it for that codec because `registerOp` appends and
-  // `createScalarFieldAccessor` assigns by name (last write wins).
-  for (const descriptor of context.queryOperations.all()) {
-    const { method: name, ...entry } = descriptor;
-    const op: NamedOp = [name, entry as SqlOperationEntry];
+  for (const [name, entry] of Object.entries(context.queryOperations.entries())) {
+    const op: NamedOp = [name, entry];
     const self = entry.self;
     if (!self) continue;
     if (self.codecId !== undefined) {
