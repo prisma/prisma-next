@@ -58,9 +58,15 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createFieldAccessor, type Expression, type FieldAccessor } from './field-accessor';
+import {
+  createLookupFrom,
+  extractLookupResult,
+  type LookupFrom,
+  type LookupResult,
+} from './lookup-builder';
 import type { FindAndModifyEnabled, LeadingMatch, UpdateEnabled } from './markers';
 import { pipelineSupportsFlatResultShape } from './pipeline-result-shape';
-import type { NestedDocShape } from './resolve-path';
+import type { ModelArrayField, NestedDocShape } from './resolve-path';
 import { contractModelToMongoResultShape } from './result-shape';
 import type {
   DocField,
@@ -265,40 +271,39 @@ export class PipelineChain<
    * the `update` or `findAndModify` wire commands. The original document's
    * nested-path shape `N` is preserved (the lookup adds a sidecar array
    * field; existing keys are untouched).
+   *
+   * The single callback receives a `from` callable that grounds the
+   * foreign-root literal sequentially before the inner `on(...)`
+   * callback is type-checked — see `lookup-builder.ts`. The resulting
+   * `Shape` gains the `As` key as a `ModelArrayField<ModelName>` so
+   * `ResolveRow` produces `Array<ForeignRow>` (with concrete leaf
+   * types) instead of the legacy `unknown[]`.
    */
-  lookup<ForeignRoot extends keyof TContract['roots'] & string, As extends string>(options: {
-    from: ForeignRoot;
-    localField: keyof Shape & string;
-    foreignField: string;
-    as: As;
-  }): PipelineChain<
+  lookup<RootName extends string, ModelName extends string, As extends string>(
+    fn: (from: LookupFrom<TContract, Shape, N>) => LookupResult<RootName, ModelName, As>,
+  ): PipelineChain<
     TContract,
-    Shape & Record<As, { readonly codecId: 'mongo/array@1'; readonly nullable: false }>,
+    Shape & Record<As, ModelArrayField<ModelName>>,
     'update-cleared',
     'fam-cleared',
     'past-leading',
     N
   > {
-    const contract: MongoContract = this.#contract;
-    const modelName = contract.roots[options.from];
-    if (!modelName) {
-      const validRoots = Object.keys(contract.roots).join(', ');
-      throw new Error(`lookup() unknown root: "${options.from}". Valid roots: ${validRoots}`);
-    }
-    const model = contract.models[modelName];
-    const collectionName = model?.storage?.collection ?? options.from;
+    const fromCallable = createLookupFrom<TContract, Shape, N>(this.#contract);
+    const result = fn(fromCallable);
+    const extracted = extractLookupResult(result, this.#contract);
     return this.#withStage<
-      Shape & Record<As, { readonly codecId: 'mongo/array@1'; readonly nullable: false }>,
+      Shape & Record<As, ModelArrayField<ModelName>>,
       'update-cleared',
       'fam-cleared',
       'past-leading',
       N
     >(
       new MongoLookupStage({
-        from: collectionName,
-        localField: options.localField,
-        foreignField: options.foreignField,
-        as: options.as,
+        from: extracted.foreignCollection,
+        localField: extracted.localField,
+        foreignField: extracted.foreignField,
+        as: extracted.as,
       }),
     );
   }
