@@ -69,32 +69,53 @@ const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Hardcoded migration hint for attributes that have been removed from PSL in
- * favor of the field-preset surface. The hint text is appended to the
- * `PSL_UNSUPPORTED_FIELD_ATTRIBUTE` message so users porting Prisma 6
- * schemas see "use this preset instead" inline. Suppressed when the field
- * already declares a `temporal.*` preset call (the user has already
- * migrated; the hint would tell them to do what they just did).
+ * Per-attribute migration rule for attributes that have been removed
+ * from PSL in favor of the field-preset surface. The `hint` text is
+ * appended to the `PSL_UNSUPPORTED_FIELD_ATTRIBUTE` message so users
+ * porting Prisma 6 schemas see "use this preset instead" inline; the
+ * `suppressWhen` predicate skips the hint when the user has already
+ * migrated (so they don't get told to do what they just did).
  *
- * Add an entry here when removing another attribute. Keep this small —
- * if the table grows past a handful of entries, factor out into a proper
- * registry.
+ * Pairing the suppression predicate with the hint makes each entry
+ * self-contained: a future entry for, say, `@id` ↔ `id.uuidv7()` cannot
+ * silently inherit the wrong predicate when added.
  */
-function getRemovedAttributeHint(attributeName: string): string | undefined {
-  if (attributeName === 'updatedAt') {
-    return 'Use `temporal.updatedAt()` as a field-preset call instead.';
-  }
-  return undefined;
+interface RemovedAttributeRule {
+  readonly hint: string;
+  readonly suppressWhen: (field: PslField) => boolean;
 }
 
-function fieldDeclaresTemporalPreset(field: PslField): boolean {
-  return field.typeConstructor?.path[0] === 'temporal';
+const REMOVED_ATTRIBUTE_RULES: ReadonlyMap<string, RemovedAttributeRule> = new Map([
+  [
+    'updatedAt',
+    {
+      hint: 'Use `temporal.updatedAt()` as a field-preset call instead.',
+      suppressWhen: (field) => field.typeConstructor?.path[0] === 'temporal',
+    },
+  ],
+]);
+
+// `validateFieldAttributes` short-circuits on `BUILTIN_FIELD_ATTRIBUTE_NAMES`
+// before consulting `REMOVED_ATTRIBUTE_RULES`. A name appearing in both sets
+// would silently suppress its migration hint, defeating the purpose of the
+// hint table. Fail at module load with a clear message — the table is
+// designed to grow and this is the cheap insurance against future drift.
+{
+  const overlap = [...REMOVED_ATTRIBUTE_RULES.keys()].filter((name) =>
+    BUILTIN_FIELD_ATTRIBUTE_NAMES.has(name),
+  );
+  if (overlap.length > 0) {
+    throw new Error(
+      `BUILTIN_FIELD_ATTRIBUTE_NAMES and REMOVED_ATTRIBUTE_RULES must not overlap. Names in both: ${overlap.join(', ')}`,
+    );
+  }
 }
 
 function validateFieldAttributes(input: {
   readonly model: PslModel;
   readonly field: PslField;
   readonly composedExtensions: ReadonlySet<string>;
+  readonly authoringContributions: AuthoringContributions | undefined;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly familyId: string;
@@ -108,6 +129,7 @@ function validateFieldAttributes(input: {
     const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions, {
       familyId: input.familyId,
       targetId: input.targetId,
+      authoringContributions: input.authoringContributions,
     });
     if (uncomposedNamespace) {
       reportUncomposedNamespace({
@@ -121,10 +143,10 @@ function validateFieldAttributes(input: {
     }
 
     const baseMessage = `Field "${input.model.name}.${input.field.name}" uses unsupported attribute "@${attribute.name}"`;
-    const removedHint = getRemovedAttributeHint(attribute.name);
+    const removedRule = REMOVED_ATTRIBUTE_RULES.get(attribute.name);
     const message =
-      removedHint && !fieldDeclaresTemporalPreset(input.field)
-        ? `${baseMessage}. ${removedHint}`
+      removedRule && !removedRule.suppressWhen(input.field)
+        ? `${baseMessage}. ${removedRule.hint}`
         : baseMessage;
 
     input.diagnostics.push({
@@ -199,6 +221,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       model,
       field,
       composedExtensions,
+      authoringContributions,
       diagnostics,
       sourceId,
       familyId,

@@ -349,7 +349,7 @@ export function createSqliteMutationDefaultGeneratorDescriptors(): readonly Muta
         },
       }),
     ),
-    timestampNowControlDescriptor([SQLITE_DATETIME_CODEC_ID]),
+    timestampNowControlDescriptor(),
   ];
 }
 

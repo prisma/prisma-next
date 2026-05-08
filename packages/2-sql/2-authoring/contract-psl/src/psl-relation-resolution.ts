@@ -1,4 +1,5 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
+import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type { PslAttribute, PslField, PslSpan } from '@prisma-next/psl-parser';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import type { RelationNode } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -334,6 +335,7 @@ export function validateNavigationListFieldAttributes(input: {
   readonly field: PslField;
   readonly sourceId: string;
   readonly composedExtensions: Set<string>;
+  readonly authoringContributions: AuthoringContributions | undefined;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly familyId: string;
   readonly targetId: string;
@@ -347,6 +349,7 @@ export function validateNavigationListFieldAttributes(input: {
     const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions, {
       familyId: input.familyId,
       targetId: input.targetId,
+      authoringContributions: input.authoringContributions,
     });
     if (uncomposedNamespace) {
       reportUncomposedNamespace({

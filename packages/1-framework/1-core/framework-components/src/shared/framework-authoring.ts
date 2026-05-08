@@ -146,6 +146,148 @@ export function isAuthoringFieldPresetDescriptor(
   );
 }
 
+/**
+ * Returns true when `namespace` is a non-leaf key in `contributions.field`.
+ *
+ * `AuthoringFieldNamespace` permits a leaf descriptor at any depth — including
+ * the root — so a top-level `field: { Foo: { kind: 'fieldPreset', ... } }`
+ * registration must NOT be treated as a "namespace" with sub-paths. Callers
+ * use this predicate to gate dot-namespaced lookups (e.g. PSL `@Foo.bar`).
+ */
+export function hasRegisteredFieldNamespace(
+  contributions: AuthoringContributions | undefined,
+  namespace: string,
+): boolean {
+  if (contributions?.field === undefined || !Object.hasOwn(contributions.field, namespace)) {
+    return false;
+  }
+  return !isAuthoringFieldPresetDescriptor(contributions.field[namespace]);
+}
+
+function isPlainNamespaceObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Merges `source` into `target` recursively at the descriptor-namespace
+ * level. `leafGuard` decides which values are descriptors (terminal
+ * merge points; same-path registrations across components are reported
+ * as duplicates) versus sub-namespaces (recursion targets).
+ *
+ * Path segments are validated against prototype-pollution names
+ * (`__proto__`, `constructor`, `prototype`). A value that is neither a
+ * recognized leaf nor a plain object — e.g. a malformed descriptor
+ * where the canonical leaf guard rejected it for missing `output` —
+ * is reported as an invalid contribution rather than recursed into,
+ * which would either silently mangle state or infinite-loop on
+ * primitive properties.
+ *
+ * Within-registry duplicate detection is this walker's job;
+ * cross-registry detection runs separately via
+ * `assertNoCrossRegistryCollisions` after merging completes.
+ */
+export function mergeAuthoringNamespaces(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+  path: readonly string[],
+  leafGuard: (value: unknown) => boolean,
+  label: string,
+): void {
+  const assertSafePath = (currentPath: readonly string[]) => {
+    const blockedSegment = currentPath.find(
+      (segment) => segment === '__proto__' || segment === 'constructor' || segment === 'prototype',
+    );
+    if (blockedSegment) {
+      throw new Error(
+        `Invalid authoring ${label} helper "${currentPath.join('.')}". Helper path segments must not use "${blockedSegment}".`,
+      );
+    }
+  };
+
+  for (const [key, sourceValue] of Object.entries(source)) {
+    const currentPath = [...path, key];
+    assertSafePath(currentPath);
+    const hasExistingValue = Object.hasOwn(target, key);
+    const existingValue = hasExistingValue ? target[key] : undefined;
+
+    if (!hasExistingValue) {
+      target[key] = sourceValue;
+      continue;
+    }
+
+    const existingIsLeaf = leafGuard(existingValue);
+    const sourceIsLeaf = leafGuard(sourceValue);
+
+    if (existingIsLeaf || sourceIsLeaf) {
+      throw new Error(
+        `Duplicate authoring ${label} helper "${currentPath.join('.')}". Helper names must be unique across composed packs.`,
+      );
+    }
+
+    if (!isPlainNamespaceObject(existingValue) || !isPlainNamespaceObject(sourceValue)) {
+      throw new Error(
+        `Invalid authoring ${label} helper "${currentPath.join('.')}". Expected a sub-namespace object or a recognized descriptor; received a malformed value.`,
+      );
+    }
+
+    mergeAuthoringNamespaces(existingValue, sourceValue, currentPath, leafGuard, label);
+  }
+}
+
+function collectAuthoringLeafPaths(
+  namespace: Readonly<Record<string, unknown>>,
+  isLeaf: (value: unknown) => boolean,
+  path: readonly string[] = [],
+): string[] {
+  const paths: string[] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isLeaf(value)) {
+      paths.push(currentPath.join('.'));
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      paths.push(
+        ...collectAuthoringLeafPaths(
+          value as Readonly<Record<string, unknown>>,
+          isLeaf,
+          currentPath,
+        ),
+      );
+    }
+  }
+  return paths;
+}
+
+export function assertNoCrossRegistryCollisions(
+  typeNamespace: AuthoringTypeNamespace,
+  fieldNamespace: AuthoringFieldNamespace,
+): void {
+  const typePaths = new Set(
+    collectAuthoringLeafPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
+  );
+  // Within-registry duplicate detection is handled upstream by the merge
+  // walker (`mergeAuthoringNamespaces` in control-stack.ts and
+  // `mergeHelperNamespaces` in composed-authoring-helpers.ts), which throws
+  // on same-path registrations within either registry before this check
+  // runs. This function only handles the cross-registry case — and an
+  // empty type namespace makes a cross-registry collision structurally
+  // impossible, so the early-out is sound.
+  if (typePaths.size === 0) {
+    return;
+  }
+  for (const fieldPath of collectAuthoringLeafPaths(
+    fieldNamespace,
+    isAuthoringFieldPresetDescriptor,
+  )) {
+    if (typePaths.has(fieldPath)) {
+      throw new Error(
+        `Ambiguous authoring registry path "${fieldPath}". The same path is registered as both a type constructor and a field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type.`,
+      );
+    }
+  }
+}
+
 export function resolveAuthoringTemplateValue(
   template: AuthoringTemplateValue,
   args: readonly unknown[],

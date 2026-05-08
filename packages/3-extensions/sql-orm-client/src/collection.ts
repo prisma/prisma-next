@@ -119,17 +119,17 @@ function applyCreateDefaults(
   tableName: string,
   rows: Record<string, unknown>[],
 ): void {
-  // Per-operation cache so generators marked `stableAcrossRows: true`
-  // (e.g. `timestampNow` for `temporal.updatedAt()`) reuse one generated value across
-  // every row in this insert, while per-row generators (e.g. `cuid`) still
-  // vary as expected.
-  const acrossRowsCache = rows.length > 1 ? new Map<string, unknown>() : undefined;
+  // Per-operation cache for generators with `stability: 'query'` (e.g.
+  // `timestampNow` for `temporal.updatedAt()`): one generated value
+  // shared across every row in this insert. Per-field generators
+  // (e.g. `cuid`) ignore the cache and vary per row.
+  const defaultValueCache = rows.length > 1 ? new Map<string, unknown>() : undefined;
   for (const row of rows) {
     const applied = ctx.context.applyMutationDefaults({
       op: 'create',
       table: tableName,
       values: row,
-      ...(acrossRowsCache ? { acrossRowsCache } : {}),
+      ...(defaultValueCache ? { defaultValueCache } : {}),
     });
     for (const def of applied) {
       row[def.column] = def.value;

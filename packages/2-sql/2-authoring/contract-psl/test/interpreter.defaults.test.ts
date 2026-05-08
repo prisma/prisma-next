@@ -413,8 +413,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     // Registers a synthetic preset under `temporal.exampleField` to confirm
     // that PSL's field-preset dispatch is generic — it walks
     // `authoringContributions.field` for any registered preset, not just the
-    // real `temporal.{createdAt,updatedAt}` pair. AC6 / TC7 from
-    // projects/created-updated-at-authoring/spec.md.
+    // real `temporal.{createdAt,updatedAt}` pair.
     const document = parsePslDocument({
       schema: `model Synthetic {
   id Int @id
@@ -466,6 +465,61 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     // mutation default should be emitted for the `example` column.
     const defaults = result.value.execution?.mutations.defaults ?? [];
     expect(defaults.find((entry) => entry.ref.column === 'example')).toBeUndefined();
+  });
+
+  it('resolves a type constructor sharing a field-preset namespace', () => {
+    const document = parsePslDocument({
+      schema: `model Synthetic {
+  id Int @id
+  example audit.Custom()
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+      authoringContributions: {
+        field: {
+          audit: {
+            createdAt: {
+              kind: 'fieldPreset',
+              output: {
+                codecId: 'pg/timestamptz@1',
+                nativeType: 'timestamptz',
+              },
+            },
+          },
+        },
+        type: {
+          audit: {
+            Custom: {
+              kind: 'typeConstructor',
+              output: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        synthetic: {
+          columns: {
+            example: {
+              codecId: 'pg/text@1',
+              nativeType: 'text',
+            },
+          },
+        },
+      },
+    });
   });
 
   // Field-preset misuse cases. The preset is a complete field declaration —
@@ -568,14 +622,11 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       );
     });
 
-    it('rejects an unknown preset name in a curated namespace with PSL_UNKNOWN_FIELD_PRESET', () => {
-      // `temporal.foo()` is a curated namespace (no extension composition
-      // needed) but the preset name is not registered. Should produce
-      // PSL_UNKNOWN_FIELD_PRESET, NOT fall through to PSL_UNSUPPORTED_FIELD_TYPE.
+    it('rejects an unknown extension namespace in field-position with PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (AC5c)', () => {
       const document = parsePslDocument({
         schema: `model Bad {
   id Int @id
-  example temporal.foo()
+  ts weather.updatedAt()
 }`,
         sourceId: 'schema.prisma',
       });
@@ -583,8 +634,143 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       const result = interpretPslDocumentToSqlContract({
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
-        // No temporal.foo registered.
-        authoringContributions: { field: { temporal: {} }, type: {} },
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+            sourceId: 'schema.prisma',
+            data: { namespace: 'weather', suggestedPack: 'weather' },
+          }),
+        ]),
+      );
+    });
+
+    it('rejects extra positional argument to a zero-arg preset (AC5a)', () => {
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example temporal.exampleField(123)
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        authoringContributions: syntheticPresetContributions,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            sourceId: 'schema.prisma',
+            message: expect.stringContaining('temporal.exampleField'),
+          }),
+        ]),
+      );
+    });
+
+    it('rejects list-of preset call with PSL_PRESET_NOT_LIST (AC5f)', () => {
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example temporal.exampleField()[]
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        authoringContributions: syntheticPresetContributions,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_PRESET_NOT_LIST',
+            sourceId: 'schema.prisma',
+          }),
+        ]),
+      );
+    });
+
+    it('rejects @default(temporal.updatedAt()) with PSL_INVALID_DEFAULT_VALUE (AC5g)', () => {
+      // Namespaced calls inside @default(...) are not supported — the
+      // default-function parser only accepts bare identifiers. The honest
+      // rejection path is "this isn't a valid @default(...) value", not
+      // "this generator isn't applicable". Locks in which diagnostic fires.
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  ts DateTime @default(temporal.updatedAt())
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_INVALID_DEFAULT_VALUE',
+            sourceId: 'schema.prisma',
+            message: expect.stringContaining('temporal.updatedAt()'),
+          }),
+        ]),
+      );
+    });
+
+    it('rejects two type-constructor calls on the same field at parse time (AC5i)', () => {
+      // PSL grammar permits at most one type-constructor call per field; a
+      // second one is a parser-level reject. This test locks in the
+      // failure mode so a future parser refactor can't silently accept the
+      // ambiguous form and let the interpreter pick one.
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example temporal.updatedAt() temporal.createdAt()
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics.length).toBeGreaterThan(0);
+    });
+
+    it('rejects an unknown preset name in a registered field namespace with PSL_UNKNOWN_FIELD_PRESET', () => {
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example audit.foo()
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        authoringContributions: { field: { audit: {} }, type: {} },
       });
 
       expect(result.ok).toBe(false);
@@ -594,7 +780,8 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
           expect.objectContaining({
             code: 'PSL_UNKNOWN_FIELD_PRESET',
             sourceId: 'schema.prisma',
-            message: expect.stringContaining('temporal.foo'),
+            message: expect.stringContaining('audit.foo'),
+            data: { namespace: 'audit', helperPath: 'audit.foo' },
           }),
         ]),
       );

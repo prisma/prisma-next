@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AuthoringTypeConstructorDescriptor } from '../src/shared/framework-authoring';
 import {
+  hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
   isAuthoringArgRef,
@@ -32,6 +33,35 @@ describe('authoring template resolution', () => {
   it('rejects descriptors without output property', () => {
     expect(isAuthoringTypeConstructorDescriptor({ kind: 'typeConstructor' })).toBe(false);
     expect(isAuthoringFieldPresetDescriptor({ kind: 'fieldPreset' })).toBe(false);
+  });
+
+  describe('hasRegisteredFieldNamespace', () => {
+    const presetLeaf = {
+      kind: 'fieldPreset',
+      output: { codecId: 'test/text@1', nativeType: 'text' },
+    } as const;
+
+    it('returns true for a non-leaf namespace key', () => {
+      expect(
+        hasRegisteredFieldNamespace({ field: { temporal: { createdAt: presetLeaf } } }, 'temporal'),
+      ).toBe(true);
+    });
+
+    it('returns true for an empty sub-namespace', () => {
+      expect(hasRegisteredFieldNamespace({ field: { temporal: {} } }, 'temporal')).toBe(true);
+    });
+
+    it('returns false for a leaf preset registered at the root', () => {
+      expect(hasRegisteredFieldNamespace({ field: { temporal: presetLeaf } }, 'temporal')).toBe(
+        false,
+      );
+    });
+
+    it('returns false for missing contributions or unknown key', () => {
+      expect(hasRegisteredFieldNamespace(undefined, 'temporal')).toBe(false);
+      expect(hasRegisteredFieldNamespace({}, 'temporal')).toBe(false);
+      expect(hasRegisteredFieldNamespace({ field: {} }, 'temporal')).toBe(false);
+    });
   });
 
   it('rejects arg refs with invalid index or path', () => {

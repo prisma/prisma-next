@@ -82,10 +82,14 @@ describe('createSqliteDefaultFunctionRegistry — dbgenerated canonicalization',
 describe('createSqliteMutationDefaultGeneratorDescriptors', () => {
   const descriptors = createSqliteMutationDefaultGeneratorDescriptors();
 
-  it('includes timestampNow for SQLite DateTime columns', () => {
+  it('includes timestampNow without applicableCodecIds (preset-only generator)', () => {
     const descriptor = descriptors.find((d) => d.id === 'timestampNow');
 
-    expect(descriptor?.applicableCodecIds).toEqual(['sqlite/datetime@1']);
+    // timestampNow ships only through the temporal.{createdAt,updatedAt}()
+    // preset path; the codec is co-registered there, so the
+    // @default(...) compatibility list is intentionally absent.
+    expect(descriptor).toBeDefined();
+    expect(descriptor?.applicableCodecIds).toBeUndefined();
   });
 });
 

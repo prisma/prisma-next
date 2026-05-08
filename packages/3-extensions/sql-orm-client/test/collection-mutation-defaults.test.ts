@@ -154,7 +154,7 @@ describe('@updatedAt mutation defaults via Collection', () => {
       const params = planParams(runtime.executions[0]);
       const dateParams = params.filter((p) => p instanceof Date) as Date[];
       expect(dateParams).toHaveLength(3);
-      // All three rows must observe the same Date instance — stableAcrossRows.
+      // All three rows must observe the same Date instance — stability: 'query'.
       // Identity (===) rather than .getTime() equality, so the assertion fails
       // if three distinct Dates happen to be allocated within the same ms.
       const first = dateParams[0];
@@ -163,7 +163,7 @@ describe('@updatedAt mutation defaults via Collection', () => {
       expect(dateParams[2]).toBe(first);
     });
 
-    it('keeps per-row variability for non-stableAcrossRows generators (id stays distinct)', async () => {
+    it("keeps per-row variability for stability: 'field' generators (id stays distinct)", async () => {
       const { collection, runtime } = setupTagCollection();
       runtime.setNextResults([
         [
@@ -181,7 +181,7 @@ describe('@updatedAt mutation defaults via Collection', () => {
 
       const params = planParams(runtime.executions[0]);
       // Explicit ids stay distinct — the cache only reuses values from
-      // generators marked stableAcrossRows, never user-supplied values.
+      // stability: 'query' generators, never user-supplied values.
       expect(params).toContain(TAG_A_ID);
       expect(params).toContain(TAG_B_ID);
     });

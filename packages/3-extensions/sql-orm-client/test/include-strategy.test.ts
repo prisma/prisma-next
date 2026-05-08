@@ -1,82 +1,76 @@
 import { describe, expect, it } from 'vitest';
 import { selectIncludeStrategy } from '../src/include-strategy';
-import { getTestContract } from './helpers';
+import { getTestContract, withCapabilities } from './helpers';
+
+// The default test contract has `target: 'postgres'`, `targetFamily: 'sql'`,
+// and capabilities populated under those two namespaces. The strategy
+// selector reads only those namespaces, so each test uses
+// `withCapabilities(...)` to swap in the override the scenario needs.
 
 describe('selectIncludeStrategy', () => {
   it('returns multiQuery when include capabilities are absent', () => {
-    const contract = getTestContract();
-    const strategy = selectIncludeStrategy(contract);
+    const contract = withCapabilities(getTestContract(), {});
 
-    expect(strategy).toBe('multiQuery');
+    expect(selectIncludeStrategy(contract)).toBe('multiQuery');
   });
 
-  it('returns correlated when jsonAgg is enabled without lateral', () => {
-    const contract = {
-      ...getTestContract(),
-      capabilities: {
-        jsonAgg: {
-          enabled: true,
-        },
-      },
-    };
+  it('returns correlated when jsonAgg is enabled in the family namespace without lateral', () => {
+    const contract = withCapabilities(getTestContract(), {
+      sql: { jsonAgg: true },
+    });
 
-    const strategy = selectIncludeStrategy(contract);
-    expect(strategy).toBe('correlated');
+    expect(selectIncludeStrategy(contract)).toBe('correlated');
   });
 
-  it('returns lateral when both lateral and jsonAgg are enabled', () => {
-    const contract = {
-      ...getTestContract(),
-      capabilities: {
-        lateral: {
-          enabled: true,
-        },
-        jsonAgg: {
-          enabled: true,
-        },
-      },
-    };
+  it('returns lateral when both flags are enabled in the same namespace', () => {
+    const contract = withCapabilities(getTestContract(), {
+      postgres: { jsonAgg: true, lateral: true },
+    });
 
-    const strategy = selectIncludeStrategy(contract);
-    expect(strategy).toBe('lateral');
+    expect(selectIncludeStrategy(contract)).toBe('lateral');
   });
 
-  it('reads object capabilities via enabled flag', () => {
-    const contract = {
-      ...getTestContract(),
-      capabilities: {
-        lateral: { enabled: true },
-        jsonAgg: { enabled: false, fallback: true },
-      },
-    };
+  it('returns lateral when flags are split across family and target namespaces', () => {
+    // Real-world shape: SQL family declares `jsonAgg`; the postgres
+    // target adds `lateral` on top.
+    const contract = withCapabilities(getTestContract(), {
+      sql: { jsonAgg: true },
+      postgres: { lateral: true },
+    });
 
-    const strategy = selectIncludeStrategy(contract);
-    expect(strategy).toBe('lateral');
+    expect(selectIncludeStrategy(contract)).toBe('lateral');
   });
 
-  it('accepts top-level boolean capability flags', () => {
-    const contract = {
-      ...getTestContract(),
-      capabilities: {
-        lateral: true,
-        jsonAgg: true,
-      },
-    } as unknown as ReturnType<typeof getTestContract>;
+  it('ignores capability flags in unrelated namespaces', () => {
+    // The default test contract's target/family are 'postgres' / 'sql'.
+    // A `mongo: { lateral: true }` namespace must not enable lateral
+    // on a postgres runtime — namespaces are scoped to the running
+    // target/family.
+    const contract = withCapabilities(getTestContract(), {
+      mongo: { jsonAgg: true, lateral: true },
+      nonsense: { lateral: true },
+    });
 
-    const strategy = selectIncludeStrategy(contract);
-    expect(strategy).toBe('lateral');
+    expect(selectIncludeStrategy(contract)).toBe('multiQuery');
   });
 
-  it('ignores non-boolean, non-object capability values', () => {
-    const contract = {
-      ...getTestContract(),
-      capabilities: {
-        lateral: 'yes',
-        jsonAgg: true,
-      },
-    } as unknown as ReturnType<typeof getTestContract>;
+  it('treats non-boolean capability values as missing', () => {
+    // The Contract type declares capability values as `boolean`. Anything
+    // else (string, object, undefined) is treated as not present.
+    // The cast on `'yes'` is deliberate — we're feeding an invalid value
+    // through a valid-typed contract to exercise the runtime check.
+    const contract = withCapabilities(getTestContract(), {
+      sql: { jsonAgg: 'yes' as unknown as boolean, lateral: true },
+    });
 
-    const strategy = selectIncludeStrategy(contract);
-    expect(strategy).toBe('correlated');
+    expect(selectIncludeStrategy(contract)).toBe('multiQuery');
+  });
+
+  it('treats explicit `false` as not enabled', () => {
+    const contract = withCapabilities(getTestContract(), {
+      sql: { jsonAgg: true, lateral: false },
+    });
+
+    expect(selectIncludeStrategy(contract)).toBe('correlated');
   });
 });

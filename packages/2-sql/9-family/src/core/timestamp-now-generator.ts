@@ -1,22 +1,33 @@
 import type { AuthoringFieldPresetDescriptor } from '@prisma-next/framework-components/authoring';
-import {
-  type MutationDefaultGeneratorDescriptor,
-  TIMESTAMP_NOW_GENERATOR_ID,
-} from '@prisma-next/framework-components/control';
+import type { MutationDefaultGeneratorDescriptor } from '@prisma-next/framework-components/control';
+
+/**
+ * Canonical id for the wall-clock-now mutation default generator.
+ *
+ * Owned by `family-sql` because that's where the generator lives. The
+ * id flows out from here to (1) the control-plane descriptor and the
+ * temporal field-preset pair below, (2) the runtime-plane sibling
+ * `timestamp-now-runtime-generator.ts`, and (3) authoring surfaces
+ * (PSL `temporal.updatedAt()`, TS `field.temporal.updatedAt()`) via
+ * the descriptor flow. Co-locating the constant with its only owner
+ * keeps the framework layer free of concrete generator ids.
+ */
+export const TIMESTAMP_NOW_GENERATOR_ID = 'timestampNow' as const;
 
 /**
  * Builds the canonical control-plane descriptor for the wall-clock-now
- * mutation default generator. Targets contribute only their applicable
- * codec ids; the descriptor's `id`, `buildPhases`, and any future shared
- * behavior live here so PSL `temporal.updatedAt()` and TS `field.temporal.updatedAt()`
- * lower to byte-identical contracts across targets.
+ * mutation default generator. The descriptor's `id` and `buildPhases`
+ * are target-agnostic so PSL `temporal.updatedAt()` and TS
+ * `field.temporal.updatedAt()` lower to byte-identical contracts.
+ *
+ * `applicableCodecIds` is omitted: `timestampNow` is preset-only (not
+ * reachable via `@default(timestampNow())` lowering), and the codec is
+ * co-registered by the preset descriptor itself, so the
+ * `@default(...)` compatibility check has no role to play here.
  */
-export function timestampNowControlDescriptor(
-  applicableCodecIds: readonly string[],
-): MutationDefaultGeneratorDescriptor {
+export function timestampNowControlDescriptor(): MutationDefaultGeneratorDescriptor {
   return {
     id: TIMESTAMP_NOW_GENERATOR_ID,
-    applicableCodecIds,
     buildPhases: () => ({
       onCreate: { kind: 'generator', id: TIMESTAMP_NOW_GENERATOR_ID },
       onUpdate: { kind: 'generator', id: TIMESTAMP_NOW_GENERATOR_ID },
@@ -59,8 +70,5 @@ export function temporalAuthoringPresets<
         },
       },
     },
-  } as const satisfies {
-    readonly createdAt: AuthoringFieldPresetDescriptor;
-    readonly updatedAt: AuthoringFieldPresetDescriptor;
-  };
+  } as const satisfies Record<string, AuthoringFieldPresetDescriptor>;
 }

@@ -63,18 +63,32 @@ export interface SqlStaticContributions {
   readonly mutationDefaultGenerators?: () => ReadonlyArray<RuntimeMutationDefaultGenerator>;
 }
 
+/**
+ * Scope across which a generator's value is constant.
+ *
+ * - `'field'` — one value per defaulting site (one column, one row).
+ *   Cache strategy: no cache; call per defaulting site. Right for
+ *   per-row identifiers (UUIDs, CUIDs, ULIDs, nanoid, ksuid).
+ * - `'row'` — one value across all defaulting sites of one row of one
+ *   operation. Cache strategy: per-call cache keyed by `generatorId`.
+ *   Right for correlation ids stamped into multiple columns of one row.
+ * - `'query'` — one value across all rows and columns of one ORM
+ *   operation. Cache strategy: caller-provided cache keyed by
+ *   `generatorId`. Right for `timestampNow` (a single timestamp per
+ *   bulk insert/update).
+ */
+export type GeneratorStability = 'field' | 'row' | 'query';
+
 export interface RuntimeMutationDefaultGenerator {
   readonly id: string;
   readonly generate: (params?: Record<string, unknown>) => unknown;
   /**
-   * When `true`, a single ORM operation that lowers to one bulk mutation
-   * (e.g. `createMany` over many rows) reuses one generated value across
-   * every row that needs this default. Callers signal a bulk scope by
-   * passing a fresh `acrossRowsCache` to `applyMutationDefaults` and reusing it
-   * across the per-row invocations. Default `false` keeps each invocation
-   * independent (right for per-row identifiers like `cuid`).
+   * Scope across which the generator's value is constant. The framework
+   * derives the cache strategy from this declaration; generator authors
+   * never need to know about cache keys. See `GeneratorStability` for
+   * the per-value semantics.
    */
-  readonly stableAcrossRows?: boolean;
+  readonly stability: GeneratorStability;
 }
 
 export interface SqlRuntimeTargetDescriptor<
@@ -700,6 +714,9 @@ function applyMutationDefaults(
 
   const applied: AppliedMutationDefault[] = [];
   const appliedColumns = new Set<string>();
+  // Fresh per-call cache for `stability: 'row'` generators — they share
+  // across columns of a single row but regenerate on the next call.
+  const rowCache = new Map<string, unknown>();
 
   for (const mutationDefault of defaults) {
     if (mutationDefault.ref.table !== options.table) {
@@ -725,11 +742,11 @@ function applyMutationDefaults(
 
     applied.push({
       column: columnName,
-      value: resolveStableAcrossRowsValue(
+      value: resolveScopedValue(
         defaultSpec,
-        columnName,
         generatorRegistry,
-        options.acrossRowsCache,
+        rowCache,
+        options.defaultValueCache,
       ),
     });
     appliedColumns.add(columnName);
@@ -738,25 +755,41 @@ function applyMutationDefaults(
   return applied;
 }
 
-function resolveStableAcrossRowsValue(
+function resolveScopedValue(
   spec: ExecutionMutationDefaultValue,
-  columnName: string,
   generatorRegistry: ReadonlyMap<string, RuntimeMutationDefaultGenerator>,
-  acrossRowsCache: Map<string, unknown> | undefined,
+  rowCache: Map<string, unknown>,
+  queryCache: Map<string, unknown> | undefined,
 ): unknown {
-  if (!acrossRowsCache || spec.kind !== 'generator') {
+  if (spec.kind !== 'generator') {
     return computeExecutionDefaultValue(spec, generatorRegistry);
   }
   const generator = generatorRegistry.get(spec.id);
-  if (!generator?.stableAcrossRows) {
+  const cache = scopedCache(generator?.stability, rowCache, queryCache);
+  if (!cache) {
     return computeExecutionDefaultValue(spec, generatorRegistry);
   }
-  if (acrossRowsCache.has(columnName)) {
-    return acrossRowsCache.get(columnName);
+  if (cache.has(spec.id)) {
+    return cache.get(spec.id);
   }
   const value = computeExecutionDefaultValue(spec, generatorRegistry);
-  acrossRowsCache.set(columnName, value);
+  cache.set(spec.id, value);
   return value;
+}
+
+function scopedCache(
+  stability: GeneratorStability | undefined,
+  rowCache: Map<string, unknown>,
+  queryCache: Map<string, unknown> | undefined,
+): Map<string, unknown> | undefined {
+  switch (stability) {
+    case 'row':
+      return rowCache;
+    case 'query':
+      return queryCache;
+    default:
+      return undefined;
+  }
 }
 
 export function createExecutionContext<

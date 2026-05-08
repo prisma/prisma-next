@@ -6,6 +6,7 @@ import type {
   AuthoringTypeConstructorDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import {
+  hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
   isAuthoringFieldPresetDescriptor,
@@ -99,18 +100,6 @@ export function getAuthoringFieldPreset(
 }
 
 /**
- * Curated SQL-family-shared namespaces. Members of this set are exempt from
- * the namespace gate — they don't require explicit extension composition.
- *
- * `temporal` is reserved for date/time field presets (`temporal.createdAt()`,
- * `temporal.updatedAt()`) and chosen for forward-compatibility with the JS/TS
- * Temporal API; date codecs are expected to migrate to Temporal-backed
- * representations, at which point `temporal.*` becomes the natural namespace
- * for any future date/time helpers.
- */
-const CURATED_NAMESPACES: ReadonlySet<string> = new Set(['temporal']);
-
-/**
  * Returns the namespace prefix of `attributeName` if it references an
  * unrecognized extension namespace, otherwise `undefined`. A namespace is
  * considered recognized when it is:
@@ -118,10 +107,10 @@ const CURATED_NAMESPACES: ReadonlySet<string> = new Set(['temporal']);
  * - `db` (native-type spec, always allowed),
  * - the active family id (e.g. `sql`),
  * - the active target id (e.g. `postgres`),
- * - a curated framework namespace (e.g. `temporal`),
+ * - a registered field-preset namespace (e.g. `temporal`),
  * - present in `composedExtensions`.
  *
- * Family/target/curated namespaces are exempted so that e.g. `@sql.foo`
+ * Family/target/field-preset namespaces are exempted so that e.g. `@sql.foo`
  * surfaces as PSL_UNSUPPORTED_*_ATTRIBUTE (the attribute isn't defined)
  * rather than PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (the namespace is already
  * composed).
@@ -129,7 +118,11 @@ const CURATED_NAMESPACES: ReadonlySet<string> = new Set(['temporal']);
 export function checkUncomposedNamespace(
   attributeName: string,
   composedExtensions: ReadonlySet<string>,
-  context?: { readonly familyId?: string; readonly targetId?: string },
+  context?: {
+    readonly familyId?: string;
+    readonly targetId?: string;
+    readonly authoringContributions?: AuthoringContributions | undefined;
+  },
 ): string | undefined {
   const dotIndex = attributeName.indexOf('.');
   if (dotIndex <= 0 || dotIndex === attributeName.length - 1) {
@@ -140,7 +133,7 @@ export function checkUncomposedNamespace(
     namespace === 'db' ||
     namespace === context?.familyId ||
     namespace === context?.targetId ||
-    CURATED_NAMESPACES.has(namespace) ||
+    hasRegisteredFieldNamespace(context?.authoringContributions, namespace) ||
     composedExtensions.has(namespace)
   ) {
     return undefined;
@@ -169,6 +162,29 @@ export function reportUncomposedNamespace(input: {
     sourceId: input.sourceId,
     span: input.span,
     data: { namespace: input.namespace, suggestedPack: input.namespace },
+  });
+}
+
+/**
+ * Pushes the canonical `PSL_UNKNOWN_FIELD_PRESET` diagnostic when a typoed
+ * preset name is referenced inside a registered field-preset namespace. The
+ * `data` payload exposes the namespace and full helper path so machine
+ * consumers (agents, IDE extensions) don't have to parse the prose.
+ */
+export function reportUnknownFieldPreset(input: {
+  readonly entityLabel: string;
+  readonly namespace: string;
+  readonly helperPath: string;
+  readonly sourceId: string;
+  readonly span: PslSpan;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): void {
+  input.diagnostics.push({
+    code: 'PSL_UNKNOWN_FIELD_PRESET',
+    message: `${input.entityLabel} references unknown field preset "${input.helperPath}". Check the spelling against the available presets in the "${input.namespace}" namespace.`,
+    sourceId: input.sourceId,
+    span: input.span,
+    data: { namespace: input.namespace, helperPath: input.helperPath },
   });
 }
 
@@ -246,18 +262,19 @@ export function resolvePslTypeConstructorDescriptor(input: {
     return descriptor;
   }
 
-  const namespace = input.call.path.length > 1 ? input.call.path[0] : undefined;
-  if (
-    namespace &&
-    namespace !== 'db' &&
-    namespace !== input.familyId &&
-    namespace !== input.targetId &&
-    !CURATED_NAMESPACES.has(namespace) &&
-    !input.composedExtensions.has(namespace)
-  ) {
+  const uncomposedNamespace = checkUncomposedNamespace(
+    input.call.path.join('.'),
+    input.composedExtensions,
+    {
+      familyId: input.familyId,
+      targetId: input.targetId,
+      authoringContributions: input.authoringContributions,
+    },
+  );
+  if (uncomposedNamespace) {
     reportUncomposedNamespace({
       subjectLabel: `Type constructor "${input.call.path.join('.')}"`,
-      namespace,
+      namespace: uncomposedNamespace,
       sourceId: input.sourceId,
       span: input.call.span,
       diagnostics: input.diagnostics,
@@ -383,12 +400,9 @@ export function resolveFieldTypeDescriptor(input: {
   readonly entityLabel: string;
 }): ResolveFieldTypeResult {
   if (input.field.typeConstructor) {
-    // Field-preset dispatch runs first. Field presets carry richer semantics
-    // (storage default + execution defaults + id/unique flags + native type)
-    // than type constructors, so when a path is registered as a field preset
-    // it is the more complete answer. Compose-time collision checks make
-    // double-registration structurally impossible — see
-    // `composed-authoring-helpers.ts`.
+    // Field presets carry richer semantics than type constructors, so a field
+    // preset match is the complete answer. Shared composition rejects exact
+    // cross-registry collisions before PSL resolution can observe them.
     const presetDescriptor = getAuthoringFieldPreset(
       input.authoringContributions,
       input.field.typeConstructor.path,
@@ -416,39 +430,43 @@ export function resolveFieldTypeDescriptor(input: {
       return { ok: true, descriptor: instantiated.descriptor, presetContributions };
     }
 
-    // Field-preset walker missed. If the namespace is a curated framework
-    // namespace (`temporal.*`, etc.), curated namespaces are reserved for
-    // field presets — a miss is a typo, not a request to look elsewhere.
-    // Emit PSL_UNKNOWN_FIELD_PRESET with a span on the preset name and bail
-    // before the type-constructor fallback. Compose-time collision checks
-    // already prevent a curated path from also being a type constructor.
     const helperPath = input.field.typeConstructor.path.join('.');
     const namespacePrefix =
       input.field.typeConstructor.path.length > 1 ? input.field.typeConstructor.path[0] : undefined;
-    if (namespacePrefix && CURATED_NAMESPACES.has(namespacePrefix)) {
-      input.diagnostics.push({
-        code: 'PSL_UNKNOWN_FIELD_PRESET',
-        message: `${input.entityLabel} references unknown field preset "${helperPath}". Check the spelling against the available presets in the "${namespacePrefix}" namespace.`,
+    const typeDescriptor = getAuthoringTypeConstructor(
+      input.authoringContributions,
+      input.field.typeConstructor.path,
+    );
+
+    if (
+      !typeDescriptor &&
+      namespacePrefix &&
+      hasRegisteredFieldNamespace(input.authoringContributions, namespacePrefix)
+    ) {
+      reportUnknownFieldPreset({
+        entityLabel: input.entityLabel,
+        namespace: namespacePrefix,
+        helperPath,
         sourceId: input.sourceId,
         span: input.field.typeConstructor.span,
+        diagnostics: input.diagnostics,
       });
       return { ok: false, alreadyReported: true };
     }
 
-    // Fall through to type-constructor resolution. `resolvePslTypeConstructorDescriptor`
-    // emits the appropriate diagnostic (uncomposed namespace, unsupported field
-    // type) when no descriptor is found in either registry.
-    const descriptor = resolvePslTypeConstructorDescriptor({
-      call: input.field.typeConstructor,
-      authoringContributions: input.authoringContributions,
-      composedExtensions: input.composedExtensions,
-      familyId: input.familyId,
-      targetId: input.targetId,
-      diagnostics: input.diagnostics,
-      sourceId: input.sourceId,
-      unsupportedCode: 'PSL_UNSUPPORTED_FIELD_TYPE',
-      unsupportedMessage: `${input.entityLabel} type constructor "${helperPath}" is not supported in SQL PSL provider v1`,
-    });
+    const descriptor =
+      typeDescriptor ??
+      resolvePslTypeConstructorDescriptor({
+        call: input.field.typeConstructor,
+        authoringContributions: input.authoringContributions,
+        composedExtensions: input.composedExtensions,
+        familyId: input.familyId,
+        targetId: input.targetId,
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        unsupportedCode: 'PSL_UNSUPPORTED_FIELD_TYPE',
+        unsupportedMessage: `${input.entityLabel} type constructor "${helperPath}" is not supported in SQL PSL provider v1`,
+      });
     if (!descriptor) {
       return { ok: false, alreadyReported: true };
     }
@@ -754,6 +772,21 @@ export function lowerDefaultForField(input: {
     input.diagnostics.push({
       code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
       message: `Default generator "${lowered.value.generated.id}" is not available in the composed mutation default registry.`,
+      sourceId: input.sourceId,
+      span: expressionEntry.span,
+    });
+    return {};
+  }
+
+  // Preset-only generators (e.g. `timestampNow`) co-register their codec
+  // through the preset descriptor, so they don't carry an
+  // `applicableCodecIds` list. Such a generator surfacing on the
+  // `@default(...)` lowering path is itself the bug — emit a diagnostic
+  // pointing the user at the correct authoring surface.
+  if (generatorDescriptor.applicableCodecIds === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+      message: `Default generator "${generatorDescriptor.id}" is not applicable to "@default(...)" lowering. Use the corresponding field preset (e.g. \`temporal.${generatorDescriptor.id === 'timestampNow' ? 'updatedAt' : generatorDescriptor.id}()\`) instead.`,
       sourceId: input.sourceId,
       span: expressionEntry.span,
     });

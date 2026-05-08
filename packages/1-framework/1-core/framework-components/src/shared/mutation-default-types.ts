@@ -4,15 +4,6 @@ import type {
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
 
-/**
- * Canonical id for the wall-clock-now mutation default generator.
- *
- * Authoring surfaces (PSL `temporal.updatedAt()`, TS `field.temporal.updatedAt()`), control
- * descriptors, and runtime generators all reference this id. Centralized
- * here so a future rename or alias is a single edit.
- */
-export const TIMESTAMP_NOW_GENERATOR_ID = 'timestampNow' as const;
-
 interface SourcePosition {
   readonly offset: number;
   readonly line: number;
@@ -73,7 +64,16 @@ export type DefaultFunctionRegistry = ReadonlyMap<string, DefaultFunctionRegistr
 
 export interface MutationDefaultGeneratorDescriptor {
   readonly id: string;
-  readonly applicableCodecIds: readonly string[];
+  /**
+   * Codec ids the generator is compatible with when the codec choice
+   * and the generator choice are made independently by the contract
+   * author. Set when the registry-coherence check is meaningful
+   * (the codec and the generator can be paired arbitrarily by the
+   * caller); omitted when the generator is only reachable through a
+   * descriptor that co-registers a fixed codec, so coherence is
+   * structural and the list would be tautological.
+   */
+  readonly applicableCodecIds?: readonly string[];
   readonly resolveGeneratedColumnDescriptor?: (input: {
     readonly generated: ExecutionMutationDefaultValue;
   }) =>

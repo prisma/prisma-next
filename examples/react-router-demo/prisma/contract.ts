@@ -22,6 +22,7 @@ export const contract = defineContract(
         id: field.id.uuidv4(),
         email: field.text(),
         createdAt: field.temporal.createdAt(),
+        updatedAt: field.temporal.updatedAt(),
       },
     });
 
@@ -31,6 +32,7 @@ export const contract = defineContract(
         title: field.text(),
         userId: field.uuid(),
         createdAt: field.temporal.createdAt(),
+        updatedAt: field.temporal.updatedAt(),
       },
     });
 

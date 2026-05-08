@@ -2,9 +2,13 @@ import type { CodecLookup } from '../shared/codec-types';
 import type {
   AuthoringContributions,
   AuthoringFieldNamespace,
-  AuthoringFieldPresetDescriptor,
-  AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
+} from '../shared/framework-authoring';
+import {
+  assertNoCrossRegistryCollisions,
+  isAuthoringFieldPresetDescriptor,
+  isAuthoringTypeConstructorDescriptor,
+  mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
 import type { ComponentMetadata } from '../shared/framework-components';
 import type {
@@ -153,70 +157,6 @@ export function extractComponentIds(
   return ids;
 }
 
-function isTypeConstructorDescriptor(value: unknown): value is AuthoringTypeConstructorDescriptor {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { kind?: unknown }).kind === 'typeConstructor'
-  );
-}
-
-function isFieldPresetDescriptor(value: unknown): value is AuthoringFieldPresetDescriptor {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { kind?: unknown }).kind === 'fieldPreset'
-  );
-}
-
-function mergeAuthoringNamespaces(
-  target: Record<string, unknown>,
-  source: Record<string, unknown>,
-  path: readonly string[],
-  leafGuard: (value: unknown) => boolean,
-  label: string,
-): void {
-  const assertSafePath = (currentPath: readonly string[]) => {
-    const blockedSegment = currentPath.find(
-      (segment) => segment === '__proto__' || segment === 'constructor' || segment === 'prototype',
-    );
-    if (blockedSegment) {
-      throw new Error(
-        `Invalid authoring ${label} helper "${currentPath.join('.')}". Helper path segments must not use "${blockedSegment}".`,
-      );
-    }
-  };
-
-  for (const [key, sourceValue] of Object.entries(source)) {
-    const currentPath = [...path, key];
-    assertSafePath(currentPath);
-    const hasExistingValue = Object.hasOwn(target, key);
-    const existingValue = hasExistingValue ? target[key] : undefined;
-
-    if (!hasExistingValue) {
-      target[key] = sourceValue;
-      continue;
-    }
-
-    const existingIsLeaf = leafGuard(existingValue);
-    const sourceIsLeaf = leafGuard(sourceValue);
-
-    if (existingIsLeaf || sourceIsLeaf) {
-      throw new Error(
-        `Duplicate authoring ${label} helper "${currentPath.join('.')}". Descriptor contributions must be unique across composed components.`,
-      );
-    }
-
-    mergeAuthoringNamespaces(
-      existingValue as Record<string, unknown>,
-      sourceValue as Record<string, unknown>,
-      currentPath,
-      leafGuard,
-      label,
-    );
-  }
-}
-
 export function assembleAuthoringContributions(
   descriptors: ReadonlyArray<{ readonly authoring?: AuthoringContributions }>,
 ): AssembledAuthoringContributions {
@@ -229,7 +169,7 @@ export function assembleAuthoringContributions(
         field,
         descriptor.authoring.field,
         [],
-        isFieldPresetDescriptor,
+        isAuthoringFieldPresetDescriptor,
         'field',
       );
     }
@@ -240,14 +180,18 @@ export function assembleAuthoringContributions(
       type,
       descriptor.authoring.type,
       [],
-      isTypeConstructorDescriptor,
+      isAuthoringTypeConstructorDescriptor,
       'type',
     );
   }
 
+  const fieldNamespace = field as AuthoringFieldNamespace;
+  const typeNamespace = type as AuthoringTypeNamespace;
+  assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace);
+
   return {
-    field: field as AuthoringFieldNamespace,
-    type: type as AuthoringTypeNamespace,
+    field: fieldNamespace,
+    type: typeNamespace,
   };
 }
 

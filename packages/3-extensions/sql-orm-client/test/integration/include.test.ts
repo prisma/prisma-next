@@ -47,12 +47,14 @@ function createUsersCollectionWithCapabilities(
   capabilities: Record<string, unknown>,
 ) {
   const base = getTestContract();
+  // Replace capabilities entirely (rather than merging with base) so the
+  // test's intent is unambiguous. Merging with the base contract's
+  // postgres namespace would leak `postgres.lateral` and `postgres.jsonAgg`
+  // into the strategy detection — making it impossible to test the
+  // correlated-only path by passing only `jsonAgg`.
   const contract = {
     ...base,
-    capabilities: {
-      ...base.capabilities,
-      ...capabilities,
-    },
+    capabilities,
   } as typeof base;
 
   const context = { ...getTestContext(), contract };
@@ -65,6 +67,41 @@ type NumericPostField = import('../../src/types').NumericFieldNames<
 >;
 
 describe('integration/include', () => {
+  it(
+    'depth-1 include against an emitted contract fires a single SQL execution (regression guard for namespaced capability lookup)',
+    async () => {
+      // Guards against regressing the fix that taught `selectIncludeStrategy`
+      // to read capability flags from the contract's `targetFamily` and
+      // `target` namespaces. The default `getTestContract()` carries
+      // `postgres: { lateral: true, jsonAgg: true, ... }` — the emitter's
+      // actual output shape. Prior to the fix, this exact test would fire
+      // 2 SQL queries instead of 1, against a real driver.
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+
+        await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+        await seedPosts(runtime, [{ id: 10, title: 'Post A', userId: 1, views: 100 }]);
+
+        runtime.resetExecutions();
+        const rows = await users.include('posts').all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            address: null,
+            posts: [{ id: 10, title: 'Post A', userId: 1, views: 100, embedding: null }],
+          },
+        ]);
+        // The point of the test: 1 execution, not N+1.
+        expect(runtime.executions).toHaveLength(1);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
   it(
     'include() stitches one-to-many and one-to-one relations from real rows',
     async () => {
@@ -333,8 +370,7 @@ describe('integration/include', () => {
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollectionWithCapabilities(runtime, {
-          lateral: { enabled: true },
-          jsonAgg: { enabled: true },
+          postgres: { jsonAgg: true, lateral: true },
         });
 
         await seedUsers(runtime, [
@@ -412,8 +448,7 @@ describe('integration/include', () => {
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollectionWithCapabilities(runtime, {
-          lateral: { enabled: true },
-          jsonAgg: { enabled: true },
+          postgres: { jsonAgg: true, lateral: true },
         });
 
         await seedUsers(runtime, [
@@ -506,7 +541,8 @@ describe('integration/include', () => {
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollectionWithCapabilities(runtime, {
-          jsonAgg: { enabled: true },
+          // jsonAgg without lateral → correlated subquery strategy.
+          sql: { jsonAgg: true },
         });
 
         await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
@@ -547,7 +583,8 @@ describe('integration/include', () => {
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollectionWithCapabilities(runtime, {
-          jsonAgg: { enabled: true },
+          // jsonAgg without lateral → correlated subquery strategy.
+          sql: { jsonAgg: true },
         });
 
         await seedUsers(runtime, [
