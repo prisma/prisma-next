@@ -1,5 +1,5 @@
 /**
- * Type tests for the class-based pgvector codec (TML-2357).
+ * Type tests for the pgvector codec (TML-2357).
  *
  * Mirrors `packages/3-targets/3-targets/postgres/test/codecs-class.types.test-d.ts`.
  *
@@ -26,7 +26,7 @@ import {
   type PgVectorDescriptor,
   pgVectorColumn,
   pgVectorDescriptor,
-} from '../src/core/codecs-class';
+} from '../src/core/codecs';
 
 // ---------------------------------------------------------------------------
 // Literal preservation through direct invocation.

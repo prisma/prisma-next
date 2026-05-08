@@ -1,5 +1,5 @@
 /**
- * Class-based form of the pgvector extension codec (TML-2357).
+ * pgvector extension codec (TML-2357).
  *
  * Mirrors the patterns in `postgres/codecs-class.ts` and
  * `sqlite/codecs-class.ts` for the single `pg/vector@1` codec. Three

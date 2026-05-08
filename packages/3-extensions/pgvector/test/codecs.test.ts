@@ -1,9 +1,9 @@
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { pgVectorDescriptor } from '../src/core/codecs-class';
+import { pgVectorDescriptor } from '../src/core/codecs';
 
-// The pgvector codec authors `encode`/`decode` synchronously; class-form
-// codecs route through `Promise`-returning methods at the boundary. The
+// The pgvector codec authors `encode`/`decode` synchronously; codecs
+// route through `Promise`-returning methods at the boundary. The
 // tests below cast through the Promise-returning shape and `await` every
 // call so unit-level coverage stays aligned with the codec contract:
 //   `Codec<Id, TTraits, TWire, TInput>` — encode/decode return Promise.

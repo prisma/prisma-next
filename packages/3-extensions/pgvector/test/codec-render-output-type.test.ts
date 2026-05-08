@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pgVectorDescriptor } from '../src/core/codecs-class';
+import { pgVectorDescriptor } from '../src/core/codecs';
 
 describe('pgvector codec renderOutputType', () => {
   const renderOutputType = pgVectorDescriptor.renderOutputType as

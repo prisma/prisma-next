@@ -6,11 +6,7 @@
 
 import type { AnyCodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
 import { expectTypeOf, test } from 'vitest';
-import {
-  codecDescriptors,
-  type PgVectorDescriptor,
-  pgVectorDescriptor,
-} from '../src/core/codecs-class';
+import { codecDescriptors, type PgVectorDescriptor, pgVectorDescriptor } from '../src/core/codecs';
 import type { CodecTypes } from '../src/exports/codec-types';
 
 // ---------------------------------------------------------------------------
