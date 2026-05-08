@@ -31,9 +31,11 @@ import {
   addGlobalOptions,
   maskConnectionUrl,
   resolveContractPath,
+  resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import { runContractSpaceVerifierPrecheck } from '../utils/contract-space-verifier-precheck';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import {
   type DbVerifyCommandSuccessResult,
@@ -347,6 +349,16 @@ async function executeDbVerifyCommand(
   if (!setupResult.ok) return setupResult;
   const { contractJson, dbConnection, contractPathAbsolute } = setupResult.value;
 
+  // Per-space layout precheck (sub-spec § 4): same gating as `db init`.
+  // Runs before any DB I/O so `verifyContractSpaces` violations surface
+  // even when the database is unreachable.
+  const { migrationsDir } = resolveMigrationPaths(options.config, setupResult.value.config);
+  const precheckResult = await runContractSpaceVerifierPrecheck({
+    migrationsDir,
+    extensionPacks: setupResult.value.config.extensionPacks ?? [],
+  });
+  if (!precheckResult.ok) return notOk(precheckResult.failure);
+
   const client = createVerifyClient(setupResult.value);
   const onProgress = createProgressAdapter({ ui, flags });
 
@@ -429,6 +441,14 @@ async function executeDbSchemaOnlyVerifyCommand(
   const setupResult = await resolveVerifySetup(paths, options, 'schema-only');
   if (!setupResult.ok) return setupResult;
   const { contractJson, dbConnection, contractPathAbsolute } = setupResult.value;
+
+  // Per-space layout precheck (sub-spec § 4); see executeDbVerifyCommand.
+  const { migrationsDir } = resolveMigrationPaths(options.config, setupResult.value.config);
+  const precheckResult = await runContractSpaceVerifierPrecheck({
+    migrationsDir,
+    extensionPacks: setupResult.value.config.extensionPacks ?? [],
+  });
+  if (!precheckResult.ok) return notOk(precheckResult.failure);
 
   const client = createVerifyClient(setupResult.value);
   const onProgress = createProgressAdapter({ ui, flags });
