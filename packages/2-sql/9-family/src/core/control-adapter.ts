@@ -41,6 +41,19 @@ export interface SqlControlAdapter<TTarget extends string = string>
   ): Promise<ContractMarkerRecord | null>;
 
   /**
+   * Reads every marker row from `prisma_contract.marker` (one per
+   * contract space) and returns them keyed by `space`. Used by the
+   * per-space verifier to detect marker-vs-pinned drift and orphan
+   * marker rows. Returns an empty map when the marker table does not
+   * yet exist (fresh database / never-signed project).
+   *
+   * @see specs/framework-mechanism.spec.md § 4 — Verifier (T1.5).
+   */
+  readAllMarkers(
+    driver: ControlDriverInstance<'sql', TTarget>,
+  ): Promise<ReadonlyMap<string, ContractMarkerRecord>>;
+
+  /**
    * Introspects a database schema and returns a raw SqlSchemaIR.
    *
    * This is a pure schema discovery operation that queries the database catalog

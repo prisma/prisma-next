@@ -35,6 +35,7 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import { runContractSpaceVerifierMarkerCheck } from '../utils/contract-space-verifier-marker-check';
 import { runContractSpaceVerifierPrecheck } from '../utils/contract-space-verifier-precheck';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import {
@@ -373,6 +374,20 @@ async function executeDbVerifyCommand(
     if (!verifyResult.ok) {
       return notOk(mapVerifyFailure(verifyResult));
     }
+
+    // Marker-aware per-space verifier (sub-spec § 4): now that the
+    // database connection is established, read every marker row and
+    // re-run the verifier with full inputs. Locks the marker-half of
+    // AC-13 + AM11 — `orphanMarker`, marker-vs-pinned `hashMismatch`,
+    // and `invariantsMismatch` — that the layout-only precheck cannot
+    // detect on its own.
+    const markerRowsBySpace = await client.readAllMarkers();
+    const markerCheckResult = await runContractSpaceVerifierMarkerCheck({
+      migrationsDir,
+      extensionPacks: setupResult.value.config.extensionPacks ?? [],
+      markerRowsBySpace,
+    });
+    if (!markerCheckResult.ok) return notOk(markerCheckResult.failure);
 
     if (mode === 'marker-only') {
       return ok({

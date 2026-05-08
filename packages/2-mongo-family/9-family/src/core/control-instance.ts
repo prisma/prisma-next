@@ -269,6 +269,19 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     return readMarker(db);
   }
 
+  // Mongo does not yet participate in the per-space mechanism (sub-spec
+  // § 2 introduced the `space` column in the SQL family's marker only).
+  // The bridge: surface the single 'app' marker keyed by APP_SPACE_ID
+  // so the per-space verifier sees a coherent input shape; per-space
+  // mongo support is a future extension.
+  async readAllMarkers(options: {
+    readonly driver: ControlDriverInstance<'mongo', string>;
+  }): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
+    const appMarker = await this.readMarker(options);
+    if (appMarker === null) return new Map();
+    return new Map([['app', appMarker]]);
+  }
+
   async introspect(options: {
     readonly driver: ControlDriverInstance<'mongo', string>;
     readonly contract?: unknown;

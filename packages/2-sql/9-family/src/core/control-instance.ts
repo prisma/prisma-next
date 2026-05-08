@@ -607,6 +607,11 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     }): Promise<ContractMarkerRecord | null> {
       return getControlAdapter().readMarker(options.driver, options.space);
     },
+    async readAllMarkers(options: {
+      readonly driver: ControlDriverInstance<'sql', string>;
+    }): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
+      return getControlAdapter().readAllMarkers(options.driver);
+    },
     async introspect(options: {
       readonly driver: ControlDriverInstance<'sql', string>;
       readonly contract?: unknown;
