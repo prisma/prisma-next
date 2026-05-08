@@ -20,6 +20,7 @@ import {
   CreateIndexCall,
   CreateTableCall,
   DropTableCall,
+  RawSqlCall,
   RecreateTableCall,
 } from '@prisma-next/target-sqlite/op-factory-call';
 import { TypeScriptRenderableSqliteMigration } from '@prisma-next/target-sqlite/planner-produced-sqlite-migration';
@@ -175,6 +176,37 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
 
       const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
       expect(ops).toEqual([]);
+    },
+  );
+
+  it(
+    'preserves RawSqlCall ops byte-for-byte through the render → execute round-trip',
+    { timeout: timeouts.coldTransformImport },
+    async () => {
+      const op = {
+        id: 'raw.custom.1',
+        label: 'raw custom 1',
+        operationClass: 'additive' as const,
+        target: { id: 'sqlite' as const },
+        precheck: [],
+        execute: [{ description: 'do thing', sql: 'SELECT 1' }],
+        postcheck: [],
+        meta: { note: 'preserved' },
+      };
+      const calls = [new RawSqlCall(op)];
+      const migration = new TypeScriptRenderableSqliteMigration(calls, META);
+
+      const tsSource = rewriteImports(migration.renderTypeScript());
+      await writeFile(join(tmpDir, 'migration.ts'), tsSource);
+
+      await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
+        cwd: tmpDir,
+      });
+
+      const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
+
+      expect(ops).toHaveLength(1);
+      expect(ops[0]).toEqual(JSON.parse(JSON.stringify(op)));
     },
   );
 
