@@ -63,9 +63,14 @@ function resolveProjectionCodec(
   registry: CodecRegistry,
   contractCodecs: ContractCodecRegistry | undefined,
 ): Codec | undefined {
-  if (item.expr.kind === 'column-ref' && contractCodecs) {
-    const byColumn = contractCodecs.forColumn(item.expr.table, item.expr.column);
-    if (byColumn) return byColumn;
+  if (contractCodecs) {
+    if (item.expr.kind === 'column-ref') {
+      const byColumn = contractCodecs.forColumn(item.expr.table, item.expr.column);
+      if (byColumn) return byColumn;
+    } else if (item.refs) {
+      const byColumn = contractCodecs.forColumn(item.refs.table, item.refs.column);
+      if (byColumn) return byColumn;
+    }
   }
   if (item.codecId) {
     const fromContract = contractCodecs?.forCodecId(item.codecId);
@@ -114,6 +119,8 @@ function buildDecodeContext(
 
     if (item.expr.kind === 'column-ref') {
       columnRefs.set(item.alias, { table: item.expr.table, column: item.expr.column });
+    } else if (item.refs) {
+      columnRefs.set(item.alias, { table: item.refs.table, column: item.refs.column });
     } else if (item.expr.kind === 'subquery' || item.expr.kind === 'json-array-agg') {
       includeAliases.add(item.alias);
     }

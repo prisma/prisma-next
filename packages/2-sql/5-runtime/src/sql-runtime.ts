@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type {
   ExecutionStackInstance,
   RuntimeDriverInstance,
@@ -25,6 +26,7 @@ import type {
   SqlQueryable,
   SqlTransaction,
 } from '@prisma-next/sql-relational-core/ast';
+import { validateParamRefRefs } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   CodecDescriptorRegistry,
@@ -213,12 +215,18 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     plan: SqlQueryPlan,
     ctx: SqlCodecCallContext,
   ): Promise<SqlExecutionPlan> {
+    validateParamRefRefs(plan.ast, this.isParameterizedCodecId);
     const lowered = lowerSqlPlan(this.adapter, this.contract, plan);
     return Object.freeze({
       ...lowered,
       params: await encodeParams(lowered, this.codecRegistry, ctx, this.contractCodecs),
     });
   }
+
+  private readonly isParameterizedCodecId = (codecId: string): boolean => {
+    const descriptor = this.codecDescriptors.descriptorFor(codecId);
+    return descriptor !== undefined && descriptor.paramsSchema !== voidParamsSchema;
+  };
 
   /**
    * Default driver invocation. Production execution paths override the
@@ -280,12 +288,18 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       checkAborted(codecCtx, 'stream');
 
-      const exec: SqlExecutionPlan = isExecutionPlan(plan)
-        ? Object.freeze({
-            ...plan,
-            params: await encodeParams(plan, self.codecRegistry, codecCtx, self.contractCodecs),
-          })
-        : await self.lower(await self.runBeforeCompile(plan), codecCtx);
+      let exec: SqlExecutionPlan;
+      if (isExecutionPlan(plan)) {
+        if (plan.ast) {
+          validateParamRefRefs(plan.ast, self.isParameterizedCodecId);
+        }
+        exec = Object.freeze({
+          ...plan,
+          params: await encodeParams(plan, self.codecRegistry, codecCtx, self.contractCodecs),
+        });
+      } else {
+        exec = await self.lower(await self.runBeforeCompile(plan), codecCtx);
+      }
 
       self.familyAdapter.validatePlan(exec, self.contract);
       self._telemetry = null;

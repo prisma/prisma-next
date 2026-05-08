@@ -8,6 +8,7 @@ import {
   type CodecRegistry,
   type ContractCodecRegistry,
   collectOrderedParamRefs,
+  type ParamRefBindingRefs,
   type SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
@@ -15,31 +16,36 @@ import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 interface ParamMetadata {
   readonly codecId: string | undefined;
   readonly name: string | undefined;
+  readonly refs: ParamRefBindingRefs | undefined;
 }
 
-const NO_METADATA: ParamMetadata = Object.freeze({ codecId: undefined, name: undefined });
+const NO_METADATA: ParamMetadata = Object.freeze({
+  codecId: undefined,
+  name: undefined,
+  refs: undefined,
+});
 
 /**
  * Resolve the codec for an outgoing param.
  *
- * Phase B (and AC-5-deferred carve-out): `ParamRef` does not carry a
- * `(table, column)` ref today — every `ParamRef` carries `codecId` but
- * not the column it relates to. Encode-side dispatch therefore consults
- * `contractCodecs.forCodecId(codecId)` (which itself prefers the
- * contract-walk-derived shared codec, falling back to the legacy
- * `CodecRegistry.get` for parameterized codec ids whose contracts don't
- * have a column the walk could resolve through).
+ * Column-aware dispatch (AC-5): when `metadata.refs` is populated by a
+ * column-bound construction site, prefer
+ * `contractCodecs.forColumn(refs.table, refs.column)` — this resolves
+ * the per-instance codec the contract walk materialized for the
+ * `(table, column)` pair, which is required for parameterized codec ids
+ * shared by multiple columns with distinct typeParams (e.g.
+ * `vector(1024)` vs. `vector(1536)`).
  *
- * For the parameterized codecs shipped at Phase B (pgvector, postgres
- * json/jsonb), encode is per-instance-stateless w.r.t. params:
- * - pgvector formats `[v1,v2,...]` regardless of declared length;
- * - postgres json/jsonb encode is `JSON.stringify` regardless of schema.
+ * Refs-less fallback for non-parameterized codecs: ParamRefs constructed
+ * outside a column-bound site (literals, transient builder state) carry
+ * a non-parameterized `codecId` whose dispatch is ambiguity-free. The
+ * `forCodecId` codec-id-keyed lookup is safe here because every column
+ * sharing the codec id resolves to the same shared codec instance.
  *
- * So the codec-id-keyed lookup yields a structurally equivalent encoder
- * even when the resolved per-instance codec carries extra state (e.g. a
- * compiled JSON-Schema validator used only by `decode`). TML-2357 retires
- * the fallback by threading `ParamRef.refs` through column-bound
- * construction sites.
+ * For parameterized codec ids without refs the
+ * {@link import('@prisma-next/sql-relational-core/ast').validateParamRefRefs}
+ * pass already raised a clear diagnostic before encode runs; this path
+ * is defense-in-depth.
  */
 function resolveParamCodec(
   metadata: ParamMetadata,
@@ -47,6 +53,10 @@ function resolveParamCodec(
   contractCodecs: ContractCodecRegistry | undefined,
 ): Codec | undefined {
   if (!metadata.codecId) return undefined;
+  if (metadata.refs && contractCodecs) {
+    const byColumn = contractCodecs.forColumn(metadata.refs.table, metadata.refs.column);
+    if (byColumn) return byColumn;
+  }
   const fromContract = contractCodecs?.forCodecId(metadata.codecId);
   if (fromContract) return fromContract;
   return registry.get(metadata.codecId);
@@ -89,7 +99,11 @@ function wrapEncodeFailure(
  */
 export async function encodeParam(
   value: unknown,
-  paramRef: { readonly codecId?: string; readonly name?: string },
+  paramRef: {
+    readonly codecId?: string;
+    readonly name?: string;
+    readonly refs?: ParamRefBindingRefs;
+  },
   paramIndex: number,
   registry: CodecRegistry,
   ctx: SqlCodecCallContext,
@@ -97,7 +111,7 @@ export async function encodeParam(
 ): Promise<unknown> {
   return encodeParamValue(
     value,
-    { codecId: paramRef.codecId, name: paramRef.name },
+    { codecId: paramRef.codecId, name: paramRef.name, refs: paramRef.refs },
     paramIndex,
     registry,
     ctx,
@@ -169,7 +183,7 @@ export async function encodeParams(
     for (let i = 0; i < paramCount && i < refs.length; i++) {
       const ref = refs[i];
       if (ref) {
-        metadata[i] = { codecId: ref.codecId, name: ref.name };
+        metadata[i] = { codecId: ref.codecId, name: ref.name, refs: ref.refs };
       }
     }
   }
