@@ -34,16 +34,18 @@ import {
  *
  * Locks the CLI-level half of:
  *
- * - AM4 (rollback semantics) — multi-space failure rolls back every
+ * - rollback semantics — a multi-space failure rolls back every
  *   space's writes and preserves pre-execution markers.
- * - AM9 (atomic init across spaces).
- * - AM10 (only the bumped extension advances on a follow-up update).
- * - AM11 (codec hooks fire through the aggregate-pipeline path —
- *   loader → `planAggregate` synth strategy → `frameworkComponents`).
+ * - atomic init across spaces.
+ * - only the bumped extension advances on a follow-up update.
+ * - codec hooks firing through the aggregate-pipeline path
+ *   (loader → `planAggregate` synth strategy → `frameworkComponents`).
  *
  * Companion to the unit-level tests in `@prisma-next/cli` that mock
- * the planner / runner. The runner-level half of AM12 is locked by
+ * the planner / runner. The runner-level multi-space coverage lives in
  * `runner.multi-space.test.ts`.
+ *
+ * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
  */
 
 const EXT_SPACE_ID = 'test_contract_space_sqlite';

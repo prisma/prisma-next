@@ -62,7 +62,9 @@ export interface ResolveIdentityValueInput {
  * Per-field lifecycle event a codec hook can react to.
  *
  * Fired during app-space migration emission as the SQL family diffs the
- * prior contract against the new contract.
+ * prior contract against the new contract. See
+ * `docs/architecture docs/adrs/ADR 212 - Codec lifecycle hooks.md`
+ * for the wiring contract.
  *
  * - `'added'`     — the field is present in the new contract but not the prior.
  * - `'dropped'`   — the field is present in the prior contract but not the new.
@@ -143,6 +145,9 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
    * are dispatched per `(table, field)` based on the field's `codecId`
    * (the new field's codec for `'added'` / `'altered'`; the prior field's
    * codec for `'dropped'`).
+   *
+   * See `docs/architecture docs/adrs/ADR 212 - Codec lifecycle hooks.md`
+   * for the wiring contract and the deterministic ordering rule.
    */
   onFieldEvent?: (event: FieldEvent, ctx: FieldEventContext) => readonly OpFactoryCall[];
 }

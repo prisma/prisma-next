@@ -1,5 +1,5 @@
 /**
- * "Deletable `node_modules`" fixture (TML-2397).
+ * "Deletable `node_modules`" fixture for AC-15 / TC-26.
  *
  * Locks in the property that the per-space verifier and runner **read
  * only the user's repo** — on-disk `contract.json` / `contract.d.ts` /
@@ -8,15 +8,18 @@
  * so the absence of `node_modules` (or any other path that resolves the
  * descriptor) does not affect verify / apply outcomes.
  *
- * Scoped to the framework helpers
+ * Scoped to the framework helpers shipped in this round
  * (`emitContractSpaceArtefacts` + `listContractSpaceDirectories` +
  * `verifyContractSpaces` + `concatenateSpaceApplyInputs`). The test
  * intentionally **does not import** the synthetic
  * `test-contract-space` fixture (today hosted under
  * `test/integration/test/contract-space-fixture/`) — that is the
  * point. The test invents a `'test-contract-space'` space id inline
- * and runs the helpers against on-disk artefacts plus a fake set of
+ * and runs the helpers against on-disk artefacts on disk plus a fake set of
  * marker rows.
+ *
+ * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
+ *   — "Pinned per-space artefacts" / verifier reads only the user repo.
  */
 
 import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
@@ -176,20 +179,15 @@ describe('per-space verifier + runner against a project with deleted node_module
 });
 
 /**
- * Locks the loader → verifier path against the deleted-`node_modules`
- * scenario (TML-2397).
+ * AC15 (M2.5) lock for the loader → planner → verifier pipeline.
  *
- * The aggregate refactor makes the loader the single descriptor-import
- * boundary for `db init` / `db update` / `db verify`: once
- * `loadContractSpaceAggregate` returns, the verifier operates purely on
- * the in-memory aggregate. This test exercises that property end-to-end:
- * with `node_modules` deleted, declared extension entries supplied
- * **inline** (the same shape
- * `cli/control-api/utils/contract-space-aggregate-loader` builds from
- * `Config.extensionPacks`), `loadContractSpaceAggregate` followed by
- * `verifyAggregate` succeeds. Planner coverage is owned by the
- * dedicated planner tests; this test intentionally does not exercise
- * `planContractSpaceAggregate`.
+ * The aggregate refactor (M2.5) makes the loader the single
+ * descriptor-import boundary for `db init` / `db update` / `db verify`:
+ * once `loadContractSpaceAggregate` returns, the planner and verifier
+ * operate purely on the in-memory aggregate. This test exercises that
+ * property end-to-end: with `node_modules` deleted, declared extension
+ * entries supplied **inline** (the same shape `cli/control-api/utils/contract-space-aggregate-loader`
+ * builds from `Config.extensionPacks`), the full pipeline succeeds.
  *
  * The test deliberately constructs `DeclaredExtensionEntry` values
  * directly — no descriptor module is imported. If the post-load
@@ -199,7 +197,7 @@ describe('per-space verifier + runner against a project with deleted node_module
  * loader is the only place that calls `validateContract` / `hashContract`,
  * the property is locked at the API surface.
  */
-describe('aggregate loader → verifier against deleted node_modules', () => {
+describe('aggregate pipeline (loader → planner → verifier) against deleted node_modules', () => {
   const HEAD_HASH = 'sha256:abc123';
   let projectRoot: string;
   let migrationsDir: string;
@@ -248,7 +246,7 @@ describe('aggregate loader → verifier against deleted node_modules', () => {
     await rm(projectRoot, { recursive: true, force: true });
   });
 
-  it('loader → verifier walks to completion with node_modules removed', async () => {
+  it('loader → verifier walk to completion with node_modules removed', async () => {
     // Reconstruct the same on-disk contract value the writer used (the
     // emitter rounds it through the canonical-JSON pipeline; the test
     // hands the validator back an identity value structurally identical
