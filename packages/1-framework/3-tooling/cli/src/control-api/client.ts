@@ -395,8 +395,8 @@ class ControlClientImpl implements ControlClient {
       mode: options.mode,
       migrations: this.options.target.migrations,
       frameworkComponents,
-      ...ifDefined('migrationsDir', options.migrationsDir),
-      ...(extensionContractSpaces.length > 0 ? { extensionContractSpaces } : {}),
+      migrationsDir: options.migrationsDir,
+      extensionContractSpaces,
       ...ifDefined('onProgress', onProgress),
     });
   }
@@ -429,8 +429,8 @@ class ControlClientImpl implements ControlClient {
       mode: options.mode,
       migrations: this.options.target.migrations,
       frameworkComponents,
-      ...ifDefined('migrationsDir', options.migrationsDir),
-      ...(extensionContractSpaces.length > 0 ? { extensionContractSpaces } : {}),
+      migrationsDir: options.migrationsDir,
+      extensionContractSpaces,
       ...ifDefined('acceptDataLoss', options.acceptDataLoss),
       ...ifDefined('onProgress', onProgress),
     });

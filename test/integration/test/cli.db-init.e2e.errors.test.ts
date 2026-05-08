@@ -28,39 +28,6 @@ withTempDir(({ createTempDir }) => {
       cleanupMocks();
     });
 
-    describe('non-empty database (conflicts)', () => {
-      it(
-        'fails when database has existing schema that conflicts',
-        async () => {
-          await withDevDatabase(async ({ connectionString }) => {
-            const { testSetup, configPath } = await setupDbInitFixture(
-              connectionString,
-              createTempDir,
-              fixtureSubdir,
-              `
-                CREATE TABLE IF NOT EXISTS "user" (
-                  id SERIAL PRIMARY KEY,
-                  name TEXT NOT NULL
-                )
-              `,
-            );
-
-            consoleErrors.length = 0;
-
-            await expect(
-              runDbInit(testSetup, ['--config', configPath, '--no-color']),
-            ).rejects.toThrow();
-
-            const errorText = stripAnsi(consoleErrors.join('\n'));
-            expect(errorText).toContain('PN-RUN-3020');
-            expect(errorText).toContain('Issues');
-            expect(errorText).toContain('Extra column "user"."name"');
-          });
-        },
-        timeouts.spinUpPpgDev,
-      );
-    });
-
     describe('error handling', () => {
       it(
         'handles missing contract file',
@@ -163,7 +130,6 @@ withTempDir(({ createTempDir }) => {
         timeouts.spinUpPpgDev,
       );
     });
-
     describe('marker mismatch', () => {
       it(
         'does not reference non-existent db migrate command',

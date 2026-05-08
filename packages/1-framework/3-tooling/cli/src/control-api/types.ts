@@ -192,14 +192,14 @@ export interface DbInitOptions {
    */
   readonly connection?: unknown;
   /**
-   * On-disk migrations directory. Required when any loaded extension
-   * publishes a `contractSpace` — the per-space flow reads each space's
-   * pinned `refs/head.json` and migration packages from this root.
-   * Ignored otherwise, preserving today's single-space behaviour.
+   * On-disk migrations directory. Always required — every `db init`
+   * routes through the per-space flow, which reads pinned
+   * `refs/head.json` and extension destination contracts from this
+   * root.
    *
    * @see specs/framework-mechanism.spec.md § 6 — `db init` per-space.
    */
-  readonly migrationsDir?: string;
+  readonly migrationsDir: string;
   /** Optional progress callback for observing operation progress */
   readonly onProgress?: OnControlProgress;
 }
@@ -231,14 +231,14 @@ export interface DbUpdateOptions {
    */
   readonly acceptDataLoss?: boolean;
   /**
-   * On-disk migrations directory. Required when any loaded extension
-   * publishes a `contractSpace` — the per-space flow reads each space's
-   * pinned `refs/head.json` and migration packages from this root.
-   * Ignored otherwise, preserving today's single-space behaviour.
+   * On-disk migrations directory. Always required — every `db update`
+   * routes through the per-space flow, which reads pinned
+   * `refs/head.json` and extension destination contracts from this
+   * root.
    *
    * @see specs/framework-mechanism.spec.md § 6 — `db update` per-space.
    */
-  readonly migrationsDir?: string;
+  readonly migrationsDir: string;
   /** Optional progress callback for observing operation progress */
   readonly onProgress?: OnControlProgress;
 }

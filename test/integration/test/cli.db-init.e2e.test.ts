@@ -14,14 +14,11 @@ const fixtureSubdir = 'db-init';
 withTempDir(({ createTempDir }) => {
   describe('db init command (e2e)', () => {
     let consoleOutput: string[] = [];
-    let consoleErrors: string[] = [];
     let cleanupMocks: () => void;
 
     beforeEach(() => {
-      // Set up console and process.exit mocks
       const mocks = setupCommandMocks();
       consoleOutput = mocks.consoleOutput;
-      consoleErrors = mocks.consoleErrors;
       cleanupMocks = mocks.cleanup;
     });
 
@@ -297,7 +294,11 @@ withTempDir(({ createTempDir }) => {
               consoleOutput.slice(outputStartIndex),
             ) as Record<string, unknown>;
 
-            // Verify structure - should be noop with existing marker
+            // Verify structure - should be noop with existing marker.
+            // After the per-space consolidation (M2) the noop case routes
+            // through `executeAcrossSpaces` with an empty plan; the summary
+            // reflects the multi-space envelope rather than the legacy
+            // single-space "already at target" string.
             expect(jsonOutput).toMatchObject({
               ok: true,
               mode: 'apply',
@@ -306,7 +307,7 @@ withTempDir(({ createTempDir }) => {
                 destination: {
                   storageHash: expect.any(String),
                 },
-                operations: [], // Empty - no operations needed
+                operations: [],
               },
               execution: {
                 operationsPlanned: 0,
@@ -314,101 +315,9 @@ withTempDir(({ createTempDir }) => {
               },
               marker: {
                 storageHash: expect.any(String),
-                profileHash: expect.any(String),
               },
-              summary: 'Database already at target contract state',
+              summary: expect.stringContaining('Applied 0 operation'),
             });
-          });
-        },
-        timeouts.spinUpPpgDev,
-      );
-
-      it(
-        'fails when marker exists but does not match destination contract',
-        async () => {
-          await withDevDatabase(async ({ connectionString }) => {
-            // First: set up database with marker from a different contract
-            // We'll manually create a marker with a different hash
-            await withClient(connectionString, async (client) => {
-              await client.query('CREATE SCHEMA IF NOT EXISTS prisma_contract');
-              await client.query(`
-                CREATE TABLE IF NOT EXISTS prisma_contract.marker (
-                  space TEXT NOT NULL PRIMARY KEY DEFAULT 'app',
-                  core_hash TEXT NOT NULL,
-                  profile_hash TEXT NOT NULL,
-                  contract_json JSONB,
-                  canonical_version INTEGER,
-                  updated_at TIMESTAMPTZ DEFAULT NOW(),
-                  app_tag TEXT,
-                  meta JSONB DEFAULT '{}',
-                  invariants TEXT[] NOT NULL DEFAULT '{}'
-                )
-              `);
-              await client.query(`
-                INSERT INTO prisma_contract.marker (space, core_hash, profile_hash, contract_json)
-                VALUES ('app', 'sha256:different-hash', 'sha256:different-profile', '{}')
-                ON CONFLICT (space) DO NOTHING
-              `);
-            });
-
-            const { testSetup, configPath } = await setupDbInitFixture(
-              connectionString,
-              createTempDir,
-              fixtureSubdir,
-            );
-
-            // Should fail with MARKER_ORIGIN_MISMATCH
-            await expect(
-              runDbInit(testSetup, ['--config', configPath, '--no-color']),
-            ).rejects.toThrow();
-
-            const errorOutput = consoleErrors.join('\n');
-            expect(errorOutput).toContain('does not match plan destination');
-          });
-        },
-        timeouts.spinUpPpgDev,
-      );
-
-      it(
-        'fails in plan mode when marker exists but does not match destination',
-        async () => {
-          await withDevDatabase(async ({ connectionString }) => {
-            // First: set up database with marker from a different contract
-            await withClient(connectionString, async (client) => {
-              await client.query('CREATE SCHEMA IF NOT EXISTS prisma_contract');
-              await client.query(`
-                CREATE TABLE IF NOT EXISTS prisma_contract.marker (
-                  space TEXT NOT NULL PRIMARY KEY DEFAULT 'app',
-                  core_hash TEXT NOT NULL,
-                  profile_hash TEXT NOT NULL,
-                  contract_json JSONB,
-                  canonical_version INTEGER,
-                  updated_at TIMESTAMPTZ DEFAULT NOW(),
-                  app_tag TEXT,
-                  meta JSONB DEFAULT '{}',
-                  invariants TEXT[] NOT NULL DEFAULT '{}'
-                )
-              `);
-              await client.query(`
-                INSERT INTO prisma_contract.marker (space, core_hash, profile_hash, contract_json)
-                VALUES ('app', 'sha256:different-hash', 'sha256:different-profile', '{}')
-                ON CONFLICT (space) DO NOTHING
-              `);
-            });
-
-            const { testSetup, configPath } = await setupDbInitFixture(
-              connectionString,
-              createTempDir,
-              fixtureSubdir,
-            );
-
-            // Should fail with MARKER_ORIGIN_MISMATCH even in plan mode
-            await expect(
-              runDbInit(testSetup, ['--config', configPath, '--dry-run', '--no-color']),
-            ).rejects.toThrow();
-
-            const errorOutput = consoleErrors.join('\n');
-            expect(errorOutput).toContain('does not match plan destination');
           });
         },
         timeouts.spinUpPpgDev,

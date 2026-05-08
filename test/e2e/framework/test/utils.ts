@@ -109,7 +109,11 @@ export async function runDbInit(options: {
   const controlClient = createControlClientForTests(connectionString);
 
   try {
-    const result = await controlClient.dbInit({ contract: contractJson, mode: 'apply' });
+    const result = await controlClient.dbInit({
+      contract: contractJson,
+      mode: 'apply',
+      migrationsDir: '/tmp/__e2e-test-migrations',
+    });
     if (!result.ok) {
       throw new Error(
         `dbInit failed: ${result.failure.summary}\n${JSON.stringify(result.failure, null, 2)}`,
@@ -132,6 +136,7 @@ async function getPlannedDdlSql(options: {
       contract,
       mode: 'plan',
       connection: connectionString,
+      migrationsDir: '/tmp/__e2e-test-migrations',
     });
     if (!result.ok) {
       throw new Error(`dbInit plan failed: ${result.failure.summary}`);
