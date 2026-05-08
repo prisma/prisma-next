@@ -28,6 +28,7 @@ import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 import { createCipherstashStringCodec } from '../core/codec-runtime';
 import { CIPHERSTASH_SPACE_ID } from '../core/constants';
+import { cipherstashQueryOperations } from '../core/operators';
 import { createParameterizedCodecDescriptors } from '../core/parameterized';
 import type { CipherstashSdk } from '../core/sdk';
 
@@ -98,6 +99,7 @@ export function createCipherstashRuntimeDescriptor(
       return registry;
     },
     parameterizedCodecs: () => parameterizedDescriptors,
+    queryOperations: () => cipherstashQueryOperations(),
     create() {
       return {
         familyId: 'sql' as const,
