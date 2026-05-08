@@ -1,0 +1,154 @@
+import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  setupCommandMocks,
+  setupTestDirectoryFromFixtures,
+  withTempDir,
+} from './utils/cli-test-helpers';
+import { runDbUpdateAllowFailure, setupDbUpdateFixture } from './utils/db-update-test-helpers';
+
+/**
+ * Integration coverage for the marker-aware contract-space verifier
+ * wired into `db update` (sub-spec § 4 / project § "Verifier wiring
+ * contract"). Locks the `db update`-level half of:
+ *
+ * - **AC-13** — `db update` rejects when an orphan marker row exists in
+ *   the database (a marker for a space that's not declared in
+ *   `extensionPacks`).
+ * - **AC-16** — `db update` rejects when an extension is declared in
+ *   `extensionPacks` but no pinned `migrations/<space-id>/` directory
+ *   exists on disk yet (`declaredButUnmigrated`).
+ *
+ * Pre-amendment, `db update` ran neither verifier — both kinds of
+ * violation slipped through. Post-amendment, both checks fire as
+ * preconditions before any apply work.
+ */
+withTempDir(({ createTempDir }) => {
+  describe('db update command - contract-space verifier wiring', () => {
+    let consoleOutput: string[] = [];
+    let cleanupMocks: () => void;
+
+    beforeEach(() => {
+      const mocks = setupCommandMocks();
+      consoleOutput = mocks.consoleOutput;
+      cleanupMocks = mocks.cleanup;
+    });
+
+    afterEach(() => {
+      cleanupMocks();
+    });
+
+    it(
+      'rejects when an orphan marker row exists for a space not in extensionPacks (AC-13)',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          await withClient(connectionString, async (client) => {
+            await client.query('CREATE SCHEMA IF NOT EXISTS prisma_contract');
+            await client.query(`
+              CREATE TABLE IF NOT EXISTS prisma_contract.marker (
+                space TEXT NOT NULL PRIMARY KEY DEFAULT 'app',
+                core_hash TEXT NOT NULL,
+                profile_hash TEXT NOT NULL,
+                contract_json JSONB,
+                canonical_version INTEGER,
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                app_tag TEXT,
+                meta JSONB DEFAULT '{}',
+                invariants TEXT[] NOT NULL DEFAULT '{}'
+              )
+            `);
+            await client.query(`
+              INSERT INTO prisma_contract.marker (space, core_hash, profile_hash, contract_json)
+              VALUES ('retired-extension', 'sha256:retired', 'sha256:retired-profile', '{}')
+              ON CONFLICT (space) DO NOTHING
+            `);
+          });
+
+          const { testSetup, configPath } = await setupDbUpdateFixture(
+            connectionString,
+            createTempDir,
+            'db-init',
+          );
+
+          consoleOutput.length = 0;
+
+          const exitCode = await runDbUpdateAllowFailure(testSetup, [
+            '--config',
+            configPath,
+            '--json',
+            '--no-color',
+          ]);
+          expect(exitCode).not.toBe(0);
+
+          const errorText = consoleOutput.join('\n').trim();
+          const errorJson = JSON.parse(errorText) as Record<string, unknown>;
+
+          expect(errorJson).toMatchObject({
+            code: 'PN-MIG-5002',
+            domain: 'MIG',
+          });
+          const meta = errorJson['meta'] as
+            | { violations?: Array<{ kind: string; spaceId: string }> }
+            | undefined;
+          const kinds = (meta?.violations ?? []).map((v) => v.kind);
+          const spaces = (meta?.violations ?? []).map((v) => v.spaceId);
+          expect(kinds).toContain('orphanMarker');
+          expect(spaces).toContain('retired-extension');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'rejects when an extension declares a contractSpace but no pinned migrations dir exists (AC-16)',
+      async () => {
+        await withDevDatabase(async ({ connectionString }) => {
+          const testSetup = setupTestDirectoryFromFixtures(
+            createTempDir,
+            'db-init-with-contract-space',
+            'prisma-next.config.with-db.ts',
+            { '{{DB_URL}}': connectionString },
+          );
+          const { configPath } = testSetup;
+
+          const { createContractEmitCommand } = await import(
+            '@prisma-next/cli/commands/contract-emit'
+          );
+          const { executeCommand } = await import('./utils/cli-test-helpers');
+          const emitCommand = createContractEmitCommand();
+          const originalCwd = process.cwd();
+          try {
+            process.chdir(testSetup.testDir);
+            await executeCommand(emitCommand, ['--config', configPath, '--no-color']);
+          } finally {
+            process.chdir(originalCwd);
+          }
+
+          consoleOutput.length = 0;
+
+          const exitCode = await runDbUpdateAllowFailure(testSetup, [
+            '--config',
+            configPath,
+            '--json',
+            '--no-color',
+          ]);
+          expect(exitCode).not.toBe(0);
+
+          const errorText = consoleOutput.join('\n').trim();
+          const errorJson = JSON.parse(errorText) as Record<string, unknown>;
+
+          expect(String(errorJson['code'])).toMatch(/^PN-MIG-50/);
+          expect(errorJson['domain']).toBe('MIG');
+          const meta = errorJson['meta'] as
+            | { violations?: Array<{ kind: string; spaceId: string }> }
+            | undefined;
+          const kinds = (meta?.violations ?? []).map((v) => v.kind);
+          const spaces = (meta?.violations ?? []).map((v) => v.spaceId);
+          expect(kinds).toContain('declaredButUnmigrated');
+          expect(spaces).toContain('test-contract-space');
+        });
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
+});
