@@ -7,7 +7,7 @@
  *
  * 1. A `PgXCodec` class extending {@link CodecImpl} that wraps the
  *    module-level encode/decode/encodeJson/decodeJson constants exported
- *    from `codecs.ts` (the single source of truth for non-trivial
+ *    from `codec-helpers.ts` (the single source of truth for non-trivial
  *    runtime conversions; trivial identity passthroughs are inlined).
  * 2. A `PgXDescriptor` class extending {@link CodecDescriptorImpl}
  *    declaring the codec id, traits, target types, params schema, meta,
