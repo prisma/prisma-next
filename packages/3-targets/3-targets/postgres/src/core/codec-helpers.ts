@@ -68,13 +68,29 @@ export const pgNumericRenderOutputType = (typeParams: {
     );
   }
   const scale = typeParams.scale;
-  return typeof scale === 'number' ? `Numeric<${precision}, ${scale}>` : `Numeric<${precision}>`;
+  if (scale === undefined) return `Numeric<${precision}>`;
+  if (typeof scale !== 'number' || !Number.isFinite(scale) || !Number.isInteger(scale)) {
+    throw new Error(
+      `renderOutputType: expected integer "scale" in typeParams for Numeric, got ${String(scale)}`,
+    );
+  }
+  return `Numeric<${precision}, ${scale}>`;
 };
+
+// ISO 8601 UTC: `YYYY-MM-DDTHH:MM:SS[.mmm…]Z`. Trailing `Z` is required;
+// fractional seconds are optional. Other `Date`-parseable formats
+// (`January 15, 2024`, `01/15/2024`, etc.) are intentionally rejected
+// because those formats are implementation-defined and not the
+// documented contract for `pg/timestamp@1` / `pg/timestamptz@1`.
+const ISO_8601_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 
 export const pgTimestampEncodeJson = (value: Date): JsonValue => value.toISOString();
 export const pgTimestampDecodeJson = (json: JsonValue): Date => {
   if (typeof json !== 'string') {
     throw new Error(`Expected ISO date string for pg/timestamp@1, got ${typeof json}`);
+  }
+  if (!ISO_8601_UTC.test(json)) {
+    throw new Error(`Invalid ISO date string for pg/timestamp@1: ${json}`);
   }
   const date = new Date(json);
   if (Number.isNaN(date.getTime())) {
@@ -87,6 +103,9 @@ export const pgTimestamptzEncodeJson = (value: Date): JsonValue => value.toISOSt
 export const pgTimestamptzDecodeJson = (json: JsonValue): Date => {
   if (typeof json !== 'string') {
     throw new Error(`Expected ISO date string for pg/timestamptz@1, got ${typeof json}`);
+  }
+  if (!ISO_8601_UTC.test(json)) {
+    throw new Error(`Invalid ISO date string for pg/timestamptz@1: ${json}`);
   }
   const date = new Date(json);
   if (Number.isNaN(date.getTime())) {
@@ -109,8 +128,11 @@ export const pgEnumRenderOutputType = (typeParams: {
       `renderOutputType: expected array "values" in typeParams for enum, got ${typeof values}`,
     );
   }
+  if (!values.every((v): v is string => typeof v === 'string')) {
+    throw new Error(`renderOutputType: expected string[] "values" in typeParams for enum`);
+  }
   return values
-    .map((value) => `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
+    .map((value) => `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
     .join(' | ');
 };
 
