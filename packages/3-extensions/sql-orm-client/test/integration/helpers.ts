@@ -45,6 +45,34 @@ export function createReturningTagsCollection(runtime: PgIntegrationRuntime) {
   return new Collection({ runtime, context }, 'Tag');
 }
 
+// Tags collection bound to a contract where `tags.primaryKey` has been
+// stripped, simulating an id-less SQL model. The underlying Postgres table
+// still has a primary key (we don't reshape the schema here); the contract is
+// the orm-client's source of truth for PK presence, so the lane behaves as
+// though the table had none. Use this for id-less ORM end-to-end coverage.
+export function createIdlessTagsCollection(runtime: PgIntegrationRuntime) {
+  const base = withReturningCapability(getTestContract());
+  const tagsTable = base.storage.tables.tags;
+  const idlessContract = {
+    ...base,
+    storage: {
+      ...base.storage,
+      tables: {
+        ...base.storage.tables,
+        tags: { ...tagsTable, primaryKey: undefined },
+      },
+    },
+    // Cast through `unknown` because TestContract pins `tags.primaryKey` to
+    // the literal shape generated for the fixture; widening it to undefined
+    // is intentional for this id-less test scenario.
+  } as unknown as TestContract;
+  const context = {
+    ...getTestContext(),
+    contract: idlessContract,
+  } as ExecutionContext<TestContract>;
+  return new Collection({ runtime, context }, 'Tag');
+}
+
 export async function withCollectionRuntime(
   fn: (runtime: PgIntegrationRuntime) => Promise<void>,
 ): Promise<void> {
