@@ -1,0 +1,68 @@
+/**
+ * Framework-native shape for the CipherStash SDK that the cipherstash
+ * extension wraps.
+ *
+ * The first-attempt SDK (see `reference/cipherstash/stack/...`) is rich
+ * and Prisma-adapter shaped. The framework-native shape consumed by the
+ * codec runtime, the bulk-encrypt middleware, and `decryptAll` is
+ * intentionally smaller — three async methods that each map cleanly to
+ * one CipherStash bulk-call shape:
+ *
+ *   - `decrypt`     — single-cell read used by `EncryptedString#decrypt()`
+ *                     when the user opts out of bulk decryption.
+ *   - `bulkEncrypt` — write-side coalesced encrypt; the bulk-encrypt
+ *                     middleware (M2 R2) calls this from `beforeExecute`.
+ *   - `bulkDecrypt` — read-side coalesced decrypt; `decryptAll` (M3)
+ *                     calls this from a recursive walker.
+ *
+ * Each method accepts an optional `AbortSignal`. Cancellation is forwarded
+ * directly to the SDK per the umbrella spec's cancellation contract (the
+ * per-execute `MiddlewareContext.signal` from M1's middleware-param-
+ * transform seam, or the caller-supplied signal on `decrypt({signal})`).
+ */
+
+/**
+ * Routing-key tuple used by `bulkEncrypt`/`bulkDecrypt` to group requests
+ * so each ZeroKMS round-trip handles one homogeneous batch. Routing key
+ * is `(table, column)` per `plan.md § Open items 5` (resolved 2026-05-06).
+ */
+export interface CipherstashRoutingKey {
+  readonly table: string;
+  readonly column: string;
+}
+
+export interface CipherstashSingleDecryptArgs {
+  /**
+   * The wire ciphertext to decrypt. Opaque to the framework; the SDK
+   * inspects the embedded `i.t` / `i.c` schema markers to pick the
+   * right `cast_as` for the round-trip.
+   */
+  readonly ciphertext: unknown;
+  readonly table: string;
+  readonly column: string;
+  readonly signal?: AbortSignal;
+}
+
+export interface CipherstashBulkEncryptArgs {
+  readonly routingKey: CipherstashRoutingKey;
+  readonly values: ReadonlyArray<string>;
+  readonly signal?: AbortSignal;
+}
+
+export interface CipherstashBulkDecryptArgs {
+  readonly routingKey: CipherstashRoutingKey;
+  readonly ciphertexts: ReadonlyArray<unknown>;
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * The framework-native CipherStash SDK contract consumed by the envelope,
+ * codec, middleware, and `decryptAll` surfaces. Real implementations wrap
+ * a CipherStash `EncryptionClient`; tests construct mock SDKs that
+ * implement these three methods directly.
+ */
+export interface CipherstashSdk {
+  decrypt(args: CipherstashSingleDecryptArgs): Promise<string>;
+  bulkEncrypt(args: CipherstashBulkEncryptArgs): Promise<ReadonlyArray<unknown>>;
+  bulkDecrypt(args: CipherstashBulkDecryptArgs): Promise<ReadonlyArray<string>>;
+}

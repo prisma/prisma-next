@@ -20,7 +20,8 @@
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/migration-tools": "workspace:*",
-    "@prisma-next/sql-contract": "workspace:*"
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
@@ -42,6 +43,7 @@
   ],
   "exports": {
     "./control": "./dist/control.mjs",
+    "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },
   "repository": {

@@ -2461,6 +2461,9 @@ importers:
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../2-sql/1-core/contract
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/utils
     devDependencies:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
