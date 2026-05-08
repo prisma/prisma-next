@@ -1,0 +1,16 @@
+{
+  "hash": "sha256:f3418b4e2ae64b26f422674c0241e42373c7e2d03cb188c72709bef3228dc201",
+  "invariants": [
+    "cipherstash:create-eql_v2_blake3-v1",
+    "cipherstash:create-eql_v2_bloom_filter-v1",
+    "cipherstash:create-eql_v2_configuration-v1",
+    "cipherstash:create-eql_v2_configuration_state-v1",
+    "cipherstash:create-eql_v2_encrypted-v1",
+    "cipherstash:create-eql_v2_hmac_256-v1",
+    "cipherstash:create-eql_v2_ore_block_u64_8_256-v1",
+    "cipherstash:create-eql_v2_ore_block_u64_8_256_term-v1",
+    "cipherstash:create-eql_v2_ore_cllw_u64_8-v1",
+    "cipherstash:create-eql_v2_ore_cllw_var_8-v1",
+    "cipherstash:install-eql-bundle-v1"
+  ]
+}

@@ -1,0 +1,14 @@
+// Cipherstash integration example schema.
+//
+// One model with one searchable encrypted column. The
+// `{ equality: true, freeTextSearch: true }` parameters opt the column
+// into both deterministic-equality and bloom-filter free-text search
+// indexes — corresponding to the two cipherstash search operators the
+// extension exposes (`cipherstashEq`, `cipherstashIlike`).
+
+model User {
+  id    String                                                            @id
+  email cipherstash.EncryptedString({ equality: true, freeTextSearch: true })
+
+  @@map("user")
+}

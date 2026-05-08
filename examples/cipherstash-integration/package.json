@@ -1,0 +1,38 @@
+{
+  "name": "cipherstash-integration-example",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "emit": "prisma-next contract emit",
+    "migration:plan": "prisma-next migration plan",
+    "migration:apply": "prisma-next migration apply",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings"
+  },
+  "dependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/extension-cipherstash": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/postgres": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-psl": "workspace:*",
+    "@prisma-next/sql-orm-client": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "tsx": "^4.19.2",
+    "typescript": "catalog:"
+  }
+}

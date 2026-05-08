@@ -1,0 +1,112 @@
+{
+  "from": null,
+  "to": "sha256:f3418b4e2ae64b26f422674c0241e42373c7e2d03cb188c72709bef3228dc201",
+  "fromContract": null,
+  "toContract": {
+    "target": "postgres",
+    "targetFamily": "sql",
+    "roots": {},
+    "models": {},
+    "capabilities": {},
+    "extensionPacks": {},
+    "meta": {
+      "cipherstashFutureIR": {
+        "compositeTypes": [
+          {
+            "schema": null,
+            "name": "eql_v2_encrypted"
+          },
+          {
+            "schema": "eql_v2",
+            "name": "ore_block_u64_8_256_term"
+          },
+          {
+            "schema": "eql_v2",
+            "name": "ore_block_u64_8_256"
+          },
+          {
+            "schema": "eql_v2",
+            "name": "ore_cllw_u64_8"
+          },
+          {
+            "schema": "eql_v2",
+            "name": "ore_cllw_var_8"
+          }
+        ],
+        "enums": [
+          {
+            "schema": null,
+            "name": "eql_v2_configuration_state",
+            "values": ["active", "inactive", "encrypting", "pending"]
+          }
+        ],
+        "domains": [
+          {
+            "schema": "eql_v2",
+            "name": "bloom_filter"
+          },
+          {
+            "schema": "eql_v2",
+            "name": "hmac_256"
+          },
+          {
+            "schema": "eql_v2",
+            "name": "blake3"
+          }
+        ]
+      }
+    },
+    "profileHash": "cipherstash-extension-profile-v1",
+    "storage": {
+      "tables": {
+        "eql_v2_configuration": {
+          "columns": {
+            "id": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "state": {
+              "codecId": "pg/text@1",
+              "nativeType": "eql_v2_configuration_state",
+              "nullable": false
+            },
+            "data": {
+              "codecId": "pg/jsonb@1",
+              "nativeType": "jsonb",
+              "nullable": false
+            }
+          },
+          "primaryKey": {
+            "columns": ["id"]
+          },
+          "uniques": [],
+          "indexes": [],
+          "foreignKeys": []
+        }
+      },
+      "storageHash": "sha256:f3418b4e2ae64b26f422674c0241e42373c7e2d03cb188c72709bef3228dc201"
+    }
+  },
+  "hints": {
+    "used": [],
+    "applied": [],
+    "plannerVersion": "2.0.0"
+  },
+  "labels": [],
+  "providedInvariants": [
+    "cipherstash:create-eql_v2_blake3-v1",
+    "cipherstash:create-eql_v2_bloom_filter-v1",
+    "cipherstash:create-eql_v2_configuration-v1",
+    "cipherstash:create-eql_v2_configuration_state-v1",
+    "cipherstash:create-eql_v2_encrypted-v1",
+    "cipherstash:create-eql_v2_hmac_256-v1",
+    "cipherstash:create-eql_v2_ore_block_u64_8_256-v1",
+    "cipherstash:create-eql_v2_ore_block_u64_8_256_term-v1",
+    "cipherstash:create-eql_v2_ore_cllw_u64_8-v1",
+    "cipherstash:create-eql_v2_ore_cllw_var_8-v1",
+    "cipherstash:install-eql-bundle-v1"
+  ],
+  "createdAt": "2026-06-01T00:00:00.000Z",
+  "migrationHash": "sha256:3451f119f001f152d5f793aacdbaf8e1117dba4bf9e3d4f2fd83559b3ccf65bb"
+}
