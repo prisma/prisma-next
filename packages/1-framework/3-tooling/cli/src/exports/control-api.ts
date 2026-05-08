@@ -20,9 +20,13 @@ export { createControlClient } from '../control-api/client';
 
 // Contract enrichment (merges framework-derived capabilities and extension pack metadata)
 export { enrichContract } from '../control-api/contract-enrichment';
-
-// Standalone operations (for tooling that doesn't need full client)
 export { executeContractEmit } from '../control-api/operations/contract-emit';
+// Standalone operations (for tooling that doesn't need full client)
+export {
+  type ExecutePerSpaceDbApplyOptions,
+  executePerSpaceDbApply,
+  type PerSpaceExtensionInput,
+} from '../control-api/operations/db-apply-per-space';
 // CLI-specific types
 export type {
   ContractEmitOptions,

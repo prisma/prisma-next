@@ -3304,6 +3304,9 @@ importers:
       '@prisma-next/driver-sqlite':
         specifier: workspace:*
         version: link:../../7-drivers/sqlite
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../../../1-framework/3-tooling/migration
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
