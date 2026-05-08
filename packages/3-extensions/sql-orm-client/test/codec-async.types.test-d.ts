@@ -35,7 +35,7 @@ import type { Contract } from './fixtures/generated/contract';
 
 // `User.address` is jsonb-backed (a value object whose fields and the field
 // itself flow through the `pg/jsonb@1` codec); `User.invitedById` is int4 and
-// nullable. Both codecs are lifted to async dispatch at the class-form codec
+// nullable. Both codecs are lifted to async dispatch at the codec
 // boundary regardless of whether the author wrote sync or async functions, so
 // these columns are representative of "async codec columns" at the runtime
 // boundary.
