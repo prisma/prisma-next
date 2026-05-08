@@ -58,18 +58,22 @@ describe('deriveProvidedInvariants', () => {
     expect(deriveProvidedInvariants([nonDataOp('add-table'), dataOp('cleanup')])).toEqual([]);
   });
 
-  it('skips non-data ops', () => {
+  it('includes invariantIds from additive ops alongside data ops', () => {
+    // Both data-class and additive-class ops may declare invariantIds for
+    // marker bookkeeping. operationClass governs policy gating; invariantId
+    // governs replay tracking. Cipherstash's `installEqlBundle` and
+    // structural `create-*` ops are the canonical additive-with-invariantId
+    // case (sub-spec § 3 / cipherstash-migration.spec.md).
     expect(
       deriveProvidedInvariants([
         nonDataOp('add-table'),
-        // additive ops with stray invariantId-like fields are ignored
-        { ...nonDataOp('phantom'), invariantId: 'should-be-ignored' } as MigrationPlanOperation,
+        { ...nonDataOp('install-bundle'), invariantId: 'ext:bundle-v1' } as MigrationPlanOperation,
         dataOp('phone-backfill', 'phone-backfill'),
       ]),
-    ).toEqual(['phone-backfill']);
+    ).toEqual(['ext:bundle-v1', 'phone-backfill']);
   });
 
-  it('returns sorted, deduplicated invariantIds across data ops', () => {
+  it('returns sorted, deduplicated invariantIds across all ops', () => {
     expect(
       deriveProvidedInvariants([dataOp('z', 'zebra'), dataOp('a', 'apple'), dataOp('m', 'mango')]),
     ).toEqual(['apple', 'mango', 'zebra']);
