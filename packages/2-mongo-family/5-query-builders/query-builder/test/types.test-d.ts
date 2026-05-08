@@ -1,4 +1,6 @@
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import { expectTypeOf } from 'vitest';
+import type { ModelArrayField } from '../src/resolve-path';
 import type {
   BooleanField,
   DateField,
@@ -59,6 +61,13 @@ describe('type machinery', () => {
     type Row = ResolveRow<Shape, TestCodecTypes>;
 
     expectTypeOf<Row['x']>().toEqualTypeOf<unknown>();
+  });
+
+  it('ResolveRow falls back to unknown[] for ModelArrayField on non-concrete contracts', () => {
+    type Shape = { readonly customer: ModelArrayField<'User'> };
+    type Row = ResolveRow<Shape, TestCodecTypes, MongoContract>;
+
+    expectTypeOf<Row['customer']>().toEqualTypeOf<unknown[]>();
   });
 
   it('BooleanField resolves to boolean through ResolveRow', () => {
