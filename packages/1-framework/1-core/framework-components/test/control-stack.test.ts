@@ -1,4 +1,5 @@
 import type { JsonValue } from '@prisma-next/contract/types';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { describe, expect, it } from 'vitest';
 import type { CreateControlStackInput } from '../src/control/control-stack';
 import {
@@ -13,6 +14,8 @@ import {
   extractQueryOperationTypeImports,
   validateScalarTypeCodecIds,
 } from '../src/control/control-stack';
+import type { Codec } from '../src/shared/codec';
+import type { AnyCodecDescriptor } from '../src/shared/codec-descriptor';
 import type { CodecLookup } from '../src/shared/codec-types';
 import type { ComponentDescriptor } from '../src/shared/framework-components';
 
@@ -257,11 +260,9 @@ describe('extractCodecLookup', () => {
       decode: async (v: unknown) => v,
       encodeJson: (v: unknown) => v,
       decodeJson: (j: unknown) => j,
-    }) as unknown as import('../src/shared/codec').Codec;
+    }) as unknown as Codec;
 
-  const stubDescriptor = (
-    id: string,
-  ): import('../src/shared/codec-descriptor').AnyCodecDescriptor => ({
+  const stubDescriptor = (id: string): AnyCodecDescriptor => ({
     codecId: id,
     traits: [],
     targetTypes: [],
@@ -271,7 +272,7 @@ describe('extractCodecLookup', () => {
         vendor: 'test',
         validate: () => ({ value: undefined }),
       },
-    } as unknown as import('@standard-schema/spec').StandardSchemaV1<void>,
+    } as unknown as StandardSchemaV1<void>,
     isParameterized: false,
     factory: () => () => stubCodec(id),
   });

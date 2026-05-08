@@ -1,4 +1,5 @@
-import type { CodecLookup } from '../shared/codec-types';
+import type { Codec } from '../shared/codec';
+import type { CodecLookup, CodecMeta } from '../shared/codec-types';
 import type {
   AuthoringContributions,
   AuthoringFieldNamespace,
@@ -270,16 +271,16 @@ export function assembleControlMutationDefaults(
 }
 
 export function extractCodecLookup(
-  descriptors: ReadonlyArray<Pick<ComponentMetadata & { id?: string }, 'types' | 'id'>>,
+  descriptors: ReadonlyArray<Pick<ComponentMetadata & { id: string }, 'types' | 'id'>>,
 ): CodecLookup {
-  const byId = new Map<string, import('../shared/codec').Codec>();
+  const byId = new Map<string, Codec>();
   const targetTypesById = new Map<string, readonly string[]>();
-  const metaById = new Map<string, import('../shared/codec-types').CodecMeta>();
+  const metaById = new Map<string, CodecMeta>();
   const renderersById = new Map<string, (params: Record<string, unknown>) => string | undefined>();
   const owners = new Map<string, string>();
   for (const descriptor of descriptors) {
     const codecTypes = descriptor.types?.codecTypes;
-    const descriptorId = descriptor.id ?? '<unknown>';
+    const descriptorId = descriptor.id;
     // Descriptor-side metadata is the single source of truth for
     // `targetTypes` / `meta` / `renderOutputType`. Every contributor
     // ships a `codecDescriptors` list on `types.codecTypes`.
@@ -301,21 +302,19 @@ export function extractCodecLookup(
       if (typeof codecDescriptor.renderOutputType === 'function') {
         renderersById.set(codecDescriptor.codecId, codecDescriptor.renderOutputType);
       }
-      // Materialize a representative `Codec` instance for `byId.get()`
-      // so consumers reading the lookup's instance side (e.g. SQL
-      // renderer's cast-policy lookup) keep finding the codec.
-      // Descriptors whose factory needs concrete params raise — those
-      // are populated lazily by `buildContractCodecRegistry` at runtime.
-      if (!byId.has(codecDescriptor.codecId)) {
-        try {
-          const representative = codecDescriptor.factory(undefined as never)({
-            name: `<lookup:${codecDescriptor.codecId}>`,
-          } as Parameters<ReturnType<typeof codecDescriptor.factory>>[0]);
-          byId.set(codecDescriptor.codecId, representative);
-        } catch {
-          // Parameterized factory needs real params; leave `byId.get()`
-          // returning `undefined` for this codec id.
-        }
+      // Materialize a representative `Codec` instance for `byId.get()` so
+      // consumers reading the lookup's instance side (e.g. SQL renderer's
+      // cast-policy lookup) keep finding the codec. Parameterized
+      // descriptors are skipped here — their factories require concrete
+      // params and `buildContractCodecRegistry` materializes per-column
+      // instances at runtime. Skipping by descriptor flag (rather than
+      // try/catch on the factory call) means a genuine factory bug does
+      // not silently disappear from `byId`.
+      if (!byId.has(codecDescriptor.codecId) && !codecDescriptor.isParameterized) {
+        const representative = codecDescriptor.factory(undefined as never)({
+          name: `<lookup:${codecDescriptor.codecId}>`,
+        } as Parameters<ReturnType<typeof codecDescriptor.factory>>[0]);
+        byId.set(codecDescriptor.codecId, representative);
       }
     }
   }
