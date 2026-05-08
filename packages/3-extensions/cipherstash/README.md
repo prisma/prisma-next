@@ -5,21 +5,22 @@ application-layer encryption for Postgres via the EQL bundle.
 
 ## Status
 
-Work in progress under
-[`projects/extension-contract-spaces`](../../../projects/extension-contract-spaces/)
+Authored as a **contract space** per
+[ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
 (Linear: [TML-2397](https://linear.app/prisma/issue/TML-2397)).
 
 This package authors CipherStash's database scaffolding (the
 `eql_v2_configuration` table, the `eql_v2_encrypted` / `ore_*` composite
 types, the `eql_v2.bloom_filter` / `hmac_256` / `blake3` domains, and the
-EQL bundle SQL) as a **contract space** so the Prisma Next framework can
+EQL bundle SQL) as a contract space, so the Prisma Next framework can
 plan, apply, and verify it the same way it manages an application's own
 schema.
 
 The codec runtime (encoding/decoding `Encrypted<string>` payloads) and the
 `searchable: true` codec lifecycle hook for `add_search_config` /
-`remove_search_config` ops are intentionally **not** in this round
-(M3 R2+ — see plan).
+`remove_search_config` ops (see
+[ADR 212 — Codec lifecycle hooks](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Codec%20lifecycle%20hooks.md))
+are intentionally **not** in this round.
 
 ## What this package contributes
 
@@ -59,11 +60,8 @@ transaction as any application-space migration emitted in the same
 
 ## See also
 
-- Project spec:
-  [`projects/extension-contract-spaces/spec.md`](../../../projects/extension-contract-spaces/spec.md)
-- M3 sub-spec:
-  [`projects/extension-contract-spaces/specs/cipherstash-migration.spec.md`](../../../projects/extension-contract-spaces/specs/cipherstash-migration.spec.md)
-- Framework mechanism sub-spec:
-  [`projects/extension-contract-spaces/specs/framework-mechanism.spec.md`](../../../projects/extension-contract-spaces/specs/framework-mechanism.spec.md)
+- [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
+- [ADR 212 — Codec lifecycle hooks](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Codec%20lifecycle%20hooks.md)
+- [Subsystem doc — Ecosystem Extensions & Packs](../../../docs/architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20%26%20Packs.md)
 - Reference fixture: [`packages/3-extensions/test-contract-space`](../test-contract-space)
 - Reference shape: [`packages/3-extensions/pgvector`](../pgvector)

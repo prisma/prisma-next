@@ -63,8 +63,8 @@ export interface ResolveIdentityValueInput {
  *
  * Fired during app-space migration emission as the SQL family diffs the
  * prior contract against the new contract. See
- * `projects/extension-contract-spaces/specs/framework-mechanism.spec.md`
- * § 5 for the wiring contract.
+ * `docs/architecture docs/adrs/ADR 212 - Codec lifecycle hooks.md`
+ * for the wiring contract.
  *
  * - `'added'`     — the field is present in the new contract but not the prior.
  * - `'dropped'`   — the field is present in the prior contract but not the new.
@@ -146,8 +146,8 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
    * (the new field's codec for `'added'` / `'altered'`; the prior field's
    * codec for `'dropped'`).
    *
-   * See `projects/extension-contract-spaces/specs/framework-mechanism.spec.md`
-   * § 5 for the wiring contract and the deterministic ordering rule.
+   * See `docs/architecture docs/adrs/ADR 212 - Codec lifecycle hooks.md`
+   * for the wiring contract and the deterministic ordering rule.
    */
   onFieldEvent?: (
     event: FieldEvent,
@@ -162,7 +162,7 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
  * writes per loaded extension.
  *
  * Project: extension contract spaces (TML-2397). See
- * `projects/extension-contract-spaces/specs/framework-mechanism.spec.md` § 1.
+ * `docs/architecture docs/adrs/ADR 211 - Contract spaces.md`.
  */
 export interface ExtensionContractRef {
   readonly hash: string;

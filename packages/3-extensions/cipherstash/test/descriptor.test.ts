@@ -1,8 +1,7 @@
 /**
  * Structural verification for the CipherStash extension descriptor.
  *
- * R1's verification surface (per `projects/extension-contract-spaces/plan.md`
- * § "M3 — Tasks T3.1 → T3.3"):
+ * R1's verification surface (TML-2397):
  *   - the descriptor's `contractSpace` field is wired and shaped correctly;
  *   - the contract IR enumerates the typed objects R1 ships
  *     (project AC8 / TC-13 — partial coverage; composite/enum/domain IR

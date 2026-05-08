@@ -17,8 +17,8 @@
  * and runs the helpers against pinned files on disk plus a fake set of
  * marker rows.
  *
- * @see specs/framework-mechanism.spec.md § 4 — Verifier (T1.5).
- * @see projects/extension-contract-spaces/spec.md AC-15 / TC-26.
+ * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
+ *   — "Pinned per-space artefacts" / verifier reads only the user repo.
  */
 
 import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';

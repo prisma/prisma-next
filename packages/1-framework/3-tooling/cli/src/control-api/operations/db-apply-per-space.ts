@@ -86,8 +86,8 @@ export interface PerSpaceExtensionInput {
  *    failure on any space rolls back every space's writes
  *    (AM4-rollback CLI-level half).
  *
- * @see projects/extension-contract-spaces/specs/framework-mechanism.spec.md
- *   § 6 — `db init` / `db update` per-space.
+ * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
+ *   — `db init` / `db update` per-space.
  */
 export interface ExecutePerSpaceDbApplyOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;

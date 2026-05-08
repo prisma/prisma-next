@@ -30,8 +30,7 @@ import {
  * `runner.multi-space.test.ts`). Companion to the unit-level tests in
  * `@prisma-next/cli` that mock the planner / runner.
  *
- * @see projects/extension-contract-spaces/specs/framework-mechanism.spec.md
- *   § 6.
+ * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
  */
 
 const EXT_SPACE_ID = 'test_contract_space_sqlite';
