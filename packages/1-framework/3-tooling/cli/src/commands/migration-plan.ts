@@ -42,6 +42,11 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import {
+  formatContractSpaceDriftWarning,
+  type MigrateExtensionInput,
+  runContractSpaceMigratePass,
+} from '../utils/contract-space-migrate-pass';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -217,6 +222,32 @@ async function executeMigrationPlanCommand(
         why: `Unexpected error while loading migrations: ${message}`,
       }),
     );
+  }
+
+  // Per-space migrate pass: drift detection + pinned artefact emission for
+  // every loaded extension that exposes a `contractSpace`. Runs *before*
+  // the app-space no-op check so that an extension bump alone (with no
+  // structural app-space change) still re-pins extension artefacts on
+  // disk. Drift warnings are non-fatal — the pinned files are refreshed
+  // and the user is notified that the bump is being captured.
+  // See specs/framework-mechanism.spec.md § 3 — Drift detection (T1.9).
+  const extensionInputs: readonly MigrateExtensionInput[] = (config.extensionPacks ?? []).map(
+    (pack) => {
+      const cs = (pack as { readonly contractSpace?: MigrateExtensionInput['contractSpace'] })
+        .contractSpace;
+      return cs !== undefined ? { id: pack.id, contractSpace: cs } : { id: pack.id };
+    },
+  );
+  const migratePass = await runContractSpaceMigratePass({
+    migrationsDir,
+    extensionPacks: extensionInputs,
+  });
+  if (!flags.json && !flags.quiet) {
+    for (const drift of migratePass.drifts) {
+      if (drift.kind === 'drift') {
+        ui.stderr(formatContractSpaceDriftWarning(drift));
+      }
+    }
   }
 
   // Check for no-op (same hash means no changes)
