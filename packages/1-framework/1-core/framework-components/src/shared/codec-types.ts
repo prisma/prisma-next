@@ -1,26 +1,7 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Codec } from './codec';
 
-export type CodecTrait =
-  | 'equality'
-  | 'order'
-  | 'boolean'
-  | 'numeric'
-  | 'textual'
-  /**
-   * The codec carries a per-instance `validate(value: unknown) =>
-   * JsonSchemaValidationResult` function on the resolved codec object that
-   * the framework's `JsonSchemaValidatorRegistry` consults at runtime. The
-   * trait gates the `extractValidator` cast from structurally-typed
-   * `unknown` to a typed validator view.
-   *
-   * Retirement target. The unified `CodecDescriptor` model moves
-   * validation into the resolved codec's `decode` body; the parallel
-   * `JsonSchemaValidatorRegistry` (and this trait alongside it) retires
-   * under TML-2357 (T3.5.12). Per-library JSON extensions like
-   * `@prisma-next/extension-arktype-json` already follow the new pattern.
-   */
-  | 'json-validator';
+export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
 
 /**
  * Per-call context the runtime threads to every `codec.encode` /

@@ -35,8 +35,6 @@ import type {
   AppliedMutationDefault,
   CodecDescriptorRegistry,
   ExecutionContext,
-  JsonSchemaValidateFn,
-  JsonSchemaValidatorRegistry,
   MutationDefaultsOptions,
   TypeHelperRegistry,
 } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -181,7 +179,7 @@ export function createSqlExecutionStack<TTargetId extends string>(options: {
   });
 }
 
-export type { ExecutionContext, JsonSchemaValidatorRegistry, TypeHelperRegistry };
+export type { ExecutionContext, TypeHelperRegistry };
 
 export function assertExecutionStackContractRequirements(
   contract: Contract<SqlStorage>,
@@ -432,24 +430,6 @@ function validateColumnTypeParams(
   }
 }
 
-type JsonValidatorCodec = {
-  readonly validate: JsonSchemaValidateFn;
-};
-
-function hasValidateFunction(candidate: unknown): candidate is JsonValidatorCodec {
-  if (candidate === null || typeof candidate !== 'object') return false;
-  const validate = (candidate as { readonly validate?: unknown }).validate;
-  return typeof validate === 'function';
-}
-
-function extractValidator(
-  candidate: unknown,
-  descriptor: CodecDescriptor<unknown> | undefined,
-): JsonSchemaValidateFn | undefined {
-  if (!descriptor?.traits?.includes('json-validator')) return undefined;
-  return hasValidateFunction(candidate) ? candidate.validate : undefined;
-}
-
 function isResolvedCodec(candidate: unknown): candidate is Codec {
   return (
     candidate !== null &&
@@ -475,15 +455,11 @@ function isResolvedCodec(candidate: unknown): candidate is Codec {
  *   parameterized codec id share one resolved codec without explicit
  *   caching.
  *
- * Combines what `initializeTypeHelpers` (named-instance walk) and the
- * old `buildJsonSchemaValidatorRegistry` (per-column walk) used to do
- * separately: one walk over all columns, one resolved codec per column,
- * one trait-gated validator extraction per column. The result drives
- * both the dispatch registry (`ContractCodecRegistry.forColumn`) and the
- * validator registry.
- *
  * Codec-registry-unification spec § AC-4: every column resolves through
- * one descriptor map without branching on parameterization.
+ * one descriptor map without branching on parameterization. JSON-Schema
+ * validation, when required, lives inside the resolved codec's `decode`
+ * body (see `arktype-json`'s `ArktypeJsonCodecClass`); the framework no
+ * longer maintains a parallel validator registry (TML-2357 M4).
  */
 function buildContractCodecRegistry(
   contract: Contract<SqlStorage>,
@@ -491,10 +467,7 @@ function buildContractCodecRegistry(
   legacyCodecRegistry: CodecRegistry,
   types: TypeHelperRegistry,
   parameterizedDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
-): {
-  readonly registry: ContractCodecRegistry;
-  readonly jsonValidators: JsonSchemaValidatorRegistry | undefined;
-} {
+): ContractCodecRegistry {
   const byColumn = new Map<string, Codec>();
   const byCodecId = new Map<string, Codec>();
   // Codec ids whose `byCodecId` entry is ambiguous — multiple distinct
@@ -505,7 +478,6 @@ function buildContractCodecRegistry(
   // wrong instance. Retires when AC-5's `ParamRef.refs` plumbing lands
   // (TML-2357).
   const ambiguousCodecIds = new Set<string>();
-  const validators = new Map<string, JsonSchemaValidateFn>();
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
@@ -578,10 +550,6 @@ function buildContractCodecRegistry(
 
       if (resolvedCodec) {
         byColumn.set(columnKey, resolvedCodec);
-        const validate = extractValidator(resolvedCodec, descriptor);
-        if (validate) {
-          validators.set(columnKey, validate);
-        }
         const existing = byCodecId.get(column.codecId);
         if (existing === undefined) {
           byCodecId.set(column.codecId, resolvedCodec);
@@ -622,15 +590,7 @@ function buildContractCodecRegistry(
     },
   };
 
-  const jsonValidators: JsonSchemaValidatorRegistry | undefined =
-    validators.size > 0
-      ? {
-          get: (key: string) => validators.get(key),
-          size: validators.size,
-        }
-      : undefined;
-
-  return { registry, jsonValidators };
+  return registry;
 }
 
 function assertMutationDefaultGeneratorsAvailable(
@@ -889,14 +849,13 @@ export function createExecutionContext<
 
   const types = initializeTypeHelpers(contract.storage, parameterizedCodecDescriptors);
 
-  const { registry: contractCodecs, jsonValidators: jsonSchemaValidators } =
-    buildContractCodecRegistry(
-      contract,
-      codecDescriptors,
-      codecRegistry,
-      types,
-      parameterizedCodecDescriptors,
-    );
+  const contractCodecs = buildContractCodecRegistry(
+    contract,
+    codecDescriptors,
+    codecRegistry,
+    types,
+    parameterizedCodecDescriptors,
+  );
 
   return {
     contract,
@@ -905,7 +864,6 @@ export function createExecutionContext<
     codecDescriptors,
     queryOperations: queryOperationRegistry,
     types,
-    ...(jsonSchemaValidators ? { jsonSchemaValidators } : {}),
     applyMutationDefaults: (options) =>
       applyMutationDefaults(contract, mutationDefaultGeneratorRegistry, options),
   };

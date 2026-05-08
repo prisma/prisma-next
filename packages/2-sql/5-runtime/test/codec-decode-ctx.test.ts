@@ -76,7 +76,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
     const controller = new AbortController();
     const rowCtx: SqlCodecCallContext = { signal: controller.signal };
-    await decodeRow({ a: 'A', b: 'B' }, p, registry, undefined, rowCtx);
+    await decodeRow({ a: 'A', b: 'B' }, p, registry, rowCtx);
 
     expect(observed).toHaveLength(2);
     expect(observed[0]).toBe(controller.signal);
@@ -103,7 +103,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
       columnProjection('total', 'orders', 'total', 'test/observe-col@1'),
     ]);
 
-    await decodeRow({ email: 'email', total: 'total' }, p, registry, undefined, {
+    await decodeRow({ email: 'email', total: 'total' }, p, registry, {
       signal: new AbortController().signal,
     });
 
@@ -132,7 +132,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
       columnProjection('secret', 'user', 'secret', 'test/observe-projection@1'),
     ]);
 
-    await decodeRow({ secret: 'wire' }, p, registry, undefined, {
+    await decodeRow({ secret: 'wire' }, p, registry, {
       signal: new AbortController().signal,
     });
 
@@ -168,7 +168,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
       column: { table: 'stale', name: 'stale' },
     };
 
-    await decodeRow({ agg: '1' }, p, registry, undefined, rowCtx);
+    await decodeRow({ agg: '1' }, p, registry, rowCtx);
 
     expect(observed).toBeDefined();
     expect(observed?.column).toBeUndefined();
@@ -198,7 +198,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
       column: { table: 'stale', name: 'stale' },
     };
 
-    await decodeRow({ computed: 'wire' }, p, registry, undefined, rowCtx);
+    await decodeRow({ computed: 'wire' }, p, registry, rowCtx);
 
     expect(observed).toBeDefined();
     expect(observed?.column).toBeUndefined();
@@ -223,7 +223,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
     const p = buildPlan([columnProjection('x', 'users', 'x', 'test/single-arg-author@1')]);
 
-    const result = await decodeRow({ x: 'wire' }, p, registry, undefined, {});
+    const result = await decodeRow({ x: 'wire' }, p, registry, {});
     expect(result).toEqual({ x: 'wire' });
     expect(invoked).toBe(1);
     expect(receivedWire).toBe('wire');
@@ -254,7 +254,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     controller.abort(reason);
 
     await expect(
-      decodeRow({ a: '1', b: '2' }, p, registry, undefined, { signal: controller.signal }),
+      decodeRow({ a: '1', b: '2' }, p, registry, { signal: controller.signal }),
     ).rejects.toMatchObject({
       code: 'RUNTIME.ABORTED',
       details: { phase: 'decode' },
@@ -279,7 +279,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
     const controller = new AbortController();
     const reason = new Error('mid-decode abort');
-    const promise = decodeRow({ x: 'wire' }, p, registry, undefined, {
+    const promise = decodeRow({ x: 'wire' }, p, registry, {
       signal: controller.signal,
     });
 
@@ -311,7 +311,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     const p = buildPlan([columnProjection('x', 'users', 'x', 'test/explody@1')]);
 
     await expect(
-      decodeRow({ x: 'wire' }, p, registry, undefined, { signal: new AbortController().signal }),
+      decodeRow({ x: 'wire' }, p, registry, { signal: new AbortController().signal }),
     ).rejects.toMatchObject({
       code: 'RUNTIME.DECODE_FAILED',
       cause,
@@ -340,7 +340,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
     const p = buildPlan([columnProjection('email', 'users', 'email', 'test/recorder@1')]);
 
-    await decodeRow({ email: 'wire' }, p, registry, undefined, {
+    await decodeRow({ email: 'wire' }, p, registry, {
       signal: new AbortController().signal,
     });
 

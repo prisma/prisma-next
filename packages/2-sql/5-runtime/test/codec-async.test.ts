@@ -1,6 +1,7 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import { coreHash } from '@prisma-next/contract/types';
-import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
+import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
   type AnyExpression,
@@ -13,10 +14,6 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
-import type {
-  JsonSchemaValidateFn,
-  JsonSchemaValidatorRegistry,
-} from '@prisma-next/sql-relational-core/query-lane-context';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { decodeRow } from '../src/codecs/decoding';
@@ -328,32 +325,6 @@ describe('encodeParams — async, concurrent dispatch', () => {
 // =============================================================================
 
 describe('decodeRow — async, concurrent per-cell dispatch', () => {
-  function buildJsonbRegistry(): CodecRegistry {
-    const registry = newCodecRegistry();
-    registry.register(
-      defineTestCodec<'pg/jsonb@1', readonly [], string, JsonValue>({
-        typeId: 'pg/jsonb@1',
-        targetTypes: ['jsonb'],
-        encode: (v: JsonValue) => JSON.stringify(v),
-        decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w) as JsonValue,
-      }),
-    );
-    return registry;
-  }
-
-  function buildValidator(
-    valid: (value: unknown) => boolean,
-    message = 'invalid',
-  ): JsonSchemaValidateFn {
-    return (value: unknown) => {
-      if (valid(value)) return { valid: true };
-      return {
-        valid: false,
-        errors: [{ path: '/', message, keyword: 'custom' }],
-      };
-    };
-  }
-
   it('dispatches per-cell decoders concurrently via Promise.all', async () => {
     const dA = deferred<string>();
     const dB = deferred<string>();
@@ -403,7 +374,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     });
 
     const row = { a: 'A', b: 'B', n: 21 };
-    const promise = decodeRow(row, plan, registry, undefined, {});
+    const promise = decodeRow(row, plan, registry, {});
 
     expect(callOrder).toEqual(['decode-a-start', 'decode-b-start', 'decode-sync']);
 
@@ -429,54 +400,60 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       projections: [{ alias: 'name', codecId: 'test/async@1' }],
     });
 
-    const result = await decodeRow({ name: 'alice' }, plan, registry, undefined, {});
+    const result = await decodeRow({ name: 'alice' }, plan, registry, {});
     expect(typeof (result['name'] as { then?: unknown } | null)?.then).toBe('undefined');
     expect(result['name']).toBe('decoded:alice');
   });
 
-  it('runs JSON-Schema validation against the resolved (awaited) decoded value', async () => {
-    const registry = buildJsonbRegistry();
-    const validators: JsonSchemaValidatorRegistry = {
-      get: (key) =>
-        key === 'user.metadata'
-          ? buildValidator(
-              (v) => typeof v === 'object' && v !== null && 'name' in (v as object),
-              "must have required property 'name'",
-            )
-          : undefined,
-      size: 1,
-    };
+  it('codec.decode that throws JSON-Schema validation envelope from inline validation surfaces as DECODE_FAILED with cause', async () => {
+    // Post-M4: validation lives in the resolved codec's `decode` body
+    // (e.g. arktype-json validates against its rehydrated schema and
+    // throws `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` directly). The
+    // runtime no longer maintains a parallel validator registry; the
+    // inline error gets wrapped in the standard `RUNTIME.DECODE_FAILED`
+    // envelope by `wrapDecodeFailure` with the original validation
+    // error attached on `cause`.
+    const registry = newCodecRegistry();
+    registry.register(
+      defineTestCodec<'pg/inline-validating-json@1', readonly [], string, JsonValue>({
+        typeId: 'pg/inline-validating-json@1',
+        targetTypes: ['jsonb'],
+        encode: (v: JsonValue) => JSON.stringify(v),
+        decode: async (w: string) => {
+          const parsed = JSON.parse(w) as Record<string, unknown>;
+          if (!('name' in parsed)) {
+            throw runtimeError(
+              'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+              "JSON validation failed: must have required property 'name'",
+              { issues: "must have required property 'name'" },
+            );
+          }
+          return parsed as JsonValue;
+        },
+      }),
+    );
 
     const plan = buildAstPlan({
       projections: [
         {
           alias: 'metadata',
-          codecId: 'pg/jsonb@1',
+          codecId: 'pg/inline-validating-json@1',
           column: { table: 'user', column: 'metadata' },
         },
       ],
     });
 
-    const result = await decodeRow(
-      { metadata: '{"name":"alice"}' },
-      plan,
-      registry,
-      validators,
-      {},
-    );
-    expect(result['metadata']).toEqual({ name: 'alice' });
+    const ok = await decodeRow({ metadata: '{"name":"alice"}' }, plan, registry, {});
+    expect(ok['metadata']).toEqual({ name: 'alice' });
 
-    await expect(
-      decodeRow({ metadata: '{"age":30}' }, plan, registry, validators, {}),
-    ).rejects.toMatchObject({
-      code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
-      details: {
-        table: 'user',
-        column: 'metadata',
-        direction: 'decode',
-        codecId: 'pg/jsonb@1',
-      },
-    });
+    const rejection = (await decodeRow({ metadata: '{"age":30}' }, plan, registry, {}).catch(
+      (e: unknown) => e,
+    )) as Error & { code?: string; cause?: { code?: string } };
+    expect(rejection.code).toBe('RUNTIME.DECODE_FAILED');
+    expect(rejection.cause).toBeDefined();
+    expect((rejection.cause as { code?: string }).code).toBe(
+      'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+    );
   });
 
   it('wraps decode failures in RUNTIME.DECODE_FAILED with { table, column, codec } and cause', async () => {
@@ -503,9 +480,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       ],
     });
 
-    await expect(
-      decodeRow({ explody: 'wire' }, plan, registry, undefined, {}),
-    ).rejects.toMatchObject({
+    await expect(decodeRow({ explody: 'wire' }, plan, registry, {})).rejects.toMatchObject({
       code: 'RUNTIME.DECODE_FAILED',
       category: 'RUNTIME',
       severity: 'error',
@@ -532,7 +507,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     );
 
     const plan = buildRawPlan();
-    const result = await decodeRow({ id: 1, email: 'a@b.com' }, plan, registry, undefined, {});
+    const result = await decodeRow({ id: 1, email: 'a@b.com' }, plan, registry, {});
     expect(result).toEqual({ id: 1, email: 'a@b.com' });
   });
 
@@ -542,7 +517,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       projections: [{ alias: 'id' }, { alias: 'email' }],
     });
 
-    await expect(decodeRow({ id: 1 }, plan, registry, undefined, {})).rejects.toMatchObject({
+    await expect(decodeRow({ id: 1 }, plan, registry, {})).rejects.toMatchObject({
       code: 'RUNTIME.DECODE_FAILED',
       details: {
         alias: 'email',
@@ -568,7 +543,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       }),
     );
 
-    const result = await decodeRow({ id: null }, plan, registry, undefined, {});
+    const result = await decodeRow({ id: null }, plan, registry, {});
     expect(result).toEqual({ id: null });
   });
 
@@ -608,7 +583,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       ],
     });
 
-    const result = await decodeRow({ syncCol: 'a', asyncCol: 'b' }, plan, registry, undefined, {});
+    const result = await decodeRow({ syncCol: 'a', asyncCol: 'b' }, plan, registry, {});
     expect(result).toEqual({ syncCol: 'sync:a', asyncCol: 'async:b' });
   });
 });
@@ -657,7 +632,7 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
         ],
       });
 
-      const result = await decodeRow({ secret: wire }, plan, registry, undefined, {});
+      const result = await decodeRow({ secret: wire }, plan, registry, {});
       expect(result['secret']).toBe('top-secret');
     },
   );
@@ -676,13 +651,9 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
       ],
     });
 
-    const rejection = await decodeRow(
-      { secret: 'bad-payload' },
-      plan,
-      registry,
-      undefined,
-      {},
-    ).catch((e: unknown) => e);
+    const rejection = await decodeRow({ secret: 'bad-payload' }, plan, registry, {}).catch(
+      (e: unknown) => e,
+    );
     expect(rejection).toBeInstanceOf(Error);
     const err = rejection as Error & {
       code?: string;

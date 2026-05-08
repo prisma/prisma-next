@@ -384,7 +384,7 @@ describe('runBeforeCompileChain', () => {
         ast: result.ast,
         meta: result.meta,
       };
-      const row = await decodeRow({ user_id: 7 }, plan, decoderRegistry, undefined, {});
+      const row = await decodeRow({ user_id: 7 }, plan, decoderRegistry, {});
       expect(row).toEqual({ user_id: 107 });
     },
     timeouts.default,
@@ -416,7 +416,7 @@ describe('runBeforeCompileChain', () => {
         ast: insert,
         meta,
       };
-      const row = await decodeRow({ id: 7 }, plan, decoderRegistry, undefined, {});
+      const row = await decodeRow({ id: 7 }, plan, decoderRegistry, {});
       expect(row).toEqual({ id: 107 });
     },
     timeouts.default,

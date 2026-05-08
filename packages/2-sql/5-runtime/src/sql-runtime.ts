@@ -28,10 +28,7 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import { validateParamRefRefs } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type {
-  CodecDescriptorRegistry,
-  JsonSchemaValidatorRegistry,
-} from '@prisma-next/sql-relational-core/query-lane-context';
+import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeRow } from './codecs/decoding';
@@ -146,7 +143,6 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private readonly codecRegistry: CodecRegistry;
   private readonly contractCodecs: ContractCodecRegistry;
   private readonly codecDescriptors: CodecDescriptorRegistry;
-  private readonly jsonSchemaValidators: JsonSchemaValidatorRegistry | undefined;
   private readonly sqlCtx: SqlMiddlewareContext;
   private readonly verify: RuntimeVerifyOptions;
   private codecRegistryValidated: boolean;
@@ -186,7 +182,6 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.codecRegistry = context.codecs;
     this.contractCodecs = context.contractCodecs;
     this.codecDescriptors = context.codecDescriptors;
-    this.jsonSchemaValidators = context.jsonSchemaValidators;
     this.sqlCtx = sqlCtx;
     this.verify = verify;
     this.codecRegistryValidated = false;
@@ -348,7 +343,6 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
               next.value,
               exec,
               self.codecRegistry,
-              self.jsonSchemaValidators,
               codecCtx,
               self.contractCodecs,
             );

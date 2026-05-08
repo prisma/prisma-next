@@ -83,9 +83,11 @@ const stack = createSqlExecutionStack({
 - The codec is library-bound (`arktype/json@1`), not target-bound. Other
   schema libraries ship as parallel extensions (`zod/json@1`,
   `valibot/json@1`) when their serialize/rehydrate stories materialize.
-- `decode` validates internally and throws on rejection; the framework's
-  `JsonSchemaValidatorRegistry` is not consulted for arktype-json columns
-  (no `'json-validator'` trait + per-instance `validate` extraction). The
-  one-path "validate inside `decode`" matches the spec's Case J pinning.
+- `decode` validates internally and throws on rejection. JSON-Schema
+  validation lives uniformly inside the resolved codec's `decode` body
+  (TML-2357 M4); the framework no longer maintains a parallel validator
+  registry. Validation rejections surface as `RUNTIME.DECODE_FAILED`
+  envelopes with the original `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED`
+  attached on `cause`.
 - For untyped raw JSON columns, use `jsonColumn` / `jsonbColumn` from
   `@prisma-next/adapter-postgres/column-types` instead.

@@ -186,7 +186,7 @@ Users who want to query through Kysely or Drizzle are opting out of Prisma Next'
 Already addressed:
 
 - **Plain TS interfaces / types**: `contract.d.ts` provides zero-dependency typed model definitions.
-- **Typed JSON fields** (`prisma-json-types-generator`): Prisma Next has a more capable built-in solution. The `jsonb(schema)` authoring helper accepts any Standard Schema value (arktype, zod, etc.), extracts its JSON Schema into `typeParams.schemaJson`, and uses it for both compile-time typing (emitted into `contract.d.ts` as a concrete type expression) and runtime validation (compiled via Ajv into validators on `ExecutionContext.jsonSchemaValidators`). Strictly more capable than the overlay approach.
+- **Typed JSON fields** (`prisma-json-types-generator`): Prisma Next has a more capable built-in solution. Library-bound JSON codecs (e.g. `@prisma-next/extension-arktype-json`) accept a typed schema (arktype, zod, etc.), serialize the schema's IR into the contract, and validate inline inside the resolved codec's `decode` body — used for both compile-time typing (emitted into `contract.d.ts` as a concrete type expression) and runtime validation. Strictly more capable than the overlay approach.
 - **Repository / custom models** (`prisma-custom-models-generator`): The ORM client's `Collection` subclassing is this pattern done properly — custom collections add domain methods that compose with all built-in query methods and propagate through includes. No scaffolding generator needed.
 - **Class-based DTOs** (`prisma-class-generator`): Low relevance in Prisma Next's functional/interface-oriented design.
 

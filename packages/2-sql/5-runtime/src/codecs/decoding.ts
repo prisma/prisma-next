@@ -1,6 +1,5 @@
 import {
   checkAborted,
-  isRuntimeError,
   raceAgainstAbort,
   runtimeError,
 } from '@prisma-next/framework-components/runtime';
@@ -13,8 +12,6 @@ import type {
   SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
-import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
-import { validateJsonValue } from './json-schema-validation';
 
 type ColumnRef = { table: string; column: string };
 
@@ -138,10 +135,6 @@ function previewWireValue(wireValue: unknown): string {
   return String(wireValue).substring(0, WIRE_PREVIEW_LIMIT);
 }
 
-function isJsonSchemaValidationError(error: unknown): boolean {
-  return isRuntimeError(error) && error.code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED';
-}
-
 function wrapDecodeFailure(
   error: unknown,
   alias: string,
@@ -205,8 +198,12 @@ function decodeIncludeAggregate(alias: string, wireValue: unknown): unknown {
 
 /**
  * Decodes a single field. Single-armed: every cell takes the same path —
- * `codec.decode → await → JSON-Schema validate → return plain value` — so
- * sync- and async-authored codecs are indistinguishable to callers.
+ * `codec.decode → await → return plain value` — so sync- and async-
+ * authored codecs are indistinguishable to callers. JSON-Schema
+ * validation, when required, lives inside the resolved codec's `decode`
+ * body (e.g. `arktype-json` validates against its rehydrated schema and
+ * throws `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` from `decode` directly);
+ * there is no separate validator-registry pass.
  *
  * The row-level `rowCtx` is repackaged into a per-cell
  * `SqlCodecCallContext` whose `column = { table, name }` is a structural
@@ -222,7 +219,6 @@ async function decodeField(
   alias: string,
   wireValue: unknown,
   decodeCtx: DecodeContext,
-  jsonValidators: JsonSchemaValidatorRegistry | undefined,
   rowCtx: SqlCodecCallContext,
 ): Promise<unknown> {
   if (wireValue === null) {
@@ -253,23 +249,11 @@ async function decodeField(
     cellCtx = rowCtxWithoutColumn;
   }
 
-  let decoded: unknown;
   try {
-    decoded = await codec.decode(wireValue, cellCtx);
+    return await codec.decode(wireValue, cellCtx);
   } catch (error) {
     wrapDecodeFailure(error, alias, ref, codec, wireValue);
   }
-
-  if (jsonValidators && ref) {
-    try {
-      validateJsonValue(jsonValidators, ref.table, ref.column, decoded, 'decode', codec.id);
-    } catch (error) {
-      if (isJsonSchemaValidationError(error)) throw error;
-      wrapDecodeFailure(error, alias, ref, codec, wireValue);
-    }
-  }
-
-  return decoded;
 }
 
 /**
@@ -294,7 +278,6 @@ export async function decodeRow(
   row: Record<string, unknown>,
   plan: SqlExecutionPlan,
   registry: CodecRegistry,
-  jsonValidators: JsonSchemaValidatorRegistry | undefined,
   rowCtx: SqlCodecCallContext,
   contractCodecs?: ContractCodecRegistry,
 ): Promise<Record<string, unknown>> {
@@ -330,7 +313,7 @@ export async function decodeRow(
       continue;
     }
 
-    tasks.push(decodeField(alias, wireValue, decodeCtx, jsonValidators, rowCtx));
+    tasks.push(decodeField(alias, wireValue, decodeCtx, rowCtx));
   }
 
   const settled = await raceAgainstAbort(Promise.all(tasks), signal, 'decode');
