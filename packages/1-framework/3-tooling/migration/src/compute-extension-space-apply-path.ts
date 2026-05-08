@@ -1,5 +1,4 @@
 import { EMPTY_CONTRACT_HASH } from './constants';
-import type { MigrationEdge } from './graph';
 import { readMigrationsDir } from './io';
 import { findPathWithDecision, reconstructGraph } from './migration-graph';
 import type { MigrationOps } from './package';
@@ -124,18 +123,6 @@ export async function computeExtensionSpaceApplyPath(
     };
   }
 
-  const edgesByHash = new Map<string, MigrationEdge>();
-  for (const pkg of packages) {
-    edgesByHash.set(pkg.metadata.migrationHash, {
-      from: pkg.metadata.from ?? EMPTY_CONTRACT_HASH,
-      to: pkg.metadata.to,
-      migrationHash: pkg.metadata.migrationHash,
-      dirName: pkg.dirName,
-      createdAt: pkg.metadata.createdAt,
-      labels: pkg.metadata.labels,
-      invariants: pkg.metadata.providedInvariants,
-    });
-  }
   const packagesByHash = new Map(packages.map((pkg) => [pkg.metadata.migrationHash, pkg]));
 
   const pathOps: MigrationOps[number][] = [];
