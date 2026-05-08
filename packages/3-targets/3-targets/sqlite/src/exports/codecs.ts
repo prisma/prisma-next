@@ -1,4 +1,4 @@
-export type { JsonValue } from '../core/codecs';
+export type { JsonValue } from '../core/codec-helpers';
 export type {
   SqliteBigintDescriptor,
   SqliteBlobDescriptor,
@@ -7,7 +7,7 @@ export type {
   SqliteJsonDescriptor,
   SqliteRealDescriptor,
   SqliteTextDescriptor,
-} from '../core/codecs-class';
+} from '../core/codecs';
 export {
   sqliteBigintColumn,
   sqliteBlobColumn,
@@ -16,5 +16,5 @@ export {
   sqliteJsonColumn,
   sqliteRealColumn,
   sqliteTextColumn,
-} from '../core/codecs-class';
+} from '../core/codecs';
 export { sqliteCodecRegistry } from '../core/registry';

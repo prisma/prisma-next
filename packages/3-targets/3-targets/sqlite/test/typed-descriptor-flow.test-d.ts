@@ -12,7 +12,7 @@ import {
   type SqliteIntegerDescriptor,
   sqliteDatetimeDescriptor,
   sqliteIntegerDescriptor,
-} from '../src/core/codecs-class';
+} from '../src/core/codecs';
 import type { CodecTypes } from '../src/exports/codec-types';
 
 // ---------------------------------------------------------------------------

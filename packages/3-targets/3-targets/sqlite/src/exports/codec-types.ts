@@ -2,7 +2,7 @@
  * Codec type definitions for the SQLite target.
  *
  * Defining `CodecTypes` here (rather than re-exporting from
- * `core/codecs-class`) keeps the tsdown DTS bundler from emitting
+ * `core/codecs`) keeps the tsdown DTS bundler from emitting
  * a private chunk path in downstream `.d.mts` files: consumers see
  * `CodecTypes` resolved via this public entry point rather than via
  * a hash-named internal chunk (TML-2357).
@@ -15,7 +15,7 @@ import {
   sqlIntDescriptor,
   sqlVarcharDescriptor,
 } from '@prisma-next/sql-relational-core/ast';
-import type { JsonValue } from '../core/codecs';
+import type { JsonValue } from '../core/codec-helpers';
 import {
   sqliteBigintDescriptor,
   sqliteBlobDescriptor,
@@ -24,7 +24,7 @@ import {
   sqliteJsonDescriptor,
   sqliteRealDescriptor,
   sqliteTextDescriptor,
-} from '../core/codecs-class';
+} from '../core/codecs';
 
 const codecDescriptorMap = {
   char: sqlCharDescriptor,

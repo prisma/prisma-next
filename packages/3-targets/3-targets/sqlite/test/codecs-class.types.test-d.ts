@@ -1,5 +1,5 @@
 /**
- * Type tests for the class-based SQLite target codecs (TML-2357).
+ * Type tests for the SQLite target codecs (TML-2357).
  *
  * Mirrors `packages/3-targets/3-targets/postgres/test/codecs-class.types.test-d.ts`.
  *
@@ -37,7 +37,7 @@ import {
   sqliteDatetimeDescriptor,
   sqliteIntegerColumn,
   sqliteIntegerDescriptor,
-} from '../src/core/codecs-class';
+} from '../src/core/codecs';
 
 // ---------------------------------------------------------------------------
 // Literal preservation through direct invocation.
