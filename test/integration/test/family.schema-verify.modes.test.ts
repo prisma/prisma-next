@@ -6,8 +6,8 @@ import {
   defineContract,
   field,
   int4Column,
+  legacyDatabaseDependencyExtension,
   model,
-  pgvector,
   postgresPack,
   runSchemaVerify,
   sqlFamily,
@@ -39,7 +39,7 @@ describe('family instance schemaVerify - modes', () => {
         const contract = defineContract({
           family: sqlFamily,
           target: postgresPack,
-          extensionPacks: { pgvector },
+          extensionPacks: { 'legacy-vector': legacyDatabaseDependencyExtension },
           models: {
             User: model('User', {
               fields: {
@@ -51,7 +51,7 @@ describe('family instance schemaVerify - modes', () => {
         });
 
         const result = await runSchemaVerify(getConnectionString(), contract, {
-          extensions: [pgvector],
+          extensions: [legacyDatabaseDependencyExtension],
         });
 
         expect(result).toMatchObject({
