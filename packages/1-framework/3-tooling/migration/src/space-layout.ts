@@ -14,6 +14,15 @@ export { APP_SPACE_ID };
 export type ValidSpaceId = string & { readonly __brand: 'ValidSpaceId' };
 
 /**
+ * Branded string carrying a compile-time guarantee that the value has
+ * been validated by {@link assertValidSpaceId}. Downstream filesystem
+ * helpers (e.g. {@link spaceMigrationDirectory}) accept this type to
+ * make "validated" tracking visible at the type level rather than
+ * relying purely on a runtime check.
+ */
+export type ValidSpaceId = string & { readonly __brand: 'ValidSpaceId' };
+
+/**
  * Pattern a contract-space identifier must match. The constraint is
  * filesystem-friendly: lowercase letters / digits / hyphen / underscore,
  * starts with a letter, max 64 characters.
