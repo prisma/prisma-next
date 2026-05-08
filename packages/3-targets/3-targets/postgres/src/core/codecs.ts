@@ -1,7 +1,7 @@
 /**
  * Native Postgres target codecs (TML-2357).
- * Mirrors the SQL base codec class form in
- * `packages/2-sql/4-lanes/relational-core/src/ast/sql-codecs-class.ts`.
+ * Mirrors the SQL base codec form in
+ * `packages/2-sql/4-lanes/relational-core/src/ast/sql-codecs.ts`.
  *
  * Each codec ships as three artifacts:
  *

@@ -1,7 +1,7 @@
 /**
  * Type tests for the Postgres target codecs (TML-2357).
  *
- * Mirrors `packages/2-sql/4-lanes/relational-core/test/ast/sql-codecs-class.types.test-d.ts`.
+ * Mirrors `packages/2-sql/4-lanes/relational-core/test/ast/sql-codecs.types.test-d.ts`.
  *
  * Coverage selection per the M0 brief: representative codecs only,
  * since the framework-level type discipline is exercised in Phase A

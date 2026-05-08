@@ -39,7 +39,7 @@ import type {
   SqlVarcharCodec,
   sqlIntDescriptor,
   sqlVarcharDescriptor,
-} from '../src/ast/sql-codecs-class';
+} from '../src/ast/sql-codecs';
 
 // ---------------------------------------------------------------------------
 // Round-trip extractor: descriptor -> resolved codec instance.

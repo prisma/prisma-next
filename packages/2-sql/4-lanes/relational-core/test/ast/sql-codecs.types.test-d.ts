@@ -38,7 +38,7 @@ import {
   sqlTextDescriptor,
   sqlTimestampColumn,
   sqlTimestampDescriptor,
-} from '../../src/ast/sql-codecs-class';
+} from '../../src/ast/sql-codecs';
 
 // ---------------------------------------------------------------------------
 // AC-CB-2: literal preservation through direct invocation
