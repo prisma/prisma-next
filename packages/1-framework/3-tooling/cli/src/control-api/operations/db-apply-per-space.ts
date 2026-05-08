@@ -5,6 +5,7 @@ import type {
   ControlFamilyInstance,
   MigrationOperationPolicy,
   MigrationPlan,
+  MigrationPlannerConflict,
   MigrationPlannerResult,
   MigrationPlanOperation,
   MultiSpaceCapableRunner,
@@ -53,15 +54,21 @@ export interface PerSpaceExtensionInput {
  * The flow:
  *
  * 1. Read every marker row keyed by `space`.
- * 2. For each declared extension space, walk its on-disk migration
- *    graph from `currentMarker → pinnedHeadRef.hash` via
- *    {@link computeExtensionSpaceApplyPath} (ADR 208).
- * 3. Plan the app space against the live introspected schema (today's
- *    single-space `db init` / `db update` behaviour).
- * 4. Concatenate per cross-space ordering (extensions alphabetically
- *    by space id, then app-space) via
- *    {@link concatenateSpaceApplyInputs}.
- * 5. Apply every space inside one outer transaction via
+ * 2. Read every extension's pinned destination contract (so the
+ *    app-space planner can prune extension-owned tables out of the
+ *    introspected schema before planning).
+ * 3. Introspect the live database schema once (app-only work, hoisted
+ *    out of the per-space loop).
+ * 4. Build a {@link SpacePathResolver} per space. For an extension,
+ *    the resolver wraps {@link computeExtensionSpaceApplyPath} (ADR
+ *    208). For the app, it wraps `planner.plan` against the pruned
+ *    introspected slice. Order: extensions alphabetically by space
+ *    id, then app — matching {@link concatenateSpaceApplyInputs}'s
+ *    cross-space convention.
+ * 5. Iterate resolvers in order, invoking `resolve(currentMarker)` on
+ *    each. Failures (planning conflicts on app, path-resolution
+ *    failures on extensions) short-circuit the entire flow.
+ * 6. Apply every space inside one outer transaction via
  *    `runner.executeAcrossSpaces({ driver, perSpaceOptions })` — a
  *    failure on any space rolls back every space's writes
  *    (AM4-rollback CLI-level half).
@@ -85,6 +92,57 @@ export interface ExecutePerSpaceDbApplyOptions<TFamilyId extends string, TTarget
   readonly policy: MigrationOperationPolicy;
   readonly action: 'dbInit' | 'dbUpdate';
   readonly onProgress?: OnControlProgress;
+}
+
+/**
+ * Per-space resolution outcome. Every space — app or extension —
+ * produces one of three shapes via its {@link SpacePathResolver}:
+ *
+ * - `ok`: a {@link MigrationPlan} ready to feed into the runner,
+ *   alongside the destination contract for runner-level verification
+ *   and the operations to surface in the aggregate plan output.
+ * - `planning-failure`: the planner refused to emit a plan (today
+ *   only the app resolver can produce this).
+ * - `extension-path-failure`: the on-disk migration graph cannot
+ *   reach the pinned head ref (today only extension resolvers can
+ *   produce this).
+ *
+ * The orchestrator dispatches on `kind` and translates each failure
+ * into the action-appropriate failure envelope via the existing
+ * `build*Failure` helpers.
+ */
+type SpaceResolution =
+  | {
+      readonly kind: 'ok';
+      readonly destinationContract: unknown;
+      readonly plan: MigrationPlan;
+      readonly displayOps: readonly MigrationPlanOperation[];
+    }
+  | {
+      readonly kind: 'planning-failure';
+      readonly conflicts: readonly MigrationPlannerConflict[] | undefined;
+    }
+  | {
+      readonly kind: 'extension-path-failure';
+      readonly why: string;
+    };
+
+/**
+ * Per-space path resolver — the seam that lets the orchestrator drive
+ * one symmetric loop over every space rather than maintaining
+ * separate code paths for app vs extension. The asymmetry between
+ * "synthesise a plan from introspected schema" (app) and "walk the
+ * on-disk migration graph from `currentMarker → pinnedHeadRef`"
+ * (extension) lives entirely inside the resolver factories
+ * ({@link makeAppResolver}, {@link makeExtensionResolver}).
+ */
+interface SpacePathResolver {
+  readonly spaceId: string;
+  readonly migrationsDir: string;
+  readonly resolve: (
+    currentMarkerHash: string | null,
+    currentMarkerInvariants: readonly string[],
+  ) => Promise<SpaceResolution>;
 }
 
 /**
@@ -117,88 +175,20 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
   const planner = migrations.createPlanner(familyInstance);
   const runner = migrations.createRunner(familyInstance);
 
-  // Read every marker row up-front so the per-space pathfinding has
-  // each space's `currentMarker` available without re-querying.
+  // Read every marker row up-front so each resolver call has the
+  // current marker available without re-querying.
   const markerRows = await familyInstance.readAllMarkers({ driver });
 
-  // ---------------------------------------------------------------------------
-  // Extension-space path resolution: walk each space's pinned migration
-  // graph from `currentMarker → pinnedHeadRef.hash`. Done BEFORE
-  // app-space planning so the extensions' destination contracts are
-  // available to filter the introspected schema (otherwise the
-  // app-space planner would treat extension-owned tables as extras and
-  // emit destructive ops to drop them).
-  // ---------------------------------------------------------------------------
-  interface PerSpaceContext {
-    readonly spaceId: string;
-    readonly destinationContract: unknown;
-    readonly plan: MigrationPlan;
-    readonly displayOps: readonly MigrationPlanOperation[];
-  }
-
-  const extensionContexts: PerSpaceContext[] = [];
-
+  // App-only work, hoisted out of the per-space loop: introspect once
+  // and prune extension-owned tables out of the result. Without the
+  // prune the app-space planner would treat extension-owned tables as
+  // "extras" and emit destructive ops to drop them — defeating
+  // disjoint per-space ownership (sub-spec § 1, AM2).
+  const extensionDestinationContracts: unknown[] = [];
   for (const ext of extensionContractSpaces) {
-    const spaceId = ext.id;
-    const marker = markerRows.get(spaceId);
-    const currentMarkerHash = marker?.storageHash ?? null;
-    const currentMarkerInvariants = marker?.invariants ?? [];
-
-    const outcome = await computeExtensionSpaceApplyPath({
-      projectMigrationsDir: migrationsDir,
-      spaceId,
-      currentMarkerHash,
-      currentMarkerInvariants,
-    });
-
-    if (outcome.kind === 'pinnedHeadRefMissing') {
-      // Verifier precheck should have caught this, but the operation
-      // is the last line of defence — surface a coherent failure
-      // rather than throw.
-      return buildExtensionPathFailure(action, {
-        spaceId,
-        why: `Extension space "${spaceId}" has no pinned \`refs/head.json\`. Re-run \`prisma-next migrate\` before \`${action === 'dbInit' ? 'db init' : 'db update'}\`.`,
-      });
-    }
-    if (outcome.kind === 'unreachable') {
-      return buildExtensionPathFailure(action, {
-        spaceId,
-        why: `No path in the on-disk migration graph for extension space "${spaceId}" reaches the pinned head ref hash "${outcome.pinnedHeadRef.hash}".`,
-      });
-    }
-    if (outcome.kind === 'unsatisfiable') {
-      return buildExtensionPathFailure(action, {
-        spaceId,
-        why: `On-disk migration graph for extension space "${spaceId}" reaches the pinned head ref hash but does not cover required invariants: ${outcome.missing.join(', ')}.`,
-      });
-    }
-
-    const destinationContract = await readPinnedSpaceContract(migrationsDir, spaceId);
-
-    const extPlan: MigrationPlan = {
-      targetId: '' as unknown as MigrationPlan['targetId'], // patched below once app-space plan is known
-      origin: currentMarkerHash === null ? null : { storageHash: currentMarkerHash },
-      destination: { storageHash: outcome.pinnedHeadRef.hash },
-      operations: outcome.pathOps,
-      providedInvariants: outcome.providedInvariants,
-    };
-
-    extensionContexts.push({
-      spaceId,
-      destinationContract,
-      plan: extPlan,
-      displayOps: outcome.pathOps,
-    });
+    extensionDestinationContracts.push(await readPinnedSpaceContract(migrationsDir, ext.id));
   }
 
-  // ---------------------------------------------------------------------------
-  // App-space planning (today's single-space `db init` / `db update` flow).
-  // The introspected schema is pruned to exclude tables owned by other
-  // (extension) spaces so the planner does not emit destructive ops to
-  // drop them as "extras". This mirrors the runner's
-  // `strictVerification: false` setting at apply time — each space owns
-  // a disjoint slice of the live schema (sub-spec § 1).
-  // ---------------------------------------------------------------------------
   const introspectSpanId = 'introspect';
   onProgress?.({
     action,
@@ -209,82 +199,122 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
   const schemaIR = await familyInstance.introspect({ driver });
   onProgress?.({ action, kind: 'spanEnd', spanId: introspectSpanId, outcome: 'ok' });
 
-  const prunedSchemaIR = pruneSchemaByOtherSpaceContracts(
-    schemaIR,
-    extensionContexts.map((ctx) => ctx.destinationContract),
-  );
+  const prunedSchemaIR = pruneSchemaByOtherSpaceContracts(schemaIR, extensionDestinationContracts);
+
+  // Build the per-space resolver list. The order — extensions
+  // alphabetically by space id, then app — mirrors
+  // `concatenateSpaceApplyInputs`'s convention; the runner reports
+  // `failingSpace` against this ordering, and existing tests pin it.
+  const sortedExtensions = [...extensionContractSpaces].sort((a, b) => a.id.localeCompare(b.id));
+  const resolvers: SpacePathResolver[] = [
+    ...sortedExtensions.map(
+      (ext, index): SpacePathResolver =>
+        makeExtensionResolver({
+          spaceId: ext.id,
+          migrationsDir,
+          destinationContract:
+            extensionDestinationContracts[
+              extensionContractSpaces.findIndex((e) => e.id === ext.id)
+            ],
+          // `index` retained for potential future per-extension
+          // span-id derivation; intentionally unused today.
+          _index: index,
+        }),
+    ),
+    makeAppResolver({
+      spaceId: APP_SPACE_ID,
+      migrationsDir,
+      contract,
+      planner,
+      prunedSchemaIR,
+      frameworkComponents,
+      policy,
+    }),
+  ];
 
   const planSpanId = 'plan';
   onProgress?.({ action, kind: 'spanStart', spanId: planSpanId, label: 'Planning migration' });
-  const plannerResult: MigrationPlannerResult = await planner.plan({
-    contract,
-    schema: prunedSchemaIR,
-    policy,
-    fromContract: null,
-    frameworkComponents,
-  });
-  if (plannerResult.kind === 'failure') {
-    onProgress?.({ action, kind: 'spanEnd', spanId: planSpanId, outcome: 'error' });
-    return buildPlanningFailure(action, plannerResult.conflicts);
+
+  const resolutions: Array<{
+    readonly spaceId: string;
+    readonly destinationContract: unknown;
+    readonly plan: MigrationPlan;
+    readonly displayOps: readonly MigrationPlanOperation[];
+  }> = [];
+  for (const resolver of resolvers) {
+    const marker = markerRows.get(resolver.spaceId);
+    const resolution = await resolver.resolve(
+      marker?.storageHash ?? null,
+      marker?.invariants ?? [],
+    );
+    if (resolution.kind === 'extension-path-failure') {
+      onProgress?.({ action, kind: 'spanEnd', spanId: planSpanId, outcome: 'error' });
+      return buildExtensionPathFailure(action, {
+        spaceId: resolver.spaceId,
+        why: resolution.why,
+      });
+    }
+    if (resolution.kind === 'planning-failure') {
+      onProgress?.({ action, kind: 'spanEnd', spanId: planSpanId, outcome: 'error' });
+      return buildPlanningFailure(action, resolution.conflicts);
+    }
+    resolutions.push({
+      spaceId: resolver.spaceId,
+      destinationContract: resolution.destinationContract,
+      plan: resolution.plan,
+      displayOps: resolution.displayOps,
+    });
   }
   onProgress?.({ action, kind: 'spanEnd', spanId: planSpanId, outcome: 'ok' });
 
-  const appPlan: MigrationPlan = plannerResult.plan;
-
   // Patch each extension plan's targetId to match the app plan's now
   // that we know it (extension paths walk operations rendered against
-  // the same target as the app contract).
-  const perSpaceContexts: PerSpaceContext[] = extensionContexts.map((ctx) => ({
-    ...ctx,
-    plan: { ...ctx.plan, targetId: appPlan.targetId },
-  }));
+  // the same target as the app contract). The placeholder-then-patch
+  // sequence is documented as awkward-but-contained in the M2 review;
+  // out of scope to remove here.
+  const appPlan = resolutions.find((r) => r.spaceId === APP_SPACE_ID)?.plan;
+  if (!appPlan) {
+    // Unreachable — the app resolver is always last in `resolvers`.
+    throw new Error('App-space plan missing from resolver outputs');
+  }
+  const patchedResolutions = resolutions.map((r) =>
+    r.spaceId === APP_SPACE_ID ? r : { ...r, plan: { ...r.plan, targetId: appPlan.targetId } },
+  );
 
-  const appSpaceContext: PerSpaceContext = {
-    spaceId: APP_SPACE_ID,
-    destinationContract: contract,
-    plan: appPlan,
-    displayOps: appPlan.operations,
-  };
-
-  perSpaceContexts.push(appSpaceContext);
-
-  // Concatenate via the framework-level helper for cross-space ordering
-  // (extensions alphabetical first, then app-space) and duplicate-id
-  // rejection.
+  // Concatenate via the framework-level helper for cross-space
+  // ordering and duplicate-id rejection.
   const orderedInputs: readonly SpaceApplyInput<MigrationPlanOperation>[] =
     concatenateSpaceApplyInputs(
-      perSpaceContexts.map(
-        (ctx): SpaceApplyInput<MigrationPlanOperation> => ({
-          spaceId: ctx.spaceId,
+      patchedResolutions.map(
+        (r): SpaceApplyInput<MigrationPlanOperation> => ({
+          spaceId: r.spaceId,
           // The runner does not consume `migrationDirectory` directly
-          // for app-space synthesis paths, but the field is part of the
-          // canonical `SpaceApplyInput` shape — surface it for parity
-          // with how `migrate apply` shapes its inputs.
+          // for app-space synthesis paths, but the field is part of
+          // the canonical `SpaceApplyInput` shape — surface it for
+          // parity with how `migrate apply` shapes its inputs.
           migrationDirectory: migrationsDir,
-          currentMarkerHash: markerRows.get(ctx.spaceId)?.storageHash ?? null,
-          currentMarkerInvariants: markerRows.get(ctx.spaceId)?.invariants ?? [],
-          path: ctx.displayOps,
+          currentMarkerHash: markerRows.get(r.spaceId)?.storageHash ?? null,
+          currentMarkerInvariants: markerRows.get(r.spaceId)?.invariants ?? [],
+          path: r.displayOps,
         }),
       ),
     );
-  const orderedContexts: PerSpaceContext[] = orderedInputs.map((input) => {
-    const ctx = perSpaceContexts.find((c) => c.spaceId === input.spaceId);
-    if (!ctx) {
+  const orderedResolutions = orderedInputs.map((input) => {
+    const r = patchedResolutions.find((c) => c.spaceId === input.spaceId);
+    if (!r) {
       // Unreachable — concatenateSpaceApplyInputs preserves identity.
-      throw new Error(`Per-space context missing for space "${input.spaceId}"`);
+      throw new Error(`Per-space resolution missing for space "${input.spaceId}"`);
     }
-    return ctx;
+    return r;
   });
 
-  // ---------------------------------------------------------------------------
   // Plan-mode: surface aggregate operations without applying.
-  // ---------------------------------------------------------------------------
   if (mode === 'plan') {
-    const aggregateOps = orderedContexts.flatMap((ctx) => ctx.displayOps);
+    const aggregateOps = orderedResolutions.flatMap((r) => r.displayOps);
     const preview = hasOperationPreview(familyInstance)
       ? familyInstance.toOperationPreview(aggregateOps)
       : undefined;
-    const summary = `Planned ${aggregateOps.length} operation(s) across ${orderedContexts.length} space(s)`;
+    const summary = `Planned ${aggregateOps.length} operation(s) across ${orderedResolutions.length} space(s)`;
     return wrapPlanResult(action, {
       operations: aggregateOps,
       destination: appPlan.destination,
@@ -293,10 +323,8 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
     });
   }
 
-  // ---------------------------------------------------------------------------
   // Apply-mode: route through `runner.executeAcrossSpaces` for atomic
   // multi-space transaction with rollback on any failure.
-  // ---------------------------------------------------------------------------
   if (!hasMultiSpaceRunner(runner)) {
     return buildExtensionPathFailure(action, {
       spaceId: '<runner>',
@@ -313,22 +341,23 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
   });
 
   const perSpaceOptions: MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>[] =
-    orderedContexts.map((ctx) => ({
-      space: ctx.spaceId,
-      plan: ctx.plan,
+    orderedResolutions.map((r) => ({
+      space: r.spaceId,
+      plan: r.plan,
       driver,
-      destinationContract: ctx.destinationContract,
+      destinationContract: r.destinationContract,
       policy,
       executionChecks: { prechecks: false, postchecks: false, idempotencyChecks: false },
       frameworkComponents,
       // Multi-space post-apply verification is intentionally non-strict
-      // per-space: each space's `destinationContract` describes only its
-      // own tables, so without this every space's verifier would treat
-      // every other space's tables as "extras". The tolerant mode still
-      // catches missing tables / columns / wrong types — only the
-      // "extras" gate is disabled. SQL-family runners read this via
-      // structural typing on `MultiSpaceRunnerPerSpaceOptions`
-      // (sub-spec § 4 — Runner protocol).
+      // per-space: each space's `destinationContract` describes only
+      // its own tables, so without this every space's verifier would
+      // treat every other space's tables as "extras". The tolerant
+      // mode still catches missing tables / columns / wrong types —
+      // only the "extras" gate is disabled. SQL-family runners read
+      // this via structural typing on
+      // `MultiSpaceRunnerPerSpaceOptions` (sub-spec § 4 — Runner
+      // protocol).
       strictVerification: false,
     })) as MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>[];
 
@@ -359,13 +388,13 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
     0,
   );
 
-  const aggregateOps = orderedContexts.flatMap((ctx) => ctx.displayOps);
+  const aggregateOps = orderedResolutions.flatMap((r) => r.displayOps);
   const summary =
     action === 'dbInit'
-      ? `Applied ${totalOpsExecuted} operation(s) across ${orderedContexts.length} space(s), database signed`
+      ? `Applied ${totalOpsExecuted} operation(s) across ${orderedResolutions.length} space(s), database signed`
       : totalOpsExecuted === 0
-        ? `Database already matches contract across ${orderedContexts.length} space(s), signature updated`
-        : `Applied ${totalOpsExecuted} operation(s) across ${orderedContexts.length} space(s), signature updated`;
+        ? `Database already matches contract across ${orderedResolutions.length} space(s), signature updated`
+        : `Applied ${totalOpsExecuted} operation(s) across ${orderedResolutions.length} space(s), signature updated`;
 
   return wrapApplyResult(action, {
     operations: aggregateOps,
@@ -374,6 +403,113 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
     operationsExecuted: totalOpsExecuted,
     summary,
   });
+}
+
+// ============================================================================
+// Resolver factories
+// ============================================================================
+
+interface MakeExtensionResolverArgs {
+  readonly spaceId: string;
+  readonly migrationsDir: string;
+  readonly destinationContract: unknown;
+  readonly _index: number;
+}
+
+function makeExtensionResolver(args: MakeExtensionResolverArgs): SpacePathResolver {
+  return {
+    spaceId: args.spaceId,
+    migrationsDir: args.migrationsDir,
+    resolve: async (currentMarkerHash, currentMarkerInvariants): Promise<SpaceResolution> => {
+      const outcome = await computeExtensionSpaceApplyPath({
+        projectMigrationsDir: args.migrationsDir,
+        spaceId: args.spaceId,
+        currentMarkerHash,
+        currentMarkerInvariants,
+      });
+
+      if (outcome.kind === 'pinnedHeadRefMissing') {
+        return {
+          kind: 'extension-path-failure',
+          why: `Extension space "${args.spaceId}" has no pinned \`refs/head.json\`. Re-run \`prisma-next migrate\` before \`db init\` / \`db update\`.`,
+        };
+      }
+      if (outcome.kind === 'unreachable') {
+        return {
+          kind: 'extension-path-failure',
+          why: `No path in the on-disk migration graph for extension space "${args.spaceId}" reaches the pinned head ref hash "${outcome.pinnedHeadRef.hash}".`,
+        };
+      }
+      if (outcome.kind === 'unsatisfiable') {
+        return {
+          kind: 'extension-path-failure',
+          why: `On-disk migration graph for extension space "${args.spaceId}" reaches the pinned head ref hash but does not cover required invariants: ${outcome.missing.join(', ')}.`,
+        };
+      }
+
+      const extPlan: MigrationPlan = {
+        // `targetId` is patched at the orchestrator level once the
+        // app-space plan is known. Documented as awkward-but-contained
+        // in the M2 review; out of scope.
+        targetId: '' as unknown as MigrationPlan['targetId'],
+        origin: currentMarkerHash === null ? null : { storageHash: currentMarkerHash },
+        destination: { storageHash: outcome.pinnedHeadRef.hash },
+        operations: outcome.pathOps,
+        providedInvariants: outcome.providedInvariants,
+      };
+
+      return {
+        kind: 'ok',
+        destinationContract: args.destinationContract,
+        plan: extPlan,
+        displayOps: outcome.pathOps,
+      };
+    },
+  };
+}
+
+interface MakeAppResolverArgs<TFamilyId extends string, TTargetId extends string> {
+  readonly spaceId: string;
+  readonly migrationsDir: string;
+  readonly contract: Contract;
+  readonly planner: ReturnType<
+    TargetMigrationsCapability<
+      TFamilyId,
+      TTargetId,
+      ControlFamilyInstance<TFamilyId, unknown>
+    >['createPlanner']
+  >;
+  readonly prunedSchemaIR: unknown;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
+  readonly policy: MigrationOperationPolicy;
+}
+
+function makeAppResolver<TFamilyId extends string, TTargetId extends string>(
+  args: MakeAppResolverArgs<TFamilyId, TTargetId>,
+): SpacePathResolver {
+  return {
+    spaceId: args.spaceId,
+    migrationsDir: args.migrationsDir,
+    resolve: async (): Promise<SpaceResolution> => {
+      const plannerResult: MigrationPlannerResult = await args.planner.plan({
+        contract: args.contract,
+        schema: args.prunedSchemaIR,
+        policy: args.policy,
+        fromContract: null,
+        frameworkComponents: args.frameworkComponents,
+      });
+      if (plannerResult.kind === 'failure') {
+        return { kind: 'planning-failure', conflicts: plannerResult.conflicts };
+      }
+      const appPlan = plannerResult.plan;
+      return {
+        kind: 'ok',
+        destinationContract: args.contract,
+        plan: appPlan,
+        displayOps: appPlan.operations,
+      };
+    },
+  };
 }
 
 // ============================================================================
