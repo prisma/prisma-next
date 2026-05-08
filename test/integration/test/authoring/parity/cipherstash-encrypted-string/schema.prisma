@@ -1,3 +1,10 @@
+// PSL side of the cipherstash EncryptedString PSL ↔ TS authoring parity
+// fixture. The `cli.emit-parity-fixtures.test.ts` runner asserts byte-
+// identical contract.json between this schema and the sibling
+// `contract.ts`. The matrix below covers both M2 R2 (AC-PARITY1..2)
+// and the cipherstash umbrella scenario`s contract.json parity
+// requirement (project-1 spec § AC-UMB2): `full` and `optionalFull`
+// are the umbrella column shapes (M3 R3 T3.7 + T3.10).
 model User {
   id                  Int @id @default(autoincrement())
   storageOnly         cipherstash.EncryptedString({})
