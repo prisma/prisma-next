@@ -13,7 +13,8 @@
  */
 
 import type { CodecTypes } from '../types/codec-types';
-import { ARKTYPE_JSON_CODEC_ID, codecDescriptorClassList } from './arktype-json-codec-class';
+import { ARKTYPE_JSON_CODEC_ID } from './arktype-json-codec-class';
+import { arktypeJsonCodecRegistry } from './registry';
 
 const arktypeJsonPackMetaBase = {
   kind: 'extension',
@@ -24,7 +25,7 @@ const arktypeJsonPackMetaBase = {
   capabilities: {},
   types: {
     codecTypes: {
-      codecDescriptors: codecDescriptorClassList,
+      codecDescriptors: Array.from(arktypeJsonCodecRegistry.values()),
       import: {
         package: '@prisma-next/extension-arktype-json/codec-types',
         named: 'CodecTypes',

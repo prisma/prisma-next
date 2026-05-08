@@ -285,9 +285,9 @@ arktypeJsonColumn satisfies ColumnHelperFor<ArktypeJsonDescriptor>;
 export type ArktypeJsonCodec<TInferred> = ArktypeJsonCodecClass<TInferred>;
 
 // ---------------------------------------------------------------------------
-// Class-form descriptor list. Single entry: `arktype/json@1`. The
-// arktype-json contributor pack's unified `codecs:` slot consumes this
-// list directly.
+// Internal descriptor list. Single entry: `arktype/json@1`. Wrapped in a
+// `CodecDescriptorRegistry` by `core/registry.ts`; the arktype-json
+// contributor pack's `codecs:` slot consumes via that registry.
 // ---------------------------------------------------------------------------
 
-export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [arktypeJsonDescriptor];
+export const codecDescriptors: readonly AnyCodecDescriptor[] = [arktypeJsonDescriptor];
