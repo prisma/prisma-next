@@ -197,9 +197,9 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
   // prune the app-space planner would treat extension-owned tables as
   // "extras" and emit destructive ops to drop them — defeating
   // disjoint per-space ownership (sub-spec § 1, AM2).
-  const extensionDestinationContracts: unknown[] = [];
+  const destinationByExtId = new Map<string, unknown>();
   for (const ext of extensionContractSpaces) {
-    extensionDestinationContracts.push(await readPinnedSpaceContract(migrationsDir, ext.id));
+    destinationByExtId.set(ext.id, await readPinnedSpaceContract(migrationsDir, ext.id));
   }
 
   onProgress?.({
@@ -211,7 +211,9 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
   const schemaIR = await familyInstance.introspect({ driver });
   onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.introspect, outcome: 'ok' });
 
-  const prunedSchemaIR = pruneSchemaByOtherSpaceContracts(schemaIR, extensionDestinationContracts);
+  const prunedSchemaIR = pruneSchemaByOtherSpaceContracts(schemaIR, [
+    ...destinationByExtId.values(),
+  ]);
 
   // Build the per-space resolver list. The order — extensions
   // alphabetically by space id, then app — mirrors
@@ -220,17 +222,11 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
   const sortedExtensions = [...extensionContractSpaces].sort((a, b) => a.id.localeCompare(b.id));
   const resolvers: SpacePathResolver[] = [
     ...sortedExtensions.map(
-      (ext, index): SpacePathResolver =>
+      (ext): SpacePathResolver =>
         makeExtensionResolver({
           spaceId: ext.id,
           migrationsDir,
-          destinationContract:
-            extensionDestinationContracts[
-              extensionContractSpaces.findIndex((e) => e.id === ext.id)
-            ],
-          // `index` retained for potential future per-extension
-          // span-id derivation; intentionally unused today.
-          _index: index,
+          destinationContract: destinationByExtId.get(ext.id),
         }),
     ),
     makeAppResolver({
@@ -315,10 +311,15 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
         }),
       ),
     );
+  // Build a single index over `patchedResolutions` keyed by space id so
+  // re-mapping in `concatenateSpaceApplyInputs` order is O(N) instead
+  // of O(N²) (the input list is canonically the same set of space ids
+  // — `concatenateSpaceApplyInputs` rejects unknowns and preserves
+  // identity, so the `.get(...)!` is sound).
+  const patchedBySpaceId = new Map(patchedResolutions.map((r) => [r.spaceId, r]));
   const orderedResolutions = orderedInputs.map((input) => {
-    const r = patchedResolutions.find((c) => c.spaceId === input.spaceId);
+    const r = patchedBySpaceId.get(input.spaceId);
     if (!r) {
-      // Unreachable — concatenateSpaceApplyInputs preserves identity.
       throw new Error(`Per-space resolution missing for space "${input.spaceId}"`);
     }
     return r;
@@ -431,7 +432,6 @@ interface MakeExtensionResolverArgs {
   readonly spaceId: string;
   readonly migrationsDir: string;
   readonly destinationContract: unknown;
-  readonly _index: number;
 }
 
 function makeExtensionResolver(args: MakeExtensionResolverArgs): SpacePathResolver {
