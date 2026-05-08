@@ -1,0 +1,97 @@
+/**
+ * Constructive type tests for the postgres per-target descriptor record
+ * layer (TML-2357 M0 R6 / Phase D — T0.D.2).
+ *
+ * Coverage:
+ *   - the public descriptor list (`codecDescriptorClassList`) narrows to
+ *     `readonly AnyCodecDescriptor[]`, so heterogeneous descriptor
+ *     storage works without per-codec branching;
+ *   - trait literals survive on each descriptor class — the M0 R5
+ *     {@link DescriptorCodecTraits} fix reads `traits` directly off the
+ *     descriptor, so the literal tuple shape (`readonly ['equality',
+ *     'order', 'numeric']`) is preserved rather than widened to
+ *     `readonly CodecTrait[]`;
+ *   - the resolved `CodecTypes` projection contains the codec-id keys
+ *     consumers reference at the no-emit authoring chain.
+ *
+ * Negative coverage (`// @ts-expect-error`) proves that a regression in
+ * trait preservation or a missing codec id breaks the test compile.
+ */
+
+import type { AnyCodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
+import { expectTypeOf, test } from 'vitest';
+import {
+  codecDescriptorClassList,
+  type PgInt4Descriptor,
+  type PgNumericDescriptor,
+  pgInt4DescriptorClass,
+  pgNumericDescriptorClass,
+} from '../src/core/codecs-class';
+import type { CodecTypes } from '../src/exports/codec-types';
+
+// ---------------------------------------------------------------------------
+// Heterogeneous descriptor storage narrows to AnyCodecDescriptor.
+// ---------------------------------------------------------------------------
+
+test('codecDescriptorClassList narrows to readonly AnyCodecDescriptor[]', () => {
+  expectTypeOf(codecDescriptorClassList).toEqualTypeOf<readonly AnyCodecDescriptor[]>();
+});
+
+test('list entries extend AnyCodecDescriptor', () => {
+  expectTypeOf<(typeof codecDescriptorClassList)[number]>().toExtend<AnyCodecDescriptor>();
+});
+
+// ---------------------------------------------------------------------------
+// Trait literals preserved on individual descriptors (M0 R5 fix).
+// ---------------------------------------------------------------------------
+
+test('pgInt4Descriptor.traits is a readonly literal tuple, not widened', () => {
+  type Traits = PgInt4Descriptor['traits'];
+  expectTypeOf<Traits>().toEqualTypeOf<readonly ['equality', 'order', 'numeric']>();
+  expectTypeOf<Traits[number]>().toExtend<CodecTrait>();
+});
+
+test('pgNumericDescriptor.traits preserves the same literal tuple', () => {
+  type Traits = PgNumericDescriptor['traits'];
+  expectTypeOf<Traits>().toEqualTypeOf<readonly ['equality', 'order', 'numeric']>();
+});
+
+test('pgInt4Descriptor.codecId is the literal `pg/int4@1`', () => {
+  expectTypeOf(pgInt4DescriptorClass.codecId).toEqualTypeOf<'pg/int4@1'>();
+});
+
+test('pgNumericDescriptor.codecId is the literal `pg/numeric@1`', () => {
+  expectTypeOf(pgNumericDescriptorClass.codecId).toEqualTypeOf<'pg/numeric@1'>();
+});
+
+// ---------------------------------------------------------------------------
+// CodecTypes projection contains the expected codec-id keys.
+// ---------------------------------------------------------------------------
+
+test('CodecTypes is keyed by codec id and exposes input/output/traits', () => {
+  expectTypeOf<CodecTypes['pg/int4@1']>().toExtend<{
+    readonly input: number;
+    readonly output: number;
+    readonly traits: 'equality' | 'order' | 'numeric';
+  }>();
+
+  expectTypeOf<CodecTypes['pg/varchar@1']>().toExtend<{
+    readonly input: string;
+    readonly output: string;
+  }>();
+});
+
+// ---------------------------------------------------------------------------
+// Negative tests.
+// ---------------------------------------------------------------------------
+
+test('widened trait shape on pgInt4 fails the equality check', () => {
+  type Traits = PgInt4Descriptor['traits'];
+  // @ts-expect-error -- traits literal tuple is preserved, not widened to CodecTrait[]
+  expectTypeOf<Traits>().toEqualTypeOf<readonly CodecTrait[]>();
+});
+
+test('non-existent codec id is absent from CodecTypes', () => {
+  // @ts-expect-error -- `pg/nonexistent@1` is not a registered codec id
+  type _Missing = CodecTypes['pg/nonexistent@1'];
+});
