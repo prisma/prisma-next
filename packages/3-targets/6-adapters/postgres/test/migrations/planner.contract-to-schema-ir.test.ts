@@ -1,9 +1,8 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
 import type {
   CodecControlHooks,
-  ComponentDatabaseDependency,
   NativeTypeExpander,
-  SqlControlExtensionDescriptor,
   SqlPlannerResult,
 } from '@prisma-next/family-sql/control';
 import {
@@ -624,51 +623,6 @@ describe('planner — type and nullability change behavior', () => {
 
 // --- Comprehensive incremental migration test (prisma-next-demo-like contract) ---
 
-const pgvectorDependency: ComponentDatabaseDependency<unknown> = {
-  id: 'postgres.extension.vector',
-  label: 'Enable vector extension',
-  install: [
-    {
-      id: 'extension.vector',
-      label: 'Enable extension "vector"',
-      summary: 'Ensures the vector extension is available for pgvector operations',
-      operationClass: 'additive',
-      target: { id: 'postgres' },
-      precheck: [
-        {
-          description: 'verify extension "vector" is not already enabled',
-          sql: "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-        },
-      ],
-      execute: [
-        {
-          description: 'create extension "vector"',
-          sql: 'CREATE EXTENSION IF NOT EXISTS vector',
-        },
-      ],
-      postcheck: [
-        {
-          description: 'confirm extension "vector" is enabled',
-          sql: "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-        },
-      ],
-    },
-  ],
-};
-
-function createPgvectorComponent(): SqlControlExtensionDescriptor<'postgres'> {
-  return {
-    kind: 'extension',
-    id: 'pgvector',
-    familyId: 'sql',
-    targetId: 'postgres',
-    version: '0.0.0-test',
-
-    databaseDependencies: { init: [pgvectorDependency] },
-    create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
-  };
-}
-
 function createAdapterHooksComponent(): TargetBoundComponentDescriptor<'sql', string> {
   const parameterizedTypeHooks: CodecControlHooks = {
     expandNativeType: expandParameterizedNativeType,
@@ -816,8 +770,8 @@ function createDemoContract(
   };
 }
 
-describe('incremental migration with full contract surface (extensions, enums, FKs)', () => {
-  const frameworkComponents = [createPgvectorComponent(), createAdapterHooksComponent()];
+describe('incremental migration with full contract surface (enums, FKs)', () => {
+  const frameworkComponents = [createAdapterHooksComponent(), pgvectorDescriptor];
 
   it('only emits ops for the actual change when adding a column to an existing table', () => {
     const toStorage: Omit<SqlStorage, 'storageHash'> = {
@@ -837,7 +791,6 @@ describe('incremental migration with full contract surface (extensions, enums, F
     const fromSchemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
       expandNativeType: expandParameterizedNativeType,
       renderDefault: postgresRenderDefault,
-      frameworkComponents,
     });
     const toContract = createDemoContract(toStorage);
     const planner = createPostgresMigrationPlanner();
@@ -858,15 +811,13 @@ describe('incremental migration with full contract surface (extensions, enums, F
     const opIds = result.plan.operations.map((op) => op.id);
 
     expect(opIds).toEqual(['column.user.name']);
-    expect(opIds).not.toContain('extension.vector');
     expect(opIds.filter((id) => id.startsWith('type.'))).toHaveLength(0);
   });
 
-  it('produces no ops when from and to storages are identical (with extensions and types)', () => {
+  it('produces no ops when from and to storages are identical (with types)', () => {
     const fromSchemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
       expandNativeType: expandParameterizedNativeType,
       renderDefault: postgresRenderDefault,
-      frameworkComponents,
     });
     const toContract = createDemoContract(DEMO_BASE_STORAGE);
     const planner = createPostgresMigrationPlanner();
@@ -909,25 +860,14 @@ describe('incremental migration with full contract surface (extensions, enums, F
     }
 
     const opIds = result.plan.operations.map((op) => op.id);
-    expect(opIds).toContain('extension.vector');
     expect(opIds.some((id) => id.startsWith('type.'))).toBe(true);
     expect(opIds.some((id) => id.startsWith('table.'))).toBe(true);
-  });
-
-  it('contractToSchemaIR derives dependencies from framework components', () => {
-    const schemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
-      expandNativeType: expandParameterizedNativeType,
-      renderDefault: postgresRenderDefault,
-      frameworkComponents,
-    });
-    expect(schemaIR.dependencies).toContainEqual({ id: 'postgres.extension.vector' });
   });
 
   it('contractToSchemaIR derives annotations from contract storage types', () => {
     const schemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
       expandNativeType: expandParameterizedNativeType,
       renderDefault: postgresRenderDefault,
-      frameworkComponents,
     });
     const pgAnnotations = schemaIR.annotations?.['pg'] as Record<string, unknown> | undefined;
     const storageTypes = pgAnnotations?.['storageTypes'] as Record<string, unknown> | undefined;
@@ -936,13 +876,5 @@ describe('incremental migration with full contract surface (extensions, enums, F
       codecId: 'pg/enum@1',
       nativeType: 'user_type',
     });
-  });
-
-  it('contractToSchemaIR defaults to empty dependencies when no framework components given', () => {
-    const schemaIR = contractToSchemaIR(createDemoContract(DEMO_BASE_STORAGE), {
-      expandNativeType: expandParameterizedNativeType,
-      renderDefault: postgresRenderDefault,
-    });
-    expect(schemaIR.dependencies).toEqual([]);
   });
 });

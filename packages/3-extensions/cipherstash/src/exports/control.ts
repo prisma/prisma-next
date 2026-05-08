@@ -19,11 +19,6 @@
  *     migration via `planFieldEventOperations` (sub-spec § 5). Implements
  *     `add_search_config` / `remove_search_config` / rotate behaviour
  *     for `searchable: true` `Encrypted<string>` columns (sub-spec § 4).
- *
- * `databaseDependencies` is intentionally absent — CipherStash is
- * greenfield on contract spaces and never used the legacy
- * `databaseDependencies.init` mechanism (project spec FR13). The
- * regression test `test/descriptor.test.ts` pins this absence.
  */
 
 import type {

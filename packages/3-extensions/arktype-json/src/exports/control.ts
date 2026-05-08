@@ -7,8 +7,8 @@
  * imports (per `.cursor/rules/multi-plane-entrypoints.mdc`).
  *
  * Unlike pgvector, arktype-json has no database extension to install
- * (`jsonb` is a built-in Postgres type), no `databaseDependencies`, no
- * query operations, and the only control-plane hook is the identity
+ * (`jsonb` is a built-in Postgres type), no contract space, no query
+ * operations, and the only control-plane hook is the identity
  * `expandNativeType` (jsonb is dimension-free; the schema in typeParams
  * affects runtime validation only, never DDL).
  */

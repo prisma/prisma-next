@@ -36,8 +36,8 @@ describe('arktypeJsonRuntimeDescriptor', () => {
 describe('arktypeJsonExtensionDescriptor (control)', () => {
   // The control descriptor wires the migration-plane hooks into the SQL
   // family's control stack. arktype-json's `expandNativeType` is an
-  // identity (`jsonb` is dimension-free) and there's no
-  // `databaseDependencies` (`jsonb` is built into Postgres).
+  // identity (`jsonb` is dimension-free) and there is no contract space
+  // to install (`jsonb` is built into Postgres).
   it('declares family, target, and version aligned with pack-meta', () => {
     expect(arktypeJsonExtensionDescriptor.familyId).toBe('sql');
     expect(arktypeJsonExtensionDescriptor.targetId).toBe('postgres');

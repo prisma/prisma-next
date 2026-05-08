@@ -21,10 +21,9 @@ import { createIntegrationTestDir } from '../utils/cli-test-helpers';
  * `<projectRoot>/migrations/pgvector/...` so the per-space db init
  * flow (sub-spec § 6) can read its head ref + baseline migration.
  *
- * pgvector moved from `databaseDependencies.init` to a contract space
- * in the extension-contract-spaces project (M4); db init now requires
- * a `migrationsDir` whenever any extension publishes a contract space
- * because the apply path reads the user repo, not the descriptor.
+ * Db init requires a `migrationsDir` whenever any extension publishes
+ * a contract space because the apply path reads the user repo, not the
+ * descriptor.
  */
 async function materialisePgvectorPinnedArtefacts(projectRoot: string): Promise<string> {
   const migrationsDir = join(projectRoot, 'migrations');

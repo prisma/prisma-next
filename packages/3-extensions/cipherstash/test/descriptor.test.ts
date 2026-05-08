@@ -20,10 +20,6 @@
  * § 6 Scenarios A–D) lands in M3 R2+.
  */
 
-import {
-  collectInitDependencies,
-  isDatabaseDependencyProvider,
-} from '@prisma-next/family-sql/control';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { describe, expect, it } from 'vitest';
 import {
@@ -110,32 +106,5 @@ describe('cipherstash extension descriptor', () => {
         headRefHash: space.headRef.hash,
       }),
     ).not.toThrow();
-  });
-
-  describe('databaseDependencies absence (T3.5 regression — FR13)', () => {
-    /**
-     * Cipherstash is greenfield on contract spaces and must never declare
-     * `databaseDependencies` — the contract-space mechanism (M1+M2) replaces
-     * the legacy `databaseDependencies.init` install path. These three
-     * checks pin both the syntactic shape and the framework-level semantic
-     * shape so a regression cannot slip back in: a future descriptor change
-     * that re-introduces the field would be caught by either the property
-     * absence, the SQL family duck-type, or the `init` ops list reaching
-     * a non-zero length when collected against the descriptor.
-     */
-    it('the descriptor object literally omits the databaseDependencies property', () => {
-      expect(Object.hasOwn(cipherstashExtensionDescriptor, 'databaseDependencies')).toBe(false);
-      expect(
-        (cipherstashExtensionDescriptor as { databaseDependencies?: unknown }).databaseDependencies,
-      ).toBeUndefined();
-    });
-
-    it('isDatabaseDependencyProvider returns false for the descriptor', () => {
-      expect(isDatabaseDependencyProvider(cipherstashExtensionDescriptor)).toBe(false);
-    });
-
-    it('collectInitDependencies returns no install ops when given just the descriptor', () => {
-      expect(collectInitDependencies([cipherstashExtensionDescriptor])).toEqual([]);
-    });
   });
 });

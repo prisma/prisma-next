@@ -11,11 +11,10 @@
  * Ships a single baseline migration whose only op is
  * {@link installVectorExtensionOp} — it carries the
  * `CREATE EXTENSION IF NOT EXISTS vector` DDL plus a postcondition that
- * confirms the extension landed. Mirrors the legacy
- * legacy `databaseDependencies.init[0]` shape (precheck / execute /
- * postcheck) but as an `ExtensionMigrationPackage` op so the framework's
- * per-space runner / verifier (M1+M2) can manage it the same way it
- * manages an application's own migrations.
+ * confirms the extension landed. The op uses the standard
+ * precheck / execute / postcheck shape so the framework's per-space
+ * runner / verifier (M1+M2) can manage it the same way it manages an
+ * application's own migrations.
  *
  * The op carries the stable `pgvector:install-vector-v1` invariantId —
  * once published it is immutable (project spec FR11).

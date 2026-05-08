@@ -1,9 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
-import type {
-  ComponentDatabaseDependency,
-  SqlControlExtensionDescriptor,
-} from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -12,67 +8,9 @@ import type { PostgresColumnDefault } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
 import postgresAdapterDescriptor from '../../src/exports/control';
 
-/**
- * Synthetic stand-in for the legacy pgvector `databaseDependencies.init`
- * descriptor. pgvector itself migrated to the contract-space mechanism
- * in TML-2397 / M4 (project: extension-contract-spaces, T4.2) and no
- * longer carries `databaseDependencies`. These planner tests still
- * need a `databaseDependencies` provider to exercise the planner's
- * `extension.vector` op-emission path; this descriptor provides that
- * same shape (the planner's behaviour is what's under test, not
- * pgvector specifically). The whole `databaseDependencies` mechanism
- * is removed in M5 — at which point this descriptor and the
- * extension-install ops it drives also go away.
- */
-const pgvectorLegacyDependency: ComponentDatabaseDependency<unknown> = {
-  id: 'postgres.extension.vector',
-  label: 'Enable extension "vector"',
-  install: [
-    {
-      id: 'extension.vector',
-      label: 'Enable extension "vector"',
-      operationClass: 'additive',
-      target: {
-        id: 'postgres',
-        details: { schema: 'public', objectType: 'extension', name: 'vector' },
-      },
-      precheck: [],
-      execute: [
-        { description: 'create extension "vector"', sql: 'CREATE EXTENSION IF NOT EXISTS vector' },
-      ],
-      postcheck: [],
-    },
-  ],
-};
-
-const pgvectorLegacyDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
-  kind: 'extension',
-  id: 'pgvector',
-  familyId: 'sql',
-  targetId: 'postgres',
-  version: '0.0.0-test',
-  databaseDependencies: { init: [pgvectorLegacyDependency] },
-  create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
-};
-
 type PostgresStorageColumn = Omit<StorageColumn, 'default'> & {
   readonly default?: PostgresColumnDefault;
 };
-
-function createFrameworkComponentWithDependencies(
-  dependencies: readonly ComponentDatabaseDependency<unknown>[],
-): SqlControlExtensionDescriptor<'postgres'> {
-  return {
-    kind: 'extension',
-    id: 'mixed-dependencies',
-    familyId: 'sql',
-    targetId: 'postgres',
-    version: '0.0.0-test',
-
-    databaseDependencies: { init: dependencies },
-    create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
-  };
-}
 
 function createTestContract(overrides?: Partial<Contract<SqlStorage>>): Contract<SqlStorage> {
   return {
@@ -128,20 +66,18 @@ const contract = createTestContract();
 
 const emptySchema: SqlSchemaIR = {
   tables: {},
-  dependencies: [],
 };
 
 describe('PostgresMigrationPlanner - when database is empty', () => {
-  it('builds additive plan for empty schema with database dependencies', () => {
+  it('builds additive plan for empty schema (tables, indexes, FKs)', () => {
     const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [pgvectorLegacyDescriptor];
 
     const result = planner.plan({
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
-      frameworkComponents,
+      frameworkComponents: [pgvectorDescriptor],
     });
 
     expect(result.kind).toBe('success');
@@ -151,7 +87,6 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     const operations = result.plan.operations;
     expect(operations.length).toBeGreaterThan(0);
     expect(operations.map((op) => op.id)).toEqual([
-      'extension.vector',
       'table.post',
       'table.user',
       'unique.user.user_email_key',
@@ -159,10 +94,6 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       'index.user.user_email_idx',
       'foreignKey.post.post_userId_fkey',
     ]);
-    expect(operations[0]).toMatchObject({
-      label: 'Enable extension "vector"',
-      execute: [{ sql: 'CREATE EXTENSION IF NOT EXISTS vector' }],
-    });
     expect(operations.find((op) => op.id === 'table.user')).toMatchObject({
       execute: [
         {
@@ -189,79 +120,6 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     });
     expect(uniqueOp!.execute[0]!.sql).toContain('ALTER TABLE');
     expect(uniqueOp!.execute[0]!.sql).toContain('"user_email_key"');
-  });
-
-  it('emits extension install for migration plan policy (data class allowed)', () => {
-    // Regression: the planner used to dispatch on the `'data'` operation
-    // class to a strategy chain that did NOT include
-    // `dependencyInstallCallStrategy`, causing `migration plan` to fail with
-    // `Unknown dependency type: postgres.extension.vector` for any contract
-    // using extension packs. The unified `postgresPlannerStrategies` chain
-    // must produce the install op for both `db init` and `migration plan`
-    // policies.
-    const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [pgvectorLegacyDescriptor];
-
-    const result = planner.plan({
-      contract,
-      schema: emptySchema,
-      policy: {
-        allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'],
-      },
-      fromContract: null,
-      frameworkComponents,
-    });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-    const operationIds = result.plan.operations.map((op) => op.id);
-    expect(operationIds).toContain('extension.vector');
-    expect(result.plan.operations.find((op) => op.id === 'extension.vector')).toMatchObject({
-      label: 'Enable extension "vector"',
-      execute: [{ sql: 'CREATE EXTENSION IF NOT EXISTS vector' }],
-    });
-  });
-
-  it('ignores non-postgres dependency install operations', () => {
-    const planner = createPostgresMigrationPlanner();
-    const mysqlDependency: ComponentDatabaseDependency<unknown> = {
-      id: 'mysql.extension.audit',
-      label: 'Enable mysql audit extension',
-      install: [
-        {
-          id: 'extension.audit.mysql',
-          label: 'Enable mysql audit extension',
-          operationClass: 'additive',
-          target: { id: 'mysql' },
-          precheck: [],
-          execute: [{ description: 'enable mysql audit extension', sql: 'SELECT 1' }],
-          postcheck: [],
-        },
-      ],
-    };
-    const frameworkComponents = [
-      pgvectorLegacyDescriptor,
-      createFrameworkComponentWithDependencies([mysqlDependency]),
-    ];
-
-    const result = planner.plan({
-      contract,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      fromContract: null,
-      frameworkComponents,
-    });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-    const operationIds = result.plan.operations.map((op) => op.id);
-    expect(operationIds).toContain('extension.vector');
-    expect(operationIds).not.toContain('extension.audit.mysql');
-    expect(result.plan.operations.every((op) => op.target.id === 'postgres')).toBe(true);
   });
 
   it('renders parameterized column types in DDL', () => {
@@ -408,71 +266,8 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     expect(sql).not.toContain('"embedding" "vector(1536)"');
   });
 
-  it('skips dependency install when dependency already satisfied', () => {
-    const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [pgvectorLegacyDescriptor];
-    const schemaWithExtension: SqlSchemaIR = {
-      tables: {},
-      dependencies: [{ id: 'postgres.extension.vector' }],
-    };
-
-    const result = planner.plan({
-      contract,
-      schema: schemaWithExtension,
-      policy: INIT_ADDITIVE_POLICY,
-      fromContract: null,
-      frameworkComponents,
-    });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-    expect(result.plan.operations.map((op) => op.id)).not.toContain('extension.vector');
-  });
-
-  it('builds additive plan for empty schema without database dependencies', () => {
-    const planner = createPostgresMigrationPlanner();
-    // Use extension descriptor but without databaseDependencies
-    const extensionWithoutDeps: SqlControlExtensionDescriptor<'postgres'> = {
-      kind: 'extension',
-      id: 'pgvector',
-      familyId: 'sql',
-      targetId: 'postgres',
-      version: '0.0.0-test',
-
-      // No databaseDependencies - planner should work without them
-      databaseDependencies: {},
-      create: () => ({ familyId: 'sql', targetId: 'postgres' }) as never,
-    };
-
-    const result = planner.plan({
-      contract,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      fromContract: null,
-      frameworkComponents: [extensionWithoutDeps],
-    });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') {
-      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
-    }
-    const operations = result.plan.operations;
-    // No extension operations when no dependencies are provided
-    expect(operations.map((op) => op.id)).toEqual([
-      'table.post',
-      'table.user',
-      'unique.user.user_email_key',
-      'index.post.post_userId_idx',
-      'index.user.user_email_idx',
-      'foreignKey.post.post_userId_fkey',
-    ]);
-  });
-
   it('still plans additive fixes when schema contains extra tables', () => {
     const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [pgvectorLegacyDescriptor];
     const nonEmptySchema: SqlSchemaIR = {
       tables: {
         existing: {
@@ -486,7 +281,6 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
 
     const result = planner.plan({
@@ -494,7 +288,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       schema: nonEmptySchema,
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
-      frameworkComponents,
+      frameworkComponents: [pgvectorDescriptor],
     });
 
     expect(result.kind).toBe('success');
@@ -502,7 +296,6 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       throw new Error(`Expected success but got ${JSON.stringify(result)}`);
     }
     expect(result.plan.operations.map((op) => op.id)).toEqual([
-      'extension.vector',
       'table.post',
       'table.user',
       'unique.user.user_email_key',
@@ -514,7 +307,6 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
 
   it('ignores extra tables when they are unrelated to the contract', () => {
     const planner = createPostgresMigrationPlanner();
-    const frameworkComponents = [pgvectorLegacyDescriptor];
     const nonEmptySchema: SqlSchemaIR = {
       tables: {
         users: {
@@ -548,7 +340,6 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
 
     const result = planner.plan({
@@ -556,7 +347,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       schema: nonEmptySchema,
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
-      frameworkComponents,
+      frameworkComponents: [pgvectorDescriptor],
     });
 
     expect(result.kind).toBe('success');
@@ -564,7 +355,6 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       throw new Error(`Expected success but got ${JSON.stringify(result)}`);
     }
     expect(result.plan.operations.map((op) => op.id)).toEqual([
-      'extension.vector',
       'table.post',
       'table.user',
       'unique.user.user_email_key',

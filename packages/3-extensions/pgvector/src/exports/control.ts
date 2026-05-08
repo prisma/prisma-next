@@ -9,15 +9,9 @@
  * paths read the user's repo (`migrations/pgvector/...`) instead — see
  * project spec NFR3 / FR2 / FR10.
  *
- * `databaseDependencies` is intentionally absent — pgvector was
- * migrated off the legacy `databaseDependencies.init` mechanism in M4
- * (project spec FR13). The `CREATE EXTENSION IF NOT EXISTS vector`
- * DDL the legacy entry carried now lives as the body of the
- * `installVectorExtension` op inside the baseline migration package
- * (`../core/migrations.ts`). Presence of `contractSpace` is the
- * shipping-strategy gate: the framework loads the contract space and
- * ignores any `databaseDependencies` block (project plan §
- * "Shipping Strategy"). M5 removes the field at the framework level.
+ * The `CREATE EXTENSION IF NOT EXISTS vector` DDL lives as the body
+ * of the `installVectorExtension` op inside the baseline migration
+ * package (`../core/migrations.ts`).
  */
 
 import type {

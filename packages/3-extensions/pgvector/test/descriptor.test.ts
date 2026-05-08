@@ -16,19 +16,12 @@
  *   - the descriptor is self-consistent (`headRef.hash` matches a
  *     re-derived `computeStorageHash(...)` over `(target,
  *     targetFamily, storage)` — same check the family runs at
- *     create-time via `assertDescriptorSelfConsistency`);
- *   - the legacy `databaseDependencies` field is absent at the
- *     property, duck-type, and `init`-collection layers (project
- *     spec FR13).
+ *     create-time via `assertDescriptorSelfConsistency`).
  *
  * This file is a fast in-process check; live-database e2e against
  * pgvector lives in `test/scenario-a.e2e.integration.test.ts` (T4.3).
  */
 
-import {
-  collectInitDependencies,
-  isDatabaseDependencyProvider,
-} from '@prisma-next/family-sql/control';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { describe, expect, it } from 'vitest';
 import { VECTOR_CODEC_ID } from '../src/core/constants';
@@ -116,32 +109,5 @@ describe('pgvector extension descriptor (contract space)', () => {
         headRefHash: space.headRef.hash,
       }),
     ).not.toThrow();
-  });
-
-  describe('databaseDependencies absence (T4.2 regression — FR13)', () => {
-    /**
-     * Pgvector is now on the contract-space mechanism and must never
-     * declare `databaseDependencies` — its `installVectorExtension` op
-     * lives inside the baseline migration package instead. Three checks
-     * pin both the syntactic shape and the framework-level semantic
-     * shape so a regression cannot slip back in: a future descriptor
-     * change that re-introduces the field would be caught by either the
-     * property absence, the SQL family duck-type, or the `init` ops list
-     * reaching a non-zero length when collected against the descriptor.
-     */
-    it('the descriptor object literally omits the databaseDependencies property', () => {
-      expect(Object.hasOwn(pgvectorExtensionDescriptor, 'databaseDependencies')).toBe(false);
-      expect(
-        (pgvectorExtensionDescriptor as { databaseDependencies?: unknown }).databaseDependencies,
-      ).toBeUndefined();
-    });
-
-    it('isDatabaseDependencyProvider returns false for the descriptor', () => {
-      expect(isDatabaseDependencyProvider(pgvectorExtensionDescriptor)).toBe(false);
-    });
-
-    it('collectInitDependencies returns no install ops when given just the descriptor', () => {
-      expect(collectInitDependencies([pgvectorExtensionDescriptor])).toEqual([]);
-    });
   });
 });
