@@ -347,7 +347,9 @@ describe.sequential(
      * stops short of applying. This validates:
      *
      *   - the cipherstash codec hook fires for `User.email`, emitting
-     *     a `cipherstash-codec:User.email:add-search-config@v1` op;
+     *     a `cipherstash-codec:User.email:add-search-config:match@v1` op
+     *     (post-T2.9 per-flag invariantId shape — see
+     *     {@link ADD_SEARCH_CONFIG_INVARIANT_ID});
      *   - both spaces are present in the plan output, with cipherstash
      *     ops ordered before app-space ops (per
      *     `concatenateSpaceApplyInputs`).
