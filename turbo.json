@@ -47,6 +47,17 @@
     },
     "@prisma-next/sql-builder#emit": {
       "dependsOn": ["@prisma-next/cli#build"]
+    },
+    "@prisma-next/extension-cipherstash#test": {
+      "dependsOn": ["build"],
+      "inputs": ["src/**", "test/**", "dist/**"],
+      "env": ["TEST_TIMEOUT_MULTIPLIER"]
+    },
+    "@prisma-next/extension-cipherstash#test:coverage": {
+      "dependsOn": ["build"],
+      "inputs": ["src/**", "test/**", "dist/**"],
+      "outputs": ["coverage/**"],
+      "env": ["TEST_TIMEOUT_MULTIPLIER"]
     }
   }
 }
