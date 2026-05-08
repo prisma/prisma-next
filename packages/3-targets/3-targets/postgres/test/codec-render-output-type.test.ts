@@ -18,11 +18,11 @@ import {
   pgTimetzDescriptor,
   pgVarbitDescriptor,
   pgVarcharDescriptor,
-} from '../src/core/codecs-class';
+} from '../src/core/codecs';
 
 // `renderOutputType` is a `CodecDescriptor`-side concern after the SQL
 // `Codec` narrow (TML-2357). Tests read the renderer from
-// the class-form descriptor directly.
+// the descriptor directly.
 function rendererFor(
   descriptor: AnyCodecDescriptor,
 ): ((typeParams: Record<string, unknown>) => string | undefined) | undefined {

@@ -21,7 +21,7 @@ export type {
   PgTimetzDescriptor,
   PgVarbitDescriptor,
   PgVarcharDescriptor,
-} from '../core/codecs-class';
+} from '../core/codecs';
 export {
   pgBitColumn,
   pgBoolColumn,
@@ -45,5 +45,5 @@ export {
   pgTimetzColumn,
   pgVarbitColumn,
   pgVarcharColumn,
-} from '../core/codecs-class';
+} from '../core/codecs';
 export { postgresCodecRegistry } from '../core/registry';

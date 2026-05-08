@@ -2,7 +2,7 @@
  * Codec type definitions for the Postgres target.
  *
  * This file is the public origin of `CodecTypes`. Defining it here
- * (rather than re-exporting from `core/codecs-class`) keeps the
+ * (rather than re-exporting from `core/codecs`) keeps the
  * tsdown DTS bundler from emitting a private chunk path in
  * downstream `.d.mts` files: consumers see `CodecTypes` resolved via
  * this public entry point rather than via a hash-named internal
@@ -49,7 +49,7 @@ import {
   pgTimetzDescriptor,
   pgVarbitDescriptor,
   pgVarcharDescriptor,
-} from '../core/codecs-class';
+} from '../core/codecs';
 
 const codecDescriptorMap = {
   char: sqlCharDescriptor,

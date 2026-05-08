@@ -1,6 +1,6 @@
 import { buildCodecDescriptorRegistry } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
-import { codecDescriptors } from './codecs-class';
+import { codecDescriptors } from './codecs';
 
 /**
  * Registry of every codec descriptor shipped by `@prisma-next/target-postgres`.

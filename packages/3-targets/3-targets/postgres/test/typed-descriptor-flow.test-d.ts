@@ -26,7 +26,7 @@ import {
   type PgNumericDescriptor,
   pgInt4Descriptor,
   pgNumericDescriptor,
-} from '../src/core/codecs-class';
+} from '../src/core/codecs';
 import type { CodecTypes } from '../src/exports/codec-types';
 
 // ---------------------------------------------------------------------------

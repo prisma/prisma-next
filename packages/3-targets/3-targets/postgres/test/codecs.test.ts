@@ -35,7 +35,7 @@ import {
   pgTimetzDescriptor,
   pgVarbitDescriptor,
   pgVarcharDescriptor,
-} from '../src/core/codecs-class';
+} from '../src/core/codecs';
 
 const SYNTH_CTX: CodecInstanceContext = { name: 'test' };
 
@@ -484,7 +484,7 @@ describe('adapter-postgres codecs', () => {
     it.each(paramsSchemaPresenceCases)('descriptor for $scalar carries a paramsSchema', ({
       scalar,
     }) => {
-      // Class-form descriptors always carry `paramsSchema` (every codec
+      // Descriptors always carry `paramsSchema` (every codec
       // has one, be it `voidParamsSchema` for non-parameterized codecs
       // or a codec-specific schema). The parameterization split
       // remains observable through the descriptor's typed paramsSchema

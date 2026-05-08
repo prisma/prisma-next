@@ -1,5 +1,5 @@
 /**
- * Type tests for the class-based Postgres target codecs (TML-2357).
+ * Type tests for the Postgres target codecs (TML-2357).
  *
  * Mirrors `packages/2-sql/4-lanes/relational-core/test/ast/sql-codecs-class.types.test-d.ts`.
  *
@@ -42,7 +42,7 @@ import {
   pgNumericDescriptor,
   pgTimestamptzColumn,
   pgTimestamptzDescriptor,
-} from '../src/core/codecs-class';
+} from '../src/core/codecs';
 
 // ---------------------------------------------------------------------------
 // Literal preservation through direct invocation.

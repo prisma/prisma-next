@@ -38,7 +38,7 @@ import {
   pgTimestamptzDescriptor,
   pgTimetzDescriptor,
   pgVarbitDescriptor,
-} from '../src/core/codecs-class';
+} from '../src/core/codecs';
 
 const instanceCtx = { name: '<test>' };
 const callCtx = {};
