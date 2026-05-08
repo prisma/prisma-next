@@ -686,6 +686,13 @@ export interface ControlClient {
   readMarker(): Promise<ContractMarkerRecord | null>;
 
   /**
+   * Reads every marker row (one per contract space). Used by the
+   * per-space verifier to detect orphan marker rows and marker-vs-pinned
+   * drift after a database connection has been established.
+   */
+  readAllMarkers(): Promise<ReadonlyMap<string, ContractMarkerRecord>>;
+
+  /**
    * Applies pre-planned on-disk migrations to the database.
    * Each migration runs in its own transaction with full execution checks.
    * Resume-safe: re-running after failure picks up from the last applied migration.

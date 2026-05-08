@@ -405,6 +405,11 @@ class ControlClientImpl implements ControlClient {
     return familyInstance.readMarker({ driver });
   }
 
+  async readAllMarkers(): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
+    const { driver, familyInstance } = await this.ensureConnected();
+    return familyInstance.readAllMarkers({ driver });
+  }
+
   async migrationApply(options: MigrationApplyOptions): Promise<MigrationApplyResult> {
     const { onProgress } = options;
     await this.connectWithProgress(options.connection, 'migrationApply', onProgress);

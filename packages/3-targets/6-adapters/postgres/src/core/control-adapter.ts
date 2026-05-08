@@ -124,6 +124,56 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   }
 
   /**
+   * Reads every row from `prisma_contract.marker` and returns them keyed
+   * by `space`. Mirrors the existence probe in {@link readMarker}: a
+   * fresh database without the `prisma_contract` schema returns an empty
+   * map rather than raising "relation does not exist".
+   */
+  async readAllMarkers(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+  ): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
+    const exists = await driver.query(
+      `select 1
+       from information_schema.tables
+       where table_schema = $1 and table_name = $2`,
+      ['prisma_contract', 'marker'],
+    );
+    if (exists.rows.length === 0) {
+      return new Map();
+    }
+
+    const result = await driver.query<{
+      space: string;
+      core_hash: string;
+      profile_hash: string;
+      contract_json: unknown | null;
+      canonical_version: number | null;
+      updated_at: Date | string;
+      app_tag: string | null;
+      meta: unknown | null;
+      invariants: readonly string[];
+    }>(
+      `select
+         space,
+         core_hash,
+         profile_hash,
+         contract_json,
+         canonical_version,
+         updated_at,
+         app_tag,
+         meta,
+         invariants
+       from prisma_contract.marker`,
+    );
+
+    const rows = new Map<string, ContractMarkerRecord>();
+    for (const row of result.rows) {
+      rows.set(row.space, parseContractMarkerRow(row));
+    }
+    return rows;
+  }
+
+  /**
    * Introspects a Postgres database schema and returns a raw SqlSchemaIR.
    *
    * This is a pure schema discovery operation that queries the Postgres catalog

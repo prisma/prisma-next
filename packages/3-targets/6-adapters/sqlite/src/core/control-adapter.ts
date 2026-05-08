@@ -134,6 +134,57 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
     return parseContractMarkerRow({ ...row, invariants });
   }
 
+  /**
+   * Reads every row from `_prisma_marker` and returns them keyed by
+   * `space`. Mirrors the existence probe in {@link readMarker}: a
+   * fresh database without the marker table returns an empty map.
+   */
+  async readAllMarkers(
+    driver: ControlDriverInstance<'sql', 'sqlite'>,
+  ): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
+    const exists = await driver.query(
+      `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`,
+      ['_prisma_marker'],
+    );
+    if (exists.rows.length === 0) {
+      return new Map();
+    }
+
+    const result = await driver.query<{
+      space: string;
+      core_hash: string;
+      profile_hash: string;
+      contract_json: unknown | null;
+      canonical_version: number | null;
+      updated_at: Date | string;
+      app_tag: string | null;
+      meta: unknown | null;
+      invariants: unknown;
+    }>(
+      `SELECT
+         space,
+         core_hash,
+         profile_hash,
+         contract_json,
+         canonical_version,
+         updated_at,
+         app_tag,
+         meta,
+         invariants
+       FROM _prisma_marker`,
+    );
+
+    const rows = new Map<string, ContractMarkerRecord>();
+    for (const row of result.rows) {
+      const invariants =
+        typeof row.invariants === 'string'
+          ? (JSON.parse(row.invariants) as unknown)
+          : row.invariants;
+      rows.set(row.space, parseContractMarkerRow({ ...row, invariants }));
+    }
+    return rows;
+  }
+
   async introspect(
     driver: ControlDriverInstance<'sql', 'sqlite'>,
     _contract?: unknown,

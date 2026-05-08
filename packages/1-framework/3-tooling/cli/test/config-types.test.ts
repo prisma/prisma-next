@@ -70,6 +70,7 @@ describe('defineConfig', () => {
           timings: { total: 0 },
         }),
         readMarker: async () => null,
+        readAllMarkers: async () => new Map(),
         introspect: async () => ({ tables: {}, extensionPacks: [] }),
       }),
     },
