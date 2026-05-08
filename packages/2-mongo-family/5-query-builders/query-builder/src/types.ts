@@ -1,5 +1,6 @@
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoAggAccumulator, MongoAggExpr } from '@prisma-next/mongo-query-ast/execution';
+import type { ModelArrayField } from './resolve-path';
 
 export interface DocField {
   readonly codecId: string;
@@ -42,15 +43,32 @@ export type ModelToDocShape<
   };
 };
 
+/**
+ * Resolve a `DocShape` to a concrete row object type by looking up each
+ * field's codec id in `CodecTypes`.
+ *
+ * The optional `TContract` parameter exists so the resolver can detect
+ * `ModelArrayField<ModelName>` — the marker variant produced by
+ * `lookup()` for "an array of foreign-model rows" — and resolve it to
+ * `ResolveRow<ModelToDocShape<TContract, ModelName>, CodecTypes,
+ * TContract>[]`. When the contract is not threaded through, the variant
+ * falls back to `unknown[]` (preserving the legacy resolver shape for
+ * call sites that do not need lookup-row resolution).
+ */
 export type ResolveRow<
   Shape extends DocShape,
   CodecTypes extends Record<string, { readonly output: unknown }>,
+  TContract extends MongoContract = MongoContract,
 > = {
-  -readonly [K in keyof Shape & string]: Shape[K]['codecId'] extends keyof CodecTypes
-    ? Shape[K]['nullable'] extends true
-      ? CodecTypes[Shape[K]['codecId']]['output'] | null
-      : CodecTypes[Shape[K]['codecId']]['output']
-    : unknown;
+  -readonly [K in keyof Shape & string]: Shape[K] extends ModelArrayField<infer ModelName>
+    ? ModelName extends keyof TContract['models'] & string
+      ? ResolveRow<ModelToDocShape<TContract, ModelName>, CodecTypes, TContract>[]
+      : unknown[]
+    : Shape[K]['codecId'] extends keyof CodecTypes
+      ? Shape[K]['nullable'] extends true
+        ? CodecTypes[Shape[K]['codecId']]['output'] | null
+        : CodecTypes[Shape[K]['codecId']]['output']
+      : unknown;
 };
 
 export interface TypedAggExpr<F extends DocField> {

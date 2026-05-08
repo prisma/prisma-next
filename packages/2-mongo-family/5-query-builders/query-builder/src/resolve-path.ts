@@ -24,6 +24,26 @@ export interface ObjectField<N extends NestedDocShape> extends DocField {
 }
 
 /**
+ * Marker `DocField` variant representing "an array of foreign-model rows"
+ * — the result of a `$lookup` whose foreign side was selected via the
+ * typed `col` accessor. `ModelName` is the literal foreign model name
+ * (e.g. `'User'`), preserved in the type so `ResolveRow` can resolve the
+ * field to `ResolveRow<ModelToDocShape<TC, ModelName>, …>[]` rather than
+ * the opaque `unknown[]` produced by the legacy `mongo/array@1` sentinel.
+ *
+ * Like `ObjectField`, the codec id is a purely type-level sentinel —
+ * there is no runtime codec entry for `'prisma/modelArray@1'`. The
+ * surrounding pipeline emits the standard `MongoLookupStage` whose
+ * runtime shape is unchanged; the marker exists solely to thread the
+ * foreign element type through the result-row resolver.
+ */
+export interface ModelArrayField<ModelName extends string> extends DocField {
+  readonly codecId: 'prisma/modelArray@1';
+  readonly nullable: false;
+  readonly model: ModelName;
+}
+
+/**
  * Document shape that carries nested value-object sub-shapes.
  *
  * Structurally identical to a flat `DocShape` (`Record<string, DocField>`),
