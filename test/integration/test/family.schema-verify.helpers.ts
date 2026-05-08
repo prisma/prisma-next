@@ -25,7 +25,7 @@ export { default as sqlFamily } from '@prisma-next/family-sql/pack';
 export { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 export { default as postgresPack } from '@prisma-next/target-postgres/pack';
 export { timeouts, withClient };
-export { legacyDatabaseDependencyExtension, pgvector } from './family.schema-verify.extensions';
+export { pgvector } from './family.schema-verify.extensions';
 
 /**
  * Sets up a shared dev database for schema verification tests.
