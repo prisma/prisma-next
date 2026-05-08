@@ -29,15 +29,21 @@ function emptyCodecRegistry(): CodecRegistry {
 /**
  * Creates a stub adapter for testing.
  * This helper DRYs up the common pattern of adapter creation in tests.
+ *
+ * The codec registry is captured once in the closure so repeated
+ * `profile.codecs()` calls return the same instance — codecs registered
+ * via one call are visible to later calls. Returning a fresh empty
+ * registry per call would make tests order-dependent.
  */
 export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> {
+  const codecRegistry = emptyCodecRegistry();
   return {
     profile: {
       id: 'stub-profile',
       target: 'postgres',
       capabilities: {},
       codecs() {
-        return emptyCodecRegistry();
+        return codecRegistry;
       },
       readMarkerStatement: () => ({ sql: '', params: [] }),
       parseMarkerRow: () => {
