@@ -23,8 +23,8 @@ export const testContractSpaceContract: Contract<SqlStorage> = {
     tables: {
       [TEST_BOX_TABLE]: {
         columns: {
-          x: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
-          y: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
+          x: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          y: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
         },
         uniques: [],
         indexes: [],

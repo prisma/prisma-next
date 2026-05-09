@@ -433,6 +433,7 @@ class ControlClientImpl implements ControlClient {
       frameworkComponents,
       mode: options.strict ? 'strict' : 'lenient',
       skipSchema: options.skipSchema,
+      skipMarker: options.skipMarker,
       ...ifDefined('onProgress', onProgress),
     });
   }

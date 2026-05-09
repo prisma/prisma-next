@@ -22,13 +22,12 @@ import type { ContractSpaceMember } from './types';
  *   (multi-member deployments where each member's tables look like
  *   extras to every other member's verify pass).
  *
- * **Duck-typing semantics** (preserved from the predecessor
- * `pruneSchemaByOtherSpaceContracts`): the helper operates on `unknown`
- * for the schema and falls through structurally if the shape doesn't
- * match. Every family today exposes `storage.tables: Record<string, ...>`
- * and the introspected schema mirrors the same shape; a future family
- * with a different storage shape gets the schema returned unchanged
- * rather than blowing up the aggregate planner.
+ * **Duck-typing semantics**: the helper operates on `unknown` for the
+ * schema and falls through structurally if the shape doesn't match.
+ * Every family today exposes `storage.tables: Record<string, ...>` and
+ * the introspected schema mirrors the same shape; a future family with
+ * a different storage shape gets the schema returned unchanged rather
+ * than blowing up the aggregate planner.
  */
 export function projectSchemaToSpace(
   schema: unknown,

@@ -253,6 +253,7 @@ export interface DbVerifyOptions {
   readonly migrationsDir: string;
   readonly strict: boolean;
   readonly skipSchema: boolean;
+  readonly skipMarker: boolean;
   readonly connection?: unknown;
   readonly onProgress?: OnControlProgress;
 }

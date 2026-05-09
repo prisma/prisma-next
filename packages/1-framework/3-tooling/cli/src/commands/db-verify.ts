@@ -378,6 +378,7 @@ async function executeDbVerifyCommand(
       migrationsDir,
       strict: options.strict ?? false,
       skipSchema: mode === 'marker-only',
+      skipMarker: false,
       onProgress,
     });
     if (!aggregateResult.ok) return notOk(aggregateResult.failure);
@@ -471,9 +472,7 @@ function combineSchemaResults(
   return {
     ok: okAll,
     ...(okAll ? {} : { code: appResult.code ?? 'PN-RUN-3010' }),
-    summary: okAll
-      ? 'Schema matches contract'
-      : `Schema verification found ${counts.fail} issue(s)`,
+    summary: appResult.summary,
     contract: appResult.contract,
     target: appResult.target,
     schema: {
@@ -519,6 +518,7 @@ async function executeDbSchemaOnlyVerifyCommand(
       migrationsDir,
       strict: options.strict ?? false,
       skipSchema: false,
+      skipMarker: true,
       onProgress,
     });
     if (!aggregateResult.ok) return notOk(aggregateResult.failure);

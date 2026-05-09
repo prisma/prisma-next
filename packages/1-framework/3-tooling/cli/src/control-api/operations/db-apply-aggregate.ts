@@ -41,9 +41,8 @@ import { stripOperations } from './migration-helpers';
 
 /**
  * Span IDs emitted via `onProgress` during the aggregate apply flow.
- * Mirrors the legacy {@link executePerSpaceDbApply} span identifiers
- * verbatim so the structured-output renderer (and tests asserting on
- * span ids) keep working unchanged.
+ * Stable identifiers consumed by the structured-output renderer and by
+ * tests asserting on span ids.
  */
 const SPAN_IDS = {
   introspect: 'introspect',
@@ -54,10 +53,9 @@ const SPAN_IDS = {
 /**
  * Inputs shared by `db init` and `db update` aggregate apply flows.
  *
- * Mirrors the legacy {@link executePerSpaceDbApply} option set but
- * accepts the already-validated app contract + descriptor list — the
+ * Accepts the already-validated app contract + descriptor list — the
  * loader gathers the rest from disk + descriptors. The CLI is the
- * descriptor-import boundary (sub-spec § Loader).
+ * descriptor-import boundary; everything downstream is descriptor-free.
  */
 export interface ExecuteAggregateApplyOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
@@ -81,7 +79,7 @@ export interface ExecuteAggregateApplyOptions<TFamilyId extends string, TTargetI
 /**
  * Loader → planner → runner pipeline shared by `db init` and `db update`.
  *
- * Replaces the legacy `executePerSpaceDbApply` orchestrator. The pipeline:
+ * The pipeline:
  *
  * 1. **Load**: build a {@link ContractSpaceAggregate} from the descriptor
  *    set + on-disk pinned artefacts. Any layout / drift / disjointness /

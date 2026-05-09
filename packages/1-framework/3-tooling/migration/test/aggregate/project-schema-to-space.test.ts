@@ -9,10 +9,7 @@ import type { ContractSpaceMember } from '../../src/aggregate/types';
  * project the introspected live schema down to the slice claimed by a
  * single contract-space member.
  *
- * Replaces the unit tests for the old `pruneSchemaByOtherSpaceContracts`
- * (formerly in `db-apply-per-space.test.ts`) — this is the new home for
- * that helper after the M2.5 aggregate refactor. The semantics are
- * preserved verbatim:
+ * Semantics:
  *
  * - `unknown` for schema; structural fall-through when shape doesn't match.
  * - Tables claimed by other members are stripped; everything else is

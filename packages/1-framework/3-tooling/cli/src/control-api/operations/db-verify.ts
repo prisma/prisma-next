@@ -48,6 +48,7 @@ export interface ExecuteDbVerifyOptions<TFamilyId extends string, TTargetId exte
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly mode: 'strict' | 'lenient';
   readonly skipSchema: boolean;
+  readonly skipMarker: boolean;
   readonly onProgress?: OnControlProgress;
 }
 
@@ -100,6 +101,7 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
     frameworkComponents,
     mode,
     skipSchema,
+    skipMarker,
     onProgress,
   } = options;
 
@@ -198,7 +200,9 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
   }
 
   const markerCheck = verifyResult.value.markerCheck;
-  const markerError = mapMarkerCheckFailures(aggregate.app.spaceId, markerCheck);
+  const markerError = skipMarker
+    ? null
+    : mapMarkerCheckFailures(aggregate.app.spaceId, markerCheck);
   if (markerError !== null) {
     onProgress?.({
       action: 'schemaVerify',
