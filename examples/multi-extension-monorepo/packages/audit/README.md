@@ -7,9 +7,7 @@ their `extensionPacks`.
 
 ## Authoring (maintainers)
 
-This package follows the on-disk-in-package authoring convention
-introduced in M3.5 (project: `extension-contract-spaces`,
-[ADR 211](../../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)).
+This package follows the on-disk-in-package authoring convention ([ADR 211](../../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)).
 See the [example monorepo's README](../../README.md#authoring-maintainers)
 for the full step-by-step workflow — the short version is:
 

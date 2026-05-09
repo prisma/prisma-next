@@ -1,6 +1,5 @@
 /**
- * Multi-extension monorepo end-to-end against PGlite — project:
- * extension-contract-spaces, M4 / T4.4 / TC-8 / spec AC4.
+ * Multi-extension monorepo end-to-end against PGlite.
  *
  * Drives the CLI per-space `db init` flow (`executePerSpaceDbApply`)
  * against a real Postgres (PGlite via `createDevDatabase`) with **two**
@@ -18,8 +17,7 @@
  *      `emitPinnedSpaceArtefacts` runs for both extension spaces, the
  *      user's repo carries `migrations/audit/{contract.json,
  *      contract.d.ts, refs/head.json}` and the same triple under
- *      `migrations/feature-flags/`. Closes spec AC4 / TC-8 at the
- *      on-disk shape level.
+ *      `migrations/feature-flags/`.
  *
  *   2. **Multi-space planning across three spaces.** Calling
  *      `executePerSpaceDbApply` with `mode: 'plan'` produces a plan
@@ -36,25 +34,23 @@
  *        - all three tables (`audit_event`, `feature_flag`, the app
  *          `User`-equivalent) exist in `public`;
  *        - the marker table has rows for `app`, `audit`, and
- *          `feature-flags` (project AC4 / AC5 / TC-8);
+ *          `feature-flags`;
  *        - each marker row carries the expected `core_hash` and the
  *          expected `applied_invariants`;
  *        - insert + select round-trip works against each table
  *          (proving the apply path actually ran the DDL, not just
  *          updated the marker).
  *
- *   4. **Order-independent across `extensionPacks` declaration order
- *      (NFR6).** Re-running the apply path with the extensions
- *      declared in reverse order produces the same marker hashes —
- *      cross-space ordering is determined by space id, not by
- *      declaration order.
+ *   4. **Order-independent across `extensionPacks` declaration order.**
+ *      Re-running the apply path with the extensions declared in
+ *      reverse order produces the same marker hashes — cross-space
+ *      ordering is determined by space id, not by declaration order.
  *
  * The fixtures (`audit*`, `featureFlags*`) are pulled from each
- * package's descriptor `contractSpace` rather than from
- * (now-deleted) per-package `contract.ts` / `migrations.ts` modules —
- * after M3.5 R3 each internal package authors via the on-disk
- * `prisma-next contract emit` / `prisma-next migration plan` pipeline,
- * and the descriptor is the canonical reader of those artefacts.
+ * package's descriptor `contractSpace`. Each internal package authors
+ * via the on-disk `prisma-next contract emit` / `prisma-next migration
+ * plan` pipeline, and the descriptor is the canonical reader of those
+ * artefacts.
  */
 
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -175,7 +171,7 @@ async function setupTestProject(): Promise<TestProject> {
 }
 
 describe.sequential(
-  'multi-extension-monorepo end-to-end (PGlite, T4.4)',
+  'multi-extension-monorepo end-to-end (PGlite)',
   { timeout: timeouts.spinUpPpgDev },
   () => {
     let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -208,7 +204,7 @@ describe.sequential(
       }
     });
 
-    it('pinned per-space artefacts land for both extension spaces (TC-8)', async () => {
+    it('pinned per-space artefacts land for both extension spaces', async () => {
       project = await setupTestProject();
 
       const auditHeadJson = JSON.parse(
@@ -286,7 +282,7 @@ describe.sequential(
       expect(appIdx).toBeGreaterThan(featureFlagsIdx);
     });
 
-    it('mode=apply: three spaces apply atomically; markers + round-trips OK (TC-8 / AC5)', async () => {
+    it('mode=apply: three spaces apply atomically; markers + round-trips OK', async () => {
       project = await setupTestProject();
 
       const result = await executePerSpaceDbApply({
@@ -376,7 +372,7 @@ describe.sequential(
       expect(appRows.rows[0]?.email).toBe('alice@example.com');
     });
 
-    it('marker hashes are independent of `extensionPacks` declaration order (NFR6)', async () => {
+    it('marker hashes are independent of `extensionPacks` declaration order', async () => {
       project = await setupTestProject();
 
       const result = await executePerSpaceDbApply({

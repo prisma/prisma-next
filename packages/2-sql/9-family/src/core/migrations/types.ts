@@ -367,11 +367,8 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
   /**
    * Logical contract space this plan applies to. Defaults to
    * `'app'` so existing single-space callers keep working without
-   * modification. Multi-space callers (the per-space runner wiring
-   * landed in M2 R4) supply each space's id explicitly so the marker
+   * modification. Multi-space callers supply each space's id explicitly so the marker
    * write goes against the right row.
-   *
-   * @see specs/framework-mechanism.spec.md § 6 — Per-space runner.
    */
   readonly space?: string;
   /**
@@ -438,14 +435,12 @@ export interface SqlMigrationRunner<TTargetDetails> {
    * Apply a single migration plan against an already-open connection
    * **without** opening a transaction. The caller is responsible for
    * wrapping the call (and any siblings) in `BEGIN` / `COMMIT` /
-   * `ROLLBACK`. Used by the per-space runner wiring (sub-spec § 6) to
+   * `ROLLBACK`. Used by the per-space runner wiring to
    * fan out across contract spaces inside one outer transaction so a
-   * mid-apply failure rolls back every space's writes (AM4-rollback).
+   * mid-apply failure rolls back every space's writes.
    *
    * Idempotent control-table setup (`prisma_contract.*`) and marker
    * writes use `options.space` to address the per-space marker row.
-   *
-   * @see specs/framework-mechanism.spec.md § "R4 design choice".
    */
   executeOnConnection(
     options: SqlMigrationRunnerExecuteOptions<TTargetDetails>,
@@ -458,13 +453,11 @@ export interface SqlMigrationRunner<TTargetDetails> {
    * the runner is responsible for opening / committing the outer
    * transaction (and any target-specific connection-level setup such
    * as the SQLite FK pragma toggle). A failure on any space rolls
-   * back every space's writes — the AM4-rollback guarantee.
+   * back every space's writes — the all-or-nothing rollback guarantee.
    *
    * Each space's `SqlMigrationRunnerExecuteOptions` must reference the
    * same `driver` (the connection the outer transaction is open on).
    * Per-space marker writes use `options.space` to address the row.
-   *
-   * @see specs/framework-mechanism.spec.md § 4 — Runner; § "R4 design choice".
    */
   executeAcrossSpaces(options: {
     readonly driver: ControlDriverInstance<'sql', string>;

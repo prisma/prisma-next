@@ -13,13 +13,11 @@ import { APP_SPACE_ID } from './space-layout';
  *   space — `<projectRoot>/migrations` for `'app'` and
  *   `<projectRoot>/migrations/<space-id>` for an extension space.
  * - `currentMarkerHash` and `currentMarkerInvariants` are the values
- *   read from the `prisma_contract.marker` row keyed by `space = <space-id>`
- *   (T1.1). `null` hash = no marker row yet.
+ *   read from the `prisma_contract.marker` row keyed by `space = <space-id>`.
+ *   `null` hash = no marker row yet.
  * - `path` is the per-space operation list resolved from
  *   `findPathWithDecision(currentMarker, ref.hash, effectiveRequired)`
  *   per ADR 208, materialised against the on-disk migration packages.
- *
- * @see specs/framework-mechanism.spec.md § 4 — Runner.
  */
 export interface SpaceApplyInput<TOp> {
   readonly spaceId: string;
@@ -33,7 +31,7 @@ export interface SpaceApplyInput<TOp> {
  * Order a set of per-space apply inputs into the canonical cross-space
  * sequence the runner applies under a single transaction.
  *
- * Cross-space ordering convention (sub-spec § 4):
+ * Cross-space ordering convention:
  *
  * 1. **Extension spaces first**, alphabetically by `spaceId`.
  * 2. **App space last** — only one `'app'` entry expected, at most.
@@ -43,7 +41,7 @@ export interface SpaceApplyInput<TOp> {
  * them. Putting app-space last lets app-space ops freely depend on any
  * extension-space declaration in the same transaction.
  *
- * Determinism (NFR6): the output order is independent of the input
+ * Determinism: the output order is independent of the input
  * order, so two callers with the same set of `extensionPacks` produce
  * identical apply sequences.
  *
@@ -57,7 +55,7 @@ export interface SpaceApplyInput<TOp> {
  * before invoking this helper. The actual DB application — driving the
  * transaction, committing marker writes, recording the per-space marker
  * rows — happens at the SQL-family consumption site (per the
- * helper-location convention from R3).
+ * helper-location convention).
  */
 export function concatenateSpaceApplyInputs<TOp>(
   inputs: readonly SpaceApplyInput<TOp>[],

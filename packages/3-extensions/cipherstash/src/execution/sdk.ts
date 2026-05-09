@@ -11,20 +11,20 @@
  *   - `decrypt`     — single-cell read used by `EncryptedString#decrypt()`
  *                     when the user opts out of bulk decryption.
  *   - `bulkEncrypt` — write-side coalesced encrypt; the bulk-encrypt
- *                     middleware (M2 R2) calls this from `beforeExecute`.
- *   - `bulkDecrypt` — read-side coalesced decrypt; `decryptAll` (M3)
- *                     calls this from a recursive walker.
+ *                     middleware calls this from `beforeExecute`.
+ *   - `bulkDecrypt` — read-side coalesced decrypt; `decryptAll` calls
+ *                     this from a recursive walker.
  *
  * Each method accepts an optional `AbortSignal`. Cancellation is forwarded
- * directly to the SDK per the umbrella spec's cancellation contract (the
- * per-execute `MiddlewareContext.signal` from M1's middleware-param-
- * transform seam, or the caller-supplied signal on `decrypt({signal})`).
+ * directly to the SDK (the per-execute `MiddlewareContext.signal` from
+ * the middleware-param-transform seam, or the caller-supplied signal on
+ * `decrypt({signal})`).
  */
 
 /**
  * Routing-key tuple used by `bulkEncrypt`/`bulkDecrypt` to group requests
  * so each ZeroKMS round-trip handles one homogeneous batch. Routing key
- * is `(table, column)` per `plan.md § Open items 5` (resolved 2026-05-06).
+ * is `(table, column)`.
  */
 export interface CipherstashRoutingKey {
   readonly table: string;

@@ -20,7 +20,7 @@ export interface MongoMiddlewareContext extends RuntimeMiddlewareContext {}
  * construction time via `checkMiddlewareCompatibility`.
  *
  * `beforeExecute` accepts an additive third {@link MongoParamRefMutator}
- * argument matching the SQL family's seam (AC-FAM1). Existing 2-arg
+ * argument matching the SQL family's seam. Existing 2-arg
  * middleware bodies remain valid — TypeScript permits assigning a
  * function with fewer parameters to a function-typed slot that declares
  * more.

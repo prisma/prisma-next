@@ -93,10 +93,8 @@ export async function writeMigrationPackage(
  * The function fails (via `writeMigrationPackage`'s underlying check)
  * if the target directory already exists, mirroring the strictness of
  * the app-space emit path. Callers wanting "create-or-overwrite"
- * semantics handle that at a higher level (e.g. T1.8's pinned-artefact
+ * semantics handle that at a higher level (e.g. pinned-artefact
  * emission, which lives outside the per-package writer).
- *
- * @see specs/framework-mechanism.spec.md § 3 — Emission helper (T1.7).
  */
 export async function writeExtensionMigrationPackage(
   targetDir: string,
@@ -114,8 +112,7 @@ export async function writeExtensionMigrationPackage(
  * package only if `<targetDir>/<pkg.dirName>/` does not already exist on
  * disk; returns `{ written: false }` when the package directory is
  * present (no rewrite, no comparison — by-existence skip is the
- * canonical AC-7 / AM12 semantic per `framework-mechanism.spec.md`
- * § "Materialisation idempotency").
+ * canonical materialisation idempotency semantic).
  *
  * Concretely:
  *   - existing dir → skip silently, return `{ written: false }`.
@@ -129,9 +126,6 @@ export async function writeExtensionMigrationPackage(
  * `migrations/<spaceId>/` directory, and by extension-package tests
  * that mirror the same idempotent-rematerialise property locally
  * without taking a CLI dependency.
- *
- * @see specs/framework-mechanism.spec.md § 3 — Emission helper (T1.7),
- *   AC-7 idempotency clause.
  */
 export async function materialiseExtensionMigrationPackageIfMissing(
   targetDir: string,

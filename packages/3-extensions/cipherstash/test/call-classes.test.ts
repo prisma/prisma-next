@@ -1,5 +1,5 @@
 /**
- * Cipherstash migration IR call classes — T1.4.
+ * Cipherstash migration IR call classes.
  *
  * Each `*Call` is a renderable node implementing the framework
  * `OpFactoryCall` interface. The class carries the literal arguments its
@@ -7,10 +7,7 @@
  * constructor, and exposes:
  *
  *   - `toOp()` — produces the runtime op shape that the codec hook used
- *     to build via `buildAddOp` / `buildRemoveOp`. Byte-equality with the
- *     pre-CR-1 op shape is the round-trip invariant
- *     (`examples/cipherstash-integration/.../ops.json` is captured
- *     pre-change and must remain identical).
+ *     to build via `buildAddOp` / `buildRemoveOp`.
  *   - `renderTypeScript()` — emits a `cipherstashAddSearchConfig({...})`
  *     / `cipherstashRemoveSearchConfig({...})` factory call so the
  *     generated `migration.ts` reads as a normal authored migration.

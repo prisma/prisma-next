@@ -117,9 +117,9 @@ async function executeDbInitCommand(
   const { client, config, contractJson, dbConnection, onProgress, contractPathAbsolute } =
     ctxResult.value;
 
-  // Per-space layout precheck (sub-spec § 4): catches the
-  // `declaredButUnmigrated` / `orphanPinnedDir` cases at the CLI surface
-  // before any database connection.
+  // Per-space layout precheck: catches the `declaredButUnmigrated` /
+  // `orphanPinnedDir` cases at the CLI surface before any database
+  // connection.
   const { migrationsDir } = resolveMigrationPaths(options.config, config);
   const precheckResult = await runContractSpaceVerifierPrecheck({
     migrationsDir,
@@ -131,10 +131,9 @@ async function executeDbInitCommand(
   }
 
   try {
-    // Marker-aware verifier (sub-spec § 4): connect explicitly so we
-    // can read marker rows before any apply work runs. Locks AC-13 +
-    // AM11 at the `db init` integration surface — `orphanMarker`,
-    // marker-vs-pinned `hashMismatch`, and `invariantsMismatch` — that
+    // Marker-aware verifier: connect explicitly so we can read marker
+    // rows before any apply work runs. Catches `orphanMarker`,
+    // marker-vs-pinned `hashMismatch`, and `invariantsMismatch` — cases
     // the layout-only precheck cannot detect on its own. Mirrors the
     // wiring already in place in `db verify`.
     await client.connect(dbConnection);

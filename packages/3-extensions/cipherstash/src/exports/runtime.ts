@@ -10,8 +10,8 @@
  * (descriptor, codec lifecycle hook, contract-space artefacts) so apps
  * that only emit migrations against cipherstash never load the runtime,
  * and apps that only run queries never load the migration-time
- * descriptor (project AC-UMB9 — tree-shakable control vs runtime
- * planes).
+ * descriptor — the control plane and runtime plane are tree-shakable
+ * along this seam.
  *
  * `createCipherstashRuntimeDescriptor({ sdk })` is the recommended
  * composition entry — it bundles the SDK-bound codec, the parameterized

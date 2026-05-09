@@ -10,8 +10,7 @@ import {
 } from './fixtures/runner-fixtures';
 
 /**
- * Validates the T1.1 SQLite marker schema migration (sub-spec
- * `framework-mechanism.spec.md § 2`):
+ * Validates the SQLite marker schema migration:
  *
  * - Fresh database (`_prisma_marker` already in the new shape) -> no-op,
  *   table shape preserved, existing rows preserved.
@@ -25,7 +24,7 @@ import {
  * rebuild dance internally; these tests check the dance terminates in
  * the documented end state.
  */
-describe('marker schema migration (T1.1) - sqlite', () => {
+describe('marker schema migration — sqlite', () => {
   let testDb: TestDatabase | undefined;
 
   afterEach(() => {

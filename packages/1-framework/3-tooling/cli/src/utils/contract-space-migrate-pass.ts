@@ -14,8 +14,6 @@ import {
  * a structurally-typed `headRef`. SQL-family callers pass the same
  * `Contract<SqlStorage>` value through unchanged — `emitPinnedSpaceArtefacts`
  * already serialises through `canonicalizeJson` and is framework-neutral.
- *
- * @see specs/framework-mechanism.spec.md § 3 — Per-space helper location.
  */
 export interface MigrateExtensionInput {
   readonly id: string;
@@ -45,8 +43,6 @@ export interface ContractSpaceMigratePassResult {
  * Run drift detection + pinned-artefact emission for every loaded
  * extension space at `migrate` time.
  *
- * Per sub-spec § 3:
- *
  * - For each declared extension that exposes a `contractSpace`:
  *   - Read the pinned head hash from `migrations/<spaceId>/refs/head.json`
  *     (returns `null` on first emit).
@@ -61,15 +57,6 @@ export interface ContractSpaceMigratePassResult {
  * Drift warnings are returned to the caller for formatting (TerminalUI,
  * structured-output envelope, etc.) — the helper does not print directly,
  * keeping it framework-neutral and unit-testable.
- *
- * Extension migration packages (the descriptor's pre-canned `migrations`
- * array → `migrations/<spaceId>/<dirName>/`) are intentionally not
- * materialised here — that interaction will be wired in a follow-on round
- * once the runner-side single-tx slice (sub-spec § 6) is in place. Pinned
- * artefacts on disk are sufficient to lock the drift-warning behaviour
- * and the always-on re-pin AC for R2.
- *
- * @see specs/framework-mechanism.spec.md § 3 — Drift detection (T1.9).
  */
 export async function runContractSpaceMigratePass(
   inputs: ContractSpaceMigratePassInputs,
@@ -104,8 +91,8 @@ export async function runContractSpaceMigratePass(
  * funnel this through their preferred output channel (TerminalUI line,
  * structured-output envelope `warnings[]`, etc.).
  *
- * Locks AM7 — drift warning surfaces the extension name and the diff
- * direction (descriptor → pinned).
+ * The drift warning surfaces the extension name and the diff direction
+ * (descriptor → pinned).
  */
 export function formatContractSpaceDriftWarning(drift: SpaceContractDriftResult): string {
   if (drift.kind !== 'drift') {

@@ -33,8 +33,8 @@ function makeAdapter(impl: (sql: string, params: readonly unknown[]) => void = (
   return { lower } as unknown as SqlControlAdapter<'postgres'>;
 }
 
-describe('planFromAst integrated with dataTransform (AC-PLAN3)', () => {
-  it("AC-PLAN3: a plan returned by planFromAst satisfies dataTransform's assertContractMatches", () => {
+describe('planFromAst integrated with dataTransform', () => {
+  it("a plan returned by planFromAst satisfies dataTransform's assertContractMatches", () => {
     const ast = RawSqlExpr.of(
       ['SELECT eql_v2.add_search_config(', ', ', ')'],
       [

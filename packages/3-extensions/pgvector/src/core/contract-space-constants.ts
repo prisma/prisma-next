@@ -7,11 +7,9 @@
  *
  * The space identifier `'pgvector'` is what the framework writes to
  * `migrations/pgvector/` in the user's repo and what the marker table's
- * `space` column carries for pgvector-owned rows (project spec FR3,
- * sub-spec § 1).
+ * `space` column carries for pgvector-owned rows.
  *
- * The `pgvector:*` invariantId namespace is locked here per project
- * spec FR11 — once published, an invariantId is immutable.
+ * The `pgvector:*` invariantId namespace is locked here — once published, an invariantId is immutable.
  */
 
 export const PGVECTOR_SPACE_ID = 'pgvector' as const;
@@ -22,7 +20,7 @@ export const PGVECTOR_BASELINE_MIGRATION_NAME = '20260601T0000_install_vector_ex
 
 /**
  * `pgvector:*` invariantIds emitted by the baseline migration. Each id,
- * once published, is immutable (project spec FR11): downstream
+ * once published, is immutable: downstream
  * consumers (other extensions, the marker table) reference them by
  * literal string match.
  */

@@ -1,7 +1,6 @@
 /**
- * `createCipherstashRuntimeDescriptor({ sdk })` — F5 / AC-CODEC5
- * (PASS-without-caveat) and the consumer-facing wrapper that
- * unblocks AC-UMB9's byte-level bundling assertion.
+ * `createCipherstashRuntimeDescriptor({ sdk })` — the consumer-facing
+ * wrapper that the byte-level bundling-isolation test depends on.
  *
  * The wrapper composes the SDK-bound codec runtime + the
  * parameterized-codec descriptor list + the codec-instances metadata

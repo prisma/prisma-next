@@ -87,7 +87,7 @@ async function executeDbUpdateCommand(
     ctxResult.value;
   const { migrationsDir } = resolveMigrationPaths(options.config, config);
 
-  // Per-space layout precheck (sub-spec § 4): catches the
+  // Per-space layout precheck: catches the
   // `declaredButUnmigrated` / `orphanPinnedDir` cases at the CLI surface
   // before any database connection. Mirrors the wiring in `db init` /
   // `db verify` so a single-command invocation cannot bypass the
@@ -102,11 +102,10 @@ async function executeDbUpdateCommand(
   }
 
   try {
-    // Marker-aware verifier (sub-spec § 4): connect explicitly so we
-    // can read marker rows before any apply work runs. Locks AC-13 +
-    // AM11 at the `db update` integration surface — pre-amendment
-    // `db update` ran neither verifier, so orphan markers and
-    // marker-vs-pinned drift slipped through entirely.
+    // Marker-aware verifier: connect explicitly so we can read marker
+    // rows before any apply work runs. Earlier `db update` ran neither
+    // verifier, so orphan markers and marker-vs-pinned drift slipped
+    // through entirely.
     await client.connect(dbConnection);
 
     const markerRowsBySpace = await client.readAllMarkers();

@@ -38,11 +38,11 @@
  * The handle has two flavours:
  *   - **Write side** — `EncryptedString.from(plaintext)` populates the
  *     `plaintext` slot and leaves `ciphertext` empty. The bulk-encrypt
- *     middleware (M2 R2) populates `ciphertext`. Per `plan.md § Open
- *     items 6` (resolved 2026-05-06), the middleware does **not** zero
- *     the plaintext slot post-encrypt; as a side effect a write-side
- *     envelope's `decrypt()` returns the original plaintext synchronously
- *     without an SDK round-trip.
+ *     middleware populates `ciphertext` post-SDK and intentionally
+ *     leaves the plaintext slot in place (zeroing JS strings is
+ *     best-effort and GC-driven lifecycle is sufficient here). As a
+ *     side effect a write-side envelope's `decrypt()` returns the
+ *     original plaintext synchronously without an SDK round-trip.
  *   - **Read side** — `EncryptedString.fromInternal({...})` (called from
  *     the codec `decode` body) populates `ciphertext`, `(table, column)`
  *     from `SqlCodecCallContext.column`, and an `sdk` reference so
@@ -86,8 +86,8 @@ export class EncryptedString {
 
   /**
    * Construct a write-side envelope from plaintext. Bulk-encrypt
-   * middleware (M2 R2) populates the handle's ciphertext slot before the
-   * codec encodes the envelope to wire format.
+   * middleware populates the handle's ciphertext slot before the codec
+   * encodes the envelope to wire format.
    */
   static from(plaintext: string): EncryptedString {
     return new EncryptedString({
@@ -143,9 +143,9 @@ export class EncryptedString {
    *   per the umbrella cancellation contract; the SDK promise is also
    *   raced against the signal so an abort surfaces a `RUNTIME.ABORTED
    *   { phase: 'decrypt' }` envelope promptly even if the SDK body
-   *   ignores the signal (M3 R3 T3.8 / AC-UMB5). The cached-plaintext
-   *   fast path returns synchronously without consulting the signal —
-   *   no IO, no abort observation point.
+   *   ignores the signal. The cached-plaintext fast path returns
+   *   synchronously without consulting the signal — no IO, no abort
+   *   observation point.
    */
   async decrypt(opts?: { signal?: AbortSignal }): Promise<string> {
     if (this.#handle.plaintext !== undefined) {
@@ -199,12 +199,11 @@ export class EncryptedString {
 
 /**
  * Populate the handle's ciphertext slot. Called by the bulk-encrypt
- * middleware after the SDK returns the encrypted batch (M2 R2).
+ * middleware after the SDK returns the encrypted batch.
  *
- * Per `plan.md § Open items 6` (resolved 2026-05-06), the plaintext slot
- * is intentionally retained — zeroing in JS is best-effort (strings are
- * immutable) and the GC-driven lifecycle is sufficient for Project 1's
- * bounded scope.
+ * The plaintext slot is intentionally retained — zeroing in JS is
+ * best-effort (strings are immutable) and the GC-driven lifecycle is
+ * sufficient.
  */
 export function setHandleCiphertext(envelope: EncryptedString, ciphertext: unknown): void {
   envelope.expose().ciphertext = ciphertext;

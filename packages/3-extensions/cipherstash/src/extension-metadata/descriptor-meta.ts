@@ -5,9 +5,9 @@
  * the metadata block that gets serialized into `contract.json`'s
  * `extensionPacks.cipherstash` slot at emit time.
  *
- * SDK-free: the runtime descriptor (forthcoming in M2 R3 alongside the
- * bulk-encrypt middleware) layers SDK-bound codec instances on top at
- * execution time. The `codecInstances` slot here uses the metadata-only
+ * SDK-free: the runtime descriptor layers SDK-bound codec instances on
+ * top at execution time. The `codecInstances` slot here uses the
+ * metadata-only
  * codec from `./codec-metadata` because pack-meta consumers only read
  * codec metadata (typeId, targetTypes, traits, renderOutputType);
  * runtime encode/decode always go through the SDK-bound codec produced
@@ -18,7 +18,7 @@
  * meta so the framework's contract emitter sees `authoring`,
  * `types.codecTypes.codecInstances`, and `types.storage` alongside
  * the contract-space and codec-lifecycle-hooks blocks already wired
- * by TML-2397.
+ * by the codec lifecycle hook block.
  */
 
 import { cipherstashAuthoringTypes } from '../contract/authoring';

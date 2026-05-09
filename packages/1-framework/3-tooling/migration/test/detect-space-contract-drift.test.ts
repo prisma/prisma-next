@@ -71,8 +71,8 @@ describe('detectSpaceContractDrift', () => {
   });
 
   it("does not validate the spaceId pattern (caller's responsibility)", () => {
-    // Pure function that only inspects the hashes; AM7's "warning names
-    // the extension" comes from the result.spaceId being threaded
+    // Pure function that only inspects the hashes; the warning text that
+    // names the extension comes from the result.spaceId being threaded
     // through verbatim for the caller to format.
     const result = detectSpaceContractDrift('Whatever You Like', {
       descriptorHash: HASH_A,

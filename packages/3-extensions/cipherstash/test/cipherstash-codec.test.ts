@@ -1,7 +1,7 @@
 /**
- * Codec lifecycle hook tests for `cipherstash:string@1` — T2.9.
+ * Codec lifecycle hook tests for `cipherstash:string@1`.
  *
- * Per the umbrella spec each enabled flag in the column's `typeParams`
+ * Each enabled flag in the column's `typeParams`
  * maps to its own EQL search-config index:
  *
  *   - `equality: true`        → `'unique'` index

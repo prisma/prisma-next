@@ -8,9 +8,8 @@
  * descriptor at `src/exports/control.ts` then JSON-imports those
  * artefacts.
  *
- * This is the M3.5 R1 reference model — see ADR 211 (Contract spaces)
- * for the full authoring convention; cipherstash / pgvector adopt the
- * same shape in R2 / R3.
+ * This package is the reference model for that convention — see ADR 211 (Contract spaces)
+ * for the full authoring story; cipherstash and pgvector adopt the same shape with their own migrations.
  */
 
 import postgresAdapter from '@prisma-next/adapter-postgres/control';

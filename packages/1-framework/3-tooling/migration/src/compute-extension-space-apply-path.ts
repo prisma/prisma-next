@@ -52,9 +52,6 @@ export type ExtensionSpaceApplyPathOutcome =
  *   marker row keyed by `space = <spaceId>`. `null` hash = no marker yet
  *   (the pathfinder treats this as the empty-contract sentinel per ADR
  *   208).
- *
- * @see specs/framework-mechanism.spec.md § 6 — `db init` / `db update`
- *   per-space.
  */
 export interface ComputeExtensionSpaceApplyPathInputs {
   readonly projectMigrationsDir: string;
@@ -72,8 +69,7 @@ export interface ComputeExtensionSpaceApplyPathInputs {
  * Reads only on-disk artefacts (`migrations/<spaceId>/refs/head.json`
  * and the per-space migration packages). **Does not import any
  * extension descriptor module** — `db init` / `db update` must remain
- * runnable without the descriptor source on disk (project spec
- * non-goal § "no descriptor at apply time", AM11).
+ * runnable without the descriptor source on disk (no descriptor at apply time).
  *
  * Behaviour:
  * - Returns `{ kind: 'ok', pathOps: [], … }` when the marker is already

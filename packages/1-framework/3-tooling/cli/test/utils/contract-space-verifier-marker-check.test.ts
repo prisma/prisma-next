@@ -58,7 +58,7 @@ describe('runContractSpaceVerifierMarkerCheck', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('reports orphanMarker when a marker exists for a space not in extensionPacks (locks AC-13)', async () => {
+  it('reports orphanMarker when a marker exists for a space not in extensionPacks', async () => {
     const result = await runContractSpaceVerifierMarkerCheck({
       migrationsDir,
       extensionPacks: [],
@@ -75,7 +75,7 @@ describe('runContractSpaceVerifierMarkerCheck', () => {
     }
   });
 
-  it('reports hashMismatch when marker hash diverges from pinned hash (locks AM11 marker-half)', async () => {
+  it('reports hashMismatch when marker hash diverges from pinned hash (marker half)', async () => {
     await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { v: 1 },
       contractDts: '\n',

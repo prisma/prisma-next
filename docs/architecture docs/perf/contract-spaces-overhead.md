@@ -1,9 +1,9 @@
-# Contract-spaces overhead — NFR5 measurement
+# Contract-spaces overhead
 
-NFR5 (TML-2397, [project spec § Non-functional](../adrs/ADR%20211%20-%20Contract%20spaces.md))
-budgets the contract-space mechanism at **< 5 %** of `emit + dbInit` for an
-app-only project versus the same project with **one** extension contract space
-loaded. This note captures the measurement we ran to validate that bound.
+The contract-space mechanism (TML-2397, [ADR 211](../adrs/ADR%20211%20-%20Contract%20spaces.md))
+should add no more than a few percent to `emit + dbInit` for an app-only
+project versus the same project with **one** extension contract space loaded.
+This note captures the measurement we ran to validate that bound.
 
 ## TL;DR
 
@@ -22,7 +22,7 @@ A one-shot benchmark, not a CI gate. The script lives at
 why we did not invest in a permanent bench harness).
 
 **What we measure.** The benchmark exercises the three pure / IO-bound helpers
-the per-space mechanism added in M1:
+the per-space mechanism adds:
 
 - `gatherDiskContractSpaceState` — `readdir` of the project's `migrations/`
   directory plus one `readPinnedHeadRef` (`readFile`) per declared extension
@@ -76,9 +76,9 @@ The per-extension-space overhead is dominated by the extra `readFile` of
 ## Reading the percentages honestly
 
 The benchmark reports a relative delta of "≈ +200 %" between scenarios.
-**Do not interpret that as a NFR5 budget violation.** The denominator is
+**Do not interpret that as a budget violation.** The denominator is
 sub-millisecond synthetic work (one `readdir`); doubling something tiny is
-still tiny. NFR5's "< 5 %" was written against the total wall-clock of
+still tiny. The "< 5 %" target was written against the total wall-clock of
 `emit + dbInit` end-to-end, which in practice runs in hundreds of milliseconds
 to seconds (PGlite startup + DDL roundtrips for the cipherstash / pgvector
 extensions involve `CREATE EXTENSION`, schema creation, index creation, and
@@ -87,7 +87,7 @@ optional EQL bundle install).
 A single extra `readFile` adding ~60 µs is well inside any reasonable
 interpretation of the 5 % budget for a multi-hundred-millisecond `dbInit`.
 
-**Conclusion: NFR5 holds.**
+**Conclusion: the budget holds.**
 
 ## Limitations
 

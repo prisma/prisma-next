@@ -1,5 +1,5 @@
 /**
- * `decryptAll` — read-side bulk-decrypt walker (M3 R2 T3.4).
+ * `decryptAll` — read-side bulk-decrypt walker.
  *
  * Public utility users invoke after `findMany` (or any other read
  * surface) to materialize the plaintext for every `EncryptedString`
@@ -17,8 +17,8 @@
  * The `decryptAll` shape lets the caller buffer the result set
  * explicitly (with `await stream.toArray()`) and then opt into bulk
  * decryption in one round-trip per `(table, column)` group. The runtime
- * descriptor F5 wrapper (M2 R3) deliberately does NOT register an
- * implicit-decrypt middleware for this reason.
+ * descriptor wrapper deliberately does NOT register an implicit-decrypt
+ * middleware for this reason.
  *
  * **Walker shape**.
  *
@@ -49,14 +49,14 @@
  *
  * **Cancellation**. `opts.signal` is forwarded by identity to every
  * `bulkDecrypt` call via `ifDefined` — the same shape the bulk-encrypt
- * middleware (AC-MW4) and `EncryptedString.decrypt({ signal? })` use.
- * As of M3 R3 T3.8 the awaiting walker also races each SDK promise
- * against `opts.signal` via `raceCipherstashAbort` so an abort
- * surfaces `RUNTIME.ABORTED { phase: 'decrypt-all' }` promptly even
- * when the SDK body itself ignores the signal (AC-UMB5). A pre-check
- * before the first SDK round-trip short-circuits when the signal is
- * already aborted at entry; the no-envelopes-reachable fast path
- * returns immediately without observing the signal.
+ * middleware and `EncryptedString.decrypt({ signal? })` use. The
+ * walker also races each SDK promise against `opts.signal` via
+ * `raceCipherstashAbort` so an abort surfaces `RUNTIME.ABORTED
+ * { phase: 'decrypt-all' }` promptly even when the SDK body itself
+ * ignores the signal. A pre-check before the first SDK round-trip
+ * short-circuits when the signal is already aborted at entry; the
+ * no-envelopes-reachable fast path returns immediately without
+ * observing the signal.
  */
 
 import { ifDefined } from '@prisma-next/utils/defined';

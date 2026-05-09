@@ -1,25 +1,25 @@
 /**
- * Full umbrella end-to-end against PGlite — cipherstash plan.md
- * § T3.5 + § T3.6 (search half of AC-UMB1 + AC-UMB3 read half).
+ * Full umbrella end-to-end against PGlite — search + decrypt round-trip.
  *
- * Sibling to `storage-roundtrip.e2e.integration.test.ts` (T2.8 storage
+ * Sibling to `storage-roundtrip.e2e.integration.test.ts` (storage
  * half). Reuses the same synthetic-EQL-bundle approach but extends the
  * stub with two function definitions — `eql_v2.eq(a, b)` and
  * `eql_v2.ilike(a, b)` — so the operator-lowering paths
- * (`cipherstashEq`, `cipherstashIlike` from M3 R1) reach a real
- * Postgres function call at execute time.
+ * (`cipherstashEq`, `cipherstashIlike`) reach a real Postgres function
+ * call at execute time.
  *
- * Three search/decrypt phases land per the round prompt:
+ * Three search/decrypt phases:
  *
- *   1. **Insert 10 envelopes** (carry-forward from T2.8). Asserts the
- *      bulk-encrypt middleware made exactly one `bulkEncrypt` call.
+ *   1. **Insert 10 envelopes** (carry-forward from the storage round-
+ *      trip). Asserts the bulk-encrypt middleware made exactly one
+ *      `bulkEncrypt` call.
  *   2. **`cipherstashEq('alice5@example.com')`** returns the matching
  *      row; the lowered SQL goes through `eql_v2.eq(...)`.
  *   3. **`cipherstashIlike('%alice%')`** returns all 10 rows.
  *      `decryptAll` over the 10-row result set materializes plaintext
- *      and issues exactly one `bulkDecrypt` call (T3.6 — read half of
- *      AC-UMB3). Subsequent `envelope.decrypt()` returns the cached
- *      plaintext synchronously without consulting the SDK.
+ *      and issues exactly one `bulkDecrypt` call. Subsequent
+ *      `envelope.decrypt()` returns the cached plaintext synchronously
+ *      without consulting the SDK.
  *
  * **Synthetic EQL bundle** caveat — the stub is fake: `eql_v2.eq` and
  * `eql_v2.ilike` here compare the SDK`s synthetic ciphertexts as plain
@@ -31,9 +31,7 @@
  * `decryptAll` → cached plaintext loop — against a real Postgres engine
  * (PGlite). It does NOT validate EQL`s correctness against real
  * encrypted ciphertexts; that gate belongs on a real-Postgres + real-
- * EQL-bundle e2e (out of project scope per the M3 R2 prompt`s explicit
- * "Items the orchestrator has triaged out of scope" list — M4 / post-
- * Project-1 territory).
+ * EQL-bundle e2e.
  */
 
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
@@ -87,8 +85,7 @@ import {
   EQL_V2_SCHEMA,
 } from '../src/extension-metadata/constants';
 
-// Forward-port (M3.5 R2): the cipherstash contract / baseline migration / head ref
-// now flow through on-disk JSON via the descriptor's contractSpace, replacing the
+// The cipherstash contract / baseline migration / head ref flow through on-disk JSON via the descriptor's contractSpace, replacing the
 // previous in-memory `core/contract` and `core/migrations` modules.
 const cipherstashContractSpace = cipherstashExtensionDescriptor.contractSpace!;
 const cipherstashContract = cipherstashContractSpace.contractJson;
@@ -163,8 +160,7 @@ const frameworkComponents = [
  *
  * Mirrors the storage-roundtrip e2e`s baseline stub (composite type +
  * configuration table + add/remove search-config functions) and adds
- * two function stubs the M3 R1 operator lowering reaches at execute
- * time:
+ * two function stubs the operator lowering reaches at execute time:
  *
  *   - `eql_v2.eq(a, b)` — boolean equality on the synthetic SDK`s
  *     `{ c: 'ct:<plaintext>' }` ciphertexts. Both `a` and `b` are
@@ -183,7 +179,7 @@ const frameworkComponents = [
  * `unique` index attached at search-config registration; real EQL
  * `eql_v2.ilike` operates on the bloom-filter `match` index. The
  * synthetic forms exist exclusively for test wiring; correctness of
- * EQL`s encrypted operators is an out-of-scope (M4+) concern.
+ * EQL`s encrypted operators is deferred beyond this harness.
  */
 function buildSyntheticEqlBundleSql(): string {
   return [
@@ -402,7 +398,7 @@ function buildSearchPlan(method: 'cipherstashEq' | 'cipherstashIlike', value: st
 }
 
 describe.sequential(
-  'cipherstash full umbrella round-trip — search + decryptAll (PGlite, T3.5 + T3.6)',
+  'cipherstash full umbrella round-trip — search + decryptAll (PGlite)',
   { timeout: timeouts.spinUpPpgDev * 2 },
   () => {
     let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -461,7 +457,7 @@ describe.sequential(
       }
     });
 
-    it('inserts → cipherstashEq → cipherstashIlike → decryptAll round-trips with one bulkEncrypt per write group and one bulkDecrypt per read group (AC-UMB1 search half + AC-UMB3 read half)', async () => {
+    it('inserts → cipherstashEq → cipherstashIlike → decryptAll round-trips with one bulkEncrypt per write group and one bulkDecrypt per read group', async () => {
       const sdk = makeCounterSdk();
       const cipherstashRuntime = createCipherstashRuntimeDescriptor({ sdk });
 
@@ -496,7 +492,7 @@ describe.sequential(
       });
 
       try {
-        // ── Phase 1: insert 10 envelopes (carry-forward from T2.8) ──
+        // ── Phase 1: insert 10 envelopes ──
         const plaintexts = Array.from({ length: ROW_COUNT }, (_, i) => `alice${i}@example.com`);
         const envelopes = plaintexts.map((p) => EncryptedString.from(p));
         const insertPlan = buildInsertPlan(
@@ -504,8 +500,8 @@ describe.sequential(
         );
         await runtime.execute(insertPlan).toArray();
 
-        // AC-UMB3 storage half — exactly one bulk-encrypt per
-        // `(table, column)` group regardless of row count.
+        // Exactly one bulk-encrypt per `(table, column)` group
+        // regardless of row count.
         expect(sdk.bulkEncryptCalls).toHaveLength(1);
         expect(sdk.bulkEncryptCalls[0]?.routingKey).toEqual({
           table: APP_TABLE,
@@ -538,10 +534,9 @@ describe.sequential(
         expect(sdk.bulkEncryptCalls).toHaveLength(3);
 
         // ── Phase 4: decryptAll over 10 rows = 1 bulkDecrypt call ──
-        // (T3.6 — read half of AC-UMB3.) Pre-flight: nothing
-        // decrypted yet on the read side, so every envelope`s
-        // plaintext slot is empty and the SDK`s single-cell decrypt
-        // counter is at zero.
+        // Pre-flight: nothing decrypted yet on the read side, so
+        // every envelope`s plaintext slot is empty and the SDK`s
+        // single-cell decrypt counter is at zero.
         expect(sdk.bulkDecryptCalls).toHaveLength(0);
         expect(sdk.singleDecryptCalls).toHaveLength(0);
 
@@ -554,8 +549,8 @@ describe.sequential(
         });
         expect(sdk.bulkDecryptCalls[0]?.ciphertexts).toHaveLength(ROW_COUNT);
 
-        // AC-DEC3 / AC-ENV3 — every envelope`s `decrypt()` now
-        // returns plaintext synchronously without an extra SDK call.
+        // Every envelope`s `decrypt()` now returns plaintext
+        // synchronously without an extra SDK call.
         const sortedById = [...ilikeResults].sort((a, b) => a.id.localeCompare(b.id));
         const decrypted = await Promise.all(sortedById.map((row) => row.email.decrypt()));
         expect(decrypted).toEqual(plaintexts);

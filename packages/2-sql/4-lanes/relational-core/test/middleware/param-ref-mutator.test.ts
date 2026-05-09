@@ -31,7 +31,7 @@ function buildPlan(): {
 }
 
 describe('createSqlParamRefMutator', () => {
-  it('AC-MUT2: entries() enumerates every ParamRef with { ref, value, codecId }', () => {
+  it('entries() enumerates every ParamRef with { ref, value, codecId }', () => {
     const { plan, refs } = buildPlan();
     const mutator = createSqlParamRefMutator(plan);
     const entries = [...mutator.entries()];
@@ -56,7 +56,7 @@ describe('createSqlParamRefMutator', () => {
     expect(entries[2]?.ref).toBe(refs[2] as unknown);
   });
 
-  it('AC-MUT5: currentParams() returns plan.params by reference identity when no middleware mutates', () => {
+  it('currentParams() returns plan.params by reference identity when no middleware mutates', () => {
     const { plan } = buildPlan();
     const mutator = createSqlParamRefMutator(plan);
 

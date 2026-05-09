@@ -33,11 +33,6 @@ export interface DescriptorSelfConsistencyInputs {
  * `MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH` on failure with both the
  * recomputed and published hashes in `details` so callers can surface a
  * clear remediation hint without re-deriving them.
- *
- * @see specs/framework-mechanism.spec.md § 3 — Drift detection (note for
- *      M2 wiring): "verify descriptor self-consistency by recomputing
- *      `hash(canonicalize(descriptor.contractSpace.contractJson))` and
- *      asserting equality with `descriptor.contractSpace.headRef.hash`."
  */
 export function assertDescriptorSelfConsistency(inputs: DescriptorSelfConsistencyInputs): void {
   // The published `storage.storageHash` is the *output* of the production

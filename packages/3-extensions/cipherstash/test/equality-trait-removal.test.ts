@@ -1,5 +1,5 @@
 /**
- * Regression test — M3 R1 follow-up decision (2026-05).
+ * Regression test.
  *
  * The cipherstash storage codec must NOT advertise the framework's
  * `equality` trait. Re-adding it without re-routing through the
@@ -26,9 +26,9 @@
  * op for the column`s `unique` index at migration time. The two
  * `equality` concepts share only their name.
  *
- * Decision authored by the project owner; recorded here so a future
- * change that flips the trait declaration without re-routing the
- * dispatch trips this test loudly rather than re-opening the footgun.
+ * Recorded here so a future change that flips the trait declaration
+ * without re-routing the dispatch trips this test loudly rather than
+ * re-opening the footgun.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -45,7 +45,7 @@ function emptySdk(): CipherstashSdk {
   };
 }
 
-describe('cipherstash codec: no `equality` trait (M3 R1 follow-up regression)', () => {
+describe('cipherstash codec: no `equality` trait', () => {
   it('runtime codec declares an empty traits list', () => {
     const codec = createCipherstashStringCodec(emptySdk());
     expect(codec.traits).toEqual([]);

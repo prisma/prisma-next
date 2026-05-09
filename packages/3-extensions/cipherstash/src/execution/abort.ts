@@ -1,5 +1,5 @@
 /**
- * Cipherstash-internal `RUNTIME.ABORTED` phase wrapping (M3 R3 T3.8).
+ * Cipherstash-internal `RUNTIME.ABORTED` phase wrapping.
  *
  * The framework`s `runtimeAborted(phase)` (`@prisma-next/framework-
  * components/runtime`) constructs the canonical `RUNTIME.ABORTED`

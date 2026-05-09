@@ -1,7 +1,7 @@
 /**
  * Structural verification for the CipherStash extension descriptor.
  *
- * **On-disk-in-package authoring (M3.5 R2).** The descriptor's
+ * **On-disk-in-package authoring.** The descriptor's
  * contract / migrations / head ref now flow through JSON-import
  * declarations from the package's emitted artefacts:
  *
@@ -83,7 +83,7 @@ describe('cipherstash extension descriptor (on-disk-in-package authoring)', () =
     }
   });
 
-  it('inlines the EQL bundle SQL byte-for-byte through ops.json (AC-7)', () => {
+  it('inlines the EQL bundle SQL byte-for-byte through ops.json', () => {
     const baseline = cipherstashExtensionDescriptor.contractSpace!.migrations[0]!;
     const installOp = baseline.ops.find(
       (op) => op.invariantId === CIPHERSTASH_INVARIANTS.installBundle,

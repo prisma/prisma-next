@@ -96,10 +96,8 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
    * Apply the plan against an already-open connection without managing
    * the transaction lifecycle. The caller owns BEGIN/COMMIT/ROLLBACK
    * and any connection-level setup (FK pragma toggle, FK integrity
-   * check). Used by the per-space runner orchestration in M2 R4 to fan
+   * check). Used by the per-space runner orchestration to fan
    * out across contract spaces inside one outer transaction.
-   *
-   * @see specs/framework-mechanism.spec.md § "R4 design choice".
    */
   async executeOnConnection(
     options: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>,
@@ -345,7 +343,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     // shape; no-op on fresh or already-migrated databases. SQLite
     // requires PRAGMA-driven detection + rebuild-table for the PK
     // change, so the migration is imperative rather than a static SQL
-    // statement list. See `specs/framework-mechanism.spec.md § 2`.
+    // statement list.
     await migrateMarkerSchemaSqlite(driver);
     await this.executeStatement(driver, ensureLedgerTableStatement);
   }

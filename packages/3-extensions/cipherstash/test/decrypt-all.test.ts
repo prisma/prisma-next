@@ -1,22 +1,17 @@
 /**
  * `decryptAll` — read-side bulk-decrypt walker.
  *
- * Pins AC-DEC1..4 (canonical AC list lives in the package`s
- * `DEVELOPING.md § Acceptance criteria → decryptAll walker`):
+ * Pinned behaviour:
  *
- *   - **AC-DEC1**: walks recursively (objects, arrays, nested envelopes)
- *     and decrypts every `EncryptedString` it finds.
- *   - **AC-DEC2**: K envelopes across distinct routing keys ⇒ exactly
- *     one `bulkDecrypt` per routing-key group.
- *   - **AC-DEC3**: after return, every touched envelope`s `decrypt()`
- *     returns the cached plaintext synchronously without consulting
- *     the SDK.
- *   - **AC-DEC4**: `opts.signal` forwarded by identity to the SDK on
- *     every `bulkDecrypt` call. (RUNTIME.ABORTED phase-tag wrapping —
- *     the umbrella-level half of AC-DEC4 — is M3 R3 cancellation
- *     scope per the orchestrator`s round prompt; this round only
- *     pins the signal-forwarding contract that matches the existing
- *     bulk-encrypt middleware AC-MW4 + single-cell `decrypt` patterns.)
+ *   - Walks recursively (objects, arrays, nested envelopes) and
+ *     decrypts every `EncryptedString` it finds.
+ *   - K envelopes across distinct routing keys ⇒ exactly one
+ *     `bulkDecrypt` per routing-key group.
+ *   - After return, every touched envelope`s `decrypt()` returns the
+ *     cached plaintext synchronously without consulting the SDK.
+ *   - `opts.signal` forwarded by identity to the SDK on every
+ *     `bulkDecrypt` call — matching the bulk-encrypt middleware and
+ *     single-cell `decrypt` patterns.
  *
  * The tests use an in-memory `CounterSdk` mirroring the storage
  * round-trip e2e`s mock SDK — `bulkDecrypt({ ciphertexts })` reads the
@@ -110,7 +105,7 @@ function makeReadEnvelope(args: MakeReadEnvelopeArgs): EncryptedString {
   return EncryptedString.fromInternal(fromInternalArgs);
 }
 
-describe('decryptAll — AC-DEC1 walks recursively and decrypts every envelope', () => {
+describe('decryptAll — walks recursively and decrypts every envelope', () => {
   it('decrypts a single envelope inside a flat row', async () => {
     const sdk = makeCounterSdk();
     const envelope = makeReadEnvelope({
@@ -221,7 +216,7 @@ describe('decryptAll — AC-DEC1 walks recursively and decrypts every envelope',
   });
 });
 
-describe('decryptAll — AC-DEC2 one bulkDecrypt per routing-key group', () => {
+describe('decryptAll — one bulkDecrypt per routing-key group', () => {
   it('groups envelopes by (table, column) and issues one bulkDecrypt per group', async () => {
     const sdk = makeCounterSdk();
     const usersEmails = ['a', 'b', 'c'].map((p) =>
@@ -304,7 +299,7 @@ describe('decryptAll — AC-DEC2 one bulkDecrypt per routing-key group', () => {
   });
 });
 
-describe('decryptAll — AC-DEC3 cached plaintext after return', () => {
+describe('decryptAll — cached plaintext after return', () => {
   it('subsequent envelope.decrypt() returns synchronously without consulting the SDK', async () => {
     const sdk = makeCounterSdk();
     const envelopes = ['a', 'b', 'c'].map((p) =>
@@ -327,7 +322,7 @@ describe('decryptAll — AC-DEC3 cached plaintext after return', () => {
   });
 });
 
-describe('decryptAll — AC-DEC4 forwards opts.signal to the SDK', () => {
+describe('decryptAll — forwards opts.signal to the SDK', () => {
   it('forwards signal by identity on every bulkDecrypt call', async () => {
     const sdk = makeCounterSdk();
     const usersEmails = ['a', 'b'].map((p) =>
@@ -404,8 +399,8 @@ describe('decryptAll — diagnostics on misuse', () => {
   it('propagates SDK errors without retrying or swallowing', async () => {
     // The walker is a pure orchestrator — failure modes are the SDK's,
     // surfaced unchanged so callers can attribute them via existing
-    // SDK error taxonomy. AC-MW-style error envelopes (RUNTIME.ABORTED
-    // phase tags) are M3 R3 cancellation umbrella scope.
+    // SDK error taxonomy. RUNTIME.ABORTED phase-tag wrapping lives in
+    // the cancellation umbrella, not here.
     const sdk = makeCounterSdk();
     sdk.bulkDecrypt = vi.fn(() => Promise.reject(new Error('SDK boom')));
     const envelope = makeReadEnvelope({

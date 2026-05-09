@@ -1,8 +1,8 @@
 /**
- * Routing-key derivation for cipherstash bulk operations — T2.4
- * partial / Decision 2 from `plan.md § Open items 5` (resolved
- * 2026-05-06): the routing key is `(table, column)` derived from the
- * envelope handle, with no per-column override surface.
+ * Routing-key derivation for cipherstash bulk operations.
+ *
+ * The routing key is `(table, column)` derived from the envelope
+ * handle, with no per-column override surface.
  *
  * Tests cover:
  *   - `routingKeyId(...)` produces stable, collision-free string keys.

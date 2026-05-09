@@ -1,19 +1,16 @@
 /**
- * Operator lowering — M3 R1 (T3.1 / T3.2 / T3.3).
+ * Operator lowering — snapshot tests pinning the SQL shape that
+ * cipherstash-typed columns lower to under each user-facing predicate:
  *
- * Snapshot tests pin the SQL shape that cipherstash-typed columns lower
- * to under each user-facing predicate the project surfaces in M3:
+ *   - `email.cipherstashEq(value)` on a `cipherstash/string@1` column
+ *     lowers to `eql_v2.eq("email", $1::eql_v2_encrypted)`. The `$1`
+ *     parameter is bound to an `EncryptedString` envelope that the
+ *     bulk-encrypt middleware populates with ciphertext before the
+ *     Postgres codec encodes the wire payload — not asserted here
+ *     (live-Postgres exercise lives in the e2e suite); this round
+ *     only pins the SQL shape.
  *
- *   - **AC-OP1 (T3.1).** `email.cipherstashEq(value)` on a
- *     `cipherstash/string@1` column lowers to
- *     `eql_v2.eq("email", $1::eql_v2_encrypted)`. The `$1` parameter
- *     is bound to an `EncryptedString` envelope that the bulk-encrypt
- *     middleware (M2 R3) populates with ciphertext before the Postgres
- *     codec encodes the wire payload — not asserted here (live-Postgres
- *     exercise lives in M3 R2 / T3.5); this round only pins the SQL
- *     shape.
- *
- *   - **AC-OP2 (T3.2).** `email.cipherstashIlike(pattern)` lowers to
+ *   - `email.cipherstashIlike(pattern)` lowers to
  *     `eql_v2.ilike("email", $1::eql_v2_encrypted)`. EQL's `ilike`
  *     function takes an encrypted match-term (the pattern is encrypted
  *     just like an `eq` value).
@@ -22,21 +19,21 @@
  *   (`cipherstashEq` / `cipherstashIlike`) so the registrations
  *   coexist with the framework`s built-in `eq` / `ilike` rather than
  *   overriding them — the framework registry rejects same-method
- *   collisions and we don`t override operators. See `src/execution/operators.ts`
- *   for the trade-off rationale and the gap that follow-up framework
- *   work (per-codec where-binding rewrite SPI) would close.
+ *   collisions and we don`t override operators. See
+ *   `src/execution/operators.ts` for the trade-off rationale and the
+ *   gap that follow-up framework work (per-codec where-binding
+ *   rewrite SPI) would close.
  *
- *   - **AC-OP3 (T3.3).** `WHERE email IS NULL` lowers to
- *     `WHERE "user"."email" IS NULL` — no EQL function call. Null
- *     checks short-circuit at the framework level via the always-on
- *     `isNull` / `isNotNull` comparison methods (no trait gating, no
- *     codec dispatch — see `COMPARISON_METHODS_META.isNull` in
+ *   - `WHERE email IS NULL` lowers to `WHERE "user"."email" IS NULL`
+ *     — no EQL function call. Null checks short-circuit at the
+ *     framework level via the always-on `isNull` / `isNotNull`
+ *     comparison methods (no trait gating, no codec dispatch — see
+ *     `COMPARISON_METHODS_META.isNull` in
  *     `packages/3-extensions/sql-orm-client/src/types.ts`), so this is
  *     a regression assertion: the cipherstash extension must not
  *     intercept null checks.
  *
- *   - **AC-OP4 (T3.3).** `WHERE email IS NOT NULL` — same shape with
- *     `IS NOT NULL`.
+ *   - `WHERE email IS NOT NULL` — same shape with `IS NOT NULL`.
  *
  * The lowering shape is verified against the stack-composed Postgres
  * runtime adapter (the helper at `packages/3-targets/6-adapters/
@@ -45,19 +42,19 @@
  * dependency) loaded with the cipherstash runtime descriptor. The
  * adapter's `lower` is what the runtime's encode pipeline calls before
  * driver execution; pinning its output is the strongest unit-level
- * assurance available without standing up a real Postgres + EQL bundle
- * (M3 R2).
+ * assurance available without standing up a real Postgres + EQL
+ * bundle.
  *
  * Why we do not exercise the bulk-encrypt middleware here. The
  * middleware reads `params.entries()` and stamps ciphertexts via
  * `replaceValues` — a concern of the runtime's `beforeExecute` chain,
  * not of the AST → SQL lowering. The middleware's contract is covered
- * exhaustively by `bulk-encrypt-middleware.test.ts` (T2.4 / AC-MW1..5)
- * and the SDK-call-counter assertion of `storage-roundtrip.e2e.
- * integration.test.ts` (T2.8 / AC-MW1 amortization). These snapshot
- * tests assert only that the SQL shape produced by lowering would be a
- * valid input to that middleware (a `ParamRef` carrying an
- * `EncryptedString` envelope tagged with the cipherstash codec id).
+ * exhaustively by `bulk-encrypt-middleware.test.ts` and the SDK-call-
+ * counter assertion of `storage-roundtrip.e2e.integration.test.ts`.
+ * These snapshot tests assert only that the SQL shape produced by
+ * lowering would be a valid input to that middleware (a `ParamRef`
+ * carrying an `EncryptedString` envelope tagged with the cipherstash
+ * codec id).
  */
 
 import postgresRuntimeAdapter from '@prisma-next/adapter-postgres/runtime';
@@ -217,7 +214,7 @@ function selectWithWhere(whereExpr: AnyExpression) {
     .withWhere(whereExpr);
 }
 
-describe('cipherstash operator lowering — cipherstashEq (T3.1, AC-OP1)', () => {
+describe('cipherstash operator lowering — cipherstashEq', () => {
   it('lowers email.cipherstashEq(plaintext) to eql_v2.eq("email", $1::eql_v2_encrypted)', () => {
     const op = getOperator('cipherstashEq');
     const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), 'alice@example.com');
@@ -271,7 +268,7 @@ describe('cipherstash operator lowering — cipherstashEq (T3.1, AC-OP1)', () =>
   });
 });
 
-describe('cipherstash operator lowering — cipherstashIlike (T3.2, AC-OP2)', () => {
+describe('cipherstash operator lowering — cipherstashIlike', () => {
   it('lowers email.cipherstashIlike(pattern) to eql_v2.ilike("email", $1::eql_v2_encrypted)', () => {
     const op = getOperator('cipherstashIlike');
     const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), '%alice%');
@@ -301,7 +298,7 @@ describe('cipherstash operator lowering — cipherstashIlike (T3.2, AC-OP2)', ()
   });
 });
 
-describe('cipherstash operator lowering — null short-circuit (T3.3, AC-OP3 / AC-OP4)', () => {
+describe('cipherstash operator lowering — null short-circuit', () => {
   // The `isNull` / `isNotNull` ORM column methods construct
   // `NullCheckExpr` directly (see
   // `packages/3-extensions/sql-orm-client/src/types.ts:374-381`); they
@@ -336,7 +333,7 @@ describe('cipherstash operator lowering — null short-circuit (T3.3, AC-OP3 / A
 });
 
 describe('createCipherstashRuntimeDescriptor — queryOperations registration', () => {
-  it('exposes cipherstashEq + cipherstashIlike via the runtime descriptor (M3 R1 wiring)', () => {
+  it('exposes cipherstashEq + cipherstashIlike via the runtime descriptor', () => {
     // Names are cipherstash-prefixed so they coexist with the
     // framework`s built-in `eq` / `ilike` registrations rather than
     // overriding them. The trade-off is documented in

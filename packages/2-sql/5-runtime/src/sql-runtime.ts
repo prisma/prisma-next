@@ -310,7 +310,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       // `mutator` is built once per execute() and exposes the plan's
       // outbound `ParamRef` slots to `beforeExecute`. If no middleware
       // mutates, `mutator.currentParams()` returns `lowered.params` by
-      // reference identity (AC-MUT5).
+      // reference identity.
       const mutator = createSqlParamRefMutator(lowered);
 
       self.familyAdapter.validatePlan(lowered, self.contract);

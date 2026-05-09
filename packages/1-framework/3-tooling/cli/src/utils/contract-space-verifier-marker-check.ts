@@ -14,7 +14,7 @@ import { CliStructuredError } from './cli-errors';
  * Mirrors {@link import('./contract-space-verifier-precheck').ContractSpaceVerifierPrecheckInputs}
  * but threads the marker rows the caller has just read from the database.
  * Used by `db verify` after connection is established and the live
- * marker rows are available; locks the marker-half of AC-13 and AM11
+ * marker rows are available; covers the marker-half of the verifier
  * (orphan marker rows, marker-vs-pinned hash / invariants drift).
  */
 export interface ContractSpaceVerifierMarkerCheckInputs {
@@ -27,7 +27,7 @@ export interface ContractSpaceVerifierMarkerCheckInputs {
 }
 
 /**
- * Run the full per-space verifier (sub-spec § 4) — same composition as
+ * Run the full per-space verifier — same composition as
  * {@link import('./contract-space-verifier-precheck').runContractSpaceVerifierPrecheck}
  * but with marker rows threaded through. Surfaces every violation kind
  * the helper supports:
@@ -44,8 +44,6 @@ export interface ContractSpaceVerifierMarkerCheckInputs {
  * Promotes the layout-only precheck into a full check at the cost of a
  * single extra `SELECT` on `prisma_contract.marker`. Surfaces every
  * violation in one structured envelope (so users see the full picture).
- *
- * @see specs/framework-mechanism.spec.md § 4 — Verifier (T1.5).
  */
 export async function runContractSpaceVerifierMarkerCheck(
   inputs: ContractSpaceVerifierMarkerCheckInputs,

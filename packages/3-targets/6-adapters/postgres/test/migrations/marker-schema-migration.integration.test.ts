@@ -14,8 +14,7 @@ import {
 } from './fixtures/runner-fixtures';
 
 /**
- * Validates the T1.1 marker schema migration (sub-spec
- * `framework-mechanism.spec.md § 2`) against a real Postgres (PGlite via
+ * Validates the marker schema migration against a real Postgres (PGlite via
  * `createDevDatabase`):
  *
  * - On a fresh database created in the **new** shape (`space TEXT
@@ -26,11 +25,8 @@ import {
  *   repoint the primary key from `id` to `space`.
  * - On an already-migrated database, applying the statements a second
  *   time is a no-op (idempotency).
- *
- * Together these three cases exercise the AM2 acceptance criterion in
- * the sub-spec.
  */
-describe.sequential('marker schema migration (T1.1)', () => {
+describe.sequential('marker schema migration', () => {
   let database: Awaited<ReturnType<typeof createTestDatabase>>;
   let driver: PostgresControlDriver | undefined;
 

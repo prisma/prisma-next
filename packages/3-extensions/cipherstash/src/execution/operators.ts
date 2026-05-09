@@ -1,5 +1,5 @@
 /**
- * Cipherstash query-operations registry — M3 R1 (T3.1 / T3.2).
+ * Cipherstash query-operations registry.
  *
  * `cipherstashEq` and `cipherstashIlike` lower to EQL's encrypted-aware
  * comparison functions (`eql_v2.eq`, `eql_v2.ilike`) on
@@ -15,8 +15,8 @@
  * ciphers contain randomized nonces, so two encrypts of the same
  * plaintext do not byte-equal under SQL `=`. EQL's `eql_v2.eq` /
  * `eql_v2.ilike` short-circuit through the per-column index
- * (`unique` / `match`) emitted by the codec lifecycle hook (T2.9) and
- * produce correct results.
+ * (`unique` / `match`) emitted by the codec lifecycle hook and produce
+ * correct results.
  *
  * **Why cipherstash-namespaced method names (`cipherstashEq`,
  * `cipherstashIlike`) rather than reusing the framework`s `eq` /
@@ -48,7 +48,7 @@
  * The encrypted-arg path: the operator wraps the user-supplied value
  * in an `EncryptedString` envelope and stamps the column`s
  * `(table, column)` routing context onto the envelope`s handle. The
- * bulk-encrypt middleware (M2 R3) then groups the envelope alongside
+ * bulk-encrypt middleware then groups the envelope alongside
  * any others targeting the same `(table, column)` and issues one
  * `sdk.bulkEncrypt` per group. The cipherstash codec encodes the
  * resulting ciphertext as the wire payload at
@@ -64,9 +64,9 @@
  * predicate suitable for a WHERE clause (see
  * `packages/3-extensions/sql-orm-client/src/model-accessor.ts:172-178`).
  *
- * **`isNull` / `isNotNull` are NOT registered here** (T3.3 / AC-OP3 /
- * AC-OP4). The framework`s always-on `isNull` / `isNotNull`
- * comparison methods construct `NullCheckExpr` directly, bypassing
+ * **`isNull` / `isNotNull` are NOT registered here.** The framework`s
+ * always-on `isNull` / `isNotNull` comparison methods construct
+ * `NullCheckExpr` directly, bypassing
  * the operator-registry dispatch, and lower to `<col> IS [NOT] NULL`
  * regardless of codec — pinned by `test/operator-lowering.test.ts`.
  */
@@ -188,12 +188,12 @@ function eqlOperator(publicMethod: string, eqlFunction: 'eq' | 'ilike'): SqlOper
  * runtime descriptor by `createCipherstashRuntimeDescriptor` and read
  * by the SQL runtime`s `extractCodecLookup` / `queryOperations`
  * aggregation (`packages/2-sql/5-runtime/src/sql-context.ts`). Two
- * descriptors today, one per AC:
+ * descriptors today:
  *
- *   - `cipherstashEq` (AC-OP1) — encrypted equality via EQL`s
- *     `unique` index. SQL: `eql_v2.eq("col", $1::eql_v2_encrypted)`.
- *   - `cipherstashIlike` (AC-OP2) — encrypted free-text match via
- *     EQL`s `match` index. SQL:
+ *   - `cipherstashEq` — encrypted equality via EQL`s `unique` index.
+ *     SQL: `eql_v2.eq("col", $1::eql_v2_encrypted)`.
+ *   - `cipherstashIlike` — encrypted free-text match via EQL`s
+ *     `match` index. SQL:
  *     `eql_v2.ilike("col", $1::eql_v2_encrypted)`.
  *
  * Both descriptors register `self: { codecId: 'cipherstash/string@1' }`

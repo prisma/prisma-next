@@ -183,7 +183,7 @@ describe(
       expect(helperTable.rows[0]!.cnt).toBe(1);
     });
 
-    it('rolls back ALL spaces when any one fails (locks AM4-rollback)', async () => {
+    it('rolls back ALL spaces when any one fails', async () => {
       testDb = createTestDatabase();
       const { driver } = testDb;
       const runner = sqliteTargetDescriptor.createRunner(familyInstance);

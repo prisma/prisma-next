@@ -12,11 +12,11 @@
  * `vector(N)` as `nativeType` rely on this op having applied first.
  *
  * The op carries the stable `pgvector:install-vector-v1` invariantId —
- * once published it is immutable (project spec FR11).
+ * once published it is immutable.
  *
- * Authoring loop: this file is hand-edited (M3.5 Path B — see
- * `docs/architecture docs/adrs/ADR 211 - Contract spaces.md`'s
- * on-disk-in-package authoring section). The CLI's `migration plan`
+ * Authoring loop: this file is hand-edited — see
+ * `docs/architecture docs/adrs/ADR 211 - Contract spaces.md`
+ * for the on-disk-in-package authoring discussion. The CLI's `migration plan`
  * command refuses to scaffold this directory because pgvector's
  * contract has no tables / models for the planner to diff (only a
  * `storage.types` registration, which the planner doesn't translate

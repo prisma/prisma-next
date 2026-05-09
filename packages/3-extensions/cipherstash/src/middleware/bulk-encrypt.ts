@@ -13,26 +13,25 @@
  * 2. Iterates `params.entries()` to collect every cipherstash-codec'd
  *    `ParamRef` whose value is an `EncryptedString`, groups them by
  *    routing key, and issues exactly one `sdk.bulkEncrypt(...)` call
- *    per group (AC-MW1). Per `plan.md § Open items 5` (Decision 2),
- *    routing-key derivation is `(table, column)` — homogeneous batches
- *    only.
+ *    per group. Routing-key derivation is `(table, column)` —
+ *    homogeneous batches only.
  *
  * 3. Stamps each returned ciphertext onto the envelope's handle via
- *    `setHandleCiphertext` (AC-MW3) and writes the envelope back
- *    through `params.replaceValues` so the runtime's `currentParams()`
- *    view reflects the post-mutation slot. The handle's `plaintext`
- *    slot is **retained** (AC-MW5) — `envelope.decrypt()` continues to
- *    return the plaintext synchronously without consulting the SDK.
+ *    `setHandleCiphertext` and writes the envelope back through
+ *    `params.replaceValues` so the runtime's `currentParams()` view
+ *    reflects the post-mutation slot. The handle's `plaintext` slot
+ *    is **retained** — `envelope.decrypt()` continues to return the
+ *    plaintext synchronously without consulting the SDK.
  *
  * Cancellation: `ctx.signal` is forwarded by identity to every
- * `bulkEncrypt` call (AC-MW4) via `ifDefined`; the SDK is responsible
- * for honoring it. As of M3 R3 T3.8, the awaiting middleware also
- * races the SDK promise against `ctx.signal` via `raceCipherstashAbort`
- * so a caller-side abort surfaces a `RUNTIME.ABORTED { phase:
- * 'bulk-encrypt' }` envelope promptly even when the SDK body itself
- * ignores the signal (AC-UMB5). A pre-flight `checkCipherstashAborted`
- * short-circuits before any SDK round-trip is scheduled when the
- * signal is already aborted at entry.
+ * `bulkEncrypt` call via `ifDefined`; the SDK is responsible for
+ * honoring it. The awaiting middleware also races the SDK promise
+ * against `ctx.signal` via `raceCipherstashAbort` so a caller-side
+ * abort surfaces a `RUNTIME.ABORTED { phase: 'bulk-encrypt' }`
+ * envelope promptly even when the SDK body itself ignores the signal.
+ * A pre-flight `checkCipherstashAborted` short-circuits before any
+ * SDK round-trip is scheduled when the signal is already aborted at
+ * entry.
  */
 
 import type {

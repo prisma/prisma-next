@@ -12,8 +12,6 @@ import { errorDuplicateSpaceId } from './errors';
  *   to emit for that space — for app-space, the just-emitted root
  *   `contract.json`; for an extension space, the descriptor's
  *   `contractSpace.contractJson`.
- *
- * @see specs/framework-mechanism.spec.md § 3.
  */
 export interface SpacePlanInput<TContract> {
   readonly spaceId: string;
@@ -32,7 +30,7 @@ export interface SpacePlanOutput<TPackage> {
  *
  * Behaviour:
  *
- * - The output is sorted alphabetically by `spaceId` (AM3). Two callers
+ * - The output is sorted alphabetically by `spaceId`. Two callers
  *   passing the same set of inputs in different orders observe
  *   byte-identical outputs.
  * - The per-space planner (`planSpace`) is called exactly once per
@@ -52,8 +50,6 @@ export interface SpacePlanOutput<TPackage> {
  * resolve async I/O (e.g. reading pinned `contract.json` from disk)
  * resolve it before calling `planAllSpaces` and pass the materialised
  * inputs through.
- *
- * @see specs/framework-mechanism.spec.md § 3 — Per-space planner (T1.3).
  */
 export function planAllSpaces<TContract, TPackage>(
   inputs: readonly SpacePlanInput<TContract>[],

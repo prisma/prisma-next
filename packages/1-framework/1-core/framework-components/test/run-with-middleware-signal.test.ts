@@ -36,8 +36,8 @@ async function* yieldRows<R>(rows: ReadonlyArray<R>): AsyncGenerator<R, void, un
   }
 }
 
-describe('RuntimeMiddlewareContext.signal (AC-ABT1)', () => {
-  it('AC-ABT1: ctx.signal is the exact same reference at every middleware phase', async () => {
+describe('RuntimeMiddlewareContext.signal', () => {
+  it('ctx.signal is the exact same reference at every middleware phase', async () => {
     const controller = new AbortController();
     const ctx = makeCtx(controller.signal);
     const observed: AbortSignal[] = [];

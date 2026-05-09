@@ -39,7 +39,7 @@ describe('materialiseExtensionMigrationPackageIfMissing', () => {
     expect(second.written).toBe(false);
   });
 
-  it('leaves on-disk content byte-identical when the dir already exists (AC-7 / AM12)', async () => {
+  it('leaves on-disk content byte-identical when the dir already exists', async () => {
     const ops = createTestOps();
     const metadata = createTestMetadata({}, ops);
     const pkg = { dirName: 'baseline', dirPath: 'baseline', metadata, ops };

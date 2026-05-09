@@ -103,7 +103,7 @@ export function runWithMiddleware<
         for (const mw of middleware) {
           if (mw.beforeExecute) {
             // Already-aborted at entry to this middleware short-circuits with
-            // a phase-tagged envelope before the body runs (AC-ABT2).
+            // a phase-tagged envelope before the body runs.
             checkAborted(ctx, 'beforeExecute');
             // The framework only forwards the mutator the caller supplied; a
             // pass-through `undefined` for non-mutating families is safe — the
@@ -115,7 +115,7 @@ export function runWithMiddleware<
             const work = mw.beforeExecute(exec, ctx, paramsMutator as TMutator);
             if (work !== undefined) {
               // Mid-flight abort surfaces RUNTIME.ABORTED promptly even when
-              // the middleware body ignores ctx.signal (AC-ABT3).
+              // the middleware body ignores ctx.signal.
               await raceAgainstAbort(Promise.resolve(work), ctx.signal, 'beforeExecute');
             }
           }

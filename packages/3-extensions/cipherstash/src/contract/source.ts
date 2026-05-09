@@ -1,8 +1,7 @@
 /**
  * TS contract source for the `extension-cipherstash` package.
  *
- * Authored against the on-disk-in-package convention introduced in M3.5
- * R1 (project: extension-contract-spaces, TML-2397). The same emit
+ * Authored against the on-disk-in-package convention. The same emit
  * pipeline application authors use is applied here:
  *
  *   `prisma-next contract emit` → `<package>/contract.{json,d.ts}`
@@ -11,18 +10,17 @@
  * The descriptor at `src/exports/control.ts` then wires the emitted JSON
  * artefacts via JSON-import declarations.
  *
- * ## R2 IR coverage and explicit deferral
+ * ## IR coverage and explicit deferral
  *
- * The project spec lists four kinds of typed objects CipherStash should
- * declare in its contract IR: tables, enums, composite types, and
- * domains (project spec FR9 / AC8; M3 sub-spec § 2). Of these, today's
- * `SqlStorage` IR (`@prisma-next/sql-contract/types`) only models tables
- * and parameterised type instances (a fit for things like pgvector's
- * `vector(N)`, but not yet codec-less composite types, standalone
- * enums, or domains).
+ * CipherStash should declare four kinds of typed objects in its
+ * contract IR: tables, enums, composite types, and domains. Of these,
+ * today's `SqlStorage` IR (`@prisma-next/sql-contract/types`) only
+ * models tables and parameterised type instances (a fit for things
+ * like pgvector's `vector(N)`, but not yet codec-less composite types,
+ * standalone enums, or domains).
  *
- * R2 declares the only IR-representable object today (the
- * `eql_v2_configuration` table) using portable column types
+ * The contract therefore declares the only IR-representable object
+ * today (the `eql_v2_configuration` table) using portable column types
  * (`field.text()` / `field.json()`). The actual database state — the
  * `eql_v2` schema, the typed `eql_v2_configuration_state` enum, the
  * `eql_v2_encrypted` composite, the `eql_v2.bloom_filter` / `hmac_256`

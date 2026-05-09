@@ -11,7 +11,7 @@ import { encodeParams } from '../src/codecs/encoding';
 
 const TEST_HASH = coreHash('sha256:raw-sql-expr-encode');
 
-describe('encodeParams over a RawSqlExpr-backed plan (AC-LOW4)', () => {
+describe('encodeParams over a RawSqlExpr-backed plan', () => {
   it('runs async codec.encode for ParamRefs interpolated inside a RawSqlExpr AST', async () => {
     const registry = createCodecRegistry();
     registry.register(

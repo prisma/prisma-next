@@ -105,12 +105,11 @@ export class SqliteMigrationPlanner
       return plannerFailure(result.failure);
     }
 
-    // Codec lifecycle hook (T2.2): inline `onFieldEvent`-emitted ops after
-    // structural DDL. Sub-spec § 5 fixes the ordering as
-    // `structural → added → dropped → altered`, with within-group sorting by
-    // `(tableName, fieldName)` deterministic for byte-stable re-emits.
+    // Codec lifecycle hook: inline `onFieldEvent`-emitted ops after
+    // structural DDL. Ordering is structural → added → dropped → altered,
+    // with within-group sorting by `(tableName, fieldName)` deterministic for byte-stable re-emits.
     // Hook fires only at the application emitter — extension-space planning
-    // (M2 R2) never reaches this helper.
+    // never reaches this helper.
     const fieldEventOps = planFieldEventOperations({
       priorContract: options.fromContract,
       newContract: options.contract,

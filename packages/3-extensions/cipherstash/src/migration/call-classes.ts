@@ -22,10 +22,10 @@
  * cipherstashAddSearchConfig({ table: 'user', column: 'email', index: 'unique' });
  * ```
  *
- * Round-trip invariant: `toOp()` produces the same shape the codec hook
- * used to build via `buildAddOp` / `buildRemoveOp` (pre-CR-1). `ops.json`
- * stays byte-identical across the refactor; only `migration.ts` changes
- * (factory call instead of `rawSql({...})`).
+ * Round-trip invariant: `toOp()` produces the same op shape the codec
+ * hook would emit directly — `ops.json` stays byte-identical;
+ * `migration.ts` carries a factory call instead of an opaque
+ * `rawSql({...})` block.
  */
 
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
@@ -108,8 +108,7 @@ function invariantIdFor(
  * private slot (`#args`). Accessor properties on the class are
  * non-enumerable, and the backing record is a private field, so
  * `Object.keys(call)` and `canonicalizeJson(...)` see only the op
- * fields — `ops.json` and `migrationHash` stay byte-stable across the
- * pre/post CR-1 representation switch.
+ * fields — `ops.json` and `migrationHash` stay byte-stable.
  */
 abstract class CipherstashOpFactoryCallNode extends TsExpression implements OpFactoryCall {
   abstract get factoryName(): string;
@@ -130,8 +129,7 @@ abstract class CipherstashOpFactoryCallNode extends TsExpression implements OpFa
    * Re-expose the runtime op view for callers that prefer to lower
    * Calls explicitly (notably {@link renderOps} on the postgres lane).
    * The returned object is a plain copy of this Call's op-shaped
-   * fields, matching the shape `buildAddOp` / `buildRemoveOp`
-   * produced pre-CR-1.
+   * fields.
    */
   toOp(): CipherstashOp {
     return {
@@ -188,10 +186,9 @@ export class CipherstashAddSearchConfigCall extends CipherstashOpFactoryCallNode
   ) {
     super();
     this.#args = { table, column, index, castAs };
-    // Property assignment order matches the literal record
-    // `buildAddOp` produced pre-CR-1 (id → label → operationClass →
-    // invariantId → target → precheck → execute → postcheck), so
-    // `JSON.stringify(call)` lays out keys in the same byte order the
+    // Property assignment order is fixed (id → label → operationClass
+    // → invariantId → target → precheck → execute → postcheck) so
+    // `JSON.stringify(call)` lays out keys in the byte order the
     // baseline `ops.json` carries.
     this.id = `cipherstash-codec.${table}.${column}.add-search-config.${index}`;
     this.label = `Register cipherstash search config (${index}) for ${table}.${column}`;

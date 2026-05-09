@@ -24,8 +24,6 @@ export interface PinnedHeadRef {
  * hash so the verifier can compare invariants against marker rows.
  *
  * Returns `null` when the pinned file does not exist (first emit).
- *
- * @see specs/framework-mechanism.spec.md § 4 — Verifier (T1.5).
  */
 export async function readPinnedHeadRef(
   projectMigrationsDir: string,

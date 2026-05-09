@@ -32,17 +32,17 @@ const contract = validateContract<PostgresContract>(
   { get: () => undefined },
 );
 
-describe('renderLoweredSql RawSqlExpr arm (AC-LOW1..5)', () => {
+describe('renderLoweredSql RawSqlExpr arm', () => {
   const adapter = createPostgresAdapter();
 
-  it('AC-LOW5: zero-arg raw lowers to its single fragment with empty params', () => {
+  it('zero-arg raw lowers to its single fragment with empty params', () => {
     const ast = RawSqlExpr.of(['SELECT 1'], []);
     const lowered = adapter.lower(ast, { contract });
     expect(lowered.sql).toBe('SELECT 1');
     expect(lowered.params).toEqual([]);
   });
 
-  it('AC-LOW1: one ParamRef substitutes $1 at the gap and lifts the value into params', () => {
+  it('one ParamRef substitutes $1 at the gap and lifts the value into params', () => {
     const ast = RawSqlExpr.of(
       ['SELECT eql_v2.eq(', ')'],
       [ParamRef.of('alice@example.com', { codecId: 'pg/text@1' })],
@@ -52,7 +52,7 @@ describe('renderLoweredSql RawSqlExpr arm (AC-LOW1..5)', () => {
     expect(lowered.params).toEqual(['alice@example.com']);
   });
 
-  it('AC-LOW2: multiple ParamRefs in different positions render $1, $2, ... in source order', () => {
+  it('multiple ParamRefs in different positions render $1, $2, ... in source order', () => {
     const ast = RawSqlExpr.of(
       ['SELECT eql_v2.add_search_config(', ', ', ', ', ', ', ')'],
       [
@@ -67,7 +67,7 @@ describe('renderLoweredSql RawSqlExpr arm (AC-LOW1..5)', () => {
     expect(lowered.params).toEqual(['user', 'email', 'unique', 'text']);
   });
 
-  it('AC-LOW3: an inlined typed-builder expression lowers via renderExpr; sub-params append in canonical order', () => {
+  it('an inlined typed-builder expression lowers via renderExpr; sub-params append in canonical order', () => {
     const inner = BinaryExpr.eq(
       ColumnRef.of('user', 'email'),
       ParamRef.of('alice@example.com', { codecId: 'pg/text@1' }),
@@ -99,9 +99,9 @@ describe('renderLoweredSql RawSqlExpr arm (AC-LOW1..5)', () => {
   // SQL-injection invariant: ParamRef values never get text-inlined into
   // the rendered SQL. They must appear only in the params array, with
   // positional placeholders ($1, $2, ...) at their original positions.
-  // Defense in depth on top of AC-LOW1/LOW2 — exercised here with the
+  // Defense in depth — exercised here with the
   // exact shape cipherstash's `addSearchConfig` migration factory uses.
-  it('AC-LOW6: ParamRef values are never text-inlined into the rendered SQL', () => {
+  it('ParamRef values are never text-inlined into the rendered SQL', () => {
     const ast = RawSqlExpr.of(
       ['SELECT eql_v2.add_search_config(', ', ', ')'],
       [

@@ -1,6 +1,5 @@
 /**
- * Type-shape tests for the `EncryptedString` envelope's public surface
- * (AC-ENV4).
+ * Type-shape tests for the `EncryptedString` envelope's public surface.
  *
  * The envelope follows the Rust `secrecy` pattern: the wrapped handle is
  * reachable via the explicit `expose()` method (and `EncryptedStringHandle`

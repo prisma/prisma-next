@@ -1,6 +1,5 @@
 /**
- * Scenario A end-to-end against PGlite — pgvector contract-space
- * (project: extension-contract-spaces, M4 / T4.3).
+ * Scenario A end-to-end against PGlite — pgvector contract-space wiring.
  *
  * This test was relocated from
  * `packages/3-extensions/pgvector/test/scenario-a.e2e.integration.test.ts`
@@ -22,14 +21,13 @@
  * inlined here with comments tying them to their source-of-truth
  * locations.
  *
- * Drives the CLI per-space `db init` flow (`executePerSpaceDbApply`,
- * sub-spec § 6) against a real Postgres (PGlite via
+ * Drives the CLI per-space `db init` flow (`executePerSpaceDbApply`)
+ * against a real Postgres (PGlite via
  * `createDevDatabase`) with pgvector wired as an extension space and a
  * user `Doc` table that carries a `vector(N)` column. Three layers of
  * coverage:
  *
- *   1. **Pinned `ops.json` byte-equivalence (disk).** Closes project
- *      AC10 / TC-15 at the on-disk shape level — the `CREATE EXTENSION
+ *   1. **Pinned `ops.json` byte-equivalence (disk).** At the on-disk shape level — the `CREATE EXTENSION
  *      IF NOT EXISTS vector` SQL flows through
  *      `installVectorExtension.execute[0].sql` and is serialised
  *      byte-for-byte.
@@ -44,8 +42,7 @@
  *      ship the `vector` extension; the synthetic-stub variant
  *      replaces the install op's SQL with a `CREATE DOMAIN vector AS
  *      text` stub so the framework + per-space wiring runs against a
- *      real DB. Asserts marker rows for both `app` and `pgvector`
- *      (project AC5 / AC10 / TC-16).
+ *      real DB. Asserts marker rows for both `app` and `pgvector`.
  */
 
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -272,7 +269,7 @@ async function setupTestProject(args: {
 }
 
 describe.sequential(
-  'pgvector Scenario A end-to-end (PGlite, T4.3)',
+  'pgvector Scenario A end-to-end (PGlite)',
   { timeout: timeouts.spinUpPpgDev },
   () => {
     let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -305,7 +302,7 @@ describe.sequential(
       }
     });
 
-    it('pinned ops.json carries the CREATE EXTENSION SQL byte-for-byte (TC-15)', async () => {
+    it('pinned ops.json carries the CREATE EXTENSION SQL byte-for-byte', async () => {
       project = await setupTestProject({ migration: pgvectorBaselineMigration });
       const opsPath = join(project.pgvectorBaselineDir, 'ops.json');
       const opsRaw = await readFile(opsPath, 'utf-8');

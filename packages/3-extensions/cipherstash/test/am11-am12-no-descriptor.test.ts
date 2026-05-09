@@ -1,21 +1,21 @@
 /**
- * AM11 + AM12 regression — verify / apply / re-materialise without the
- * cipherstash descriptor on disk.
+ * Regression — verify / apply / re-materialise without the cipherstash
+ * descriptor on disk.
  *
- * Locks the framework-mechanism sub-spec acceptance criteria:
+ * Pinned properties:
  *
- *   - **AM11.** With the cipherstash extension's installed package
- *     directory removed (a stand-in for `rm -rf node_modules/@prisma-
- *     next/extension-cipherstash`), the per-space verifier helpers
- *     succeed against pinned `migrations/cipherstash/` files alone —
- *     they never resolve the descriptor module. The companion
- *     `migrate` path, by contrast, *does* import descriptors and is
- *     expected to fail informatively without them; we cover that
- *     direction by asserting the helper that *would* be used at
- *     `migrate`-time refuses to operate on a missing descriptor input.
+ *   - With the cipherstash extension's installed package directory
+ *     removed (a stand-in for `rm -rf node_modules/@prisma-next/
+ *     extension-cipherstash`), the per-space verifier helpers succeed
+ *     against pinned `migrations/cipherstash/` files alone — they
+ *     never resolve the descriptor module. The companion `migrate`
+ *     path, by contrast, *does* import descriptors and is expected to
+ *     fail informatively without them; we cover that direction by
+ *     asserting the helper that *would* be used at `migrate`-time
+ *     refuses to operate on a missing descriptor input.
  *
- *   - **AM12.** Re-running the materialisation pass against an already
- *     emitted `migrations/cipherstash/<dirName>/` leaves its contents
+ *   - Re-running the materialisation pass against an already emitted
+ *     `migrations/cipherstash/<dirName>/` leaves its contents
  *     byte-untouched (existence check, not write-and-compare).
  *
  * Mirrors `packages/1-framework/3-tooling/migration/test/deletable-
@@ -103,7 +103,7 @@ async function readBytesAt(p: string): Promise<Buffer> {
   return readFile(p);
 }
 
-describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor on disk', () => {
+describe('cipherstash — verify / re-materialise without descriptor on disk', () => {
   let fixture: ProjectFixture;
 
   beforeEach(async () => {
@@ -114,7 +114,7 @@ describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor
     await rm(fixture.projectRoot, { recursive: true, force: true });
   });
 
-  describe('AM11 — verify reads only the user repo', () => {
+  describe('verify reads only the user repo', () => {
     beforeEach(async () => {
       await rm(fixture.nodeModulesPkgDir, { recursive: true, force: true });
       const remaining = await readdir(join(fixture.projectRoot, 'node_modules', '@prisma-next'));
@@ -196,7 +196,7 @@ describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor
     });
   });
 
-  describe('AM12 — extension migration-package materialisation is idempotent', () => {
+  describe('extension migration-package materialisation is idempotent', () => {
     /**
      * The CLI's `runContractSpaceExtensionMigrationsPass` (in `@prisma-
      * next/cli`) calls

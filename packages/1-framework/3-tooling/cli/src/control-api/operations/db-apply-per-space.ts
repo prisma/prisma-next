@@ -54,8 +54,7 @@ const SPAN_IDS = {
  * Information about an extension contract space that the CLI threads
  * through to the per-space `db init` / `db update` flow. Only the
  * `id` is mandatory — the rest is read from on-disk pinned artefacts
- * at apply time so the descriptor module is not required at runtime
- * (project spec § Non-goals; AM11).
+ * at apply time so the descriptor module is not required at runtime.
  */
 export interface PerSpaceExtensionInput {
   readonly id: string;
@@ -83,8 +82,8 @@ export interface PerSpaceExtensionInput {
  *    failures on extensions) short-circuit the entire flow.
  * 6. Apply every space inside one outer transaction via
  *    `runner.executeAcrossSpaces({ driver, perSpaceOptions })` — a
- *    failure on any space rolls back every space's writes
- *    (AM4-rollback CLI-level half).
+ *    failure on any space rolls back every space's writes (the
+ *    cross-space rollback guarantee, CLI-level half).
  *
  * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
  *   — `db init` / `db update` per-space.
@@ -196,7 +195,7 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
   // and prune extension-owned tables out of the result. Without the
   // prune the app-space planner would treat extension-owned tables as
   // "extras" and emit destructive ops to drop them — defeating
-  // disjoint per-space ownership (sub-spec § 1, AM2).
+  // disjoint per-space ownership.
   const destinationByExtId = new Map<string, unknown>();
   for (const ext of extensionContractSpaces) {
     destinationByExtId.set(ext.id, await readPinnedSpaceContract(migrationsDir, ext.id));
@@ -282,8 +281,8 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
   // Patch each extension plan's targetId to match the app plan's now
   // that we know it (extension paths walk operations rendered against
   // the same target as the app contract). The placeholder-then-patch
-  // sequence is documented as awkward-but-contained in the M2 review;
-  // out of scope to remove here.
+  // sequence is documented as awkward-but-contained; out of scope to
+  // remove here.
   const appPlan = resolutions.find((r) => r.spaceId === APP_SPACE_ID)?.plan;
   if (!appPlan) {
     // Unreachable — the app resolver is always last in `resolvers`.
@@ -467,8 +466,8 @@ function makeExtensionResolver(args: MakeExtensionResolverArgs): SpacePathResolv
 
       const extPlan: MigrationPlan = {
         // `targetId` is patched at the orchestrator level once the
-        // app-space plan is known. Documented as awkward-but-contained
-        // in the M2 review; out of scope.
+        // app-space plan is known. Documented as awkward-but-contained;
+        // out of scope.
         targetId: '' as unknown as MigrationPlan['targetId'],
         origin: currentMarkerHash === null ? null : { storageHash: currentMarkerHash },
         destination: { storageHash: outcome.pinnedHeadRef.hash },
@@ -647,8 +646,7 @@ function buildExtensionPathFailure(args: {
  *
  * Without this prune, the app-space planner would treat
  * extension-owned tables as "extras" and emit destructive ops to drop
- * them — defeating the whole point of disjoint per-space ownership
- * (sub-spec § 1, AM2).
+ * them — defeating the whole point of disjoint per-space ownership.
  */
 export function pruneSchemaByOtherSpaceContracts(
   schema: unknown,

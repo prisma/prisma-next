@@ -1,5 +1,5 @@
 /**
- * Cipherstash cancellation umbrella — M3 R3 T3.8 (AC-UMB5).
+ * Cipherstash cancellation umbrella.
  *
  * Pins the contract for the cipherstash-internal `RUNTIME.ABORTED`
  * envelope wrapping at every async observation point that the umbrella
@@ -317,7 +317,7 @@ describe('decryptAll — RUNTIME.ABORTED { phase: "decrypt-all" }', () => {
     // do. A walk that finds zero envelopes returns immediately
     // without observing the signal — symmetric with `decryptAll`'s
     // documented "no SDK call when no envelopes are reachable"
-    // contract from M3 R2.
+    // contract.
     const controller = new AbortController();
     controller.abort(new Error('client gone'));
     await expect(decryptAll({}, { signal: controller.signal })).resolves.toBeUndefined();

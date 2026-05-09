@@ -2,7 +2,7 @@ import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import { createMongoParamRefMutator, flattenMongoParamRefs } from '../src/mongo-param-ref-mutator';
 
-describe('MongoParamRefMutator (AC-FAM2)', () => {
+describe('MongoParamRefMutator', () => {
   it('flattenMongoParamRefs walks objects, arrays, and nested leaves in pre-order', () => {
     const a = MongoParamRef.of('a', { codecId: 'cipherstash/string@1' });
     const b = MongoParamRef.of(42, { codecId: 'pg/text@1' });

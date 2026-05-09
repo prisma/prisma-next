@@ -1,14 +1,12 @@
 /**
  * Control hooks for the `cipherstash:string@1` codec.
  *
- * Implements `CodecControlHooks.onFieldEvent` per the framework-
- * mechanism sub-spec § 5 and the cipherstash sub-spec § 4. Reacts to
- * per-field added / dropped / altered events as the *application*
- * emitter diffs the prior contract against the new contract; the
- * returned Calls flow through the SQL planner's IR alongside structural
- * DDL and render as `cipherstashAddSearchConfig({...})` /
- * `cipherstashRemoveSearchConfig({...})` calls in the user's
- * `migration.ts` (sub-spec § 5; ADR 195 two-renderer pattern).
+ * Implements `CodecControlHooks.onFieldEvent`. Reacts to per-field
+ * added / dropped / altered events as the *application* emitter diffs
+ * the prior contract against the new contract; the returned Calls flow
+ * through the SQL planner's IR alongside structural DDL and render as
+ * `cipherstashAddSearchConfig({...})` / `cipherstashRemoveSearchConfig({...})`
+ * calls in the user's `migration.ts` (ADR 195 two-renderer pattern).
  *
  * Trigger: a field uses the `cipherstash:string@1` codec. The planner
  * already dispatches per `(table, field)` based on the field's

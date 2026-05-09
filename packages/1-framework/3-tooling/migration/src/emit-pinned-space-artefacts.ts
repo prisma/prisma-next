@@ -61,8 +61,6 @@ export interface PinnedSpaceArtefactInputs {
  *
  * The migrations directory and space subdirectory are created if they
  * do not yet exist (`mkdir { recursive: true }`).
- *
- * @see specs/framework-mechanism.spec.md § 3 — Pinned artefact emission (T1.8).
  */
 export async function emitPinnedSpaceArtefacts(
   projectMigrationsDir: string,

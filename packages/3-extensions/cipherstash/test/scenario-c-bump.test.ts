@@ -1,8 +1,7 @@
 /**
- * T3.7 / Scenario C — bump-cipherstash diff test (pure-fixture, no DB).
+ * Scenario C — bump-cipherstash diff test (pure-fixture, no DB).
  *
- * The cipherstash-migration sub-spec § 7 codifies a property of the
- * framework's `migrate`-time on-disk shape:
+ * Codifies a property of the framework's `migrate`-time on-disk shape:
  *
  *   when an extension version bump produces a new contract hash + a
  *   new migration package, re-running the materialisation passes
@@ -12,7 +11,7 @@
  *     (b) write the new migration directory under
  *         `migrations/<spaceId>/<newDirName>/`, and
  *     (c) leave the previously-emitted migration directory(s)
- *         byte-untouched (AC-7 / AM12 by-existence skip).
+ *         byte-untouched (by-existence skip).
  *
  * Pure fixture means: no live Postgres, no PGlite — the test computes
  * the on-disk shape and asserts on it. The two passes invoked here
@@ -21,10 +20,6 @@
  * + `runContractSpaceExtensionMigrationsPass` call. Calling them
  * directly keeps cipherstash's test cone independent of the CLI
  * package (cipherstash must not import the CLI).
- *
- * Locks AC-14 (cipherstash-migration spec) → project AC9 (extension
- * version bump → diff-able migrations + advancing head ref). Sub-spec
- * § 7 is the source of truth for the assertion list.
  */
 
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
@@ -65,9 +60,8 @@ const PROFILE = profileHash('cipherstash-extension-profile-v1');
 
 /**
  * Build a tiny cipherstash-shaped descriptor at version `v`. The
- * configuration table grows a new column at v2 (the audit_column from
- * sub-spec § 6 Scenario C); that's what advances the storage hash and
- * justifies the new migration package.
+ * configuration table grows a new audit column at v2; that's what
+ * advances the storage hash and justifies the new migration package.
  */
 function buildVersion(v: 1 | 2): SyntheticVersion {
   const baseColumns = {

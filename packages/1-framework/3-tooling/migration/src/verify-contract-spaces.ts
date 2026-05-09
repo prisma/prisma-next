@@ -26,8 +26,6 @@ function hasErrnoCode(error: unknown, code: string): boolean {
  * Reads only the user's repo. **No descriptor import.** The caller
  * (verifier) feeds the result into {@link verifyContractSpaces} alongside
  * the loaded-space set and the marker rows.
- *
- * @see specs/framework-mechanism.spec.md § 4 — Verifier (steps 5–6).
  */
 export async function listPinnedSpaceDirectories(
   projectMigrationsDir: string,
@@ -65,7 +63,7 @@ export interface SpacePinnedHashRecord {
 
 /**
  * Marker row read from `prisma_contract.marker` (one per `space`).
- * Caller resolves these via the family runtime's marker reader (T1.1)
+ * Caller resolves these via the family runtime's marker reader
  * before invoking {@link verifyContractSpaces}.
  */
 export interface SpaceMarkerRecord {
@@ -143,10 +141,10 @@ export type VerifyContractSpacesResult =
 
 /**
  * Pure structural verifier for the per-space mechanism. Aggregates the
- * three orphan / missing checks (FR6 cases a–c) plus per-space hash and
+ * three orphan / missing checks (cases a–c) plus per-space hash and
  * invariant comparison.
  *
- * Algorithm (sub-spec § 4):
+ * Algorithm:
  *
  * - For every extension space declared in `loadedSpaces` (`'app'`
  *   excluded — its pinned `contract.json` lives at the project root):
@@ -162,17 +160,14 @@ export type VerifyContractSpacesResult =
  *   `orphanMarker`. The app-space marker is always loaded (`'app'` is
  *   in `loadedSpaces` by definition).
  *
- * Output is deterministic (NFR6): violations are sorted first by `kind`
+ * Output is deterministic: violations are sorted first by `kind`
  * (`declaredButUnmigrated` → `orphanMarker` → `orphanPinnedDir` →
  * `hashMismatch` → `invariantsMismatch`) then by `spaceId`. Two callers
  * passing equivalent inputs see byte-identical violation lists.
  *
  * Synchronous, pure, no I/O. **Does not import the extension descriptor**
- * (the inputs are pre-resolved by the caller). This is the property
- * AC-15 / AC-26 ("verifier reads only the user repo, not
- * `node_modules`") locks in.
- *
- * @see specs/framework-mechanism.spec.md § 4 — Verifier (T1.5).
+ * (the inputs are pre-resolved by the caller). This is the property that
+ * the verifier reads only the user repo, not `node_modules`.
  */
 export function verifyContractSpaces(
   inputs: VerifyContractSpacesInputs,

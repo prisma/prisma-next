@@ -10,13 +10,13 @@
  * `hmac_256` / `blake3` domains, plus the ORE composites — is created
  * by the vendored EQL bundle SQL (see `../../../src/migration/eql-bundle.ts`,
  * which re-exports the bundle from `eql-install.generated.ts`
- * byte-for-byte per project spec NFR4 / AC7). The bundle also creates
- * the `eql_v2_configuration` table itself, so the planner-emitted
+ * byte-for-byte). The bundle also creates the `eql_v2_configuration`
+ * table itself, so the planner-emitted
  * `createTable` op would conflict with the bundle's `CREATE TABLE`
  * and is intentionally dropped from this migration's `operations`
  * getter.
  *
- * Authoring loop: this file is hand-edited (M3.5 Path A — see
+ * Authoring loop: this file is hand-edited (see
  * `docs/architecture docs/adrs/ADR 211 - Contract spaces.md`'s
  * on-disk-in-package authoring section). Re-emit `ops.json` /
  * `migration.json` after edits via `node migration.ts`.

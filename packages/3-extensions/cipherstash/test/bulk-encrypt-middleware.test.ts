@@ -1,25 +1,23 @@
 /**
- * Bulk-encrypt middleware behaviour — T2.4 / AC-MW1..5.
+ * Bulk-encrypt middleware behaviour.
  *
  * Drives `bulkEncryptMiddleware(sdk).beforeExecute(plan, ctx, params)`
  * against an instrumented mock `CipherstashSdk` and asserts:
  *
- *   - **AC-MW1.** One `bulkEncrypt` call per `(table, column)` group;
- *     N envelopes in the same column collapse into a single SDK
- *     round-trip.
- *   - **AC-MW2.** `(table, column)` is derived from the lowered
- *     `InsertAst` / `UpdateAst` via the middleware's AST walk and
- *     stamped onto each envelope handle before grouping. A
- *     pre-stamped routing context (write-once-wins) is preserved.
- *   - **AC-MW3.** The SDK-returned ciphertext is stamped onto every
- *     envelope handle via `setHandleCiphertext`; codec.encode then
- *     reads it on the wire.
- *   - **AC-MW4.** `ctx.signal` is forwarded by identity to the SDK so
- *     downstream cancellation observes the same `AbortSignal`.
- *   - **AC-MW5.** The handle's `plaintext` slot is **retained**
- *     post-encrypt — `envelope.decrypt()` returns the cached plaintext
- *     synchronously without consulting the SDK
- *     (`plan.md § Open items 6` resolved 2026-05-06).
+ *   - One `bulkEncrypt` call per `(table, column)` group; N envelopes
+ *     in the same column collapse into a single SDK round-trip.
+ *   - `(table, column)` is derived from the lowered `InsertAst` /
+ *     `UpdateAst` via the middleware's AST walk and stamped onto each
+ *     envelope handle before grouping. A pre-stamped routing context
+ *     (write-once-wins) is preserved.
+ *   - The SDK-returned ciphertext is stamped onto every envelope
+ *     handle via `setHandleCiphertext`; codec.encode then reads it
+ *     on the wire.
+ *   - `ctx.signal` is forwarded by identity to the SDK so downstream
+ *     cancellation observes the same `AbortSignal`.
+ *   - The handle's `plaintext` slot is **retained** post-encrypt —
+ *     `envelope.decrypt()` returns the cached plaintext synchronously
+ *     without consulting the SDK.
  *
  * Plus the no-op shape (no cipherstash params → no SDK call) and the
  * SDK-shape error path (wrong number of ciphertexts → diagnostic).
@@ -147,7 +145,7 @@ function buildUpdatePlan(table: string, set: Record<string, unknown>): SqlExecut
 }
 
 describe('bulkEncryptMiddleware', () => {
-  describe('AC-MW1 — one bulkEncrypt call per (table, column) group', () => {
+  describe('one bulkEncrypt call per (table, column) group', () => {
     it('issues exactly one bulkEncrypt call when 10 rows insert into one column', async () => {
       const sdk = makeCounterSdk();
       const middleware = bulkEncryptMiddleware(sdk);
@@ -190,7 +188,7 @@ describe('bulkEncryptMiddleware', () => {
     });
   });
 
-  describe('AC-MW3 — ciphertext is stamped onto each envelope handle', () => {
+  describe('ciphertext is stamped onto each envelope handle', () => {
     it('populates handle.ciphertext with the SDK-returned wire value', async () => {
       const sdk = makeCounterSdk();
       const middleware = bulkEncryptMiddleware(sdk);
@@ -204,7 +202,7 @@ describe('bulkEncryptMiddleware', () => {
     });
   });
 
-  describe('AC-MW4 — ctx.signal is forwarded by identity to the SDK', () => {
+  describe('ctx.signal is forwarded by identity to the SDK', () => {
     it('passes ctx.signal to bulkEncrypt by reference', async () => {
       const sdk = makeCounterSdk();
       const middleware = bulkEncryptMiddleware(sdk);
@@ -232,7 +230,7 @@ describe('bulkEncryptMiddleware', () => {
     });
   });
 
-  describe('AC-MW5 — plaintext slot is retained post-encrypt', () => {
+  describe('plaintext slot is retained post-encrypt', () => {
     it('decrypt() returns plaintext synchronously without consulting the SDK', async () => {
       const sdk = makeCounterSdk();
       const middleware = bulkEncryptMiddleware(sdk);
@@ -261,7 +259,7 @@ describe('bulkEncryptMiddleware', () => {
     });
   });
 
-  describe('AC-MW2 — routing key is derived from envelope handle (table, column)', () => {
+  describe('routing key is derived from envelope handle (table, column)', () => {
     it('stamps (table, column) from InsertAst before grouping', async () => {
       const sdk = makeCounterSdk();
       const middleware = bulkEncryptMiddleware(sdk);

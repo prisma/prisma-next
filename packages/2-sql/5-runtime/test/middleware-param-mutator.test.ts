@@ -185,8 +185,8 @@ function buildPlan(): SqlQueryPlan {
   };
 }
 
-describe('beforeExecute mutator (AC-MUT3, AC-MUT5, AC-EX1, AC-ABT2..4)', () => {
-  it('AC-MUT3: a mutated value reaches subsequent codec.encode', async () => {
+describe('beforeExecute mutator', () => {
+  it('a mutated value reaches subsequent codec.encode', async () => {
     const mutating: SqlMiddleware = {
       name: 'mutate-emails',
       familyId: 'sql',
@@ -214,7 +214,7 @@ describe('beforeExecute mutator (AC-MUT3, AC-MUT5, AC-EX1, AC-ABT2..4)', () => {
     ]);
   });
 
-  it('AC-EX1: bulk-pattern fixture — entries() walk, codec-id filter, single async call, replaceValues writeback, encode reflects writeback', async () => {
+  it('bulk-pattern fixture — entries() walk, codec-id filter, single async call, replaceValues writeback, encode reflects writeback', async () => {
     let bulkCalls = 0;
     const bulkMiddleware: SqlMiddleware = {
       name: 'bulk-encrypt-stub',
@@ -262,7 +262,7 @@ describe('beforeExecute mutator (AC-MUT3, AC-MUT5, AC-EX1, AC-ABT2..4)', () => {
     ]);
   });
 
-  it('AC-MUT5: with no mutating middleware, plan.params reaches encodeParams without allocation', async () => {
+  it('with no mutating middleware, plan.params reaches encodeParams without allocation', async () => {
     let observed: unknown[] | undefined;
     const observer: SqlMiddleware = {
       name: 'observer',
@@ -290,7 +290,7 @@ describe('beforeExecute mutator (AC-MUT3, AC-MUT5, AC-EX1, AC-ABT2..4)', () => {
     ]);
   });
 
-  it('AC-ABT2: pre-check at second middleware entry throws phase: "beforeExecute"', async () => {
+  it('pre-check at second middleware entry throws phase: "beforeExecute"', async () => {
     const events: string[] = [];
     const ctrl = new AbortController();
     const first: SqlMiddleware = {
@@ -320,7 +320,7 @@ describe('beforeExecute mutator (AC-MUT3, AC-MUT5, AC-EX1, AC-ABT2..4)', () => {
     expect(events).toEqual(['first']);
   });
 
-  it('AC-ABT3: mid-flight abort surfaces RUNTIME.ABORTED promptly even when middleware ignores the signal', async () => {
+  it('mid-flight abort surfaces RUNTIME.ABORTED promptly even when middleware ignores the signal', async () => {
     const ctrl = new AbortController();
     const mw: SqlMiddleware = {
       name: 'slow-and-deaf',
@@ -341,7 +341,7 @@ describe('beforeExecute mutator (AC-MUT3, AC-MUT5, AC-EX1, AC-ABT2..4)', () => {
     });
   });
 
-  it('AC-ABT4: middleware bodies that throw non-abort errors pass through unchanged (no re-wrap)', async () => {
+  it('middleware bodies that throw non-abort errors pass through unchanged (no re-wrap)', async () => {
     const customError = new Error('something else');
     const mw: SqlMiddleware = {
       name: 'throws',

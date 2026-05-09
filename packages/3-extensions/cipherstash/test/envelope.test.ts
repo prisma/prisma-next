@@ -1,13 +1,11 @@
 /**
  * Behavioural tests for the `EncryptedString` envelope and the
- * `CipherstashSdk` shape it talks to. Covers AC-ENV1, AC-ENV2, AC-ENV4
- * from `envelope-codec-extension.spec.md` (M2 R1, project-1).
+ * `CipherstashSdk` shape it talks to.
  *
- * Per the spec § Open items 6 (resolved 2026-05-06), the envelope does
- * **not** zero its handle's plaintext slot post-encrypt. As a side
- * effect a write-side envelope's `decrypt()` returns the original
- * plaintext synchronously without consulting the SDK; AC-MW5 builds on
- * this property in M2 R2.
+ * The envelope does **not** zero its handle's plaintext slot
+ * post-encrypt. As a side effect a write-side envelope's `decrypt()`
+ * returns the original plaintext synchronously without consulting the
+ * SDK; the bulk-encrypt middleware builds on this property.
  */
 
 import { inspect } from 'node:util';
@@ -23,7 +21,7 @@ function emptySdk(): CipherstashSdk {
   };
 }
 
-describe('EncryptedString.from(plaintext) — AC-ENV1', () => {
+describe('EncryptedString.from(plaintext)', () => {
   it('returns an EncryptedString instance', () => {
     const envelope = EncryptedString.from('alice@example.com');
     expect(envelope).toBeInstanceOf(EncryptedString);
@@ -42,7 +40,7 @@ describe('EncryptedString.from(plaintext) — AC-ENV1', () => {
   });
 });
 
-describe('EncryptedString.fromInternal(...) — AC-ENV2 (read-side)', () => {
+describe('EncryptedString.fromInternal(...) — read-side', () => {
   it('decrypt({signal}) calls the SDK single-cell decrypt and returns plaintext', async () => {
     const ciphertext = { c: 'cipher', i: { t: 'user', c: 'email' } };
     const decryptMock = vi.fn().mockResolvedValue('alice@example.com');
@@ -128,7 +126,7 @@ describe('EncryptedString.fromInternal(...) — AC-ENV2 (read-side)', () => {
   });
 });
 
-describe('EncryptedString — accidental-exposure overrides (Rust `secrecy` style) — AC-ENV4', () => {
+describe('EncryptedString — accidental-exposure overrides (Rust `secrecy` style)', () => {
   // The handle stays reachable on purpose: `expose()` is the explicit
   // opt-in. What these tests pin is that *every common implicit*
   // exposure path — JSON, console, stringification, primitive coercion

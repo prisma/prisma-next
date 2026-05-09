@@ -42,12 +42,12 @@ export type MongoParamRefEntryUnion<TCodecMap extends Record<string, unknown>> =
  * Mongo-family mutator threaded into `MongoMiddleware.beforeExecute` as
  * `params`. Walks the lowered tree (objects, arrays, leaves) and yields
  * `MongoParamRef` slots in pre-order; mutator semantics match the SQL
- * family's `SqlParamRefMutator` (AC-FAM1, AC-FAM2).
+ * family's `SqlParamRefMutator`.
  */
 export interface MongoParamRefMutator<
   TCodecMap extends Record<string, unknown> = Record<string, unknown>,
 > extends ParamRefMutator {
-  /** Iterate every `MongoParamRef` reachable from the lowered tree (AC-FAM2). */
+  /** Iterate every `MongoParamRef` reachable from the lowered tree. */
   entries(): IterableIterator<MongoParamRefEntryUnion<TCodecMap>>;
 
   replaceValue<TCodecId extends keyof TCodecMap & string>(

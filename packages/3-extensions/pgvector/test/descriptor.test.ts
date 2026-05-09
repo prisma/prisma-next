@@ -1,7 +1,7 @@
 /**
  * Structural verification for the pgvector extension descriptor.
  *
- * **On-disk-in-package authoring (M3.5 R3).** The descriptor's
+ * **On-disk-in-package authoring.** The descriptor's
  * contract / migrations / head ref now flow through JSON-import
  * declarations from the package's emitted artefacts:
  *

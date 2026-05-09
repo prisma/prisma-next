@@ -70,7 +70,7 @@ describe('runContractSpaceMigratePass', () => {
     expect(out.drifts.map((d) => d.kind)).toEqual(['noDrift']);
   });
 
-  it('reports kind=drift when descriptor hash diverges from pinned (locks AM7)', async () => {
+  it('reports kind=drift when descriptor hash diverges from pinned', async () => {
     await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { v: 1 },
       contractDts: '\n',

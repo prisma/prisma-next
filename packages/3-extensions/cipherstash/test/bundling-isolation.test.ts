@@ -1,5 +1,5 @@
 /**
- * AC-UMB9 — control vs runtime/middleware byte-level subpath isolation.
+ * Control vs runtime/middleware byte-level subpath isolation.
  *
  * The cipherstash extension publishes three runtime-relevant subpath
  * entries: `./control` (contract-space authoring + the codec lifecycle
@@ -12,7 +12,7 @@
  * a consumer pulling `./control` does not drag in `EncryptedString`,
  * the SDK interface, the codec runtime, or the bulk-encrypt middleware.
  *
- * This test is the canonical AC-UMB9 guard. It asserts:
+ * This test is the canonical isolation guard. It asserts:
  *
  *   1. **Entry-body forbidden-substring check** (per entry): the
  *      entry `.mjs` body — both the inline source and its `import` /
@@ -128,7 +128,7 @@ function findLeaksInEntry(entry: ChunkFile, forbidden: readonly string[]): strin
   return forbidden.filter((needle) => entry.body.includes(needle));
 }
 
-describe('bundling isolation (AC-UMB9)', () => {
+describe('bundling isolation', () => {
   it('dist entry files exist (run `pnpm --filter @prisma-next/extension-cipherstash build` first)', () => {
     for (const entry of ENTRY_FILES) {
       expect(existsSync(join(DIST, entry)), `dist/${entry} is missing`).toBe(true);

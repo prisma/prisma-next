@@ -8,12 +8,12 @@
  *   ciphertext + the cell's `(table, column)` from `ctx.column` + the
  *   SDK reference captured at codec construction time. The envelope's
  *   `decrypt({signal?})` later routes through the captured SDK; callers
- *   can also `await decryptAll(rows)` (M3) to coalesce decrypts across
- *   many envelopes into one bulk SDK call.
+ *   can also `await decryptAll(rows)` to coalesce decrypts across many
+ *   envelopes into one bulk SDK call.
  *
  * - `encode(envelope, ctx)` extracts the ciphertext from the envelope's
- *   handle. The bulk-encrypt middleware (M2 R2) populates the
- *   ciphertext slot before the codec runs; an envelope whose ciphertext
+ *   handle. The bulk-encrypt middleware populates the ciphertext slot
+ *   before the codec runs; an envelope whose ciphertext
  *   slot is empty at encode time is a programmer error (the middleware
  *   was not registered, or this codec instance was used in a non-
  *   cipherstash context).

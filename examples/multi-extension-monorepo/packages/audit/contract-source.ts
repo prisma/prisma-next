@@ -1,8 +1,8 @@
 /**
  * TS contract source for the internal `audit` contract-space package.
  *
- * Authored against the on-disk-in-package convention introduced in M3.5
- * R1 (project: extension-contract-spaces, TML-2397). The same emit
+ * Authored against the on-disk-in-package convention for extension contract spaces
+ * (TML-2397). The same emit
  * pipeline application authors use is applied here:
  *
  *   `prisma-next contract emit` → `<package>/contract.{json,d.ts}`
@@ -11,7 +11,7 @@
  * The descriptor at `./control.ts` then wires the emitted JSON
  * artefacts via JSON-import declarations.
  *
- * Mirrors the cipherstash / pgvector R3 layout but lives at the
+ * Mirrors the cipherstash / pgvector package layout but lives at the
  * subdirectory root (no `src/`) because this monorepo example ships as
  * a single workspace package — see the example's `README.md` for the
  * "internal package" framing.

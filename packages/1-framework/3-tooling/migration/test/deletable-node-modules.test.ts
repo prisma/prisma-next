@@ -1,5 +1,5 @@
 /**
- * "Deletable `node_modules`" fixture for AC-15 / TC-26.
+ * "Deletable `node_modules`" fixture.
  *
  * Locks in the property that the per-space verifier and runner **read
  * only the user's repo** — pinned `contract.json` / `contract.d.ts` /
@@ -8,7 +8,7 @@
  * so the absence of `node_modules` (or any other path that resolves the
  * descriptor) does not affect verify / apply outcomes.
  *
- * Scoped to the framework helpers shipped in this round
+ * Scoped to the framework helpers
  * (`emitPinnedSpaceArtefacts` + `listPinnedSpaceDirectories` +
  * `verifyContractSpaces` + `concatenateSpaceApplyInputs`). The test
  * intentionally **does not import** the synthetic
@@ -60,9 +60,8 @@ async function setupProjectWithPinnedTestSpace(): Promise<ProjectFixture> {
 
   // Stand-in for an installed extension package — the descriptor module
   // would normally live under `node_modules/<pkg>/...`. The test deletes
-  // this directory before invoking the verifier to model the AC-15 case
-  // ("verifier + runner succeed when extension descriptor not
-  // importable, e.g. node_modules removed").
+  // this directory before invoking the verifier to model the case where
+  // the extension descriptor is not importable (for example after removing `node_modules`).
   await mkdir(join(nodeModulesPath, '@prisma-next', 'extension-test-contract-space'), {
     recursive: true,
   });
@@ -76,7 +75,7 @@ async function setupProjectWithPinnedTestSpace(): Promise<ProjectFixture> {
   return { projectRoot, projectMigrationsDir, nodeModulesPath };
 }
 
-describe('per-space verifier + runner against a project with deleted node_modules (AC-15 / TC-26)', () => {
+describe('per-space verifier + runner against a project with deleted node_modules', () => {
   let fixture: ProjectFixture;
 
   beforeEach(async () => {

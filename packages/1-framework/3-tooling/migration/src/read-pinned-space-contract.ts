@@ -15,8 +15,7 @@ function hasErrnoCode(error: unknown, code: string): boolean {
  *
  * Companion to {@link import('./read-pinned-head-ref').readPinnedHeadRef}
  * — same ENOENT-throws / corrupt-file-error semantics. Returns the
- * canonical-JSON value the framework wrote during emit (sub-spec § 3 —
- * pinned artefacts), so re-running this helper across machines / runs
+ * canonical-JSON value the framework wrote during emit for pinned artefacts, so re-running this helper across machines / runs
  * yields a byte-identical value.
  *
  * Rejects the app space id: the app-space contract lives at

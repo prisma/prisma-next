@@ -21,13 +21,13 @@ export interface ContractSpaceVerifierPrecheckInputs {
 }
 
 /**
- * Run the layout-only half of the per-space verifier (sub-spec § 4) at
- * the CLI surface before invoking any database-touching operation.
+ * Run the layout-only half of the per-space verifier at the CLI surface
+ * before invoking any database-touching operation.
  *
  * This pass is composed alongside its marker-aware sibling
  * {@link import('./contract-space-verifier-marker-check').runContractSpaceVerifierMarkerCheck}
  * by `db init`, `db update`, and `db verify` — all three commands wire
- * both passes uniformly after the M2 orchestrator consolidation.
+ * both passes uniformly.
  *
  * Division of labour:
  *
@@ -42,8 +42,6 @@ export interface ContractSpaceVerifierPrecheckInputs {
  * Surfaces violations as a structured CLI error whose envelope lists
  * every offence at once (so users see the full picture rather than
  * fixing them one at a time across re-runs).
- *
- * @see specs/framework-mechanism.spec.md § 4 — Verifier (T1.5).
  */
 export async function runContractSpaceVerifierPrecheck(
   inputs: ContractSpaceVerifierPrecheckInputs,

@@ -63,7 +63,7 @@ describe('deriveProvidedInvariants', () => {
     // marker bookkeeping. operationClass governs policy gating; invariantId
     // governs replay tracking. Cipherstash's `installEqlBundle` and
     // structural `create-*` ops are the canonical additive-with-invariantId
-    // case (sub-spec § 3 / cipherstash-migration.spec.md).
+    // case in cipherstash migrations.
     expect(
       deriveProvidedInvariants([
         nonDataOp('add-table'),

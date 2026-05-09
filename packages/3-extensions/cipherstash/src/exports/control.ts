@@ -1,8 +1,8 @@
 /**
  * Control-plane descriptor for the CipherStash extension.
  *
- * **On-disk-in-package authoring (M3.5 R2).** The extension's contract
- * + migrations are emitted by the same pipeline application authors use:
+ * **On-disk-in-package authoring.** The extension's contract +
+ * migrations are emitted by the same pipeline application authors use:
  *
  *   `prisma-next contract emit` → `<package>/contract.{json,d.ts}`
  *   `prisma-next migration plan` → `<package>/migrations/cipherstash/<dir>/...`
@@ -21,15 +21,14 @@
  *   - `types.codecTypes.controlPlaneHooks[CIPHERSTASH_STRING_CODEC_ID]`
  *     — the lifecycle hook the SQL planner extracts via
  *     `extractCodecControlHooks` and inlines into the application's
- *     migration via `planFieldEventOperations` (sub-spec § 5).
- *     Implements `add_search_config` / `remove_search_config` /
- *     rotate behaviour for `searchable: true` `Encrypted<string>`
- *     columns.
+ *     migration via `planFieldEventOperations`. Implements
+ *     `add_search_config` / `remove_search_config` / rotate behaviour
+ *     for `searchable: true` `Encrypted<string>` columns.
  *
  * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
  *   (on-disk-in-package authoring convention).
  * @see packages/3-extensions/test-contract-space/src/exports/control.ts
- *   (R1 reference model).
+ *   (reference model).
  */
 
 import { fileURLToPath } from 'node:url';
@@ -88,10 +87,10 @@ const cipherstashContractSpace: ExtensionContractSpace = {
 const cipherstashExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
   // Spread pack-meta first so it contributes `kind` / `id` / `familyId`
   // / `targetId` / `version` / `authoring` / `types.{codecTypes,storage}`
-  // — then overlay the contract-space block (TML-2397) and the codec
-  // lifecycle hook (TML-2397) on top. The two `types.codecTypes` slots
-  // (`codecInstances` from pack-meta, `controlPlaneHooks` from this
-  // descriptor) coexist on the same path and are merged below.
+  // — then overlay the contract-space block and the codec lifecycle
+  // hook on top. The two `types.codecTypes` slots (`codecInstances`
+  // from pack-meta, `controlPlaneHooks` from this descriptor) coexist
+  // on the same path and are merged below.
   ...cipherstashPackMeta,
   contractSpace: cipherstashContractSpace,
   /**

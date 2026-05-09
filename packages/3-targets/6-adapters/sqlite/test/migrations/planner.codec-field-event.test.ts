@@ -86,7 +86,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
     expect(ids).toContain('table.User');
   });
 
-  it('fires on field drop in app-space (verifies M2 R1 wiring across event kinds)', () => {
+  it('fires on field drop in app-space (codec field-event wiring across event kinds)', () => {
     const events: string[] = [];
     const hooks: CodecControlHooks = {
       onFieldEvent: (event, ctx) => {

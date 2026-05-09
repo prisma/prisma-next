@@ -32,7 +32,7 @@ describe('planAllSpaces', () => {
     expect(result.map((r) => r.spaceId)).toEqual(['app', 'cipherstash']);
   });
 
-  it('sorts outputs alphabetically by spaceId regardless of input order (AM3)', () => {
+  it('sorts outputs alphabetically by spaceId regardless of input order', () => {
     const order1 = planAllSpaces(
       [makeInput('cipherstash', 'h1'), makeInput('app', 'h2'), makeInput('pgvector', 'h3')],
       planSpace,

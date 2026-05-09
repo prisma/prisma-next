@@ -21,12 +21,13 @@ import {
 } from './fixtures/runner-fixtures';
 
 /**
- * End-to-end T2.5 — drives the CLI per-space `db init` / `db update`
- * flow (`executePerSpaceDbApply`, sub-spec § 6) against a real SQLite
+ * End-to-end: drives the CLI per-space `db init` / `db update`
+ * flow (`executePerSpaceDbApply`) against a real SQLite
  * database with on-disk pinned artefacts.
  *
- * Locks the CLI-level half of AM4-rollback + AM9 + AM10 + AM11, and
- * substantially advances AM12 (the runner-level half is covered by
+ * Covers transactional rollback across spaces, multi-space init semantics,
+ * pinned-head bumps, marker-vs-pinned checks at the CLI surface, and
+ * materialisation idempotency (the runner-level scenarios live in
  * `runner.multi-space.test.ts`). Companion to the unit-level tests in
  * `@prisma-next/cli` that mock the planner / runner.
  *
@@ -82,7 +83,7 @@ const extContractV2 = buildExtensionContract(2);
 // `precheck`, `execute`, `postcheck`) on top of the framework-level
 // `MigrationPlanOperation` shape. Tests author the runtime shape and
 // cast to `MigrationPlanOperation` because the on-disk `ops.json`
-// schema is intentionally light (sub-spec § 1, AM3) — the SQL runner
+// schema is intentionally light — the SQL runner
 // reads the additional fields at execution time.
 function buildBaselineOps(): readonly MigrationPlanOperation[] {
   return [
@@ -235,7 +236,7 @@ describe(
       });
     }
 
-    it('initialises both spaces atomically on a fresh database (locks AM9, AM11 prerequisites)', async () => {
+    it('initialises both spaces atomically on a fresh database', async () => {
       const tmpDir = createTmpDir();
       const { migrationsDir } = await setupBaselinePinned(tmpDir);
 
@@ -279,7 +280,7 @@ describe(
       expect(helperTable.rows[0]!.cnt).toBe(1);
     });
 
-    it('advances only the bumped extension space when re-running with a new pinned head (locks AM10)', async () => {
+    it('advances only the bumped extension space when re-running with a new pinned head', async () => {
       const tmpDir = createTmpDir();
       const baseline = await setupBaselinePinned(tmpDir);
 
@@ -369,7 +370,7 @@ describe(
       expect(helperCols.rows.map((c) => c.name).sort()).toEqual(['id', 'note']);
     });
 
-    it('fires the codec onFieldEvent hook on app-space field add through the per-space db init flow (M2 R1 wiring still flows through T2.3)', async () => {
+    it('fires the codec onFieldEvent hook on app-space field add through the per-space db init flow', async () => {
       const tmpDir = createTmpDir();
       const { migrationsDir } = await setupBaselinePinned(tmpDir);
 
@@ -457,12 +458,12 @@ describe(
       // The codec-emitted op was included in the aggregate operations
       // surfaced to the caller (proves the codec hook flows through
       // `executePerSpaceDbApply` → planner.plan → `frameworkComponents`,
-      // i.e. the M2 R1 wiring still works under the per-space surface).
+      // i.e. codec field-event wiring still works under the per-space surface).
       const ids = result.value.plan.operations.map((op) => op.id);
       expect(ids).toContain('codec.added.user.email');
     });
 
-    it('rolls back ALL spaces and preserves pre-execution markers when any space fails (locks AM4-rollback CLI half)', async () => {
+    it('rolls back ALL spaces and preserves pre-execution markers when any space fails (CLI half)', async () => {
       const tmpDir = createTmpDir();
       const baseline = await setupBaselinePinned(tmpDir);
 

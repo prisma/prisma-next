@@ -20,8 +20,8 @@ const contract: Contract<SqlStorage> = {
   models: {},
 };
 
-describe('planFromAst (AC-PLAN1..3)', () => {
-  it('AC-PLAN1: meta.storageHash matches contract.storage.storageHash', () => {
+describe('planFromAst', () => {
+  it('meta.storageHash matches contract.storage.storageHash', () => {
     const ast = RawSqlExpr.of(['SELECT 1'], []);
     const plan = planFromAst(ast, contract);
     expect(plan.meta.storageHash).toBe(contract.storage.storageHash);
@@ -34,7 +34,7 @@ describe('planFromAst (AC-PLAN1..3)', () => {
     expect(plan.meta.targetFamily).toBe(contract.targetFamily);
   });
 
-  it("AC-PLAN2: meta.lane defaults to 'raw' and is overridable via the third arg", () => {
+  it("meta.lane defaults to 'raw' and is overridable via the third arg", () => {
     const ast = RawSqlExpr.of(['SELECT 1'], []);
     const defaultPlan = planFromAst(ast, contract);
     expect(defaultPlan.meta.lane).toBe('raw');

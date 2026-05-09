@@ -1,15 +1,15 @@
 /**
- * Scenario A end-to-end against PGlite — cipherstash sub-spec § 6 / T3.6.
+ * Scenario A end-to-end against PGlite.
  *
- * Drives the CLI per-space `db init` flow (`executePerSpaceDbApply`,
- * sub-spec § 6) against a real Postgres (PGlite via `createDevDatabase`)
- * with cipherstash wired as an extension space and the
+ * Drives the CLI per-space `db init` flow (`executePerSpaceDbApply`)
+ * against a real Postgres (PGlite via `createDevDatabase`) with
+ * cipherstash wired as an extension space and the
  * `cipherstash:string@1` codec hook attached to a searchable
  * `Encrypted<String>` column on the application contract.
  *
  * Three layers of coverage:
  *
- *   1. **AC-7 byte-equivalence (disk).** The pinned
+ *   1. **Byte-equivalence (disk).** The pinned
  *      `migrations/cipherstash/<dirName>/ops.json` carries the vendored
  *      `EQL_BUNDLE_SQL` byte-for-byte (single-string `execute[0].sql`).
  *
@@ -23,9 +23,9 @@
  *        - the codec-hook-emitted `add_search_config@v1` op for
  *          `User.email`.
  *
- *      This locks TC-14 (codec hook validated by the first real
- *      consumer) plus the planning half of AM4 (multi-space ordering
- *      preserved through `concatenateSpaceApplyInputs`).
+ *      This locks the codec-hook contract validated by the first real
+ *      consumer plus the planning half of multi-space ordering
+ *      preserved through `concatenateSpaceApplyInputs`.
  *
  *   3. **Multi-space apply (synthetic bundle).** Same wiring as test
  *      (2), but with a synthetic cipherstash baseline whose `installEql
@@ -53,11 +53,7 @@
  * (`RuntimeError: unreachable`). The synthetic-bundle apply path here
  * verifies the framework + codec wiring against a real database; the
  * real-bundle apply against a real Postgres (with `pgcrypto`) is
- * deferred to M3 R4 / TML-2373 e2e infra.
- *
- * Scenario B (drop searchable column → `remove_search_config` op) and
- * Scenario C (extension version bump) are deferred to R4 per the
- * orchestrator's R3-only scope.
+ * exercised by the example app's e2e setup.
  */
 
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -285,7 +281,7 @@ async function setupTestProject(args: {
 }
 
 describe.sequential(
-  'cipherstash Scenario A end-to-end (PGlite, T3.6)',
+  'cipherstash Scenario A end-to-end (PGlite)',
   { timeout: timeouts.spinUpPpgDev },
   () => {
     let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -320,12 +316,11 @@ describe.sequential(
     });
 
     /**
-     * AC-7 byte-equivalence (sub-spec § 3): the bundle SQL flowed
-     * through `installEqlBundleOp.execute[0].sql` and was serialised to
-     * the on-disk `ops.json` byte-for-byte. This closes the half of
-     * AC-7 that R2 left gated behind "the test reads the on-disk file".
+     * Byte-equivalence: the bundle SQL flowed through
+     * `installEqlBundleOp.execute[0].sql` and was serialised to the
+     * on-disk `ops.json` byte-for-byte.
      */
-    it('pinned ops.json carries the EQL bundle byte-for-byte (AC-7)', async () => {
+    it('pinned ops.json carries the EQL bundle byte-for-byte', async () => {
       project = await setupTestProject({ migration: cipherstashBaselineMigration });
       const opsPath = join(project.cipherstashBaselineDir, 'ops.json');
       const opsRaw = await readFile(opsPath, 'utf-8');
@@ -348,7 +343,7 @@ describe.sequential(
      *
      *   - the cipherstash codec hook fires for `User.email`, emitting
      *     a `cipherstash-codec:User.email:add-search-config:match@v1` op
-     *     (post-T2.9 per-flag invariantId shape — see
+     *     (per-flag invariantId shape — see
      *     {@link ADD_SEARCH_CONFIG_INVARIANT_ID});
      *   - both spaces are present in the plan output, with cipherstash
      *     ops ordered before app-space ops (per

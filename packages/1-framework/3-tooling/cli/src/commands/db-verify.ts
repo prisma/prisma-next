@@ -350,7 +350,7 @@ async function executeDbVerifyCommand(
   if (!setupResult.ok) return setupResult;
   const { contractJson, dbConnection, contractPathAbsolute } = setupResult.value;
 
-  // Per-space layout precheck (sub-spec § 4): same gating as `db init`.
+  // Per-space layout precheck: same gating as `db init`.
   // Runs before any DB I/O so `verifyContractSpaces` violations surface
   // even when the database is unreachable.
   const { migrationsDir } = resolveMigrationPaths(options.config, setupResult.value.config);
@@ -375,12 +375,11 @@ async function executeDbVerifyCommand(
       return notOk(mapVerifyFailure(verifyResult));
     }
 
-    // Marker-aware per-space verifier (sub-spec § 4): now that the
-    // database connection is established, read every marker row and
-    // re-run the verifier with full inputs. Locks the marker-half of
-    // AC-13 + AM11 — `orphanMarker`, marker-vs-pinned `hashMismatch`,
-    // and `invariantsMismatch` — that the layout-only precheck cannot
-    // detect on its own.
+    // Marker-aware per-space verifier: now that the database connection
+    // is established, read every marker row and re-run the verifier
+    // with full inputs. Catches `orphanMarker`, marker-vs-pinned
+    // `hashMismatch`, and `invariantsMismatch` — cases the layout-only
+    // precheck cannot detect on its own.
     const markerRowsBySpace = await client.readAllMarkers();
     const markerCheckResult = await runContractSpaceVerifierMarkerCheck({
       migrationsDir,
@@ -457,7 +456,7 @@ async function executeDbSchemaOnlyVerifyCommand(
   if (!setupResult.ok) return setupResult;
   const { contractJson, dbConnection, contractPathAbsolute } = setupResult.value;
 
-  // Per-space layout precheck (sub-spec § 4); see executeDbVerifyCommand.
+  // Per-space layout precheck; see executeDbVerifyCommand.
   const { migrationsDir } = resolveMigrationPaths(options.config, setupResult.value.config);
   const precheckResult = await runContractSpaceVerifierPrecheck({
     migrationsDir,

@@ -38,27 +38,23 @@ export interface ContractSpaceExtensionMigrationsPassResult {
  * under `migrations/<spaceId>/<dirName>/` for every package that does
  * not yet exist there.
  *
- * Sub-spec § 3 § Helper location pattern — the per-space "planner" for
- * extension spaces is a no-op that just returns the descriptor's
- * `migrations` verbatim; the value `planAllSpaces` brings to this
- * consumer site is **deterministic ordering** (alphabetical by spaceId)
- * and **duplicate-spaceId detection**. The actual write is performed
- * via `writeExtensionMigrationPackage` (T1.7) per package.
+ * The per-space "planner" for extension spaces is a no-op that just
+ * returns the descriptor's `migrations` verbatim; the value
+ * `planAllSpaces` brings to this consumer site is **deterministic
+ * ordering** (alphabetical by spaceId) and **duplicate-spaceId
+ * detection**. The actual write is performed via
+ * `writeExtensionMigrationPackage` per package.
  *
  * Idempotent: an existing `migrations/<spaceId>/<dirName>/` is left
  * untouched and reported in `result.skipped` — the helper never
- * overwrites authored migration content. This is what AM12
- * (sub-spec § 4 — Acceptance Criteria, "re-running `migrate` does not
- * corrupt or churn extension migration packages") locks in.
+ * overwrites authored migration content, so re-running `migrate` does
+ * not corrupt or churn extension migration packages.
  *
  * Pinned per-space artefacts (`contract.json`, `contract.d.ts`,
  * `refs/head.json`) are emitted by
  * {@link import('./contract-space-migrate-pass').runContractSpaceMigratePass}
  * separately — they cover the head-pointer side of the ledger. This
  * helper covers the migration-graph side.
- *
- * @see specs/framework-mechanism.spec.md § 3 — Per-space planner (T1.3),
- *   emit pipeline (T1.7).
  */
 export async function runContractSpaceExtensionMigrationsPass(
   inputs: ContractSpaceExtensionMigrationsPassInputs,

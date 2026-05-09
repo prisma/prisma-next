@@ -1,7 +1,7 @@
 /**
  * Control-plane descriptor for the synthetic test extension.
  *
- * **Reference model — on-disk-in-package authoring (M3.5 R1).**
+ * **Reference model — on-disk-in-package authoring.**
  *
  * The extension's contract + migrations are emitted by the same
  * pipeline application authors use:

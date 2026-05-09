@@ -8,7 +8,7 @@ import testContractSpaceExtensionDescriptor from '../src/exports/control';
  * Reference-model descriptor self-tests.
  *
  * The synthetic `test-contract-space` extension is the canonical example
- * of on-disk-in-package authoring (M3.5 R1). These assertions lock down
+ * of on-disk-in-package authoring. These assertions lock down
  * the wiring: contract value comes from `contract.json`, migrations from
  * `migrations/<space-id>/<dirName>/{migration,ops}.json`, head ref from
  * `refs/head.json`. Hash-level values are sourced from the on-disk

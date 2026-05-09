@@ -158,7 +158,7 @@ function buildContext(event: FieldEvent, entry: FieldEntry): FieldEventContext {
 /**
  * `'altered'` predicate: returns `true` when any property other than
  * `codecId` differs. Pure-`codecId` changes are excluded — codec rotation
- * is a v1 non-goal (project spec § Non-goals).
+ * is deferred for v1.
  */
 function isAlteration(prior: StorageColumn, current: StorageColumn): boolean {
   if (prior.codecId !== current.codecId) return false;

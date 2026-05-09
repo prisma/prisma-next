@@ -1,6 +1,5 @@
 /**
- * Storage round-trip end-to-end against PGlite — cipherstash plan.md
- * § T2.8 (storage half of AC-UMB1 + AC-UMB3).
+ * Storage round-trip end-to-end against PGlite.
  *
  * Builds on `scenario-a.e2e.integration.test.ts` (which proves the
  * control-plane apply path: bundle install + codec-hook ops landing
@@ -17,7 +16,7 @@
  *   2. Stand up a runtime via `createRuntime` with:
  *        - postgres target / adapter / driver (runtime planes)
  *        - `createCipherstashRuntimeDescriptor({ sdk })` as an
- *          extension pack (F5 — runtime descriptor wrapper)
+ *          extension pack
  *        - `bulkEncryptMiddleware(sdk)` registered manually (the SQL
  *          runtime descriptor has no middleware slot; consumers
  *          compose it themselves — documented on the
@@ -26,9 +25,9 @@
  *
  *   3. Insert 10 rows × 1 cipherstash column via a hand-built
  *      `InsertAst` wrapped in `planFromAst`. Assert the bulk-encrypt
- *      middleware made **exactly one** `bulkEncrypt` call (AC-MW1
- *      bulk-amortization claim, AC-UMB3 storage half), batching all
- *      10 plaintexts under one `(table, column)` routing key.
+ *      middleware made **exactly one** `bulkEncrypt` call (the bulk-
+ *      amortization claim), batching all 10 plaintexts under one
+ *      `(table, column)` routing key.
  *
  *   4. Query the rows back via a hand-built `SelectAst`. Assert each
  *      decoded row's `email` is an `EncryptedString` envelope; calling
@@ -49,7 +48,7 @@
  * codec hook touches. The storage half of the round-trip — type cast
  * `$N::eql_v2_encrypted`, composite-text encode/decode, marker rows —
  * runs against real Postgres semantics. Operator lowering (`eq`,
- * `ilike`) and the real-bundle e2e against `pgcrypto` are M3 scope.
+ * `ilike`) and the real-bundle e2e against `pgcrypto` are out of scope for this test.
  */
 
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
@@ -100,8 +99,7 @@ import {
   EQL_V2_SCHEMA,
 } from '../src/extension-metadata/constants';
 
-// Forward-port (M3.5 R2): the cipherstash contract / baseline migration / head ref
-// now flow through on-disk JSON via the descriptor's contractSpace, replacing the
+// The cipherstash contract / baseline migration / head ref flow through on-disk JSON via the descriptor's contractSpace, replacing the
 // previous in-memory `core/contract` and `core/migrations` modules.
 const cipherstashContractSpace = cipherstashExtensionDescriptor.contractSpace!;
 const cipherstashContract = cipherstashContractSpace.contractJson;
@@ -374,7 +372,7 @@ function buildSelectPlan() {
 }
 
 describe.sequential(
-  'cipherstash storage round-trip (PGlite, T2.8)',
+  'cipherstash storage round-trip (PGlite)',
   { timeout: timeouts.spinUpPpgDev * 2 },
   () => {
     let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -480,8 +478,7 @@ describe.sequential(
 
         await runtime.execute(insertPlan).toArray();
 
-        // AC-MW1 / AC-UMB3 storage half — exactly one bulk-encrypt call
-        // amortizes the 10-row insert.
+        // Exactly one bulk-encrypt call amortizes the 10-row insert.
         expect(sdk.bulkEncryptCalls).toHaveLength(1);
         expect(sdk.bulkEncryptCalls[0]?.routingKey).toEqual({
           table: APP_TABLE,
@@ -527,15 +524,15 @@ describe.sequential(
         expect(decrypted).toEqual(envelopes.map((_, i) => `alice${i}@example.com`));
 
         // 10 single-cell decrypt calls — the read-side bulk path
-        // (`decryptAll`) is M3 scope; M2 only guarantees the per-cell
-        // envelope path round-trips.
+        // (`decryptAll`) is exercised separately; this test only
+        // guarantees the per-cell envelope path round-trips.
         expect(sdk.singleDecryptCalls).toHaveLength(10);
       } finally {
         await runtime.close();
       }
 
-      // Pin the descriptor's metadata so a future bump bumps both the
-      // wrapper's version and the AC-CODEC5 evidence cell together.
+      // Pin the descriptor's metadata so a future version bump
+      // intentionally surfaces here.
       expect(CIPHERSTASH_EXTENSION_VERSION).toBe('0.0.1');
     });
   },

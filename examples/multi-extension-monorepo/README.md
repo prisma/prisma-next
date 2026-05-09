@@ -3,8 +3,7 @@
 Worked example: a Prisma Next application that depends on **two** internal
 contract-space packages — `audit` and `feature-flags` — plus its own
 application schema. Exercises the framework's per-space planner / runner /
-verifier with multiple extensions composed into a single application
-(project: `extension-contract-spaces`, **M4 / TC-8** / spec **AC4**).
+verifier with multiple extensions composed into a single application.
 
 ## What this demonstrates
 
@@ -75,8 +74,7 @@ pnpm --filter @prisma-next/example-multi-extension-monorepo test
 ## Authoring (maintainers)
 
 Each internal "package" under `packages/` follows the **on-disk-in-package
-authoring** convention introduced in M3.5 (project:
-`extension-contract-spaces`, ADR 211). The same pipeline application
+authoring** convention (see [ADR 211](../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)). The same pipeline application
 authors use is applied per-subdirectory:
 
 1. Edit `packages/<pkg>/contract-source.ts` (the TS entry-point that calls
@@ -100,8 +98,8 @@ authors use is applied per-subdirectory:
 
    Then hand-edit the generated `migrations/<pkg>/<dir>/migration.ts`'s
    `operations` getter so each op carries the package's stable
-   `<pkg>:<change>-vN` invariantId (project FR11 — invariantIds cannot be
-   renamed once published). Re-emit `ops.json` + `migration.json`:
+   `<pkg>:<change>-vN` invariantId (invariantIds cannot be renamed once
+   published). Re-emit `ops.json` + `migration.json`:
 
    ```sh
    node migrations/<pkg>/<dir>/migration.ts

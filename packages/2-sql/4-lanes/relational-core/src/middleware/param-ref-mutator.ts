@@ -23,7 +23,7 @@ declare const paramRefHandleBrand: unique symbol;
  *
  * The phantom `TCodecId` parameter records the codec id of the
  * referenced `ParamRef` so type-level inference can route replacement
- * values through `TCodecMap` to the codec's declared `TInput` (AC-TYPE1).
+ * values through `TCodecMap` to the codec's declared `TInput`.
  */
 export interface ParamRefHandle<TCodecId extends string | undefined = string | undefined> {
   readonly [paramRefHandleBrand]: TCodecId;
@@ -62,14 +62,14 @@ export type ParamRefEntryUnion<TCodecMap extends Record<string, unknown>> =
  * `params`. Scope is `ParamRef.value` slots only — middleware cannot
  * insert / remove `ParamRef`s, rewrite SQL, or modify projection. The
  * type-level `ParamRefHandle` brand and the `replaceValue(ref,
- * newValue)` shape enforce this at compile time (AC-MUT4).
+ * newValue)` shape enforce this at compile time.
  *
  * Allocation discipline: the mutator is constructed lazily from the
  * plan. `entries()` walks the plan's existing AST without allocating
  * an intermediate array; the working params buffer is only allocated
  * on the first `replaceValue` / `replaceValues` call. If no middleware
  * mutates, `currentParams()` returns the plan's original `params` by
- * reference identity (AC-MUT5).
+ * reference identity.
  *
  * The `TCodecMap` parameter is a record keyed by codec id; `replaceValue`
  * infers `newValue` from `TCodecMap[H['codecId']]` for handles whose
@@ -80,7 +80,7 @@ export type ParamRefEntryUnion<TCodecMap extends Record<string, unknown>> =
 export interface SqlParamRefMutator<
   TCodecMap extends Record<string, unknown> = Record<string, unknown>,
 > extends ParamRefMutator {
-  /** Iterate every outbound `ParamRef` the plan currently carries, in canonical order (AC-MUT2). */
+  /** Iterate every outbound `ParamRef` the plan currently carries, in canonical order. */
   entries(): IterableIterator<ParamRefEntryUnion<TCodecMap>>;
 
   /**

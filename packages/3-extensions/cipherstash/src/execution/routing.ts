@@ -1,12 +1,11 @@
 /**
  * Routing-key derivation for cipherstash bulk operations.
  *
- * Per `plan.md § Open items 5` (resolved 2026-05-06), the routing key
- * is derived from the envelope handle's `(table, column)` — there is no
- * per-column override surface. Every cipherstash envelope passing
- * through `bulkEncryptMiddleware` (and, in M3, `decryptAll`) carries
- * `(table, column)` on its handle, populated by the middleware's AST
- * walk before the bulk-encrypt phase begins.
+ * The routing key is derived from the envelope handle's
+ * `(table, column)` — there is no per-column override surface. Every
+ * cipherstash envelope passing through `bulkEncryptMiddleware` (and
+ * `decryptAll`) carries `(table, column)` on its handle, populated by
+ * the middleware's AST walk before the bulk-encrypt phase begins.
  *
  * `groupByRoutingKey` produces one homogeneous group per
  * `(table, column)` pair so each `bulkEncrypt` call serves a single

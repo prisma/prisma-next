@@ -1,7 +1,5 @@
 /**
- * Nullable umbrella end-to-end against PGlite — pins AC-UMB4
- * (canonical AC list lives in the package`s `DEVELOPING.md §
- * Acceptance criteria → Umbrella round-trips`).
+ * Nullable umbrella end-to-end against PGlite.
  *
  * Sibling to `umbrella.e2e.integration.test.ts` (search + read-side
  * bulk-call counting on the non-nullable variant). Reuses the same
@@ -10,7 +8,7 @@
  * encrypted-equality query / read-side `decryptAll` round-trip can
  * all be exercised on the same fixture.
  *
- * AC-UMB4 (paraphrased): the nullable variant
+ * Pinned: the nullable variant
  * `email: EncryptedString({ equality: true })?` round-trips correctly
  * with a mix of null and non-null rows; `email.isNull()` lowers to
  * `WHERE email IS NULL` directly via `NullCheckExpr` (not an
@@ -48,9 +46,8 @@
  * `eql_v2.eq` and `eql_v2.ilike` are stubbed with cleartext-comparing
  * function bodies so the operator-lowering wire path can reach a real
  * Postgres function call at execute time. The synthetic stub does NOT
- * validate EQL`s correctness against real ciphertexts (out of project
- * scope per the M3 R2 prompt`s explicit "Items the orchestrator has
- * triaged out of scope" list — M4 / post-Project-1 territory).
+ * validate EQL`s correctness against real ciphertexts; that gate
+ * belongs on a real-Postgres + real-EQL-bundle e2e.
  */
 
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
@@ -112,8 +109,7 @@ import {
   EQL_V2_SCHEMA,
 } from '../src/extension-metadata/constants';
 
-// Forward-port (M3.5 R2): the cipherstash contract / baseline migration / head ref
-// now flow through on-disk JSON via the descriptor's contractSpace, replacing the
+// The cipherstash contract / baseline migration / head ref flow through on-disk JSON via the descriptor's contractSpace, replacing the
 // previous in-memory `core/contract` and `core/migrations` modules.
 const cipherstashContractSpace = cipherstashExtensionDescriptor.contractSpace!;
 const cipherstashContract = cipherstashContractSpace.contractJson;
@@ -447,7 +443,7 @@ function buildSearchPlan(method: 'cipherstashEq' | 'cipherstashIlike', value: st
 }
 
 describe.sequential(
-  'cipherstash nullable umbrella round-trip — mixed-null insert + isNull/isNotNull + cipherstashEq + decryptAll (PGlite, T3.7 / AC-UMB4)',
+  'cipherstash nullable umbrella round-trip — mixed-null insert + isNull/isNotNull + cipherstashEq + decryptAll (PGlite)',
   { timeout: timeouts.spinUpPpgDev * 2 },
   () => {
     let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -506,7 +502,7 @@ describe.sequential(
       }
     });
 
-    it('mixed-null insert → isNull/isNotNull (no eql_v2 call) → cipherstashEq → decryptAll skips nulls (AC-UMB4)', async () => {
+    it('mixed-null insert → isNull/isNotNull (no eql_v2 call) → cipherstashEq → decryptAll skips nulls', async () => {
       const sdk = makeCounterSdk();
       const cipherstashRuntime = createCipherstashRuntimeDescriptor({ sdk });
 
@@ -557,9 +553,8 @@ describe.sequential(
           .map((r) => r.email)
           .map((e) => {
             // Fish the original plaintext back out for the
-            // assertion below; the envelope's handle is package-
-            // private but `decrypt()` returns the cached plaintext
-            // synchronously for write-side envelopes (AC-MW5).
+            // assertion below; `decrypt()` returns the cached
+            // plaintext synchronously for write-side envelopes.
             return e;
           });
         expect(populatedPlaintexts).toHaveLength(POPULATED_HALF);
@@ -663,7 +658,7 @@ describe.sequential(
         expect(sdk.bulkDecryptCalls[0]?.ciphertexts).toHaveLength(POPULATED_HALF);
 
         // Cached plaintexts now resolve synchronously without
-        // additional SDK calls (AC-DEC3).
+        // additional SDK calls.
         const populatedSorted = [...isNotNullResults].sort((a, b) => a.id.localeCompare(b.id));
         const decrypted = await Promise.all(
           populatedSorted.map((row) => {

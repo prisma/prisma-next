@@ -1,7 +1,6 @@
 /**
  * Behavioural tests for the cipherstash storage codec runtime + the
- * parameterized codec descriptor. Covers AC-CODEC1..CODEC5 from
- * `envelope-codec-extension.spec.md` (M2 R1, project-1).
+ * parameterized codec descriptor.
  *
  * The codec runtime is constructed via `codec({ ... })` from
  * `@prisma-next/sql-relational-core/ast`. Author-side `encode`/`decode`
@@ -36,7 +35,7 @@ function ctxWithColumn(table: string, name: string): SqlCodecCallContext {
 
 const ctxWithoutColumn: SqlCodecCallContext = {};
 
-describe('createCipherstashStringCodec — registration shape — AC-CODEC1', () => {
+describe('createCipherstashStringCodec — registration shape', () => {
   it('uses cipherstash/string@1 as the codec id', () => {
     const codec = createCipherstashStringCodec(emptySdk());
     expect(codec.id).toBe(CIPHERSTASH_STRING_CODEC_ID);
@@ -50,8 +49,8 @@ describe('createCipherstashStringCodec — registration shape — AC-CODEC1', ()
   });
 
   it('declares no codec traits — equality search routes through cipherstashEq', () => {
-    // Regression test for the M3 R1 follow-up decision: cipherstash
-    // columns do NOT advertise the framework`s `equality` trait at the
+    // Regression test: cipherstash columns do NOT advertise the
+    // framework`s `equality` trait at the
     // codec level. The framework`s built-in `eq` is gated on
     // `equality` and lowers to standard SQL `=`, which is wrong for
     // EQL ciphers (randomized nonces). Equality search on cipherstash
@@ -64,7 +63,7 @@ describe('createCipherstashStringCodec — registration shape — AC-CODEC1', ()
   });
 });
 
-describe('codec.decode(wire, ctx) — AC-CODEC2', () => {
+describe('codec.decode(wire, ctx)', () => {
   it('constructs an envelope carrying the column identity from ctx.column', async () => {
     const sdk = emptySdk();
     const codec = createCipherstashStringCodec(sdk);
@@ -84,7 +83,7 @@ describe('codec.decode(wire, ctx) — AC-CODEC2', () => {
   });
 });
 
-describe('codec.encode(envelope, ctx) — AC-CODEC3', () => {
+describe('codec.encode(envelope, ctx)', () => {
   it('extracts the ciphertext from the envelope handle', async () => {
     const codec = createCipherstashStringCodec(emptySdk());
     const envelope = EncryptedString.from('alice@example.com');
@@ -104,7 +103,7 @@ describe('codec.encode(envelope, ctx) — AC-CODEC3', () => {
   });
 });
 
-describe('codec.renderOutputType — AC-CODEC4', () => {
+describe('codec.renderOutputType', () => {
   it('returns "EncryptedString"', () => {
     const codec = createCipherstashStringCodec(emptySdk());
     expect(codec.renderOutputType?.({})).toBe('EncryptedString');
@@ -163,7 +162,7 @@ describe('eql_v2_encrypted wire-format round-trip — wire-format fix', () => {
   });
 });
 
-describe('createParameterizedCodecDescriptors — AC-CODEC5', () => {
+describe('createParameterizedCodecDescriptors', () => {
   it('exposes a single descriptor for cipherstash/string@1', () => {
     const descriptors = createParameterizedCodecDescriptors(emptySdk());
     expect(descriptors).toHaveLength(1);

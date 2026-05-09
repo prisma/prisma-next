@@ -1,7 +1,7 @@
 /**
  * Control-plane descriptor for the pgvector extension.
  *
- * **On-disk-in-package authoring (M3.5 R3).** The extension's contract
+ * **On-disk-in-package authoring.** The extension's contract
  * + migrations are emitted by the same pipeline application authors use:
  *
  *   `prisma-next contract emit` → `<package>/contract.{json,d.ts}`
