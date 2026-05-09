@@ -2,7 +2,9 @@
   "from": null,
   "to": "sha256:a9332fa03df5f9a354837771d52806a5acfe236851ccc5bac8e50f84fb92ebc5",
   "labels": [],
-  "providedInvariants": ["pgvector:install-vector-v1"],
+  "providedInvariants": [
+    "pgvector:install-vector-v1"
+  ],
   "createdAt": "2026-06-01T00:00:00.000Z",
   "fromContract": null,
   "toContract": {

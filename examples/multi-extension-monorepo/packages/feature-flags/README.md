@@ -18,12 +18,23 @@ for the full step-by-step workflow — the short version is:
 3. If the schema changed: `pnpm exec prisma-next migration plan --name <slug>`,
    then hand-edit the generated `migrations/feature-flags/<dir>/migration.ts`
    so each op carries the package's stable invariantId, and re-emit
-   `ops.json` with `pnpm tsx migrations/feature-flags/<dir>/migration.ts`.
-   (Use `tsx`, not bare `node`: the Migration subclass imports
-   relative TypeScript siblings which Node's native loader can't
-   resolve without a TS-aware loader. `migration plan` is **not**
-   chained into the package's build script — it's non-idempotent and
-   runs manually when the schema changes.)
+   `ops.json` from this directory with:
+
+   ```sh
+   pnpm exec tsx "$PWD/migrations/feature-flags/<dir>/migration.ts" \
+     --config "$PWD/prisma-next.config.ts"
+   ```
+
+   The verbose absolute-path incantation is necessary because this
+   subdirectory has no `package.json`: `pnpm exec` rewinds cwd to the
+   monorepo root (`examples/multi-extension-monorepo/`) before exec,
+   which would otherwise resolve the migration path / config path
+   against the wrong directory. (`tsx` rather than bare `node` because
+   the Migration subclass imports relative TypeScript siblings which
+   Node's native loader can't resolve without a TS-aware loader.
+   `migration plan` is **not** chained into the package's build
+   script — it's non-idempotent and runs manually when the schema
+   changes.)
 4. Update [`refs/head.json`](./refs/head.json) to pin the new head
    `(hash, invariants)`.
 5. The descriptor at [`control.ts`](./control.ts) is JSON-import wiring
