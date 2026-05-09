@@ -3,9 +3,8 @@ import type {
   ComponentDatabaseDependencies,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
+import { POSTGIS_GEOMETRY_CODEC_ID } from '../core/constants';
 import { postgisPackMeta, postgisQueryOperations } from '../core/descriptor-meta';
-
-const POSTGIS_GEOMETRY_CODEC_ID = 'pg/geometry@1' as const;
 
 const geometryControlPlaneHooks: CodecControlHooks = {
   expandNativeType: ({ nativeType, typeParams }) => {

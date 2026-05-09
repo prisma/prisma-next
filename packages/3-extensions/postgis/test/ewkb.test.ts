@@ -205,5 +205,23 @@ describe('postgis EWKB / EWKT', () => {
       const hex = '02' + '01000000';
       expect(() => decodeEWKBHex(hex)).toThrow('invalid byte order');
     });
+
+    it('rejects malformed hex pairs', () => {
+      // Valid LE Point header followed by a non-hex pair where the X coord starts.
+      const hex = '01' + '01000000' + 'gg' + '00000000000000' + '0000000000000000';
+      expect(() => decodeEWKBHex(hex)).toThrow('invalid hex byte');
+    });
+
+    it('rejects buffers truncated mid-coordinate', () => {
+      // LE Point header but only 4 of 16 coordinate bytes present.
+      const hex = '01' + '01000000' + '00000000';
+      expect(() => decodeEWKBHex(hex)).toThrow('unexpected end of buffer');
+    });
+
+    it('rejects trailing bytes after a valid geometry', () => {
+      // LE Point at origin without SRID, plus an extra trailing byte.
+      const hex = '01' + '01000000' + '0000000000000000' + '0000000000000000' + '00';
+      expect(() => decodeEWKBHex(hex)).toThrow('trailing data after geometry');
+    });
   });
 });

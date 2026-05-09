@@ -32,17 +32,19 @@ const TYPE_MULTIPOINT = 4;
 const TYPE_MULTILINESTRING = 5;
 const TYPE_MULTIPOLYGON = 6;
 
+const HEX_PAIR_RE = /^[0-9a-fA-F]{2}$/;
+
 function hexToBytes(hex: string): Uint8Array {
   if (hex.length % 2 !== 0) {
     throw new Error('Geometry wire value: odd-length hex string');
   }
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < bytes.length; i++) {
-    const byte = Number.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
-    if (Number.isNaN(byte)) {
+    const pair = hex.slice(i * 2, i * 2 + 2);
+    if (!HEX_PAIR_RE.test(pair)) {
       throw new Error(`Geometry wire value: invalid hex byte at offset ${i * 2}`);
     }
-    bytes[i] = byte;
+    bytes[i] = Number.parseInt(pair, 16);
   }
   return bytes;
 }
@@ -55,22 +57,41 @@ class Reader {
     this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   }
 
+  private requireBytes(needed: number): void {
+    if (this.offset + needed > this.view.byteLength) {
+      throw new Error(
+        `Geometry wire value: unexpected end of buffer (need ${needed} bytes at offset ${this.offset}, ${this.view.byteLength - this.offset} available)`,
+      );
+    }
+  }
+
   readUint8(): number {
+    this.requireBytes(1);
     const v = this.view.getUint8(this.offset);
     this.offset += 1;
     return v;
   }
 
   readUint32(littleEndian: boolean): number {
+    this.requireBytes(4);
     const v = this.view.getUint32(this.offset, littleEndian);
     this.offset += 4;
     return v >>> 0;
   }
 
   readFloat64(littleEndian: boolean): number {
+    this.requireBytes(8);
     const v = this.view.getFloat64(this.offset, littleEndian);
     this.offset += 8;
     return v;
+  }
+
+  hasRemaining(): boolean {
+    return this.offset !== this.view.byteLength;
+  }
+
+  remainingBytes(): number {
+    return this.view.byteLength - this.offset;
   }
 }
 
@@ -90,9 +111,11 @@ function readHeader(reader: Reader): Header {
   if ((typeCode & FLAG_Z) !== 0 || (typeCode & FLAG_M) !== 0) {
     throw new Error('Geometry wire value: Z/M coordinates are not supported');
   }
-  const hasSRID = (typeCode & FLAG_SRID) !== 0;
-  const srid = hasSRID ? reader.readUint32(littleEndian) : undefined;
-  return { geomType: typeCode & TYPE_MASK, littleEndian, srid };
+  const geomType = typeCode & TYPE_MASK;
+  if ((typeCode & FLAG_SRID) !== 0) {
+    return { geomType, littleEndian, srid: reader.readUint32(littleEndian) };
+  }
+  return { geomType, littleEndian };
 }
 
 function readPosition(reader: Reader, littleEndian: boolean): Position {
@@ -194,6 +217,16 @@ function readMultiPolygon(reader: Reader, header: Header): GeometryMultiPolygon 
 export function decodeEWKBHex(hex: string): Geometry {
   const reader = new Reader(hexToBytes(hex));
   const header = readHeader(reader);
+  const geometry = readGeometryBody(reader, header);
+  if (reader.hasRemaining()) {
+    throw new Error(
+      `Geometry wire value: trailing data after geometry (${reader.remainingBytes()} bytes)`,
+    );
+  }
+  return geometry;
+}
+
+function readGeometryBody(reader: Reader, header: Header): Geometry {
   switch (header.geomType) {
     case TYPE_POINT:
       return readPoint(reader, header);
