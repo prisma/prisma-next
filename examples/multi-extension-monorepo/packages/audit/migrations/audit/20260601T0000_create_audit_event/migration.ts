@@ -12,7 +12,9 @@
  * Re-emit `ops.json` / `migration.json` after edits via
  * `node migration.ts` (or `tsx migration.ts` on Node < 24).
  */
+import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { Migration, MigrationCLI, rawSql } from '@prisma-next/target-postgres/migration';
+import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { AUDIT_BASELINE_INVARIANT_ID, AUDIT_EVENT_TABLE } from '../../../constants';
 
 export default class M extends Migration {
@@ -23,7 +25,7 @@ export default class M extends Migration {
     };
   }
 
-  override get operations() {
+  override get operations(): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
     return [
       rawSql({
         id: `audit.create-${AUDIT_EVENT_TABLE}`,
