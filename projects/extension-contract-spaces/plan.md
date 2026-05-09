@@ -2,7 +2,7 @@
 
 ## Summary
 
-Introduce **contract spaces** — disjoint `(contract.json, migration-graph)` units that the framework treats uniformly — so extensions become first-class schema contributors using the same planner, runner, verifier, and migration shape as application authoring. As part of the project, the in-tree workspace extension that uses `databaseDependencies.init` (pgvector — confirmed sole consumer by spike) is migrated to a contract space; cipherstash is authored fresh on the new mechanism. arktype-json is out of scope (spike confirmed it ships no `databaseDependencies` and needs no DB scaffolding). After both extensions ship, the `databaseDependencies` mechanism is removed. The cipherstash blocker (TML-2373) is unblocked by M3.
+Introduce **contract spaces** — disjoint `(contract.json, migration-graph)` units that the framework treats uniformly — so extensions become first-class schema contributors using the same planner, runner, verifier, and migration shape as application authoring. As part of the project, the in-tree workspace extension that uses `databaseDependencies.init` (pgvector — confirmed sole consumer by spike) is migrated to a contract space; cipherstash is authored fresh on the new mechanism. arktype-json is out of scope (spike confirmed it ships no `databaseDependencies` and needs no DB scaffolding). After both extensions ship, the user-facing `migration` CLI surface (`plan` / `status` / `apply`) is promoted to operate on the contract-space aggregate so the canonical deploy path treats every space first-class — `migration apply` is the production path; `db init` / `db update` remain dev-time conveniences. Then the `databaseDependencies` mechanism is removed. The cipherstash blocker (TML-2373) is unblocked by M3.
 
 **Spec:** `projects/extension-contract-spaces/spec.md`
 
@@ -37,7 +37,7 @@ Three milestones have task specs because their implementation detail is large en
 - [`specs/m2-orchestrator-consolidation-spec.md`](./specs/m2-orchestrator-consolidation-spec.md) — the M2 R6 consolidation slice (collapsed dual `db init` path, marker-aware verifier wired into all apply paths, path-resolver seam).
 - [`specs/contract-space-aggregate-spec.md`](./specs/contract-space-aggregate-spec.md) — locks down the typed `ContractSpaceAggregate` + loader + aggregate planner + aggregate verifier; the deletion list for today's per-space orchestrator; commit-by-commit slice; 15 acceptance criteria; closes F00 / F05 / F09 / F15 / F23 (subsumes F30). Drives M2.5.
 - [`specs/cipherstash-migration.spec.md`](./specs/cipherstash-migration.spec.md) — locks down cipherstash's package layout, contract IR contents, baseline migration shape (with the EQL bundle byte-equivalence rule), codec hook behaviour, descriptor wiring, and four end-to-end test scenarios (initial, drop, bump, revert workaround). Drives M3.
-- [`specs/contract-space-on-disk-shape.spec.md`](./specs/contract-space-on-disk-shape.spec.md) — pre-launch shape-locking slice on top of M2.5: subspace the app's migrations under `migrations/<appSpaceId>/` (uniform with extensions); drop the "pinned" qualifier from artefact-emission helpers; relocate in-tree fixtures and examples atomically. Spelling normalisation ("artefact" → "artifact") is deferred to M5 T5.10.
+- [`specs/migration-cli-aggregate.spec.md`](./specs/migration-cli-aggregate.spec.md) — locks down the user-facing migration CLI surface against the contract-space aggregate: `migration plan` / `status` / `apply` semantics and output shapes, the corresponding `db init` / `db update` success-output shape, operation-label conventions, and the e2e snapshot test plan walking a pgvector-using app on PGlite. Drives M6.
 
 M4 (pgvector + monorepo example) and M5 (`databaseDependencies` removal + close-out) are small enough to be captured inline in this plan; no task spec needed.
 
@@ -301,19 +301,59 @@ Migrate the only existing workspace consumer of `databaseDependencies` (pgvector
 - `pnpm lint:deps`
 - `pnpm build`
 
+### Milestone 6: Promote the `migration` CLI to the contract-space aggregate
+
+The framework treats contract spaces as first-class as of M2.5; the user-facing CLI surface for the canonical deploy workflow does not. `migration plan` / `status` / `apply` enumerate, schedule, and report on the app space only — extension spaces are silently ignored, which surfaced under e2e verification (`projects/extension-contract-spaces/e2e-verification.md`, findings F1 / F3 / F4 / F7) as: plan summary buries the cross-space side effect, status omits extension spaces, apply silently misses extension-space migrations and fails on the app-space ops that depend on them, and `db init` / `db update` success output collapses per-space markers into a single ambiguous signature.
+
+Resolution: **the `migration` family is the canonical production path and operates on the aggregate.** `migration apply` runs the cross-space schedule (extensions alphabetically, then app — same ordering helper that already drives `db init` / `db update`); `migration status` enumerates every on-disk space; `migration plan` summarises by space. `db init` / `db update` remain dev-time conveniences (introspect + plan + apply in one go) and gain the per-space success-output shape we wanted on the production path anyway. The architectural inversion is clean: the canonical surface (`migration` family) drives the deploy story; the dev surface (`db` family) is the iteration shortcut.
+
+This milestone runs **before M5**, not after, because:
+- The project's stated objective ("first-class extension contract spaces") isn't met until the canonical user-facing CLI matches the framework model.
+- M5 ships the Contract Spaces ADR (T5.3) and the Migration System subsystem doc update (T5.7) — those need to describe shipped reality, not aspiration.
+- Closeout (T5.9) deletes `projects/extension-contract-spaces/`. Landing M6 first lets its sub-spec live alongside the others until the whole project closes together.
+
+**Sub-spec:** [`specs/migration-cli-aggregate.spec.md`](./specs/migration-cli-aggregate.spec.md) drives this milestone. Read it first; the tasks below collapse onto its required-changes / acceptance-criteria sections.
+
+**Tasks:**
+
+- [ ] **T6.2** `migration plan` output: group by space; surface extension-space materialisations as their own block; "Next:" line points at `prisma-next migration apply` (canonical) regardless of how many spaces are present. (Closes F1; satisfies AC3.)
+- [ ] **T6.3** `migration status` output: enumerate every on-disk contract space; per-space marker + pending + ref columns; cross-space pending count; recommended next command is the canonical `migration apply` when pending migrations exist. (Closes F4; satisfies AC2.)
+- [ ] **T6.4** `migration apply` behaviour: walks the aggregate, applying every space's pending migrations in the canonical cross-space order (extensions alphabetically, then app — same `concatenate-space-apply-inputs` helper that drives `db init` / `db update`). Per-space success summary (markers, directories, ops by space, order). (Closes F3; satisfies AC1, AC5, AC6.)
+- [ ] **T6.5** `db init` / `db update` success output shape: per-space markers, per-space applied directories + ops, applied order, "Run `prisma-next migration status` to confirm" hint. The single ambiguous "Signature:" line is replaced per the sub-spec § Output shape contract. (Closes F7; satisfies AC4.)
+- [ ] **T6.6** Operation-label cleanup: cipherstash extension's `CipherstashAddSearchConfigCall.label` rewritten to action-first / column-first form per the sub-spec; CLI formatter drops `[additive]` from the default-line (or pushes behind `--verbose` per sub-spec Open question 1). (Closes F2; satisfies AC7, AC8.)
+- [ ] **T6.7** `examples/cipherstash-integration/package.json`: add `db:init` / `db:update` scripts (parity with `examples/prisma-next-demo/package.json`). (Satisfies AC9.)
+- [ ] **T6.8** E2E snapshot test against a pgvector-using app: `emit → plan → status → apply → status` walks both spaces, every output shape locked. Runs on PGlite via the existing `examples/prisma-next-demo` / `packages/3-extensions/pgvector/test/integration/` harness. (Satisfies AC10; covers AC1–AC6, AC8 alongside the per-command unit tests.)
+
+**Validation gate:**
+
+- `pnpm typecheck`
+- `pnpm test:packages`
+- `pnpm test:integration`
+- `pnpm test:e2e`
+- `pnpm lint:deps`
+- `pnpm build`
+- e2e snapshot for the pgvector-using-app walkthrough passes on PGlite (locks T6.2 / T6.3 / T6.4 / T6.5 output shapes)
+
+**Out of scope** (called out so M6 close-out doesn't accidentally absorb them):
+- F5 — PGlite incompatibility with the real EQL bundle. Belongs in `examples/cipherstash-integration/README.md` plus a real-PG bootstrap script. Separate concern.
+- F6 — Upstream CipherStash bundle bug (`add_encrypted_constraint` mishandles `%I` for the constraint-name fragment). Filed upstream; PR-side workaround is `@@map("users")`.
+- F8 — Example app SDK envelope shape. Resolved by the swap to `@cipherstash/stack` (verification doc § "Switching the example off the stub SDK").
+
 ### Milestone 5: Remove `databaseDependencies` mechanism + close-out
 
 Remove the `databaseDependencies` mechanism from the framework. After M3 + M4 land, the only remaining consumer is gone (pgvector was the sole workspace consumer; cipherstash never used it). The blast radius is small — confirmed by spike: 3 files (the type def, the re-export, and pgvector's now-removed usage). Also normalises the "artefact" spelling our project drifted into back to the repo's prevailing "artifact" convention (T5.10). Migrate finalised ADRs into `docs/`, strip transient project references, delete `projects/extension-contract-spaces/`.
+
+> **Sequencing note.** M5 runs **after M6**. M6 promotes the `migration` CLI family to the contract-space aggregate, so by the time M5's ADRs and subsystem docs are written, the canonical user-facing surface matches the framework model. T5.3 / T5.7 below reflect that.
 
 **Tasks:**
 
 - [ ] **T5.1** Remove `ComponentDatabaseDependencies` and `ComponentDatabaseDependency` types from `packages/2-sql/9-family/src/core/migrations/types.ts`. Remove the re-export from `packages/2-sql/9-family/src/exports/control.ts`. Remove the `databaseDependencies?` field from `SqlControlExtensionDescriptor`. Remove any planner / runner / verifier code paths that consume `databaseDependencies`. (satisfies: TC-19)
 - [ ] **T5.2** Audit: `rg 'ComponentDatabaseDependencies|ComponentDatabaseDependency|databaseDependencies' packages/ examples/` returns zero matches. (satisfies: TC-19)
-- [ ] **T5.3** New ADR — Contract spaces. Captures the design (per-space planner / runner / verifier, descriptor model, layout convention, pinned per-space artefacts, marker schema change, db init/update semantics).
+- [ ] **T5.3** New ADR — Contract spaces. Captures the design: per-space planner / runner / verifier, descriptor model, layout convention, pinned per-space artefacts, marker schema change, the `ContractSpaceAggregate` runtime model (M2.5), the canonical user-facing migration CLI surface against the aggregate (M6 — `migration plan` / `status` / `apply` semantics; production deploy path) alongside the `db init` / `db update` dev-time conveniences, and the per-space output shape they share.
 - [ ] **T5.4** New ADR — Codec lifecycle hooks. Captures the hook contract (synchronous, app-space-bound, IR scope, altered semantics).
 - [ ] **T5.5** Update ADR 154 — record supersession; mark `databaseDependencies` removed.
 - [ ] **T5.6** Update ADR 021 — record marker schema gain of `space` column; PK change.
-- [ ] **T5.7** Update subsystem docs: Migration System (per-space planner/runner/verifier; ADR 208 use in db init/update; pinned per-space artefact layout), Ecosystem Extensions & Packs (descriptor model; contract space authoring guide).
+- [ ] **T5.7** Update subsystem docs: Migration System (per-space planner / runner / verifier; aggregate model from M2.5; canonical `migration plan` / `status` / `apply` surface against the aggregate from M6; `db init` / `db update` dev-time path; ADR 208 use; on-disk layout — every space, app + extensions, lives at `migrations/<spaceId>/`), Ecosystem Extensions & Packs (descriptor model; contract space authoring guide).
 - [ ] **T5.8** NFR5 perf benchmark: emit + dbInit with 0 vs 1 extensions; assert < 5% delta. Capture results in `docs/`. (satisfies: TC-24)
 - [ ] **T5.10** Spelling normalisation — "artefact" → "artifact" across this project's surfaces. The project drifted from the repo's prevailing convention (470+ "artifact" occurrences in 144 files vs. 164 "artefact" in 41 files; our project authored ≈56% of the "artefact" cluster). Mechanical sweep covering: file renames (e.g. `emit-contract-space-artefacts.ts` → `emit-contract-space-artifacts.ts`, plus matching `.test.ts` peers), identifier renames (`emitContractSpaceArtefacts` → `emitContractSpaceArtifacts`, `ContractSpaceArtefactInputs` → `ContractSpaceArtifactInputs`), JSDoc / comment / fixture text, error-code strings, test descriptions. Out-of-scope outliers (kept as-is, not our drift): `docs/architecture docs/research/README.md`, `test/integration/test/cli.init-templates.e2e.test.ts` (TML-2318), `packages/1-framework/3-tooling/cli/src/commands/init/templates/quick-reference-{postgres,mongo}.md`. Acceptance bar: `rg -i 'artefact' packages/ test/` matches only the listed outliers. Lands as a single focused commit before T5.9 so the close-out PR's repo state is final. (Origin: pre-launch shape-locking discussion; see `specs/contract-space-on-disk-shape.spec.md` § "Out of scope".)
 - [ ] **T5.9** Close-out: migrate finalised ADRs into `docs/architecture docs/adrs/`. Strip references to `projects/extension-contract-spaces/` across the repo (replace with canonical `docs/` links). Delete `projects/extension-contract-spaces/`. PR title or branch references TML-2397 so Linear's GitHub integration auto-completes the issue on merge.
