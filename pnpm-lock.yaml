@@ -2468,6 +2468,9 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../3-targets/7-drivers/postgres
+      '@prisma-next/sql-contract-ts':
+        specifier: workspace:*
+        version: link:../../2-sql/2-authoring/contract-ts
       '@prisma-next/sql-schema-ir':
         specifier: workspace:*
         version: link:../../2-sql/1-core/schema-ir
