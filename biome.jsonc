@@ -14,7 +14,11 @@
       "!**/node_modules",
       "!**/.prisma",
       "!**/*.d.ts",
-      "!**/contract.json"
+      "!**/contract.json",
+      "!**/migrations/*/*/migration.json",
+      "!**/migrations/*/*/ops.json",
+      "!**/migrations/*/*/end-contract.json",
+      "!**/migrations/*/*/start-contract.json"
     ]
   },
   "formatter": {
