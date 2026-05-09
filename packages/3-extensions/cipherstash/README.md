@@ -58,6 +58,35 @@ runs CipherStash's migrations against the live database in the same
 transaction as any application-space migration emitted in the same
 `migrate` invocation.
 
+## Authoring (maintainers)
+
+The extension's contract + baseline migration are emitted on-disk inside
+this package using the same pipeline application authors use:
+
+- `pnpm build:contract-space` — runs `prisma-next contract emit` to
+  produce `<package>/contract.{json,d.ts}` from the TS source at
+  `src/contract-source.ts`.
+- `prisma-next migration plan` (run inside the package) — scaffolds a
+  new migration directory under `migrations/cipherstash/<dirName>/`.
+  The baseline migration's `migration.ts` is then hand-edited so that
+  its `operations` getter installs the EQL bundle byte-for-byte plus
+  the structural `cipherstash:*` no-op ops that register invariantIds
+  for typed objects the bundle creates (see the comment in
+  `migrations/cipherstash/20260601T0000_install_eql_bundle/migration.ts`).
+- `node migration.ts` (run inside the migration directory) — re-emits
+  `ops.json` + `migration.json` from the hand-edited subclass.
+- `refs/head.json` is hand-pinned with the latest migration's `to`
+  hash + `providedInvariants`.
+
+The descriptor at `src/exports/control.ts` then JSON-imports those
+artefacts and synthesises the framework's `MigrationPackage` shape
+(with `dirPath` resolved from `import.meta.url`).
+
+See [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
+("On-disk-in-package authoring convention") for the full rationale and
+[`packages/3-extensions/test-contract-space`](../test-contract-space)
+for the reference model.
+
 ## See also
 
 - [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
