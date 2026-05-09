@@ -1,17 +1,13 @@
 /**
  * Static names used by the synthetic test extension's contract space.
  *
- * The extension's `headRef.hash` (and the contract's `storage.storageHash`)
- * are content-addressed and computed from the storage IR — see
- * {@link import('./contract').TEST_HEAD_HASH}. Keeping the names here and
- * the hash next to the storage definition lets the framework's descriptor
- * self-consistency check (M2 R2) pass without manual hash bookkeeping.
+ * Kept as a small public constants module so consuming tests
+ * (`packages/3-extensions/test-contract-space/test/descriptor.test.ts`,
+ * the SQLite per-space CLI test, and any future fixtures referencing
+ * the synthetic space) can import the canonical id without depending
+ * on the descriptor's full module graph.
  */
 
 export const TEST_SPACE_ID = 'test-contract-space';
 
 export const TEST_BOX_TABLE = 'test_box';
-
-export const TEST_BASELINE_INVARIANT_ID = 'test-contract-space:create-test_box-v1';
-
-export const TEST_BASELINE_MIGRATION_NAME = '20260101T0000_create_test_box';

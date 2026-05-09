@@ -1,0 +1,34 @@
+[
+  {
+    "id": "table.test_box",
+    "label": "Create table \"test_box\"",
+    "summary": "Creates table \"test_box\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "test_box"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"test_box\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"test_box\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"test_box\"",
+        "sql": "CREATE TABLE \"public\".\"test_box\" (\n  \"x\" int4 NOT NULL,\n  \"y\" int4 NOT NULL\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"test_box\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"test_box\"') IS NOT NULL"
+      }
+    ]
+  }
+]

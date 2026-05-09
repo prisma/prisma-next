@@ -6,7 +6,8 @@
   "sideEffects": false,
   "description": "Private workspace fixture exercising the framework's contract-space mechanism end-to-end. Not published.",
   "scripts": {
-    "build": "tsdown",
+    "build:contract-space": "prisma-next contract emit",
+    "build": "pnpm build:contract-space && tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
@@ -23,6 +24,10 @@
     "@prisma-next/sql-contract": "workspace:*"
   },
   "devDependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
