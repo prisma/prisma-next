@@ -6,7 +6,7 @@ It is not itself a persona — `_shape.md` is excluded from the persona ID set b
 
 ## Required sections (minimum content per spec FR2)
 
-Every persona doc has these four sections, in this order:
+Every persona doc has these five sections, in this order:
 
 1. **`# <Persona name>`** — H1 with the human-readable persona name (e.g. `# Architect`). The persona ID (kebab-case filename) and the H1 should map cleanly (`architect.md` → `# Architect`; `principal-engineer.md` → `# Principal engineer`).
 
