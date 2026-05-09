@@ -8,9 +8,15 @@
   <a href="https://pris.ly/discord">Discord</a>  |  <a href="https://twitter.com/prisma">X</a>  |  <a href="https://pris.ly/pn-anouncement">Blog Post</a>  |  <a href="./ARCHITECTURE.md">Architecture</a>
 </p>
 
+<p align="center">
+  <a href="./LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" /></a>
+  <a href="https://www.npmjs.com/package/prisma-next"><img alt="npm" src="https://img.shields.io/npm/v/prisma-next?label=prisma-next" /></a>
+  <a href="https://github.com/prisma/prisma-next/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/prisma/prisma-next/actions/workflows/ci.yml/badge.svg" /></a>
+</p>
+
 ---
 
-> **In Development (Not a Product Release)**: Prisma Next is an active engineering project and a public look at where Prisma is heading. It is not ready for production yet: APIs will change, and it's not yet recommended for production use.
+> **In Development (Pre-1.0)**: Prisma Next is an active engineering project and a public look at where Prisma is heading. It is not ready for production yet — pre-1.0, expect breaking changes between minor versions, and only the latest minor receives security fixes. Don't build production applications on Prisma Next yet unless you are prepared to follow upgrades closely.
 >
 > Prisma 7 remains the recommended version of Prisma for production applications.
 
@@ -197,13 +203,17 @@ Prisma Next is in development. Here's what to expect:
 
 (*) Working, but not feature-complete or production-ready. APIs are subject to breaking changes.
 
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, the test/lint/typecheck command set, DCO signoff, and PR expectations. For substantive changes please open an issue first so we can give you direction-fit feedback before you invest implementation time.
+
+Security issues should not be filed as public issues — please follow the Private Vulnerability Reporting flow described in [SECURITY.md](./SECURITY.md).
+
 ## Community
 
 - **Discord**: Join the conversation at [pris.ly/discord](https://pris.ly/discord)
 - **X**: Follow [@prisma](https://twitter.com/prisma) for updates
 - **Blog**: Read about our journey at [prisma.io/blog](https://www.prisma.io/blog)
-
-Prisma Next is not open to external contributions at this time. See [CONTRIBUTORS.md](./CONTRIBUTORS.md) for details. We plan to open contributions in the future: star and watch this repo to stay in the loop.
 
 ## License
 
