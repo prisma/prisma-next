@@ -12,14 +12,12 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { db } from '../src/prisma/db';
-import {
-  findCafesInBbox,
-  findCafesInNeighborhood,
-  findCafesNearPoint,
-  findCafesWithinRadius,
-  findNeighborhoodForPoint,
-  findRoutesIntersecting,
-} from '../src/queries';
+import { findCafesInBbox } from '../src/queries/find-cafes-in-bbox';
+import { findCafesInNeighborhood } from '../src/queries/find-cafes-in-neighborhood';
+import { findCafesNearPoint } from '../src/queries/find-cafes-near-point';
+import { findCafesWithinRadius } from '../src/queries/find-cafes-within-radius';
+import { findNeighborhoodForPoint } from '../src/queries/find-neighborhood-for-point';
+import { findRoutesIntersecting } from '../src/queries/find-routes-intersecting';
 import { cafes, neighborhoods, routes } from '../src/seed-data';
 import { buildTestRuntime, isPostgisAvailable, resetTestDatabase } from './utils/test-database';
 

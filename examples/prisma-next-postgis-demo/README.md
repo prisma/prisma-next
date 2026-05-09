@@ -197,7 +197,7 @@ sphere, so the projected `meters` field is meaningful out of the box.
 
 ```typescript
 import { point } from '@prisma-next/extension-postgis/geojson';
-import { findCafesNearPoint } from './src/queries';
+import { findCafesNearPoint } from './src/queries/find-cafes-near-point';
 
 const ferryBuilding = point(-122.3937, 37.7955, 4326);
 const closest = await findCafesNearPoint(ferryBuilding, 5);

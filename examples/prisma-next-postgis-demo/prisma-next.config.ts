@@ -7,6 +7,11 @@ import sql from '@prisma-next/family-sql/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
 
+const databaseUrl = process.env['DATABASE_URL'];
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is required (load it from .env or your environment)');
+}
+
 export default defineConfig({
   family: sql,
   target: postgres,
@@ -18,7 +23,6 @@ export default defineConfig({
     target: postgres,
   }),
   db: {
-    // biome-ignore lint/style/noNonNullAssertion: loaded from .env
-    connection: process.env['DATABASE_URL']!,
+    connection: databaseUrl,
   },
 });
