@@ -23,7 +23,7 @@ import {
 } from '@prisma-next/migration-tools/aggregate';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { errorRunnerFailed } from '../../utils/cli-errors';
+import { CliStructuredError, errorRunnerFailed } from '../../utils/cli-errors';
 import {
   type BuildAggregateInputs,
   buildContractSpaceAggregate,
@@ -131,6 +131,18 @@ export async function executeAggregateApply<TFamilyId extends string, TTargetId 
 
   // 2. Read live DB state (markers + schema).
   const markerRows = await familyInstance.readAllMarkers({ driver });
+
+  // 2a. Orphan-marker pre-flight: refuse to apply when a marker row
+  // exists for a space that is not declared in the aggregate.
+  // Mirrors the M2 marker-check that `db init` / `db update` ran via
+  // `runContractSpaceVerifierMarkerCheck`. Runs before planning so a
+  // user with an orphaned marker (e.g. a retired extension whose
+  // migrations directory has been removed) is told to clean it up
+  // rather than silently advancing the app's marker.
+  const orphanMarkerError = detectOrphanMarkers(aggregate, markerRows);
+  if (orphanMarkerError !== null) {
+    throw orphanMarkerError;
+  }
 
   onProgress?.({
     action,
@@ -268,6 +280,55 @@ export async function executeAggregateApply<TFamilyId extends string, TTargetId 
     operationsPlanned: totalOpsPlanned,
     operationsExecuted: totalOpsExecuted,
     summary,
+  });
+}
+
+/**
+ * Compare the live `_prisma_marker` rows against the aggregate's
+ * declared members. Any marker row whose `space` is not a member of
+ * the aggregate is an "orphan" — typically a marker left behind by
+ * an extension that was removed from `extensionPacks` without first
+ * cleaning up its on-disk migrations / database tables.
+ *
+ * Returns a {@link CliStructuredError} envelope (code `5002`,
+ * `kind: 'orphanMarker'`) for the first orphan it finds, or `null`
+ * when every marker row maps to a declared member. Mirrors the M2
+ * `runContractSpaceVerifierMarkerCheck` envelope so downstream
+ * tooling (integration tests, JSON consumers) keeps asserting on the
+ * same shape.
+ */
+function detectOrphanMarkers(
+  aggregate: ContractSpaceAggregate,
+  markerRows: ReadonlyMap<string, unknown>,
+): CliStructuredError | null {
+  const memberSpaceIds = new Set<string>([
+    aggregate.app.spaceId,
+    ...aggregate.extensions.map((m) => m.spaceId),
+  ]);
+  const orphans: string[] = [];
+  for (const [spaceId, row] of markerRows) {
+    if (row !== null && row !== undefined && !memberSpaceIds.has(spaceId)) {
+      orphans.push(spaceId);
+    }
+  }
+  if (orphans.length === 0) return null;
+  orphans.sort((a, b) => a.localeCompare(b));
+  const summary =
+    orphans.length === 1
+      ? `Orphan contract-space marker detected for "${orphans[0]}"`
+      : `Orphan contract-space markers detected for ${orphans.length} spaces`;
+  return new CliStructuredError('5002', summary, {
+    domain: 'MIG',
+    why: `The database has \`_prisma_marker\` rows for spaces (${orphans
+      .map((s) => `"${s}"`)
+      .join(
+        ', ',
+      )}) that are not declared in the project's \`extensionPacks\`. The aggregate pipeline refuses to advance markers it cannot account for.`,
+    fix: 'Either re-declare the missing extension(s) in `extensionPacks` (so the aggregate owns them again), or remove the orphan marker row(s) from `_prisma_marker` once you have confirmed the corresponding tables can be safely retired.',
+    docsUrl: 'https://pris.ly/contract-spaces',
+    meta: {
+      violations: orphans.map((spaceId) => ({ kind: 'orphanMarker', spaceId })),
+    },
   });
 }
 
