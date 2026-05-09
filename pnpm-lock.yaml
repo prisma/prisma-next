@@ -97,6 +97,9 @@ importers:
 
   examples/cipherstash-integration:
     dependencies:
+      '@cipherstash/stack':
+        specifier: ^0.15.3
+        version: 0.15.3
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
         version: link:../../packages/3-targets/6-adapters/postgres
@@ -4303,6 +4306,9 @@ packages:
     resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
     hasBin: true
 
+  '@byteslice/result@0.2.0':
+    resolution: {integrity: sha512-4zENy+fMQuZ5vvoK+W685qdkPu7FBJ8lo5t5XSUAbqvixsiTzvAGDkxsrAR9WwqlvY3OgitWo8ciCXLSURcNLw==}
+
   '@chevrotain/cst-dts-gen@10.5.0':
     resolution: {integrity: sha512-lhmC/FyqQ2o7pGK4Om+hzuDrm9rhFYIJ/AXoQBeongmn870Xeb0L6oGEiuR8nohFNL5sMaQEJWCxr1oIVIVXrw==}
 
@@ -4314,6 +4320,51 @@ packages:
 
   '@chevrotain/utils@10.5.0':
     resolution: {integrity: sha512-hBzuU5+JjB2cqNZyszkDHZgOSrUUT8V3dhgRl8Q9Gp6dAj/H5+KILGjbhDpc3Iy9qmqlm/akuOI2ut9VUtzJxQ==}
+
+  '@cipherstash/protect-ffi-darwin-arm64@0.21.4':
+    resolution: {integrity: sha512-FR9YF3nYOvGC1L9i87DEndicRkrKZGeExlWXXYNICB+uZ+a3ITq0zS0ez70tI5oiYuOxoteV2IiBpvylDPVF8g==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@cipherstash/protect-ffi-darwin-x64@0.21.4':
+    resolution: {integrity: sha512-V+WcAP4AfWLtIKclmAcpNpl1vnHFyytv81z3LKQboLUp/hXWRZpYfKty3V/E3CvmwHc/Dfdwjn9WpVZFylPrFw==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@cipherstash/protect-ffi-linux-arm64-gnu@0.21.4':
+    resolution: {integrity: sha512-iICGR7SV7hOzlzb+74w63RZl4+df+GkNfSUhq7/pmXD+I32gn+kI1vMpQUSHKH3ba4iOxysQZ79vID/g6knbFQ==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@cipherstash/protect-ffi-linux-x64-gnu@0.21.4':
+    resolution: {integrity: sha512-EVvwER2XWCpyzRcQeQ5ZHzYng5F5ss5VKfvJp7d+6scH5I4MqqwroMdBckA8C6TbAq9aTxhw7K5MbIq/QQiOnQ==}
+    cpu: [x64]
+    os: [linux]
+
+  '@cipherstash/protect-ffi-linux-x64-musl@0.21.4':
+    resolution: {integrity: sha512-K9173RQT+1oK/pUboWYXDYHYeRHtsXhKQEBIkmQx1F22TMmLbVX6H4gkhhQnD6dyy2hFAETqx3J+PcJ3TWhYMQ==}
+    cpu: [x64]
+    os: [linux]
+
+  '@cipherstash/protect-ffi-win32-x64-msvc@0.21.4':
+    resolution: {integrity: sha512-UMQX68NpIi62ur7AEK7yAGeP83XDk5HrqmOeZF1W4AS7i3eN0Ixrc3sDm7WH+YYzVK0P5XHi6L9ckMg2V/oKCg==}
+    cpu: [x64]
+    os: [win32]
+
+  '@cipherstash/protect-ffi@0.21.4':
+    resolution: {integrity: sha512-fGGhXGEpRDPlptE/035qcqYeqgdqGyHKdS0G0yamQ5YDXiBm5Q5ayXgYZ6FdpMrKTSuQjOwyKY0ogwQJj5Qqdg==}
+
+  '@cipherstash/stack@0.15.3':
+    resolution: {integrity: sha512-LNWTEUNwCCmqBRlN0ggsc9b3lAybL38ZqHV5bFmPAImnuojvzJiVHbPICTvB4j1bnPsOjDV0SRs5OfewA+P3AQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@supabase/supabase-js': '>=2'
+      drizzle-orm: '>=0.33'
+    peerDependenciesMeta:
+      '@supabase/supabase-js':
+        optional: true
+      drizzle-orm:
+        optional: true
 
   '@clack/core@1.1.0':
     resolution: {integrity: sha512-SVcm4Dqm2ukn64/8Gub2wnlA5nS2iWJyCkdNHcvNHPIeBTGojpdJ+9cZKwLfmqy7irD4N5qLteSilJlE0WLAtA==}
@@ -5126,6 +5177,9 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
+
+  '@neon-rs/load@0.1.82':
+    resolution: {integrity: sha512-H4Gu2o5kPp+JOEhRrOQCnJnf7X6sv9FBLttM/wSbb4efsgFWeHzfU/ItZ01E5qqEk+U6QGdeVO7lxXIAtYHr5A==}
 
   '@next/env@15.5.15':
     resolution: {integrity: sha512-vcmyu5/MyFzN7CdqRHO3uHO44p/QPCZkuTUXroeUmhNP8bL5PHFEhik22JUazt+CDDoD6EpBYRCaS2pISL+/hg==}
@@ -6920,6 +6974,26 @@ packages:
   events-universal@1.0.1:
     resolution: {integrity: sha512-LUd5euvbMLpwOF8m6ivPCbhQeSiYVNb8Vs0fQ8QjXo0JTkEHpz8pxdQf0gStltaPpw0Cca8b39KxvK9cfKRiAw==}
 
+  evlog@1.9.0:
+    resolution: {integrity: sha512-Dzv4drz+MydyZlLok2ATc1O4WBBDEh0+mNl2Tk3NePdaHWgmvCYYovOQgXycxn7NOSv2acRqXHfUlbP6A3rdGQ==}
+    peerDependencies:
+      '@nuxt/kit': ^4.3.1
+      h3: ^1.15.5
+      nitro: ^3.0.1-alpha.2
+      nitropack: ^2.13.1
+      ofetch: ^1.5.1
+    peerDependenciesMeta:
+      '@nuxt/kit':
+        optional: true
+      h3:
+        optional: true
+      nitro:
+        optional: true
+      nitropack:
+        optional: true
+      ofetch:
+        optional: true
+
   exit-hook@2.2.1:
     resolution: {integrity: sha512-eNTPlAD67BmP31LDINZ3U7HSF8l57TxOY2PmBJ1shpCvpnxBF93mWCE8YHBnXs8qiUZJc9WDcWIeC3a2HIAMfw==}
     engines: {node: '>=6'}
@@ -8440,6 +8514,10 @@ packages:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
     engines: {node: '>= 0.4.0'}
 
+  uuid@13.0.0:
+    resolution: {integrity: sha512-XQegIaBTVUjSHliKqcnFqYypAd4S+WCYt5NIeRs6w/UAry7z8Y9j5ZwRRL4kzq9U3sD6v+85er9FvkEaBpji2w==}
+    hasBin: true
+
   valibot@1.2.0:
     resolution: {integrity: sha512-mm1rxUsmOxzrwnX5arGS+U4T25RdvpPjPN4yR0u9pUBov9+zGVtO84tif1eY4r6zWxVxu3KzIyknJy3rxfRZZg==}
     peerDependencies:
@@ -8732,6 +8810,9 @@ packages:
   zeptomatch@2.1.0:
     resolution: {integrity: sha512-KiGErG2J0G82LSpniV0CtIzjlJ10E04j02VOudJsPyPwNZgGnRKQy7I1R7GMyg/QswnE4l7ohSGrQbQbjXPPDA==}
 
+  zod@3.24.2:
+    resolution: {integrity: sha512-lY7CDW43ECgW9u1TcT3IoXHflywfVqDYze4waEz812jR/bZ8FHDsl7pFQoSZTz5N+2NqRXs8GBwnAwo3ZNxqhQ==}
+
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
@@ -9013,6 +9094,8 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
 
+  '@byteslice/result@0.2.0': {}
+
   '@chevrotain/cst-dts-gen@10.5.0':
     dependencies:
       '@chevrotain/gast': 10.5.0
@@ -9027,6 +9110,49 @@ snapshots:
   '@chevrotain/types@10.5.0': {}
 
   '@chevrotain/utils@10.5.0': {}
+
+  '@cipherstash/protect-ffi-darwin-arm64@0.21.4':
+    optional: true
+
+  '@cipherstash/protect-ffi-darwin-x64@0.21.4':
+    optional: true
+
+  '@cipherstash/protect-ffi-linux-arm64-gnu@0.21.4':
+    optional: true
+
+  '@cipherstash/protect-ffi-linux-x64-gnu@0.21.4':
+    optional: true
+
+  '@cipherstash/protect-ffi-linux-x64-musl@0.21.4':
+    optional: true
+
+  '@cipherstash/protect-ffi-win32-x64-msvc@0.21.4':
+    optional: true
+
+  '@cipherstash/protect-ffi@0.21.4':
+    dependencies:
+      '@neon-rs/load': 0.1.82
+    optionalDependencies:
+      '@cipherstash/protect-ffi-darwin-arm64': 0.21.4
+      '@cipherstash/protect-ffi-darwin-x64': 0.21.4
+      '@cipherstash/protect-ffi-linux-arm64-gnu': 0.21.4
+      '@cipherstash/protect-ffi-linux-x64-gnu': 0.21.4
+      '@cipherstash/protect-ffi-linux-x64-musl': 0.21.4
+      '@cipherstash/protect-ffi-win32-x64-msvc': 0.21.4
+
+  '@cipherstash/stack@0.15.3':
+    dependencies:
+      '@byteslice/result': 0.2.0
+      '@cipherstash/protect-ffi': 0.21.4
+      evlog: 1.9.0
+      uuid: 13.0.0
+      zod: 3.24.2
+    transitivePeerDependencies:
+      - '@nuxt/kit'
+      - h3
+      - nitro
+      - nitropack
+      - ofetch
 
   '@clack/core@1.1.0':
     dependencies:
@@ -9536,6 +9662,8 @@ snapshots:
       '@emnapi/runtime': 1.9.2
       '@tybys/wasm-util': 0.10.1
     optional: true
+
+  '@neon-rs/load@0.1.82': {}
 
   '@next/env@15.5.15': {}
 
@@ -11158,6 +11286,8 @@ snapshots:
     transitivePeerDependencies:
       - bare-abort-controller
 
+  evlog@1.9.0: {}
+
   exit-hook@2.2.1: {}
 
   expect-type@1.3.0: {}
@@ -12681,6 +12811,8 @@ snapshots:
 
   utils-merge@1.0.1: {}
 
+  uuid@13.0.0: {}
+
   valibot@1.2.0(typescript@5.9.3):
     optionalDependencies:
       typescript: 5.9.3
@@ -12926,5 +13058,7 @@ snapshots:
     dependencies:
       grammex: 3.1.12
       graphmatch: 1.1.0
+
+  zod@3.24.2: {}
 
   zod@3.25.76: {}

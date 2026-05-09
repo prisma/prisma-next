@@ -3,9 +3,9 @@ import { createCipherstashRuntimeDescriptor } from '@prisma-next/extension-ciphe
 import postgres from '@prisma-next/postgres/runtime';
 import type { Contract } from './prisma/contract.d';
 import contractJson from './prisma/contract.json' with { type: 'json' };
-import { createDemoSdk } from './sdk';
+import { createCipherstashSdk } from './sdk';
 
-const sdk = createDemoSdk();
+const sdk = createCipherstashSdk();
 
 export const db = postgres<Contract>({
   contractJson,

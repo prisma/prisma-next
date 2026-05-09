@@ -14,6 +14,7 @@
     "lint": "biome check . --error-on-warnings"
   },
   "dependencies": {
+    "@cipherstash/stack": "^0.15.3",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",

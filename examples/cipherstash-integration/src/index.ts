@@ -27,14 +27,14 @@
  *   - A Postgres database with the EQL bundle installed. Set
  *     `DATABASE_URL` (e.g. via `.env`) before invoking `pnpm start`.
  *   - The migrations under `migrations/` applied
- *     (`pnpm migration:apply`). The cipherstash extension contributes
- *     its own contract space at `migrations/cipherstash/` which
- *     installs the EQL composite types, configuration table, and
+ *     (`pnpm db:init` / `pnpm db:update`). The cipherstash extension
+ *     contributes its own contract space at `migrations/cipherstash/`
+ *     which installs the EQL composite types, configuration table, and
  *     bundle SQL alongside the application schema.
- *   - A real CipherStash-backed `CipherstashSdk` implementation. The
- *     `src/sdk.ts` shipped here is a **demo stub** — it tags
- *     plaintexts with a `ct:` prefix instead of encrypting them. Swap
- *     it for a real client before any non-toy use.
+ *   - A CipherStash workspace + ZeroKMS credentials. Populate
+ *     `CS_WORKSPACE_CRN`, `CS_CLIENT_ID`, `CS_CLIENT_KEY`, and
+ *     `CS_CLIENT_ACCESS_KEY` in `.env` (see `.env.example`) — the SDK
+ *     wrapper in `src/sdk.ts` wires `@cipherstash/stack` directly.
  */
 
 import 'dotenv/config';
