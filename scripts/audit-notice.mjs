@@ -123,7 +123,7 @@ function collectRuntimeRedistributedSet() {
       if (!info || typeof info !== 'object') continue;
       const version = info.version;
       if (typeof version !== 'string') continue;
-      if (info.path && /\/packages\//.test(info.path)) continue;
+      if (info.path && /[\\/]packages[\\/]/.test(info.path)) continue;
       const key = `${name}@${version}`;
       if (seen.has(key)) continue;
       seen.add(key);
