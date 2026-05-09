@@ -45,7 +45,16 @@ export default class M extends Migration {
         target: { id: 'postgres' },
         precheck: [],
         execute: [{ description: INSTALL_LABEL, sql: EQL_BUNDLE_SQL }],
-        postcheck: [],
+        postcheck: [
+          {
+            description: 'verify "eql_v2" schema exists',
+            sql: "SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'eql_v2')",
+          },
+          {
+            description: 'verify "eql_v2_encrypted" composite type exists',
+            sql: "SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'eql_v2_encrypted')",
+          },
+        ],
       }),
     ];
   }
