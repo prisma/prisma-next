@@ -14,7 +14,7 @@ Codecs already exist as first-class objects: every column in the contract names 
 flowchart LR
   Diff[App-space planner] --> Detect[detect field event]
   Detect -->|new field's codec| Hook[onFieldEvent]
-  Hook -->|"SqlMigrationPlanOperation[]<br/>(each with invariantId)"| Append[append to ops.json]
+  Hook -->|"OpFactoryCall[]<br/>(each Call lowers to op via toOp(),<br/>each op carries an invariantId)"| Append[inline into postgres planner IR]
   Append --> Mig[app-space migration]
 ```
 
@@ -53,11 +53,13 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
   readonly onFieldEvent?: (
     event: FieldEvent,
     ctx: FieldEventContext,
-  ) => readonly SqlMigrationPlanOperation<TTargetDetails>[];
+  ) => readonly OpFactoryCall[];
 }
 ```
 
-The hook is **synchronous** (no I/O at plan time), receives concrete SQL family IR (`StorageTable` / `StorageColumn` from `@prisma-next/sql-contract/types`), and returns a list of migration ops each carrying its own `invariantId`.
+The hook is **synchronous** (no I/O at plan time), receives concrete SQL family IR (`StorageTable` / `StorageColumn` from `@prisma-next/sql-contract/types`), and returns a list of `OpFactoryCall` instances ([ADR 195](./ADR%20195%20-%20Planner%20IR%20with%20two%20renderers.md)) — each Call carries its own `invariantId` (surfaced through `toOp()`), self-renders to TypeScript, and self-lowers to a runtime op.
+
+Returning `OpFactoryCall[]` rather than raw `SqlMigrationPlanOperation[]` is what makes codec contributions render as factory calls in the user's `migration.ts` instead of verbose `rawSql({...})` blocks. The postgres planner inlines the Calls into its own call list with no wrapping; both the TypeScript renderer and the operation renderer dispatch through the framework `OpFactoryCall` interface polymorphically. Cipherstash's [`@prisma-next/extension-cipherstash/migration`](../../../packages/3-extensions/cipherstash/src/exports/migration.ts) subpath exposes the matching factory functions (`cipherstashAddSearchConfig` / `cipherstashRemoveSearchConfig`) so users authoring hand-written migrations call the same factories the codec hook uses.
 
 ### Triggered events and dispatch
 
@@ -81,7 +83,7 @@ Note: cross-space *SQL writes* are still possible inside an op's body (e.g. `INS
 
 ### Each op carries an `invariantId`
 
-Hook-returned ops are typed `SqlMigrationPlanOperation<TTargetDetails>[]`. Each op must carry an `invariantId` of the codec's choice. The `invariantId` ends up in the marker's `applied_invariants` set after apply, which makes the hook participate in [ADR 208](./ADR%20208%20-%20Invariant-aware%20migration%20routing.md)'s ref-driven routing.
+Hook-returned values are `OpFactoryCall[]`; each Call's `toOp()` lowers to an `SqlMigrationPlanOperation<TTargetDetails>` carrying an `invariantId` of the codec's choice. The `invariantId` ends up in the marker's `applied_invariants` set after apply, which makes the hook participate in [ADR 208](./ADR%20208%20-%20Invariant-aware%20migration%20routing.md)'s ref-driven routing.
 
 By convention, codec-emitted invariantIds carry a `<extension>-codec:` prefix and identify the column being acted on:
 
@@ -97,11 +99,11 @@ The convention keeps codec-emitted invariantIds visually distinct from extension
 Two pieces of plumbing connect the hook to the planner:
 
 - **`extractCodecControlHooks(descriptors)`** (in `@prisma-next/family-sql/control`) — collects `onFieldEvent` hooks across all loaded extension descriptors into a `Map<codecId, CodecControlHooks>`. Erases target-details to `unknown` at the codec-extraction boundary (pre-existing convention shared with the rest of `extractCodecControlHooks`'s return type).
-- **`planFieldEventOperations(options)`** (in `@prisma-next/family-sql/control`) — given the prior/new app contracts and the hook map, walks per-field diffs, dispatches hooks, and returns the concatenated `SqlMigrationPlanOperation<unknown>[]` ready to inline into the app-space migration. Each target's planner casts the helper's `unknown` results back to its target-details specialisation at the integration site (scoped per-line `.map(...)` cast with an explanatory comment, per the codebase's typesafety rules).
+- **`planFieldEventOperations(options)`** (in `@prisma-next/family-sql/control`) — given the prior/new app contracts and the hook map, walks per-field diffs, dispatches hooks, and returns the concatenated `OpFactoryCall[]` ready to inline into the app-space migration's IR. Each target's planner concatenates these Calls onto its own call list with no wrapping (no `RawSqlCall`, no target-details cast at this seam — `toOp()` is what re-specializes back to the target's op shape, and that happens later in `renderOps`).
 
-The cast-at-integration-site pattern mirrors the existing `extractCodecControlHooks` shape and the rest of the SQL family's codec-control surface: `extractCodecControlHooks` already erases target-details to `unknown` because codec hooks are inherently cross-target (one codec implementation works for both Postgres and SQLite). Either we widen the type at the consumer site (current pattern) or every hook is generic over its target — the latter inflates type complexity for marginal benefit.
+The "no cast at the inline seam" property follows from typing the hook's return as `OpFactoryCall[]` (framework-level): `OpFactoryCall` is target-agnostic by construction, so it concatenates onto a target's call list without a re-specialization step. The framework-level `MigrationPlanOperation` returned by `toOp()` is structurally a supertype of every target's op shape; targets cast back at the renderer-output boundary (`renderOps` returns the postgres-specialized `Op` via a documented per-line `as` cast) where the trust boundary is explicit — codec contributions targeted that lane by construction because the planner only inlines hooks for that adapter.
 
-This is a documented departure from the framework-mechanism sub-spec's first-cut intention to keep the surface generic over `TTargetDetails` end-to-end. It is structural-not-cosmetic — the helper boundary at `unknown` is what makes target-agnostic codec packages possible — and is called out here so future readers don't try to "tighten" the type without understanding why it's loose.
+`extractCodecControlHooks` still erases target-details to `unknown` because codec hooks are inherently cross-target (one codec implementation works for any SQL adapter). That part of the surface is unchanged.
 
 ### Op order
 
@@ -123,45 +125,49 @@ This mirrors the broader `migrate` (persist) vs `db init`/`db update` (apply-and
 ### Worked example: cipherstash
 
 ```ts
+import {
+  cipherstashAddSearchConfig,
+  cipherstashRemoveSearchConfig,
+} from '@prisma-next/extension-cipherstash/migration';
+
 const cipherstashStringCodecHooks: CodecControlHooks = {
   expandNativeType: ({ nativeType }) => nativeType,
 
   onFieldEvent: (event, { tableName, fieldName, newField, priorField }) => {
-    const searchable = newField?.typeParams?.['searchable'] === true;
-    const wasSearchable = priorField?.typeParams?.['searchable'] === true;
+    // Maps `Encrypted<string>` typeParams flags to EQL search-config indices.
+    const enabled = (field: StorageColumn | undefined): readonly CipherstashSearchIndex[] => [
+      ...(field?.typeParams?.['equality'] === true ? ['unique'] as const : []),
+      ...(field?.typeParams?.['freeTextSearch'] === true ? ['match'] as const : []),
+    ];
 
-    if (event === 'added' && searchable) {
-      return [{
-        id: `cipherstash-codec.${tableName}.${fieldName}.add-search-config`,
-        operationClass: 'data',
-        invariantId: `cipherstash-codec:${tableName}.${fieldName}:add-search-config@v1`,
-        execute: [{
-          description: `register ${tableName}.${fieldName} as searchable`,
-          sql: `INSERT INTO eql_v2_configuration (table_name, column_name, ...) VALUES ($1, $2, ...)`,
-          params: [tableName, fieldName],
-        }],
-      }];
+    if (event === 'added') {
+      return enabled(newField).map((index) =>
+        cipherstashAddSearchConfig({ table: tableName, column: fieldName, index }),
+      );
     }
-
-    if (event === 'dropped' && wasSearchable) {
-      return [{
-        id: `cipherstash-codec.${tableName}.${fieldName}.remove-search-config`,
-        operationClass: 'data',
-        invariantId: `cipherstash-codec:${tableName}.${fieldName}:remove-search-config@v1`,
-        execute: [{
-          description: `unregister ${tableName}.${fieldName}`,
-          sql: `DELETE FROM eql_v2_configuration WHERE table_name = $1 AND column_name = $2`,
-          params: [tableName, fieldName],
-        }],
-      }];
+    if (event === 'dropped') {
+      return enabled(priorField).map((index) =>
+        cipherstashRemoveSearchConfig({ table: tableName, column: fieldName, index }),
+      );
     }
-
+    if (event === 'altered') {
+      const before = new Set(enabled(priorField));
+      const after = new Set(enabled(newField));
+      return [
+        ...[...after].filter((i) => !before.has(i))
+          .map((index) => cipherstashAddSearchConfig({ table: tableName, column: fieldName, index })),
+        ...[...before].filter((i) => !after.has(i))
+          .map((index) => cipherstashRemoveSearchConfig({ table: tableName, column: fieldName, index })),
+      ];
+    }
     return [];
   },
 };
 ```
 
-The hook reads `typeParams.searchable` off the field, decides whether work is needed, and emits ops. It never reads the live database, never reads cipherstash's contract-space contract or marker — those advance independently via ADR 211's per-space mechanism. It is a pure function over IR.
+The hook reads the typeParams flags off the field, maps them to EQL search-config indices, and constructs `*Call` instances via the public factory functions. It never reads the live database, never reads cipherstash's contract-space contract or marker — those advance independently via ADR 211's per-space mechanism. It is a pure function over IR.
+
+The same factory functions are re-exported from `@prisma-next/extension-cipherstash/migration` for users authoring hand-written migrations — the codec hook's emit path and the user's authoring path are the same surface.
 
 ## Consequences
 
@@ -175,7 +181,7 @@ The hook reads `typeParams.searchable` off the field, decides whether work is ne
 
 - **Hooks are synchronous-by-design.** They can't read DB state at plan time; if a codec needs DB-state-aware planning, it must take a different approach (probably an extension-owned migration of its own under ADR 211, or a deferred mechanism not yet designed).
 - **App-space-bound by API shape.** Cross-space codec hooks are out of scope; if a real consumer surfaces the need, the API can grow a new context shape rather than retrofitting cross-space behaviour into `onFieldEvent`.
-- **Helper boundary types `unknown`.** `planFieldEventOperations` returns `SqlMigrationPlanOperation<unknown>[]`; the integration site casts back to its target-details specialisation. Documented as a structural divergence from the spec's first-cut generic vision; aligns with the existing `extractCodecControlHooks` surface.
+- **Codecs that emit ops also own a small IR.** Returning `OpFactoryCall[]` rather than raw ops means a codec contributing per-field work needs to define its own `*Call` classes (implementing the framework `OpFactoryCall` interface, [ADR 195](./ADR%20195%20-%20Planner%20IR%20with%20two%20renderers.md)) and a public factory subpath so its rendered `migration.ts` calls are user-authorable. The boilerplate is small (one class per factory; cipherstash has two) and the win is a `migration.ts` that reads as factory calls instead of `rawSql({...})` blocks.
 
 ## Related
 

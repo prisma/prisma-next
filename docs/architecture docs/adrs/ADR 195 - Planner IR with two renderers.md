@@ -31,36 +31,51 @@ Both outputs derive from the same `CreateIndexCall` instance. The factory functi
 
 ## Decision
 
-The planner produces an intermediate representation — `OpFactoryCall[]` — instead of constructing operations directly. Two renderers consume the IR: one materializes runnable operations, the other emits TypeScript source. The IR is a discriminated union of frozen AST classes with a visitor interface for exhaustive dispatch.
+The planner produces an intermediate representation — `OpFactoryCall[]` — instead of constructing operations directly. Two renderers consume the IR: one materializes runnable operations, the other emits TypeScript source. The IR is a hierarchy of frozen classes; each class self-describes via abstract methods (`renderTypeScript`, `importRequirements`, `toOp`).
 
-This pattern is **target-agnostic**. Mongo is the first implementation, but the same structure — planner → factory-call IR → operation renderer + TypeScript renderer — applies to any target. A Postgres planner could produce `SqlOpFactoryCall[]` with its own factories and renderers.
+This pattern is **target-agnostic** and **extension-extensible**. Mongo and Postgres both implement it; a third party can also implement `OpFactoryCall` directly without depending on a target's package-private base class. Cipherstash's codec lifecycle hook ([ADR 212](./ADR%20212%20-%20Codec%20lifecycle%20hooks.md)) does exactly this — it returns Calls implementing the framework `OpFactoryCall` interface, and the postgres planner inlines them into its call list polymorphically.
+
+### Framework `OpFactoryCall` interface
+
+The framework-level interface in `@prisma-next/framework-components/control` is the cross-target contract. Every Call class — postgres `*Call`, mongo `*Call`, cipherstash `*Call`, and any future extension-owned IR node — implements it directly:
+
+```ts
+export interface OpFactoryCall {
+  readonly factoryName: string;
+  readonly operationClass: MigrationOperationClass;
+  readonly label: string;
+  renderTypeScript(): string;
+  importRequirements(): readonly ImportRequirement[];
+  toOp(): MigrationPlanOperation;
+}
+```
+
+`renderTypeScript()` and `importRequirements()` are the TypeScript renderer's polymorphic seam — each Call decides what source text it emits and which symbols it pulls in. `toOp()` is the operation renderer's seam — each Call lowers itself to a runtime `MigrationPlanOperation` (concrete subclasses narrow the return type via covariance, e.g. postgres returns `SqlMigrationPlanOperation<PostgresPlanTargetDetails>`). The renderers (`renderCallsToTypeScript`, `renderOps`) operate on the framework type and dispatch through these methods — they never need to know which Call class they're holding, so codec-emitted Calls flow through unchanged alongside structural Calls.
 
 ## The IR
 
-`OpFactoryCall` is a union of five frozen classes, one per factory function:
+Each target package owns its own `*Call` class hierarchy, rooted in a target-local abstract base that extends `TsExpression` (from `@prisma-next/ts-render`, which provides `renderTypeScript` / `importRequirements`) and implements the framework `OpFactoryCall` interface. Concrete classes carry the factory's arguments as readonly fields and define `toOp()` directly:
 
 ```ts
-abstract class OpFactoryCallNode {
-  abstract readonly factory: string;
+abstract class PostgresOpFactoryCallNode extends TsExpression implements OpFactoryCall {
+  abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
-  abstract accept<R>(visitor: OpFactoryCallVisitor<R>): R;
+  abstract toOp(): SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
+  // renderTypeScript / importRequirements come from TsExpression
 }
 
-class CreateIndexCall extends OpFactoryCallNode {
-  readonly factory = 'createIndex' as const;
+class CreateTableCall extends PostgresOpFactoryCallNode {
+  readonly factoryName = 'createTable' as const;
   readonly operationClass = 'additive' as const;
-  // collection, keys, options — matches the createIndex factory signature
+  // schemaName, tableName, columns, primaryKey — matches createTable's signature
 }
-class DropIndexCall    extends OpFactoryCallNode { readonly factory = 'dropIndex' as const;    /* ... */ }
-class CreateCollectionCall extends OpFactoryCallNode { readonly factory = 'createCollection' as const; /* ... */ }
-class DropCollectionCall   extends OpFactoryCallNode { readonly factory = 'dropCollection' as const;   /* ... */ }
-class CollModCall          extends OpFactoryCallNode { readonly factory = 'collMod' as const;          /* ... */ }
-
-type OpFactoryCall = CreateIndexCall | DropIndexCall | CreateCollectionCall | DropCollectionCall | CollModCall;
+// ... one class per pure factory function
 ```
 
-Each class carries the factory name as a literal-typed `factory` discriminant, the factory's arguments as readonly fields, and planner-derived metadata (`operationClass`, `label`). Instances are frozen at construction. The `OpFactoryCallVisitor<R>` interface provides compile-time exhaustiveness: adding a sixth variant forces every dispatch site to handle it.
+Each class carries the factory name as a literal-typed `factoryName` discriminant, the factory's arguments as readonly fields, and planner-derived metadata (`operationClass`, `label`). Instances are frozen at construction.
+
+Adding a new variant means defining a new `*Call` class — there is no central exhaustiveness check. `renderTypeScript`, `importRequirements`, and `toOp` are abstract on the base, so the compiler still rejects an incomplete subclass. The cost relative to the original visitor design is that the IR no longer enforces "every dispatch site handles every variant" at compile time; the win is that extensions can add `*Call` classes (cipherstash already does) without modifying a target-local visitor enum.
 
 ### Why planner-derived semantics ride on the IR
 
@@ -74,40 +89,32 @@ For most variants the classification is constant (`CreateIndexCall` is always `'
 
 ### Operation renderer (`renderOps`)
 
-A visitor that calls the factory functions with the arguments from each IR node:
+A polymorphic dispatch through each Call's `toOp()`:
 
 ```ts
-const renderVisitor: OpFactoryCallVisitor<MongoMigrationPlanOperation> = {
-  createIndex(call) {
-    return createIndex(call.collection, call.keys, call.options);
-  },
-  dropIndex(call) {
-    return dropIndex(call.collection, call.keys);
-  },
-  // ... one case per variant
-};
-
-function renderOps(calls: ReadonlyArray<OpFactoryCall>): MongoMigrationPlanOperation[] {
-  return calls.map((call) => call.accept(renderVisitor));
+function renderOps(calls: readonly OpFactoryCall[]): MigrationPlanOperation[] {
+  return calls.map((call) => call.toOp());
 }
 ```
 
-The result is an array of `MongoMigrationPlanOperation` — the same three-phase envelopes from [ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md), serializable to `ops.json`.
+The result is an array of `MigrationPlanOperation` — the same three-phase envelopes from [ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md) (mongo) or [ADR 191](ADR%20191%20-%20Generic%20three-phase%20migration%20operation%20envelope.md) (sql), serializable to `ops.json`. Targets re-specialize the framework-level return type back to their own `Op` shape at the integration boundary (cipherstash's codec-emitted Calls target the postgres lane by construction; the postgres `renderOps` casts back to `SqlMigrationPlanOperation<PostgresPlanTargetDetails>` with a comment-documented `as` cast).
 
 ### TypeScript renderer (`renderCallsToTypeScript`)
 
-A visitor that emits the source text of each factory call:
+A polymorphic dispatch through each Call's `renderTypeScript()` and `importRequirements()`:
 
 ```ts
-const renderCallVisitor: OpFactoryCallVisitor<string> = {
-  createIndex(call) {
-    return `createIndex(${renderLiteral(call.collection)}, ${renderLiteral(call.keys)}, ${renderLiteral(call.options)})`;
-  },
-  // ...
-};
+export function renderCallsToTypeScript(
+  calls: readonly OpFactoryCall[],
+  meta: RenderMigrationMeta,
+): string {
+  const imports = buildImports(calls); // dedupes call.importRequirements() across all calls
+  const operationsBody = calls.map((c) => c.renderTypeScript()).join(',\n');
+  // ... wraps in shebang + Migration subclass scaffold + MigrationCLI.run(...)
+}
 ```
 
-The outer function wraps the rendered calls in a complete `migration.ts` file: shebang, imports from `@prisma-next/family-mongo/migration` and `@prisma-next/target-mongo/migration`, a `Migration` subclass with `describe()` and `operations`, and `Migration.run(import.meta.url, M)`. The result is a runnable file the developer can edit, then execute to emit `ops.json` ([ADR 192](ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md)).
+The outer function wraps the rendered calls in a complete `migration.ts` file: shebang, target-owned base imports (`Migration`, `MigrationCLI` from `@prisma-next/target-postgres/migration` or `@prisma-next/target-mongo/migration`), the deduplicated import requirements declared by each Call (so codec-emitted Calls pull in their own factory module — e.g. `cipherstashAddSearchConfig` from `@prisma-next/extension-cipherstash/migration`), a `Migration` subclass with `describe()` and `operations`, and `MigrationCLI.run(import.meta.url, M)`. The result is a runnable file the developer can edit, then execute to emit `ops.json` ([ADR 192](ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md)).
 
 ### Wiring
 
@@ -143,10 +150,20 @@ The planner could produce `MongoMigrationPlanOperation[]` as before, and a separ
 
 ### Plain data objects instead of frozen classes
 
-`OpFactoryCall` could be a plain discriminated union (`{ factory: 'createIndex'; collection: string; ... }`) rather than a class hierarchy with a visitor. Plain data is simpler and serializes naturally. We chose classes because:
+`OpFactoryCall` could be a plain discriminated union (`{ factoryName: 'createIndex'; collection: string; ... }`) rather than a class hierarchy. Plain data is simpler and serializes naturally. We chose classes because:
 
-- **Exhaustiveness.** The visitor interface forces every dispatch site to handle every variant at compile time. With plain data and `switch`, a missing case is a runtime error unless the developer remembers to enable `noUncheckedIndexedAccess` or a lint rule. Since dispatch sites are spread across modules (`renderOps`, `renderCallsToTypeScript`, planner label derivation), compile-time enforcement is worth the ceremony.
-- **Consistency.** The codebase's DDL commands, inspection commands, and filter expressions already use the same frozen-class/visitor pattern. Using it here keeps the AST layer uniform.
+- **Self-describing nodes.** `renderTypeScript`, `importRequirements`, and `toOp` are abstract on the base — each subclass owns its own emit logic. With plain data, every renderer would need a switch over `factoryName` and would have to be updated whenever a new variant is added. The class-per-factory shape keeps emit logic co-located with the data it operates on.
+- **Extension-extensible.** Cipherstash and other extensions add new `*Call` classes that implement the framework `OpFactoryCall` interface; the postgres renderer accepts them polymorphically without target-side changes. A discriminated-union shape would require every renderer to know every `factoryName` literal, which closes the door on out-of-tree variants.
+- **Consistency.** The codebase's DDL commands, inspection commands, and filter expressions already use the same frozen-class pattern. Using it here keeps the AST layer uniform.
+
+### Centralised visitor for compile-time exhaustiveness
+
+An earlier draft of this ADR proposed an `OpFactoryCallVisitor<R>` interface where every dispatch site called `node.accept(visitor)` and the union type forced every visitor to handle every variant. We dropped it during implementation:
+
+- **Adding variants requires editing target-local code.** Every new `*Call` class would have to update the union type *and* every visitor implementation in the target. Cipherstash needs to add `*Call` classes without touching postgres internals — a closed visitor interface contradicts that.
+- **The compile-time signal it provided is weak in practice.** Most dispatch sites are local to a single file and trivially exhaustive at the type level via the abstract methods on the base. The ceremony of `accept(visitor)` + a parallel `Visitor<R>` interface buys little against the alternative of "abstract methods on the base + concrete subclasses".
+
+Subclassing-with-abstract-methods preserves the property the visitor was meant to enforce (every Call class implements every renderer hook) without closing the variant set.
 
 ### Separate metadata type alongside the call
 
