@@ -42,27 +42,6 @@ import 'dotenv/config';
 import { decryptAll, EncryptedString } from '@prisma-next/extension-cipherstash/runtime';
 import { db } from './db';
 
-/**
- * The cipherstash search operators (`cipherstashEq`, `cipherstashIlike`)
- * are bound onto the model accessor at runtime by
- * `context.queryOperations` (see `model-accessor.ts` in
- * `@prisma-next/sql-orm-client`), but the cipherstash extension does
- * not yet ship a static `QueryOperationTypes` surface analogous to
- * pgvector`s `@prisma-next/extension-pgvector/operation-types`. Until
- * it does, the call sites cast the column accessor through the small
- * shape below so the `where(...)` callbacks typecheck.
- */
-interface CipherstashColumnSurface {
-  cipherstashEq(value: string): never;
-  cipherstashIlike(pattern: string): never;
-}
-
-function cipherstash(column: unknown): CipherstashColumnSurface {
-  // Bridges the runtime-only operator surface to the type system; see
-  // the docblock above for the surface gap.
-  return column as CipherstashColumnSurface;
-}
-
 const PLAINTEXTS = [
   'alice@example.com',
   'bob@example.com',
@@ -102,9 +81,7 @@ async function insertUsers(): Promise<void> {
 
 async function searchByEq(): Promise<void> {
   console.log('\n--- cipherstashEq ---');
-  const rows = await db.orm.User.where((u) =>
-    cipherstash(u.email).cipherstashEq('alice@example.com'),
-  ).all();
+  const rows = await db.orm.User.where((u) => u.email.cipherstashEq('alice@example.com')).all();
   console.log(`Found ${rows.length} row(s) for alice@example.com.`);
   await decryptAll(rows);
   for (const row of rows) {
@@ -114,9 +91,7 @@ async function searchByEq(): Promise<void> {
 
 async function searchByIlikeAndDecrypt(): Promise<void> {
   console.log('\n--- cipherstashIlike + decryptAll ---');
-  const rows = await db.orm.User.where((u) =>
-    cipherstash(u.email).cipherstashIlike('%@example.com'),
-  ).all();
+  const rows = await db.orm.User.where((u) => u.email.cipherstashIlike('%@example.com')).all();
   console.log(`Found ${rows.length} row(s) matching %@example.com.`);
   await decryptAll(rows);
   for (const row of rows) {

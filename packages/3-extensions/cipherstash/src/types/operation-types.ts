@@ -68,18 +68,29 @@ export type QueryOperationTypes<CT extends CodecTypesBase> = SqlQueryOperationTy
       readonly self: { readonly codecId: CipherstashStringCodec };
       readonly impl: (
         self: CodecExpression<CipherstashStringCodec, boolean, CT>,
-        other: CodecExpression<CipherstashStringCodec, boolean, CT>,
+        // The runtime wraps the second argument in an `EncryptedString`
+        // envelope at lowering time (`asEncryptedParam` in
+        // `../core/operators.ts`); plain strings and pre-built
+        // envelopes both work. We type it as `pg/text@1` so callers
+        // can pass a plain string literal — the cipherstash extension
+        // doesn`t ship a `codec-types` surface declaring an `input`
+        // type for `cipherstash/string@1`, so the symmetric
+        // `cipherstash/string@1`-typed shape pgvector uses for its
+        // `other` arg would only accept full `Expression` values, not
+        // raw strings. The asymmetry mirrors the runtime: the column
+        // `self` is the encrypted column; the comparand is a value the
+        // operator encrypts on the user`s behalf.
+        other: CodecExpression<'pg/text@1', boolean, CT>,
       ) => Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
     };
     readonly cipherstashIlike: {
       readonly self: { readonly codecId: CipherstashStringCodec };
       readonly impl: (
         self: CodecExpression<CipherstashStringCodec, boolean, CT>,
-        // ILIKE pattern is a plain SQL pattern (`%x%`) the runtime wraps
-        // in an `EncryptedString` envelope at lowering time. Typed as
-        // `pg/text@1` (not `cipherstash/string@1`) so callers can pass
-        // a plain string literal; this matches the design doc and the
-        // user-visible call shape (`cipherstashIlike('%@example.com')`).
+        // ILIKE pattern is a plain SQL pattern (`%x%`) the runtime
+        // wraps in an `EncryptedString` envelope at lowering time.
+        // Typed as `pg/text@1` for the same reason as
+        // `cipherstashEq`s `other` arg (see comment above).
         pattern: CodecExpression<'pg/text@1', boolean, CT>,
       ) => Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
     };

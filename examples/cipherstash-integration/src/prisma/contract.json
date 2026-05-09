@@ -94,6 +94,20 @@
       "kind": "extension",
       "targetId": "postgres",
       "types": {
+        "operationTypes": {
+          "import": {
+            "alias": "CipherstashOperationTypes",
+            "named": "OperationTypes",
+            "package": "@prisma-next/extension-cipherstash/operation-types"
+          }
+        },
+        "queryOperationTypes": {
+          "import": {
+            "alias": "CipherstashQueryOperationTypes",
+            "named": "QueryOperationTypes",
+            "package": "@prisma-next/extension-cipherstash/operation-types"
+          }
+        },
         "storage": [
           {
             "familyId": "sql",
