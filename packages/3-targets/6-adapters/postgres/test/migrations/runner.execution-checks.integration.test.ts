@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -49,6 +50,7 @@ describe.sequential('PostgresMigrationRunner - Execution Checks', () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
         const planWithFailingChecks = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -139,6 +141,7 @@ describe.sequential('PostgresMigrationRunner - Execution Checks', () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
         const planWithPreSatisfiedPostcheck = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [

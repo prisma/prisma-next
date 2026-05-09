@@ -64,15 +64,28 @@ export class SqliteMigrationPlanner
      */
     readonly fromContract: Contract | null;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+    /**
+     * Contract space this plan applies to. Stamped onto the produced
+     * {@link TypeScriptRenderableSqliteMigration.spaceId} so the runner keys
+     * the marker row by the right space.
+     */
+    readonly spaceId: string;
   }): SqlitePlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
 
-  emptyMigration(context: MigrationScaffoldContext): TypeScriptRenderableSqliteMigration {
-    return new TypeScriptRenderableSqliteMigration([], {
-      from: context.fromHash,
-      to: context.toHash,
-    });
+  emptyMigration(
+    context: MigrationScaffoldContext,
+    spaceId: string,
+  ): TypeScriptRenderableSqliteMigration {
+    return new TypeScriptRenderableSqliteMigration(
+      [],
+      {
+        from: context.fromHash,
+        to: context.toHash,
+      },
+      spaceId,
+    );
   }
 
   private planSql(options: SqlMigrationPlannerPlanOptions): SqlitePlanResult {
@@ -114,6 +127,7 @@ export class SqliteMigrationPlanner
           from: options.fromContract?.storage.storageHash ?? null,
           to: options.contract.storage.storageHash,
         },
+        options.spaceId,
         destination,
       ),
     };

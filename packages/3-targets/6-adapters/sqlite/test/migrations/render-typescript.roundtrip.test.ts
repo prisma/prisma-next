@@ -14,6 +14,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import {
   AddColumnCall,
   CreateIndexCall,
@@ -139,7 +140,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
         new CreateIndexCall('user', 'user_email_idx', ['email']),
         new DropTableCall('stale'),
       ];
-      const migration = new TypeScriptRenderableSqliteMigration(calls, META);
+      const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
 
       const tsSource = rewriteImports(migration.renderTypeScript());
       await writeFile(join(tmpDir, 'migration.ts'), tsSource);
@@ -162,7 +163,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
     'renders an empty calls list whose executed scaffold emits []',
     { timeout: timeouts.coldTransformImport },
     async () => {
-      const migration = new TypeScriptRenderableSqliteMigration([], META);
+      const migration = new TypeScriptRenderableSqliteMigration([], META, APP_SPACE_ID);
 
       const tsSource = rewriteImports(migration.renderTypeScript());
       await writeFile(join(tmpDir, 'migration.ts'), tsSource);
@@ -205,7 +206,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
           operationClass: 'widening',
         }),
       ];
-      const migration = new TypeScriptRenderableSqliteMigration(calls, META);
+      const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
 
       const tsSource = rewriteImports(migration.renderTypeScript());
       await writeFile(join(tmpDir, 'migration.ts'), tsSource);

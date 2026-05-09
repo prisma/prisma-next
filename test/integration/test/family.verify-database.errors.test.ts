@@ -8,8 +8,11 @@ import { emit } from '@prisma-next/emitter';
 import sql from '@prisma-next/family-sql/control';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import type { VerifyDatabaseResult } from '@prisma-next/framework-components/control';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import {
+  APP_SPACE_ID,
+  createControlStack,
+  type VerifyDatabaseResult,
+} from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
@@ -210,6 +213,7 @@ describe('family instance verify - errors', () => {
 
             // Write marker with different hash
             const write = writeContractMarker({
+              space: APP_SPACE_ID,
               storageHash: 'sha256:different-hash',
               profileHash: contractWithDb.profileHash ?? contractWithDb.storage.storageHash,
               contractJson: contractWithDb,
@@ -268,6 +272,7 @@ describe('family instance verify - errors', () => {
 
             // Write marker with different profileHash
             const write = writeContractMarker({
+              space: APP_SPACE_ID,
               storageHash: contractWithDb.storage.storageHash,
               profileHash: 'sha256:different-profile-hash',
               contractJson: contractWithDb,
@@ -364,6 +369,7 @@ describe('family instance verify - errors', () => {
             await executeStatement(client, ensureTableStatement);
 
             const write = writeContractMarker({
+              space: APP_SPACE_ID,
               storageHash: contractWithDb.storage.storageHash,
               profileHash: contractWithDb.profileHash ?? contractWithDb.storage.storageHash,
               contractJson: contractWithDb,

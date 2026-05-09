@@ -4,7 +4,7 @@ import sqlFamilyDescriptor, {
   createMigrationPlan,
   type SqlMigrationRunnerFailure,
 } from '@prisma-next/family-sql/control';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
@@ -73,6 +73,7 @@ export async function resetDatabase(driver: PostgresControlDriver): Promise<void
 export function createFailingPlan() {
   return createMigrationPlan<PostgresPlanTargetDetails>({
     targetId: 'postgres',
+    spaceId: APP_SPACE_ID,
     origin: null,
     destination: toPlanContractInfo(contract),
     operations: [

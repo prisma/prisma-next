@@ -1,3 +1,4 @@
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { describe, expect, test } from 'vitest';
 import {
   buildMergeMarkerStatements,
@@ -25,8 +26,9 @@ describe('ensureMarkerTableStatement', () => {
 });
 
 describe('buildMergeMarkerStatements', () => {
-  test("keys the upsert by `space` (defaulting to 'app' when omitted)", () => {
+  test('keys the upsert by `space` and binds the caller-supplied app space', () => {
     const stmts = buildMergeMarkerStatements({
+      space: APP_SPACE_ID,
       storageHash: 'sha256:dest',
       profileHash: 'sha256:profile',
       invariants: [],
@@ -34,8 +36,8 @@ describe('buildMergeMarkerStatements', () => {
     expect(stmts.insert.sql).toMatch(/\(\s*space\b/);
     expect(stmts.insert.sql).not.toMatch(/\bid\b/);
     expect(stmts.update.sql).toMatch(/where space = \$1/i);
-    expect(stmts.insert.params[0]).toBe('app');
-    expect(stmts.update.params[0]).toBe('app');
+    expect(stmts.insert.params[0]).toBe(APP_SPACE_ID);
+    expect(stmts.update.params[0]).toBe(APP_SPACE_ID);
   });
 
   test('honours a caller-supplied `space` value', () => {

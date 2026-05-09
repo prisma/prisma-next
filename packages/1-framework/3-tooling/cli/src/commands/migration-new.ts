@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
@@ -231,12 +231,15 @@ async function executeMigrationNewCommand(
     const stack = createControlStack(config);
     const familyInstance = config.family.create(stack);
     const planner = migrations.createPlanner(familyInstance);
-    const emptyPlan = planner.emptyMigration({
-      packageDir,
-      contractJsonPath: join(packageDir, 'end-contract.json'),
-      fromHash,
-      toHash: toStorageHash,
-    });
+    const emptyPlan = planner.emptyMigration(
+      {
+        packageDir,
+        contractJsonPath: join(packageDir, 'end-contract.json'),
+        fromHash,
+        toHash: toStorageHash,
+      },
+      APP_SPACE_ID,
+    );
     await writeMigrationTs(packageDir, emptyPlan.renderTypeScript());
 
     return ok({

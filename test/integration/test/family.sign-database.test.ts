@@ -5,8 +5,11 @@ import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import type { SignDatabaseResult } from '@prisma-next/framework-components/control';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import {
+  APP_SPACE_ID,
+  createControlStack,
+  type SignDatabaseResult,
+} from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -134,7 +137,7 @@ describe('family instance sign', () => {
           expect(result.timings.total).toBeGreaterThanOrEqual(0);
 
           // Verify marker was written to database
-          const marker = await familyInstance.readMarker({ driver });
+          const marker = await familyInstance.readMarker({ driver, space: APP_SPACE_ID });
           expect(marker).not.toBeNull();
           expect(marker?.storageHash).toBe(validatedContract.storage.storageHash);
         } finally {
@@ -168,6 +171,7 @@ describe('family instance sign', () => {
         `);
         // Write initial marker with different hash
         const write = writeContractMarker({
+          space: APP_SPACE_ID,
           storageHash: 'sha256:old-hash',
           profileHash: 'sha256:old-profile-hash',
           contractJson: { target: 'postgres' },
@@ -226,7 +230,7 @@ describe('family instance sign', () => {
           expect(result.timings.total).toBeGreaterThanOrEqual(0);
 
           // Verify marker was updated in database
-          const marker = await familyInstance.readMarker({ driver });
+          const marker = await familyInstance.readMarker({ driver, space: APP_SPACE_ID });
           expect(marker).not.toBeNull();
           expect(marker?.storageHash).toBe(validatedContract.storage.storageHash);
           expect(marker?.storageHash).not.toBe('sha256:old-hash');
@@ -275,7 +279,7 @@ describe('family instance sign', () => {
             contractPath: './contract.json',
           });
 
-          const marker = await familyInstance.readMarker({ driver });
+          const marker = await familyInstance.readMarker({ driver, space: APP_SPACE_ID });
           expect(marker?.storageHash).toBe(validatedContract.storage.storageHash);
           expect(marker?.invariants).toEqual(['email-verified', 'phone-backfill']);
         } finally {
@@ -346,7 +350,7 @@ describe('family instance sign', () => {
           expect(firstResult.marker.created).toBe(true);
 
           // Get the marker's updated_at timestamp
-          const markerAfterFirst = await familyInstance.readMarker({ driver });
+          const markerAfterFirst = await familyInstance.readMarker({ driver, space: APP_SPACE_ID });
           const firstUpdatedAt = markerAfterFirst?.updatedAt;
 
           // Second sign - should be idempotent
@@ -370,7 +374,10 @@ describe('family instance sign', () => {
           expect(secondResult.marker.previous).toBeUndefined();
 
           // Verify marker was not updated (updated_at should be the same)
-          const markerAfterSecond = await familyInstance.readMarker({ driver });
+          const markerAfterSecond = await familyInstance.readMarker({
+            driver,
+            space: APP_SPACE_ID,
+          });
           expect(markerAfterSecond?.updatedAt).toEqual(firstUpdatedAt);
         } finally {
           await driver.close();

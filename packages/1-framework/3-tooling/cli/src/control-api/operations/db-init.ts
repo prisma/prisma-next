@@ -8,7 +8,7 @@ import type {
   MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
-import { hasOperationPreview } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, hasOperationPreview } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbInitResult, DbInitSuccess, OnControlProgress } from '../types';
@@ -89,6 +89,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     // site (vs. silently letting the planner default to a baseline plan).
     fromContract: null,
     frameworkComponents,
+    spaceId: APP_SPACE_ID,
   });
 
   if (plannerResult.kind === 'failure') {
@@ -123,7 +124,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     spanId: checkMarkerSpanId,
     label: 'Checking database signature',
   });
-  const existingMarker = await familyInstance.readMarker({ driver });
+  const existingMarker = await familyInstance.readMarker({ driver, space: APP_SPACE_ID });
   if (existingMarker) {
     const markerMatchesDestination =
       existingMarker.storageHash === migrationPlan.destination.storageHash &&

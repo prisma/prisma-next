@@ -101,15 +101,28 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly fromContract: Contract | null;
     readonly schemaName?: string;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+    /**
+     * Contract space this plan applies to. Stamped onto the produced
+     * {@link TypeScriptRenderablePostgresMigration.spaceId} so the runner keys
+     * the marker row by the right space.
+     */
+    readonly spaceId: string;
   }): PostgresPlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
 
-  emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
-    return new TypeScriptRenderablePostgresMigration([], {
-      from: context.fromHash,
-      to: context.toHash,
-    });
+  emptyMigration(
+    context: MigrationScaffoldContext,
+    spaceId: string,
+  ): MigrationPlanWithAuthoringSurface {
+    return new TypeScriptRenderablePostgresMigration(
+      [],
+      {
+        from: context.fromHash,
+        to: context.toHash,
+      },
+      spaceId,
+    );
   }
 
   private planSql(options: SqlMigrationPlannerPlanOptions): PostgresPlanResult {
@@ -147,10 +160,14 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 
     return Object.freeze({
       kind: 'success' as const,
-      plan: new TypeScriptRenderablePostgresMigration(result.value.calls, {
-        from: options.fromContract?.storage.storageHash ?? null,
-        to: options.contract.storage.storageHash,
-      }),
+      plan: new TypeScriptRenderablePostgresMigration(
+        result.value.calls,
+        {
+          from: options.fromContract?.storage.storageHash ?? null,
+          to: options.contract.storage.storageHash,
+        },
+        options.spaceId,
+      ),
     });
   }
 

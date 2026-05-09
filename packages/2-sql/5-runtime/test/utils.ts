@@ -26,6 +26,7 @@ import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import type { SqlStatement } from '../src/exports';
 import {
+  APP_SPACE_ID,
   createExecutionContext,
   type createRuntime,
   createSqlExecutionStack,
@@ -100,6 +101,7 @@ export async function setupTestDatabase(
   await executeStatement(client, ensureSchemaStatement);
   await executeStatement(client, ensureTableStatement);
   const write = writeContractMarker({
+    space: APP_SPACE_ID,
     storageHash: contract.storage.storageHash,
     profileHash: contract.profileHash,
     contractJson: contract,
@@ -116,6 +118,7 @@ export async function writeTestContractMarker(
   contract: Contract<SqlStorage>,
 ): Promise<void> {
   const write = writeContractMarker({
+    space: APP_SPACE_ID,
     storageHash: contract.storage.storageHash,
     profileHash: contract.profileHash,
     contractJson: contract,

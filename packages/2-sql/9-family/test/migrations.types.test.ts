@@ -1,3 +1,4 @@
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   createMigrationPlan,
@@ -30,6 +31,7 @@ describe('createMigrationPlan', () => {
 
     const plan = createMigrationPlan<TestTargetDetails>({
       targetId: 'postgres',
+      spaceId: APP_SPACE_ID,
       origin: { storageHash: 'originCore', profileHash: 'originProfile' },
       destination: { storageHash: 'core', profileHash: 'profile' },
       operations: sourceOperations as readonly SqlMigrationPlanOperation<TestTargetDetails>[],
@@ -63,6 +65,7 @@ describe('createMigrationPlan', () => {
     const mutableDetails = { schema: 'public', objectType: 'table' as const, name: 'user' };
     const plan = createMigrationPlan({
       targetId: 'postgres',
+      spaceId: APP_SPACE_ID,
       destination: { storageHash: 'abc' },
       operations: [
         {
@@ -96,6 +99,7 @@ describe('createMigrationPlan', () => {
   it('preserves primitive details without cloning', () => {
     const plan = createMigrationPlan({
       targetId: 'postgres',
+      spaceId: APP_SPACE_ID,
       destination: { storageHash: 'abc' },
       operations: [
         {
@@ -120,6 +124,7 @@ describe('createMigrationPlan', () => {
     const mutableArray = ['item1', 'item2'];
     const plan = createMigrationPlan({
       targetId: 'postgres',
+      spaceId: APP_SPACE_ID,
       destination: { storageHash: 'abc' },
       operations: [
         {
@@ -149,6 +154,7 @@ describe('planner helpers', () => {
   it('produce immutable envelopes that clone conflict metadata', () => {
     const plan: SqlMigrationPlan<TestTargetDetails> = createMigrationPlan({
       targetId: 'postgres',
+      spaceId: APP_SPACE_ID,
       destination: { storageHash: 'abc', profileHash: 'def' },
       operations: [],
       providedInvariants: [],

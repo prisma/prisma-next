@@ -53,13 +53,15 @@ export const ensureLedgerTableStatement: SqlStatement = {
 
 export interface MergeMarkerInput {
   /**
-   * Logical space identifier for this marker row. Defaults to
-   * {@link APP_SPACE_ID} (`'app'`) so existing single-app callers keep
-   * working without modification; per-space callers (planner / runner /
-   * verifier extensions over contract spaces) pass their space id
-   * explicitly.
+   * Logical space identifier for this marker row. Required at every
+   * call site so the type system surfaces every place that needs to
+   * thread the value (rather than letting an `?? APP_SPACE_ID`
+   * fall-through silently collapse multi-space markers onto the
+   * `'app'` row). App-plan callers pass {@link APP_SPACE_ID}
+   * (`'app'`); per-extension callers (planner / runner / verifier
+   * extensions over contract spaces) pass the extension's space id.
    */
-  readonly space?: string;
+  readonly space: string;
   readonly storageHash: string;
   readonly profileHash: string;
   readonly contractJson?: unknown;
@@ -80,7 +82,7 @@ export function buildMergeMarkerStatements(input: MergeMarkerInput): {
   readonly update: SqlStatement;
 } {
   const params: readonly unknown[] = [
-    input.space ?? APP_SPACE_ID,
+    input.space,
     input.storageHash,
     input.profileHash,
     jsonParam(input.contractJson),

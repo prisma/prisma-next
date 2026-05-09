@@ -8,7 +8,7 @@ import sqlFamilyDescriptor, {
   createMigrationPlan,
   type SqlMigrationRunnerFailure,
 } from '@prisma-next/family-sql/control';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
@@ -116,6 +116,7 @@ export function createTestDatabase(): TestDatabase {
 export function createFailingPlan() {
   return createMigrationPlan<SqlitePlanTargetDetails>({
     targetId: 'sqlite',
+    spaceId: APP_SPACE_ID,
     origin: null,
     destination: toPlanContractInfo(contract),
     operations: [

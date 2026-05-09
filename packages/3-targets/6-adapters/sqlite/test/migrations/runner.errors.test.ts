@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
 import {
   buildWriteMarkerStatements,
@@ -35,6 +36,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
 
     const emptyPlan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [],
@@ -85,6 +87,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     await executeStatement(driver, ensureMarkerTableStatement);
     await executeStatement(driver, ensureLedgerTableStatement);
     const mismatchedMarker = buildWriteMarkerStatements({
+      space: APP_SPACE_ID,
       storageHash: 'sha256:other-contract',
       profileHash: 'sha256:other-profile',
       contractJson: { storageHash: 'sha256:other-contract' },
@@ -97,6 +100,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
     const emptyPlan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: {
         storageHash: 'sha256:expected-origin',
         profileHash: 'sha256:expected-profile',
@@ -141,6 +145,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
 
     const planWithFailingPostcheck = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [
@@ -195,6 +200,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
 
     const planWithInvalidSql = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [
@@ -259,6 +265,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
     const emptyPlan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [],
@@ -300,6 +307,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
 
     const plan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: { storageHash: 'sha256:plan-hash', profileHash: 'sha256:plan-profile' },
       operations: [],
@@ -334,6 +342,7 @@ describe('SqliteMigrationRunner - Policy Violations', () => {
 
     const planWithPolicyViolation = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [

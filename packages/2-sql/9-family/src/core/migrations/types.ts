@@ -198,6 +198,21 @@ export interface SqlMigrationPlanContractInfo {
 
 export interface SqlMigrationPlan<TTargetDetails> extends MigrationPlan {
   /**
+   * Contract space this plan applies to. The runner uses this to key the
+   * `prisma_contract.marker` row it writes/reads (`space = <spaceId>`),
+   * so per-extension plans hit per-extension marker rows instead of all
+   * collapsing onto the app's row.
+   *
+   * App-plan callers pass `APP_SPACE_ID` (`'app'`); per-extension plans
+   * pass the extension's space id. Required at every call site so the
+   * type system surfaces every place that needs to thread the value
+   * (rather than letting an `?? APP_SPACE_ID` fall-through silently
+   * collapse multi-space markers onto the `'app'` row).
+   *
+   * @see specs/framework-mechanism.spec.md § 2.
+   */
+  readonly spaceId: string;
+  /**
    * Origin contract identity that the plan expects the database to currently be at.
    * If omitted or null, the runner skips origin validation entirely.
    */
@@ -261,6 +276,14 @@ export interface SqlMigrationPlannerPlanOptions {
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
+  /**
+   * Contract space the plan applies to. The planner stamps this onto
+   * the produced {@link SqlMigrationPlan.spaceId} so the runner keys
+   * the marker row by the right space. App-plan callers pass
+   * `APP_SPACE_ID`; per-extension callers pass the extension's space
+   * id.
+   */
+  readonly spaceId: string;
   /**
    * The "from" contract (state the planner assumes the database starts at),
    * or `null` for reconciliation flows that have no prior contract.
@@ -362,6 +385,10 @@ export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDet
 
 export interface CreateSqlMigrationPlanOptions<TTargetDetails> {
   readonly targetId: string;
+  /**
+   * Contract space this plan applies to. Mirrors {@link SqlMigrationPlan.spaceId}.
+   */
+  readonly spaceId: string;
   readonly origin?: SqlMigrationPlanContractInfo | null;
   readonly destination: SqlMigrationPlanContractInfo;
   readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];

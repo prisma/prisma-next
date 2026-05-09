@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -55,6 +56,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
         const planWithPreSatisfiedPostcheck = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -177,6 +179,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
 
         const planWithPreSatisfiedPostcheck = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [mutableOperation],
@@ -246,6 +249,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           policy: INIT_ADDITIVE_POLICY,
           fromContract: null,
           frameworkComponents,
+          spaceId: APP_SPACE_ID,
         });
         if (initialPlan.kind !== 'success') {
           throw new Error('expected initial planner success');
@@ -270,6 +274,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         // true no-op: nothing should be written.
         const noOpSelfEdgePlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: toPlanContractInfo(contract),
           destination: toPlanContractInfo(contract),
           operations: [],
@@ -320,6 +325,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           policy: INIT_ADDITIVE_POLICY,
           fromContract: null,
           frameworkComponents,
+          spaceId: APP_SPACE_ID,
         });
         if (initialPlan.kind !== 'success') {
           throw new Error('expected initial planner success');
@@ -339,6 +345,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
 
         const selfEdgePlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: toPlanContractInfo(contract),
           destination: toPlanContractInfo(contract),
           operations: [

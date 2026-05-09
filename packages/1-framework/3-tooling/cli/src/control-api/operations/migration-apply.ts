@@ -5,6 +5,7 @@ import type {
   MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type {
@@ -142,8 +143,14 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
 
     // Manifest `from === null` means "no prior state" — the runner expects
     // `origin: null` for a fresh database (no marker present).
+    //
+    // M3 will thread the package's owning space id through `MigrationApplyStep`
+    // and use it here. Until then, all on-disk migration packages live under
+    // the app's `migrations/` directory, so this path is exclusively app-scope
+    // and we pass `APP_SPACE_ID` explicitly.
     const plan = {
       targetId,
+      spaceId: APP_SPACE_ID,
       origin: migration.from === null ? null : { storageHash: migration.from },
       destination: { storageHash: migration.to },
       operations,

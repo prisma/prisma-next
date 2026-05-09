@@ -15,6 +15,7 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
+  APP_SPACE_ID,
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
   VERIFY_CODE_TARGET_MISMATCH,
@@ -255,7 +256,15 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
 
   async readMarker(options: {
     readonly driver: ControlDriverInstance<'mongo', string>;
+    readonly space: string;
   }): Promise<ContractMarkerRecord | null> {
+    if (options.space !== APP_SPACE_ID) {
+      throw new Error(
+        'Mongo target does not yet support per-space contract markers. ' +
+          `readMarker was called with space="${options.space}", but only "${APP_SPACE_ID}" is supported. ` +
+          'Per-space marker support is tracked separately for Mongo and is not part of the SQL-family contract-spaces work.',
+      );
+    }
     const db = extractDb(options.driver);
     return readMarker(db);
   }
