@@ -1,41 +1,41 @@
 /**
- * Structural verification for the pgvector extension descriptor on the
- * contract-space mechanism (project: extension-contract-spaces, M4
- * T4.1 + T4.2).
+ * Structural verification for the pgvector extension descriptor.
  *
- * Pins:
- *   - the descriptor's `contractSpace` field is wired and shaped
- *     correctly (project AC10 / TC-15);
- *   - the contract IR declares the parameterised native `vector` type
- *     under `storage.types` (project FR9 / TC-15 — pgvector's vector
- *     IS representable in today's IR vocabulary, unlike CipherStash's
- *     deferred composite/enum/domain typed objects);
- *   - the baseline migration carries the `installVectorExtension` op
- *     with the stable `pgvector:install-vector-v1` invariantId
- *     (project FR11 / FR15);
- *   - the descriptor is self-consistent (`headRef.hash` matches a
- *     re-derived `computeStorageHash(...)` over `(target,
- *     targetFamily, storage)` — same check the family runs at
- *     create-time via `assertDescriptorSelfConsistency`).
+ * **On-disk-in-package authoring (M3.5 R3).** The descriptor's
+ * contract / migrations / head ref now flow through JSON-import
+ * declarations from the package's emitted artefacts:
  *
- * This file is a fast in-process check; live-database e2e against
- * pgvector lives in `test/scenario-a.e2e.integration.test.ts` (T4.3).
+ *   - `<package>/contract.json`
+ *   - `<package>/migrations/pgvector/<dirName>/{migration,ops}.json`
+ *   - `<package>/refs/head.json`
+ *
+ * These assertions lock down the wiring: the descriptor exposes
+ * structurally correct values; the parameterised `vector` native type
+ * is registered under `storage.types`; and the head ref tracks the
+ * latest migration's `to` hash.
+ *
+ * Hash-level values are sourced from the on-disk artefacts (via the
+ * descriptor's contractSpace) rather than hand-pinned in the test, so
+ * the assertions stay honest under re-emission. Mirrors the synthetic
+ * extension's `test/descriptor.test.ts` reference model.
+ *
+ * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
  */
 
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { describe, expect, it } from 'vitest';
 import { VECTOR_CODEC_ID } from '../src/core/constants';
-import { PGVECTOR_STORAGE_HASH } from '../src/core/contract';
 import {
   PGVECTOR_BASELINE_MIGRATION_NAME,
   PGVECTOR_INVARIANTS,
   PGVECTOR_NATIVE_TYPE,
   PGVECTOR_SPACE_ID,
 } from '../src/core/contract-space-constants';
-import { PGVECTOR_BASELINE_INVARIANTS } from '../src/core/migrations';
 import pgvectorExtensionDescriptor from '../src/exports/control';
 
-describe('pgvector extension descriptor (contract space)', () => {
+describe('pgvector extension descriptor (on-disk-in-package authoring)', () => {
   it('identifies as a SQL extension targeted at postgres', () => {
     expect(pgvectorExtensionDescriptor).toMatchObject({
       kind: 'extension',
@@ -56,12 +56,24 @@ describe('pgvector extension descriptor (contract space)', () => {
     });
   });
 
-  it('publishes one baseline migration containing the installVectorExtension op', () => {
+  it('publishes one baseline migration sourced from the on-disk emit pipeline', () => {
     const space = pgvectorExtensionDescriptor.contractSpace!;
     expect(space.migrations).toHaveLength(1);
     const baseline = space.migrations[0]!;
     expect(baseline.dirName).toBe(PGVECTOR_BASELINE_MIGRATION_NAME);
+    expect(baseline.metadata.from).toBeNull();
+    expect(baseline.metadata.to).toBe(space.contractJson.storage.storageHash);
+  });
 
+  it("synthesises the migration package's `dirPath` from the descriptor's URL", () => {
+    const baseline = pgvectorExtensionDescriptor.contractSpace!.migrations[0]!;
+    expect(existsSync(baseline.dirPath)).toBe(true);
+    expect(existsSync(join(baseline.dirPath, 'migration.json'))).toBe(true);
+    expect(existsSync(join(baseline.dirPath, 'ops.json'))).toBe(true);
+  });
+
+  it('baseline ops carry the installVectorExtension op with the stable invariantId', () => {
+    const baseline = pgvectorExtensionDescriptor.contractSpace!.migrations[0]!;
     const opIds = baseline.ops.map((op) => op.invariantId).filter(Boolean);
     expect(opIds).toEqual([PGVECTOR_INVARIANTS.installVector]);
   });
@@ -92,10 +104,12 @@ describe('pgvector extension descriptor (contract space)', () => {
     expect(installOp!.precheck?.[0]?.sql).toContain("extname = 'vector'");
   });
 
-  it('points the head ref at the storage-hash of the published contract', () => {
-    const headRef = pgvectorExtensionDescriptor.contractSpace!.headRef;
-    expect(headRef.hash).toBe(PGVECTOR_STORAGE_HASH);
-    expect(headRef.invariants).toEqual(PGVECTOR_BASELINE_INVARIANTS);
+  it("points the head ref at the latest migration's destination hash", () => {
+    const space = pgvectorExtensionDescriptor.contractSpace!;
+    expect(space.headRef.hash).toBe(space.migrations[0]!.metadata.to);
+    expect([...space.headRef.invariants].sort()).toEqual(
+      [...space.migrations[0]!.metadata.providedInvariants].sort(),
+    );
   });
 
   it('self-consistency check passes — headRef.hash matches re-derived storage hash', () => {
