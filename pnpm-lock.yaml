@@ -2621,6 +2621,9 @@ importers:
 
   packages/3-extensions/pgvector:
     dependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../../3-targets/6-adapters/postgres
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
@@ -2655,9 +2658,6 @@ importers:
         specifier: ^2.0.0
         version: 2.1.29
     devDependencies:
-      '@prisma-next/adapter-postgres':
-        specifier: workspace:*
-        version: link:../../3-targets/6-adapters/postgres
       '@prisma-next/cli':
         specifier: workspace:*
         version: link:../../1-framework/3-tooling/cli
