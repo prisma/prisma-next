@@ -190,7 +190,7 @@ export function parseObjectLiteralStringMap(input: {
         diagnostics: input.diagnostics,
         sourceId: input.sourceId,
         span: input.span,
-        message: `${input.entityLabel} object-literal value for "${key}" must be a quoted string literal`,
+        message: `${input.entityLabel} object-literal value for "${key}" must be a quoted string literal (V1 PSL @@index options support string leaves only; use the TS authoring surface for non-string options)`,
       });
     }
     if (Object.hasOwn(result, key)) {

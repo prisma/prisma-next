@@ -1,5 +1,6 @@
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ContractDefinition,
   FieldNode,
@@ -573,9 +574,9 @@ function resolveModelNode(
   })) satisfies readonly UniqueConstraintNode[];
   const indexes = (spec.sqlSpec?.indexes ?? []).map((index) => ({
     columns: mapFieldNamesToColumnNames(spec.modelName, index.fields, spec.fieldToColumn),
-    ...(index.name ? { name: index.name } : {}),
-    ...(index.type ? { type: index.type } : {}),
-    ...(index.options ? { options: index.options } : {}),
+    ...ifDefined('name', index.name),
+    ...ifDefined('type', index.type),
+    ...ifDefined('options', index.options),
   })) satisfies readonly IndexNode[];
   const foreignKeys = resolveForeignKeyNodes(spec, allSpecs);
   const relations = Object.entries(spec.relations).map(([relationName, relationBuilder]) =>

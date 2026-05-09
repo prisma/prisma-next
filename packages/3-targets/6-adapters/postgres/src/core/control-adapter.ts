@@ -547,7 +547,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           // explicit type matches a default-method introspected index without
           // forcing DROP+CREATE on every plan.
           const indexType = idxRow.amname === 'btree' ? undefined : idxRow.amname;
-          const indexOptions = parsePgReloptions(idxRow.reloptions);
+          const indexOptions = parsePgReloptions(idxRow.reloptions, idxRow.indexname);
           indexesMap.set(idxRow.indexname, {
             columns: [idxRow.attname],
             name: idxRow.indexname,
@@ -707,8 +707,9 @@ function mapReferentialAction(rule: string): SqlReferentialAction | undefined {
  *
  * Returns `undefined` when the input is null/empty (no WITH clause).
  */
-function parsePgReloptions(
+export function parsePgReloptions(
   reloptions: readonly string[] | null,
+  indexName: string,
 ): Record<string, string> | undefined {
   if (!reloptions || reloptions.length === 0) {
     return undefined;
@@ -717,8 +718,9 @@ function parsePgReloptions(
   for (const entry of reloptions) {
     const eq = entry.indexOf('=');
     if (eq === -1) {
-      // Defensive: skip malformed entries rather than corrupting the IR.
-      continue;
+      throw new Error(
+        `Postgres introspection: malformed reloption entry "${entry}" on index "${indexName}" (expected "key=value")`,
+      );
     }
     const key = entry.slice(0, eq);
     const value = entry.slice(eq + 1);

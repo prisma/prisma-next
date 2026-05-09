@@ -375,6 +375,9 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
       seenUniqueDefinitions.add(signature);
     }
 
+    const sortOptions = (o: Record<string, unknown> | undefined): Record<string, unknown> | null =>
+      o ? Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b))) : null;
+
     const seenIndexDefinitions = new Set<string>();
     for (const index of table.indexes) {
       const duplicateColumn = findDuplicateValue(index.columns);
@@ -385,7 +388,7 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
       const signature = JSON.stringify({
         columns: index.columns,
         type: index.type ?? null,
-        options: index.options ?? null,
+        options: sortOptions(index.options),
       });
       if (seenIndexDefinitions.has(signature)) {
         errors.push(

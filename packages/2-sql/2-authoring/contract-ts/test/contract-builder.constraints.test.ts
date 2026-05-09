@@ -238,6 +238,34 @@ describe('contract definition constraint support', () => {
     ).toThrow(/Contract semantic validation failed:.*user_pkey/);
   });
 
+  it('throws a contextual error when an extension pack declares a malformed indexTypes value', () => {
+    const malformedIndexPack = {
+      kind: 'extension',
+      id: 'malformed-pack',
+      familyId: 'sql',
+      targetId: 'postgres',
+      version: '0.0.1',
+      indexTypes: 'oops',
+    } as const;
+
+    expect(() =>
+      defineContract({
+        family: bareFamilyPack,
+        target: postgresTargetPack,
+        // The pack is intentionally malformed for this test; the runtime
+        // shape check is what we want to exercise.
+        extensionPacks: { malformed: malformedIndexPack as unknown as typeof testIndexPack },
+        models: {
+          Doc: model('Doc', {
+            fields: {
+              id: field.column(int4Column).id(),
+            },
+          }).sql({ table: 'doc' }),
+        },
+      }),
+    ).toThrow(/malformed-pack/);
+  });
+
   it('throws at authoring time when an index uses an unregistered type', () => {
     expect(() =>
       defineContract(

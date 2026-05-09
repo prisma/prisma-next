@@ -79,11 +79,23 @@ function assertStorageSemantics(
   }
 
   const indexTypeRegistry = createIndexTypeRegistry();
-  for (const pack of [definition.target, ...Object.values(definition.extensionPacks ?? {})]) {
-    const registration = (pack as { readonly indexTypes?: IndexTypeRegistration<IndexTypeMap> })
-      .indexTypes;
-    if (!registration) continue;
-    for (const entry of registration.entries) {
+  const packsToRegister: ReadonlyArray<{ readonly id?: string; readonly indexTypes?: unknown }> = [
+    definition.target,
+    ...Object.values(definition.extensionPacks ?? {}),
+  ];
+  for (const pack of packsToRegister) {
+    const registration = pack.indexTypes;
+    if (registration === undefined) continue;
+    if (
+      typeof registration !== 'object' ||
+      registration === null ||
+      !Array.isArray((registration as { entries?: unknown }).entries)
+    ) {
+      throw new Error(
+        `Pack "${pack.id ?? '<unknown>'}" declares "indexTypes" but its value is not an IndexTypeRegistration (expected an object with an "entries" array; got ${typeof registration}).`,
+      );
+    }
+    for (const entry of (registration as IndexTypeRegistration<IndexTypeMap>).entries) {
       indexTypeRegistry.register(entry);
     }
   }
