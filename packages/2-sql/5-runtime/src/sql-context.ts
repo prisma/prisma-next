@@ -502,35 +502,34 @@ function buildContractCodecRegistry(
               columnName,
             });
             const ctx: SqlCodecInstanceContext = {
-              name: `<anon:${tableName}.${columnName}>`,
+              name: `<col:${tableName}.${columnName}>`,
               usedAt: [{ table: tableName, column: columnName }],
             };
             resolvedCodec = parameterizedDescriptor.factory(validatedParams)(ctx);
           }
         } else if (!isParameterized) {
-          // Non-parameterized column. Cache the resolved codec by codec
-          // id — non-parameterized descriptors' factories are constant
-          // (every call returns the same shared codec instance), so
-          // columns sharing this codec id share one resolved instance.
-          let cached = byCodecId.get(column.codecId);
-          if (!cached) {
-            const ctx: SqlCodecInstanceContext = {
-              name: `<shared:${column.codecId}>`,
-              usedAt: [{ table: tableName, column: columnName }],
-            };
-            // The descriptor's `P` is `void` for non-parameterized
-            // codecs; the runtime's `void` value is `undefined`. The
-            // cast narrows the descriptor's family-agnostic
-            // `CodecInstanceContext` slot to the SQL
-            // `SqlCodecInstanceContext` we pass at this call site —
-            // function-argument contravariance makes the narrow safe.
-            const voidFactory = descriptor.factory as unknown as (
-              params: undefined,
-            ) => (ctx: SqlCodecInstanceContext) => Codec;
-            cached = voidFactory(undefined)(ctx);
-            byCodecId.set(column.codecId, cached);
-          }
-          resolvedCodec = cached;
+          // Non-parameterized column. F42: materialize a fresh codec
+          // instance per `forColumn(table, column)` entry with a
+          // column-specific `SqlCodecInstanceContext`. The pre-populated
+          // `byCodecId` representative (built with the synthetic
+          // `<shared:codecId>` context and empty `usedAt`) is reserved
+          // for `forCodecId()` refs-less fallbacks; reusing it for
+          // column-bound dispatch would erase per-column diagnostics for
+          // any descriptor whose factory reads `CodecInstanceContext`.
+          const ctx: SqlCodecInstanceContext = {
+            name: `<col:${tableName}.${columnName}>`,
+            usedAt: [{ table: tableName, column: columnName }],
+          };
+          // The descriptor's `P` is `void` for non-parameterized
+          // codecs; the runtime's `void` value is `undefined`. The
+          // cast narrows the descriptor's family-agnostic
+          // `CodecInstanceContext` slot to the SQL
+          // `SqlCodecInstanceContext` we pass at this call site —
+          // function-argument contravariance makes the narrow safe.
+          const voidFactory = descriptor.factory as unknown as (
+            params: undefined,
+          ) => (ctx: SqlCodecInstanceContext) => Codec;
+          resolvedCodec = voidFactory(undefined)(ctx);
         }
         // else: parameterized codec id with no typeRef and no
         // typeParams — this is the legitimate "undimensioned" form for
