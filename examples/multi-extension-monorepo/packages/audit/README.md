@@ -18,7 +18,12 @@ for the full step-by-step workflow — the short version is:
 3. If the schema changed: `pnpm exec prisma-next migration plan --name <slug>`,
    then hand-edit the generated `migrations/audit/<dir>/migration.ts`
    so each op carries the package's stable invariantId, and re-emit
-   `ops.json` with `node migrations/audit/<dir>/migration.ts`.
+   `ops.json` with `pnpm tsx migrations/audit/<dir>/migration.ts`.
+   (Use `tsx`, not bare `node`: the Migration subclass imports
+   relative TypeScript siblings which Node's native loader can't
+   resolve without a TS-aware loader. `migration plan` is **not**
+   chained into the package's build script — it's non-idempotent and
+   runs manually when the schema changes.)
 4. Update [`refs/head.json`](./refs/head.json) to pin the new head
    `(hash, invariants)`.
 5. The descriptor at [`control.ts`](./control.ts) is JSON-import wiring

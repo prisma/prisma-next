@@ -133,6 +133,19 @@ Resolving `dirPath` from `import.meta.url` keeps the value correct regardless of
 
 The package's `build` script chains `prisma-next contract emit` ahead of `tsdown` so the emitted artefacts stay in sync with the TS schema source. `prisma-next migration plan` is **not** part of the build script — it is non-idempotent (each invocation generates a new timestamped directory) and is run manually when the contract source changes, exactly the way application authors run it.
 
+#### Two authoring paths: planner-emitted (A) vs hand-scaffolded (B)
+
+Most extensions use **Path A**: `prisma-next migration plan` scaffolds the migration directory from the contract diff (cipherstash + the audit / feature-flags monorepo packages all follow this), and the resulting `migration.ts` is hand-edited to carry the extension's stable invariantIds and any non-derivable ops (e.g. cipherstash's `installEqlBundle` op + structural `cipherstash:create-*-v1` no-ops). `pnpm tsx migrations/<space>/<dirName>/migration.ts` then re-emits `ops.json` + `migration.json` deterministically.
+
+A handful of extensions need **Path B** — hand-scaffolding the migration directory — when the contract declares only `storage.types` (no tables / models). For such contracts the planner returns `PN-CLI-4020 Contract changed but planner produced no operations`, so `migration plan` cannot scaffold the baseline. The author instead:
+
+1. Creates `migrations/<space>/<timestamp>_<name>/` by hand.
+2. Seeds `migration.json` with `from: null`, `to: <storageHash from contract.json>`, and `toContract` set to the emitted `<package>/contract.json` byte-for-byte.
+3. Hand-authors `migration.ts` as a `Migration` subclass returning the production op list (typically a single `rawSql` op installing the underlying database extension) via the `operations` getter.
+4. Runs `pnpm tsx migrations/<space>/<dirName>/migration.ts` to canonicalise `ops.json` + `migration.json` from the subclass output.
+
+pgvector (whose contract declares only `vector(N)` under `storage.types`) is the exemplar. Future migrations on a Path-B-bootstrapped extension that *do* add tables / models can use `migration plan` (Path A) directly — the path choice is per-migration, not per-extension.
+
 ### On-disk layout (the user's repo)
 
 ```
@@ -341,6 +354,7 @@ The asymmetry between `migrate` (authoring) and the apply/verify path is what ma
 - **Cross-space dependencies as a first-class concept.** Convention-based ordering (extensions first, app-space second) is sufficient for v1 given the single-transaction property.
 - **Cross-space codec hooks.** Codec-emitted ops are app-space-bound by API shape — the hook signature has no parameter for cross-space context. See [ADR 212](./ADR%20212%20-%20Codec%20lifecycle%20hooks.md).
 - **`refs/head.json` ergonomics.** Today the extension author hand-pins `refs/head.json` after running `migration plan` (copy `to` from the latest migration's metadata; copy `providedInvariants` from the same). Adding a `prisma-next refs update` (or equivalent) command that emits/refreshes head pins from the latest migration is a small follow-up; until it ships, the `test-contract-space` reference model documents the manual step.
+- **Relocate `adapter-postgres`'s pgvector test fixtures.** M3.5 R3 broke an `adapter-postgres ↔ extension-pgvector` workspace cycle by demoting `@prisma-next/adapter-postgres` to an optional `peerDependencies` entry on `@prisma-next/extension-pgvector` (the cycle exists because `adapter-postgres`'s tests import pgvector fixtures — planner-test, sql-renderer cast policy, control-adapter parity — and pgvector's new `prisma-next.config.ts` flow needs `adapter-postgres`). The peerDeps workaround is correct in install/runtime semantics but papers over a real layering issue. Proper resolution: relocate `adapter-postgres`'s pgvector-specific test fixtures into either pgvector's own test suite or a separate `extension-pgvector-fixtures` test package, then revert the peerDeps entry to a regular `devDependencies` line. Out of scope for the M3.5 alignment work; tracked here so the workaround's rationale is discoverable.
 
 ## Related
 
