@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
   getExitCode,
+  parseJsonObjectFromCliCapture,
   setupCommandMocks,
   setupDbTestFixture,
   setupTestDirectoryFromFixtures,
@@ -192,9 +193,9 @@ withTempDir(({ createTempDir }) => {
 
           await runDbSign(testSetup, configPath, ['--config', configPath, '--json', '--no-color']);
 
-          // Get output and parse JSON (only from this command)
-          const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
-          const jsonOutput = JSON.parse(output) as Record<string, unknown>;
+          const jsonOutput = parseJsonObjectFromCliCapture(
+            consoleOutput.slice(outputStartIndex),
+          ) as Record<string, unknown>;
 
           // Normalize non-deterministic values (timing, contractPath) for snapshot
           const meta = jsonOutput['meta'] as Record<string, unknown> | undefined;
@@ -413,8 +414,7 @@ withTempDir(({ createTempDir }) => {
           expect(getExitCode()).toBe(1);
 
           // Verify that JSON output was printed (not human-readable output)
-          const output = consoleOutput.slice(outputStartIndex).join('\n');
-          const jsonOutput = JSON.parse(output);
+          const jsonOutput = parseJsonObjectFromCliCapture(consoleOutput.slice(outputStartIndex));
           expect(jsonOutput).toMatchObject({
             ok: false,
             summary: expect.stringContaining('does not satisfy contract'),

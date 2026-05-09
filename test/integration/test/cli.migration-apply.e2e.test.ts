@@ -17,6 +17,7 @@ const TSX_BIN = resolve(__dirname, '../../../node_modules/.bin/tsx');
 import {
   executeCommand,
   getExitCode,
+  parseJsonObjectFromCliCapture,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
@@ -129,8 +130,7 @@ withTempDir(({ createTempDir }) => {
             consoleErrors.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
-            const output = consoleOutput.join('\n').trim();
-            const parsed = JSON.parse(output) as MigrationApplyResult;
+            const parsed = parseJsonObjectFromCliCapture(consoleOutput) as MigrationApplyResult;
 
             expect(parsed.ok).toBe(true);
             expect(parsed.migrationsApplied).toBe(1);
@@ -190,8 +190,7 @@ withTempDir(({ createTempDir }) => {
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
-            const output = consoleOutput.join('\n').trim();
-            const parsed = JSON.parse(output) as MigrationApplyResult;
+            const parsed = parseJsonObjectFromCliCapture(consoleOutput) as MigrationApplyResult;
 
             expect(parsed.ok).toBe(true);
             expect(parsed.migrationsApplied).toBe(0);
@@ -299,8 +298,7 @@ withTempDir(({ createTempDir }) => {
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
-            const output = consoleOutput.join('\n').trim();
-            const parsed = JSON.parse(output) as MigrationApplyResult;
+            const parsed = parseJsonObjectFromCliCapture(consoleOutput) as MigrationApplyResult;
 
             expect(parsed.ok).toBe(true);
             expect(parsed.migrationsApplied).toBe(2);
@@ -349,7 +347,7 @@ withTempDir(({ createTempDir }) => {
             // Apply first migration successfully.
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
-            const firstApply = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
+            const firstApply = parseJsonObjectFromCliCapture(consoleOutput) as MigrationApplyResult;
             expect(firstApply.migrationsApplied).toBe(1);
 
             // Insert rows with duplicate emails so a unique constraint will fail.
@@ -411,8 +409,8 @@ withTempDir(({ createTempDir }) => {
 
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
-            const resumeResult = JSON.parse(
-              consoleOutput.join('\n').trim(),
+            const resumeResult = parseJsonObjectFromCliCapture(
+              consoleOutput,
             ) as MigrationApplyResult;
             expect(resumeResult.migrationsApplied).toBe(1);
             expect(resumeResult.markerHash).toBe(secondMigration!.metadata.to);
@@ -480,7 +478,7 @@ withTempDir(({ createTempDir }) => {
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
-            const firstApply = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
+            const firstApply = parseJsonObjectFromCliCapture(consoleOutput) as MigrationApplyResult;
             expect(firstApply.ok).toBe(true);
             expect(firstApply.migrationsApplied).toBe(1);
 
@@ -512,7 +510,9 @@ withTempDir(({ createTempDir }) => {
             consoleErrors.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
-            const secondApply = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
+            const secondApply = parseJsonObjectFromCliCapture(
+              consoleOutput,
+            ) as MigrationApplyResult;
             expect(secondApply.ok).toBe(true);
             expect(secondApply.migrationsApplied).toBe(1);
 
@@ -589,7 +589,7 @@ withTempDir(({ createTempDir }) => {
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
-            const result = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
+            const result = parseJsonObjectFromCliCapture(consoleOutput) as MigrationApplyResult;
             expect(result.ok).toBe(true);
             expect(result.migrationsApplied).toBe(3);
 

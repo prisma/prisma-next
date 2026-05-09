@@ -1,7 +1,11 @@
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { setupCommandMocks, withTempDir } from './utils/cli-test-helpers';
+import {
+  parseJsonObjectFromCliCapture,
+  setupCommandMocks,
+  withTempDir,
+} from './utils/cli-test-helpers';
 import { runDbInit, setupDbInitFixture } from './utils/db-init-test-helpers';
 
 // Fixture subdirectory for db-init e2e tests
@@ -85,9 +89,9 @@ withTempDir(({ createTempDir }) => {
 
             await runDbInit(testSetup, ['--config', configPath, '--json', '--no-color']);
 
-            // Get output and parse JSON (only from this command)
-            const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
-            const jsonOutput = JSON.parse(output) as Record<string, unknown>;
+            const jsonOutput = parseJsonObjectFromCliCapture(
+              consoleOutput.slice(outputStartIndex),
+            ) as Record<string, unknown>;
 
             // Verify structure
             expect(jsonOutput).toMatchObject({
@@ -181,8 +185,9 @@ withTempDir(({ createTempDir }) => {
               '--no-color',
             ]);
 
-            const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
-            const jsonOutput = JSON.parse(output) as Record<string, unknown>;
+            const jsonOutput = parseJsonObjectFromCliCapture(
+              consoleOutput.slice(outputStartIndex),
+            ) as Record<string, unknown>;
 
             // Verify structure
             expect(jsonOutput).toMatchObject({
@@ -288,8 +293,9 @@ withTempDir(({ createTempDir }) => {
             // Second run: should succeed as noop
             await runDbInit(testSetup, ['--config', configPath, '--json', '--no-color']);
 
-            const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
-            const jsonOutput = JSON.parse(output) as Record<string, unknown>;
+            const jsonOutput = parseJsonObjectFromCliCapture(
+              consoleOutput.slice(outputStartIndex),
+            ) as Record<string, unknown>;
 
             // Verify structure - should be noop with existing marker
             expect(jsonOutput).toMatchObject({
