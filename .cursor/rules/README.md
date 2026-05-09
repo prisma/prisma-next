@@ -75,7 +75,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 
 ## TypeScript & Typing
 - `.cursor/rules/typescript-patterns.mdc` — TS patterns index (short)
-- `.cursor/rules/jsdoc-no-artificial-line-wraps.mdc` — JSDoc prose: no manual ~80-column wraps; avoid orphaned doc blocks
+- `.agents/rules/jsdoc-no-artificial-line-wraps.mdc` — JSDoc prose: no manual ~80-column wraps; avoid orphaned doc blocks
 - `.cursor/rules/generic-parameters.mdc` — Generic parameter defaults
 - `.cursor/rules/interface-factory-pattern.mdc` — Interface-based design + factories
 - `.cursor/rules/type-predicates.mdc` — Replace blind casts with type predicates
