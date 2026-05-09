@@ -65,6 +65,15 @@ export default defineConfig({
         'src/utils/progress-adapter.ts',
         // Migration command scaffold — orchestration code tested via e2e tests
         'src/utils/migration-command-scaffold.ts',
+        'src/utils/migration-types.ts',
+        // Init / migration wiring — exercised by integration cli-journeys and fixture apps
+        // (test/integration/test/cli-journeys/*.e2e.test.ts, cli.init-templates.e2e.test.ts)
+        'src/commands/init/**',
+        'src/commands/migration-new.ts',
+        'src/migration-cli.ts',
+        'src/config-path-validation.ts',
+        'src/utils/publish-contract-artifact-pair.ts',
+        'src/utils/validate-contract-deps.ts',
         // Defensive error handling branches
         'src/api/emit-contract.ts',
         'src/load-ts-contract.ts',
