@@ -1,4 +1,4 @@
-import type { AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
+import type { AnyFromSource, AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
 
 /**
  * Build a map from query-local table aliases to their underlying source table names.
@@ -8,14 +8,12 @@ import type { AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
  */
 function buildAliasMap(ast: AnyQueryAst): ReadonlyMap<string, string> {
   const aliases = new Map<string, string>();
-  const recordSource = (source: { kind: string }): void => {
+  const recordSource = (source: AnyFromSource): void => {
     if (source.kind === 'table-source') {
-      const ts = source as { name: string; alias?: string };
-      const key = ts.alias ?? ts.name;
-      aliases.set(key, ts.name);
-    } else if (source.kind === 'derived-table-source') {
-      const ds = source as { alias: string };
-      aliases.set(ds.alias, ds.alias);
+      const key = source.alias ?? source.name;
+      aliases.set(key, source.name);
+    } else {
+      aliases.set(source.alias, source.alias);
     }
   };
   if (ast.kind === 'select') {
@@ -23,8 +21,8 @@ function buildAliasMap(ast: AnyQueryAst): ReadonlyMap<string, string> {
     for (const join of ast.joins ?? []) {
       recordSource(join.source);
     }
-  } else if ('table' in ast && ast.table) {
-    recordSource(ast.table as { kind: string });
+  } else {
+    recordSource(ast.table);
   }
   return aliases;
 }
