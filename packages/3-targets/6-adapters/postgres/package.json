@@ -33,7 +33,7 @@
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/utils": "workspace:*",
-    "arktype": "^2.0.0"
+    "arktype": "^2.2.0"
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
