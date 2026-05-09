@@ -144,10 +144,6 @@ console.log(await rows[0]?.email.decrypt());
 
 See [`DEVELOPING.md`](./DEVELOPING.md) for source layout, design choices, and the canonical Acceptance Criteria list.
 
-### Known surface gap
-
-The runtime registers `cipherstashEq` / `cipherstashIlike` on cipherstash columns via `context.queryOperations`, but the package does not yet ship a static `QueryOperationTypes` surface analogous to [`@prisma-next/extension-pgvector/operation-types`](../pgvector/src/exports/). Tracked under [TML-2435](https://linear.app/prisma-company/issue/TML-2435/cipherstash-ship-queryoperationtypes-export-so-cipherstasheq) — until it lands, consumers cast the column accessor through a small local shape so `where(...)` callbacks typecheck (the runtime call works regardless). The example app at [`examples/cipherstash-integration/`](../../../examples/cipherstash-integration/README.md) demonstrates the cast and documents the same gap.
-
 ## References
 
 - [CipherStash](https://cipherstash.com) — managed application-layer encryption for Postgres.
