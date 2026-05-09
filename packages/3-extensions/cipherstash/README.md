@@ -66,15 +66,23 @@ this package using the same pipeline application authors use:
 - `pnpm build:contract-space` — runs `prisma-next contract emit` to
   produce `<package>/contract.{json,d.ts}` from the TS source at
   `src/contract-source.ts`.
-- `prisma-next migration plan` (run inside the package) — scaffolds a
-  new migration directory under `migrations/cipherstash/<dirName>/`.
-  The baseline migration's `migration.ts` is then hand-edited so that
-  its `operations` getter installs the EQL bundle byte-for-byte plus
-  the structural `cipherstash:*` no-op ops that register invariantIds
-  for typed objects the bundle creates (see the comment in
-  `migrations/cipherstash/20260601T0000_install_eql_bundle/migration.ts`).
-- `node migration.ts` (run inside the migration directory) — re-emits
-  `ops.json` + `migration.json` from the hand-edited subclass.
+- `pnpm exec prisma-next migration plan --name <slug>` (run from this
+  package directory) — scaffolds a new migration directory under
+  `migrations/cipherstash/<dirName>/`. **Not chained into
+  `pnpm build`**: `migration plan` is non-idempotent (each invocation
+  generates a new timestamped directory), so it runs manually when the
+  contract source changes — same convention application authors
+  follow. The baseline migration's `migration.ts` is then hand-edited
+  so that its `operations` getter installs the EQL bundle byte-for-byte
+  plus the structural `cipherstash:*` no-op ops that register
+  invariantIds for typed objects the bundle creates (see the comment
+  in `migrations/cipherstash/20260601T0000_install_eql_bundle/migration.ts`).
+- `pnpm tsx migrations/cipherstash/<dirName>/migration.ts` (run from
+  this package directory) — re-emits `ops.json` + `migration.json`
+  from the hand-edited subclass. Use `tsx`, not bare `node`, because
+  the Migration subclass imports relative TypeScript siblings
+  (`../../../src/core/constants`, `../../../src/core/eql-bundle`)
+  which Node's native loader can't resolve without a TS-aware loader.
 - `refs/head.json` is hand-pinned with the latest migration's `to`
   hash + `providedInvariants`.
 
