@@ -46,8 +46,6 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * per-space verifier to detect marker-vs-pinned drift and orphan
    * marker rows. Returns an empty map when the marker table does not
    * yet exist (fresh database / never-signed project).
-   *
-   * @see specs/framework-mechanism.spec.md § 4 — Verifier (T1.5).
    */
   readAllMarkers(
     driver: ControlDriverInstance<'sql', TTarget>,

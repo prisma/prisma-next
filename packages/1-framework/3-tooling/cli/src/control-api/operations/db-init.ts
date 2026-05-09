@@ -36,9 +36,6 @@ export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extend
    * only) or n=k+1 (extensions + app) resolver list, and the resolver
    * for any extension space reads its pinned `refs/head.json` from
    * `<migrationsDir>/<space-id>/refs/head.json`.
-   *
-   * @see projects/extension-contract-spaces/specs/m2-orchestrator-consolidation-spec.md
-   *   § "One-path `db init`".
    */
   readonly migrationsDir: string;
   /**
@@ -55,12 +52,9 @@ export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extend
  * Execute `db init` against the configured contract.
  *
  * Always routes through {@link executePerSpaceDbApply} so the
- * single-space and multi-space behaviours share one loop. The legacy
- * dual-path conditional (introspection/planning/idempotency/apply
- * inlined here when no extension spaces were declared) was deleted in
- * commit 3 of the M2 orchestrator-consolidation slice — the per-space
- * flow walks an n=1 resolver list and is bit-equivalent for the
- * app-only case.
+ * single-space and multi-space behaviours share one loop. The
+ * per-space flow walks an n=1 resolver list and is bit-equivalent for
+ * the app-only case.
  */
 export async function executeDbInit<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbInitOptions<TFamilyId, TTargetId>,

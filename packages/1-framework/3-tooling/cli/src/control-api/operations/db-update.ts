@@ -38,9 +38,6 @@ export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId exte
   /**
    * On-disk migrations directory the per-space flow reads pinned
    * artefacts from.
-   *
-   * @see projects/extension-contract-spaces/specs/m2-orchestrator-consolidation-spec.md
-   *   § "One-path `db init`" (the same property holds for `db update`).
    */
   readonly migrationsDir: string;
   /**

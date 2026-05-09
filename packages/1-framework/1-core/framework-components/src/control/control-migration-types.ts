@@ -442,8 +442,6 @@ export interface MigrationRunner<
  * one — additional optional fields (e.g. SQL's `strictVerification`,
  * `schemaName`, `callbacks`) are tolerated by the underlying runner without
  * affecting cross-target wiring.
- *
- * @see specs/framework-mechanism.spec.md § 4 — Runner.
  */
 export interface MultiSpaceRunnerPerSpaceOptions<
   TFamilyId extends string = string,
@@ -475,14 +473,12 @@ export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiS
 /**
  * Optional capability for runners that can apply a list of per-space plans
  * inside a single outer transaction. A failure on any space rolls back every
- * space's writes — the AM4-rollback guarantee.
+ * space's writes.
  *
  * Today's only implementer is the SQL family (`SqlMigrationRunner`); Mongo
  * per-space is a non-goal per the project spec. The capability is declared
  * at the framework layer so CLI utilities can route through it without
  * importing the SQL family directly.
- *
- * @see specs/framework-mechanism.spec.md § 4 — Runner; § "R4 design choice".
  */
 export interface MultiSpaceCapableRunner<
   TFamilyId extends string = string,

@@ -66,9 +66,8 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
 
   /**
    * Reads every marker row keyed by `space`. Used by the per-space
-   * verifier (sub-spec § 4) to detect orphan marker rows and
-   * marker-vs-pinned drift. Returns an empty map when the marker
-   * table does not yet exist.
+   * verifier to detect orphan marker rows and marker-vs-pinned drift.
+   * Returns an empty map when the marker table does not yet exist.
    */
   readAllMarkers(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;

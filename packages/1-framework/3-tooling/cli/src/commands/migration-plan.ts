@@ -235,7 +235,6 @@ async function executeMigrationPlanCommand(
   // structural app-space change) still re-pins extension artefacts on
   // disk. Drift warnings are non-fatal — the pinned files are refreshed
   // and the user is notified that the bump is being captured.
-  // See specs/framework-mechanism.spec.md § 3 — Drift detection (T1.9).
   const extensionInputs: readonly MigrateExtensionInput[] = (config.extensionPacks ?? []).map(
     (pack) => {
       const cs = (pack as { readonly contractSpace?: MigrateExtensionInput['contractSpace'] })
@@ -257,9 +256,9 @@ async function executeMigrationPlanCommand(
 
   // Materialise descriptor-shipped migration packages onto disk under
   // `migrations/<spaceId>/<dirName>/` for any package not yet present.
-  // Idempotent (existing dirs are left untouched). Locks AC-7.
+  // Idempotent (existing dirs are left untouched).
   // Uses `planAllSpaces` for deterministic ordering + duplicate-spaceId
-  // detection. See specs/framework-mechanism.spec.md § 3.
+  // detection.
   const extensionMigrationsInputs: readonly ExtensionMigrationsExtensionInput[] = (
     config.extensionPacks ?? []
   ).map((pack) => {

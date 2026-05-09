@@ -26,8 +26,6 @@ export type ValidSpaceId = string & { readonly __brand: 'ValidSpaceId' };
  * Pattern a contract-space identifier must match. The constraint is
  * filesystem-friendly: lowercase letters / digits / hyphen / underscore,
  * starts with a letter, max 64 characters.
- *
- * @see specs/framework-mechanism.spec.md § 3.
  */
 const SPACE_ID_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
 

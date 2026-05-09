@@ -196,8 +196,6 @@ export interface DbInitOptions {
    * routes through the per-space flow, which reads pinned
    * `refs/head.json` and extension destination contracts from this
    * root.
-   *
-   * @see specs/framework-mechanism.spec.md § 6 — `db init` per-space.
    */
   readonly migrationsDir: string;
   /** Optional progress callback for observing operation progress */
@@ -235,8 +233,6 @@ export interface DbUpdateOptions {
    * routes through the per-space flow, which reads pinned
    * `refs/head.json` and extension destination contracts from this
    * root.
-   *
-   * @see specs/framework-mechanism.spec.md § 6 — `db update` per-space.
    */
   readonly migrationsDir: string;
   /** Optional progress callback for observing operation progress */

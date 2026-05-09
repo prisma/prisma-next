@@ -34,8 +34,6 @@ function hasErrnoCode(error: unknown, code: string): boolean {
  *   on a corrupt `refs/head.json` so callers can distinguish "no
  *   pinned file" (returns `null`) from "pinned file but unreadable"
  *   (throws).
- *
- * @see specs/framework-mechanism.spec.md § 3 — Drift detection (T1.9).
  */
 export async function readPinnedContractHash(
   projectMigrationsDir: string,

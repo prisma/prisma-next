@@ -121,8 +121,6 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
    * caller (single-space `execute(...)` above, or the multi-space
    * outer-tx orchestrator at the SQL family level) owns the
    * `BEGIN`/`COMMIT`/`ROLLBACK` lifecycle.
-   *
-   * @see specs/framework-mechanism.spec.md § "R4 design choice".
    */
   async executeOnConnection(
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
@@ -167,7 +165,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     // own user-facing tables in the live schema, and `verifySqlSchema`
     // matches the destination contract against the database, which
     // would flag every app-space table as "extra" when called against
-    // an extension contract. Per sub-spec § 6.
+    // an extension contract.
     if (space === 'app') {
       const schemaIR = await this.family.introspect({
         driver,

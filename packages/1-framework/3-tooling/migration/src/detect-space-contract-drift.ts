@@ -12,8 +12,6 @@
  * the space (the descriptor declares an extension that has never been
  * emitted into the user's repo). That's the "first emit" case — no
  * drift to surface; the migrate emit will create the pinned files.
- *
- * @see specs/framework-mechanism.spec.md § 3 — Drift detection (T1.9).
  */
 export interface DetectSpaceContractDriftInputs {
   readonly descriptorHash: string;
@@ -56,15 +54,13 @@ export type SpaceContractDriftResult = {
  * already canonical hashes produced by the same pipeline, so any
  * difference is meaningful drift.
  *
- * Synchronous, pure, no I/O. The caller (SQL family in M2 R1) reads
- * the pinned `contract.json` and computes its hash, then invokes this
- * helper alongside the descriptor's `headRef.hash`. Composes naturally
- * with {@link import('./read-pinned-contract-hash').readPinnedContractHash}
+ * Synchronous, pure, no I/O. The caller (SQL family) reads the pinned
+ * `contract.json` and computes its hash, then invokes this helper
+ * alongside the descriptor's `headRef.hash`. Composes naturally with
+ * {@link import('./read-pinned-contract-hash').readPinnedContractHash}
  * which provides the read-side primitive.
  *
- * @see specs/framework-mechanism.spec.md § 3 — Drift detection (T1.9).
- * @see specs/framework-mechanism.spec.md AM7 — drift warning surfaces
- *   the extension name and the diff direction.
+ * The drift warning surfaces the extension name and the diff direction.
  */
 export function detectSpaceContractDrift(
   spaceId: string,

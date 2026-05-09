@@ -22,8 +22,6 @@ function hasErrnoCode(error: unknown, code: string): boolean {
  * Reads only the user's repo. **No descriptor import.** The caller
  * (verifier) feeds the result into {@link verifyContractSpaces} alongside
  * the loaded-space set and the marker rows.
- *
- * @see specs/framework-mechanism.spec.md § 4 — Verifier (steps 5–6).
  */
 export async function listPinnedSpaceDirectories(
   projectMigrationsDir: string,
@@ -75,8 +73,8 @@ export interface SpacePinnedHashRecord {
 
 /**
  * Marker row read from `prisma_contract.marker` (one per `space`).
- * Caller resolves these via the family runtime's marker reader (T1.1)
- * before invoking {@link verifyContractSpaces}.
+ * Caller resolves these via the family runtime's marker reader before
+ * invoking {@link verifyContractSpaces}.
  */
 export interface SpaceMarkerRecord {
   readonly hash: string;
@@ -153,17 +151,17 @@ export type VerifyContractSpacesResult =
 
 /**
  * Pure structural verifier for the per-space mechanism. Aggregates the
- * three orphan / missing checks (FR6 cases a–c) plus per-space hash and
- * invariant comparison.
+ * three orphan / missing checks plus per-space hash and invariant
+ * comparison.
  *
- * Algorithm (sub-spec § 4):
+ * Algorithm:
  *
  * - For every extension space declared in `loadedSpaces` (`'app'`
  *   excluded — its pinned `contract.json` lives at the project root):
  *   - If no pinned dir on disk → `declaredButUnmigrated`.
  *   - Else if `markerRowsBySpace` lacks an entry → no violation here;
- *     the live-DB compare in step 8 (out of scope of this helper) is
- *     where the absence shows up.
+ *     the live-DB compare done outside this helper is where the
+ *     absence shows up.
  *   - Else compare marker hash / invariants vs. pinned hash /
  *     invariants → `hashMismatch` / `invariantsMismatch` on drift.
  * - For every pinned dir on disk that is not in `loadedSpaces` →
@@ -172,17 +170,14 @@ export type VerifyContractSpacesResult =
  *   `orphanMarker`. The app-space marker is always loaded (`'app'` is
  *   in `loadedSpaces` by definition).
  *
- * Output is deterministic (NFR6): violations are sorted first by `kind`
+ * Output is deterministic: violations are sorted first by `kind`
  * (`declaredButUnmigrated` → `orphanMarker` → `orphanPinnedDir` →
  * `hashMismatch` → `invariantsMismatch`) then by `spaceId`. Two callers
  * passing equivalent inputs see byte-identical violation lists.
  *
  * Synchronous, pure, no I/O. **Does not import the extension descriptor**
- * (the inputs are pre-resolved by the caller). This is the property
- * AC-15 / AC-26 ("verifier reads only the user repo, not
- * `node_modules`") locks in.
- *
- * @see specs/framework-mechanism.spec.md § 4 — Verifier (T1.5).
+ * (the inputs are pre-resolved by the caller); the verifier reads only
+ * the user repo, not `node_modules`.
  */
 export function verifyContractSpaces(
   inputs: VerifyContractSpacesInputs,

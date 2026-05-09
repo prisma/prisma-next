@@ -96,10 +96,8 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
    * Apply the plan against an already-open connection without managing
    * the transaction lifecycle. The caller owns BEGIN/COMMIT/ROLLBACK
    * and any connection-level setup (FK pragma toggle, FK integrity
-   * check). Used by the per-space runner orchestration in M2 R4 to fan
-   * out across contract spaces inside one outer transaction.
-   *
-   * @see specs/framework-mechanism.spec.md § "R4 design choice".
+   * check). Used by the per-space runner orchestration to fan out
+   * across contract spaces inside one outer transaction.
    */
   async executeOnConnection(
     options: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>,

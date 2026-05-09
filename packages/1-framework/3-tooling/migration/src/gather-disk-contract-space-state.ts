@@ -28,13 +28,10 @@ export interface DiskContractSpaceState {
  * Synchronous in spirit but async due to filesystem reads. Reads only
  * the user's repo. **Does not import any extension descriptor module.**
  *
- * Composition convention (sub-spec § 3 — Helper location): pure
- * target-agnostic primitive in `1-framework`; the SQL family (and any
- * future target family) wires it into its `dbInit` / `verify` flows
- * alongside its own marker-row read before invoking
- * `verifyContractSpaces`.
- *
- * @see specs/framework-mechanism.spec.md § 4 — Verifier (T1.5).
+ * Composition convention: pure target-agnostic primitive in
+ * `1-framework`; the SQL family (and any future target family) wires
+ * it into its `dbInit` / `verify` flows alongside its own marker-row
+ * read before invoking `verifyContractSpaces`.
  */
 export async function gatherDiskContractSpaceState(args: {
   readonly projectMigrationsDir: string;

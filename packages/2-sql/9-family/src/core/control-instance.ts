@@ -302,7 +302,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     stack.extensionPacks as unknown as readonly (SqlControlExtensionDescriptor<TTargetId> &
       DescriptorWithStorageTypes)[];
 
-  // Descriptor self-consistency check (sub-spec § 3 — note for M2 wiring).
+  // Descriptor self-consistency check.
   // Each extension that exposes a `contractSpace` must publish a
   // `headRef.hash` that matches the canonical hash recomputed from its
   // `contractJson`. A stale value would silently corrupt every downstream
