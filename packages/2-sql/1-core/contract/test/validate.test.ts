@@ -3,10 +3,10 @@ import { ContractValidationError } from '@prisma-next/contract/validate-contract
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { type } from 'arktype';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { validateIndexTypes } from '../src/index-type-validation';
 import { createIndexTypeRegistry } from '../src/index-types';
 import type { SqlStorage } from '../src/types';
 import { validateContract } from '../src/validate';
-import { validateIndexTypes } from '../src/validators';
 
 const baseContract = {
   target: 'postgres',

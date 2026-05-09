@@ -17,6 +17,7 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
   type IndexTypeMap,
@@ -29,7 +30,7 @@ import {
   type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
-import { validateIndexTypes, validateStorageSemantics } from '@prisma-next/sql-contract/validators';
+import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ContractDefinition,
