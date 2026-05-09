@@ -7,5 +7,6 @@ export default defineConfig({
     'src/exports/pack.ts',
     'src/exports/column-types.ts',
     'src/exports/middleware.ts',
+    'src/exports/migration.ts',
   ],
 });

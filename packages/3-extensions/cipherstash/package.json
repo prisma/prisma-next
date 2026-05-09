@@ -52,6 +52,7 @@
     "./column-types": "./dist/column-types.mjs",
     "./control": "./dist/control.mjs",
     "./middleware": "./dist/middleware.mjs",
+    "./migration": "./dist/migration.mjs",
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"

@@ -481,6 +481,12 @@
       "plane": "runtime"
     },
     {
+      "glob": "packages/3-extensions/cipherstash/src/exports/migration.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "migration"
+    },
+    {
       "glob": "packages/3-extensions/cipherstash/src/middleware/**",
       "domain": "extensions",
       "layer": "adapters",
