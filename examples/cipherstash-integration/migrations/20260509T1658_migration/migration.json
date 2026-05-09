@@ -1,12 +1,6 @@
 {
   "from": null,
-  "to": "sha256:fa4b91dbc8e079a775b010fc5ca3616d3713afa64b1b9c97eedf4aa90cc0bf39",
-  "labels": [],
-  "providedInvariants": [
-    "cipherstash-codec:user.email:add-search-config:match@v1",
-    "cipherstash-codec:user.email:add-search-config:unique@v1"
-  ],
-  "createdAt": "2026-05-08T17:21:42.729Z",
+  "to": "sha256:79f6ec1138421f622bdb029df699d034eb2a93d5675c1e653e23cd667f35427e",
   "fromContract": null,
   "toContract": {
     "schemaVersion": "1",
@@ -14,7 +8,7 @@
     "target": "postgres",
     "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
     "roots": {
-      "user": "User"
+      "users": "User"
     },
     "models": {
       "User": {
@@ -48,14 +42,14 @@
               "column": "id"
             }
           },
-          "table": "user"
+          "table": "users"
         }
       }
     },
     "storage": {
-      "storageHash": "sha256:fa4b91dbc8e079a775b010fc5ca3616d3713afa64b1b9c97eedf4aa90cc0bf39",
+      "storageHash": "sha256:79f6ec1138421f622bdb029df699d034eb2a93d5675c1e653e23cd667f35427e",
       "tables": {
-        "user": {
+        "users": {
           "columns": {
             "email": {
               "codecId": "cipherstash/string@1",
@@ -102,6 +96,20 @@
         "kind": "extension",
         "targetId": "postgres",
         "types": {
+          "operationTypes": {
+            "import": {
+              "alias": "CipherstashOperationTypes",
+              "named": "OperationTypes",
+              "package": "@prisma-next/extension-cipherstash/operation-types"
+            }
+          },
+          "queryOperationTypes": {
+            "import": {
+              "alias": "CipherstashQueryOperationTypes",
+              "named": "QueryOperationTypes",
+              "package": "@prisma-next/extension-cipherstash/operation-types"
+            }
+          },
           "storage": [
             {
               "familyId": "sql",
@@ -126,5 +134,11 @@
     "applied": [],
     "plannerVersion": "2.0.0"
   },
-  "migrationHash": "sha256:d6a43cb0fb6e3328892eb3670c517896d121410257d370f150b9d16243d97e58"
+  "labels": [],
+  "createdAt": "2026-05-09T16:58:25.730Z",
+  "providedInvariants": [
+    "cipherstash-codec:users.email:add-search-config:match@v1",
+    "cipherstash-codec:users.email:add-search-config:unique@v1"
+  ],
+  "migrationHash": "sha256:7d139688311978b1ca44e1fc15539080e1e2d2419be341cb238ab6d19ab25798"
 }

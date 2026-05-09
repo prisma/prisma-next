@@ -40,17 +40,21 @@ void db.orm.User.where((u) => u.email.cipherstashIlike('%@example.com'));
 
 // -- Positive: SQL query builder exposes the operators via fns -----------
 
-// `db.sql.user.select(...).where((f, fns) => fns.cipherstashEq(f.email, ...))`
+// `db.sql.users.select(...).where((f, fns) => fns.cipherstashEq(f.email, ...))`
 // — the SQL builder projects extension query operations onto the
 // `fns` namespace via `Functions<QC>` (see
 // `packages/2-sql/4-lanes/sql-builder/src/expression.ts`). The
 // builder must surface `cipherstashEq` / `cipherstashIlike`
 // alongside the framework`s built-in `eq`, `gt`, etc.
-void db.sql.user
+//
+// (The SQL accessor name follows the table's database name, which
+// the schema maps to `users` via `@@map("users")` — see the
+// reserved-word workaround in `prisma/schema.prisma`.)
+void db.sql.users
   .select('id')
   .where((f, fns) => fns.cipherstashEq(f.email, 'alice@example.com'))
   .build();
-void db.sql.user
+void db.sql.users
   .select('id')
   .where((f, fns) => fns.cipherstashIlike(f.email, '%@example.com'))
   .build();
@@ -71,7 +75,7 @@ void db.orm.User.where((u) =>
   u.id.cipherstashIlike('%alice%'),
 );
 
-void db.sql.user
+void db.sql.users
   .select('id')
   .where((f, fns) =>
     // @ts-expect-error AC-2 negative: cipherstashEq rejects pg/text@1 self.
@@ -79,7 +83,7 @@ void db.sql.user
   )
   .build();
 
-void db.sql.user
+void db.sql.users
   .select('id')
   .where((f, fns) =>
     // @ts-expect-error AC-2 negative: cipherstashIlike rejects pg/text@1 self.

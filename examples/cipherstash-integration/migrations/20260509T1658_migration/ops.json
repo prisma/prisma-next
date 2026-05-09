@@ -1,0 +1,68 @@
+[
+  {
+    "id": "table.users",
+    "label": "Create table \"users\"",
+    "summary": "Creates table \"users\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "users"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"users\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"users\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"users\"",
+        "sql": "CREATE TABLE \"public\".\"users\" (\n  \"email\" eql_v2_encrypted NOT NULL,\n  \"id\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"users\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"users\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "cipherstash-codec.users.email.add-search-config.unique",
+    "label": "Register cipherstash search config (unique) for users.email",
+    "operationClass": "additive",
+    "invariantId": "cipherstash-codec:users.email:add-search-config:unique@v1",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Register cipherstash unique search config for users.email",
+        "sql": "SELECT eql_v2.add_search_config('users', 'email', 'unique', 'text');"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "cipherstash-codec.users.email.add-search-config.match",
+    "label": "Register cipherstash search config (match) for users.email",
+    "operationClass": "additive",
+    "invariantId": "cipherstash-codec:users.email:add-search-config:match@v1",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Register cipherstash match search config for users.email",
+        "sql": "SELECT eql_v2.add_search_config('users', 'email', 'match', 'text');"
+      }
+    ],
+    "postcheck": []
+  }
+]

@@ -13,7 +13,9 @@ import type { Timestamptz } from '@prisma-next/target-postgres/codec-types';
 import type { Time } from '@prisma-next/target-postgres/codec-types';
 import type { Timetz } from '@prisma-next/target-postgres/codec-types';
 import type { Interval } from '@prisma-next/target-postgres/codec-types';
+import type { OperationTypes as CipherstashOperationTypes } from '@prisma-next/extension-cipherstash/operation-types';
 import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';
+import type { QueryOperationTypes as CipherstashQueryOperationTypes } from '@prisma-next/extension-cipherstash/operation-types';
 
 import type {
   ContractWithTypeMaps,
@@ -27,15 +29,16 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:fa4b91dbc8e079a775b010fc5ca3616d3713afa64b1b9c97eedf4aa90cc0bf39'>;
+  StorageHashBase<'sha256:79f6ec1138421f622bdb029df699d034eb2a93d5675c1e653e23cd667f35427e'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
 
 export type CodecTypes = PgTypes;
-export type OperationTypes = Record<string, never>;
+export type OperationTypes = CipherstashOperationTypes;
 export type LaneCodecTypes = CodecTypes;
-export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes>;
+export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
+  CipherstashQueryOperationTypes<CodecTypes>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
   : _Encoded;
@@ -63,7 +66,7 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = ContractType<
   {
     readonly tables: {
-      readonly user: {
+      readonly users: {
         columns: {
           readonly id: {
             readonly nativeType: 'text';
@@ -104,7 +107,7 @@ type ContractBase = ContractType<
       };
       readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'user';
+        readonly table: 'users';
         readonly fields: {
           readonly id: { readonly column: 'id' };
           readonly email: { readonly column: 'email' };
@@ -115,7 +118,7 @@ type ContractBase = ContractType<
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
-  readonly roots: { readonly user: 'User' };
+  readonly roots: { readonly users: 'User' };
   readonly capabilities: {
     readonly postgres: {
       readonly jsonAgg: true;
@@ -138,6 +141,20 @@ type ContractBase = ContractType<
       readonly targetId: 'postgres';
       readonly types: {
         readonly codecTypes: {};
+        readonly operationTypes: {
+          readonly import: {
+            readonly alias: 'CipherstashOperationTypes';
+            readonly named: 'OperationTypes';
+            readonly package: '@prisma-next/extension-cipherstash/operation-types';
+          };
+        };
+        readonly queryOperationTypes: {
+          readonly import: {
+            readonly alias: 'CipherstashQueryOperationTypes';
+            readonly named: 'QueryOperationTypes';
+            readonly package: '@prisma-next/extension-cipherstash/operation-types';
+          };
+        };
         readonly storage: readonly [
           {
             readonly familyId: 'sql';

@@ -6,7 +6,7 @@ export default class M extends Migration {
   override describe() {
     return {
       from: null,
-      to: 'sha256:fa4b91dbc8e079a775b010fc5ca3616d3713afa64b1b9c97eedf4aa90cc0bf39',
+      to: 'sha256:79f6ec1138421f622bdb029df699d034eb2a93d5675c1e653e23cd667f35427e',
     };
   }
 
@@ -14,15 +14,15 @@ export default class M extends Migration {
     return [
       createTable(
         'public',
-        'user',
+        'users',
         [
           { name: 'email', typeSql: 'eql_v2_encrypted', defaultSql: '', nullable: false },
           { name: 'id', typeSql: 'text', defaultSql: '', nullable: false },
         ],
         { columns: ['id'] },
       ),
-      cipherstashAddSearchConfig({ table: 'user', column: 'email', index: 'unique' }),
-      cipherstashAddSearchConfig({ table: 'user', column: 'email', index: 'match' }),
+      cipherstashAddSearchConfig({ table: 'users', column: 'email', index: 'unique' }),
+      cipherstashAddSearchConfig({ table: 'users', column: 'email', index: 'match' }),
     ];
   }
 }

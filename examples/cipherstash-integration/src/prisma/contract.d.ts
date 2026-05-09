@@ -29,7 +29,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:fa4b91dbc8e079a775b010fc5ca3616d3713afa64b1b9c97eedf4aa90cc0bf39'>;
+  StorageHashBase<'sha256:79f6ec1138421f622bdb029df699d034eb2a93d5675c1e653e23cd667f35427e'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
@@ -66,7 +66,7 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = ContractType<
   {
     readonly tables: {
-      readonly user: {
+      readonly users: {
         columns: {
           readonly id: {
             readonly nativeType: 'text';
@@ -107,7 +107,7 @@ type ContractBase = ContractType<
       };
       readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'user';
+        readonly table: 'users';
         readonly fields: {
           readonly id: { readonly column: 'id' };
           readonly email: { readonly column: 'email' };
@@ -118,7 +118,7 @@ type ContractBase = ContractType<
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
-  readonly roots: { readonly user: 'User' };
+  readonly roots: { readonly users: 'User' };
   readonly capabilities: {
     readonly postgres: {
       readonly jsonAgg: true;

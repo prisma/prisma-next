@@ -4,7 +4,7 @@
   "target": "postgres",
   "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
-    "user": "User"
+    "users": "User"
   },
   "models": {
     "User": {
@@ -38,14 +38,14 @@
             "column": "id"
           }
         },
-        "table": "user"
+        "table": "users"
       }
     }
   },
   "storage": {
-    "storageHash": "sha256:fa4b91dbc8e079a775b010fc5ca3616d3713afa64b1b9c97eedf4aa90cc0bf39",
+    "storageHash": "sha256:79f6ec1138421f622bdb029df699d034eb2a93d5675c1e653e23cd667f35427e",
     "tables": {
-      "user": {
+      "users": {
         "columns": {
           "email": {
             "codecId": "cipherstash/string@1",
@@ -92,6 +92,20 @@
       "kind": "extension",
       "targetId": "postgres",
       "types": {
+        "operationTypes": {
+          "import": {
+            "alias": "CipherstashOperationTypes",
+            "named": "OperationTypes",
+            "package": "@prisma-next/extension-cipherstash/operation-types"
+          }
+        },
+        "queryOperationTypes": {
+          "import": {
+            "alias": "CipherstashQueryOperationTypes",
+            "named": "QueryOperationTypes",
+            "package": "@prisma-next/extension-cipherstash/operation-types"
+          }
+        },
         "storage": [
           {
             "familyId": "sql",
