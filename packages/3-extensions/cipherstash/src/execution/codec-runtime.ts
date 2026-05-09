@@ -34,7 +34,7 @@
 import type { Codec, SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
 import { codec } from '@prisma-next/sql-relational-core/ast';
 import { CIPHERSTASH_STRING_CODEC_ID } from '../extension-metadata/constants';
-import { EncryptedString, getInternalHandle } from './envelope';
+import { EncryptedString } from './envelope';
 import type { CipherstashSdk } from './sdk';
 
 const CIPHERSTASH_STRING_TARGET_TYPE = 'eql_v2_encrypted' as const;
@@ -121,7 +121,7 @@ export function createCipherstashStringCodec(sdk: CipherstashSdk): CipherstashSt
     traits: CIPHERSTASH_STRING_TRAITS,
     renderOutputType: () => 'EncryptedString',
     encode: (envelope: EncryptedString, _ctx: SqlCodecCallContext): unknown => {
-      const handle = getInternalHandle(envelope);
+      const handle = envelope.expose();
       if (handle.ciphertext === undefined) {
         throw new Error(
           'cipherstash codec: envelope has no ciphertext at encode time. ' +

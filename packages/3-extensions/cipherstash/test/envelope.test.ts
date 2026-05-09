@@ -10,6 +10,7 @@
  * this property in M2 R2.
  */
 
+import { inspect } from 'node:util';
 import { describe, expect, it, vi } from 'vitest';
 import { EncryptedString } from '../src/execution/envelope';
 import type { CipherstashSdk } from '../src/execution/sdk';
@@ -127,22 +128,63 @@ describe('EncryptedString.fromInternal(...) — AC-ENV2 (read-side)', () => {
   });
 });
 
-describe('EncryptedString — handle is package-private — AC-ENV4', () => {
+describe('EncryptedString — accidental-exposure overrides (Rust `secrecy` style) — AC-ENV4', () => {
+  // The handle stays reachable on purpose: `expose()` is the explicit
+  // opt-in. What these tests pin is that *every common implicit*
+  // exposure path — JSON, console, stringification, primitive coercion
+  // — refuses to leak the plaintext. If a future refactor drops one of
+  // these overrides, the regression surfaces here.
+
   it('exposes no own enumerable property', () => {
     const envelope = EncryptedString.from('secret');
     expect(Object.keys(envelope)).toEqual([]);
   });
 
-  it('JSON.stringify produces a non-revealing placeholder', () => {
+  it('expose() is the explicit access path — returns the wrapped handle', () => {
     const envelope = EncryptedString.from('top-secret');
-    const json = JSON.stringify(envelope);
-    expect(json).not.toContain('top-secret');
-    expect(json).toBe(JSON.stringify({ $encryptedString: '<opaque>' }));
+    const handle = envelope.expose();
+    expect(handle.plaintext).toBe('top-secret');
   });
 
-  it('public methods are limited to decrypt and toJSON', () => {
-    const proto = Object.getPrototypeOf(EncryptedString.from('x')) as object;
-    const ownNames = Object.getOwnPropertyNames(proto).filter((n) => n !== 'constructor');
-    expect(ownNames.sort()).toEqual(['decrypt', 'toJSON']);
+  it('JSON.stringify cannot leak plaintext', () => {
+    const envelope = EncryptedString.from('top-secret');
+    const json = JSON.stringify({ email: envelope });
+    expect(json).not.toContain('top-secret');
+  });
+
+  it('String(envelope) and toString() cannot leak plaintext', () => {
+    const envelope = EncryptedString.from('top-secret');
+    expect(String(envelope)).not.toContain('top-secret');
+    expect(envelope.toString()).not.toContain('top-secret');
+  });
+
+  it('template-literal coercion (Symbol.toPrimitive) cannot leak plaintext', () => {
+    const envelope = EncryptedString.from('top-secret');
+    const interpolated = `email is ${envelope}`;
+    expect(interpolated).not.toContain('top-secret');
+  });
+
+  it('valueOf() cannot leak plaintext', () => {
+    const envelope = EncryptedString.from('top-secret');
+    expect(String(envelope.valueOf())).not.toContain('top-secret');
+  });
+
+  it('util.inspect (and therefore console.log) cannot leak plaintext', () => {
+    const envelope = EncryptedString.from('top-secret');
+    const inspected = inspect(envelope, {
+      depth: Number.POSITIVE_INFINITY,
+      getters: true,
+      showHidden: true,
+    });
+    expect(inspected).not.toContain('top-secret');
+  });
+
+  it('inspecting an object that contains an envelope does not leak plaintext', () => {
+    const envelope = EncryptedString.from('top-secret');
+    const inspected = inspect(
+      { user: { id: 'u1', email: envelope } },
+      { depth: Number.POSITIVE_INFINITY },
+    );
+    expect(inspected).not.toContain('top-secret');
   });
 });

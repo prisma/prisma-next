@@ -78,7 +78,7 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
-import { EncryptedString, getInternalHandle } from '../src/execution/envelope';
+import { EncryptedString } from '../src/execution/envelope';
 import { cipherstashQueryOperations } from '../src/execution/operators';
 import type { CipherstashSdk } from '../src/execution/sdk';
 import { createCipherstashRuntimeDescriptor } from '../src/exports/runtime';
@@ -247,7 +247,7 @@ describe('cipherstash operator lowering — cipherstashEq (T3.1, AC-OP1)', () =>
     expect(lowered.params).toHaveLength(1);
     const envelope = lowered.params[0];
     expect(envelope).toBeInstanceOf(EncryptedString);
-    const handle = getInternalHandle(envelope as EncryptedString);
+    const handle = (envelope as EncryptedString).expose();
     expect(handle.plaintext).toBe('alice@example.com');
     expect(handle.table).toBe(TABLE);
     expect(handle.column).toBe(COLUMN);
@@ -265,7 +265,7 @@ describe('cipherstash operator lowering — cipherstashEq (T3.1, AC-OP1)', () =>
     // augments it with the routing key (write-once-wins semantics —
     // see `setHandleRoutingKey`).
     expect(lowered.params[0]).toBe(userEnvelope);
-    const handle = getInternalHandle(userEnvelope);
+    const handle = userEnvelope.expose();
     expect(handle.table).toBe(TABLE);
     expect(handle.column).toBe(COLUMN);
   });
@@ -294,7 +294,7 @@ describe('cipherstash operator lowering — cipherstashIlike (T3.2, AC-OP2)', ()
     expect(lowered.params).toHaveLength(1);
     const envelope = lowered.params[0];
     expect(envelope).toBeInstanceOf(EncryptedString);
-    const handle = getInternalHandle(envelope as EncryptedString);
+    const handle = (envelope as EncryptedString).expose();
     expect(handle.plaintext).toBe('%alice%');
     expect(handle.table).toBe(TABLE);
     expect(handle.column).toBe(COLUMN);

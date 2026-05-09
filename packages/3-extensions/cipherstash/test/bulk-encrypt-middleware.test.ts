@@ -38,7 +38,7 @@ import { createSqlParamRefMutator } from '@prisma-next/sql-relational-core/middl
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type { SqlMiddlewareContext } from '@prisma-next/sql-runtime';
 import { describe, expect, it, vi } from 'vitest';
-import { EncryptedString, getInternalHandle, setHandleRoutingKey } from '../src/execution/envelope';
+import { EncryptedString, setHandleRoutingKey } from '../src/execution/envelope';
 import type {
   CipherstashBulkDecryptArgs,
   CipherstashBulkEncryptArgs,
@@ -200,7 +200,7 @@ describe('bulkEncryptMiddleware', () => {
 
       await middleware.beforeExecute?.(plan, createCtx(), params);
 
-      expect(getInternalHandle(envelope).ciphertext).toBe('cipher:user.email:alice@example.com');
+      expect(envelope.expose().ciphertext).toBe('cipher:user.email:alice@example.com');
     });
   });
 
@@ -257,7 +257,7 @@ describe('bulkEncryptMiddleware', () => {
 
       await middleware.beforeExecute?.(plan, createCtx(), params);
 
-      expect(getInternalHandle(envelope).plaintext).toBe('alice@example.com');
+      expect(envelope.expose().plaintext).toBe('alice@example.com');
     });
   });
 
@@ -271,8 +271,8 @@ describe('bulkEncryptMiddleware', () => {
 
       await middleware.beforeExecute?.(plan, createCtx(), params);
 
-      expect(getInternalHandle(envelope).table).toBe('user');
-      expect(getInternalHandle(envelope).column).toBe('email');
+      expect(envelope.expose().table).toBe('user');
+      expect(envelope.expose().column).toBe('email');
     });
 
     it('stamps (table, column) from UpdateAst before grouping', async () => {

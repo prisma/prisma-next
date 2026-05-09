@@ -50,12 +50,7 @@ import type {
 import type { SqlMiddleware } from '@prisma-next/sql-runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { checkCipherstashAborted, raceCipherstashAbort } from '../execution/abort';
-import {
-  EncryptedString,
-  getInternalHandle,
-  setHandleCiphertext,
-  setHandleRoutingKey,
-} from '../execution/envelope';
+import { EncryptedString, setHandleCiphertext, setHandleRoutingKey } from '../execution/envelope';
 import { type BulkEncryptTarget, groupByRoutingKey } from '../execution/routing';
 import type { CipherstashSdk } from '../execution/sdk';
 import { CIPHERSTASH_STRING_CODEC_ID } from '../extension-metadata/constants';
@@ -125,7 +120,7 @@ function collectTargets(
     if (entry.codecId !== CIPHERSTASH_STRING_CODEC_ID) continue;
     const value = entry.value;
     if (!(value instanceof EncryptedString)) continue;
-    const handle = getInternalHandle(value);
+    const handle = value.expose();
     if (handle.plaintext === undefined) {
       throw new Error(
         'cipherstash bulk-encrypt: encountered an envelope with no plaintext on the write path. ' +

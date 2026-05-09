@@ -61,12 +61,7 @@
 
 import { ifDefined } from '@prisma-next/utils/defined';
 import { checkCipherstashAborted, raceCipherstashAbort } from './abort';
-import {
-  EncryptedString,
-  getInternalHandle,
-  isHandleDecrypted,
-  setHandlePlaintextCache,
-} from './envelope';
+import { EncryptedString, isHandleDecrypted, setHandlePlaintextCache } from './envelope';
 import type { CipherstashRoutingKey, CipherstashSdk } from './sdk';
 
 export interface DecryptAllOptions {
@@ -134,7 +129,7 @@ function collectTargets(root: unknown): BulkDecryptTarget[] {
     if (seenEnvelopes.has(envelope)) return;
     seenEnvelopes.add(envelope);
     if (isHandleDecrypted(envelope)) return;
-    const handle = getInternalHandle(envelope);
+    const handle = envelope.expose();
     if (handle.table === undefined || handle.column === undefined) {
       throw new Error(
         'cipherstash decryptAll: envelope is missing (table, column) routing context. ' +

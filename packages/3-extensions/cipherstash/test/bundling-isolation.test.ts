@@ -55,7 +55,6 @@ const ENTRY_FILES = ['control.mjs', 'runtime.mjs', 'middleware.mjs'] as const;
 const CONTROL_FORBIDDEN = [
   'EncryptedString',
   'setHandleCiphertext',
-  'getInternalHandle',
   'CipherstashSdk',
   'bulkEncryptMiddleware',
   'createCipherstashStringCodec',

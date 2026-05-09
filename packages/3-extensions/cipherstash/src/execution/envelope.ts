@@ -2,11 +2,38 @@
  * `EncryptedString` envelope and its package-internal handle helpers.
  *
  * The envelope is the user-facing input/output type for cipherstash-
- * backed columns. The handle is package-private — its TypeScript shape
- * is not exported and no public method on `EncryptedString` returns it
- * (AC-ENV4). Storage is a module-scoped `WeakMap` keyed on the envelope
- * so `Object.keys(envelope)` and the default `JSON.stringify` shape stay
- * trivially clean across every JS host.
+ * backed columns. It wraps an `EncryptedStringHandle` (plaintext slot,
+ * ciphertext slot, routing key, SDK reference) holding the per-cell
+ * lifecycle state.
+ *
+ * ## Encapsulation pattern (Rust `secrecy` style)
+ *
+ * Storage is a `#private` instance field. The blessed read path is the
+ * explicit `expose()` method — same shape as the Rust `secrecy` crate's
+ * `SecretBox<T>::expose_secret`. Calling `expose()` is a deliberate
+ * opt-in: the caller is announcing "I want the wrapped state". The
+ * envelope does not — and is not meant to — make that *impossible*; it
+ * is meant to make accidental exposure (logger output, error envelopes,
+ * stringification, JSON serialization, primitive coercion) impossible
+ * unless the caller goes through `expose()`.
+ *
+ * Concretely the class overrides every coercion / serialization vector
+ * that would otherwise reveal the handle:
+ *
+ *   - `toJSON()`                                    — `JSON.stringify`
+ *   - `toString()`                                  — `String(envelope)`
+ *   - `valueOf()`                                   — legacy primitive coercion
+ *   - `[Symbol.toPrimitive]()`                      — template literals, `+`
+ *   - `[Symbol.for('nodejs.util.inspect.custom')]()` — `console.log`,
+ *                                                     Node REPL, debuggers
+ *
+ * All five return the same `[REDACTED]` placeholder. Without these
+ * overrides, modern Node runtimes surface `#private` fields in
+ * `util.inspect` output by default, which would silently re-expose
+ * the handle through `console.log(envelope)` (and any error message
+ * that interpolates an envelope).
+ *
+ * ## Lifecycle
  *
  * The handle has two flavours:
  *   - **Write side** — `EncryptedString.from(plaintext)` populates the
@@ -26,7 +53,14 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { checkCipherstashAborted, raceCipherstashAbort } from './abort';
 import type { CipherstashSdk } from './sdk';
 
-interface EncryptedStringHandle {
+/**
+ * The mutable state of an `EncryptedString` — exposed by `expose()` for
+ * callers that explicitly opt in. Mutating these slots from outside the
+ * package is supported (we don't stop you) but unusual; the framework's
+ * own lifecycle mutators (`setHandleCiphertext`, `setHandleRoutingKey`,
+ * etc.) are the conventional path.
+ */
+export interface EncryptedStringHandle {
   plaintext: string | undefined;
   ciphertext: unknown;
   table: string | undefined;
@@ -34,21 +68,133 @@ interface EncryptedStringHandle {
   sdk: CipherstashSdk | undefined;
 }
 
-const handles = new WeakMap<EncryptedString, EncryptedStringHandle>();
+const REDACTED = '[REDACTED]';
 
-/**
- * Internal accessor used by the codec, the bulk-encrypt middleware, and
- * `decryptAll`. Not exported from any subpath; package-internal call
- * sites import this from the module directly.
- */
-export function getInternalHandle(envelope: EncryptedString): EncryptedStringHandle {
-  const handle = handles.get(envelope);
-  if (!handle) {
-    throw new Error(
-      'EncryptedString: handle missing — envelope was not constructed via the official factories.',
-    );
+export interface EncryptedStringFromInternalArgs {
+  readonly ciphertext: unknown;
+  readonly table: string;
+  readonly column: string;
+  readonly sdk: CipherstashSdk;
+}
+
+export class EncryptedString {
+  readonly #handle: EncryptedStringHandle;
+
+  private constructor(handle: EncryptedStringHandle) {
+    this.#handle = handle;
   }
-  return handle;
+
+  /**
+   * Construct a write-side envelope from plaintext. Bulk-encrypt
+   * middleware (M2 R2) populates the handle's ciphertext slot before the
+   * codec encodes the envelope to wire format.
+   */
+  static from(plaintext: string): EncryptedString {
+    return new EncryptedString({
+      plaintext,
+      ciphertext: undefined,
+      table: undefined,
+      column: undefined,
+      sdk: undefined,
+    });
+  }
+
+  /**
+   * Construct a read-side envelope from a wire ciphertext + the column
+   * identity + the SDK used to decrypt the cell. Called from the codec
+   * `decode` body.
+   */
+  static fromInternal(args: EncryptedStringFromInternalArgs): EncryptedString {
+    return new EncryptedString({
+      plaintext: undefined,
+      ciphertext: args.ciphertext,
+      table: args.table,
+      column: args.column,
+      sdk: args.sdk,
+    });
+  }
+
+  /**
+   * Explicitly retrieve the wrapped handle. Modelled on Rust `secrecy`'s
+   * `SecretBox<T>::expose_secret`: the handle is reachable, but you have
+   * to ask for it by name. Callers reach for `expose()` when they need
+   * to inspect or transport the ciphertext envelope, debug lifecycle
+   * state, or wire ad-hoc tooling around the SDK reference.
+   *
+   * Mutating the returned handle is supported but unusual — the
+   * framework's lifecycle mutators (`setHandleCiphertext`,
+   * `setHandleRoutingKey`, etc.) are the conventional path during
+   * encrypt / decrypt flow.
+   */
+  expose(): EncryptedStringHandle {
+    return this.#handle;
+  }
+
+  /**
+   * Decrypt and return the plaintext.
+   *
+   * - If the handle's `plaintext` slot is already populated (write-side
+   *   envelopes from `from(plaintext)`, or read-side envelopes already
+   *   materialized by `decryptAll(...)` or a prior `decrypt()`), returns
+   *   the cached plaintext synchronously without consulting the SDK.
+   * - Otherwise (read-side handle without a cached plaintext), invokes
+   *   the SDK's single-cell `decrypt` with the handle's routing context.
+   *   The caller-supplied `signal` is forwarded to the SDK by identity
+   *   per the umbrella cancellation contract; the SDK promise is also
+   *   raced against the signal so an abort surfaces a `RUNTIME.ABORTED
+   *   { phase: 'decrypt' }` envelope promptly even if the SDK body
+   *   ignores the signal (M3 R3 T3.8 / AC-UMB5). The cached-plaintext
+   *   fast path returns synchronously without consulting the signal —
+   *   no IO, no abort observation point.
+   */
+  async decrypt(opts?: { signal?: AbortSignal }): Promise<string> {
+    if (this.#handle.plaintext !== undefined) {
+      return this.#handle.plaintext;
+    }
+    if (
+      !this.#handle.sdk ||
+      this.#handle.table === undefined ||
+      this.#handle.column === undefined
+    ) {
+      throw new Error(
+        'EncryptedString.decrypt(): envelope has no cached plaintext and no SDK binding. ' +
+          'This typically means the bulk-encrypt middleware did not run before the encode site.',
+      );
+    }
+    checkCipherstashAborted(opts?.signal, 'decrypt');
+    const plaintext = await raceCipherstashAbort(
+      this.#handle.sdk.decrypt({
+        ciphertext: this.#handle.ciphertext,
+        table: this.#handle.table,
+        column: this.#handle.column,
+        ...ifDefined('signal', opts?.signal),
+      }),
+      opts?.signal,
+      'decrypt',
+    );
+    this.#handle.plaintext = plaintext;
+    return plaintext;
+  }
+
+  toJSON(): string {
+    return REDACTED;
+  }
+
+  toString(): string {
+    return REDACTED;
+  }
+
+  valueOf(): string {
+    return REDACTED;
+  }
+
+  [Symbol.toPrimitive](): string {
+    return REDACTED;
+  }
+
+  [Symbol.for('nodejs.util.inspect.custom')](): string {
+    return REDACTED;
+  }
 }
 
 /**
@@ -61,7 +207,7 @@ export function getInternalHandle(envelope: EncryptedString): EncryptedStringHan
  * bounded scope.
  */
 export function setHandleCiphertext(envelope: EncryptedString, ciphertext: unknown): void {
-  getInternalHandle(envelope).ciphertext = ciphertext;
+  envelope.expose().ciphertext = ciphertext;
 }
 
 /**
@@ -70,7 +216,7 @@ export function setHandleCiphertext(envelope: EncryptedString, ciphertext: unkno
  * memoization).
  */
 export function setHandlePlaintextCache(envelope: EncryptedString, plaintext: string): void {
-  getInternalHandle(envelope).plaintext = plaintext;
+  envelope.expose().plaintext = plaintext;
 }
 
 /**
@@ -88,7 +234,7 @@ export function setHandleRoutingKey(
   table: string,
   column: string,
 ): void {
-  const handle = getInternalHandle(envelope);
+  const handle = envelope.expose();
   if (handle.table === undefined) {
     handle.table = table;
   }
@@ -103,104 +249,5 @@ export function setHandleRoutingKey(
  * envelopes that don't need a round-trip.
  */
 export function isHandleDecrypted(envelope: EncryptedString): boolean {
-  return getInternalHandle(envelope).plaintext !== undefined;
-}
-
-export interface EncryptedStringFromInternalArgs {
-  readonly ciphertext: unknown;
-  readonly table: string;
-  readonly column: string;
-  readonly sdk: CipherstashSdk;
-}
-
-export class EncryptedString {
-  /**
-   * Construct a write-side envelope from plaintext. Bulk-encrypt
-   * middleware (M2 R2) populates the handle's ciphertext slot before the
-   * codec encodes the envelope to wire format.
-   */
-  static from(plaintext: string): EncryptedString {
-    const envelope = new EncryptedString();
-    handles.set(envelope, {
-      plaintext,
-      ciphertext: undefined,
-      table: undefined,
-      column: undefined,
-      sdk: undefined,
-    });
-    return envelope;
-  }
-
-  /**
-   * Construct a read-side envelope from a wire ciphertext + the column
-   * identity + the SDK used to decrypt the cell. Called from the codec
-   * `decode` body; intentionally exported from `execution/envelope.ts` for
-   * the codec and for tests, but not re-exported from any subpath.
-   */
-  static fromInternal(args: EncryptedStringFromInternalArgs): EncryptedString {
-    const envelope = new EncryptedString();
-    handles.set(envelope, {
-      plaintext: undefined,
-      ciphertext: args.ciphertext,
-      table: args.table,
-      column: args.column,
-      sdk: args.sdk,
-    });
-    return envelope;
-  }
-
-  /**
-   * Decrypt and return the plaintext.
-   *
-   * - If the handle's `plaintext` slot is already populated (write-side
-   *   envelopes from `from(plaintext)`, or read-side envelopes
-   *   already materialized by `decryptAll(...)` or a prior `decrypt()`),
-   *   returns the cached plaintext synchronously without consulting the
-   *   SDK.
-   * - Otherwise (read-side handle without a cached plaintext), invokes
-   *   the SDK's single-cell `decrypt` with the handle's routing context.
-   *   The caller-supplied `signal` is forwarded to the SDK by identity
-   *   per the umbrella cancellation contract; the SDK promise is also
-   *   raced against the signal so an abort surfaces a `RUNTIME.ABORTED
-   *   { phase: 'decrypt' }` envelope promptly even if the SDK body
-   *   ignores the signal (M3 R3 T3.8 / AC-UMB5). The cached-plaintext
-   *   fast path returns synchronously without consulting the signal —
-   *   no IO, no abort observation point.
-   */
-  async decrypt(opts?: { signal?: AbortSignal }): Promise<string> {
-    const handle = getInternalHandle(this);
-    if (handle.plaintext !== undefined) {
-      return handle.plaintext;
-    }
-    if (!handle.sdk || handle.table === undefined || handle.column === undefined) {
-      throw new Error(
-        'EncryptedString.decrypt(): envelope has no cached plaintext and no SDK binding. ' +
-          'This typically means the bulk-encrypt middleware did not run before the encode site.',
-      );
-    }
-    checkCipherstashAborted(opts?.signal, 'decrypt');
-    const plaintext = await raceCipherstashAbort(
-      handle.sdk.decrypt({
-        ciphertext: handle.ciphertext,
-        table: handle.table,
-        column: handle.column,
-        ...ifDefined('signal', opts?.signal),
-      }),
-      opts?.signal,
-      'decrypt',
-    );
-    handle.plaintext = plaintext;
-    return plaintext;
-  }
-
-  /**
-   * `JSON.stringify(envelope)` produces a non-revealing placeholder
-   * regardless of which slot of the handle is populated. Without this
-   * override `JSON.stringify` would still produce `{}` (handle data
-   * lives in a `WeakMap`), but the explicit placeholder documents the
-   * intent and matches the umbrella spec's open-question default.
-   */
-  toJSON(): unknown {
-    return { $encryptedString: '<opaque>' };
-  }
+  return envelope.expose().plaintext !== undefined;
 }

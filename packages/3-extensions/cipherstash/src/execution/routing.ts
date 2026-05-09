@@ -16,7 +16,6 @@
  */
 
 import type { EncryptedString } from './envelope';
-import { getInternalHandle } from './envelope';
 import type { CipherstashRoutingKey } from './sdk';
 
 /**
@@ -55,7 +54,7 @@ export function routingKeyId(routingKey: CipherstashRoutingKey): string {
  * should have populated the slot.
  */
 export function getRoutingKey(envelope: EncryptedString): CipherstashRoutingKey {
-  const handle = getInternalHandle(envelope);
+  const handle = envelope.expose();
   if (handle.table === undefined || handle.column === undefined) {
     throw new Error(
       'cipherstash bulk-encrypt: envelope has no (table, column) routing context. ' +

@@ -39,7 +39,10 @@ export {
 } from '../execution/codec-runtime';
 export type { DecryptAllOptions } from '../execution/decrypt-all';
 export { decryptAll } from '../execution/decrypt-all';
-export type { EncryptedStringFromInternalArgs } from '../execution/envelope';
+export type {
+  EncryptedStringFromInternalArgs,
+  EncryptedStringHandle,
+} from '../execution/envelope';
 export { EncryptedString } from '../execution/envelope';
 export type { CipherstashStringParams } from '../execution/parameterized';
 export {

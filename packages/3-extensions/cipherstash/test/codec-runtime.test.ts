@@ -15,7 +15,7 @@ import {
   CIPHERSTASH_STRING_CODEC_ID,
   createCipherstashStringCodec,
 } from '../src/execution/codec-runtime';
-import { EncryptedString, getInternalHandle, setHandleCiphertext } from '../src/execution/envelope';
+import { EncryptedString, setHandleCiphertext } from '../src/execution/envelope';
 import {
   createParameterizedCodecDescriptors,
   encryptedStringParamsSchema,
@@ -71,7 +71,7 @@ describe('codec.decode(wire, ctx) — AC-CODEC2', () => {
     const wire = `("${JSON.stringify({ c: 'cipher' }).replaceAll('"', '""')}")`;
     const envelope = await codec.decode(wire, ctxWithColumn('user', 'email'));
     expect(envelope).toBeInstanceOf(EncryptedString);
-    const handle = getInternalHandle(envelope);
+    const handle = envelope.expose();
     expect(handle.table).toBe('user');
     expect(handle.column).toBe('email');
     expect(handle.sdk).toBe(sdk);
@@ -130,7 +130,7 @@ describe('eql_v2_encrypted wire-format round-trip — wire-format fix', () => {
     expect(wireString.endsWith('")')).toBe(true);
 
     const decoded = await codec.decode(wireString, ctxWithColumn('user', 'email'));
-    expect(getInternalHandle(decoded).ciphertext).toEqual(payload);
+    expect(decoded.expose().ciphertext).toEqual(payload);
   });
 
   it('decode accepts a pre-parsed { data: ... } row from the pg driver', async () => {
@@ -141,13 +141,13 @@ describe('eql_v2_encrypted wire-format round-trip — wire-format fix', () => {
       { data: payload } as unknown as string,
       ctxWithColumn('user', 'email'),
     );
-    expect(getInternalHandle(decoded).ciphertext).toEqual(payload);
+    expect(decoded.expose().ciphertext).toEqual(payload);
   });
 
   it('decode passes through null/undefined unchanged', async () => {
     const codec = createCipherstashStringCodec(emptySdk());
     const decoded = await codec.decode(null as unknown as string, ctxWithColumn('user', 'email'));
-    expect(getInternalHandle(decoded).ciphertext).toBeNull();
+    expect(decoded.expose().ciphertext).toBeNull();
   });
 
   it('encode then decode preserves embedded double quotes via the composite text-format escape', async () => {
@@ -159,7 +159,7 @@ describe('eql_v2_encrypted wire-format round-trip — wire-format fix', () => {
     const wireString = wire as string;
     expect(wireString.includes('""')).toBe(true);
     const decoded = await codec.decode(wireString, ctxWithColumn('user', 'email'));
-    expect(getInternalHandle(decoded).ciphertext).toEqual(payload);
+    expect(decoded.expose().ciphertext).toEqual(payload);
   });
 });
 
