@@ -41,6 +41,8 @@ export const contract = defineContract(
   {
     family: sqlFamily,
     target: postgresPack,
+  },
+  () => ({
     types: {
       [PGVECTOR_NATIVE_TYPE]: {
         codecId: VECTOR_CODEC_ID,
@@ -48,8 +50,6 @@ export const contract = defineContract(
         typeParams: {},
       },
     },
-  },
-  () => ({
     models: {},
   }),
 );
