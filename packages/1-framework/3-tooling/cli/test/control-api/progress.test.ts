@@ -57,11 +57,15 @@ describe('executeDbInit progress emission', () => {
     await executeDbInit({
       driver: mockDriver,
       familyInstance: mockFamilyInstance,
-      contract: {} as Contract,
+      contract: {
+        target: 'postgres',
+        storage: { storageHash: 'sha256:fixture', tables: {} },
+      } as unknown as Contract,
       mode: 'plan',
       migrations: mockMigrations,
       frameworkComponents: mockFrameworkComponents,
       migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
       onProgress: (event) => {
         events.push(event);
       },
@@ -138,11 +142,15 @@ describe('executeDbInit progress emission', () => {
     await executeDbInit({
       driver: mockDriver,
       familyInstance: mockFamilyInstance,
-      contract: {} as Contract,
+      contract: {
+        target: 'postgres',
+        storage: { storageHash: 'sha256:fixture', tables: {} },
+      } as unknown as Contract,
       mode: 'apply',
       migrations: mockMigrations,
       frameworkComponents: mockFrameworkComponents,
       migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
       onProgress: (event) => {
         events.push(event);
       },
@@ -197,11 +205,15 @@ describe('executeDbInit progress emission', () => {
     const result = await executeDbInit({
       driver: mockDriver,
       familyInstance: mockFamilyInstance,
-      contract: {} as Contract,
+      contract: {
+        target: 'postgres',
+        storage: { storageHash: 'sha256:fixture', tables: {} },
+      } as unknown as Contract,
       mode: 'plan',
       migrations: mockMigrations,
       frameworkComponents: mockFrameworkComponents,
       migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);

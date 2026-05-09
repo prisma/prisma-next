@@ -19,8 +19,6 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
-import { runContractSpaceVerifierMarkerCheck } from '../utils/contract-space-verifier-marker-check';
-import { runContractSpaceVerifierPrecheck } from '../utils/contract-space-verifier-precheck';
 import {
   formatMigrationApplyOutput,
   formatMigrationJson,
@@ -87,40 +85,13 @@ async function executeDbUpdateCommand(
     ctxResult.value;
   const { migrationsDir } = resolveMigrationPaths(options.config, config);
 
-  // Per-space layout precheck (sub-spec § 4): catches the
-  // `declaredButUnmigrated` / `orphanPinnedDir` cases at the CLI surface
-  // before any database connection. Mirrors the wiring in `db init` /
-  // `db verify` so a single-command invocation cannot bypass the
-  // layout invariants.
-  const precheckResult = await runContractSpaceVerifierPrecheck({
-    migrationsDir,
-    extensionPacks: config.extensionPacks ?? [],
-  });
-  if (!precheckResult.ok) {
-    await client.close();
-    return notOk(precheckResult.failure);
-  }
+  // The aggregate loader (loader → planner → runner pipeline) folds in
+  // the legacy precheck and marker-check helpers; no extra gating is
+  // needed at this surface.
 
   try {
-    // Marker-aware verifier (sub-spec § 4): connect explicitly so we
-    // can read marker rows before any apply work runs. Locks AC-13 +
-    // AM11 at the `db update` integration surface — pre-amendment
-    // `db update` ran neither verifier, so orphan markers and
-    // marker-vs-pinned drift slipped through entirely.
     await client.connect(dbConnection);
 
-    const markerRowsBySpace = await client.readAllMarkers();
-    const markerCheckResult = await runContractSpaceVerifierMarkerCheck({
-      migrationsDir,
-      extensionPacks: config.extensionPacks ?? [],
-      markerRowsBySpace,
-    });
-    if (!markerCheckResult.ok) {
-      return notOk(markerCheckResult.failure);
-    }
-
-    // Call dbUpdate on the already-connected client (omit `connection`
-    // — `client.connect()` throws if already connected).
     const result = await client.dbUpdate({
       contract: contractJson,
       mode: options.dryRun ? 'plan' : 'apply',

@@ -108,7 +108,11 @@ function createMockMigrations(overrides?: {
   >;
 }
 
-const dummyContract = { schemaVersion: '1', target: 'postgres' } as unknown as Contract;
+const dummyContract = {
+  schemaVersion: '1',
+  target: 'postgres',
+  storage: { storageHash: 'sha256:dummy', tables: {} },
+} as unknown as Contract;
 
 describe('executeDbUpdate', () => {
   it('succeeds on a fresh database without marker', async () => {
@@ -120,6 +124,7 @@ describe('executeDbUpdate', () => {
       migrations: createMockMigrations(),
       frameworkComponents: [],
       migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);
@@ -151,6 +156,7 @@ describe('executeDbUpdate', () => {
       }),
       frameworkComponents: [],
       migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(false);
@@ -203,6 +209,7 @@ describe('executeDbUpdate', () => {
       migrations,
       frameworkComponents: [],
       migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);
@@ -238,6 +245,7 @@ describe('executeDbUpdate', () => {
       }),
       frameworkComponents: [],
       migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(false);
@@ -276,6 +284,7 @@ describe('executeDbUpdate', () => {
       }),
       frameworkComponents: [],
       migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);
@@ -328,6 +337,7 @@ describe('executeDbUpdate', () => {
       }),
       frameworkComponents: [],
       migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);
@@ -379,6 +389,7 @@ describe('executeDbUpdate', () => {
       migrations,
       frameworkComponents: [],
       migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);
@@ -429,6 +440,7 @@ describe('executeDbUpdate', () => {
       migrations,
       frameworkComponents: [],
       migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(planFn).toHaveBeenCalledWith(
@@ -487,6 +499,7 @@ describe('executeDbUpdate', () => {
         migrations: createDestructiveMigrations(),
         frameworkComponents: [],
         migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
       });
 
       expect(result.ok).toBe(false);
@@ -514,6 +527,7 @@ describe('executeDbUpdate', () => {
         migrations: createDestructiveMigrations(),
         frameworkComponents: [],
         migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
       });
 
       expect(result.ok).toBe(true);
@@ -535,6 +549,7 @@ describe('executeDbUpdate', () => {
         migrations: createDestructiveMigrations(),
         frameworkComponents: [],
         migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
       });
 
       expect(result.ok).toBe(true);
@@ -587,6 +602,7 @@ describe('executeDbUpdate', () => {
       migrations,
       frameworkComponents: [],
       migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);
@@ -617,6 +633,7 @@ describe('executeDbUpdate', () => {
         migrations: createMockMigrations(),
         frameworkComponents: [],
         migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
         onProgress: (event) => events.push(event),
       });
 
@@ -642,6 +659,7 @@ describe('executeDbUpdate', () => {
         migrations: createMockMigrations(),
         frameworkComponents: [],
         migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
         onProgress: (event) => events.push(event),
       });
 
@@ -667,6 +685,7 @@ describe('executeDbUpdate', () => {
         }),
         frameworkComponents: [],
         migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
         onProgress: (event) => events.push(event),
       });
 
@@ -693,6 +712,7 @@ describe('executeDbUpdate', () => {
         }),
         frameworkComponents: [],
         migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
         onProgress: (event) => events.push(event),
       });
 
@@ -709,6 +729,7 @@ describe('executeDbUpdate', () => {
         migrations: createMockMigrations(),
         frameworkComponents: [],
         migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
       });
 
       expect(result.ok).toBe(true);

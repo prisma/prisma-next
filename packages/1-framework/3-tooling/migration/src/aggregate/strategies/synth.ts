@@ -32,6 +32,15 @@ export type SynthStrategyOutcome =
   | { readonly kind: 'failure'; readonly conflicts: readonly MigrationPlannerConflict[] };
 
 /**
+ * The {@link MigrationPlanner.plan} interface is declared as synchronous,
+ * but historical and test fixture call sites have always invoked it
+ * with `await` (see prior `db-apply-per-space.ts`). Tolerating a
+ * Promise here keeps existing test mocks working without changing the
+ * declared family SPI.
+ */
+type MaybeAsyncPlannerResult = MigrationPlannerResult | Promise<MigrationPlannerResult>;
+
+/**
  * Synthesise a migration plan for a single member by projecting the
  * live schema down to that member's claimed slice and delegating to
  * the family's `createPlanner(...).plan(...)`.
@@ -54,9 +63,9 @@ export type SynthStrategyOutcome =
  *   strategy selector falls back to synth when graph-walk isn't
  *   required).
  */
-export function synthStrategy<TFamilyId extends string, TTargetId extends string>(
+export async function synthStrategy<TFamilyId extends string, TTargetId extends string>(
   input: SynthStrategyInputs<TFamilyId, TTargetId>,
-): SynthStrategyOutcome {
+): Promise<SynthStrategyOutcome> {
   const projectedSchema = projectSchemaToSpace(
     input.schemaIntrospection,
     input.member,
@@ -64,13 +73,13 @@ export function synthStrategy<TFamilyId extends string, TTargetId extends string
   );
 
   const planner = input.migrations.createPlanner(input.familyInstance);
-  const plannerResult: MigrationPlannerResult = planner.plan({
+  const plannerResult: MigrationPlannerResult = await (planner.plan({
     contract: input.member.contract,
     schema: projectedSchema,
     policy: input.operationPolicy,
     fromContract: null,
     frameworkComponents: input.frameworkComponents,
-  });
+  }) as MaybeAsyncPlannerResult);
 
   if (plannerResult.kind === 'failure') {
     return { kind: 'failure', conflicts: plannerResult.conflicts };

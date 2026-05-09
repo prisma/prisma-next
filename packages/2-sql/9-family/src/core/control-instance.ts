@@ -206,6 +206,22 @@ export interface SqlControlFamilyInstance
 
   schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult>;
 
+  /**
+   * Verify a contract against an already-introspected schema slice.
+   *
+   * Used by the aggregate verifier to invoke per-member verification
+   * with the live schema pre-projected to the member's claimed slice
+   * via `projectSchemaToSpace`. Closes F23 — without per-member
+   * pre-projection, single-contract verifiers see other-space tables
+   * as `extras`.
+   */
+  schemaVerifyAgainstSchema(options: {
+    readonly contract: unknown;
+    readonly schema: SqlSchemaIR;
+    readonly strict: boolean;
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  }): VerifyDatabaseSchemaResult;
+
   sign(options: {
     readonly driver: ControlDriverInstance<'sql', string>;
     readonly contract: unknown;
@@ -507,6 +523,27 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         typeMetadataRegistry,
         frameworkComponents,
         // Wire up target-specific normalizers if available
+        ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
+        ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
+      });
+    },
+    schemaVerifyAgainstSchema(options: {
+      readonly contract: unknown;
+      readonly schema: SqlSchemaIR;
+      readonly strict: boolean;
+      readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+    }): VerifyDatabaseSchemaResult {
+      const contract = sqlValidateContract<Contract<SqlStorage>>(
+        options.contract,
+        emptyCodecLookup,
+      );
+      const controlAdapter = getControlAdapter();
+      return verifySqlSchema({
+        contract,
+        schema: options.schema,
+        strict: options.strict,
+        typeMetadataRegistry,
+        frameworkComponents: options.frameworkComponents,
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
       });

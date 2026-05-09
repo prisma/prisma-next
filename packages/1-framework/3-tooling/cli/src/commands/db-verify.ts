@@ -35,8 +35,6 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
-import { runContractSpaceVerifierMarkerCheck } from '../utils/contract-space-verifier-marker-check';
-import { runContractSpaceVerifierPrecheck } from '../utils/contract-space-verifier-precheck';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import {
   type DbVerifyCommandSuccessResult,
@@ -349,45 +347,40 @@ async function executeDbVerifyCommand(
   const setupResult = await resolveVerifySetup(paths, options, mode);
   if (!setupResult.ok) return setupResult;
   const { contractJson, dbConnection, contractPathAbsolute } = setupResult.value;
-
-  // Per-space layout precheck (sub-spec § 4): same gating as `db init`.
-  // Runs before any DB I/O so `verifyContractSpaces` violations surface
-  // even when the database is unreachable.
   const { migrationsDir } = resolveMigrationPaths(options.config, setupResult.value.config);
-  const precheckResult = await runContractSpaceVerifierPrecheck({
-    migrationsDir,
-    extensionPacks: setupResult.value.config.extensionPacks ?? [],
-  });
-  if (!precheckResult.ok) return notOk(precheckResult.failure);
 
   const client = createVerifyClient(setupResult.value);
   const onProgress = createProgressAdapter({ ui, flags });
 
   try {
+    // Single-contract marker verification preserved for the existing
+    // marker / target / hash failure surface (`PN-RUN-3001/3002/3003`).
+    // The aggregate verifier (run below for the per-space marker /
+    // schema checks) does not duplicate this: it concerns itself with
+    // marker-vs-pinned and orphan-marker drift, not the
+    // hash-mismatch-against-the-app-contract lane that today's
+    // `client.verify` covers.
     const verifyResult = await client.verify({
       contract: contractJson,
       connection: dbConnection,
       onProgress,
     });
 
-    // If verification failed, map to CLI structured error
     if (!verifyResult.ok) {
       return notOk(mapVerifyFailure(verifyResult));
     }
 
-    // Marker-aware per-space verifier (sub-spec § 4): now that the
-    // database connection is established, read every marker row and
-    // re-run the verifier with full inputs. Locks the marker-half of
-    // AC-13 + AM11 — `orphanMarker`, marker-vs-pinned `hashMismatch`,
-    // and `invariantsMismatch` — that the layout-only precheck cannot
-    // detect on its own.
-    const markerRowsBySpace = await client.readAllMarkers();
-    const markerCheckResult = await runContractSpaceVerifierMarkerCheck({
+    // Aggregate verifier (loader → verifier pipeline). Runs the layout
+    // precheck, marker-aware per-space verifier, and (full mode only)
+    // per-space pre-projected schema verification (closes F23).
+    const aggregateResult = await client.dbVerify({
+      contract: contractJson,
       migrationsDir,
-      extensionPacks: setupResult.value.config.extensionPacks ?? [],
-      markerRowsBySpace,
+      strict: options.strict ?? false,
+      skipSchema: mode === 'marker-only',
+      onProgress,
     });
-    if (!markerCheckResult.ok) return notOk(markerCheckResult.failure);
+    if (!aggregateResult.ok) return notOk(aggregateResult.failure);
 
     if (mode === 'marker-only') {
       return ok({
@@ -408,14 +401,13 @@ async function executeDbVerifyCommand(
       });
     }
 
-    const schemaVerifyResult = await client.schemaVerify({
-      contract: contractJson,
-      strict: options.strict ?? false,
-      onProgress,
-    });
-
-    if (!schemaVerifyResult.ok) {
-      return notOk(schemaVerifyResult);
+    const combined = combineSchemaResults(
+      aggregateResult.value.schemaResults,
+      aggregateResult.value.appSpaceId,
+      options.strict ?? false,
+    );
+    if (!combined.ok) {
+      return notOk(combined);
     }
 
     return ok({
@@ -428,9 +420,9 @@ async function executeDbVerifyCommand(
       ...ifDefined('missingCodecs', verifyResult.missingCodecs),
       ...ifDefined('codecCoverageSkipped', verifyResult.codecCoverageSkipped),
       schema: {
-        summary: schemaVerifyResult.summary,
-        counts: schemaVerifyResult.schema.counts,
-        strict: schemaVerifyResult.meta?.strict ?? false,
+        summary: combined.summary,
+        counts: combined.schema.counts,
+        strict: combined.meta?.strict ?? false,
       },
       meta: {
         ...(verifyResult.meta ?? {}),
@@ -445,6 +437,65 @@ async function executeDbVerifyCommand(
   }
 }
 
+/**
+ * Collapse the aggregate verifier's per-space schema results into a
+ * single {@link VerifyDatabaseSchemaResult} for the existing CLI
+ * display surface. Concatenates issues across members; sums counts;
+ * uses the app member's result as the structural envelope (storage
+ * hash, target).
+ */
+function combineSchemaResults(
+  perSpace: ReadonlyMap<string, VerifyDatabaseSchemaResult>,
+  appSpaceId: string,
+  strict: boolean,
+): VerifyDatabaseSchemaResult {
+  const appResult = perSpace.get(appSpaceId) ?? perSpace.values().next().value;
+  if (appResult === undefined) {
+    throw new Error('Aggregate verifier returned no schema results — this is a wiring bug.');
+  }
+
+  let okAll = true;
+  let issues: VerifyDatabaseSchemaResult['schema']['issues'] = [];
+  const counts = { pass: 0, warn: 0, fail: 0, totalNodes: 0 };
+  const childRoots: Array<VerifyDatabaseSchemaResult['schema']['root']> = [];
+  for (const [, result] of perSpace) {
+    if (!result.ok) okAll = false;
+    issues = [...issues, ...result.schema.issues];
+    counts.pass += result.schema.counts.pass;
+    counts.warn += result.schema.counts.warn;
+    counts.fail += result.schema.counts.fail;
+    counts.totalNodes += result.schema.counts.totalNodes;
+    childRoots.push(result.schema.root);
+  }
+
+  return {
+    ok: okAll,
+    ...(okAll ? {} : { code: appResult.code ?? 'PN-RUN-3010' }),
+    summary: okAll
+      ? 'Schema matches contract'
+      : `Schema verification found ${counts.fail} issue(s)`,
+    contract: appResult.contract,
+    target: appResult.target,
+    schema: {
+      issues,
+      root: {
+        status: okAll ? 'pass' : 'fail',
+        kind: 'aggregate',
+        name: 'aggregate',
+        contractPath: '',
+        code: 'AGGREGATE',
+        message: okAll ? 'Aggregate schema matches' : 'Aggregate schema mismatch',
+        expected: undefined,
+        actual: undefined,
+        children: childRoots,
+      },
+      counts,
+    },
+    meta: { strict },
+    timings: { total: 0 },
+  };
+}
+
 async function executeDbSchemaOnlyVerifyCommand(
   options: DbVerifyOptions,
   flags: GlobalFlags,
@@ -456,27 +507,29 @@ async function executeDbSchemaOnlyVerifyCommand(
   const setupResult = await resolveVerifySetup(paths, options, 'schema-only');
   if (!setupResult.ok) return setupResult;
   const { contractJson, dbConnection, contractPathAbsolute } = setupResult.value;
-
-  // Per-space layout precheck (sub-spec § 4); see executeDbVerifyCommand.
   const { migrationsDir } = resolveMigrationPaths(options.config, setupResult.value.config);
-  const precheckResult = await runContractSpaceVerifierPrecheck({
-    migrationsDir,
-    extensionPacks: setupResult.value.config.extensionPacks ?? [],
-  });
-  if (!precheckResult.ok) return notOk(precheckResult.failure);
 
   const client = createVerifyClient(setupResult.value);
   const onProgress = createProgressAdapter({ ui, flags });
 
   try {
-    const schemaVerifyResult = await client.schemaVerify({
+    await client.connect(dbConnection);
+    const aggregateResult = await client.dbVerify({
       contract: contractJson,
+      migrationsDir,
       strict: options.strict ?? false,
-      connection: dbConnection,
+      skipSchema: false,
       onProgress,
     });
+    if (!aggregateResult.ok) return notOk(aggregateResult.failure);
 
-    return ok(schemaVerifyResult);
+    return ok(
+      combineSchemaResults(
+        aggregateResult.value.schemaResults,
+        aggregateResult.value.appSpaceId,
+        options.strict ?? false,
+      ),
+    );
   } catch (error) {
     return wrapVerifyError(error, contractPathAbsolute, 'db verify --schema-only');
   } finally {

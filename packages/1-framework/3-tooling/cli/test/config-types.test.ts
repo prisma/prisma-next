@@ -61,6 +61,28 @@ describe('defineConfig', () => {
           },
           timings: { total: 0 },
         }),
+        schemaVerifyAgainstSchema: () => ({
+          ok: true,
+          summary: 'test',
+          contract: { storageHash: 'test' },
+          target: { expected: 'postgres' },
+          schema: {
+            issues: [],
+            root: {
+              status: 'pass' as const,
+              kind: 'root',
+              name: 'root',
+              contractPath: '',
+              code: '',
+              message: '',
+              expected: null,
+              actual: null,
+              children: [],
+            },
+            counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
+          },
+          timings: { total: 0 },
+        }),
         sign: async () => ({
           ok: true,
           summary: 'test',
