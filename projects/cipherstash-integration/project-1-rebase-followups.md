@@ -1,106 +1,92 @@
 # Project 1 — code review items (post-rebase)
 
-Code review items raised after project-1 was nominally closed out. As of 2026-05-09 the project's branch (`tml-2373-project-1-on-2397`) has been rebased on top of the TML-2397 close-out tip (`tml-2397-remove-database-dependencies-and-closeout`, M3.5 alignment + M5 polish + T5.9 deletion all merged). CR-2 / CR-3 / CR-4 / CR-5 are resolved by the rebase. The remaining work is **CR-1** + **TML-2435**.
+Code review items raised after project-1 was nominally closed out. As of 2026-05-09 the project's branch (`tml-2373-project-1-on-2397`) has been rebased on top of the TML-2397 close-out tip (`tml-2397-remove-database-dependencies-and-closeout`, M3.5 alignment + M5 polish + T5.9 deletion all merged). CR-2 / CR-3 / CR-4 are resolved by the rebase. The remaining work — **all in-scope on this branch, all part of project-1's acceptance criteria** — is **CR-1** + **CR-5** (operator type-visibility, supersedes the now-deleted TML-2435 ticket).
 
-This file is the durable record. It lives under `projects/cipherstash-integration/` (sibling of project-2 + sql-raw-factory) — it'll be deleted alongside the umbrella project's eventual close-out, after CR-1 + TML-2435 land and the project-1 PR is reopened.
+This file is the durable record. It lives under `projects/cipherstash-integration/` (sibling of project-2 + sql-raw-factory) — it'll be deleted alongside the umbrella project's eventual close-out, after CR-1 + CR-5 land and the project-1 PR is reopened.
 
-## CR-1 — Cipherstash migration-op factories must be public, user-callable, and renderable via the codec hook (NEW; in-scope, not deferred)
+## CR-1 — Cipherstash migration-op factories: public, user-callable, and renderable via the codec hook
 
-**Status:** Not implemented.
+**Status:** Designed (2026-05-09 design discussion); not yet implemented.
 
-**What's there now (project-1 worktree):**
+### Symptom
 
-[`packages/3-extensions/cipherstash/src/core/cipherstash-codec.ts:98-132`](../../packages/3-extensions/cipherstash/src/core/cipherstash-codec.ts:98-132) constructs migration ops as plain `SqlMigrationPlanOperation` records via file-private `buildAddOp` / `buildRemoveOp` helpers, and `onFieldEvent` returns `readonly Op[]` (a list of *runtime* op shapes, not renderable factory-call IR nodes):
+[`packages/3-extensions/cipherstash/src/core/cipherstash-codec.ts`](../../packages/3-extensions/cipherstash/src/core/cipherstash-codec.ts) constructs migration ops as plain `SqlMigrationPlanOperation` records via file-private `buildAddOp` / `buildRemoveOp` helpers. `onFieldEvent` returns `readonly SqlMigrationPlanOperation<unknown>[]` (runtime op shapes, not renderable IR).
+
+The postgres planner's merge point ([`packages/3-targets/3-targets/postgres/src/core/migrations/planner.ts:161-175`](../../packages/3-targets/3-targets/postgres/src/core/migrations/planner.ts:161-175)) wraps each codec-emitted op in a `RawSqlCall` (the unstructured-op fallback). Consequence: `prisma-next migration plan` against an app with `Encrypted<string>` columns renders cipherstash's contributions as verbose `rawSql({ id, label, operationClass, invariantId, target, precheck, execute: [{ description, sql }], postcheck })` blocks — see [`examples/cipherstash-integration/migrations/20260508T1721_migration/migration.ts`](../../examples/cipherstash-integration/migrations/20260508T1721_migration/migration.ts).
+
+### Locked-in design (post-discussion)
+
+The fix is a small, focused set of changes — *not* a renderer lift. The renderer stays in target-postgres (postgres owns its migration scaffolding). What changes is the type contract between the codec hook and the planner, plus cipherstash adding its own renderable Call classes that implement the framework `OpFactoryCall` interface directly.
+
+#### 1. Promote framework `OpFactoryCall` to require the render+toOp surface
+
+[`packages/1-framework/1-core/framework-components/src/control/control-migration-types.ts:92-99`](../../packages/1-framework/1-core/framework-components/src/control/control-migration-types.ts:92-99) currently defines `OpFactoryCall` as a metadata-only interface (`factoryName`, `operationClass`, `label`). Both postgres's `PostgresOpFactoryCallNode` and mongo's `OpFactoryCallNode` already provide the render+toOp methods via `TsExpression` + abstract `toOp`, so promotion is a no-op for current implementers and aligns the type with its stated purpose ("framework-level contract for a single factory call in a target's planner IR").
 
 ```typescript
-// Current shape — NON-renderable
-type Op = SqlMigrationPlanOperation<unknown>;
+export interface OpFactoryCall {
+  readonly factoryName: string;
+  readonly operationClass: MigrationOperationClass;
+  readonly label: string;
+  renderTypeScript(): string;
+  importRequirements(): readonly ImportRequirement[];
+  toOp(): MigrationPlanOperation;
+}
+```
 
-function onFieldEvent(
-  event: 'added' | 'dropped' | 'altered',
+`ImportRequirement` flows in from `@prisma-next/ts-render` (peer package within `1-framework/1-core`). `toOp()` returns the framework-level base `MigrationPlanOperation`; postgres / mongo / cipherstash subclasses narrow via covariant return.
+
+This is a structural breaking change to a framework-public interface. Audited blast radius: zero — the only direct consumers are the postgres + mongo packages (which already satisfy the promoted shape) and `field-event-planner` test stubs (updated in the same change).
+
+#### 2. Widen the codec hook contract — `OpFactoryCall[]`, hard-cut
+
+[`packages/2-sql/9-family/src/core/migrations/types.ts`](../../packages/2-sql/9-family/src/core/migrations/types.ts) `CodecControlHooks.onFieldEvent` return type:
+
+```typescript
+// before
+readonly onFieldEvent?: (
+  event: FieldEvent,
   ctx: FieldEventContext,
-): readonly Op[] { /* ... returns plain SqlMigrationPlanOperation literals ... */ }
+) => readonly SqlMigrationPlanOperation<TTargetDetails>[];
+
+// after
+readonly onFieldEvent?: (
+  event: FieldEvent,
+  ctx: FieldEventContext,
+) => readonly OpFactoryCall[];
 ```
 
-Consequence: `prisma-next migration plan` against an app with `Encrypted<string>` columns produces a `migration.ts` like [`examples/cipherstash-integration/migrations/20260508T1721_migration/migration.ts`](../../examples/cipherstash-integration/migrations/20260508T1721_migration/migration.ts) where codec-emitted ops render as verbose `rawSql({ id, label, operationClass, invariantId, target, precheck, execute: [{ description, sql }], postcheck })` blocks. The TS scaffolder's `RawSqlCall` ([`packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts:687-708`](../../packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts:687-708)) is the catch-all that fires whenever an op didn't come in as a structured `*Call` IR node.
+No `OpFactoryCall | SqlMigrationPlanOperation` widening for back-compat. Cipherstash is the only production implementer; tests update in the same change.
 
-### What "done" looks like — sharpened scope (per user direction 2026-05-09)
+[`packages/2-sql/9-family/src/core/migrations/field-event-planner.ts:65-67`](../../packages/2-sql/9-family/src/core/migrations/field-event-planner.ts:65-67) `planFieldEventOperations` return type changes from `readonly SqlMigrationPlanOperation<unknown>[]` to `readonly OpFactoryCall[]`. The `appendOps` accumulator changes accordingly.
 
-User direction (verbatim):
+#### 3. Drop the postgres planner's `RawSqlCall` wrap
 
-> I expect cipherstash operation functions to be part of the public, user-facing API, so users can utilize them in their own migration.ts files.
->
-> I also expect them to be rendered by the planner as needed, so the codec interface that lets cipherstash codecs respond to field additions/deletions etc must be able to return a *renderable* operation (whatever that's called), and must do so
-
-Two coupled requirements: a public surface authors can call directly, AND the codec hook returning renderable IR (not just runtime ops). Both are satisfied by reusing the framework's existing `OpFactoryCall` pattern.
-
-#### 1. Public, user-callable factories — `@prisma-next/extension-cipherstash/migration`
-
-New entry-point exporting:
+[`packages/3-targets/3-targets/postgres/src/core/migrations/planner.ts:170-175`](../../packages/3-targets/3-targets/postgres/src/core/migrations/planner.ts:170-175) becomes simply:
 
 ```typescript
-// packages/3-extensions/cipherstash/src/exports/migration.ts (new)
-export { cipherstashAddSearchConfig, cipherstashRemoveSearchConfig } from '../core/migration-ops';
-// ...optional re-export of the index-name type for ergonomics
-export type { CipherstashSearchIndex } from '../core/migration-ops';
+const calls = [...result.value.calls, ...fieldEventOps];
 ```
 
-Factory signatures (using the index name directly so the codec-hook flag-to-index walk continues to live inside cipherstash, not the API surface):
+The cast through `RawSqlCall` is gone. Cipherstash's calls flow into the postgres call list as first-class `OpFactoryCall` instances and self-render.
 
-```typescript
-type CipherstashSearchIndex = 'unique' | 'match';
+#### 4. Widen postgres's renderer input type
 
-interface CipherstashSearchConfigArgs {
-  readonly table: string;
-  readonly column: string;
-  readonly index: CipherstashSearchIndex;
-  readonly castAs?: string; // defaults to 'text', matching today's DEFAULT_CAST_AS
-}
+[`packages/3-targets/3-targets/postgres/src/core/migrations/render-typescript.ts:46`](../../packages/3-targets/3-targets/postgres/src/core/migrations/render-typescript.ts:46) `renderCallsToTypeScript` parameter widens from `ReadonlyArray<PostgresOpFactoryCall>` to `ReadonlyArray<OpFactoryCall>`. Body is unchanged — already polymorphic via `call.renderTypeScript()` + `call.importRequirements()`. `BASE_IMPORTS` stays target-side (postgres still owns its scaffold's `Migration` + `MigrationCLI` re-exports).
 
-function cipherstashAddSearchConfig(args: CipherstashSearchConfigArgs): CipherstashAddSearchConfigCall;
-function cipherstashRemoveSearchConfig(args: CipherstashSearchConfigArgs): CipherstashRemoveSearchConfigCall;
-```
+`TypeScriptRenderablePostgresMigration`'s constructor signature widens to match.
 
-A user authoring a hand-written migration can import and call them directly:
-
-```typescript
-// app's migrations/<dir>/migration.ts (hand-authored, post-CR-1)
-import { Migration, MigrationCLI, createTable } from '@prisma-next/target-postgres/migration';
-import {
-  cipherstashAddSearchConfig,
-  cipherstashRemoveSearchConfig,
-} from '@prisma-next/extension-cipherstash/migration';
-
-export default class M extends Migration {
-  override get operations() {
-    return [
-      createTable('public', 'user', /* ... */),
-      cipherstashAddSearchConfig({ table: 'user', column: 'email', index: 'unique' }),
-      cipherstashAddSearchConfig({ table: 'user', column: 'email', index: 'match' }),
-    ];
-  }
-}
-```
-
-Identical ergonomics to `createTable` / `setNotNull` etc. from `@prisma-next/target-postgres/migration`. No special-casing.
-
-#### 2. Renderable IR — `CipherstashAddSearchConfigCall` / `CipherstashRemoveSearchConfigCall`
-
-Cipherstash gets its own `*Call` classes following the framework's existing `PostgresOpFactoryCall` pattern (the abstract base + `FrameworkOpFactoryCall` interface — [`packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts:51-64`](../../packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts:51-64)):
+#### 5. Cipherstash `*Call` classes — package-internal
 
 ```typescript
 // packages/3-extensions/cipherstash/src/core/migration-call-classes.ts (new)
+import type { OpFactoryCall, MigrationPlanOperation, MigrationOperationClass }
+  from '@prisma-next/framework-components/control';
+import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
-import type {
-  OpFactoryCall as FrameworkOpFactoryCall,
-  MigrationOperationClass,
-} from '@prisma-next/framework-components/control';
 
 const CIPHERSTASH_MIGRATION_MODULE = '@prisma-next/extension-cipherstash/migration';
 
-abstract class CipherstashOpFactoryCallNode
-  extends TsExpression
-  implements FrameworkOpFactoryCall {
+abstract class CipherstashOpFactoryCallNode extends TsExpression implements OpFactoryCall {
   abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
@@ -109,15 +95,28 @@ abstract class CipherstashOpFactoryCallNode
   importRequirements(): readonly ImportRequirement[] {
     return [{ moduleSpecifier: CIPHERSTASH_MIGRATION_MODULE, symbol: this.factoryName }];
   }
+
+  protected freeze(): void { Object.freeze(this); }
 }
 
 export class CipherstashAddSearchConfigCall extends CipherstashOpFactoryCallNode {
   readonly factoryName = 'cipherstashAddSearchConfig' as const;
   readonly operationClass = 'additive' as const;
-  // ... constructor stamping (table, column, index, castAs); label; freeze ...
+  readonly label: string;
 
-  toOp(): Op {
-    // Returns the same SqlMigrationPlanOperation buildAddOp produces today.
+  constructor(
+    readonly table: string,
+    readonly column: string,
+    readonly index: 'unique' | 'match',
+    readonly castAs: string = 'text',
+  ) {
+    super();
+    this.label = `Register cipherstash search config (${index}) for ${table}.${column}`;
+    this.freeze();
+  }
+
+  toOp(): SqlMigrationPlanOperation<unknown> {
+    // Same shape as today's buildAddOp.
   }
 
   renderTypeScript(): string {
@@ -133,64 +132,96 @@ export class CipherstashAddSearchConfigCall extends CipherstashOpFactoryCallNode
 // CipherstashRemoveSearchConfigCall — mirror image, operationClass: 'destructive'.
 ```
 
-The factory functions exported in (1) construct these classes directly:
+No shared framework-level `OpFactoryCallNode` abstract base — cipherstash extends `TsExpression` directly. If a fourth caller wants the boilerplate later, refactor then.
+
+#### 6. Cipherstash public factories — `@prisma-next/extension-cipherstash/migration`
 
 ```typescript
-export function cipherstashAddSearchConfig(args: CipherstashSearchConfigArgs): CipherstashAddSearchConfigCall {
-  return new CipherstashAddSearchConfigCall(args.table, args.column, args.index, args.castAs ?? 'text');
+// packages/3-extensions/cipherstash/src/exports/migration.ts (new)
+export {
+  cipherstashAddSearchConfig,
+  cipherstashRemoveSearchConfig,
+} from '../core/migration-call-classes';
+export type { CipherstashSearchIndex } from '../core/migration-call-classes';
+```
+
+```typescript
+// packages/3-extensions/cipherstash/src/core/migration-call-classes.ts (continued)
+export type CipherstashSearchIndex = 'unique' | 'match';
+
+export interface CipherstashSearchConfigArgs {
+  readonly table: string;
+  readonly column: string;
+  readonly index: CipherstashSearchIndex;
+  readonly castAs?: string;
+}
+
+export function cipherstashAddSearchConfig(
+  args: CipherstashSearchConfigArgs,
+): CipherstashAddSearchConfigCall {
+  return new CipherstashAddSearchConfigCall(
+    args.table, args.column, args.index, args.castAs ?? 'text',
+  );
+}
+// ...cipherstashRemoveSearchConfig identical shape
+```
+
+User authoring a hand-written migration:
+
+```typescript
+import { Migration, MigrationCLI, createTable } from '@prisma-next/target-postgres/migration';
+import { cipherstashAddSearchConfig } from '@prisma-next/extension-cipherstash/migration';
+
+export default class M extends Migration {
+  override get operations() {
+    return [
+      createTable('public', 'user', /* ... */),
+      cipherstashAddSearchConfig({ table: 'user', column: 'email', index: 'unique' }),
+      cipherstashAddSearchConfig({ table: 'user', column: 'email', index: 'match' }),
+    ];
+  }
 }
 ```
 
-#### 3. Codec hook returns the renderable IR, not the runtime op
+Identical ergonomics to `createTable` / `setNotNull` etc. from `@prisma-next/target-postgres/migration`. No special-casing.
 
-`CodecControlHooks.onFieldEvent` return type widens to allow either (today's `SqlMigrationPlanOperation`) or the new framework-level `OpFactoryCall` interface (which both `PostgresOpFactoryCall` subclasses and `Cipherstash*Call` subclasses implement):
+#### 7. Cipherstash's codec hook returns Calls
+
+[`packages/3-extensions/cipherstash/src/core/cipherstash-codec.ts`](../../packages/3-extensions/cipherstash/src/core/cipherstash-codec.ts) `onFieldEvent` builds Calls instead of Ops:
 
 ```typescript
-// packages/2-sql/9-family/src/control/codec-hooks.ts (the framework's hook contract)
-export interface CodecControlHooks {
-  onFieldEvent?(
-    event: 'added' | 'dropped' | 'altered',
-    ctx: FieldEventContext,
-  ): readonly OpFactoryCall[];
-  // ...expandNativeType etc.
+function onFieldEvent(event, ctx): readonly OpFactoryCall[] {
+  // same flag-to-index walk; calls factories instead of constructing ops
+  ops.push(cipherstashAddSearchConfig({
+    table: tableName,
+    column: fieldName,
+    index: FLAG_TO_INDEX[flag],
+  }));
 }
 ```
 
-(Open question for the rebase: whether to widen to `OpFactoryCall | SqlMigrationPlanOperation` for back-compat, or hard-cut to `OpFactoryCall`. Recommendation: hard-cut — it's the same M3.5-style migration we did with `MigrationPackage` unification, and the only existing implementation is cipherstash itself.)
+The flag-to-index walk stays inside cipherstash, not on the public API. The factory args expose the index name directly because users authoring migrations naturally express "I want a unique-index search config on this column," not "I want this column's `equality` flag to be true."
 
-Cipherstash's hook then returns Calls directly:
+### Acceptance criteria
 
-```typescript
-// packages/3-extensions/cipherstash/src/core/cipherstash-codec.ts (after CR-1)
-function onFieldEvent(
-  event: 'added' | 'dropped' | 'altered',
-  ctx: FieldEventContext,
-): readonly OpFactoryCall[] {
-  // ...same flag-to-index walk as today, but builds Calls instead of Ops:
-  ops.push(cipherstashAddSearchConfig({ table: tableName, column: fieldName, index: FLAG_TO_INDEX[flag] }));
-}
-```
+Round-trip property given a contract diff that adds `Encrypted<string>` with `equality: true, freeTextSearch: true` on `user.email`:
 
-#### 4. Planner integration
+- `prisma-next migration plan` produces a `migration.ts` whose codec-emitted ops are exactly two `cipherstashAddSearchConfig({ table: 'user', column: 'email', index: 'unique' })` / `index: 'match'` calls. **Zero** `rawSql({ id: 'cipherstash-codec.*', ... })` blocks.
+- The rendered `migration.ts` carries `import { cipherstashAddSearchConfig } from '@prisma-next/extension-cipherstash/migration';` automatically (deduped alongside postgres imports).
+- Re-running `pnpm tsx migrations/.../migration.ts` re-emits `ops.json` byte-for-byte. Runtime op shape is unchanged; only IR / TS rendering changes.
+- `migration.json` hash is preserved. The canonical content is invariant.
+- Hand-written migrations using the public factory functions produce `ops.json` byte-identical to a planner-generated equivalent.
 
-The SQL family's `planFieldEventOperations` already gathers codec-hook output and hands it to the planner's call-list. Because Cipherstash's Calls implement the same `OpFactoryCall` interface as Postgres's `*Call` classes, no special-case needed in the planner — they flow through `renderCallsToTypeScript` ([`packages/3-targets/3-targets/postgres/src/core/migrations/render-typescript.ts`](../../packages/3-targets/3-targets/postgres/src/core/migrations/render-typescript.ts)) and produce the right `import` + factory call in the rendered `migration.ts`. The `RawSqlCall` fallback only fires for ops that were never wrapped in a structured Call in the first place — which post-CR-1 is the user's own raw escape-hatch and nothing else.
+### Documentation
 
-#### 5. Round-trip property (acceptance test)
+The implementation PR updates:
 
-Given a contract diff that adds `Encrypted<string>` with `equality: true, freeTextSearch: true` on `user.email`:
+- **ADR 195 — Planner IR with two renderers**: amend to record (a) the framework `OpFactoryCall` interface promotion, (b) the inheritance-with-abstract-methods pattern as the actual chosen shape (the ADR's visitor-pattern section is stale relative to the postgres+mongo implementations), and (c) extensions can implement `OpFactoryCall` directly without depending on a target's package-private base.
+- **ADR 212 — Codec lifecycle hooks**: amend the hook return type from `SqlMigrationPlanOperation[]` to `OpFactoryCall[]`. Update the mermaid flow diagram to reflect that codec-emitted output flows through the planner's call list (rendered to `migration.ts`) AND through `toOp()` derivation (rendered to `ops.json`).
 
-- `prisma-next migration plan` produces a `migration.ts` whose codec-emitted ops are exactly two `cipherstashAddSearchConfig({ table: 'user', column: 'email', index: 'unique' })` / `index: 'match'` calls — **zero** `rawSql({ id: 'cipherstash-codec.*', ... })` blocks.
-- The rendered `migration.ts` carries `import { cipherstashAddSearchConfig } from '@prisma-next/extension-cipherstash/migration';` automatically.
-- Re-running `pnpm tsx migrations/.../migration.ts` re-emits `ops.json` byte-for-byte (the runtime op shape is unchanged; only the IR / TS rendering changes).
-- The hash on `migration.json` is preserved (canonical content unchanged).
+### Estimate
 
-#### 6. Back-compat for the example app's existing migration
-
-The currently-committed `examples/cipherstash-integration/migrations/20260508T1721_migration/migration.ts` (the `rawSql({...})` shape) is regenerated as part of the rebase — its `migrationHash` should be preserved (op identity / SQL is unchanged), only the TS rendering and import statement change. If the hash *would* shift, that's a CR-1 implementation bug to fix — the canonical content is invariant.
-
-**Estimate:** ~1 day. Bulk is the new Call classes + the migration export entry-point + widening the hook interface. The codec-hook walk barely changes (one-line: builds a Call instead of an Op). No planner changes (already polymorphic over `OpFactoryCall`).
-
-**Land where:** This is in-scope for the project-1 rebase PR. Not a follow-up ticket; not deferred.
+~1 day. Bulk is the new Call classes + the migration export entry-point + the hook contract widening. Postgres planner change is two lines (drop the `.map(op => new RawSqlCall(...))` and the cast). The codec-hook walk barely changes (one line per branch: builds a Call instead of an Op).
 
 ## CR-2 — On-disk extension contract + migrations [RESOLVED by rebase]
 
@@ -245,9 +276,11 @@ The "Option A" decision (each extension package gets its own `prisma-next.config
 
 The `MigrationPackage` unification (CR-2) was the seam. The CLI's `runContractSpaceExtensionMigrationsPass` now consumes a single `MigrationPackage` shape from the descriptor, which the descriptor synthesises by JSON-importing the extension's emitted artefacts (`contract.json`, `migrations/<space-id>/<dirName>/{migration.json, ops.json}`) and computing `dirPath` from `import.meta.url`.
 
-## CR-5 — Verify cipherstash query operators are extension-owned (sanity check)
+## CR-5 — Cipherstash query operators: extension-owned + type-visible
 
-**Status:** Done. Recording for completeness.
+**Status:** Runtime ownership done. Type-visibility designed (2026-05-09); not yet implemented. (Supersedes the now-cancelled TML-2435 follow-up — type-visibility is in-scope project-1 acceptance criteria and lands on this branch.)
+
+### Runtime ownership — done
 
 This worktree's HEAD already carries:
 
@@ -255,13 +288,83 @@ This worktree's HEAD already carries:
 - `414744fc9 feat(extension-cipherstash): drop equality trait; lock loud-failure on email.eq for cipherstash columns`
 - `cf5e7fe73 docs(project-1): cipherstash search operators are namespaced; codec declares no traits`
 
-The query-operator surface is extension-owned and namespaced — no framework operator is overridden. ADR 211 (in `docs/architecture docs/adrs/`) records the principle. The remaining type-visibility gap for `cipherstashEq` / `cipherstashIlike` on model accessors is tracked under TML-2435 and is *not* covered by this CR (the user previously moved it back into project-1 AC scope; it's open work but was deferred to this rebase).
+The query-operator surface is extension-owned and namespaced — no framework operator is overridden. [ADR 211 — Extension operator surface](../../docs/architecture%20docs/adrs/ADR%20211%20-%20Extension%20operator%20surface%20namespaced%20replacement%20operators.md) records the principle. [`packages/3-extensions/cipherstash/src/core/operators.ts`](../../packages/3-extensions/cipherstash/src/core/operators.ts) registers `cipherstashEq` / `cipherstashIlike` via `cipherstashQueryOperations()` returning `SqlOperationDescriptor[]`; the runtime descriptor wires them through the cipherstash extension's runtime contribution.
+
+### Type-visibility — locked-in design
+
+The cipherstash extension currently has *runtime* operators registered, but the TypeScript type surface doesn't make them discoverable on `cipherstash/string@1` codec accessors or via the SQL query builder's operation-typed APIs. Users calling `db.user.findMany({ where: { email: { cipherstashEq: '...' } } })` get no autocomplete / no type-checking from the codec accessor side, and `sql().where(t => t.email.cipherstashEq('...'))` is not type-visible either.
+
+The fix mirrors `pgvector`'s pattern ([`packages/3-extensions/pgvector/src/types/operation-types.ts`](../../packages/3-extensions/pgvector/src/types/operation-types.ts)):
+
+#### 1. Declare `OperationTypes` + `QueryOperationTypes` on cipherstash
+
+```typescript
+// packages/3-extensions/cipherstash/src/types/operation-types.ts (new)
+import type { CodecExpression, CodecTypesBase, Expression } from '@prisma-next/family-sql/types';
+import type { SqlQueryOperationTypes } from '@prisma-next/family-sql/types';
+
+/** Flat operation signatures for the SQL query builder. */
+export type QueryOperationTypes<CT extends CodecTypesBase> = SqlQueryOperationTypes<
+  CT,
+  {
+    readonly cipherstashEq: {
+      readonly self: { readonly codecId: 'cipherstash/string@1' };
+      readonly impl: (
+        self: CodecExpression<'cipherstash/string@1', boolean, CT>,
+        other: CodecExpression<'cipherstash/string@1', boolean, CT>,
+      ) => Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
+    };
+    readonly cipherstashIlike: {
+      readonly self: { readonly codecId: 'cipherstash/string@1' };
+      readonly impl: (
+        self: CodecExpression<'cipherstash/string@1', boolean, CT>,
+        pattern: CodecExpression<'pg/text@1', boolean, CT>,
+      ) => Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
+    };
+  }
+>;
+```
+
+(Final return-type codec ID `pg/bool@1` is subject to verification against pgvector's existing reference; if cipherstash's runtime lowers to a non-postgres-namespaced bool, this matches that.)
+
+#### 2. Re-export from a stable subpath
+
+```typescript
+// packages/3-extensions/cipherstash/src/exports/operation-types.ts (new)
+export type { QueryOperationTypes } from '../types/operation-types';
+```
+
+`package.json` `exports` adds the `./operation-types` subpath. App-side usage:
+
+```typescript
+import type { QueryOperationTypes as CipherstashOps }
+  from '@prisma-next/extension-cipherstash/operation-types';
+```
+
+The application's contract emit pipeline already composes extension operation types through the `extensionPacks` array; verifying this end-to-end (model accessor + query builder) is part of the AC.
+
+### Acceptance criteria (type-visibility)
+
+- `db.user.findMany({ where: { email: { cipherstashEq: '...' } } })` type-checks; `cipherstashEq` autocompletes on `email` (a `cipherstash/string@1` column) but does NOT autocomplete on a plain `pg/text@1` column.
+- `sql(t).where(t => t.email.cipherstashEq('...'))` type-checks; `t.email.cipherstashEq` is callable, returns the right boolean expression type.
+- `db.user.findMany({ where: { email: { eq: '...' } } })` continues to NOT type-check (the equality-trait removal already enforces this at runtime + the codec emits no `eq` at the type level).
+- A negative type-test (intentional `@ts-expect-error`) covers `cipherstashEq` on a non-cipherstash column.
+
+### Documentation
+
+The implementation PR updates:
+
+- **ADR 211 — Extension operator surface (namespaced replacement operators)**: amend to note that namespaced replacement operators must also project type-visibility through `QueryOperationTypes`. The runtime ownership half of the ADR already covers the registration pattern; the type-visibility half is the missing companion mechanism.
+
+### Estimate
+
+~½ day. Two new files + a `package.json` exports entry + the negative type-test. Mostly mirroring the pgvector reference.
 
 ## Sequencing
 
 1. ~~Rebase `tml-2373-project-1-on-2397` on `tml-2397-remove-database-dependencies-and-closeout`~~ — **DONE 2026-05-09.** Replayed 50 project-1-unique commits onto closeout-tip; skipped 57 TML-2397 duplicates. Three conflict resolutions (cipherstash `package.json` deps union; two README/test docstrings taken from closeout to preserve M3.5 wording). One follow-up commit (`fix(extension-cipherstash): forward-port e2e tests to on-disk contractSpace (post-rebase)`) rewires three e2e tests off the deleted in-memory `core/{contract,migrations}` modules onto `descriptor.contractSpace`.
-2. **TODO** — Implement **CR-1** on the rebased branch (public, user-callable migration-op factories + renderable IR via the codec hook).
-3. **TODO** — Address **TML-2435** (CR-5's residual: `QueryOperationTypes` type-visibility for `cipherstashEq` / `cipherstashIlike` on model accessors).
+2. **NEXT** — Implement **CR-1** on the rebased branch (public, user-callable migration-op factories + renderable IR via the codec hook). Includes ADR 195 + ADR 212 amendments.
+3. **AFTER CR-1** — Implement the type-visibility half of **CR-5** (`QueryOperationTypes` for `cipherstashEq` / `cipherstashIlike`). Includes the ADR 211 amendment. Cancel the TML-2435 Linear ticket once shipped.
 4. Re-open project-1's PR.
 
 Delete this file as part of the umbrella project's eventual close-out.
