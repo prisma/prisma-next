@@ -526,4 +526,34 @@ model OrderItem {
       });
     });
   });
+
+  it('maps model-level composite primary keys to storage columns', () => {
+    const document = parsePslDocument({
+      schema: `model Membership {
+  orgId String @map("org_id")
+  userId String @map("user_id")
+
+  @@id([orgId, userId], map: "membership_pkey")
+  @@map("membership")
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        membership: {
+          primaryKey: { columns: ['org_id', 'user_id'], name: 'membership_pkey' },
+        },
+      },
+    });
+  });
 });
