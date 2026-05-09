@@ -88,10 +88,14 @@ import {
   EQL_V2_ENCRYPTED_TYPE,
   EQL_V2_SCHEMA,
 } from '../src/core/constants';
-import { CIPHERSTASH_STORAGE_HASH, cipherstashContract } from '../src/core/contract';
 import { EQL_BUNDLE_SQL } from '../src/core/eql-bundle';
-import { cipherstashBaselineMigration, cipherstashHeadRef } from '../src/core/migrations';
 import cipherstashExtensionDescriptor from '../src/exports/control';
+
+const cipherstashContractSpace = cipherstashExtensionDescriptor.contractSpace!;
+const cipherstashContract = cipherstashContractSpace.contractJson;
+const cipherstashBaselineMigration = cipherstashContractSpace.migrations[0]!;
+const cipherstashHeadRef = cipherstashContractSpace.headRef;
+const CIPHERSTASH_STORAGE_HASH = cipherstashContract.storage.storageHash;
 
 const APP_CONTRACT_HASH = coreHash('sha256:cipherstash-e2e-app-v1');
 const APP_PROFILE_HASH = profileHash('sha256:cipherstash-e2e-app-profile-v1');

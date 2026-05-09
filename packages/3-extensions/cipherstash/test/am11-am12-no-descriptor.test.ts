@@ -44,8 +44,12 @@ import {
 } from '@prisma-next/migration-tools/spaces';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CIPHERSTASH_SPACE_ID } from '../src/core/constants';
-import { cipherstashContract } from '../src/core/contract';
-import { cipherstashBaselineMigration, cipherstashHeadRef } from '../src/core/migrations';
+import cipherstashExtensionDescriptor from '../src/exports/control';
+
+const cipherstashContractSpace = cipherstashExtensionDescriptor.contractSpace!;
+const cipherstashContract = cipherstashContractSpace.contractJson;
+const cipherstashBaselineMigration = cipherstashContractSpace.migrations[0]!;
+const cipherstashHeadRef = cipherstashContractSpace.headRef;
 
 interface ProjectFixture {
   readonly projectRoot: string;

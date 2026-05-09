@@ -1,24 +1,29 @@
 /**
  * Structural verification for the CipherStash extension descriptor.
  *
- * R1's verification surface (TML-2397):
- *   - the descriptor's `contractSpace` field is wired and shaped correctly;
- *   - the contract IR enumerates the typed objects R1 ships
- *     (project AC8 / TC-13 — partial coverage; composite/enum/domain IR
- *     vocabulary deferred — see contract.ts deferral block);
- *   - the baseline migration carries the `installEqlBundle` op + the
- *     create-* ops with stable `cipherstash:*` invariantIds (project AC7 /
- *     TC-12 at the structural level — bundle byte-equality lands when the
- *     real EQL bundle SQL is vendored);
- *   - the descriptor is self-consistent (`headRef.hash` matches a
- *     re-derived `computeStorageHash(...)` over `(target, targetFamily,
- *     storage)` — same check the family runs at create-time via
- *     `assertDescriptorSelfConsistency`).
+ * **On-disk-in-package authoring (M3.5 R2).** The descriptor's
+ * contract / migrations / head ref now flow through JSON-import
+ * declarations from the package's emitted artefacts:
  *
- * This file is a fast in-process check; the live-database e2e (sub-spec
- * § 6 Scenarios A–D) lands in M3 R2+.
+ *   - `<package>/contract.json`
+ *   - `<package>/migrations/cipherstash/<dirName>/{migration,ops}.json`
+ *   - `<package>/refs/head.json`
+ *
+ * These assertions lock down the wiring: the descriptor exposes
+ * structurally correct values; the emitted bundle SQL flows through
+ * `ops.json` byte-for-byte; and the head ref tracks the latest
+ * migration's `to` hash.
+ *
+ * Hash-level values are sourced from the on-disk artefacts (via the
+ * descriptor's contractSpace) rather than hand-pinned in the test, so
+ * the assertions stay honest under re-emission. Mirrors the synthetic
+ * extension's `test/descriptor.test.ts` reference model.
+ *
+ * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
  */
 
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { describe, expect, it } from 'vitest';
 import {
@@ -29,11 +34,10 @@ import {
   EQL_V2_DOMAIN_TYPES,
   EQL_V2_ORE_COMPOSITE_TYPES,
 } from '../src/core/constants';
-import { CIPHERSTASH_STORAGE_HASH } from '../src/core/contract';
-import { CIPHERSTASH_BASELINE_INVARIANTS } from '../src/core/migrations';
+import { EQL_BUNDLE_SQL } from '../src/core/eql-bundle';
 import cipherstashExtensionDescriptor from '../src/exports/control';
 
-describe('cipherstash extension descriptor', () => {
+describe('cipherstash extension descriptor (on-disk-in-package authoring)', () => {
   it('identifies as a SQL extension targeted at postgres', () => {
     expect(cipherstashExtensionDescriptor).toMatchObject({
       kind: 'extension',
@@ -49,23 +53,25 @@ describe('cipherstash extension descriptor', () => {
     expect(Object.keys(space!.contractJson.storage.tables)).toEqual([EQL_V2_CONFIGURATION_TABLE]);
   });
 
-  it('records the deferred composite/enum/domain typed objects under meta.cipherstashFutureIR', () => {
-    const meta = cipherstashExtensionDescriptor.contractSpace!.contractJson.meta;
-    const future = (meta as { readonly cipherstashFutureIR?: unknown }).cipherstashFutureIR;
-    expect(future).toBeDefined();
-    expect(future).toMatchObject({
-      compositeTypes: expect.any(Array),
-      enums: expect.any(Array),
-      domains: expect.any(Array),
-    });
-  });
-
-  it('publishes one baseline migration containing the installEqlBundle op + structural create-* ops', () => {
+  it('publishes one baseline migration sourced from the on-disk emit pipeline', () => {
     const space = cipherstashExtensionDescriptor.contractSpace!;
     expect(space.migrations).toHaveLength(1);
     const baseline = space.migrations[0]!;
     expect(baseline.dirName).toBe(CIPHERSTASH_BASELINE_MIGRATION_NAME);
+    expect(baseline.metadata.from).toBeNull();
+    expect(baseline.metadata.to).toBe(space.contractJson.storage.storageHash);
+  });
 
+  it("synthesises the migration package's `dirPath` from the descriptor's URL", () => {
+    const baseline = cipherstashExtensionDescriptor.contractSpace!.migrations[0]!;
+    expect(existsSync(baseline.dirPath)).toBe(true);
+    expect(existsSync(join(baseline.dirPath, 'migration.json'))).toBe(true);
+    expect(existsSync(join(baseline.dirPath, 'ops.json'))).toBe(true);
+  });
+
+  it('baseline ops carry the installEqlBundle op + structural create-* ops', () => {
+    const space = cipherstashExtensionDescriptor.contractSpace!;
+    const baseline = space.migrations[0]!;
     const opIds = baseline.ops.map((op) => op.invariantId).filter(Boolean);
     expect(opIds).toContain(CIPHERSTASH_INVARIANTS.installBundle);
     expect(opIds).toContain(CIPHERSTASH_INVARIANTS.createConfiguration);
@@ -88,10 +94,21 @@ describe('cipherstash extension descriptor', () => {
     }
   });
 
-  it('points the head ref at the storage-hash of the published contract', () => {
-    const headRef = cipherstashExtensionDescriptor.contractSpace!.headRef;
-    expect(headRef.hash).toBe(CIPHERSTASH_STORAGE_HASH);
-    expect(headRef.invariants).toEqual(CIPHERSTASH_BASELINE_INVARIANTS);
+  it('inlines the EQL bundle SQL byte-for-byte through ops.json (AC-7)', () => {
+    const baseline = cipherstashExtensionDescriptor.contractSpace!.migrations[0]!;
+    const installOp = baseline.ops.find(
+      (op) => op.invariantId === CIPHERSTASH_INVARIANTS.installBundle,
+    ) as { readonly execute?: ReadonlyArray<{ readonly sql: string }> } | undefined;
+    expect(installOp).toBeDefined();
+    expect(installOp?.execute?.[0]?.sql).toBe(EQL_BUNDLE_SQL);
+  });
+
+  it("points the head ref at the latest migration's destination hash", () => {
+    const space = cipherstashExtensionDescriptor.contractSpace!;
+    expect(space.headRef.hash).toBe(space.migrations[0]!.metadata.to);
+    expect([...space.headRef.invariants].sort()).toEqual(
+      [...space.migrations[0]!.metadata.providedInvariants].sort(),
+    );
   });
 
   it('self-consistency check passes — headRef.hash matches re-derived storage hash', () => {
