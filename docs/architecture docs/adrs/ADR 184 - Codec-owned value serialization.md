@@ -1,18 +1,6 @@
 # ADR 184 — Codec-owned value serialization
 
-> **Retrospective note (TML-2357 close-out).** This ADR's examples use
-> the `defineCodec({...})` factory. That factory was the canonical
-> codec-author surface at the time; under TML-2357 it was retired in
-> favor of the class-form Pattern E
-> (`class extends CodecImpl<...>` + `class extends CodecDescriptorImpl<P>`
-> + per-codec column helper). The ADR's *decision* — that codecs own
-> both wire and JSON-safe representations through `encode` / `decode`
-> + `encodeJson` / `decodeJson` — is unchanged; only the authoring
-> shape has moved on. See
-> [ADR 208 — Higher-order codecs for parameterized types](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)
-> and the
-> [Codec authoring guide](../../reference/codec-authoring-guide.md)
-> for the current shape.
+> **Retrospective note.** This ADR's examples use the `defineCodec({...})` factory. That factory was the canonical codec-author surface at the time; it was later retired in favor of class-based authoring: concrete codecs extend `CodecImpl`, descriptors extend `CodecDescriptorImpl`, and per-codec column helpers tie helpers to descriptors with `satisfies`. The ADR's *decision* — that codecs own both wire and JSON-safe representations through `encode` / `decode` + `encodeJson` / `decodeJson` — is unchanged; only the authoring shape has moved on. See [ADR 208 — Higher-order codecs for parameterized types](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) and the [Codec authoring guide](../../reference/codec-authoring-guide.md) for the current shape.
 
 ## At a glance
 

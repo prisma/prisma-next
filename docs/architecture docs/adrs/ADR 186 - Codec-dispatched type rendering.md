@@ -1,18 +1,6 @@
 # ADR 186 — Codec-dispatched type rendering
 
-> **Retrospective note (TML-2357 close-out).** This ADR introduced the
-> `renderOutputType` slot on the codec record (and shows
-> `defineCodec({...})` examples). Both the codec authoring shape and
-> the home of `renderOutputType` have since moved on:
-> [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)
-> relocated `renderOutputType` to the unified `CodecDescriptor`, and
-> TML-2357 retired the `defineCodec({...})` factory in favor of the
-> class-form Pattern E
-> (`class extends CodecDescriptorImpl<P>`). The decision this ADR
-> records — that the codec is the dispatch authority for type
-> rendering — is unchanged; only the slot's home and the authoring
-> syntax have moved. See
-> [Codec authoring guide](../../reference/codec-authoring-guide.md).
+> **Retrospective note.** This ADR introduced the `renderOutputType` slot on the codec record (and shows `defineCodec({...})` examples). Both the codec authoring shape and the home of `renderOutputType` have since moved on: [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) relocated `renderOutputType` to the unified `CodecDescriptor`, and the `defineCodec({...})` factory was retired in favor of class-based descriptors (`CodecDescriptorImpl`) and codecs (`CodecImpl`). The decision this ADR records — that the codec is the dispatch authority for type rendering — is unchanged; only the slot's home and the authoring syntax have moved. See [Codec authoring guide](../../reference/codec-authoring-guide.md).
 
 ## At a glance
 

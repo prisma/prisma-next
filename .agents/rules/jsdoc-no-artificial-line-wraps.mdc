@@ -17,4 +17,6 @@ When adding or editing **prose** in `/** ... */` or long `//` documentation:
 
 4. **Rationale** — Same as Markdown: viewers wrap to width; fixed-width source breaks harm `git diff` and merges.
 
+5. **ADR callouts and Markdown retrospectives** — Apply the same continuous-line paragraph rule to blockquotes and narrative Markdown under `docs/architecture docs/adrs/`. Prefer stable product terminology (e.g. class-based `CodecImpl` / `CodecDescriptorImpl`) over transient project codenames. Prefer repo-local links (other ADRs, `docs/reference/framework-gaps.md`, GitHub PRs) over external issue-tracker URLs in ADR bodies.
+
 Related: `.agents/skills/markdown-no-artificial-line-wraps/SKILL.md` (Markdown files).

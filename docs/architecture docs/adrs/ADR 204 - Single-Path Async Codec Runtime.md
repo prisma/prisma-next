@@ -1,20 +1,6 @@
 # ADR 204 — Single-Path Async Codec Runtime
 
-> **Retrospective note (TML-2357 close-out).** This ADR documents the
-> single-path async codec runtime through the `defineCodec({...})` /
-> `mongoCodec({...})` factories of the time. Under TML-2357 the
-> `defineCodec({...})` factory was retired in favor of the class-form
-> Pattern E (`class extends CodecImpl<...>` with `async encode` /
-> `async decode` methods). The decision this ADR records — that
-> `encode` and `decode` are uniformly Promise-returning at the public
-> boundary, and the runtime always awaits — is unchanged. The
-> sync-lifting that the factory used to perform is now a property of
-> the abstract base class's method signatures: subclasses author
-> `async` methods directly, and synchronous bodies are returned as
-> resolved promises by the engine without an explicit lift step. See
-> [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)
-> and the
-> [Codec authoring guide](../../reference/codec-authoring-guide.md).
+> **Retrospective note.** This ADR documents the single-path async codec runtime through the `defineCodec({...})` / `mongoCodec({...})` factories of the time. The `defineCodec({...})` factory was later retired in favor of class-based codecs extending `CodecImpl` with `async encode` / `async decode` methods. The decision this ADR records — that `encode` and `decode` are uniformly Promise-returning at the public boundary, and the runtime always awaits — is unchanged. The sync-lifting that the factory used to perform is now a property of the abstract base class's method signatures: subclasses author `async` methods directly, and synchronous bodies are returned as resolved promises by the engine without an explicit lift step. See [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) and the [Codec authoring guide](../../reference/codec-authoring-guide.md).
 
 ## Context
 
@@ -217,7 +203,7 @@ Codec authors write either sync or async query-time functions, with no annotatio
 
 ### Cleartext leakage via error envelopes
 
-The expanded encrypting-codec surface means encode/decode failures can carry plaintext into `error.message`, `details.errors`, or other envelope fields. The redaction policy (cause routing, bounded `wirePreview`, validator-message redaction trigger) is preserved unchanged from the prior runtime, but trait-gated redaction (e.g. omitting `wirePreview` and scrubbing `cause` for codecs that carry the `secret` trait) is **not** spelled in this ADR. Tracked as a follow-up; see [TML-2329](https://linear.app/prisma-company/issue/TML-2329). The existing `it.skip` in the JSON-Schema validation tests pins the redaction-trigger seam.
+The expanded encrypting-codec surface means encode/decode failures can carry plaintext into `error.message`, `details.errors`, or other envelope fields. The redaction policy (cause routing, bounded `wirePreview`, validator-message redaction trigger) is preserved unchanged from the prior runtime, but trait-gated redaction (e.g. omitting `wirePreview` and scrubbing `cause` for codecs that carry the `secret` trait) is **not** spelled in this ADR. Tracked as a follow-up; see [framework-gaps G9](../../reference/framework-gaps.md#g9--trait-gated-redaction-in-error-envelopes-cleartext-leakage-policy). The existing `it.skip` in the JSON-Schema validation tests pins the redaction-trigger seam.
 
 ### `Promise.all` codec dispatch is unbounded
 
@@ -225,14 +211,14 @@ The runtime encodes parameters and decodes cells via `Promise.all`. For sync-lif
 
 This is **acceptable but not safe at scale**. The standard-library `Promise.all` also propagates the first rejection without cancelling already-dispatched bodies; their results are discarded but the IO still runs to completion. Mitigations are intentionally deferred:
 
-- **Concurrency control (rate limit, batched dispatch).** Tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330) and [framework-gaps G4](../../reference/framework-gaps.md#g4--per-cell-promiseall-codec-dispatch-is-unbounded-for-network-backed-codecs). The likely landing is a per-codec-or-per-trait dispatcher that bounds in-flight requests and lifts the public `Promise.all` shape into a configurable scheduler.
+- **Concurrency control (rate limit, batched dispatch).** Tracked under [framework-gaps G4](../../reference/framework-gaps.md#g4--per-cell-promiseall-codec-dispatch-is-unbounded-for-network-backed-codecs). The likely landing is a per-codec-or-per-trait dispatcher that bounds in-flight requests and lifts the public `Promise.all` shape into a configurable scheduler.
 - **`AbortSignal` plumbing.** **Resolved by [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](./ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md).** The codec dispatch surface now threads a per-execute `CodecCallContext` (`{ signal? }` at the framework level; `SqlCodecCallContext extends CodecCallContext { column? }` at the SQL layer) to every `codec.encode` / `codec.decode` call, and `runtime.execute(plan, { signal })` surfaces `RUNTIME.ABORTED` with cooperative cancellation. None of the seven walk-back constraints below are reintroduced.
 
 The single-path always-await design does not preclude either mitigation; both can land additively without changing the codec author surface.
 
 ## Cross-family scope notes
 
-Mongo decode is **in place** as of TML-2324: the Mongo runtime walks a structural `MongoResultShape` attached to `MongoQueryPlan` / `MongoExecutionPlan` (see `packages/2-mongo-family/4-query/query-ast/src/result-shape.ts`), dispatches leaf decodes via `Promise.all` per row, and maps failures to `RUNTIME.DECODE_FAILED` with `{ collection, path, codec, wirePreview }`. Lanes populate `resultShape` for flat typed reads; raw commands omit it so rows pass through unchanged. SQL continues to use `meta.annotations` / `meta.projectionTypes`; Mongo does not use those fields for decode.
+Mongo decode is **in place**: the Mongo runtime walks a structural `MongoResultShape` attached to `MongoQueryPlan` / `MongoExecutionPlan` (see `packages/2-mongo-family/4-query/query-ast/src/result-shape.ts`), dispatches leaf decodes via `Promise.all` per row, and maps failures to `RUNTIME.DECODE_FAILED` with `{ collection, path, codec, wirePreview }`. Lanes populate `resultShape` for flat typed reads; raw commands omit it so rows pass through unchanged. SQL continues to use `meta.annotations` / `meta.projectionTypes`; Mongo does not use those fields for decode.
 
 Mongo's codec registry is now aggregated by the framework's execution-stack composition machinery (matching the SQL pattern that has been in place since ADR 152): component descriptors declare codecs on `ComponentMetadata.types.codecTypes.codecDescriptors`, and `createMongoExecutionContext({ contract, stack })` walks the stack to fold them into a single `MongoCodecRegistry` exposed on `context.codecs`. `MongoRuntimeOptions` no longer accepts a `codecs` field — users do not construct or thread a registry. See `packages/2-mongo-family/7-runtime/src/mongo-execution-stack.ts` for the Mongo-side implementation and `packages/2-sql/5-runtime/src/sql-context.ts` for the SQL counterpart.
 

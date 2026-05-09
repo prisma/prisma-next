@@ -213,7 +213,7 @@ The postgres adapter retains only the non-parameterized raw-JSON / raw-JSONB cod
 
 **Type-level brand or `OutputType` HKT field on the codec.** The codec carries an `OutputType: CodecOutputTypeFn<Params>` field, and `FieldOutputType` consults `Apply<codec.OutputType, typeParams>`. Rejected because the same information already lives in the factory function's TypeScript return type — encoding it twice and synchronizing the two encodings via `renderOutputType` is exactly the drift `function-is-signature` is meant to prevent.
 
-**Optional `init(params, instance)` hook on the codec.** Codec carries `init?` separately from a factory; runtime calls `init` per `storage.types` instance for stateful codecs. Rejected because the higher-order factory IS what `init` was — the same signature, the same lifecycle, the same purpose. One artifact, not two. The legacy `init?` slot on the SQL `Codec` extension was retired alongside the unified-descriptor migration (TML-2357).
+**Optional `init(params, instance)` hook on the codec.** Codec carries `init?` separately from a factory; runtime calls `init` per `storage.types` instance for stateful codecs. Rejected because the higher-order factory IS what `init` was — the same signature, the same lifecycle, the same purpose. One artifact, not two. The legacy `init?` slot on the SQL `Codec` extension was retired alongside the unified-descriptor migration.
 
 **A shared `columnFor(codec)(params)` helper.** A single `columnFor` helper turns any codec into a column-descriptor factory, type-discriminated on whether the codec is parameterized. Rejected because each pack ships a typed factory directly — `columnFor` would add no type information and would add an indirection at the call site.
 
@@ -223,11 +223,11 @@ The postgres adapter retains only the non-parameterized raw-JSON / raw-JSONB cod
 
 The transitional `paramsSchema?` and `init?` fields on the SQL `Codec` extension and the `renderOutputType?` field on the SQL `Codec` and Mongo `MongoCodec` extensions (introduced by [ADR 186](ADR%20186%20-%20Codec-dispatched%20type%20rendering.md)). All three migrated to `CodecDescriptor`. Pack-author column-descriptor factories (`vector(N)`, `charColumn(N)`, `numericColumn(p, s)`, …) are reshaped to return `ColumnTypeDescriptor & { type?: (ctx) => Codec<…> }` for codecs that need no-emit type-level access — the user-call site (`field.column(vector(1536))`) is unchanged.
 
-The legacy `defineCodec({...})` factory and the family-side `mkCodec({...})` instance constructor were the previous canonical author surface; they have been retired in favor of the class-form Pattern E (above) under TML-2357. The earlier ADRs that show `defineCodec({...})` examples ([ADR 184](ADR%20184%20-%20Codec-owned%20value%20serialization.md), [ADR 186](ADR%20186%20-%20Codec-dispatched%20type%20rendering.md), [ADR 202](ADR%20202%20-%20Codec%20trait%20system.md), [ADR 204](ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md), [ADR 205](ADR%20205%20-%20SQL%20cast%20emission%20is%20adapter%20policy.md)) are accurate as historical records of those decisions, but the authoring shape they show is no longer current — see the retrospective notes at the top of each.
+The legacy `defineCodec({...})` factory and the family-side `mkCodec({...})` instance constructor were the previous canonical author surface; they have been retired in favor of class-based codecs and descriptors (`CodecImpl`, `CodecDescriptorImpl`, per-codec column helpers, `satisfies`) as described above. The earlier ADRs that show `defineCodec({...})` examples ([ADR 184](ADR%20184%20-%20Codec-owned%20value%20serialization.md), [ADR 186](ADR%20186%20-%20Codec-dispatched%20type%20rendering.md), [ADR 202](ADR%20202%20-%20Codec%20trait%20system.md), [ADR 204](ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md), [ADR 205](ADR%20205%20-%20SQL%20cast%20emission%20is%20adapter%20policy.md)) are accurate as historical records of those decisions, but the authoring shape they show is no longer current — see the retrospective notes at the top of each.
 
 ## Resolves
 
-- **TML-2229.** `vector(1536)`, `arktypeJson(schema)`, and other parameterized columns resolve correctly in the no-emit path AND through the emit path (typeRef columns included, via `EmissionSpi.resolveFieldTypeParams`).
+- **Parameterized columns (no-emit and emit).** `vector(1536)`, `arktypeJson(schema)`, and other parameterized columns resolve correctly in the no-emit path AND through the emit path (typeRef columns included, via `EmissionSpi.resolveFieldTypeParams`).
 - **The deferred no-emit fix from [ADR 186](ADR%20186%20-%20Codec-dispatched%20type%20rendering.md).** The `renderOutputType` it introduced moves to its long-term home on the descriptor; the no-emit path now resolves through the factory's return type without consulting it.
 
 ## References
@@ -238,13 +238,13 @@ The legacy `defineCodec({...})` factory and the family-side `mkCodec({...})` ins
 - [ADR 184 — Codec-owned value serialization](ADR%20184%20-%20Codec-owned%20value%20serialization.md). Established the pattern of codecs owning their representations.
 - [ADR 171 — Parameterized native types in contracts](ADR%20171%20-%20Parameterized%20native%20types%20in%20contracts.md). Established `typeParams` on storage columns.
 - [ADR 168 — Postgres JSON and JSONB typed columns](ADR%20168%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md). Introduced typed JSON columns with Standard Schema. Per-library extensions (`@prisma-next/extension-arktype-json`) now own the typed JSON column shape.
-- [ADR 202 — Codec trait system](ADR%20202%20-%20Codec%20trait%20system.md). The trait system. The `'json-validator'` trait was a transitional gate for the now-deleted `JsonSchemaValidatorRegistry`; both the trait and the registry were retired under TML-2357 — JSON-Schema validation lives uniformly inside the resolved codec's `decode` body.
+- [ADR 202 — Codec trait system](ADR%20202%20-%20Codec%20trait%20system.md). The trait system. The `'json-validator'` trait was a transitional gate for the now-deleted `JsonSchemaValidatorRegistry`; both the trait and the registry were retired — JSON-Schema validation lives uniformly inside the resolved codec's `decode` body.
 
-## Status — TML-2357 close-out
+## Status — Unified descriptor authoring
 
-The TML-2357 follow-up project completed the registration-side migration this ADR's parent project deliberately deferred. After TML-2357:
+The registration-side migration this ADR's parent project deliberately deferred is complete. The framework now standardizes on:
 
-- **Class-form authoring** (Pattern E — descriptor class + codec class + per-codec helper, tied by `satisfies`) is the only authoring shape; `defineCodec({...})`, `mkCodec({...})`, `defineCodecGroup`, `defineCodecBundle`, `byScalar`, `dataTypes`, and the synthesis bridge `synthesizeNonParameterizedDescriptor` are all retired.
+- **Class-based authoring** — descriptor class + codec class + per-codec column helper, tied with `satisfies`; `defineCodec({...})`, `mkCodec({...})`, `defineCodecGroup`, `defineCodecBundle`, `byScalar`, `dataTypes`, and the synthesis bridge `synthesizeNonParameterizedDescriptor` are all retired.
 - **Single registration slot.** Every contributor ships native `CodecDescriptor`s through one `codecs:` slot; the parallel `parameterizedCodecs:` slot and the legacy `CodecParamsDescriptor` are deleted.
 - **Narrow runtime `Codec` instance.** The `Codec` interface declares only `id` (proxied through the descriptor) and the four conversion methods (`encode`, `decode`, `encodeJson`, `decodeJson`). `traits`, `targetTypes`, `meta`, and `renderOutputType` live only on the descriptor.
 - **`ParamRef.refs` plumbed.** Every column-bound `ParamRef` carries `refs: { table; column }`; the builder-pipeline `validateParamRefRefs` pass enforces refs on every parameterized `ParamRef` before encode. Encode-side dispatch resolves through `forColumn(refs.table, refs.column)` for parameterized codec ids. `forCodecId` is retained only as the refs-less fallback for non-parameterized codec ids.
@@ -254,6 +254,6 @@ The TML-2357 follow-up project completed the registration-side migration this AD
 ## Future work
 
 - **`pgEnumCodec` factory audit.** The current factory is a placeholder (enum values aren't parameterized in the curried-factory sense). A separate ticket reshapes it.
-- **Mongo registration migration + Mongo runtime `forColumn`.** Tracked under [TML-2324](https://linear.app/prisma-company/issue/TML-2324). Mongo demos don't use parameterized codecs, so the gap is authoring-time only.
+- **Mongo registration migration + Mongo runtime `forColumn`.** Separate follow-up for the Mongo family. Mongo demos don't use parameterized codecs today, so the gap is authoring-time only.
 - **Mongo control-plane unified `codecs:` registration surface.** Aligns Mongo with the SQL family's single-slot shape — separate ticket.
 - **Future schema libraries.** zod, valibot, etc. ship as parallel per-library extensions when each library has a clean serialize / rehydrate story. The arktype-json package is the structural template.

@@ -1,17 +1,6 @@
 # ADR 205 — Postgres cast emission is adapter policy, codec metadata stays descriptive
 
-> **Retrospective note (TML-2357 close-out).** This ADR's examples use
-> the `defineCodec({...})` factory. That factory was retired under
-> TML-2357 in favor of the class-form Pattern E
-> (`class extends CodecDescriptorImpl<P>`). The decision this ADR
-> records — that the SQL renderer reads `meta.db.sql.<adapter>.nativeType`
-> as descriptive metadata and the adapter applies cast policy — is
-> unchanged. `meta` is declared on the descriptor class today
-> (`readonly meta = { db: { sql: { postgres: { nativeType: 'vector' } } } } as const;`).
-> See
-> [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)
-> and the
-> [Codec authoring guide](../../reference/codec-authoring-guide.md).
+> **Retrospective note.** This ADR's examples use the `defineCodec({...})` factory. That factory was retired in favor of class-based descriptors (`CodecDescriptorImpl`) and codecs (`CodecImpl`) as described in [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md). The decision this ADR records — that the SQL renderer reads `meta.db.sql.<adapter>.nativeType` as descriptive metadata and the adapter applies cast policy — is unchanged. `meta` is declared on the descriptor class today (`readonly meta = { db: { sql: { postgres: { nativeType: 'vector' } } } } as const;`). See [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) and the [Codec authoring guide](../../reference/codec-authoring-guide.md).
 
 ## TL;DR
 
