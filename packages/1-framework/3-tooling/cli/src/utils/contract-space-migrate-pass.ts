@@ -123,20 +123,14 @@ export function formatContractSpaceDriftWarning(drift: SpaceContractDriftResult)
  *
  * Rendering a fully-typed `.d.ts` for an extension contract requires the
  * SQL-family renderer with the codec / typemap registry threaded
- * through; that integration is tracked under sub-spec Open Question 3
- * (see `projects/extension-contract-spaces/specs/framework-mechanism.spec.md`).
+ * through; that integration is a deferred follow-up.
  *
- * Until that ships, the pinned `.d.ts` is a `@ts-nocheck` stub. The
- * spec gap closing alongside the typed renderer is **AC2 / AC14**
- * (byte-equivalence of pinned per-space artefacts under `migrate`):
- * a placeholder cannot be byte-equal to a fully-rendered `.d.ts` from
- * the same descriptor, so AC2 / AC14 are PARTIAL today and become
- * fully-PASS once OQ3 closes.
- *
- * Scheduled to close in **M3** (cipherstash editor tooling) — that's
- * the milestone where the typed renderer gets its first real
- * extension-space consumer and the byte-equivalence guarantee is
- * practically required.
+ * Until it ships, the pinned `.d.ts` is a `@ts-nocheck` stub. Pinned
+ * per-space artefact byte-equivalence under `migrate` (the related
+ * acceptance property) is therefore PARTIAL today: a placeholder
+ * cannot be byte-equal to a fully-rendered `.d.ts` from the same
+ * descriptor. The guarantee becomes fully-PASS once the typed renderer
+ * gets its first real extension-space consumer.
  */
 function buildPlaceholderContractDts(spaceId: string): string {
   return [

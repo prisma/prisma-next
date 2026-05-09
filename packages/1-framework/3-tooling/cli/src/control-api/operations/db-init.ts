@@ -37,8 +37,9 @@ export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extend
    * for any extension space reads its pinned `refs/head.json` from
    * `<migrationsDir>/<space-id>/refs/head.json`.
    *
-   * @see projects/extension-contract-spaces/specs/m2-orchestrator-consolidation-spec.md
-   *   § "One-path `db init`".
+   * @see docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md
+   *   § "Lifecycle: who reads from where" — `db init` reads only
+   *   on-disk pinned state, never descriptor modules.
    */
   readonly migrationsDir: string;
   /**
