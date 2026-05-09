@@ -57,8 +57,25 @@ export interface MarkerCheckSection {
   }[];
 }
 
+/**
+ * A live storage element (today: a top-level table) not claimed by any
+ * member of the aggregate. The aggregate verifier always reports these;
+ * the caller decides what to do — `db verify --strict` treats them as
+ * errors, the lenient default treats them as informational.
+ *
+ * Today only `kind: 'table'` exists. The discriminated shape leaves
+ * room for orphan columns / indexes / sequences in the future without
+ * breaking the type contract.
+ */
+export type OrphanElement = { readonly kind: 'table'; readonly name: string };
+
 export interface SchemaCheckSection<TSchemaResult> {
   readonly perSpace: ReadonlyMap<string, TSchemaResult>;
+  /**
+   * Live elements present in the introspected schema that are not
+   * claimed by **any** aggregate member. Sorted alphabetically by name.
+   */
+  readonly orphanElements: readonly OrphanElement[];
 }
 
 export interface AggregateVerifierSuccess<TSchemaResult> {
@@ -157,6 +174,42 @@ export function verifyAggregate<TSchemaResult>(
     },
     schemaCheck: {
       perSpace: schemaPerSpace,
+      orphanElements: detectOrphanElements(schemaIntrospection, allMembers),
     },
   });
+}
+
+/**
+ * Live tables not claimed by any aggregate member. Duck-typed against
+ * the introspected schema's `tables` map; schemas whose shape doesn't
+ * match return an empty list (consistent with
+ * {@link projectSchemaToSpace}'s fall-through).
+ */
+function detectOrphanElements(
+  schemaIntrospection: unknown,
+  members: ReadonlyArray<ContractSpaceMember>,
+): readonly OrphanElement[] {
+  if (typeof schemaIntrospection !== 'object' || schemaIntrospection === null) return [];
+  const liveTables = (schemaIntrospection as { readonly tables?: unknown }).tables;
+  if (typeof liveTables !== 'object' || liveTables === null) return [];
+
+  const claimedTables = new Set<string>();
+  for (const member of members) {
+    const storage = (member.contract as { readonly storage?: unknown }).storage;
+    if (typeof storage !== 'object' || storage === null) continue;
+    const tables = (storage as { readonly tables?: unknown }).tables;
+    if (typeof tables !== 'object' || tables === null) continue;
+    for (const tableName of Object.keys(tables as Record<string, unknown>)) {
+      claimedTables.add(tableName);
+    }
+  }
+
+  const orphans: OrphanElement[] = [];
+  for (const tableName of Object.keys(liveTables as Record<string, unknown>)) {
+    if (!claimedTables.has(tableName)) {
+      orphans.push({ kind: 'table', name: tableName });
+    }
+  }
+  orphans.sort((a, b) => a.name.localeCompare(b.name));
+  return orphans;
 }

@@ -208,6 +208,70 @@ describe('verifyAggregate', () => {
       ]);
     });
 
+    it('reports live tables not claimed by any member as `orphanElements`', () => {
+      const aggregate = makeAggregate({
+        app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        extensions: [
+          makeMember({
+            spaceId: 'cipher',
+            headHash: 'sha256:cipher',
+            tables: { cipher_state: {} },
+          }),
+        ],
+      });
+      const liveSchema = {
+        tables: {
+          user: { columns: {} },
+          cipher_state: { columns: {} },
+          mystery_table: { columns: {} },
+          another_orphan: { columns: {} },
+        },
+      };
+
+      const result = verifyAggregate({
+        aggregate,
+        markersBySpaceId: new Map(),
+        schemaIntrospection: liveSchema,
+        // Lenient mode: the verifier still reports orphan elements; the
+        // caller (db verify) decides whether to treat them as errors.
+        mode: 'lenient',
+        verifySchemaForMember: STUB_VERIFY,
+      });
+
+      expect(result.assertOk().schemaCheck.orphanElements).toEqual([
+        { kind: 'table', name: 'another_orphan' },
+        { kind: 'table', name: 'mystery_table' },
+      ]);
+    });
+
+    it('returns an empty `orphanElements` list when every live table is claimed', () => {
+      const aggregate = makeAggregate({
+        app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        extensions: [
+          makeMember({
+            spaceId: 'cipher',
+            headHash: 'sha256:cipher',
+            tables: { cipher_state: {} },
+          }),
+        ],
+      });
+
+      const result = verifyAggregate({
+        aggregate,
+        markersBySpaceId: new Map(),
+        schemaIntrospection: {
+          tables: {
+            user: { columns: {} },
+            cipher_state: { columns: {} },
+          },
+        },
+        mode: 'strict',
+        verifySchemaForMember: STUB_VERIFY,
+      });
+
+      expect(result.assertOk().schemaCheck.orphanElements).toEqual([]);
+    });
+
     it('threads the verifier mode (strict / lenient) to the per-member callback verbatim', () => {
       let observedMode: 'strict' | 'lenient' | undefined;
       const aggregate = makeAggregate({
