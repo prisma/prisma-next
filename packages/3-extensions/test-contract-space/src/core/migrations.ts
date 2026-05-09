@@ -1,7 +1,5 @@
-import type {
-  ExtensionContractRef,
-  ExtensionMigrationPackage,
-} from '@prisma-next/family-sql/control';
+import type { ExtensionContractRef } from '@prisma-next/family-sql/control';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import {
   TEST_BASELINE_INVARIANT_ID,
   TEST_BASELINE_MIGRATION_NAME,
@@ -19,16 +17,22 @@ const baselineMetadata = {
   labels: [],
   providedInvariants: [TEST_BASELINE_INVARIANT_ID],
   createdAt: '2026-01-01T00:00:00.000Z',
-} as const satisfies ExtensionMigrationPackage['metadata'];
+} as const satisfies MigrationPackage['metadata'];
 
 /**
  * Single baseline migration: creates the `test_box` table from the empty
  * schema. The op carries the same `invariantId` declared in the head ref,
  * so a runner that walks this migration graph from a fresh marker reaches
  * the head ref in one step.
+ *
+ * NOTE: this in-memory authoring shape is transitional — M3.5 R1 rebuilds
+ * the package as the on-disk-in-package reference model. `dirPath` is
+ * set to a synthetic relative value so the type unification (M3.5 R1)
+ * goes through cleanly while the rebuild lands.
  */
-export const testContractSpaceBaselineMigration: ExtensionMigrationPackage = {
+export const testContractSpaceBaselineMigration: MigrationPackage = {
   dirName: TEST_BASELINE_MIGRATION_NAME,
+  dirPath: TEST_BASELINE_MIGRATION_NAME,
   metadata: baselineMetadata,
   ops: [
     {

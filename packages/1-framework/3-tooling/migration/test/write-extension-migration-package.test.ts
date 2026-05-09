@@ -20,7 +20,12 @@ describe('writeExtensionMigrationPackage', () => {
   it('writes manifest, ops, and contract.json under <targetDir>/<pkg.dirName>/', async () => {
     const ops = createTestOps();
     const metadata = createTestMetadata({}, ops);
-    const pkg = { dirName: '20260507T1100_install', metadata, ops };
+    const pkg = {
+      dirName: '20260507T1100_install',
+      dirPath: '20260507T1100_install',
+      metadata,
+      ops,
+    };
 
     await writeExtensionMigrationPackage(tmpDir, pkg);
 
@@ -32,7 +37,7 @@ describe('writeExtensionMigrationPackage', () => {
   it('serialises contract.json as the canonical JSON form of metadata.toContract', async () => {
     const ops = createTestOps();
     const metadata = createTestMetadata({}, ops);
-    const pkg = { dirName: 'baseline', metadata, ops };
+    const pkg = { dirName: 'baseline', dirPath: 'baseline', metadata, ops };
 
     await writeExtensionMigrationPackage(tmpDir, pkg);
 
@@ -44,7 +49,7 @@ describe('writeExtensionMigrationPackage', () => {
   it('produces byte-identical output across two writes of the same package (idempotency)', async () => {
     const ops = createTestOps();
     const metadata = createTestMetadata({}, ops);
-    const pkg = { dirName: 'baseline', metadata, ops };
+    const pkg = { dirName: 'baseline', dirPath: 'baseline', metadata, ops };
 
     const dirA = join(tmpDir, 'a');
     const dirB = join(tmpDir, 'b');
@@ -68,6 +73,7 @@ describe('writeExtensionMigrationPackage', () => {
     const nested = join(tmpDir, 'cipherstash');
     const pkg = {
       dirName: 'baseline',
+      dirPath: 'baseline',
       metadata: createTestMetadata({}, []),
       ops: [],
     };

@@ -57,13 +57,13 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import pgvectorExtensionDescriptor from '@prisma-next/extension-pgvector/control';
 import sqlFamilyDescriptor, {
-  type ExtensionMigrationPackage,
   INIT_ADDITIVE_POLICY,
   type SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
@@ -92,7 +92,7 @@ function getPgvectorContractSpace(): NonNullable<typeof pgvectorExtensionDescrip
   return space;
 }
 
-function getPgvectorBaselineMigration(): ExtensionMigrationPackage {
+function getPgvectorBaselineMigration(): MigrationPackage {
   const migrations = getPgvectorContractSpace().migrations;
   const baseline = migrations[0];
   if (!baseline) {
@@ -200,7 +200,7 @@ function buildSyntheticVectorInstallSql(): string {
  * {@link buildSyntheticVectorInstallSql}. The migrationHash is
  * recomputed because the on-disk representation differs.
  */
-function buildSyntheticBaselineMigration(): ExtensionMigrationPackage {
+function buildSyntheticBaselineMigration(): MigrationPackage {
   const realOps = pgvectorBaselineMigration.ops;
   const syntheticOps = realOps.map((op) => {
     const sqlOp = op as unknown as SqlMigrationPlanOperation<unknown>;
@@ -233,6 +233,7 @@ function buildSyntheticBaselineMigration(): ExtensionMigrationPackage {
 
   return {
     dirName: pgvectorBaselineMigration.dirName,
+    dirPath: pgvectorBaselineMigration.dirPath,
     metadata: {
       ...baseMetadata,
       migrationHash: computeMigrationHash(baseMetadata, syntheticOps),
@@ -248,7 +249,7 @@ interface TestProject {
 }
 
 async function setupTestProject(args: {
-  readonly migration: ExtensionMigrationPackage;
+  readonly migration: MigrationPackage;
 }): Promise<TestProject> {
   const projectRoot = await mkdtemp(join(tmpdir(), 'pgvector-scenario-a-'));
   const migrationsDir = join(projectRoot, 'migrations');

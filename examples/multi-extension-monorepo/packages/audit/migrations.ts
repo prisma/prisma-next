@@ -1,10 +1,10 @@
 import type {
   ExtensionContractRef,
-  ExtensionMigrationPackage,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import {
   AUDIT_BASELINE_INVARIANT_ID,
   AUDIT_BASELINE_MIGRATION_NAME,
@@ -54,7 +54,7 @@ export const AUDIT_BASELINE_INVARIANTS: readonly string[] = (() => {
   return [...new Set(ids)].sort();
 })();
 
-const baselineMetadataWithoutHash: Omit<ExtensionMigrationPackage['metadata'], 'migrationHash'> = {
+const baselineMetadataWithoutHash: Omit<MigrationPackage['metadata'], 'migrationHash'> = {
   from: null,
   to: AUDIT_STORAGE_HASH,
   fromContract: null,
@@ -65,8 +65,9 @@ const baselineMetadataWithoutHash: Omit<ExtensionMigrationPackage['metadata'], '
   createdAt: '2026-06-01T00:00:00.000Z',
 };
 
-export const auditBaselineMigration: ExtensionMigrationPackage = {
+export const auditBaselineMigration: MigrationPackage = {
   dirName: AUDIT_BASELINE_MIGRATION_NAME,
+  dirPath: AUDIT_BASELINE_MIGRATION_NAME,
   metadata: {
     ...baselineMetadataWithoutHash,
     migrationHash: computeMigrationHash(baselineMetadataWithoutHash, auditBaselineOps),

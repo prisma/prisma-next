@@ -1,12 +1,11 @@
 /**
  * pgvector contract space — baseline migration package.
  *
- * Per project spec FR1 and the M3 sub-spec § 3, an extension's
- * `contractSpace.migrations` is a list of in-memory
- * `ExtensionMigrationPackage` values whose `ops` carry framework-level
- * `MigrationPlanOperation`s. The SQL family runner reads the additional
- * runtime fields (`target`, `precheck`, `execute`, `postcheck`) at
- * apply time.
+ * Per project spec FR1, an extension's `contractSpace.migrations` is a
+ * list of {@link MigrationPackage} values whose `ops` carry framework-
+ * level `MigrationPlanOperation`s. The SQL family runner reads the
+ * additional runtime fields (`target`, `precheck`, `execute`,
+ * `postcheck`) at apply time.
  *
  * Ships a single baseline migration whose only op is
  * {@link installVectorExtensionOp} — it carries the
@@ -22,11 +21,11 @@
 
 import type {
   ExtensionContractRef,
-  ExtensionMigrationPackage,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { PGVECTOR_STORAGE_HASH, pgvectorContract } from './contract';
 import { PGVECTOR_BASELINE_MIGRATION_NAME, PGVECTOR_INVARIANTS } from './contract-space-constants';
 
@@ -86,7 +85,7 @@ export const PGVECTOR_BASELINE_INVARIANTS: readonly string[] = (() => {
   return [...new Set(ids)].sort();
 })();
 
-const baselineMetadataWithoutHash: Omit<ExtensionMigrationPackage['metadata'], 'migrationHash'> = {
+const baselineMetadataWithoutHash: Omit<MigrationPackage['metadata'], 'migrationHash'> = {
   from: null,
   to: PGVECTOR_STORAGE_HASH,
   fromContract: null,
@@ -102,9 +101,15 @@ const baselineMetadataWithoutHash: Omit<ExtensionMigrationPackage['metadata'], '
  * `contractSpace.migrations`. The framework's emitter writes this to
  * `migrations/pgvector/<dirName>/{manifest,ops,contract}.json` in the
  * user's repo at `migrate` time.
+ *
+ * `dirPath` is set to a synthetic relative value (the dirName itself).
+ * This is in-memory authoring — pgvector will migrate to the
+ * on-disk-in-package authoring convention (M3.5 R3); R1's type
+ * unification keeps the legacy in-memory shape working unchanged.
  */
-export const pgvectorBaselineMigration: ExtensionMigrationPackage = {
+export const pgvectorBaselineMigration: MigrationPackage = {
   dirName: PGVECTOR_BASELINE_MIGRATION_NAME,
+  dirPath: PGVECTOR_BASELINE_MIGRATION_NAME,
   metadata: {
     ...baselineMetadataWithoutHash,
     migrationHash: computeMigrationHash(baselineMetadataWithoutHash, pgvectorBaselineOps),

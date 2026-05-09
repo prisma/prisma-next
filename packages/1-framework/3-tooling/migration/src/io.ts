@@ -76,23 +76,7 @@ export async function writeMigrationPackage(
 }
 
 /**
- * Shape of an in-memory authored migration package — same as
- * `MigrationPackage` minus `dirPath` (the package has not yet been
- * emitted to disk so there is no path to record). Mirrors the
- * `ExtensionMigrationPackage` type that ships from
- * `@prisma-next/family-sql/control` for `SqlControlExtensionDescriptor`
- * authors. Defined locally to keep `migration-tools` framework-neutral.
- *
- * @see specs/framework-mechanism.spec.md § 1, § 3.
- */
-export interface MigrationPackageContents {
-  readonly dirName: string;
-  readonly metadata: MigrationMetadata;
-  readonly ops: MigrationOps;
-}
-
-/**
- * Materialise an in-memory migration package to a per-space directory.
+ * Materialise a migration package to a per-space directory.
  *
  * Writes three files under `<targetDir>/<pkg.dirName>/`:
  *
@@ -116,7 +100,7 @@ export interface MigrationPackageContents {
  */
 export async function writeExtensionMigrationPackage(
   targetDir: string,
-  pkg: MigrationPackageContents,
+  pkg: MigrationPackage,
 ): Promise<void> {
   const dir = join(targetDir, pkg.dirName);
   await writeMigrationPackage(dir, pkg.metadata, pkg.ops);
@@ -151,7 +135,7 @@ export async function writeExtensionMigrationPackage(
  */
 export async function materialiseExtensionMigrationPackageIfMissing(
   targetDir: string,
-  pkg: MigrationPackageContents,
+  pkg: MigrationPackage,
 ): Promise<{ readonly written: boolean }> {
   const pkgDir = join(targetDir, pkg.dirName);
   if (await pathExists(pkgDir)) {

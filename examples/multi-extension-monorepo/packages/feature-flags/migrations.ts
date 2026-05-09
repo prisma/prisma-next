@@ -1,10 +1,10 @@
 import type {
   ExtensionContractRef,
-  ExtensionMigrationPackage,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import {
   FEATURE_FLAG_TABLE,
   FEATURE_FLAGS_BASELINE_INVARIANT_ID,
@@ -53,7 +53,7 @@ export const FEATURE_FLAGS_BASELINE_INVARIANTS: readonly string[] = (() => {
   return [...new Set(ids)].sort();
 })();
 
-const baselineMetadataWithoutHash: Omit<ExtensionMigrationPackage['metadata'], 'migrationHash'> = {
+const baselineMetadataWithoutHash: Omit<MigrationPackage['metadata'], 'migrationHash'> = {
   from: null,
   to: FEATURE_FLAGS_STORAGE_HASH,
   fromContract: null,
@@ -64,8 +64,9 @@ const baselineMetadataWithoutHash: Omit<ExtensionMigrationPackage['metadata'], '
   createdAt: '2026-06-01T00:00:00.000Z',
 };
 
-export const featureFlagsBaselineMigration: ExtensionMigrationPackage = {
+export const featureFlagsBaselineMigration: MigrationPackage = {
   dirName: FEATURE_FLAGS_BASELINE_MIGRATION_NAME,
+  dirPath: FEATURE_FLAGS_BASELINE_MIGRATION_NAME,
   metadata: {
     ...baselineMetadataWithoutHash,
     migrationHash: computeMigrationHash(baselineMetadataWithoutHash, featureFlagsBaselineOps),

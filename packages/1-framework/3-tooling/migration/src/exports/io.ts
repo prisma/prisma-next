@@ -1,7 +1,6 @@
 export {
   copyFilesWithRename,
   formatMigrationDirName,
-  type MigrationPackageContents,
   materialiseExtensionMigrationPackageIfMissing,
   readMigrationPackage,
   readMigrationsDir,

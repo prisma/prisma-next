@@ -2,12 +2,10 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  type DescriptorMigrationPackage,
-  runContractSpaceExtensionMigrationsPass,
-} from '../../src/utils/contract-space-extension-migrations-pass';
+import { runContractSpaceExtensionMigrationsPass } from '../../src/utils/contract-space-extension-migrations-pass';
 
 function makeMetadata(args: {
   readonly from: string | null;
@@ -26,12 +24,10 @@ function makeMetadata(args: {
   };
 }
 
-function makePkg(
-  dirName: string,
-  fromTo: { from: string | null; to: string },
-): DescriptorMigrationPackage {
+function makePkg(dirName: string, fromTo: { from: string | null; to: string }): MigrationPackage {
   return {
     dirName,
+    dirPath: dirName,
     metadata: makeMetadata(fromTo),
     ops: [],
   };

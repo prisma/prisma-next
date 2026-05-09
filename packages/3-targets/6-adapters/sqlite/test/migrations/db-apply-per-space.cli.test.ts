@@ -189,6 +189,7 @@ async function writePinnedExtensionArtefacts(args: {
   const migrationHash = computeMigrationHash(baseMeta, [...args.ops]);
   await writeExtensionMigrationPackage(spaceDir, {
     dirName: args.migrationDirName,
+    dirPath: join(spaceDir, args.migrationDirName),
     metadata: { ...baseMeta, migrationHash },
     ops: [...args.ops],
   });
@@ -318,8 +319,10 @@ describe(
           createdAt: '2026-02-01T00:00:00.000Z',
         };
         const ops = [...buildAdvanceOps()];
-        await writeExtensionMigrationPackage(join(baseline.migrationsDir, EXT_SPACE_ID), {
+        const advanceSpaceDir = join(baseline.migrationsDir, EXT_SPACE_ID);
+        await writeExtensionMigrationPackage(advanceSpaceDir, {
           dirName: '20260201T0000_add_note',
+          dirPath: join(advanceSpaceDir, '20260201T0000_add_note'),
           metadata: { ...baseMeta, migrationHash: computeMigrationHash(baseMeta, ops) },
           ops,
         });
@@ -502,8 +505,10 @@ describe(
           createdAt: '2026-02-01T00:00:00.000Z',
         };
         const ops = [...buildFailingOps()];
-        await writeExtensionMigrationPackage(join(baseline.migrationsDir, EXT_SPACE_ID), {
+        const failingSpaceDir = join(baseline.migrationsDir, EXT_SPACE_ID);
+        await writeExtensionMigrationPackage(failingSpaceDir, {
           dirName: '20260201T0000_failing',
+          dirPath: join(failingSpaceDir, '20260201T0000_failing'),
           metadata: { ...baseMeta, migrationHash: computeMigrationHash(baseMeta, ops) },
           ops,
         });

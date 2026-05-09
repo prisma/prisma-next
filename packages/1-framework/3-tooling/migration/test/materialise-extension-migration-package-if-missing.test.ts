@@ -19,7 +19,7 @@ describe('materialiseExtensionMigrationPackageIfMissing', () => {
   it('writes the package and returns { written: true } on first run', async () => {
     const ops = createTestOps();
     const metadata = createTestMetadata({}, ops);
-    const pkg = { dirName: 'baseline', metadata, ops };
+    const pkg = { dirName: 'baseline', dirPath: 'baseline', metadata, ops };
 
     const result = await materialiseExtensionMigrationPackageIfMissing(tmpDir, pkg);
 
@@ -31,7 +31,7 @@ describe('materialiseExtensionMigrationPackageIfMissing', () => {
   it('returns { written: false } when <targetDir>/<pkg.dirName>/ already exists', async () => {
     const ops = createTestOps();
     const metadata = createTestMetadata({}, ops);
-    const pkg = { dirName: 'baseline', metadata, ops };
+    const pkg = { dirName: 'baseline', dirPath: 'baseline', metadata, ops };
 
     await materialiseExtensionMigrationPackageIfMissing(tmpDir, pkg);
     const second = await materialiseExtensionMigrationPackageIfMissing(tmpDir, pkg);
@@ -42,7 +42,7 @@ describe('materialiseExtensionMigrationPackageIfMissing', () => {
   it('leaves on-disk content byte-identical when the dir already exists (AC-7 / AM12)', async () => {
     const ops = createTestOps();
     const metadata = createTestMetadata({}, ops);
-    const pkg = { dirName: 'baseline', metadata, ops };
+    const pkg = { dirName: 'baseline', dirPath: 'baseline', metadata, ops };
 
     await materialiseExtensionMigrationPackageIfMissing(tmpDir, pkg);
 
@@ -67,6 +67,7 @@ describe('materialiseExtensionMigrationPackageIfMissing', () => {
     const nested = join(tmpDir, 'cipherstash');
     const pkg = {
       dirName: 'baseline',
+      dirPath: 'baseline',
       metadata: createTestMetadata({}, []),
       ops: [],
     };

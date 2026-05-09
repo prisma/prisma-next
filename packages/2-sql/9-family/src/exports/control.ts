@@ -40,7 +40,6 @@ export type {
   ExpandNativeTypeInput,
   ExtensionContractRef,
   ExtensionContractSpace,
-  ExtensionMigrationPackage,
   FieldEvent,
   FieldEventContext,
   MultiSpaceRunnerFailure,

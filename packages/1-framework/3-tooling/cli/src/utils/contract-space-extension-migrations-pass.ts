@@ -1,6 +1,5 @@
 import { materialiseExtensionMigrationPackageIfMissing } from '@prisma-next/migration-tools/io';
-import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import type { MigrationOps } from '@prisma-next/migration-tools/package';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import {
   planAllSpaces,
   type SpacePlanOutput,
@@ -8,30 +7,18 @@ import {
 } from '@prisma-next/migration-tools/spaces';
 
 /**
- * In-memory authored migration package shipped by an extension descriptor.
- * Mirrors `MigrationPackageContents` from `@prisma-next/migration-tools/io`
- * (the on-disk shape minus `dirPath`); redeclared structurally here so
- * the CLI helper does not couple to the SQL family's `ExtensionMigrationPackage`
- * type — any family that ships pre-built migration packages can pass them
- * through unchanged.
- */
-export interface DescriptorMigrationPackage {
-  readonly dirName: string;
-  readonly metadata: MigrationMetadata;
-  readonly ops: MigrationOps;
-}
-
-/**
  * Minimal descriptor view consumed by the migration-materialisation pass.
  * Mirrors {@link import('./contract-space-migrate-pass').MigrateExtensionInput}
- * but adds the `migrations` field — the canonical set of pre-built
- * migration packages the extension ships.
+ * but adds the `migrations` field — the canonical set of migration
+ * packages the extension ships, in the unified
+ * {@link MigrationPackage} shape (target-agnostic; any family that
+ * ships pre-built migration packages passes them through unchanged).
  */
 export interface ExtensionMigrationsExtensionInput {
   readonly id: string;
   readonly contractSpace?: {
     readonly contractJson: unknown;
-    readonly migrations: readonly DescriptorMigrationPackage[];
+    readonly migrations: readonly MigrationPackage[];
     readonly headRef: { readonly hash: string; readonly invariants: readonly string[] };
   };
 }
@@ -98,11 +85,10 @@ export async function runContractSpaceExtensionMigrationsPass(
   // `migrations` array. The benefit of routing through `planAllSpaces`
   // is duplicate-spaceId detection + alphabetical ordering — failures
   // there throw `MIGRATION.DUPLICATE_SPACE_ID` before any write.
-  const planned: readonly SpacePlanOutput<DescriptorMigrationPackage>[] = planAllSpaces(
+  const planned: readonly SpacePlanOutput<MigrationPackage>[] = planAllSpaces(
     planInputs,
     (input) =>
-      (input as typeof input & { readonly __migrations: readonly DescriptorMigrationPackage[] })
-        .__migrations,
+      (input as typeof input & { readonly __migrations: readonly MigrationPackage[] }).__migrations,
   );
 
   const emitted: { spaceId: string; dirName: string }[] = [];

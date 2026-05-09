@@ -34,7 +34,6 @@ import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   ExtensionContractRef,
-  ExtensionMigrationPackage,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
@@ -42,6 +41,7 @@ import {
   materialiseExtensionMigrationPackageIfMissing,
   writeExtensionMigrationPackage,
 } from '@prisma-next/migration-tools/io';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import {
   emitPinnedSpaceArtefacts,
   spaceMigrationDirectory,
@@ -58,7 +58,7 @@ interface SyntheticVersion {
   readonly contract: Contract<SqlStorage>;
   readonly contractDts: string;
   readonly headRef: ExtensionContractRef;
-  readonly migrations: readonly ExtensionMigrationPackage[];
+  readonly migrations: readonly MigrationPackage[];
 }
 
 const PROFILE = profileHash('cipherstash-extension-profile-v1');
@@ -139,8 +139,9 @@ function buildVersion(v: 1 | 2): SyntheticVersion {
     providedInvariants: baselineProvided,
     createdAt: '2026-06-01T00:00:00.000Z',
   } as const;
-  const baseline: ExtensionMigrationPackage = {
+  const baseline: MigrationPackage = {
     dirName: '20260601T0000_install_eql_bundle',
+    dirPath: '20260601T0000_install_eql_bundle',
     metadata: {
       ...baselineMetaNoHash,
       migrationHash: computeMigrationHash(baselineMetaNoHash, baselineOps),
@@ -192,8 +193,9 @@ function buildVersion(v: 1 | 2): SyntheticVersion {
     providedInvariants: auditProvided,
     createdAt: '2026-06-15T00:00:00.000Z',
   } as const;
-  const auditPkg: ExtensionMigrationPackage = {
+  const auditPkg: MigrationPackage = {
     dirName: '20260615T0000_add_audit_column',
+    dirPath: '20260615T0000_add_audit_column',
     metadata: {
       ...auditMetaNoHash,
       migrationHash: computeMigrationHash(auditMetaNoHash, auditOps),

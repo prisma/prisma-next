@@ -17,8 +17,7 @@ import type {
   OperationContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
-import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import type { MigrationOps } from '@prisma-next/migration-tools/package';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import type {
   SqlStorage,
   StorageColumn,
@@ -170,31 +169,29 @@ export interface ExtensionContractRef {
 }
 
 /**
- * In-memory authored migration package as published by an extension's
- * descriptor module. Mirrors the on-disk
- * {@link import('@prisma-next/migration-tools/package').MigrationPackage}
- * shape minus `dirPath` — at descriptor construction time the package has
- * not yet been emitted to the user's repo, so there is no path to record.
+ * Contract-space view an extension publishes through its descriptor
+ * module: the canonical contract value, the migration graph authored
+ * against it, and the pinned head ref. The framework reads this value
+ * only at authoring time (during `migrate`); apply / verify paths read
+ * the user's repo (`migrations/<space-id>/...`) instead.
  *
- * The framework's pinned-artefact emission step (T1.7 / T1.8) materialises
- * each package into `migrations/<space-id>/<dirName>/`.
- */
-export interface ExtensionMigrationPackage {
-  readonly dirName: string;
-  readonly metadata: MigrationMetadata;
-  readonly ops: MigrationOps;
-}
-
-/**
- * In-memory contract-space view an extension publishes through its
- * descriptor module: the canonical contract value, the migration graph
- * authored against it, and the pinned head ref. The framework reads this
- * value only at authoring time (during `migrate`); apply / verify paths
- * read the user's repo (`migrations/<space-id>/...`) instead.
+ * The expected authoring convention is **on-disk-in-package**: the
+ * extension's package directory contains its own emitted artefacts
+ * (`contract.json`, `migrations/<space-id>/<dirName>/...`, and
+ * `refs/head.json`) produced by the same `prisma-next contract emit`
+ * + `prisma-next migration plan` pipeline application authors use.
+ * The descriptor module wires those JSON artefacts via JSON-import
+ * declarations (`import x from '../path' with { type: 'json' }`) and
+ * synthesises {@link MigrationPackage} values whose `dirPath` points
+ * at the on-disk migration directory (typically resolved from
+ * `import.meta.url`). See
+ * `docs/architecture docs/adrs/ADR 211 - Contract spaces.md` for the
+ * full convention and `packages/3-extensions/test-contract-space/`
+ * for the reference model.
  */
 export interface ExtensionContractSpace {
   readonly contractJson: Contract<SqlStorage>;
-  readonly migrations: readonly ExtensionMigrationPackage[];
+  readonly migrations: readonly MigrationPackage[];
   readonly headRef: ExtensionContractRef;
 }
 
