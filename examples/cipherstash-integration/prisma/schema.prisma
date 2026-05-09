@@ -1,14 +1,17 @@
 // Cipherstash integration example schema.
 //
-// One model with one searchable encrypted column. The
-// `{ equality: true, freeTextSearch: true }` parameters opt the column
-// into both deterministic-equality and bloom-filter free-text search
-// indexes — corresponding to the two cipherstash search operators the
-// extension exposes (`cipherstashEq`, `cipherstashIlike`).
+// One model with one searchable encrypted column. The no-args form
+// `cipherstash.EncryptedString()` defaults both `equality` and
+// `freeTextSearch` to `true`, opting the column into both
+// deterministic-equality and bloom-filter free-text search indexes
+// (corresponding to the two cipherstash search operators the
+// extension exposes: `cipherstashEq`, `cipherstashIlike`). Pass
+// `{ equality: false }` / `{ freeTextSearch: false }` explicitly to
+// opt out.
 
 model User {
-  id    String                                                            @id
-  email cipherstash.EncryptedString({ equality: true, freeTextSearch: true })
+  id    String @id
+  email cipherstash.EncryptedString()
 
   // The CipherStash EQL bundle (eql-2.2.1) hits a SQL-injection-style bug
   // in `eql_v2.add_encrypted_constraint` when the table name needs quoting

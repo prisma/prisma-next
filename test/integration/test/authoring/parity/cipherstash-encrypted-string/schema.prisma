@@ -1,16 +1,18 @@
 // PSL side of the cipherstash EncryptedString PSL ↔ TS authoring parity
 // fixture. The `cli.emit-parity-fixtures.test.ts` runner asserts byte-
 // identical contract.json between this schema and the sibling
-// `contract.ts`. The matrix below covers both M2 R2 (AC-PARITY1..2)
-// and the cipherstash umbrella scenario`s contract.json parity
-// requirement (project-1 spec § AC-UMB2): `full` and `optionalFull`
-// are the umbrella column shapes (M3 R3 T3.7 + T3.10).
+// `contract.ts`. The matrix below covers the cipherstash arg-shape ×
+// nullability combinations: `full` exercises the no-args default
+// (`equality: true, freeTextSearch: true`); `equality` exercises an
+// explicit `freeTextSearch: false` opt-out; `storageOnly` opts both
+// flags out for non-searchable encryption. `optional*` mirrors each
+// shape with `?` for the nullable column matrix.
 model User {
   id                  Int @id @default(autoincrement())
-  storageOnly         cipherstash.EncryptedString({})
-  equality            cipherstash.EncryptedString({ equality: true })
-  full                cipherstash.EncryptedString({ equality: true, freeTextSearch: true })
-  optionalStorageOnly cipherstash.EncryptedString({})?
-  optionalEquality    cipherstash.EncryptedString({ equality: true })?
-  optionalFull        cipherstash.EncryptedString({ equality: true, freeTextSearch: true })?
+  storageOnly         cipherstash.EncryptedString({ equality: false, freeTextSearch: false })
+  equality            cipherstash.EncryptedString({ freeTextSearch: false })
+  full                cipherstash.EncryptedString()
+  optionalStorageOnly cipherstash.EncryptedString({ equality: false, freeTextSearch: false })?
+  optionalEquality    cipherstash.EncryptedString({ freeTextSearch: false })?
+  optionalFull        cipherstash.EncryptedString()?
 }

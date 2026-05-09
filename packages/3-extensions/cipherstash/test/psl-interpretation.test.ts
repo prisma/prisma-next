@@ -3,20 +3,22 @@
  * `cipherstash.EncryptedString({...})` constructor.
  *
  * Exercises the interpreter end-to-end (parser → authoring contributions
- * → SQL contract IR) so the AC checks are about *what users observe* in
- * the emitted contract, not about the descriptor template metadata.
+ * → SQL contract IR) so the assertions are about *what users observe*
+ * in the emitted contract, not about the descriptor template metadata.
  *
- * Pinned ACs (see `psl-encrypted-string-constructor.spec.md`):
- *   - AC-LOWER1: full args lower to typeParams { equality, freeTextSearch }.
- *   - AC-LOWER2: empty `{}` applies false defaults to both flags.
- *   - AC-LOWER3: `?` produces nullable: true on the column descriptor.
- *   - AC-CTOR3: unknown property name → PSL_INVALID_ATTRIBUTE_ARGUMENT.
- *   - AC-CTOR4: wrong type → PSL_INVALID_ATTRIBUTE_ARGUMENT mentioning "boolean";
- *     diagnostic span points at the offending value.
- *   - AC-ALIAS1: `types { ... }` alias resolves and is reachable from a
- *     model field via `typeRef`.
- *   - AC-ALIAS2: an alias's named-type descriptor matches the
- *     inline-form column's codec/nativeType/typeParams byte-for-byte.
+ * Pinned behaviour:
+ *   - Full args lower to `typeParams { equality, freeTextSearch }`.
+ *   - Empty `{}` (and the no-args form) defaults both flags to `true` —
+ *     searchable encryption is the legitimate default; users opt out
+ *     explicitly with `equality: false` / `freeTextSearch: false`.
+ *   - `?` produces `nullable: true` on the column descriptor.
+ *   - Unknown property name → `PSL_INVALID_ATTRIBUTE_ARGUMENT`.
+ *   - Wrong type → `PSL_INVALID_ATTRIBUTE_ARGUMENT` mentioning
+ *     "boolean"; diagnostic span points at the offending value.
+ *   - `types { ... }` alias resolves and is reachable from a model
+ *     field via `typeRef`; the alias's named-type descriptor matches
+ *     the inline-form column's codec/nativeType/typeParams
+ *     byte-for-byte.
  */
 
 import { parsePslDocument } from '@prisma-next/psl-parser';
@@ -66,7 +68,7 @@ type StorageView = {
 const asStorage = (storage: unknown): StorageView => storage as StorageView;
 
 describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
-  it('lowers full args to a column with codecId, nativeType, typeParams (AC-LOWER1)', () => {
+  it('lowers full args to a column with codecId, nativeType, typeParams', () => {
     const result = interpret(`model User {
   id Int @id
   email cipherstash.EncryptedString({ equality: true, freeTextSearch: true })
@@ -82,10 +84,58 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
     });
   });
 
-  it('applies false defaults for an empty options literal (AC-LOWER2)', () => {
+  it('defaults both flags to true for an empty options literal', () => {
     const result = interpret(`model User {
   id Int @id
   notes cipherstash.EncryptedString({})
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toMatchObject({
+      codecId: 'cipherstash/string@1',
+      nativeType: 'eql_v2_encrypted',
+      typeParams: { equality: true, freeTextSearch: true },
+      nullable: false,
+    });
+  });
+
+  it('defaults both flags to true when called with no arguments', () => {
+    const result = interpret(`model User {
+  id Int @id
+  notes cipherstash.EncryptedString()
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toMatchObject({
+      codecId: 'cipherstash/string@1',
+      nativeType: 'eql_v2_encrypted',
+      typeParams: { equality: true, freeTextSearch: true },
+      nullable: false,
+    });
+  });
+
+  it('lets equality be explicitly disabled', () => {
+    const result = interpret(`model User {
+  id Int @id
+  notes cipherstash.EncryptedString({ equality: false })
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toMatchObject({
+      codecId: 'cipherstash/string@1',
+      nativeType: 'eql_v2_encrypted',
+      typeParams: { equality: false, freeTextSearch: true },
+      nullable: false,
+    });
+  });
+
+  it('lets both flags be explicitly disabled (storage-only encryption)', () => {
+    const result = interpret(`model User {
+  id Int @id
+  notes cipherstash.EncryptedString({ equality: false, freeTextSearch: false })
 }
 `);
     expect(result.ok).toBe(true);
@@ -98,10 +148,10 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
     });
   });
 
-  it('marks nullable columns as nullable (AC-LOWER3)', () => {
+  it('marks nullable columns as nullable', () => {
     const result = interpret(`model User {
   id Int @id
-  username cipherstash.EncryptedString({ equality: true })?
+  username cipherstash.EncryptedString({ freeTextSearch: false })?
 }
 `);
     expect(result.ok).toBe(true);
@@ -114,7 +164,7 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
     });
   });
 
-  it('rejects unknown argument names with PSL_INVALID_ATTRIBUTE_ARGUMENT (AC-CTOR3)', () => {
+  it('rejects unknown argument names with PSL_INVALID_ATTRIBUTE_ARGUMENT', () => {
     const result = interpret(`model User {
   id Int @id
   email cipherstash.EncryptedString({ orderAndRange: true })
@@ -132,7 +182,7 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
     );
   });
 
-  it('rejects wrong-typed argument values with PSL_INVALID_ATTRIBUTE_ARGUMENT (AC-CTOR4)', () => {
+  it('rejects wrong-typed argument values with PSL_INVALID_ATTRIBUTE_ARGUMENT', () => {
     const result = interpret(`model User {
   id Int @id
   email cipherstash.EncryptedString({ equality: "yes" })
@@ -150,9 +200,9 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
     );
   });
 
-  it('resolves a named-type alias under types {} and uses it on a model field (AC-ALIAS1)', () => {
+  it('resolves a named-type alias under types {} and uses it on a model field', () => {
     const result = interpret(`types {
-  SearchableEmail = cipherstash.EncryptedString({ equality: true })
+  SearchableEmail = cipherstash.EncryptedString({ freeTextSearch: false })
 }
 
 model User {
@@ -176,7 +226,7 @@ model User {
     });
   });
 
-  it('produces an alias whose typeParams match the inline-constructor form for the same args (AC-ALIAS2)', () => {
+  it('produces an alias whose typeParams match the inline-constructor form for the same args', () => {
     const aliasResult = interpret(`types {
   SearchableEmail = cipherstash.EncryptedString({ equality: true, freeTextSearch: true })
 }
@@ -211,7 +261,7 @@ model User {
     });
   });
 
-  it('reports a span at the offending argument value (AC-CTOR4 span requirement)', () => {
+  it('reports a span at the offending argument value', () => {
     const result = interpret(`model User {
   id Int @id
   email cipherstash.EncryptedString({ equality: 42 })

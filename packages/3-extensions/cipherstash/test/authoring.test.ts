@@ -1,18 +1,21 @@
 /**
  * Pack-meta authoring contributions for the cipherstash extension.
  *
- * Pinned ACs (see `psl-encrypted-string-constructor.spec.md`):
- *   - AC-CTOR1 — pack-meta exposes `cipherstash.EncryptedString` as a
- *     namespaced `typeConstructor`.
- *   - AC-CTOR2 — single object argument with optional boolean
- *     `equality` and `freeTextSearch` properties.
- *   - AC-LOWER1 (shape) — output template lowers to a
- *     `ColumnTypeDescriptor` with `codecId: 'cipherstash/string@1'`,
- *     `nativeType: 'eql_v2_encrypted'`, and an `AuthoringArgRef`-based
- *     `typeParams` block carrying `false` defaults for both flags.
+ * Pinned behaviour:
+ *   - Pack-meta exposes `cipherstash.EncryptedString` as a namespaced
+ *     `typeConstructor`.
+ *   - The constructor takes a single OPTIONAL object argument with
+ *     optional boolean `equality` and `freeTextSearch` properties (so
+ *     `cipherstash.EncryptedString()` and `cipherstash.EncryptedString({})`
+ *     both parse).
+ *   - The output template lowers to a `ColumnTypeDescriptor` with
+ *     `codecId: 'cipherstash/string@1'`, `nativeType: 'eql_v2_encrypted'`,
+ *     and an `AuthoringArgRef`-based `typeParams` block carrying
+ *     `true` defaults for both flags — searchable encryption is the
+ *     legitimate default; users opt out explicitly.
  *
- * Full PSL→ColumnTypeDescriptor lowering (AC-LOWER1..3, AC-CTOR3..4,
- * AC-ALIAS1..2) is exercised in `test/psl-interpretation.test.ts`.
+ * Full PSL→ColumnTypeDescriptor lowering is exercised in
+ * `test/psl-interpretation.test.ts`.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -20,7 +23,7 @@ import { cipherstashAuthoringTypes } from '../src/contract/authoring';
 import cipherstashPack from '../src/exports/pack';
 
 describe('cipherstash pack authoring contributions', () => {
-  it('exposes cipherstash.EncryptedString as a namespaced type constructor (AC-CTOR1)', () => {
+  it('exposes cipherstash.EncryptedString as a namespaced type constructor', () => {
     expect(cipherstashPack.authoring?.type).toMatchObject({
       cipherstash: {
         EncryptedString: {
@@ -30,12 +33,13 @@ describe('cipherstash pack authoring contributions', () => {
     });
   });
 
-  it('declares a single object argument with optional equality + freeTextSearch boolean properties (AC-CTOR2)', () => {
+  it('declares a single optional object argument with optional equality + freeTextSearch boolean properties', () => {
     expect(cipherstashAuthoringTypes.cipherstash.EncryptedString).toMatchObject({
       kind: 'typeConstructor',
       args: [
         {
           kind: 'object',
+          optional: true,
           properties: {
             equality: { kind: 'boolean', optional: true },
             freeTextSearch: { kind: 'boolean', optional: true },
@@ -45,17 +49,17 @@ describe('cipherstash pack authoring contributions', () => {
     });
   });
 
-  it('lowers to ColumnTypeDescriptor with codecId cipherstash/string@1 + nativeType eql_v2_encrypted (AC-LOWER1 shape)', () => {
+  it('lowers to ColumnTypeDescriptor with codecId cipherstash/string@1 + nativeType eql_v2_encrypted, defaulting both flags to true', () => {
     expect(cipherstashAuthoringTypes.cipherstash.EncryptedString.output).toMatchObject({
       codecId: 'cipherstash/string@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: {
-        equality: { kind: 'arg', index: 0, path: ['equality'], default: false },
+        equality: { kind: 'arg', index: 0, path: ['equality'], default: true },
         freeTextSearch: {
           kind: 'arg',
           index: 0,
           path: ['freeTextSearch'],
-          default: false,
+          default: true,
         },
       },
     });

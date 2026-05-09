@@ -11,11 +11,16 @@
  * Mirrors `packages/3-extensions/pgvector/src/contract/authoring.ts`. The
  * cipherstash variant differs in three respects:
  *   (a) `cipherstash` is the namespace,
- *   (b) the constructor takes a single object argument with two
- *       optional booleans, and
- *   (c) both flags default to `false` — storage-only encryption is the
- *       legitimate default per the project's M2 standing decision
- *       ("Plaintext-zeroing decision (Open Item 6, resolved 2026-05-06)").
+ *   (b) the constructor takes a single OPTIONAL object argument with two
+ *       optional booleans (so `cipherstash.EncryptedString()`,
+ *       `cipherstash.EncryptedString({})`, and the fully-spelled
+ *       `cipherstash.EncryptedString({ equality: true, freeTextSearch: true })`
+ *       all parse), and
+ *   (c) both flags default to `true` — searchable encryption is the
+ *       legitimate default for an extension whose entire reason for
+ *       existing is to make encrypted columns queryable. Users who want
+ *       storage-only encryption opt out explicitly:
+ *       `cipherstash.EncryptedString({ equality: false, freeTextSearch: false })`.
  */
 
 import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
@@ -32,6 +37,7 @@ export const cipherstashAuthoringTypes = {
         {
           kind: 'object',
           name: 'options',
+          optional: true,
           properties: {
             equality: { kind: 'boolean', optional: true },
             freeTextSearch: { kind: 'boolean', optional: true },
@@ -42,12 +48,12 @@ export const cipherstashAuthoringTypes = {
         codecId: CIPHERSTASH_STRING_CODEC_ID,
         nativeType: EQL_V2_ENCRYPTED_TYPE,
         typeParams: {
-          equality: { kind: 'arg', index: 0, path: ['equality'], default: false },
+          equality: { kind: 'arg', index: 0, path: ['equality'], default: true },
           freeTextSearch: {
             kind: 'arg',
             index: 0,
             path: ['freeTextSearch'],
-            default: false,
+            default: true,
           },
         },
       },

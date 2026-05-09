@@ -7,9 +7,12 @@
  * byte-identical `contract.json` (verified by the parity fixture under
  * `test/integration/test/authoring/parity/cipherstash-encrypted-string/`).
  *
- * Defaults are `false`/`false` per the project's M2 standing decision:
- * storage-only encryption is the legitimate default, mirroring the PSL
- * constructor's `false` defaults declared via `AuthoringArgRef.default`.
+ * Both flags default to `true` — searchable encryption is the
+ * legitimate default for an extension whose entire reason for existing
+ * is to make encrypted columns queryable. Users who want storage-only
+ * encryption opt out explicitly: `encryptedString({ equality: false,
+ * freeTextSearch: false })`. Mirrors the PSL constructor's `true`
+ * defaults declared via `AuthoringArgRef.default`.
  */
 
 import {
@@ -19,7 +22,7 @@ import {
 
 /**
  * Search-mode parameters for `encryptedString({...})`. Both flags are
- * optional and default to `false` when omitted.
+ * optional and default to `true` when omitted.
  */
 export interface EncryptedStringOptions {
   readonly equality?: boolean;
@@ -40,18 +43,20 @@ export interface EncryptedStringColumnDescriptor {
  * factory that lowers to a `ColumnTypeDescriptor` with the
  * `cipherstash/string@1` codec and the `eql_v2_encrypted` Postgres
  * native type. The two boolean flags become `typeParams.equality` and
- * `typeParams.freeTextSearch`.
+ * `typeParams.freeTextSearch`. Both default to `true`.
  *
  * The shape matches what the PSL constructor
  * `cipherstash.EncryptedString({...})` lowers to, byte-for-byte.
  */
-export function encryptedString(options: EncryptedStringOptions): EncryptedStringColumnDescriptor {
+export function encryptedString(
+  options: EncryptedStringOptions = {},
+): EncryptedStringColumnDescriptor {
   return {
     codecId: CIPHERSTASH_STRING_CODEC_ID,
     nativeType: EQL_V2_ENCRYPTED_TYPE,
     typeParams: {
-      equality: options.equality ?? false,
-      freeTextSearch: options.freeTextSearch ?? false,
+      equality: options.equality ?? true,
+      freeTextSearch: options.freeTextSearch ?? true,
     },
   };
 }

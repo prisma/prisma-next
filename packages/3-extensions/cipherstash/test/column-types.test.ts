@@ -4,8 +4,8 @@
  * The factory must produce a `ColumnTypeDescriptor` byte-identical to
  * the lowering output of the PSL constructor `cipherstash.EncryptedString`
  * registered in `contract/authoring.ts`. The full byte-equality is verified
- * by the integration parity fixture (T2.7); these unit tests pin the
- * shape locally so a regression is caught in the package suite first.
+ * by the integration parity fixture; these unit tests pin the shape
+ * locally so a regression is caught in the package suite first.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -14,41 +14,50 @@ import { encryptedString } from '../src/exports/column-types';
 describe('cipherstash column-types', () => {
   describe('encryptedString({...}) factory', () => {
     it('produces a ColumnTypeDescriptor with cipherstash/string@1 codec id', () => {
-      const descriptor = encryptedString({});
+      const descriptor = encryptedString();
       expect(descriptor).toMatchObject({
         codecId: 'cipherstash/string@1',
         nativeType: 'eql_v2_encrypted',
       });
     });
 
-    it('applies false defaults when both flags are omitted', () => {
+    it('defaults both flags to true when called with no arguments', () => {
+      expect(encryptedString()).toMatchObject({
+        typeParams: { equality: true, freeTextSearch: true },
+      });
+    });
+
+    it('defaults both flags to true for an empty options object', () => {
       expect(encryptedString({})).toMatchObject({
-        typeParams: { equality: false, freeTextSearch: false },
+        typeParams: { equality: true, freeTextSearch: true },
       });
     });
 
-    it('preserves equality flag when provided', () => {
-      expect(encryptedString({ equality: true })).toMatchObject({
-        typeParams: { equality: true, freeTextSearch: false },
-      });
-    });
-
-    it('preserves freeTextSearch flag when provided', () => {
-      expect(encryptedString({ freeTextSearch: true })).toMatchObject({
+    it('lets equality be explicitly disabled', () => {
+      expect(encryptedString({ equality: false })).toMatchObject({
         typeParams: { equality: false, freeTextSearch: true },
       });
     });
 
-    it('preserves both flags when provided', () => {
+    it('lets freeTextSearch be explicitly disabled', () => {
+      expect(encryptedString({ freeTextSearch: false })).toMatchObject({
+        typeParams: { equality: true, freeTextSearch: false },
+      });
+    });
+
+    it('lets both flags be explicitly disabled (storage-only encryption)', () => {
+      expect(encryptedString({ equality: false, freeTextSearch: false })).toMatchObject({
+        typeParams: { equality: false, freeTextSearch: false },
+      });
+    });
+
+    it('preserves both flags when explicitly enabled', () => {
       expect(encryptedString({ equality: true, freeTextSearch: true })).toMatchObject({
         typeParams: { equality: true, freeTextSearch: true },
       });
     });
 
     it('returns a structurally equivalent descriptor to the PSL constructor lowering', () => {
-      // The TS factory must produce the same shape the PSL interpreter's
-      // type-constructor lowering produces, so the parity fixture (AC-PARITY1)
-      // can compare PSL- and TS-emitted contract.json byte-for-byte.
       expect(encryptedString({ equality: true, freeTextSearch: true })).toEqual({
         codecId: 'cipherstash/string@1',
         nativeType: 'eql_v2_encrypted',

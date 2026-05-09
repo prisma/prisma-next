@@ -4,7 +4,7 @@ End-to-end demo of [`@prisma-next/extension-cipherstash`](../../packages/3-exten
 
 ## What it shows
 
-A `User { id, email: cipherstash.EncryptedString({ equality, freeTextSearch }) }` model authored in PSL and exercised end-to-end:
+A `User { id, email: cipherstash.EncryptedString() }` model authored in PSL and exercised end-to-end (the no-args form defaults both `equality` and `freeTextSearch` to `true`):
 
 - **Insert** — write four rows; the bulk-encrypt middleware coalesces the four envelopes into one `bulkEncrypt` SDK round-trip per `(table, column)`.
 - **`cipherstashEq`** — exact-match search via the EQL `eql_v2.eq` operator, lowering to the column's deterministic `unique` index.
