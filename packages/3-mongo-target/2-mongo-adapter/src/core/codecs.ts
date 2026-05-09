@@ -118,7 +118,12 @@ function descriptorFor<Id extends string>(
 const renderVectorOutputType = (typeParams: Record<string, unknown>): string | undefined => {
   const length = typeParams['length'];
   if (length === undefined) return undefined;
-  if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
+  if (
+    typeof length !== 'number' ||
+    !Number.isFinite(length) ||
+    !Number.isInteger(length) ||
+    length <= 0
+  ) {
     throw new Error('renderOutputType: expected positive integer "length" for Vector');
   }
   return `Vector<${length}>`;

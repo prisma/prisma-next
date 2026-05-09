@@ -185,6 +185,14 @@ describe('mongo vector descriptor renderOutputType', () => {
   it('throws on non-integer length', () => {
     expect(() => renderVector?.({ length: 3.5 })).toThrow(/expected positive integer "length"/);
   });
+
+  it('throws on zero length', () => {
+    expect(() => renderVector?.({ length: 0 })).toThrow(/expected positive integer "length"/);
+  });
+
+  it('throws on negative length', () => {
+    expect(() => renderVector?.({ length: -1 })).toThrow(/expected positive integer "length"/);
+  });
 });
 
 describe('vector operation descriptors (production-defined)', () => {
