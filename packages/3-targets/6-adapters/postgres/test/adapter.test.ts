@@ -24,6 +24,7 @@ import {
   TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
@@ -302,17 +303,22 @@ describe('Postgres adapter', () => {
     expect(customAdapter.profile.id).toBe('postgres/custom@9');
   });
 
-  it('contributes parameterized codec descriptors through the unified codecs slot', async () => {
-    // The contributor protocol is unified: every codec descriptor (parameterized or not) flows through the runtime descriptor's `codecs:` slot. The adapter class itself no longer carries a dedicated parameterized-codec accessor — descriptor metadata lives on the runtime descriptor exported by the package.
-    const runtimeMod = await import('../src/exports/runtime');
-    const descriptors = runtimeMod.default.codecs();
-    expect(descriptors.length).toBeGreaterThan(0);
-    const ids = descriptors.map((d: { codecId: string }) => d.codecId);
-    expect(ids).toEqual(expect.arrayContaining(['pg/numeric@1', 'pg/timestamptz@1']));
-    for (const descriptor of descriptors) {
-      expect(descriptor.paramsSchema).toBeDefined();
-    }
-  });
+  it(
+    'contributes parameterized codec descriptors through the unified codecs slot',
+    async () => {
+      // The contributor protocol is unified: every codec descriptor (parameterized or not) flows through the runtime descriptor's `codecs:` slot. The adapter class itself no longer carries a dedicated parameterized-codec accessor — descriptor metadata lives on the runtime descriptor exported by the package.
+      // Uses `timeouts.coldTransformImport` because the dynamic `await import('../src/exports/runtime')` triggers vitest's first-pass transform of the runtime module graph (control stack, codec descriptors, descriptor-meta), which can exceed the default 200ms hook timeout on cold CI workers.
+      const runtimeMod = await import('../src/exports/runtime');
+      const descriptors = runtimeMod.default.codecs();
+      expect(descriptors.length).toBeGreaterThan(0);
+      const ids = descriptors.map((d: { codecId: string }) => d.codecId);
+      expect(ids).toEqual(expect.arrayContaining(['pg/numeric@1', 'pg/timestamptz@1']));
+      for (const descriptor of descriptors) {
+        expect(descriptor.paramsSchema).toBeDefined();
+      }
+    },
+    timeouts.coldTransformImport,
+  );
 
   it('renders DO UPDATE SET with param-ref values and UPDATE SET with column-ref values', () => {
     const insertWithParamUpdate = InsertAst.into(TableSource.named('user'))
