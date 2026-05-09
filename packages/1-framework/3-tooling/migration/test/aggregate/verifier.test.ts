@@ -1,0 +1,231 @@
+import { createSqlContract } from '@prisma-next/contract/testing';
+import type { Contract } from '@prisma-next/contract/types';
+import { describe, expect, it } from 'vitest';
+import type { ContractMarkerRecordLike } from '../../src/aggregate/marker-types';
+import type { ContractSpaceAggregate, ContractSpaceMember } from '../../src/aggregate/types';
+import { verifyAggregate } from '../../src/aggregate/verifier';
+
+interface StubSchemaResult {
+  readonly tablesSeen: readonly string[];
+}
+
+function emptyMigrations(): ContractSpaceMember['migrations'] {
+  return {
+    graph: {
+      nodes: new Set<string>(),
+      forwardChain: new Map(),
+      reverseChain: new Map(),
+      migrationByHash: new Map(),
+    },
+    packagesByMigrationHash: new Map(),
+  };
+}
+
+function makeMember(args: {
+  spaceId: string;
+  headHash: string;
+  invariants?: readonly string[];
+  tables?: Record<string, unknown>;
+}): ContractSpaceMember {
+  const tables = args.tables ?? {};
+  const contract = createSqlContract({ target: 'postgres', storage: { tables } });
+  return {
+    spaceId: args.spaceId,
+    contract: contract as Contract,
+    headRef: { hash: args.headHash, invariants: args.invariants ?? [] },
+    migrations: emptyMigrations(),
+  };
+}
+
+function makeAggregate(args: {
+  app: ContractSpaceMember;
+  extensions?: ContractSpaceMember[];
+}): ContractSpaceAggregate {
+  return { targetId: 'postgres', app: args.app, extensions: args.extensions ?? [] };
+}
+
+const STUB_VERIFY = (
+  projectedSchema: unknown,
+  _member: ContractSpaceMember,
+  _mode: 'strict' | 'lenient',
+): StubSchemaResult => {
+  const schema = projectedSchema as { tables?: Record<string, unknown> } | null;
+  if (!schema || typeof schema !== 'object' || !schema.tables) {
+    return { tablesSeen: [] };
+  }
+  return { tablesSeen: Object.keys(schema.tables).sort() };
+};
+
+describe('verifyAggregate', () => {
+  describe('markerCheck', () => {
+    it('reports `absent` when the member has no marker row', () => {
+      const aggregate = makeAggregate({
+        app: makeMember({ spaceId: 'app', headHash: 'sha256:app-head' }),
+      });
+      const result = verifyAggregate({
+        aggregate,
+        markersBySpaceId: new Map(),
+        schemaIntrospection: { tables: {} },
+        mode: 'strict',
+        verifySchemaForMember: STUB_VERIFY,
+      });
+      expect(result.ok).toBe(true);
+      expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({ kind: 'absent' });
+    });
+
+    it('reports `ok` when marker hash + invariants match the head ref', () => {
+      const aggregate = makeAggregate({
+        app: makeMember({
+          spaceId: 'app',
+          headHash: 'sha256:app-head',
+          invariants: ['inv-1'],
+        }),
+      });
+      const markers = new Map<string, ContractMarkerRecordLike>([
+        ['app', { storageHash: 'sha256:app-head', invariants: ['inv-1'] }],
+      ]);
+      const result = verifyAggregate({
+        aggregate,
+        markersBySpaceId: markers,
+        schemaIntrospection: { tables: {} },
+        mode: 'strict',
+        verifySchemaForMember: STUB_VERIFY,
+      });
+      expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({ kind: 'ok' });
+    });
+
+    it('reports `hashMismatch` when marker hash differs from head ref', () => {
+      const aggregate = makeAggregate({
+        app: makeMember({ spaceId: 'app', headHash: 'sha256:expected' }),
+      });
+      const markers = new Map<string, ContractMarkerRecordLike>([
+        ['app', { storageHash: 'sha256:actual', invariants: [] }],
+      ]);
+      const result = verifyAggregate({
+        aggregate,
+        markersBySpaceId: markers,
+        schemaIntrospection: { tables: {} },
+        mode: 'strict',
+        verifySchemaForMember: STUB_VERIFY,
+      });
+      expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({
+        kind: 'hashMismatch',
+        markerHash: 'sha256:actual',
+        expected: 'sha256:expected',
+      });
+    });
+
+    it('reports `missingInvariants` when the head ref declares invariants the marker lacks', () => {
+      const aggregate = makeAggregate({
+        app: makeMember({ spaceId: 'app', headHash: 'sha256:h' }),
+        extensions: [
+          makeMember({
+            spaceId: 'cipher',
+            headHash: 'sha256:cipher',
+            invariants: ['cipher:create-v1', 'cipher:rotate-v1'],
+          }),
+        ],
+      });
+      const markers = new Map<string, ContractMarkerRecordLike>([
+        ['cipher', { storageHash: 'sha256:cipher', invariants: ['cipher:create-v1'] }],
+      ]);
+      const result = verifyAggregate({
+        aggregate,
+        markersBySpaceId: markers,
+        schemaIntrospection: { tables: {} },
+        mode: 'strict',
+        verifySchemaForMember: STUB_VERIFY,
+      });
+      expect(result.assertOk().markerCheck.perSpace.get('cipher')).toEqual({
+        kind: 'missingInvariants',
+        missing: ['cipher:rotate-v1'],
+      });
+    });
+
+    it('lists orphan markers (rows for non-aggregate members)', () => {
+      const aggregate = makeAggregate({
+        app: makeMember({ spaceId: 'app', headHash: 'sha256:h' }),
+      });
+      const markers = new Map<string, ContractMarkerRecordLike>([
+        ['app', { storageHash: 'sha256:h', invariants: [] }],
+        ['cipher', { storageHash: 'sha256:cipher', invariants: [] }],
+        ['vector', { storageHash: 'sha256:vector', invariants: [] }],
+      ]);
+      const result = verifyAggregate({
+        aggregate,
+        markersBySpaceId: markers,
+        schemaIntrospection: { tables: {} },
+        mode: 'strict',
+        verifySchemaForMember: STUB_VERIFY,
+      });
+      expect(result.assertOk().markerCheck.orphanMarkers.map((o) => o.spaceId)).toEqual([
+        'cipher',
+        'vector',
+      ]);
+    });
+  });
+
+  describe('schemaCheck', () => {
+    it('projects the schema per member before invoking the verifier (F23 lock)', () => {
+      // Multi-member deployment: each member sees only its own tables.
+      const aggregate = makeAggregate({
+        app: makeMember({
+          spaceId: 'app',
+          headHash: 'sha256:h',
+          tables: { user: {} },
+        }),
+        extensions: [
+          makeMember({
+            spaceId: 'cipher',
+            headHash: 'sha256:cipher',
+            tables: { cipher_state: {} },
+          }),
+        ],
+      });
+      const liveSchema = {
+        tables: {
+          user: { columns: {} },
+          cipher_state: { columns: {} },
+          orphan_table: { columns: {} },
+        },
+      };
+
+      const result = verifyAggregate({
+        aggregate,
+        markersBySpaceId: new Map(),
+        schemaIntrospection: liveSchema,
+        mode: 'strict',
+        verifySchemaForMember: STUB_VERIFY,
+      });
+
+      const schemaCheck = result.assertOk().schemaCheck;
+      // App member's pass saw `user` and `orphan_table` (cipher_state pruned).
+      expect(schemaCheck.perSpace.get('app')?.tablesSeen).toEqual(['orphan_table', 'user']);
+      // Cipher member's pass saw `cipher_state` and `orphan_table` (user pruned).
+      expect(schemaCheck.perSpace.get('cipher')?.tablesSeen).toEqual([
+        'cipher_state',
+        'orphan_table',
+      ]);
+    });
+
+    it('threads the verifier mode (strict / lenient) to the per-member callback verbatim', () => {
+      let observedMode: 'strict' | 'lenient' | undefined;
+      const aggregate = makeAggregate({
+        app: makeMember({ spaceId: 'app', headHash: 'sha256:h' }),
+      });
+
+      verifyAggregate({
+        aggregate,
+        markersBySpaceId: new Map(),
+        schemaIntrospection: { tables: {} },
+        mode: 'lenient',
+        verifySchemaForMember: (_schema, _member, mode) => {
+          observedMode = mode;
+          return { tablesSeen: [] };
+        },
+      });
+
+      expect(observedMode).toBe('lenient');
+    });
+  });
+});

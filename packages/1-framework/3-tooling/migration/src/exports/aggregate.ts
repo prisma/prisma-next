@@ -24,3 +24,13 @@ export type {
   ContractSpaceMember,
   HydratedMigrationGraph,
 } from '../aggregate/types';
+export {
+  type AggregateVerifierError,
+  type AggregateVerifierInput,
+  type AggregateVerifierOutput,
+  type AggregateVerifierSuccess,
+  type MarkerCheckResult,
+  type MarkerCheckSection,
+  type SchemaCheckSection,
+  verifyAggregate,
+} from '../aggregate/verifier';

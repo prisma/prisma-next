@@ -1,0 +1,162 @@
+import { ok, type Result } from '@prisma-next/utils/result';
+import type { ContractMarkerRecordLike } from './marker-types';
+import { projectSchemaToSpace } from './project-schema-to-space';
+import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
+
+/**
+ * Caller policy for the aggregate verifier. Today's only knob is
+ * `mode`: `strict` treats orphan elements (live tables not claimed by
+ * any aggregate member) as errors; `lenient` treats them as
+ * informational. Maps directly to `db verify --strict`.
+ */
+export interface AggregateVerifierInput<TSchemaResult> {
+  readonly aggregate: ContractSpaceAggregate;
+  readonly markersBySpaceId: ReadonlyMap<string, ContractMarkerRecordLike | null>;
+  readonly schemaIntrospection: unknown;
+  readonly mode: 'strict' | 'lenient';
+  /**
+   * Caller-supplied per-space schema verifier. The CLI wires this to
+   * the family's `verifySqlSchema` (SQL) / equivalent (other
+   * families). The aggregate verifier projects the schema to the
+   * member's slice via {@link projectSchemaToSpace} before invoking
+   * the callback, so single-contract semantics are preserved.
+   *
+   * Typed structurally with a generic `TSchemaResult` so the
+   * migration-tools layer doesn't depend on the SQL family's
+   * `VerifySqlSchemaResult`. CLI callers pass the family's type
+   * through unchanged.
+   */
+  readonly verifySchemaForMember: (
+    projectedSchema: unknown,
+    member: ContractSpaceMember,
+    mode: 'strict' | 'lenient',
+  ) => TSchemaResult;
+}
+
+/**
+ * Marker-check result per member. Mirrors the four cases the
+ * `verifyContractSpaces` primitive surfaces today, plus an `'absent'`
+ * case for greenfield spaces (no marker row written yet — `db init`
+ * not run).
+ */
+export type MarkerCheckResult =
+  | { readonly kind: 'ok' }
+  | { readonly kind: 'absent' }
+  | {
+      readonly kind: 'hashMismatch';
+      readonly markerHash: string;
+      readonly expected: string;
+    }
+  | { readonly kind: 'missingInvariants'; readonly missing: readonly string[] };
+
+export interface MarkerCheckSection {
+  readonly perSpace: ReadonlyMap<string, MarkerCheckResult>;
+  readonly orphanMarkers: readonly {
+    readonly spaceId: string;
+    readonly row: ContractMarkerRecordLike;
+  }[];
+}
+
+export interface SchemaCheckSection<TSchemaResult> {
+  readonly perSpace: ReadonlyMap<string, TSchemaResult>;
+}
+
+export interface AggregateVerifierSuccess<TSchemaResult> {
+  readonly markerCheck: MarkerCheckSection;
+  readonly schemaCheck: SchemaCheckSection<TSchemaResult>;
+}
+
+export type AggregateVerifierError = {
+  readonly kind: 'introspectionFailure';
+  readonly detail: string;
+};
+
+export type AggregateVerifierOutput<TSchemaResult> = Result<
+  AggregateVerifierSuccess<TSchemaResult>,
+  AggregateVerifierError
+>;
+
+/**
+ * Verify a {@link ContractSpaceAggregate} against the live database
+ * state. Bundles two checks:
+ *
+ * - `markerCheck` per member: compare the live marker row against the
+ *   member's `headRef.hash` + `headRef.invariants`. Absence is a
+ *   distinct kind, not an error (callers — `db verify` strict vs
+ *   `db init` precondition — choose how to interpret it).
+ * - `schemaCheck` per member: project the live schema to the slice
+ *   the member claims via {@link projectSchemaToSpace}, then delegate
+ *   to the caller-supplied `verifySchemaForMember`. The pre-projection
+ *   means the family's single-contract verifier no longer sees other
+ *   members' tables as `extras` — closes F23.
+ *
+ * `markerCheck.orphanMarkers` lists every marker row whose `space` is
+ * not a member of the aggregate. `db verify` callers reject orphans;
+ * future tooling may not.
+ *
+ * Pure synchronous function; no I/O. The caller (CLI) gathers
+ * `markersBySpaceId` and `schemaIntrospection` ahead of the call.
+ */
+export function verifyAggregate<TSchemaResult>(
+  input: AggregateVerifierInput<TSchemaResult>,
+): AggregateVerifierOutput<TSchemaResult> {
+  const { aggregate, markersBySpaceId, schemaIntrospection, mode, verifySchemaForMember } = input;
+  const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
+  const memberSpaceIds = new Set(allMembers.map((m) => m.spaceId));
+
+  // Marker check per member.
+  const markerPerSpace = new Map<string, MarkerCheckResult>();
+  for (const member of allMembers) {
+    const marker = markersBySpaceId.get(member.spaceId) ?? null;
+    if (marker === null) {
+      markerPerSpace.set(member.spaceId, { kind: 'absent' });
+      continue;
+    }
+    if (marker.storageHash !== member.headRef.hash) {
+      markerPerSpace.set(member.spaceId, {
+        kind: 'hashMismatch',
+        markerHash: marker.storageHash,
+        expected: member.headRef.hash,
+      });
+      continue;
+    }
+    const markerInvariants = new Set(marker.invariants);
+    const missing = member.headRef.invariants.filter((id) => !markerInvariants.has(id));
+    if (missing.length > 0) {
+      markerPerSpace.set(member.spaceId, {
+        kind: 'missingInvariants',
+        missing: [...missing].sort(),
+      });
+      continue;
+    }
+    markerPerSpace.set(member.spaceId, { kind: 'ok' });
+  }
+
+  // Orphan markers: entries in markersBySpaceId whose spaceId is not a
+  // member of the aggregate.
+  const orphanMarkers: { spaceId: string; row: ContractMarkerRecordLike }[] = [];
+  for (const [spaceId, row] of markersBySpaceId) {
+    if (row !== null && !memberSpaceIds.has(spaceId)) {
+      orphanMarkers.push({ spaceId, row });
+    }
+  }
+  orphanMarkers.sort((a, b) => a.spaceId.localeCompare(b.spaceId));
+
+  // Schema check per member (with per-space pre-projection).
+  const schemaPerSpace = new Map<string, TSchemaResult>();
+  for (const member of allMembers) {
+    const others = allMembers.filter((m) => m.spaceId !== member.spaceId);
+    const projected = projectSchemaToSpace(schemaIntrospection, member, others);
+    schemaPerSpace.set(member.spaceId, verifySchemaForMember(projected, member, mode));
+  }
+
+  return ok({
+    markerCheck: {
+      perSpace: markerPerSpace,
+      orphanMarkers,
+    },
+    schemaCheck: {
+      perSpace: schemaPerSpace,
+    },
+  });
+}
