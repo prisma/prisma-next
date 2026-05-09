@@ -1,0 +1,78 @@
+# Dependabot configuration.
+#
+# Two ecosystems are watched:
+#   - npm: the workspace root, which covers all package.json manifests
+#     in the pnpm workspace (Dependabot resolves the workspace from the
+#     root pnpm-workspace.yaml automatically).
+#   - github-actions: the .github/workflows/ directory, where every
+#     action is pinned to a specific commit SHA. Dependabot bumps the
+#     pin (and the trailing version comment) when an upstream tag moves.
+#
+# Cadence is weekly to keep PR volume bounded. Updates are grouped so
+# that one PR per ecosystem per week is the common case; we rely on
+# Dependabot's grouping to coalesce non-major bumps. Major bumps are
+# emitted as separate PRs so they are visible and reviewable.
+#
+# All Dependabot PRs target `main`, are signed off automatically by
+# the GitHub Dependabot bot to satisfy DCO, and route to
+# @prisma/ORM-TS-Maintain via CODEOWNERS.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    target-branch: main
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+      include: scope
+    labels:
+      - dependencies
+    groups:
+      runtime-deps:
+        dependency-type: production
+        update-types:
+          - patch
+          - minor
+      dev-deps:
+        dependency-type: development
+        update-types:
+          - patch
+          - minor
+    ignore:
+      # Major version bumps for these are coordinated by hand; let Dependabot
+      # surface patch/minor only and we'll do major bumps deliberately.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    target-branch: main
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(actions)"
+      include: scope
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      actions:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+          - major
