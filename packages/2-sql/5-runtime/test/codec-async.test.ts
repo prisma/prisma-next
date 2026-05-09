@@ -388,14 +388,17 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     expect(result['name']).toBe('decoded:alice');
   });
 
-  it('codec.decode that throws JSON-Schema validation envelope from inline validation surfaces as DECODE_FAILED with cause', async () => {
+  it('codec.decode that throws JSON-Schema validation envelope passes the runtime envelope through unchanged (F40)', async () => {
     // Post-M4: validation lives in the resolved codec's `decode` body
     // (e.g. arktype-json validates against its rehydrated schema and
     // throws `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` directly). The
-    // runtime no longer maintains a parallel validator registry; the
-    // inline error gets wrapped in the standard `RUNTIME.DECODE_FAILED`
-    // envelope by `wrapDecodeFailure` with the original validation
-    // error attached on `cause`.
+    // runtime no longer maintains a parallel validator registry. F40
+    // closes the prior double-wrap regression: codec-authored runtime
+    // envelopes (DECODE_FAILED, ABORTED, JSON_SCHEMA_VALIDATION_FAILED,
+    // …) carry their own per-codec context, so `decodeField` rethrows
+    // them unchanged instead of coercing them into a fresh
+    // `RUNTIME.DECODE_FAILED` (which would have erased the original
+    // code and details).
     const registry = [
       defineTestCodec<'pg/inline-validating-json@1', readonly [], string, JsonValue>({
         typeId: 'pg/inline-validating-json@1',
@@ -438,12 +441,12 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       plan,
       {},
       buildTestContractCodecs(registry),
-    ).catch((e: unknown) => e)) as Error & { code?: string; cause?: { code?: string } };
-    expect(rejection.code).toBe('RUNTIME.DECODE_FAILED');
-    expect(rejection.cause).toBeDefined();
-    expect((rejection.cause as { code?: string }).code).toBe(
-      'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
-    );
+    ).catch((e: unknown) => e)) as Error & {
+      code?: string;
+      details?: { issues?: unknown };
+    };
+    expect(rejection.code).toBe('RUNTIME.JSON_SCHEMA_VALIDATION_FAILED');
+    expect(rejection.details?.issues).toBe("must have required property 'name'");
   });
 
   it('wraps decode failures in RUNTIME.DECODE_FAILED with { table, column, codec } and cause', async () => {
