@@ -2,6 +2,7 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
@@ -91,6 +92,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
 
     expectNarrowedType(result.kind === 'success');
@@ -115,6 +117,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
 
     expectNarrowedType(result.kind === 'success');
@@ -157,6 +160,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
     const b = planner.plan({
       contract: c,
@@ -164,6 +168,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
 
     expectNarrowedType(a.kind === 'success');

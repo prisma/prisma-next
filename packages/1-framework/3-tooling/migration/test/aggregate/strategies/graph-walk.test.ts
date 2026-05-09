@@ -4,10 +4,13 @@ import { graphWalkStrategy } from '../../../src/aggregate/strategies/graph-walk'
 import type { ContractSpaceMember } from '../../../src/aggregate/types';
 import { EMPTY_CONTRACT_HASH } from '../../../src/constants';
 import { reconstructGraph } from '../../../src/migration-graph';
-import type { MigrationPackage } from '../../../src/package';
+import type { OnDiskMigrationPackage } from '../../../src/package';
 import { createAttestedPackage } from '../../fixtures';
 
-function makeMember(packages: readonly MigrationPackage[], headHash: string): ContractSpaceMember {
+function makeMember(
+  packages: readonly OnDiskMigrationPackage[],
+  headHash: string,
+): ContractSpaceMember {
   const graph =
     packages.length === 0
       ? {

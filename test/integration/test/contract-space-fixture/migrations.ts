@@ -6,9 +6,8 @@ import {
   TEST_BASELINE_INVARIANT_ID,
   TEST_BASELINE_MIGRATION_NAME,
   TEST_BOX_TABLE,
-  TEST_HEAD_HASH,
 } from './constants';
-import { testContractSpaceContract } from './contract';
+import { TEST_HEAD_HASH, testContractSpaceContract } from './contract';
 
 const baselineMetadata = {
   migrationHash: 'synthetic-test-contract-space-baseline-hash-v1',

@@ -34,6 +34,7 @@ const extensionContract: Contract<SqlStorage> = {
 function buildSuccessfulExtensionPlan() {
   return createMigrationPlan<SqlitePlanTargetDetails>({
     targetId: 'sqlite',
+    spaceId: 'ext',
     origin: null,
     destination: toPlanContractInfo(extensionContract),
     operations: [
@@ -62,6 +63,7 @@ function buildSuccessfulExtensionPlan() {
 function buildFailingExtensionPlan() {
   return createMigrationPlan<SqlitePlanTargetDetails>({
     targetId: 'sqlite',
+    spaceId: 'ext',
     origin: null,
     destination: toPlanContractInfo(extensionContract),
     operations: [
@@ -93,6 +95,7 @@ function buildFailingExtensionPlan() {
 function buildAppPlan() {
   return createMigrationPlan<SqlitePlanTargetDetails>({
     targetId: 'sqlite',
+    spaceId: 'app',
     origin: null,
     destination: toPlanContractInfo(appContract),
     operations: [

@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
-import testContractSpaceExtension from '@prisma-next/extension-test-contract-space/control';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import testContractSpaceExtension from './contract-space-fixture/control';
 import {
   executeCommand,
   setupCommandMocks,

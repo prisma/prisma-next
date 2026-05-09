@@ -1,5 +1,5 @@
 import { stat } from 'node:fs/promises';
-import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
+import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { MigrationOps } from '@prisma-next/migration-tools/package';
 import {
@@ -58,7 +58,7 @@ export interface ContractSpaceExtensionMigrationsPassResult {
  * verbatim; the value `planAllSpaces` brings to this consumer site is
  * **deterministic ordering** (alphabetical by spaceId) and
  * **duplicate-spaceId detection**. The actual write is performed via
- * `writeExtensionMigrationPackage` per package.
+ * `materialiseMigrationPackage` per package.
  *
  * Idempotent: an existing `migrations/<spaceId>/<dirName>/` is left
  * untouched and reported in `result.skipped` — the helper never
@@ -115,7 +115,7 @@ export async function runContractSpaceExtensionMigrationsPass(
         skipped.push({ spaceId: space.spaceId, dirName: pkg.dirName });
         continue;
       }
-      await writeExtensionMigrationPackage(spaceDir, pkg);
+      await materialiseMigrationPackage(spaceDir, pkg);
       emitted.push({ spaceId: space.spaceId, dirName: pkg.dirName });
     }
   }

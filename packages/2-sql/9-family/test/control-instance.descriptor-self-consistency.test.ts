@@ -1,6 +1,7 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
+  ContractSpace,
   ControlFamilyDescriptor,
   ControlStack,
 } from '@prisma-next/framework-components/control';
@@ -9,10 +10,7 @@ import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
-import type {
-  ExtensionContractSpace,
-  SqlControlExtensionDescriptor,
-} from '../src/core/migrations/types';
+import type { SqlControlExtensionDescriptor } from '../src/core/migrations/types';
 
 const TARGET = 'postgres' as const;
 const TARGET_FAMILY = 'sql' as const;
@@ -58,7 +56,7 @@ function buildExtension(opts: {
   readonly id: string;
   readonly headRefHash: string;
 }): SqlControlExtensionDescriptor<'postgres'> {
-  const space: ExtensionContractSpace = {
+  const space: ContractSpace<Contract<SqlStorage>> = {
     contractJson: buildContract(),
     migrations: [],
     headRef: {

@@ -3,9 +3,9 @@ import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import type { Contract } from '@prisma-next/contract/types';
-import testContractSpaceExtension from '@prisma-next/extension-test-contract-space/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
-import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
+import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
@@ -16,6 +16,7 @@ import {
 import { executeStatement } from '@prisma-next/sql-runtime/test/utils';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import testContractSpaceExtension from './contract-space-fixture/control';
 import {
   executeCommand,
   getExitCode,
@@ -72,7 +73,7 @@ async function writePinnedExtensionDir(testDir: string): Promise<string> {
     const ops = [...pkg.ops];
     const baseMeta = { ...pkg.metadata, providedInvariants: [] };
     const migrationHash = computeMigrationHash(baseMeta, ops);
-    await writeExtensionMigrationPackage(spaceDir, {
+    await materialiseMigrationPackage(spaceDir, {
       dirName: pkg.dirName,
       metadata: { ...baseMeta, migrationHash },
       ops,
@@ -148,6 +149,7 @@ withTempDir(({ createTempDir }) => {
             await executeStatement(client, ensureTableStatement);
 
             const appMarker = writeContractMarker({
+              space: APP_SPACE_ID,
               storageHash: appContract.storage.storageHash,
               profileHash: appContract.profileHash ?? appContract.storage.storageHash,
               contractJson: appContract,

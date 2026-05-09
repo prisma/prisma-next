@@ -292,7 +292,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
   async readAllMarkers(options: {
     readonly driver: ControlDriverInstance<'mongo', string>;
   }): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
-    const appMarker = await this.readMarker(options);
+    const appMarker = await this.readMarker({ ...options, space: APP_SPACE_ID });
     if (appMarker === null) return new Map();
     return new Map([['app', appMarker]]);
   }

@@ -34,6 +34,7 @@ const extensionContract: Contract<SqlStorage> = {
 function buildSuccessfulExtensionPlan() {
   return createMigrationPlan<PostgresPlanTargetDetails>({
     targetId: 'postgres',
+    spaceId: 'ext',
     origin: null,
     destination: toPlanContractInfo(extensionContract),
     operations: [
@@ -62,6 +63,7 @@ function buildSuccessfulExtensionPlan() {
 function buildFailingAppPlan() {
   return createMigrationPlan<PostgresPlanTargetDetails>({
     targetId: 'postgres',
+    spaceId: 'ext',
     origin: null,
     destination: toPlanContractInfo(extensionContract),
     operations: [

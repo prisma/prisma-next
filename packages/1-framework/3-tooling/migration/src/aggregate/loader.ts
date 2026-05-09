@@ -4,7 +4,7 @@ import { EMPTY_CONTRACT_HASH } from '../constants';
 import { detectSpaceContractDrift } from '../detect-space-contract-drift';
 import { readMigrationsDir } from '../io';
 import { reconstructGraph } from '../migration-graph';
-import type { MigrationPackage } from '../package';
+import type { OnDiskMigrationPackage } from '../package';
 import { readPinnedHeadRef } from '../read-pinned-head-ref';
 import { readPinnedSpaceContract } from '../read-pinned-space-contract';
 import { APP_SPACE_ID, spaceMigrationDirectory } from '../space-layout';
@@ -71,12 +71,12 @@ export interface LoadAggregateInput {
    * the user's authored `migrations/` directory (the app member's
    * migration-package layout is family-aware: ops.json shape, manifest
    * keys, etc.). Callers — the SQL family today — read the user's
-   * `migrations/` and hand the resulting `MigrationPackage[]` through.
+   * `migrations/` and hand the resulting `OnDiskMigrationPackage[]` through.
    *
    * Passing `[]` is valid (greenfield project, no authored migrations).
    * Equivalent to `migrations/` not existing or being empty.
    */
-  readonly appMigrationPackages: ReadonlyArray<MigrationPackage>;
+  readonly appMigrationPackages: ReadonlyArray<OnDiskMigrationPackage>;
 }
 
 /**
@@ -264,7 +264,7 @@ export async function loadContractSpaceAggregate(
     // Read + integrity-check the migration packages. `readMigrationsDir`
     // re-derives `providedInvariants` and verifies migrationHash for
     // every package.
-    let packages: readonly MigrationPackage[];
+    let packages: readonly OnDiskMigrationPackage[];
     try {
       packages = await readMigrationsDir(spaceMigrationDirectory(input.migrationsDir, entry.id));
     } catch (error) {
@@ -307,7 +307,7 @@ export async function loadContractSpaceAggregate(
       });
     }
 
-    const packagesByMigrationHash = new Map<string, MigrationPackage>(
+    const packagesByMigrationHash = new Map<string, OnDiskMigrationPackage>(
       packages.map((p) => [p.metadata.migrationHash, p]),
     );
 
@@ -331,7 +331,7 @@ export async function loadContractSpaceAggregate(
       detail: error instanceof Error ? error.message : String(error),
     });
   }
-  const appPackagesByMigrationHash = new Map<string, MigrationPackage>(
+  const appPackagesByMigrationHash = new Map<string, OnDiskMigrationPackage>(
     input.appMigrationPackages.map((p) => [p.metadata.migrationHash, p]),
   );
 
