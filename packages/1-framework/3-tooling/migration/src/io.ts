@@ -4,7 +4,7 @@ import type {
   MigrationPackage,
 } from '@prisma-next/framework-components/control';
 import { type } from 'arktype';
-import { basename, dirname, join } from 'pathe';
+import { basename, dirname, join, resolve } from 'pathe';
 import { canonicalizeJson } from './canonicalize-json';
 import {
   errorDirectoryExists,
@@ -160,15 +160,16 @@ export async function writeMigrationOps(dir: string, ops: MigrationOps): Promise
 }
 
 export async function readMigrationPackage(dir: string): Promise<OnDiskMigrationPackage> {
-  const manifestPath = join(dir, MANIFEST_FILE);
-  const opsPath = join(dir, OPS_FILE);
+  const absoluteDir = resolve(dir);
+  const manifestPath = join(absoluteDir, MANIFEST_FILE);
+  const opsPath = join(absoluteDir, OPS_FILE);
 
   let manifestRaw: string;
   try {
     manifestRaw = await readFile(manifestPath, 'utf-8');
   } catch (error) {
     if (hasErrnoCode(error, 'ENOENT')) {
-      throw errorMissingFile(MANIFEST_FILE, dir);
+      throw errorMissingFile(MANIFEST_FILE, absoluteDir);
     }
     throw error;
   }
@@ -178,7 +179,7 @@ export async function readMigrationPackage(dir: string): Promise<OnDiskMigration
     opsRaw = await readFile(opsPath, 'utf-8');
   } catch (error) {
     if (hasErrnoCode(error, 'ENOENT')) {
-      throw errorMissingFile(OPS_FILE, dir);
+      throw errorMissingFile(OPS_FILE, absoluteDir);
     }
     throw error;
   }
@@ -212,15 +213,19 @@ export async function readMigrationPackage(dir: string): Promise<OnDiskMigration
   }
 
   const pkg: OnDiskMigrationPackage = {
-    dirName: basename(dir),
-    dirPath: dir,
+    dirName: basename(absoluteDir),
+    dirPath: absoluteDir,
     metadata,
     ops,
   };
 
   const verification = verifyMigrationHash(pkg);
   if (!verification.ok) {
-    throw errorMigrationHashMismatch(dir, verification.storedHash, verification.computedHash);
+    throw errorMigrationHashMismatch(
+      absoluteDir,
+      verification.storedHash,
+      verification.computedHash,
+    );
   }
 
   return pkg;

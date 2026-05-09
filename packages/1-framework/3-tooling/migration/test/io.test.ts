@@ -44,6 +44,18 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     expect(pkg.dirPath).toBe(dir);
   });
 
+  it('normalizes dirPath to absolute when called with a relative path', async () => {
+    const absoluteDir = join(tmpDir, '20260225T1430_add_users');
+    await writeTestPackage(absoluteDir);
+    const relativeDir = relative(process.cwd(), absoluteDir);
+
+    expect(relativeDir.startsWith('/')).toBe(false);
+
+    const pkg = await readMigrationPackage(relativeDir);
+
+    expect(pkg.dirPath).toBe(absoluteDir);
+  });
+
   it('writes pretty-printed JSON', async () => {
     const dir = join(tmpDir, '20260225T1430_test');
     await writeTestPackage(dir);
