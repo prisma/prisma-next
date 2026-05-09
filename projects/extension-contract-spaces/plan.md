@@ -37,6 +37,7 @@ Three milestones have task specs because their implementation detail is large en
 - [`specs/m2-orchestrator-consolidation-spec.md`](./specs/m2-orchestrator-consolidation-spec.md) — the M2 R6 consolidation slice (collapsed dual `db init` path, marker-aware verifier wired into all apply paths, path-resolver seam).
 - [`specs/contract-space-aggregate-spec.md`](./specs/contract-space-aggregate-spec.md) — locks down the typed `ContractSpaceAggregate` + loader + aggregate planner + aggregate verifier; the deletion list for today's per-space orchestrator; commit-by-commit slice; 15 acceptance criteria; closes F00 / F05 / F09 / F15 / F23 (subsumes F30). Drives M2.5.
 - [`specs/cipherstash-migration.spec.md`](./specs/cipherstash-migration.spec.md) — locks down cipherstash's package layout, contract IR contents, baseline migration shape (with the EQL bundle byte-equivalence rule), codec hook behaviour, descriptor wiring, and four end-to-end test scenarios (initial, drop, bump, revert workaround). Drives M3.
+- [`specs/contract-space-on-disk-shape.spec.md`](./specs/contract-space-on-disk-shape.spec.md) — pre-launch shape-locking slice on top of M2.5: subspace the app's migrations under `migrations/<appSpaceId>/` (uniform with extensions); drop the "pinned" qualifier from artefact-emission helpers; relocate in-tree fixtures and examples atomically. Spelling normalisation ("artefact" → "artifact") is deferred to M5 T5.10.
 
 M4 (pgvector + monorepo example) and M5 (`databaseDependencies` removal + close-out) are small enough to be captured inline in this plan; no task spec needed.
 
@@ -302,7 +303,7 @@ Migrate the only existing workspace consumer of `databaseDependencies` (pgvector
 
 ### Milestone 5: Remove `databaseDependencies` mechanism + close-out
 
-Remove the `databaseDependencies` mechanism from the framework. After M3 + M4 land, the only remaining consumer is gone (pgvector was the sole workspace consumer; cipherstash never used it). The blast radius is small — confirmed by spike: 3 files (the type def, the re-export, and pgvector's now-removed usage). Migrate finalised ADRs into `docs/`, strip transient project references, delete `projects/extension-contract-spaces/`.
+Remove the `databaseDependencies` mechanism from the framework. After M3 + M4 land, the only remaining consumer is gone (pgvector was the sole workspace consumer; cipherstash never used it). The blast radius is small — confirmed by spike: 3 files (the type def, the re-export, and pgvector's now-removed usage). Also normalises the "artefact" spelling our project drifted into back to the repo's prevailing "artifact" convention (T5.10). Migrate finalised ADRs into `docs/`, strip transient project references, delete `projects/extension-contract-spaces/`.
 
 **Tasks:**
 
@@ -314,6 +315,7 @@ Remove the `databaseDependencies` mechanism from the framework. After M3 + M4 la
 - [ ] **T5.6** Update ADR 021 — record marker schema gain of `space` column; PK change.
 - [ ] **T5.7** Update subsystem docs: Migration System (per-space planner/runner/verifier; ADR 208 use in db init/update; pinned per-space artefact layout), Ecosystem Extensions & Packs (descriptor model; contract space authoring guide).
 - [ ] **T5.8** NFR5 perf benchmark: emit + dbInit with 0 vs 1 extensions; assert < 5% delta. Capture results in `docs/`. (satisfies: TC-24)
+- [ ] **T5.10** Spelling normalisation — "artefact" → "artifact" across this project's surfaces. The project drifted from the repo's prevailing convention (470+ "artifact" occurrences in 144 files vs. 164 "artefact" in 41 files; our project authored ≈56% of the "artefact" cluster). Mechanical sweep covering: file renames (e.g. `emit-contract-space-artefacts.ts` → `emit-contract-space-artifacts.ts`, plus matching `.test.ts` peers), identifier renames (`emitContractSpaceArtefacts` → `emitContractSpaceArtifacts`, `ContractSpaceArtefactInputs` → `ContractSpaceArtifactInputs`), JSDoc / comment / fixture text, error-code strings, test descriptions. Out-of-scope outliers (kept as-is, not our drift): `docs/architecture docs/research/README.md`, `test/integration/test/cli.init-templates.e2e.test.ts` (TML-2318), `packages/1-framework/3-tooling/cli/src/commands/init/templates/quick-reference-{postgres,mongo}.md`. Acceptance bar: `rg -i 'artefact' packages/ test/` matches only the listed outliers. Lands as a single focused commit before T5.9 so the close-out PR's repo state is final. (Origin: pre-launch shape-locking discussion; see `specs/contract-space-on-disk-shape.spec.md` § "Out of scope".)
 - [ ] **T5.9** Close-out: migrate finalised ADRs into `docs/architecture docs/adrs/`. Strip references to `projects/extension-contract-spaces/` across the repo (replace with canonical `docs/` links). Delete `projects/extension-contract-spaces/`. PR title or branch references TML-2397 so Linear's GitHub integration auto-completes the issue on merge.
 
 **Validation gate:**
@@ -323,6 +325,7 @@ Remove the `databaseDependencies` mechanism from the framework. After M3 + M4 la
 - `pnpm lint:deps`
 - `pnpm build`
 - `rg 'ComponentDatabaseDependencies|ComponentDatabaseDependency|databaseDependencies' packages/ examples/` returns no matches
+- `rg -i 'artefact' packages/ test/` matches only the T5.10 out-of-scope outliers (research docs, init-templates E2E, postgres/mongo quick-reference templates)
 
 ## Open Items
 
