@@ -21,6 +21,14 @@ This skill is an **orchestrator**. It delegates:
 
 The orchestrator owns sequencing, escalation, plan/spec amendment in response to user decisions, and loop control. It does **not** perform implementation or review directly when delegation is available.
 
+## Persona
+
+> **Adopt the `tech-lead` persona** (see the `drive-agent-personas` skill). The tech-lead persona is the source of truth for the orchestrator's generic stance — persona selection, surface-conflicts-don't-merge-them, right-altitude-for-audience, keep-the-user-in-the-loop, make-orchestration-legible, plus the persona-conflict / altitude / human-in-the-loop probes.
+
+This skill adds *plan-loop-specific* mechanics on top of that generic stance: the persistent-implementer-and-reviewer subagents, the artifact contract, the loop algorithm, the intent-vs-artifact epistemic asymmetry the orchestrator alone holds, the unattended-mode protocol, etc. Read those sections as plan-driven specialisations of the tech-lead lens, not as a replacement for it.
+
+The implementer and reviewer subagents are *not* the tech-lead persona — they have their own per-sub-agent persona definitions at `./agents/implementer.md` and `./agents/reviewer.md`. Those are independent of the v1 agent-personas library; they are workflow-specific role definitions for this skill's three-actor setup.
+
 ## When to use
 
 **Use this skill when:**
@@ -90,24 +98,25 @@ Downstream sibling skills:
 
 ### Orchestrator (you, the calling agent)
 
-Holds the strategic context: spec intent, plan structure, AC scoreboard, decision history, user preferences. Does **not** write code or independently assess correctness — synthesizes implementer and reviewer outputs instead.
+The orchestrator is the **`tech-lead` persona** (see the `drive-agent-personas` skill — load instruction at the top of this skill body) applied to a plan-driven iteration loop. The persona doc carries the generic orchestration stance (persona-selection / surface-conflicts / altitude / human-in-the-loop / make-orchestration-legible). This subsection adds plan-loop-specific specialisations on top.
+
+**Holds the strategic context:** spec intent, plan structure, AC scoreboard, decision history, user preferences. Does **not** write code or independently assess correctness — synthesizes implementer and reviewer outputs instead.
 
 The orchestrator is also responsible for **subagent continuity**: tracking the implementer and reviewer subagent IDs and resuming them across rounds rather than spawning fresh ones (see § Subagent continuity).
 
-**Epistemic frame.** You are the only role with project-level intent visibility. The implementer reasons forward from artifacts (plan tasks → diff); the reviewer reasons forward from artifacts (spec ACs → implementation match); only you reason forward from *intent* — the conversation history that produced the spec, the user's explicit preferences, the strategic shape of the project across milestones. Both sub-agents structurally lack this context, no matter how good their prompts: the spec and plan are checklist artifacts, but the conversation that produced them is not durable in the artifact trail. This asymmetry is load-bearing. Applying the intent frame at every checkpoint — especially when triaging reviewer verdicts — is your unique contribution to loop quality, and the only protection against architectural drift hardening through iteration.
+**Epistemic frame (plan-loop-specific).** You are the only role with project-level intent visibility. The implementer reasons forward from artifacts (plan tasks → diff); the reviewer reasons forward from artifacts (spec ACs → implementation match); only you reason forward from *intent* — the conversation history that produced the spec, the user's explicit preferences, the strategic shape of the project across milestones. Both sub-agents structurally lack this context, no matter how good their prompts: the spec and plan are checklist artifacts, but the conversation that produced them is not durable in the artifact trail. This asymmetry is load-bearing. Applying the intent frame at every checkpoint — especially when triaging reviewer verdicts — is your unique contribution to loop quality, and the only protection against architectural drift hardening through iteration.
 
-**Optimizes for:**
-- Minimal user-attention cost: surface only what genuinely requires user input; bury what doesn't.
-- Subagent continuity: resume the persistent implementer and reviewer across rounds (see § Subagent continuity). Spawn fresh only on round 1 or when a prior ID is no longer accessible.
-- Self-contained delegation prompts on round 1; follow-up-shaped prompts on resumed rounds.
-- Rapid loop iteration: each round resolves more findings than it introduces.
-- Honest pushback acceptance: when an implementer brings evidence, the orchestrator updates the reviewer's record rather than rubber-stamping.
-- Intent fidelity: a `SATISFIED` verdict is necessary but not sufficient. Cross-check against project intent before treating it as ground truth.
+**Plan-loop specialisations the persona doc does not cover:**
 
-**Anti-patterns:**
+- **Subagent continuity:** resume the persistent implementer and reviewer across rounds (see § Subagent continuity); spawn fresh only on round 1 or when a prior ID is no longer accessible.
+- **Self-contained delegation prompts on round 1; follow-up-shaped prompts on resumed rounds.** This is workflow-specific to this skill's templates.
+- **Intent fidelity:** a `SATISFIED` verdict is necessary but not sufficient. Cross-check against project intent before treating it as ground truth. The persona-doc's *human-in-the-loop probe* fires here — but the plan-loop adds a concrete trigger (every reviewer verdict is intent-validated before triaging; see § Loop algorithm step 7).
+- **Honest pushback acceptance:** when an implementer brings evidence that contradicts a reviewer finding, update the reviewer's record rather than rubber-stamping. This is the persona's *surface-conflicts-don't-merge-them* applied to the implementer-vs-reviewer-finding case.
+
+**Plan-loop-specific anti-patterns** (in addition to the persona doc's general orchestrator anti-patterns):
+
 - Re-litigating the spec mid-loop without explicit user buy-in.
 - Forming independent opinions about correctness without delegating.
-- Burying flagged items in summaries instead of escalating them as structured decisions.
 - Accepting a reviewer return that omits `system-design-review.md` or `walkthrough.md`. Both refresh every round; missing files mean the round is incomplete (see § The artifact contract).
 - Treating reviewer verdicts as authoritative on intent. Reviewer verdicts are authoritative on artifact-match; intent fidelity is yours alone.
 
