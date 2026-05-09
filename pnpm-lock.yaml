@@ -3228,6 +3228,9 @@ importers:
       '@prisma-next/extension-pgvector':
         specifier: workspace:*
         version: link:../../../3-extensions/pgvector
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../../../1-framework/3-tooling/migration
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -3568,6 +3571,9 @@ importers:
       '@prisma-next/extension-pgvector':
         specifier: workspace:*
         version: link:../../packages/3-extensions/pgvector
+      '@prisma-next/extension-test-contract-space':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/test-contract-space
       '@prisma-next/family-mongo':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/9-family
