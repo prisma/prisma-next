@@ -86,10 +86,28 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
   }
 
   const synthedPlan = plannerResult.plan;
-  const plan: MigrationPlan = {
-    ...synthedPlan,
-    targetId: input.aggregateTargetId,
-  };
+  // The family planner returns a class-instance-shaped plan whose
+  // `destination` / `operations` are accessors on the prototype, often
+  // backed by private fields. A naive spread (`{ ...synthedPlan }`)
+  // would lose those accessors and produce a plan with
+  // `destination: undefined`; rebinding the prototype on a plain
+  // object would break private-field access. We instead wrap the plan
+  // in a Proxy that forwards every read except `targetId`, which is
+  // stamped from the aggregate's ambient target. This preserves the
+  // planner's class semantics while keeping the aggregate the single
+  // source of truth for `targetId`.
+  const plan: MigrationPlan = new Proxy(synthedPlan, {
+    get(target, prop) {
+      if (prop === 'targetId') return input.aggregateTargetId;
+      // Forward `this` as the original target so prototype-bound
+      // private fields (#destination, #operations, …) resolve.
+      return Reflect.get(target, prop, target);
+    },
+    has(target, prop) {
+      if (prop === 'targetId') return true;
+      return Reflect.has(target, prop);
+    },
+  });
 
   return {
     kind: 'ok',

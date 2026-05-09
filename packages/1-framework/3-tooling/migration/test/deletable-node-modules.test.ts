@@ -27,8 +27,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { canonicalizeJson } from '../src/canonicalize-json';
+import { concatenateSpaceApplyInputs } from '../src/concatenate-space-apply-inputs';
 import {
-  concatenateSpaceApplyInputs,
   emitPinnedSpaceArtefacts,
   listPinnedSpaceDirectories,
   type SpaceApplyInput,

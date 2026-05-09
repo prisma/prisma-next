@@ -21,12 +21,18 @@ export { createControlClient } from '../control-api/client';
 // Contract enrichment (merges framework-derived capabilities and extension pack metadata)
 export { enrichContract } from '../control-api/contract-enrichment';
 export { executeContractEmit } from '../control-api/operations/contract-emit';
-// Standalone operations (for tooling that doesn't need full client)
+// Standalone operations (for tooling that doesn't need full client). The
+// aggregate-pipeline operations replace the legacy per-space helpers.
+export { type ExecuteDbInitOptions, executeDbInit } from '../control-api/operations/db-init';
 export {
-  type ExecutePerSpaceDbApplyOptions,
-  executePerSpaceDbApply,
-  type PerSpaceExtensionInput,
-} from '../control-api/operations/db-apply-per-space';
+  type ExecuteDbUpdateOptions,
+  executeDbUpdate,
+} from '../control-api/operations/db-update';
+export {
+  type ExecuteDbVerifyOptions,
+  type ExecuteDbVerifyResult,
+  executeDbVerify,
+} from '../control-api/operations/db-verify';
 // CLI-specific types
 export type {
   ContractEmitOptions,
