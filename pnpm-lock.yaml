@@ -37,8 +37,8 @@ catalogs:
       specifier: 5.9.3
       version: 5.9.3
     vite:
-      specifier: 7.3.1
-      version: 7.3.1
+      specifier: 8.0.11
+      version: 8.0.11
     vitest:
       specifier: 4.0.17
       version: 4.0.17
@@ -145,7 +145,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: 'catalog:'
-        version: 7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
+        version: 8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
       vitest:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
@@ -221,7 +221,7 @@ importers:
         version: 19.2.3(@types/react@19.2.14)
       '@vitejs/plugin-react-swc':
         specifier: ^4.2.3
-        version: 4.2.3(vite@7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1))
+        version: 4.2.3(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       mongodb-memory-server:
         specifier: 'catalog:'
         version: 10.4.3
@@ -236,7 +236,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: 'catalog:'
-        version: 7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
+        version: 8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
       vitest:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
@@ -288,7 +288,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 0.15.2
-        version: 0.15.2(@cloudflare/workers-types@4.20260430.1)(@vitest/runner@4.1.5)(@vitest/snapshot@4.1.5)(vitest@4.1.5(@types/node@24.10.4)(@vitest/coverage-v8@4.0.17(vitest@4.0.17))(@vitest/ui@4.0.17(vitest@4.0.17))(jsdom@28.1.0(@noble/hashes@2.0.1))(vite@8.0.9(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)))
+        version: 0.15.2(@cloudflare/workers-types@4.20260430.1)(@vitest/runner@4.1.5)(@vitest/snapshot@4.1.5)(vitest@4.1.5(@types/node@24.10.4)(@vitest/coverage-v8@4.0.17(vitest@4.0.17))(@vitest/ui@4.0.17)(jsdom@28.1.0(@noble/hashes@2.0.1))(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)))
       '@cloudflare/workers-types':
         specifier: 4.20260430.1
         version: 4.20260430.1
@@ -321,7 +321,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.5(@types/node@24.10.4)(@vitest/coverage-v8@4.0.17(vitest@4.0.17))(@vitest/ui@4.0.17(vitest@4.0.17))(jsdom@28.1.0(@noble/hashes@2.0.1))(vite@8.0.9(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
+        version: 4.1.5(@types/node@24.10.4)(@vitest/coverage-v8@4.0.17(vitest@4.0.17))(@vitest/ui@4.0.17)(jsdom@28.1.0(@noble/hashes@2.0.1))(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       wrangler:
         specifier: 4.87.0
         version: 4.87.0(@cloudflare/workers-types@4.20260430.1)
@@ -439,7 +439,7 @@ importers:
         version: 19.2.3(@types/react@19.2.14)
       '@vitejs/plugin-react-swc':
         specifier: ^4.2.3
-        version: 4.2.3(vite@7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1))
+        version: 4.2.3(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       jsdom:
         specifier: ^28.1.0
         version: 28.1.0(@noble/hashes@2.0.1)
@@ -451,7 +451,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: 'catalog:'
-        version: 7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
+        version: 8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
       vitest:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
@@ -612,7 +612,7 @@ importers:
         version: 0.19.1(typescript@5.9.3)
       '@react-router/dev':
         specifier: ^7.14.0
-        version: 7.14.2(@react-router/serve@7.14.2(react-router@7.14.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@5.9.3))(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(react-router@7.14.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tsx@4.20.6)(typescript@5.9.3)(vite@7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1))(wrangler@4.87.0(@cloudflare/workers-types@4.20260430.1))(yaml@2.8.1)
+        version: 7.14.2(@react-router/serve@7.14.2(react-router@7.14.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@5.9.3))(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(react-router@7.14.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tsx@4.20.6)(typescript@5.9.3)(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))(wrangler@4.87.0(@cloudflare/workers-types@4.20260430.1))(yaml@2.8.1)
       '@types/node':
         specifier: 'catalog:'
         version: 24.10.4
@@ -633,10 +633,10 @@ importers:
         version: 5.9.3
       vite:
         specifier: 'catalog:'
-        version: 7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
+        version: 8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.9.3)(vite@7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1))
+        version: 5.1.4(typescript@5.9.3)(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       vitest:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
@@ -777,7 +777,7 @@ importers:
         version: link:../tsconfig
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -805,7 +805,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -823,7 +823,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -854,7 +854,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -879,7 +879,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -910,7 +910,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -931,7 +931,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -949,7 +949,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -967,7 +967,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -998,7 +998,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1023,7 +1023,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1048,7 +1048,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1157,7 +1157,7 @@ importers:
         version: 24.10.4
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1200,7 +1200,7 @@ importers:
         version: 24.10.4
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1237,7 +1237,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1344,13 +1344,13 @@ importers:
         version: 24.10.4
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
       vite:
         specifier: 'catalog:'
-        version: 7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
+        version: 8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
       vitest:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
@@ -1378,7 +1378,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1406,7 +1406,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1424,7 +1424,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1464,7 +1464,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1504,7 +1504,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1538,7 +1538,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1563,7 +1563,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1597,7 +1597,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1658,7 +1658,7 @@ importers:
         version: 10.4.3
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1692,7 +1692,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1720,7 +1720,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1745,7 +1745,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1821,7 +1821,7 @@ importers:
         version: 10.4.3
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1888,7 +1888,7 @@ importers:
         version: link:../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1919,7 +1919,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1940,7 +1940,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1974,7 +1974,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1999,7 +1999,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2048,7 +2048,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2103,7 +2103,7 @@ importers:
         version: 8.16.3
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2140,7 +2140,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2164,7 +2164,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2216,7 +2216,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2271,7 +2271,7 @@ importers:
         version: link:../../../1-framework/0-foundation/utils
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2326,7 +2326,7 @@ importers:
         version: 8.16.3
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2402,7 +2402,7 @@ importers:
         version: link:../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2451,7 +2451,7 @@ importers:
         version: link:../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2476,7 +2476,7 @@ importers:
         version: link:../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2546,7 +2546,7 @@ importers:
         version: 10.4.3
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2571,7 +2571,7 @@ importers:
         version: link:../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2632,7 +2632,7 @@ importers:
         version: link:../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2708,7 +2708,7 @@ importers:
         version: 8.16.0
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2784,7 +2784,7 @@ importers:
         version: 8.16.3
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2836,7 +2836,7 @@ importers:
         version: link:../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2906,7 +2906,7 @@ importers:
         version: 2.0.3
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -2985,7 +2985,7 @@ importers:
         version: 10.4.3
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -3028,7 +3028,7 @@ importers:
         version: 10.4.3
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -3098,7 +3098,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -3162,7 +3162,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -3244,7 +3244,7 @@ importers:
         version: 2.0.3
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -3320,7 +3320,7 @@ importers:
         version: 2.0.3
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -3384,7 +3384,7 @@ importers:
         version: 3.0.5(kysely@0.28.10)
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -3430,7 +3430,7 @@ importers:
         version: link:../../../0-config/tsdown
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -3696,7 +3696,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: 'catalog:'
-        version: 7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
+        version: 8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
       vite7:
         specifier: npm:vite@7.3.1
         version: vite@7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
@@ -3867,7 +3867,7 @@ importers:
         version: 8.16.3
       tsdown:
         specifier: 'catalog:'
-        version: 0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3)
+        version: 0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -4240,8 +4240,14 @@ packages:
   '@electric-sql/pglite@0.3.14':
     resolution: {integrity: sha512-3DB258dhqdsArOI1fIt7cb9RpUOgcDg5hXWVgVHAeqVQ/qxtFy605QKs4gx6mFq3jWsSPqDN8TgSEsqC3OfV9Q==}
 
+  '@emnapi/core@1.10.0':
+    resolution: {integrity: sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==}
+
   '@emnapi/core@1.9.2':
     resolution: {integrity: sha512-UC+ZhH3XtczQYfOlu3lNEkdW/p4dsJ1r/bP7H8+rhao3TTTMO1ATq/4DdIi23XuGoFY+Cz0JmCbdVl0hz9jZcA==}
+
+  '@emnapi/runtime@1.10.0':
+    resolution: {integrity: sha512-ewvYlk86xUoGI0zQRNq/mC+16R1QeDlKQy21Ki3oSYXNgLb45GV1P6A0M+/s6nyCuNDqe5VpaY84BzXGwVbwFA==}
 
   '@emnapi/runtime@1.8.1':
     resolution: {integrity: sha512-mehfKSMWjjNol8659Z8KxEMrdSJDDot5SXMq00dM8BN4o+CLNXQ0xH2V7EchNHV4RmbZLmmPdEaXZc5H2FXmDg==}
@@ -4850,6 +4856,9 @@ packages:
   '@oxc-project/types@0.126.0':
     resolution: {integrity: sha512-oGfVtjAgwQVVpfBrbtk4e1XDyWHRFta6BS3GWVzrF8xYBT2VGQAk39yJS/wFSMrZqoiCU4oghT3Ch0HaHGIHcQ==}
 
+  '@oxc-project/types@0.128.0':
+    resolution: {integrity: sha512-huv1Y/LzBJkBVHt3OlC7u0zHBW9qXf1FdD7sGmc1rXc2P1mTwHssYv7jyGx5KAACSCH+9B3Bhn6Z9luHRvf7pQ==}
+
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
 
@@ -5315,6 +5324,12 @@ packages:
     cpu: [arm64]
     os: [android]
 
+  '@rolldown/binding-android-arm64@1.0.0-rc.18':
+    resolution: {integrity: sha512-lIDyUAfD7U3+BWKzdxMbJcsYHuqXqmGz40aeRqvuAm3y5TkJSYTBW2RDrn65DJFPQqVjUAUqq5uz8urzQ8aBdQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [android]
+
   '@rolldown/binding-darwin-arm64@1.0.0-beta.57':
     resolution: {integrity: sha512-9c4FOhRGpl+PX7zBK5p17c5efpF9aSpTPgyigv57hXf5NjQUaJOOiejPLAtFiKNBIfm5Uu6yFkvLKzOafNvlTw==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -5329,6 +5344,12 @@ packages:
 
   '@rolldown/binding-darwin-arm64@1.0.0-rc.16':
     resolution: {integrity: sha512-rNz0yK078yrNn3DrdgN+PKiMOW8HfQ92jQiXxwX8yW899ayV00MLVdaCNeVBhG/TbH3ouYVObo8/yrkiectkcQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@rolldown/binding-darwin-arm64@1.0.0-rc.18':
+    resolution: {integrity: sha512-apJq2ktnGp27nSInMR5Vcj8kY6xJzDAvfdIFlpDcAK/w4cDO58qVoi1YQsES/SKiFNge/6e4CUzgjfHduYqWpQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [darwin]
@@ -5351,6 +5372,12 @@ packages:
     cpu: [x64]
     os: [darwin]
 
+  '@rolldown/binding-darwin-x64@1.0.0-rc.18':
+    resolution: {integrity: sha512-5Ofot8xbs+pxRHJqm9/9N/4sTQOvdrwEsmPE9pdLEEoAbdZtG6F2LMDfO1sp6ZAtXJuJV/21ew2srq3W8NXB5g==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [darwin]
+
   '@rolldown/binding-freebsd-x64@1.0.0-beta.57':
     resolution: {integrity: sha512-uA9kG7+MYkHTbqwv67Tx+5GV5YcKd33HCJIi0311iYBd25yuwyIqvJfBdt1VVB8tdOlyTb9cPAgfCki8nhwTQg==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -5365,6 +5392,12 @@ packages:
 
   '@rolldown/binding-freebsd-x64@1.0.0-rc.16':
     resolution: {integrity: sha512-KcRE5w8h0OnjUatG8pldyD14/CQ5Phs1oxfR+3pKDjboHRo9+MkqQaiIZlZRpsxC15paeXme/I127tUa9TXJ6g==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [freebsd]
+
+  '@rolldown/binding-freebsd-x64@1.0.0-rc.18':
+    resolution: {integrity: sha512-7h8eeOTT1eyqJyx64BFCnWZpNm486hGWt2sqeLLgDxA0xI1oGZ9H7gK1S85uNGmBhkdPwa/6reTxfFFKvIsebw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [freebsd]
@@ -5387,6 +5420,12 @@ packages:
     cpu: [arm]
     os: [linux]
 
+  '@rolldown/binding-linux-arm-gnueabihf@1.0.0-rc.18':
+    resolution: {integrity: sha512-eRcm/HVt9U/JFu5RKAEKwGQYtDCKWLiaH6wOnsSEp6NMBb/3Os8LgHZlNyzMpFVNmiiMFlfb2zEnebfzJrHFmg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm]
+    os: [linux]
+
   '@rolldown/binding-linux-arm64-gnu@1.0.0-beta.57':
     resolution: {integrity: sha512-A3/wu1RgsHhqP3rVH2+sM81bpk+Qd2XaHTl8LtX5/1LNR7QVBFBCpAoiXwjTdGnI5cMdBVi7Z1pi52euW760Fw==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -5403,6 +5442,13 @@ packages:
 
   '@rolldown/binding-linux-arm64-gnu@1.0.0-rc.16':
     resolution: {integrity: sha512-+tHktCHWV8BDQSjemUqm/Jl/TPk3QObCTIjmdDy/nlupcujZghmKK2962LYrqFpWu+ai01AN/REOH3NEpqvYQg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@rolldown/binding-linux-arm64-gnu@1.0.0-rc.18':
+    resolution: {integrity: sha512-SOrT/cT4ukTmgnrEz/Hg3m7LBnuCLW9psDeMKrimRWY4I8DmnO7Lco8W2vtqPmMkbVu8iJ+g4GFLVLLOVjJ9DQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
@@ -5429,6 +5475,13 @@ packages:
     os: [linux]
     libc: [musl]
 
+  '@rolldown/binding-linux-arm64-musl@1.0.0-rc.18':
+    resolution: {integrity: sha512-QWjdxN1HJCpBTAcZ5N5F7wju3gVPzRzSpmGzx7na0c/1qpN9CFil+xt+l9lV/1M6/gqHSNXCiqPfwhVJPeLnug==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
   '@rolldown/binding-linux-ppc64-gnu@1.0.0-rc.16':
     resolution: {integrity: sha512-EKwI1tSrLs7YVw+JPJT/G2dJQ1jl9qlTTTEG0V2Ok/RdOenRfBw2PQdLPyjhIu58ocdBfP7vIRN/pvMsPxs/AQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -5436,8 +5489,22 @@ packages:
     os: [linux]
     libc: [glibc]
 
+  '@rolldown/binding-linux-ppc64-gnu@1.0.0-rc.18':
+    resolution: {integrity: sha512-ugCOyj7a4d9h3q9B+wXmf6g3a68UsjGh6dob5DHevHGMwDUbhsYNbSPxJsENcIttJZ9jv7qGM2UesLw5jqIhdg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [ppc64]
+    os: [linux]
+    libc: [glibc]
+
   '@rolldown/binding-linux-s390x-gnu@1.0.0-rc.16':
     resolution: {integrity: sha512-Uknladnb3Sxqu6SEcqBldQyJUpk8NleooZEc0MbRBJ4inEhRYWZX0NJu12vNf2mqAq7gsofAxHrGghiUYjhaLQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [s390x]
+    os: [linux]
+    libc: [glibc]
+
+  '@rolldown/binding-linux-s390x-gnu@1.0.0-rc.18':
+    resolution: {integrity: sha512-kKWRhbsotpXkGbcd5dllUWg5gEXcDAa8u5YnP9AV5DYNbvJHGzzuwv7dpmhc8NqKMJldl0a+x76IHbspEpEmdA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [s390x]
     os: [linux]
@@ -5464,6 +5531,13 @@ packages:
     os: [linux]
     libc: [glibc]
 
+  '@rolldown/binding-linux-x64-gnu@1.0.0-rc.18':
+    resolution: {integrity: sha512-uCo8ElcCIAMyYAZyuIZ81oFkhTSIllNvUCHCAlbhlN4ji3uC28h7IIdlXyIvGO7HsuqnV9p3rD/bpH7XhIyhRw==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
   '@rolldown/binding-linux-x64-musl@1.0.0-beta.57':
     resolution: {integrity: sha512-++EQDpk/UJ33kY/BNsh7A7/P1sr/jbMuQ8cE554ZIy+tCUWCivo9zfyjDUoiMdnxqX6HLJEqqGnbGQOvzm2OMQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -5480,6 +5554,13 @@ packages:
 
   '@rolldown/binding-linux-x64-musl@1.0.0-rc.16':
     resolution: {integrity: sha512-RuERhF9/EgWxZEXYWCOaViUWHIboceK4/ivdtQ3R0T44NjLkIIlGIAVAuCddFxsZ7vnRHtNQUrt2vR2n2slB2w==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@rolldown/binding-linux-x64-musl@1.0.0-rc.18':
+    resolution: {integrity: sha512-XNOQZtuE6yUIvx4rwGemwh8kpL1xvU41FXy/s9K7T/3JVcqGzo3NfKM2HrbrGgfPYGFW42f07Wk++aOC6B9NWA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
@@ -5503,6 +5584,12 @@ packages:
     cpu: [arm64]
     os: [openharmony]
 
+  '@rolldown/binding-openharmony-arm64@1.0.0-rc.18':
+    resolution: {integrity: sha512-tSn/kzrfa7tNOXr7sEacDBN4YsIqTyLqh45IO0nHDwtpKIDNDJr+VFojt+4klSpChxB29JLyduSsE0MKEwa65A==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [openharmony]
+
   '@rolldown/binding-wasm32-wasi@1.0.0-beta.57':
     resolution: {integrity: sha512-bRhcF7NLlCnpkzLVlVhrDEd0KH22VbTPkPTbMjlYvqhSmarxNIq5vtlQS8qmV7LkPKHrNLWyJW/V/sOyFba26Q==}
     engines: {node: '>=14.0.0'}
@@ -5515,6 +5602,11 @@ packages:
 
   '@rolldown/binding-wasm32-wasi@1.0.0-rc.16':
     resolution: {integrity: sha512-3Q2KQxnC8IJOLqXmUMoYwyIPZU9hzRbnHaoV3Euz+VVnjZKcY8ktnNP8T9R4/GGQtb27C/UYKABxesKWb8lsvQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [wasm32]
+
+  '@rolldown/binding-wasm32-wasi@1.0.0-rc.18':
+    resolution: {integrity: sha512-+J9YGmc+czgqlhYmwun3S3O0FIZhsH8ep2456xwjAdIOmuJxM7xz4P4PtrxU+Bz17a/5bqPA8o3HAAoX0teUdg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [wasm32]
 
@@ -5532,6 +5624,12 @@ packages:
 
   '@rolldown/binding-win32-arm64-msvc@1.0.0-rc.16':
     resolution: {integrity: sha512-tj7XRemQcOcFwv7qhpUxMTBbI5mWMlE4c1Omhg5+h8GuLXzyj8HviYgR+bB2DMDgRqUE+jiDleqSCRjx4aYk/Q==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [win32]
+
+  '@rolldown/binding-win32-arm64-msvc@1.0.0-rc.18':
+    resolution: {integrity: sha512-zsu47DgU0FQzSwi6sU9dZoEdUv7pc1AptSEz/Z8HBg54sV0Pbs3N0+CrIbTsgiu6EyoaNN9CHboqbLaz9lhOyQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [win32]
@@ -5554,6 +5652,12 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@rolldown/binding-win32-x64-msvc@1.0.0-rc.18':
+    resolution: {integrity: sha512-7H+3yqGgmnlDTRRhw/xpYY9J1kf4GC681nVc4GqKhExZTDrVVrV2tsOR9kso0fvgBdcTCcQShx4SLLoHgaLwhg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [win32]
+
   '@rolldown/pluginutils@1.0.0-beta.57':
     resolution: {integrity: sha512-aQNelgx14tGA+n2tNSa9x6/jeoCL9fkDeCei7nOKnHx0fEFRRMu5ReiITo+zZD5TzWDGGRjbSYCs93IfRIyTuQ==}
 
@@ -5562,6 +5666,9 @@ packages:
 
   '@rolldown/pluginutils@1.0.0-rc.16':
     resolution: {integrity: sha512-45+YtqxLYKDWQouLKCrpIZhke+nXxhsw+qAHVzHDVwttyBlHNBVs2K25rDXrZzhpTp9w1FlAlvweV1H++fdZoA==}
+
+  '@rolldown/pluginutils@1.0.0-rc.18':
+    resolution: {integrity: sha512-CUY5Mnhe64xQBGZEEXQ5WyZwsc1JU3vAZLIxtrsBt3LO6UOb+C8GunVKqe9sT8NeWb4lqSaoJtp2xo6GxT1MNw==}
 
   '@rolldown/pluginutils@1.0.0-rc.2':
     resolution: {integrity: sha512-izyXV/v+cHiRfozX62W9htOAvwMo4/bXKDrQ+vom1L1qRuexPock/7VZDAhnpHCLNejd3NJ6hiab+tO0D44Rgw==}
@@ -7436,6 +7543,10 @@ packages:
     resolution: {integrity: sha512-pMMHxBOZKFU6HgAZ4eyGnwXF/EvPGGqUr0MnZ5+99485wwW41kW91A4LOGxSHhgugZmSChL5AlElNdwlNgcnLQ==}
     engines: {node: ^10 || ^12 || >=14}
 
+  postcss@8.5.14:
+    resolution: {integrity: sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg==}
+    engines: {node: ^10 || ^12 || >=14}
+
   postcss@8.5.9:
     resolution: {integrity: sha512-7a70Nsot+EMX9fFU3064K/kdHWZqGVY+BADLyXc8Dfv+mTLLVl6JzJpPaCZ2kQL9gIJvKXSLMHhqdRRjwQeFtw==}
     engines: {node: ^10 || ^12 || >=14}
@@ -7645,6 +7756,11 @@ packages:
 
   rolldown@1.0.0-rc.16:
     resolution: {integrity: sha512-rzi5WqKzEZw3SooTt7cgm4eqIoujPIyGcJNGFL7iPEuajQw7vxMHUkXylu4/vhCkJGXsgRmxqMKXUpT6FEgl0g==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    hasBin: true
+
+  rolldown@1.0.0-rc.18:
+    resolution: {integrity: sha512-phmyKBpuBdRYDf4hgyynGAYn/rDDe+iZXKVJ7WX5b1zQzpLkP5oJRPGsfJuHdzPMlyyEO/4sPW6yfSx2gf7lVg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
@@ -8139,6 +8255,49 @@ packages:
       less:
         optional: true
       lightningcss:
+        optional: true
+      sass:
+        optional: true
+      sass-embedded:
+        optional: true
+      stylus:
+        optional: true
+      sugarss:
+        optional: true
+      terser:
+        optional: true
+      tsx:
+        optional: true
+      yaml:
+        optional: true
+
+  vite@8.0.11:
+    resolution: {integrity: sha512-Jz1mxtUBR5xTT65VOdJZUUeoyLtqljmFkiUXhPTLZka3RDc9vpi/xXkyrnsdRcm2lIi3l3GPMnAidTsEGIj3Ow==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    hasBin: true
+    peerDependencies:
+      '@types/node': ^20.19.0 || >=22.12.0
+      '@vitejs/devtools': ^0.1.18
+      esbuild: ^0.27.0 || ^0.28.0
+      jiti: '>=1.21.0'
+      less: ^4.0.0
+      sass: ^1.70.0
+      sass-embedded: ^1.70.0
+      stylus: '>=0.54.8'
+      sugarss: ^5.0.0
+      terser: ^5.16.0
+      tsx: ^4.8.1
+      yaml: ^2.4.2
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+      '@vitejs/devtools':
+        optional: true
+      esbuild:
+        optional: true
+      jiti:
+        optional: true
+      less:
         optional: true
       sass:
         optional: true
@@ -8695,14 +8854,14 @@ snapshots:
     optionalDependencies:
       workerd: 1.20260430.1
 
-  '@cloudflare/vitest-pool-workers@0.15.2(@cloudflare/workers-types@4.20260430.1)(@vitest/runner@4.1.5)(@vitest/snapshot@4.1.5)(vitest@4.1.5(@types/node@24.10.4)(@vitest/coverage-v8@4.0.17(vitest@4.0.17))(@vitest/ui@4.0.17(vitest@4.0.17))(jsdom@28.1.0(@noble/hashes@2.0.1))(vite@8.0.9(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)))':
+  '@cloudflare/vitest-pool-workers@0.15.2(@cloudflare/workers-types@4.20260430.1)(@vitest/runner@4.1.5)(@vitest/snapshot@4.1.5)(vitest@4.1.5(@types/node@24.10.4)(@vitest/coverage-v8@4.0.17(vitest@4.0.17))(@vitest/ui@4.0.17)(jsdom@28.1.0(@noble/hashes@2.0.1))(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)))':
     dependencies:
       '@vitest/runner': 4.1.5
       '@vitest/snapshot': 4.1.5
       cjs-module-lexer: 1.4.3
       esbuild: 0.27.3
       miniflare: 4.20260430.0
-      vitest: 4.1.5(@types/node@24.10.4)(@vitest/coverage-v8@4.0.17(vitest@4.0.17))(@vitest/ui@4.0.17(vitest@4.0.17))(jsdom@28.1.0(@noble/hashes@2.0.1))(vite@8.0.9(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
+      vitest: 4.1.5(@types/node@24.10.4)(@vitest/coverage-v8@4.0.17(vitest@4.0.17))(@vitest/ui@4.0.17)(jsdom@28.1.0(@noble/hashes@2.0.1))(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       wrangler: 4.87.0(@cloudflare/workers-types@4.20260430.1)
       zod: 3.25.76
     transitivePeerDependencies:
@@ -8769,9 +8928,20 @@ snapshots:
 
   '@electric-sql/pglite@0.3.14': {}
 
+  '@emnapi/core@1.10.0':
+    dependencies:
+      '@emnapi/wasi-threads': 1.2.1
+      tslib: 2.8.1
+    optional: true
+
   '@emnapi/core@1.9.2':
     dependencies:
       '@emnapi/wasi-threads': 1.2.1
+      tslib: 2.8.1
+    optional: true
+
+  '@emnapi/runtime@1.10.0':
+    dependencies:
       tslib: 2.8.1
     optional: true
 
@@ -9102,6 +9272,13 @@ snapshots:
       chevrotain: 10.5.0
       lilconfig: 2.1.0
 
+  '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
+    dependencies:
+      '@emnapi/core': 1.10.0
+      '@emnapi/runtime': 1.10.0
+      '@tybys/wasm-util': 0.10.1
+    optional: true
+
   '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)':
     dependencies:
       '@emnapi/core': 1.9.2
@@ -9142,6 +9319,8 @@ snapshots:
   '@oxc-project/types@0.106.0': {}
 
   '@oxc-project/types@0.126.0': {}
+
+  '@oxc-project/types@0.128.0': {}
 
   '@polka/url@1.0.0-next.29':
     optional: true
@@ -9530,7 +9709,7 @@ snapshots:
 
   '@radix-ui/rect@1.1.1': {}
 
-  '@react-router/dev@7.14.2(@react-router/serve@7.14.2(react-router@7.14.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@5.9.3))(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(react-router@7.14.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tsx@4.20.6)(typescript@5.9.3)(vite@7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1))(wrangler@4.87.0(@cloudflare/workers-types@4.20260430.1))(yaml@2.8.1)':
+  '@react-router/dev@7.14.2(@react-router/serve@7.14.2(react-router@7.14.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@5.9.3))(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(react-router@7.14.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tsx@4.20.6)(typescript@5.9.3)(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))(wrangler@4.87.0(@cloudflare/workers-types@4.20260430.1))(yaml@2.8.1)':
     dependencies:
       '@babel/core': 7.29.0
       '@babel/generator': 7.28.5
@@ -9560,7 +9739,7 @@ snapshots:
       semver: 7.7.3
       tinyglobby: 0.2.16
       valibot: 1.2.0(typescript@5.9.3)
-      vite: 7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
+      vite: 8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
       vite-node: 3.2.4(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
     optionalDependencies:
       '@react-router/serve': 7.14.2(react-router@7.14.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@5.9.3)
@@ -9622,6 +9801,9 @@ snapshots:
   '@rolldown/binding-android-arm64@1.0.0-rc.16':
     optional: true
 
+  '@rolldown/binding-android-arm64@1.0.0-rc.18':
+    optional: true
+
   '@rolldown/binding-darwin-arm64@1.0.0-beta.57':
     optional: true
 
@@ -9629,6 +9811,9 @@ snapshots:
     optional: true
 
   '@rolldown/binding-darwin-arm64@1.0.0-rc.16':
+    optional: true
+
+  '@rolldown/binding-darwin-arm64@1.0.0-rc.18':
     optional: true
 
   '@rolldown/binding-darwin-x64@1.0.0-beta.57':
@@ -9640,6 +9825,9 @@ snapshots:
   '@rolldown/binding-darwin-x64@1.0.0-rc.16':
     optional: true
 
+  '@rolldown/binding-darwin-x64@1.0.0-rc.18':
+    optional: true
+
   '@rolldown/binding-freebsd-x64@1.0.0-beta.57':
     optional: true
 
@@ -9647,6 +9835,9 @@ snapshots:
     optional: true
 
   '@rolldown/binding-freebsd-x64@1.0.0-rc.16':
+    optional: true
+
+  '@rolldown/binding-freebsd-x64@1.0.0-rc.18':
     optional: true
 
   '@rolldown/binding-linux-arm-gnueabihf@1.0.0-beta.57':
@@ -9658,6 +9849,9 @@ snapshots:
   '@rolldown/binding-linux-arm-gnueabihf@1.0.0-rc.16':
     optional: true
 
+  '@rolldown/binding-linux-arm-gnueabihf@1.0.0-rc.18':
+    optional: true
+
   '@rolldown/binding-linux-arm64-gnu@1.0.0-beta.57':
     optional: true
 
@@ -9665,6 +9859,9 @@ snapshots:
     optional: true
 
   '@rolldown/binding-linux-arm64-gnu@1.0.0-rc.16':
+    optional: true
+
+  '@rolldown/binding-linux-arm64-gnu@1.0.0-rc.18':
     optional: true
 
   '@rolldown/binding-linux-arm64-musl@1.0.0-beta.57':
@@ -9676,10 +9873,19 @@ snapshots:
   '@rolldown/binding-linux-arm64-musl@1.0.0-rc.16':
     optional: true
 
+  '@rolldown/binding-linux-arm64-musl@1.0.0-rc.18':
+    optional: true
+
   '@rolldown/binding-linux-ppc64-gnu@1.0.0-rc.16':
     optional: true
 
+  '@rolldown/binding-linux-ppc64-gnu@1.0.0-rc.18':
+    optional: true
+
   '@rolldown/binding-linux-s390x-gnu@1.0.0-rc.16':
+    optional: true
+
+  '@rolldown/binding-linux-s390x-gnu@1.0.0-rc.18':
     optional: true
 
   '@rolldown/binding-linux-x64-gnu@1.0.0-beta.57':
@@ -9691,6 +9897,9 @@ snapshots:
   '@rolldown/binding-linux-x64-gnu@1.0.0-rc.16':
     optional: true
 
+  '@rolldown/binding-linux-x64-gnu@1.0.0-rc.18':
+    optional: true
+
   '@rolldown/binding-linux-x64-musl@1.0.0-beta.57':
     optional: true
 
@@ -9698,6 +9907,9 @@ snapshots:
     optional: true
 
   '@rolldown/binding-linux-x64-musl@1.0.0-rc.16':
+    optional: true
+
+  '@rolldown/binding-linux-x64-musl@1.0.0-rc.18':
     optional: true
 
   '@rolldown/binding-openharmony-arm64@1.0.0-beta.57':
@@ -9709,17 +9921,20 @@ snapshots:
   '@rolldown/binding-openharmony-arm64@1.0.0-rc.16':
     optional: true
 
-  '@rolldown/binding-wasm32-wasi@1.0.0-beta.57(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)':
+  '@rolldown/binding-openharmony-arm64@1.0.0-rc.18':
+    optional: true
+
+  '@rolldown/binding-wasm32-wasi@1.0.0-beta.57(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
-      '@napi-rs/wasm-runtime': 1.1.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
+      '@napi-rs/wasm-runtime': 1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
     optional: true
 
-  '@rolldown/binding-wasm32-wasi@1.0.0-beta.58(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)':
+  '@rolldown/binding-wasm32-wasi@1.0.0-beta.58(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
-      '@napi-rs/wasm-runtime': 1.1.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
+      '@napi-rs/wasm-runtime': 1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
@@ -9732,6 +9947,13 @@ snapshots:
       '@napi-rs/wasm-runtime': 1.1.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
     optional: true
 
+  '@rolldown/binding-wasm32-wasi@1.0.0-rc.18':
+    dependencies:
+      '@emnapi/core': 1.10.0
+      '@emnapi/runtime': 1.10.0
+      '@napi-rs/wasm-runtime': 1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
+    optional: true
+
   '@rolldown/binding-win32-arm64-msvc@1.0.0-beta.57':
     optional: true
 
@@ -9739,6 +9961,9 @@ snapshots:
     optional: true
 
   '@rolldown/binding-win32-arm64-msvc@1.0.0-rc.16':
+    optional: true
+
+  '@rolldown/binding-win32-arm64-msvc@1.0.0-rc.18':
     optional: true
 
   '@rolldown/binding-win32-x64-msvc@1.0.0-beta.57':
@@ -9750,11 +9975,16 @@ snapshots:
   '@rolldown/binding-win32-x64-msvc@1.0.0-rc.16':
     optional: true
 
+  '@rolldown/binding-win32-x64-msvc@1.0.0-rc.18':
+    optional: true
+
   '@rolldown/pluginutils@1.0.0-beta.57': {}
 
   '@rolldown/pluginutils@1.0.0-beta.58': {}
 
   '@rolldown/pluginutils@1.0.0-rc.16': {}
+
+  '@rolldown/pluginutils@1.0.0-rc.18': {}
 
   '@rolldown/pluginutils@1.0.0-rc.2': {}
 
@@ -10039,11 +10269,11 @@ snapshots:
     dependencies:
       '@types/webidl-conversions': 7.0.3
 
-  '@vitejs/plugin-react-swc@4.2.3(vite@7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1))':
+  '@vitejs/plugin-react-swc@4.2.3(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))':
     dependencies:
       '@rolldown/pluginutils': 1.0.0-rc.2
       '@swc/core': 1.15.18
-      vite: 7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
+      vite: 8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
     transitivePeerDependencies:
       - '@swc/helpers'
 
@@ -10087,13 +10317,13 @@ snapshots:
     optionalDependencies:
       vite: 7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
 
-  '@vitest/mocker@4.1.5(vite@8.0.9(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))':
+  '@vitest/mocker@4.1.5(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))':
     dependencies:
       '@vitest/spy': 4.1.5
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 8.0.9(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
+      vite: 8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
 
   '@vitest/pretty-format@4.0.17':
     dependencies:
@@ -11502,6 +11732,12 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
+  postcss@8.5.14:
+    dependencies:
+      nanoid: 3.3.11
+      picocolors: 1.1.1
+      source-map-js: 1.2.1
+
   postcss@8.5.9:
     dependencies:
       nanoid: 3.3.11
@@ -11661,7 +11897,7 @@ snapshots:
 
   rfdc@1.4.1: {}
 
-  rolldown-plugin-dts@0.20.0(rolldown@1.0.0-beta.57(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2))(typescript@5.9.3):
+  rolldown-plugin-dts@0.20.0(rolldown@1.0.0-beta.57(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0))(typescript@5.9.3):
     dependencies:
       '@babel/generator': 7.29.1
       '@babel/parser': 7.29.2
@@ -11671,13 +11907,13 @@ snapshots:
       dts-resolver: 2.1.3
       get-tsconfig: 4.13.0
       obug: 2.1.1
-      rolldown: 1.0.0-beta.57(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
+      rolldown: 1.0.0-beta.57(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
       - oxc-resolver
 
-  rolldown@1.0.0-beta.57(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2):
+  rolldown@1.0.0-beta.57(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0):
     dependencies:
       '@oxc-project/types': 0.103.0
       '@rolldown/pluginutils': 1.0.0-beta.57
@@ -11692,14 +11928,14 @@ snapshots:
       '@rolldown/binding-linux-x64-gnu': 1.0.0-beta.57
       '@rolldown/binding-linux-x64-musl': 1.0.0-beta.57
       '@rolldown/binding-openharmony-arm64': 1.0.0-beta.57
-      '@rolldown/binding-wasm32-wasi': 1.0.0-beta.57(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
+      '@rolldown/binding-wasm32-wasi': 1.0.0-beta.57(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
       '@rolldown/binding-win32-arm64-msvc': 1.0.0-beta.57
       '@rolldown/binding-win32-x64-msvc': 1.0.0-beta.57
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
 
-  rolldown@1.0.0-beta.58(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2):
+  rolldown@1.0.0-beta.58(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0):
     dependencies:
       '@oxc-project/types': 0.106.0
       '@rolldown/pluginutils': 1.0.0-beta.58
@@ -11714,7 +11950,7 @@ snapshots:
       '@rolldown/binding-linux-x64-gnu': 1.0.0-beta.58
       '@rolldown/binding-linux-x64-musl': 1.0.0-beta.58
       '@rolldown/binding-openharmony-arm64': 1.0.0-beta.58
-      '@rolldown/binding-wasm32-wasi': 1.0.0-beta.58(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
+      '@rolldown/binding-wasm32-wasi': 1.0.0-beta.58(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
       '@rolldown/binding-win32-arm64-msvc': 1.0.0-beta.58
       '@rolldown/binding-win32-x64-msvc': 1.0.0-beta.58
     transitivePeerDependencies:
@@ -11741,6 +11977,27 @@ snapshots:
       '@rolldown/binding-wasm32-wasi': 1.0.0-rc.16
       '@rolldown/binding-win32-arm64-msvc': 1.0.0-rc.16
       '@rolldown/binding-win32-x64-msvc': 1.0.0-rc.16
+
+  rolldown@1.0.0-rc.18:
+    dependencies:
+      '@oxc-project/types': 0.128.0
+      '@rolldown/pluginutils': 1.0.0-rc.18
+    optionalDependencies:
+      '@rolldown/binding-android-arm64': 1.0.0-rc.18
+      '@rolldown/binding-darwin-arm64': 1.0.0-rc.18
+      '@rolldown/binding-darwin-x64': 1.0.0-rc.18
+      '@rolldown/binding-freebsd-x64': 1.0.0-rc.18
+      '@rolldown/binding-linux-arm-gnueabihf': 1.0.0-rc.18
+      '@rolldown/binding-linux-arm64-gnu': 1.0.0-rc.18
+      '@rolldown/binding-linux-arm64-musl': 1.0.0-rc.18
+      '@rolldown/binding-linux-ppc64-gnu': 1.0.0-rc.18
+      '@rolldown/binding-linux-s390x-gnu': 1.0.0-rc.18
+      '@rolldown/binding-linux-x64-gnu': 1.0.0-rc.18
+      '@rolldown/binding-linux-x64-musl': 1.0.0-rc.18
+      '@rolldown/binding-openharmony-arm64': 1.0.0-rc.18
+      '@rolldown/binding-wasm32-wasi': 1.0.0-rc.18
+      '@rolldown/binding-win32-arm64-msvc': 1.0.0-rc.18
+      '@rolldown/binding-win32-x64-msvc': 1.0.0-rc.18
 
   rollup@4.59.0:
     dependencies:
@@ -12090,7 +12347,7 @@ snapshots:
       minimist: 1.2.8
       strip-bom: 3.0.0
 
-  tsdown@0.18.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@5.9.3):
+  tsdown@0.18.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3):
     dependencies:
       ansis: 4.2.0
       cac: 6.7.14
@@ -12100,14 +12357,14 @@ snapshots:
       import-without-cache: 0.2.5
       obug: 2.1.1
       picomatch: 4.0.4
-      rolldown: 1.0.0-beta.57(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
-      rolldown-plugin-dts: 0.20.0(rolldown@1.0.0-beta.57(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2))(typescript@5.9.3)
+      rolldown: 1.0.0-beta.57(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
+      rolldown-plugin-dts: 0.20.0(rolldown@1.0.0-beta.57(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0))(typescript@5.9.3)
       semver: 7.7.3
       tinyexec: 1.0.2
       tinyglobby: 0.2.16
       tree-kill: 1.2.2
       unconfig-core: 7.4.2
-      unrun: 0.2.22(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
+      unrun: 0.2.22(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -12187,9 +12444,9 @@ snapshots:
 
   unpipe@1.0.0: {}
 
-  unrun@0.2.22(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2):
+  unrun@0.2.22(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0):
     dependencies:
-      rolldown: 1.0.0-beta.58(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
+      rolldown: 1.0.0-beta.58(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
@@ -12244,13 +12501,13 @@ snapshots:
       - tsx
       - yaml
 
-  vite-tsconfig-paths@5.1.4(typescript@5.9.3)(vite@7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)):
+  vite-tsconfig-paths@5.1.4(typescript@5.9.3)(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)):
     dependencies:
       debug: 4.4.3
       globrex: 0.1.2
       tsconfck: 3.1.6(typescript@5.9.3)
     optionalDependencies:
-      vite: 7.3.1(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
+      vite: 8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
     transitivePeerDependencies:
       - supports-color
       - typescript
@@ -12268,6 +12525,21 @@ snapshots:
       fsevents: 2.3.3
       jiti: 2.6.1
       lightningcss: 1.32.0
+      tsx: 4.20.6
+      yaml: 2.8.1
+
+  vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1):
+    dependencies:
+      lightningcss: 1.32.0
+      picomatch: 4.0.4
+      postcss: 8.5.14
+      rolldown: 1.0.0-rc.18
+      tinyglobby: 0.2.16
+    optionalDependencies:
+      '@types/node': 24.10.4
+      esbuild: 0.27.3
+      fsevents: 2.3.3
+      jiti: 2.6.1
       tsx: 4.20.6
       yaml: 2.8.1
 
@@ -12325,10 +12597,10 @@ snapshots:
       - tsx
       - yaml
 
-  vitest@4.1.5(@types/node@24.10.4)(@vitest/coverage-v8@4.0.17(vitest@4.0.17))(@vitest/ui@4.0.17(vitest@4.0.17))(jsdom@28.1.0(@noble/hashes@2.0.1))(vite@8.0.9(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)):
+  vitest@4.1.5(@types/node@24.10.4)(@vitest/coverage-v8@4.0.17(vitest@4.0.17))(@vitest/ui@4.0.17)(jsdom@28.1.0(@noble/hashes@2.0.1))(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)):
     dependencies:
       '@vitest/expect': 4.1.5
-      '@vitest/mocker': 4.1.5(vite@8.0.9(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
+      '@vitest/mocker': 4.1.5(vite@8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1))
       '@vitest/pretty-format': 4.1.5
       '@vitest/runner': 4.1.5
       '@vitest/snapshot': 4.1.5
@@ -12345,7 +12617,7 @@ snapshots:
       tinyexec: 1.0.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
-      vite: 8.0.9(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
+      vite: 8.0.11(@types/node@24.10.4)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.8.1)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 24.10.4
