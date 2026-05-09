@@ -4,27 +4,15 @@ import type { Codec } from './codec';
 export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
 
 /**
- * Per-call context the runtime threads to every `codec.encode` /
- * `codec.decode` invocation for a single `runtime.execute()` call.
+ * Per-call context the runtime threads to every `codec.encode` / `codec.decode` invocation for a single `runtime.execute()` call.
  *
  * The framework-level shape is family-agnostic and carries one field:
  *
- * - `signal?: AbortSignal` — per-query cancellation. The runtime returns
- *   a `RUNTIME.ABORTED` envelope when the signal aborts; codec authors
- *   who forward `signal` to their underlying SDK get true cancellation
- *   of in-flight network calls.
+ * - `signal?: AbortSignal` — per-query cancellation. The runtime returns a `RUNTIME.ABORTED` envelope when the signal aborts; codec authors who forward `signal` to their underlying SDK get true cancellation of in-flight network calls.
  *
- * Family layers extend this base with their own shape-of-call metadata:
- * the SQL family adds `column?: SqlColumnRef` via `SqlCodecCallContext`
- * (see `@prisma-next/sql-relational-core`). Mongo currently uses this
- * framework type unchanged. Column metadata is intentionally **not** on
- * the framework type — it is a SQL-family concept rooted in SQL's
- * `(table, column)` addressing model and would not generalise to other
- * families.
+ * Family layers extend this base with their own shape-of-call metadata: the SQL family adds `column?: SqlColumnRef` via `SqlCodecCallContext` (see `@prisma-next/sql-relational-core`). Mongo currently uses this framework type unchanged. Column metadata is intentionally **not** on the framework type — it is a SQL-family concept rooted in SQL's `(table, column)` addressing model and would not generalise to other families.
  *
- * The interface is named explicitly (not inlined) so future framework
- * fields and family extensions can land additively without breaking
- * codec author signatures.
+ * The interface is named explicitly (not inlined) so future framework fields and family extensions can land additively without breaking codec author signatures.
  */
 export interface CodecCallContext {
   readonly signal?: AbortSignal;
@@ -33,22 +21,10 @@ export interface CodecCallContext {
 /**
  * Codec-id-keyed read surface threaded into emit and authoring paths.
  *
- * - `get(id)` returns the runtime {@link Codec} instance for the codec
- *   id (used by `validateContract` for `decodeJson` of literal column
- *   defaults).
- * - `targetTypesFor(id)` exposes the codec-id-keyed `targetTypes`
- *   metadata the runtime instance no longer carries (TML-2357).
- *   Returns the same array `CodecDescriptor.targetTypes` would; for
- *   Mongo (whose registration doesn't yet resolve through the unified
- *   descriptor map — TML-2324) the family-side assembly populates this
- *   directly from the contributor's codec metadata.
- * - `metaFor(id)` exposes the codec-id-keyed `meta` (e.g. SQL-side
- *   `db.sql.postgres.nativeType`) the runtime instance no longer
- *   carries.
- * - `renderOutputTypeFor(id, params)` exposes the codec-id-keyed
- *   `renderOutputType` renderer the runtime instance no longer carries.
- *   Returns `undefined` when the codec doesn't render a custom type or
- *   when the codec id is unknown.
+ * - `get(id)` returns the runtime {@link Codec} instance for the codec id (used by `validateContract` for `decodeJson` of literal column defaults).
+ * - `targetTypesFor(id)` exposes the codec-id-keyed `targetTypes` metadata the runtime instance no longer carries (TML-2357). Returns the same array `CodecDescriptor.targetTypes` would; for Mongo (whose registration doesn't yet resolve through the unified descriptor map — TML-2324) the family-side assembly populates this directly from the contributor's codec metadata.
+ * - `metaFor(id)` exposes the codec-id-keyed `meta` (e.g. SQL-side `db.sql.postgres.nativeType`) the runtime instance no longer carries.
+ * - `renderOutputTypeFor(id, params)` exposes the codec-id-keyed `renderOutputType` renderer the runtime instance no longer carries. Returns `undefined` when the codec doesn't render a custom type or when the codec id is unknown.
  */
 export interface CodecLookup {
   get(id: string): Codec | undefined;
@@ -65,43 +41,25 @@ export const emptyCodecLookup: CodecLookup = {
 };
 
 /**
- * Family-agnostic per-instance context supplied by the framework when
- * applying a higher-order codec factory. Allows stateful codecs (e.g.
- * column-scoped encryption) to derive per-instance state from the
- * materialization site.
+ * Family-agnostic per-instance context supplied by the framework when applying a higher-order codec factory. Allows stateful codecs (e.g. column-scoped encryption) to derive per-instance state from the materialization site.
  *
- * - `name` — the family-agnostic instance identity. For SQL, the runtime
- *   populates this as the `storage.types` instance name (e.g.
- *   `Embedding1536`) for typeRef-shaped columns, the synthesized
- *   anonymous instance name (`<anon:Document.embedding>`) for inline-
- *   `typeParams` columns, or a shared sentinel (`<shared:pg/text@1>`)
- *   for non-parameterized codec ids. Other families pick the analogous
- *   identity for their materialization sites.
+ * - `name` — the family-agnostic instance identity. For SQL, the runtime populates this as the `storage.types` instance name (e.g. `Embedding1536`) for typeRef-shaped columns, the synthesized anonymous instance name (`<anon:Document.embedding>`) for inline-`typeParams` columns, or a shared sentinel (`<shared:pg/text@1>`) for non-parameterized codec ids. Other families pick the analogous identity for their materialization sites.
  *
- * Family-specific extensions (e.g. {@link import('@prisma-next/sql-relational-core/ast').SqlCodecInstanceContext}
- * in the SQL layer) augment this base with domain-shaped column-set
- * metadata. Codec authors target the base when they don't read family-
- * specific metadata; they target the family extension when they do.
+ * Family-specific extensions (e.g. {@link import('@prisma-next/sql-relational-core/ast').SqlCodecInstanceContext} in the SQL layer) augment this base with domain-shaped column-set metadata. Codec authors target the base when they don't read family-specific metadata; they target the family extension when they do.
  */
 export interface CodecInstanceContext {
   readonly name: string;
 }
 
 /**
- * Family-agnostic codec metadata. Family-specific extensions augment the
- * base `db.<family>.<target>` block with native-type information; the base
- * shape is an empty object so non-relational codecs can carry no metadata.
+ * Family-agnostic codec metadata. Family-specific extensions augment the base `db.<family>.<target>` block with native-type information; the base shape is an empty object so non-relational codecs can carry no metadata.
  */
 export interface CodecMeta {
   readonly db?: Record<string, unknown>;
 }
 
 /**
- * Standard Schema validator for `void` params. Accepts only `undefined`
- * (or absent input); rejects any other value so a contract that tries to
- * thread `typeParams` through a non-parameterized codec id fails fast at
- * the JSON boundary instead of silently coercing the value away. Used by
- * the framework-supplied non-parameterized descriptor synthesizer.
+ * Standard Schema validator for `void` params. Accepts only `undefined` (or absent input); rejects any other value so a contract that tries to thread `typeParams` through a non-parameterized codec id fails fast at the JSON boundary instead of silently coercing the value away. Used by the framework-supplied non-parameterized descriptor synthesizer.
  */
 export const voidParamsSchema: StandardSchemaV1<void> = {
   '~standard': {

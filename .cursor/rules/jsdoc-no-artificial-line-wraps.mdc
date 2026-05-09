@@ -1,0 +1,20 @@
+---
+description: Avoid manual hard line breaks in JSDoc / block-comment prose at a fixed column (e.g. 80). Editors soft-wrap; artificial breaks make diffs noisy.
+alwaysApply: false
+---
+
+# JSDoc / block-comment prose — no artificial line wraps
+
+When adding or editing **prose** in `/** ... */` or long `//` documentation:
+
+1. **Paragraphs** — Prefer each paragraph as **one continuous line** (or join wrapped continuation lines). Do not break mid-sentence to stay under ~80 characters.
+
+2. **When hard newlines stay correct**
+   - **Bullet lists** (`*` / `-` in JSDoc): one line per bullet is fine; keep the bullet text on one line unless it is genuinely multiple paragraphs.
+   - **Tagged blocks** (`@param`, `@returns`, `@example`): follow normal JSDoc conventions; avoid arbitrary column wraps in the sentence text.
+
+3. **Orphaned blocks** — A doc comment must document the declaration that immediately follows it (after optional blank lines only before `import` / file headers). Do not leave a standalone `/** ... */` between imports and the next export with no attached symbol; merge into the relevant declaration's doc or delete redundancy.
+
+4. **Rationale** — Same as Markdown: viewers wrap to width; fixed-width source breaks harm `git diff` and merges.
+
+Related: `.agents/skills/markdown-no-artificial-line-wraps/SKILL.md` (Markdown files).
