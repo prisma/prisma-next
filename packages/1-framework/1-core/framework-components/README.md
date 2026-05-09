@@ -31,7 +31,7 @@ import { RuntimeCore, runWithMiddleware, type RuntimeMiddleware } from '@prisma-
 
 The base `Codec` interface lands on the seam between **query-time** methods (per-row, IO-relevant) and **build-time** methods (per-contract-load):
 
-- Query-time: `encode(value): Promise<TWire>` and `decode(wire): Promise<TInput>` are required and **Promise-returning at the public boundary**, regardless of whether the codec body is synchronous or asynchronous. Codec authors extend `CodecImpl` (per [ADR 208 — Higher-order codecs for parameterized types](../../../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)) and write whichever shape is natural per method — TypeScript bivariance accepts sync method bodies satisfying the `Promise<…>` return type, and the runtime always awaits the result.
+- Query-time: `encode(value): Promise<TWire>` and `decode(wire): Promise<TInput>` are required and **Promise-returning at the public boundary**. Codec authors extend `CodecImpl` (per [ADR 208 — Higher-order codecs for parameterized types](../../../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)); a logically synchronous body still has to return a `Promise`-compatible value (mark the method `async`, or return `Promise.resolve(...)` explicitly). The runtime always awaits the result.
 - Build-time: `encodeJson`, `decodeJson`, and the optional `renderOutputType` are **synchronous** so `validateContract` and client construction stay synchronous.
 
 There is no `runtime` / `kind` / equivalent async marker on the interface and no `TRuntime` generic. The runtime always awaits the query-time methods. See [ADR 204 — Single-Path Async Codec Runtime](../../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) for the full design.
@@ -59,8 +59,9 @@ Family layers extend the context where they have a per-call concept that doesn't
 
 ```ts
 // Sketch — codec authors extend `CodecImpl`; class methods receive `(value, ctx)`.
-encode: async (v: string, ctx) =>
-  kms.encrypt({ plaintext: v }, { signal: ctx?.signal });
+async encode(v: string, ctx: CodecCallContext): Promise<EncryptedWire> {
+  return kms.encrypt({ plaintext: v }, { signal: ctx.signal });
+}
 ```
 
 Aborts surface to the caller as `RUNTIME.ABORTED` with `details.phase ∈ { 'encode', 'decode', 'stream' }`. Codec bodies that ignore the signal complete in the background (cooperative cancellation). The `runtimeAborted(phase, cause?)` envelope helper and the `raceAgainstAbort(work, signal, phase)` race helper are exported from `@prisma-next/framework-components/runtime`.

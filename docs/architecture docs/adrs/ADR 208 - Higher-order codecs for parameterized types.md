@@ -255,5 +255,5 @@ The TML-2357 follow-up project completed the registration-side migration this AD
 
 - **`pgEnumCodec` factory audit.** The current factory is a placeholder (enum values aren't parameterized in the curried-factory sense). A separate ticket reshapes it.
 - **Mongo registration migration + Mongo runtime `forColumn`.** Tracked under [TML-2324](https://linear.app/prisma-company/issue/TML-2324). Mongo demos don't use parameterized codecs, so the gap is authoring-time only.
-- **Mongo control-plane parameterized-codecs slot.** Aligns Mongo with the SQL family's slot shape — separate ticket.
+- **Mongo control-plane unified `codecs:` registration surface.** Aligns Mongo with the SQL family's single-slot shape — separate ticket.
 - **Future schema libraries.** zod, valibot, etc. ship as parallel per-library extensions when each library has a clean serialize / rehydrate story. The arktype-json package is the structural template.
