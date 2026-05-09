@@ -31,9 +31,11 @@ The marker schema gains a `space` column with a one-shot framework-internal migr
 
 ## Sub-specs
 
-Two milestones have task specs because their implementation detail is large enough to crowd the project plan:
+Three milestones have task specs because their implementation detail is large enough to crowd the project plan:
 
 - [`specs/framework-mechanism.spec.md`](./specs/framework-mechanism.spec.md) — locks down API shapes for the per-space planner / runner / verifier, the `contractSpace` extension-descriptor field, the marker schema migration SQL, the pinned per-space artefact layout + canonicalisation rules, the codec lifecycle hook, and the per-space `db init` / `db update` flows. Drives M1 and M2.
+- [`specs/m2-orchestrator-consolidation-spec.md`](./specs/m2-orchestrator-consolidation-spec.md) — the M2 R6 consolidation slice (collapsed dual `db init` path, marker-aware verifier wired into all apply paths, path-resolver seam).
+- [`specs/contract-space-aggregate-spec.md`](./specs/contract-space-aggregate-spec.md) — locks down the typed `ContractSpaceAggregate` + loader + aggregate planner + aggregate verifier; the deletion list for today's per-space orchestrator; commit-by-commit slice; 15 acceptance criteria; closes F00 / F05 / F09 / F15 / F23 (subsumes F30). Drives M2.5.
 - [`specs/cipherstash-migration.spec.md`](./specs/cipherstash-migration.spec.md) — locks down cipherstash's package layout, contract IR contents, baseline migration shape (with the EQL bundle byte-equivalence rule), codec hook behaviour, descriptor wiring, and four end-to-end test scenarios (initial, drop, bump, revert workaround). Drives M3.
 
 M4 (pgvector + monorepo example) and M5 (`databaseDependencies` removal + close-out) are small enough to be captured inline in this plan; no task spec needed.
@@ -166,7 +168,7 @@ Introduce the codec lifecycle hook and refactor `db init` / `db update` to be pe
 - [x] **T2.3** db init per-space: extend the in-memory edge synthesis to be per-space-aware. App-space synthesizes from contract; extension-space walks the migration graph from current marker → headRef.hash via `findPathWithDecision`. Concatenate per cross-space ordering; single transaction. (satisfies: TC-21) — landed M2 R5, commits `a739991d9` + `84305b6e1`. Shipped as the framework-level operation `executePerSpaceDbApply` in `@prisma-next/cli/control-api`. Single multi-space code path serves both `db init` and `db update` (only divergence is policy + result envelope). Reads pinned artefacts via `readPinnedSpaceContract` + `computeExtensionSpaceApplyPath` (M2 R2/R3 helpers). Extension graphs walk via `findPathWithDecision` (ADR 208); cross-space ordering via `concatenateSpaceApplyInputs` (M1 R4). Atomic apply via `runner.executeAcrossSpaces` (M2 R4). The introspected schema is pruned of extension-owned tables before app-space planning (each space owns a disjoint slice — sub-spec § 1, AM2). AM9 PASS at the CLI level + AM4-rollback CLI half PASS via the SQLite e2e (T2.5).
 - [x] **T2.4** db update per-space: same as T2.3 but for `db update` (advance current marker → headRef.hash per space). (satisfies: TC-21) — landed M2 R5 (same commits as T2.3). Single shared operation `executePerSpaceDbApply` parameterised by `action: 'dbInit' | 'dbUpdate'`. AM10 PASS via the SQLite e2e — bumping the pinned head ref + writing a new migration package advances only the affected space's marker; the app-space marker is unchanged.
 - [x] **T2.5** Extend the synthetic test extension from T1.10 to exercise the codec hook + per-space db init/update. — landed M2 R5, commits `84305b6e1` + `650d3e385`. End-to-end coverage at [`packages/3-targets/6-adapters/sqlite/test/migrations/db-apply-per-space.cli.test.ts`](../../packages/3-targets/6-adapters/sqlite/test/migrations/db-apply-per-space.cli.test.ts) (4 tests covering: atomic init across both spaces; single-space marker advance on head bump; codec `onFieldEvent` fires through `executePerSpaceDbApply` → `planner.plan(...)` and the hook-emitted op shows up in the executed plan alongside structural DDL; multi-space rollback when any space's plan fails). The drop-side counterpart of the codec hook is locked at the planner unit level by [`planner.codec-field-event.test.ts`](../../packages/3-targets/6-adapters/sqlite/test/migrations/planner.codec-field-event.test.ts), which now covers all three events from sub-spec § 5 (added / dropped / altered). Authored against an inline synthetic SQLite extension space rather than `@prisma-next/extension-test-contract-space` (which is currently postgres-targeted from M1 R1 and runs through PGlite on the existing R4 multi-space rollback test); SQLite was endorsed for the rollback test by the orchestrator (`wip/unattended-decisions.md` § 12) for the in-process / no-PGlite-startup-cost reason. Substantially advances AM11 + AM12; full PASS gated on T3.6 / T3.4 once cipherstash drives the hook on a real codec.
-- [ ] **T2.6** Post-round-2 review polish — address the in-scope code-review findings from [`reviews/pr-438/code-review.md`](./reviews/pr-438/code-review.md). One commit per coherent group; preserve all consolidation-spec watchpoints (do not touch the `targetId` placeholder, do not extract `buildContractSpaceVerifierError`, leave `ensureControlTables` per-space). Findings to address (round-2 IDs):
+- [x] **T2.6** Post-round-2 review polish — address the in-scope code-review findings from [`reviews/pr-438/code-review.md`](./reviews/pr-438/code-review.md). One commit per coherent group; preserve all consolidation-spec watchpoints (do not touch the `targetId` placeholder, do not extract `buildContractSpaceVerifierError`, leave `ensureControlTables` per-space). Findings to address (round-2 IDs):
   - **F06 + F20** — add unit tests for `pruneSchemaByOtherSpaceContracts` covering (a) duck-typing fall-through when `schema` shape doesn't match, (b) genuinely-orphan-table preservation, (c) zero-cost path with no other-space contracts. (Helper currently has no targeted unit test; only implicit e2e coverage.)
   - **F08** — update the doc-comment at the top of [`packages/1-framework/3-tooling/cli/src/utils/contract-space-verifier-precheck.ts`](../../packages/1-framework/3-tooling/cli/src/utils/contract-space-verifier-precheck.ts) to reflect the post-consolidation reality (precheck handles layout-only kinds; marker-check handles marker-dependent kinds; both compose in `db init` / `db update` / `db verify`).
   - **F10** — remove dead `edgesByHash` map in [`packages/1-framework/3-tooling/migration/src/compute-extension-space-apply-path.ts`](../../packages/1-framework/3-tooling/migration/src/compute-extension-space-apply-path.ts) lines 127–138. Constructed but never read.
@@ -188,6 +190,19 @@ Introduce the codec lifecycle hook and refactor `db init` / `db update` to be pe
 - `pnpm build`
 - Cross-check: round-2 review log refreshed for the polish round (`projects/extension-contract-spaces/reviews/pr-438/{code-review,system-design-review,walkthrough}.md`).
 
+- [ ] **T2.7** Round-3 review triviality — address the one cosmetic finding filed during the M2 R6 R2 conversation that doesn't dissolve under the M2.5 aggregate refactor (F29 in [`reviews/pr-438/code-review.md`](./reviews/pr-438/code-review.md)). Mechanical / cosmetic only; no behaviour change.
+  - **F29** — Sweep source-code comments referencing transient project artefacts (`M2 review`, `M2 consolidation slice`, `out of scope`, `sub-spec § …`, `AM12`, etc.) across the cli / migration-tools / sql-family packages. Replace with constraint-described prose, or link to a durable doc under `docs/architecture docs/` once close-out migrates the relevant material. Starting filter: `rg -n "M2 (review|consolidation|spec)|sub-spec §|sub-spec OQ|AM[0-9]+|out of scope" packages/`. Each hit gets a judgement call (delete / rephrase / relink); commit message should name the rule (`.cursor/rules/doc-maintenance.mdc`).
+  - **F30 (subsumed by M2.5)** — The `PerSpace` / `per-space` evolutionary naming is no longer addressed by rename. The M2.5 aggregate refactor (see Milestone 2.5 below) deletes the affected files (`db-apply-per-space.ts`, the verifier-precheck/marker-check helpers, etc.), so the symbols disappear rather than getting renamed. F30 will be marked closed in `code-review.md` when M2.5 lands.
+
+**Validation gate (M2 R7 trivialities):**
+
+- `pnpm typecheck`
+- `pnpm test:packages`
+- `pnpm test:integration`
+- `pnpm lint:deps`
+- `pnpm build`
+- `rg -n "M2 (review|consolidation|spec)|sub-spec §|sub-spec OQ|out of scope" packages/` returns no remaining matches outside intentional close-out references (or zero matches if close-out doc migration has happened).
+
 **Validation gate (original M2):**
 
 - `pnpm typecheck`
@@ -195,6 +210,41 @@ Introduce the codec lifecycle hook and refactor `db init` / `db update` to be pe
 - `pnpm test:integration`
 - `pnpm lint:deps`
 - `pnpm build`
+
+### Milestone 2.5: Contract-space aggregate refactor
+
+Replace the loose `(contract, extensionContractSpaces, migrationsDir)` triple flowing through M2's per-space orchestrator with a typed `ContractSpaceAggregate` produced once by a loader. Three new components in `@prisma-next/migration-tools/aggregate` — loader, aggregate planner, aggregate verifier — consume the aggregate uniformly. CLI commands collapse to ~10-line pipelines. Closes the architectural concerns surfaced in the M2 R6 R2 review (F00, F05, F09, F15, F23) and subsumes F30 (the `PerSpace` evolutionary naming) by deletion rather than rename. Lands before M3 so cipherstash is the first extension authored against the new aggregate API.
+
+A task spec at [`specs/contract-space-aggregate-spec.md`](./specs/contract-space-aggregate-spec.md) captures the implementation detail (full type surface, loader / planner / verifier algorithms, strategy-selection rule, error variants, commit-by-commit slice, watchpoints).
+
+**Branch:** `tml-2397-contract-space-aggregate`, off the amended M2 head. M3 / M4 / M5 rebase onto this branch when it lands.
+
+**Tasks:**
+
+- [ ] **T2.5.1** Introduce `@prisma-next/migration-tools/aggregate` types + loader. Sub-spec § "Commit 1". Folds today's layout precheck, integrity checks, drift detection, and disjointness check into a single load step. Drift is fatal.
+- [ ] **T2.5.2** Aggregate planner with graph-walk and synth strategies. Sub-spec § "Commit 2". Strategy selection is `callerPolicy.ignoreGraphFor`-driven, with explicit `extensionPathUnsatisfiable` / `policyConflict` error variants.
+- [ ] **T2.5.3** Aggregate verifier (`markerCheck` + `schemaCheck` bundled, boolean strict mode). Sub-spec § "Commit 3". Closes F23 via per-member pre-projection of the live schema.
+- [ ] **T2.5.4** Rewire `db init` / `db update` / `db verify` as `loader → planner → runner` (or `loader → verifier`) pipelines. Sub-spec § "Commit 4".
+- [ ] **T2.5.5** Delete deprecated surfaces (`db-apply-per-space.ts`, `contract-space-verifier-{precheck,marker-check}.ts`, `contract-space-migrate-pass.ts` — its `db init`/`db update`/`db verify`-facing portions, `concatenateSpaceApplyInputs` re-export). Sub-spec § "Commit 5".
+- [ ] **T2.5.6** Integration tests + docs:
+  - New `cli.db-verify.aggregate-schema.test.ts` locking F23 behaviourally.
+  - New `cli.loader.drift.test.ts` locking drift-as-fatal.
+  - Postgres CLI per-space e2e (resolves F07; pairs with M3 T3.6 live-Postgres + EQL coverage).
+  - ADR 211 table refresh (no architectural-claim changes; column refresh for which command rejects which violation kind under the new pipeline).
+  - Sub-spec § "Commit 6".
+
+**Validation gate (M2.5):**
+
+- `pnpm typecheck`
+- `pnpm test:packages`
+- `pnpm test:integration`
+- `pnpm test:e2e`
+- `pnpm lint:deps`
+- `pnpm build`
+- `rg -n "executePerSpaceDbApply|PerSpaceExtensionInput|ExecutePerSpaceDbApplyOptions|pruneSchemaByOtherSpaceContracts" packages/` → zero matches in source.
+- `rg -n "as unknown as MigrationPlan\['targetId'\]" packages/` → zero matches.
+- All 15 ACs in the sub-spec hold (sub-spec § "Acceptance criteria").
+- [`reviews/pr-438/code-review.md`](./reviews/pr-438/code-review.md) updated: F00, F05, F09, F15, F23, F30 marked **Closed** with the relevant commit shas.
 
 ### Milestone 3: Migrate cipherstash to contract space
 
@@ -204,9 +254,10 @@ A task spec at `specs/cipherstash-migration.spec.md` captures the implementation
 
 **Tasks:**
 
-- [ ] **T3.0** Round-2-deferred prep:
-  - **F07** — add Postgres CLI per-space e2e covering `executePerSpaceDbApply` (the SQLite e2e from M2 R5 covers the helper, but the CLI surface that wires it is currently only unit-tested at the Postgres adapter level). Pairs with T3.6's live Postgres + EQL coverage.
-  - **F23** — make the live-DB schema verifier aggregate-aware. Currently `verifySqlSchema` runs against the app-space contract only and treats extension-owned tables as "extras" unless the app-space caller pre-prunes. Extend to take the union of all loaded contract spaces so live DB verification is symmetric with `verifyContractSpaces`'s contract-set view. Touches the verifier API + every caller (cli `db verify`, integration tests). Significant — design before coding.
+- [ ] **T3.0** Round-2-deferred prep — both items moved up:
+  - **F07** (Postgres CLI per-space e2e) is now part of M2.5 T2.5.6 (covers the post-aggregate pipeline).
+  - **F23** (aggregate-aware schema verifier) is closed by M2.5 T2.5.3 (per-member pre-projection in the aggregate verifier's `schemaCheck`).
+  - This task survives only if M3 surfaces a new prep item not anticipated at M2.5 close. Otherwise, M3 begins at T3.1.
 - [ ] **T3.1** Author cipherstash's contract space contents: PSL/TS for `eql_v2_configuration` table, `eql_v2_encrypted` composite, `eql_v2_configuration_state` enum, `eql_v2.bloom_filter` / `hmac_256` / `blake3` domains, `ore_*` composites. Emit `contract.json`. (satisfies: TC-13)
 - [ ] **T3.2** Author cipherstash's baseline migration: `installEqlBundle` op containing the vendored 5,750-line bundle SQL byte-for-byte + create-eql_v2_configuration op + create-type ops; each carrying `cipherstash:*` invariantIds. (satisfies: TC-1, TC-12)
 - [ ] **T3.3** Author cipherstash's `headRef` declaring the current target hash + `cipherstash:*` invariants set. Wire descriptor module to expose `contractSpace`. (satisfies: TC-1)
@@ -279,12 +330,12 @@ Carrying forward from `spec.md` § Open Questions:
 
 Plan-derived items needing resolution during execution:
 
-5. **Round-2-review consolidation watchpoints (deferred per `specs/m2-orchestrator-consolidation-spec.md`).** These were called out as out of scope for the M2 consolidation slice and remain so for this PR. Each is a follow-up candidate, not a finding:
-   - The `targetId` placeholder cast in `executePerSpaceDbApply` (round-2 finding F05) — sub-spec § 7 watchpoint 1: "documented as awkward-but-contained ... preserve the placeholder-then-patch sequence". The `targetId` is patched correctly at row-write time; the placeholder is intentional. Revisit when the runner stops requiring `MarkerRow.targetId` upfront.
-   - The duplicated `buildContractSpaceVerifierError` helper across `cli/db-init.ts` + `cli/db-update.ts` + `db-verify.ts` (round-2 finding F09) — sub-spec § 7 watchpoint 6: "Out of scope for this slice — extracting it doesn't affect AC-13/AC-16 satisfaction". The duplication is identical and stable; extracting it is a separate hygiene PR.
-   - The per-space `ensureControlTables` invocation inside `executePerSpaceDbApply` (round-2 finding F11) — sub-spec § 7 watchpoint 3: "Out of scope for this slice — leave the per-space invocation as-is". Idempotent and not on the hot path.
+5. **Round-2-review consolidation watchpoints (deferred per `specs/m2-orchestrator-consolidation-spec.md`; most close under M2.5).** These were called out as out of scope for the M2 consolidation slice. Status under the M2.5 aggregate refactor:
+   - The `targetId` placeholder cast in `executePerSpaceDbApply` (round-2 finding F05) — **closes under M2.5 T2.5.2**: `targetId` is ambient on the aggregate; the synth and graph-walk strategies set it on every emitted `MigrationPlan` from construction, no patch step. (See `specs/contract-space-aggregate-spec.md` § "Aggregate planner".)
+   - The duplicated `buildContractSpaceVerifierError` helper across `cli/db-init.ts` + `cli/db-update.ts` + `db-verify.ts` (round-2 finding F09) — **closes under M2.5 T2.5.3**: aggregate verifier owns the single envelope; the duplicated helpers go away with the deleted files.
+   - The per-space `ensureControlTables` invocation inside `executePerSpaceDbApply` (round-2 finding F11) — **explicitly preserved across M2.5** (sub-spec § "explicitly not doing"). Idempotent and not on the hot path; revisit if it surfaces in M3+ profiling.
 
-6. **`__migrations` smuggling on `MigrationDirectoryAndContract` (round-2 finding F15).** The cli's app-space resolver currently attaches `__migrations` to the app-space-only contract that `planAllSpaces` plans against, so that `executeAcrossSpaces` can surface them later. The cleaner fix is to extend `planAllSpaces` to return migrations alongside the planned ops; that's an API change to a generic primitive in `@prisma-next/migration-tools/exports/spaces` and warrants a separate slice. Captured here so the next pass at the spaces toolkit knows to clean it up.
+6. **`__migrations` smuggling on `MigrationDirectoryAndContract` (round-2 finding F15)** — **closes under M2.5 T2.5.5**: the new aggregate planner takes the aggregate directly (every member already carries its hydrated migrations); the old `planAllSpaces` and the `__migrations` smuggling channel are deleted along with `executePerSpaceDbApply`.
 
 7. **Pre-existing integration-test failure on `test/integration/test/cli.emit-cli-process.e2e.test.ts` (escapee, separate-PR follow-up).** The round-trip test fails deterministically with `Disallowed imports detected ... node:fs/promises` from `loadContractFromTs`. Reproduces on commit `d9ca821a1` (pre-M2-R6-polish baseline); the file is not touched by any commit on this branch. This is an architectural-lint regression independent of contract-spaces work — likely the contract-file allowlist gate tightened without updating the fixture, or the fixture was authored before the gate. Surfaced by the M2 R6 polish reviewer and not blocking M2 close-out, but should be filed as a separate PR / ticket so it doesn't slip past close-out unattended. Not a regression introduced by this project.
 
