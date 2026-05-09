@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/ts-render",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "TypeScript source-text rendering utilities: JSON-to-TS literal printer and abstract expression base class",

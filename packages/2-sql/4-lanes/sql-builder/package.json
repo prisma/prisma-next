@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/sql-builder",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "SQL builder lane for Prisma Next",
