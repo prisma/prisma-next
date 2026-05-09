@@ -3,16 +3,6 @@
   "to": "sha256:efa685171bebbb8f078f08d12be3578bb5d96b71669dccc6cc9e4be96af8cdb4",
   "labels": [],
   "providedInvariants": [
-    "cipherstash:create-eql_v2_blake3-v1",
-    "cipherstash:create-eql_v2_bloom_filter-v1",
-    "cipherstash:create-eql_v2_configuration-v1",
-    "cipherstash:create-eql_v2_configuration_state-v1",
-    "cipherstash:create-eql_v2_encrypted-v1",
-    "cipherstash:create-eql_v2_hmac_256-v1",
-    "cipherstash:create-eql_v2_ore_block_u64_8_256-v1",
-    "cipherstash:create-eql_v2_ore_block_u64_8_256_term-v1",
-    "cipherstash:create-eql_v2_ore_cllw_u64_8-v1",
-    "cipherstash:create-eql_v2_ore_cllw_var_8-v1",
     "cipherstash:install-eql-bundle-v1"
   ],
   "createdAt": "2026-05-09T03:42:56.902Z",
@@ -126,5 +116,5 @@
     "applied": [],
     "plannerVersion": "2.0.0"
   },
-  "migrationHash": "sha256:2cb58bcefa819201cd9309bc92861009455d3267b894f8a75603492988780cd8"
+  "migrationHash": "sha256:c15432ea5384dfede63c92600fbe4c3fdd03c8868100364388aac361523106d8"
 }

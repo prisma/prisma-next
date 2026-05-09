@@ -31,8 +31,6 @@ import {
   CIPHERSTASH_INVARIANTS,
   CIPHERSTASH_SPACE_ID,
   EQL_V2_CONFIGURATION_TABLE,
-  EQL_V2_DOMAIN_TYPES,
-  EQL_V2_ORE_COMPOSITE_TYPES,
 } from '../src/core/constants';
 import { EQL_BUNDLE_SQL } from '../src/core/eql-bundle';
 import cipherstashExtensionDescriptor from '../src/exports/control';
@@ -69,20 +67,11 @@ describe('cipherstash extension descriptor (on-disk-in-package authoring)', () =
     expect(existsSync(join(baseline.dirPath, 'ops.json'))).toBe(true);
   });
 
-  it('baseline ops carry the installEqlBundle op + structural create-* ops', () => {
+  it('baseline ops list the installEqlBundle op as the sole entry', () => {
     const space = cipherstashExtensionDescriptor.contractSpace!;
     const baseline = space.migrations[0]!;
     const opIds = baseline.ops.map((op) => op.invariantId).filter(Boolean);
-    expect(opIds).toContain(CIPHERSTASH_INVARIANTS.installBundle);
-    expect(opIds).toContain(CIPHERSTASH_INVARIANTS.createConfiguration);
-    expect(opIds).toContain(CIPHERSTASH_INVARIANTS.createConfigurationState);
-    expect(opIds).toContain(CIPHERSTASH_INVARIANTS.createEncrypted);
-    for (const name of EQL_V2_DOMAIN_TYPES) {
-      expect(opIds).toContain(CIPHERSTASH_INVARIANTS.createDomain(name));
-    }
-    for (const name of EQL_V2_ORE_COMPOSITE_TYPES) {
-      expect(opIds).toContain(CIPHERSTASH_INVARIANTS.createOreComposite(name));
-    }
+    expect(opIds).toEqual([CIPHERSTASH_INVARIANTS.installBundle]);
   });
 
   it('namespaces every baseline op invariantId under cipherstash:*', () => {

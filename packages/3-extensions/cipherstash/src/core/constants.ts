@@ -37,31 +37,6 @@ export const EQL_V2_CONFIGURATION_STATE_TYPE = 'eql_v2_configuration_state';
 /** JSONB-domain composite type user `Encrypted<string>` columns reference. */
 export const EQL_V2_ENCRYPTED_TYPE = 'eql_v2_encrypted';
 
-/** Domain types EQL exposes (declared under the `eql_v2` schema). */
-export const EQL_V2_DOMAIN_TYPES = ['bloom_filter', 'hmac_256', 'blake3'] as const;
-
-/**
- * Composite types backing the various ORE (Order-Revealing Encryption)
- * search-mode payloads, enumerated from the vendored EQL bundle's
- * `CREATE TYPE eql_v2.<name>` statements:
- *
- *   - `ore_block_u64_8_256_term` — single ORE block term (bytea wrapper).
- *   - `ore_block_u64_8_256` — array of ORE block terms; backs `ore` index.
- *   - `ore_cllw_u64_8` — fixed-width Comparable Linear Wide.
- *   - `ore_cllw_var_8` — variable-width Comparable Linear Wide.
- *
- * Synced with the bundle in M3 R4 (item 22, FR11 cleanup). Subsequent
- * bundle bumps that add ORE shapes must extend this list and mint a new
- * `cipherstash:create-eql_v2_<name>-v1` invariantId via
- * {@link CIPHERSTASH_INVARIANTS.createOreComposite}.
- */
-export const EQL_V2_ORE_COMPOSITE_TYPES = [
-  'ore_block_u64_8_256_term',
-  'ore_block_u64_8_256',
-  'ore_cllw_u64_8',
-  'ore_cllw_var_8',
-] as const;
-
 /**
  * Migration directory name for the baseline.
  *
@@ -76,12 +51,12 @@ export const CIPHERSTASH_BASELINE_MIGRATION_NAME = '20260601T0000_install_eql_bu
  * `cipherstash:*` id, once published, is immutable (project spec FR11):
  * downstream consumers (other extensions, the marker table) reference
  * them by literal string match.
+ *
+ * Today the baseline emits a single op (`installBundle`); the bundle
+ * SQL is the source of truth for every typed object it creates inside
+ * the `eql_v2` schema. New bundle versions or additional structural
+ * ops will mint new `cipherstash:*` ids alongside this entry.
  */
 export const CIPHERSTASH_INVARIANTS = {
   installBundle: 'cipherstash:install-eql-bundle-v1',
-  createConfiguration: 'cipherstash:create-eql_v2_configuration-v1',
-  createConfigurationState: 'cipherstash:create-eql_v2_configuration_state-v1',
-  createEncrypted: 'cipherstash:create-eql_v2_encrypted-v1',
-  createDomain: (name: string) => `cipherstash:create-eql_v2_${name}-v1`,
-  createOreComposite: (name: string) => `cipherstash:create-eql_v2_${name}-v1`,
 } as const;

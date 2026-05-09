@@ -1,7 +1,6 @@
 #!/usr/bin/env -S node
 /**
- * CipherStash baseline migration — install EQL bundle + register
- * invariantIds for typed objects the bundle creates.
+ * CipherStash baseline migration — install the vendored EQL bundle.
  *
  * The contract IR (see `<package>/contract.json`) declares the
  * `eql_v2_configuration` table only — that's the single typed object
@@ -9,23 +8,13 @@
  * `eql_v2` schema, the `eql_v2_configuration_state` enum, the
  * `eql_v2_encrypted` composite, the `eql_v2.bloom_filter` /
  * `hmac_256` / `blake3` domains, plus the ORE composites — is created
- * by the vendored EQL bundle SQL (see
- * `../../../src/core/eql-bundle.ts`, which re-exports the bundle from
- * `eql-install.generated.ts` byte-for-byte per project spec NFR4 /
- * AC7). The bundle also creates the `eql_v2_configuration` table
- * itself, so the planner-emitted `createTable` op would conflict with
- * the bundle's `CREATE TABLE` and is intentionally dropped from this
- * migration's `operations` getter.
- *
- * The structural `cipherstash:create-*-v1` ops that follow the bundle
- * carry stable invariantIds (per project spec FR11 — once published,
- * an invariantId cannot be renamed) but their `execute[]` is a no-op
- * `SELECT 1`. They exist purely to register the invariantId ledger
- * entries the verifier matches against `cipherstashHeadRef.invariants`
- * — the bundle owns the actual DDL. Once the IR vocabulary expands
- * (FR9 deferral, see `../../../src/contract-source.ts`), the
- * structural ops will gain real precheck SQL and the bundle's typed
- * objects will appear in `storage` / `storage.types`.
+ * by the vendored EQL bundle SQL (see `../../../src/core/eql-bundle.ts`,
+ * which re-exports the bundle from `eql-install.generated.ts`
+ * byte-for-byte per project spec NFR4 / AC7). The bundle also creates
+ * the `eql_v2_configuration` table itself, so the planner-emitted
+ * `createTable` op would conflict with the bundle's `CREATE TABLE`
+ * and is intentionally dropped from this migration's `operations`
+ * getter.
  *
  * Authoring loop: this file is hand-edited (M3.5 Path A — see
  * `docs/architecture docs/adrs/ADR 211 - Contract spaces.md`'s
@@ -33,38 +22,10 @@
  * `migration.json` after edits via `node migration.ts`.
  */
 import { Migration, MigrationCLI, rawSql } from '@prisma-next/target-postgres/migration';
-import {
-  CIPHERSTASH_INVARIANTS,
-  EQL_V2_CONFIGURATION_STATE_TYPE,
-  EQL_V2_CONFIGURATION_TABLE,
-  EQL_V2_DOMAIN_TYPES,
-  EQL_V2_ENCRYPTED_TYPE,
-  EQL_V2_ORE_COMPOSITE_TYPES,
-  EQL_V2_SCHEMA,
-} from '../../../src/core/constants';
+import { CIPHERSTASH_INVARIANTS } from '../../../src/core/constants';
 import { EQL_BUNDLE_SQL } from '../../../src/core/eql-bundle';
 
-const STRUCTURAL_OP_NOOP_SQL = 'SELECT 1';
-
-interface MakeOpArgs {
-  readonly id: string;
-  readonly label: string;
-  readonly invariantId: string;
-  readonly executeSql: string;
-}
-
-function makeOp(args: MakeOpArgs) {
-  return rawSql({
-    id: args.id,
-    label: args.label,
-    operationClass: 'additive',
-    invariantId: args.invariantId,
-    target: { id: 'postgres' },
-    precheck: [],
-    execute: [{ description: args.label, sql: args.executeSql }],
-    postcheck: [],
-  });
-}
+const INSTALL_LABEL = 'Install EQL bundle (functions, operators, casts, op classes, schema, types)';
 
 export default class M extends Migration {
   override describe() {
@@ -76,46 +37,16 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      makeOp({
+      rawSql({
         id: 'cipherstash.install-eql-bundle',
-        label: 'Install EQL bundle (functions, operators, casts, op classes, schema, types)',
+        label: INSTALL_LABEL,
+        operationClass: 'additive',
         invariantId: CIPHERSTASH_INVARIANTS.installBundle,
-        executeSql: EQL_BUNDLE_SQL,
+        target: { id: 'postgres' },
+        precheck: [],
+        execute: [{ description: INSTALL_LABEL, sql: EQL_BUNDLE_SQL }],
+        postcheck: [],
       }),
-      makeOp({
-        id: `cipherstash.create-${EQL_V2_CONFIGURATION_STATE_TYPE}`,
-        label: `Register invariant for enum ${EQL_V2_CONFIGURATION_STATE_TYPE} (created by EQL bundle)`,
-        invariantId: CIPHERSTASH_INVARIANTS.createConfigurationState,
-        executeSql: STRUCTURAL_OP_NOOP_SQL,
-      }),
-      makeOp({
-        id: `cipherstash.create-${EQL_V2_CONFIGURATION_TABLE}`,
-        label: `Register invariant for table ${EQL_V2_CONFIGURATION_TABLE} (created by EQL bundle)`,
-        invariantId: CIPHERSTASH_INVARIANTS.createConfiguration,
-        executeSql: STRUCTURAL_OP_NOOP_SQL,
-      }),
-      makeOp({
-        id: `cipherstash.create-${EQL_V2_ENCRYPTED_TYPE}`,
-        label: `Register invariant for composite type ${EQL_V2_ENCRYPTED_TYPE} (created by EQL bundle)`,
-        invariantId: CIPHERSTASH_INVARIANTS.createEncrypted,
-        executeSql: STRUCTURAL_OP_NOOP_SQL,
-      }),
-      ...EQL_V2_DOMAIN_TYPES.map((name) =>
-        makeOp({
-          id: `cipherstash.create-${EQL_V2_SCHEMA}-${name}`,
-          label: `Register invariant for domain ${EQL_V2_SCHEMA}.${name} (created by EQL bundle)`,
-          invariantId: CIPHERSTASH_INVARIANTS.createDomain(name),
-          executeSql: STRUCTURAL_OP_NOOP_SQL,
-        }),
-      ),
-      ...EQL_V2_ORE_COMPOSITE_TYPES.map((name) =>
-        makeOp({
-          id: `cipherstash.create-${EQL_V2_SCHEMA}-${name}`,
-          label: `Register invariant for composite type ${EQL_V2_SCHEMA}.${name} (created by EQL bundle)`,
-          invariantId: CIPHERSTASH_INVARIANTS.createOreComposite(name),
-          executeSql: STRUCTURAL_OP_NOOP_SQL,
-        }),
-      ),
     ];
   }
 }
