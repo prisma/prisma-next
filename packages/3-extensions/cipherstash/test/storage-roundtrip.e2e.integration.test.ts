@@ -98,9 +98,16 @@ import {
   EQL_V2_ENCRYPTED_TYPE,
   EQL_V2_SCHEMA,
 } from '../src/core/constants';
-import { cipherstashContract } from '../src/core/contract';
-import { cipherstashBaselineMigration, cipherstashHeadRef } from '../src/core/migrations';
 import cipherstashExtensionDescriptor from '../src/exports/control';
+
+// Forward-port (M3.5 R2): the cipherstash contract / baseline migration / head ref
+// now flow through on-disk JSON via the descriptor's contractSpace, replacing the
+// previous in-memory `core/contract` and `core/migrations` modules.
+const cipherstashContractSpace = cipherstashExtensionDescriptor.contractSpace!;
+const cipherstashContract = cipherstashContractSpace.contractJson;
+const cipherstashBaselineMigration = cipherstashContractSpace.migrations[0]!;
+const cipherstashHeadRef = cipherstashContractSpace.headRef;
+
 import { bulkEncryptMiddleware } from '../src/exports/middleware';
 import type {
   CipherstashBulkDecryptArgs,
