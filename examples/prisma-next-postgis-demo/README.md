@@ -79,27 +79,41 @@ pnpm db:down
 ## Next.js demo app
 
 `pnpm dev` boots a small Next.js (App Router) app at
-`http://localhost:3000` that imports the same query functions used by the
-e2e tests and renders their results as server components.
+`http://localhost:3000` that imports the same query functions used by
+the e2e tests, runs them as server components, and visualizes the data
+on a map.
 
-It exposes a single page with:
+The page has:
 
-- A query-point form (longitude, latitude, radius, limit) that defaults
-  to the Ferry Building. Submitting re-runs every query on the server.
-- Sections for each query example — `findCafesNearPoint`,
-  `findCafesWithinRadius`, `findNeighborhoodForPoint`,
-  `findCafesInNeighborhood` (SoMa), `findRoutesIntersecting` (downtown
-  closure), and `findCafesInBbox` (downtown viewport).
+- A live `PostGIS x.y.z` badge in the header (probed at request time
+  with `SELECT PostGIS_Full_Version()`), plus dataset chips (`5 cafes`,
+  `3 neighborhoods`, `2 routes`).
+- A query selector (six tabs) — pick one query at a time. Each tab
+  shows the function name, the underlying PostGIS operation
+  (`ST_DistanceSphere`, `ST_Within`, `&&`, …), the query builder
+  snippet, and the result rows.
+- A San Francisco map that always shows every cafe, neighborhood, and
+  route. The active query's results are highlighted; query overlays
+  are drawn (radius circle, bbox rectangle, closure polygon, SoMa
+  outline).
+- For point-based queries (`near`, `within`, `contains`): a small form
+  for `lng/lat/radius/limit`, preset buttons (Ferry Building,
+  Sightglass, Ritual, Andytown), or just click the map to set the
+  query point.
 
 Manual smoke test:
 
-1. Visit `http://localhost:3000` — you should see five cafes ranked by
-   distance to the Ferry Building, with `Blue Bottle (Mint Plaza)` at
-   the top.
-2. Change the query point to `lng=-122.4234`, `lat=37.7615` (Ritual in
-   the Mission). The neighborhood section should now report `Mission`.
-3. Drop the radius to `500` m. The "within radius" list should shrink
-   to just the closest one or two cafes.
+1. Visit `http://localhost:3000` — header shows `PostGIS 3.4.x` (or
+   whatever your container reports). The default tab is "Nearest
+   cafes" with `Blue Bottle (Mint Plaza)` ranked first.
+2. Click the "Neighborhood for point" tab, then click somewhere inside
+   the Mission polygon on the map. The result should switch to
+   `Mission`.
+3. Click the "Cafes within radius" tab and set radius to `500`. The
+   highlighted set on the map should shrink to one or two cafes.
+4. Click "Routes crossing closure" — the dashed red polygon downtown
+   appears, and `Market Street stroll` is highlighted while
+   `Mission loop` stays dimmed.
 
 To build and run the production bundle instead:
 
