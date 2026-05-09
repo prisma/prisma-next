@@ -1,5 +1,6 @@
 import {
   checkAborted,
+  isRuntimeError,
   raceAgainstAbort,
   runtimeError,
 } from '@prisma-next/framework-components/runtime';
@@ -260,6 +261,15 @@ async function decodeField(
   try {
     return await codec.decode(wireValue, cellCtx);
   } catch (error) {
+    // Codec-authored runtime envelopes (e.g. `RUNTIME.DECODE_FAILED` thrown
+    // from inside the codec body, or `RUNTIME.ABORTED` raised via
+    // `CodecCallContext.signal` per ADR 207) carry their own per-codec
+    // context — wrapping them again would erase that context and coerce
+    // the abort intent into a generic decode failure. Pass them through
+    // unchanged; only foreign errors get the `wrapDecodeFailure` envelope.
+    if (isRuntimeError(error)) {
+      throw error;
+    }
     wrapDecodeFailure(error, alias, ref, codec, wireValue);
   }
 }
