@@ -48,6 +48,13 @@
  *      declared in reverse order produces the same marker hashes —
  *      cross-space ordering is determined by space id, not by
  *      declaration order.
+ *
+ * The fixtures (`audit*`, `featureFlags*`) are pulled from each
+ * package's descriptor `contractSpace` rather than from
+ * (now-deleted) per-package `contract.ts` / `migrations.ts` modules —
+ * after M3.5 R3 each internal package authors via the on-disk
+ * `prisma-next contract emit` / `prisma-next migration plan` pipeline,
+ * and the descriptor is the canonical reader of those artefacts.
  */
 
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -59,6 +66,7 @@ import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
@@ -69,23 +77,45 @@ import {
   AUDIT_EVENT_TABLE,
   AUDIT_SPACE_ID,
 } from '../packages/audit/constants';
-import { AUDIT_STORAGE_HASH, auditContract } from '../packages/audit/contract';
 import auditExtensionDescriptor from '../packages/audit/control';
-import { auditBaselineMigration, auditHeadRef } from '../packages/audit/migrations';
 import {
   FEATURE_FLAG_TABLE,
   FEATURE_FLAGS_BASELINE_INVARIANT_ID,
   FEATURE_FLAGS_SPACE_ID,
 } from '../packages/feature-flags/constants';
-import {
-  FEATURE_FLAGS_STORAGE_HASH,
-  featureFlagsContract,
-} from '../packages/feature-flags/contract';
 import featureFlagsExtensionDescriptor from '../packages/feature-flags/control';
-import {
-  featureFlagsBaselineMigration,
-  featureFlagsHeadRef,
-} from '../packages/feature-flags/migrations';
+
+function requireBaseline(
+  descriptor: { readonly contractSpace?: { readonly migrations: readonly MigrationPackage[] } },
+  spaceId: string,
+): MigrationPackage {
+  const baseline = descriptor.contractSpace?.migrations[0];
+  if (!baseline) {
+    throw new Error(`${spaceId} descriptor is missing its baseline migration package`);
+  }
+  return baseline;
+}
+
+const auditContractSpace = auditExtensionDescriptor.contractSpace;
+if (!auditContractSpace) {
+  throw new Error('audit descriptor is missing its contractSpace');
+}
+const auditBaselineMigration: MigrationPackage = requireBaseline(auditExtensionDescriptor, 'audit');
+const auditContract = auditContractSpace.contractJson;
+const AUDIT_STORAGE_HASH = auditContractSpace.headRef.hash;
+const auditHeadRef = auditContractSpace.headRef;
+
+const featureFlagsContractSpace = featureFlagsExtensionDescriptor.contractSpace;
+if (!featureFlagsContractSpace) {
+  throw new Error('feature-flags descriptor is missing its contractSpace');
+}
+const featureFlagsBaselineMigration: MigrationPackage = requireBaseline(
+  featureFlagsExtensionDescriptor,
+  'feature-flags',
+);
+const featureFlagsContract = featureFlagsContractSpace.contractJson;
+const FEATURE_FLAGS_STORAGE_HASH = featureFlagsContractSpace.headRef.hash;
+const featureFlagsHeadRef = featureFlagsContractSpace.headRef;
 
 function buildFamilyInstance(declarationOrder: 'natural' | 'reverse') {
   const extensionPacks =
