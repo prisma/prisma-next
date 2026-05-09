@@ -103,7 +103,7 @@ After amending or rebasing, force-push to the contributor's fork: `git push --fo
 
 Conventional commit form, lowercase after the colon, no trailing period, under ~60 chars:
 
-```
+```text
 type(scope): concise lowercase description
 ```
 
