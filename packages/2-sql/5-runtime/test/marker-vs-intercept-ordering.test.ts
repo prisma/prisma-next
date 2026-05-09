@@ -7,17 +7,8 @@ import {
   type RuntimeExtensionInstance,
 } from '@prisma-next/framework-components/execution';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type {
-  CodecRegistry,
-  SqlDriver,
-  SqlExecuteRequest,
-} from '@prisma-next/sql-relational-core/ast';
-import {
-  codec,
-  createCodecRegistry,
-  SelectAst,
-  TableSource,
-} from '@prisma-next/sql-relational-core/ast';
+import type { Codec, SqlDriver, SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
+import { SelectAst, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it, vi } from 'vitest';
 import { parseContractMarkerRow } from '../src/marker';
@@ -29,6 +20,8 @@ import type {
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
+import { defineTestCodec } from './test-codec';
+import { descriptorsFromCodecs } from './utils';
 
 /**
  * Pins the ordering invariant from spec AC L239: marker verification runs
@@ -52,20 +45,18 @@ const testContract: Contract<SqlStorage> = {
   meta: {},
 };
 
-function createCodecs(): CodecRegistry {
-  const registry = createCodecRegistry();
-  registry.register(
-    codec({
+function createCodecs(): ReadonlyArray<Codec<string>> {
+  return [
+    defineTestCodec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
       encode: (v: number) => v,
       decode: (w: number) => w,
     }),
-  );
-  return registry;
+  ];
 }
 
-function createStubAdapter(codecs: CodecRegistry) {
+function createStubAdapter(codecs: ReadonlyArray<Codec<string>>) {
   return {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
@@ -130,8 +121,7 @@ function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => createCodecRegistry(),
-    parameterizedCodecs: () => [],
+    codecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -141,15 +131,14 @@ function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
 function createTestAdapterDescriptor(
   adapter: ReturnType<typeof createStubAdapter>,
 ): SqlRuntimeAdapterDescriptor<'postgres'> {
-  const codecRegistry = adapter.profile.codecs();
+  const descriptors = descriptorsFromCodecs(adapter.profile.codecs());
   return {
     kind: 'adapter',
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => codecRegistry,
-    parameterizedCodecs: () => [],
+    codecs: () => descriptors,
     create() {
       return Object.assign(
         { familyId: 'sql' as const, targetId: 'postgres' as const },

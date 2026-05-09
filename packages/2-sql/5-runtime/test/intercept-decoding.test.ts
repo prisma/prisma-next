@@ -7,15 +7,9 @@ import {
   type RuntimeExtensionInstance,
 } from '@prisma-next/framework-components/execution';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type {
-  CodecRegistry,
-  SqlDriver,
-  SqlExecuteRequest,
-} from '@prisma-next/sql-relational-core/ast';
+import type { Codec, SqlDriver, SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import {
   ColumnRef,
-  codec,
-  createCodecRegistry,
   ProjectionItem,
   SelectAst,
   TableSource,
@@ -31,6 +25,8 @@ import type {
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
+import { defineTestCodec } from './test-codec';
+import { descriptorsFromCodecs } from './utils';
 
 /**
  * Documents the contract: when a `SqlMiddleware.intercept` hook short-circuits
@@ -60,29 +56,25 @@ const testContract: Contract<SqlStorage> = {
  * objects. Used to demonstrate that intercepted rows containing JSON-encoded
  * values come back to the consumer as parsed objects.
  */
-function createJsonCodecRegistry(): CodecRegistry {
-  const registry = createCodecRegistry();
-  registry.register(
-    codec({
+function createJsonCodecs(): ReadonlyArray<Codec<string>> {
+  return [
+    defineTestCodec({
       typeId: 'pg/jsonb@1',
       targetTypes: ['jsonb'],
       encode: (value: string | JsonValue): string => JSON.stringify(value),
       decode: (wire: string | JsonValue): JsonValue =>
         typeof wire === 'string' ? (JSON.parse(wire) as JsonValue) : wire,
     }),
-  );
-  registry.register(
-    codec({
+    defineTestCodec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
       encode: (v: number) => v,
       decode: (w: number) => w,
     }),
-  );
-  return registry;
+  ];
 }
 
-function createStubAdapter(codecs: CodecRegistry) {
+function createStubAdapter(codecs: ReadonlyArray<Codec<string>>) {
   return {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
@@ -132,8 +124,7 @@ function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => createCodecRegistry(),
-    parameterizedCodecs: () => [],
+    codecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -143,15 +134,14 @@ function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
 function createTestAdapterDescriptor(
   adapter: ReturnType<typeof createStubAdapter>,
 ): SqlRuntimeAdapterDescriptor<'postgres'> {
-  const codecRegistry = adapter.profile.codecs();
+  const descriptors = descriptorsFromCodecs(adapter.profile.codecs());
   return {
     kind: 'adapter',
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => codecRegistry,
-    parameterizedCodecs: () => [],
+    codecs: () => descriptors,
     create() {
       return Object.assign(
         { familyId: 'sql' as const, targetId: 'postgres' as const },
@@ -162,7 +152,7 @@ function createTestAdapterDescriptor(
 }
 
 function createTestSetup(middleware: readonly SqlMiddleware[]) {
-  const codecs = createJsonCodecRegistry();
+  const codecs = createJsonCodecs();
   const adapter = createStubAdapter(codecs);
   const driver = createMockDriver();
 

@@ -514,8 +514,7 @@ describe('applyMutationDefaults', () => {
       version: '0.0.1',
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
-      codecs: () => createCodecRegistry(),
-      parameterizedCodecs: () => [],
+      codecs: () => [],
       mutationDefaultGenerators: () => [
         {
           id: 'counter',
@@ -605,8 +604,7 @@ describe('applyMutationDefaults', () => {
       version: '0.0.1',
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
-      codecs: () => createCodecRegistry(),
-      parameterizedCodecs: () => [],
+      codecs: () => [],
       mutationDefaultGenerators: () => [
         {
           id: 'correlationId',
@@ -688,8 +686,7 @@ describe('applyMutationDefaults', () => {
       version: '0.0.1',
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
-      codecs: () => createCodecRegistry(),
-      parameterizedCodecs: () => [],
+      codecs: () => [],
       mutationDefaultGenerators: () => [
         {
           id: 'perFieldCounter',

@@ -41,7 +41,7 @@ export type ColumnDescriptor = {
   readonly codecId: string;
   readonly nativeType: string;
   readonly typeRef?: string;
-  readonly typeParams?: Record<string, unknown>;
+  readonly typeParams?: Record<string, unknown> | undefined;
 };
 
 export function toNamedTypeFieldDescriptor(

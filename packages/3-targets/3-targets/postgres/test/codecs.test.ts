@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import {
   pgBitDescriptor,
   pgBoolDescriptor,
+  pgByteaDescriptor,
   pgCharDescriptor,
   pgEnumDescriptor,
   pgFloat4Descriptor,
@@ -64,6 +65,7 @@ const descriptorByScalar = {
   bool: pgBoolDescriptor,
   bit: pgBitDescriptor,
   'bit varying': pgVarbitDescriptor,
+  bytea: pgByteaDescriptor,
   interval: pgIntervalDescriptor,
   enum: pgEnumDescriptor,
   json: pgJsonDescriptor,
@@ -346,7 +348,7 @@ describe('adapter-postgres codecs', () => {
   });
 
   describe('bytea codec', () => {
-    const byteaCodec = codecDefinitions.bytea.codec as {
+    const byteaCodec = codecForScalar('bytea') as {
       encode: (value: Uint8Array, ctx: SqlCodecCallContext) => Promise<Uint8Array>;
       decode: (wire: Uint8Array, ctx: SqlCodecCallContext) => Promise<Uint8Array>;
       encodeJson: (value: Uint8Array) => unknown;
