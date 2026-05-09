@@ -17,7 +17,7 @@ When adding or editing **prose** in `/** ... */` or long `//` documentation:
 
 4. **Orphaned blocks** — A doc comment must document the declaration that immediately follows it (after optional blank lines only before `import` / file headers). Do not leave a standalone `/** ... */` between imports and the next export with no attached symbol; merge into the relevant declaration's doc or delete redundancy.
 
-5. **Markdown is exempt** — Do not apply this rule to `.md` files (READMEs, ADRs, PR bodies, rulecards). Markdown prose stays on one continuous line per paragraph; see `.agents/skills/markdown-no-artificial-line-wraps/SKILL.md`. ADR callouts and narrative Markdown under `docs/architecture docs/adrs/` follow the Markdown rule, not this one.
+5. **Markdown is exempt** — Do not apply this rule to `.md` files (READMEs, ADRs, PR bodies, rulecards, and any other Markdown). Markdown prose stays on one continuous line per paragraph; see `.agents/skills/markdown-no-artificial-line-wraps/SKILL.md`.
 
 6. **Rationale** — Wrapping at the same width that the formatter uses keeps doc-comment prose visually consistent with surrounding code, avoids both "one giant line" and "narrow 1990s terminal" extremes, and produces stable diffs because the wrap width is anchored to the formatter rather than picked per-author.
 

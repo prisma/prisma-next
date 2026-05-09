@@ -40,6 +40,7 @@ export interface CodecDescriptor<P = void> {
   readonly targetTypes: readonly string[];
   readonly meta?: CodecMeta;
   readonly paramsSchema: StandardSchemaV1<P>;
+  readonly isParameterized: boolean;
   readonly renderOutputType?: (params: P) => string | undefined;
   readonly factory: (params: P) => (ctx: CodecInstanceContext) => Codec;
 }
@@ -51,6 +52,7 @@ export abstract class CodecDescriptorImpl<P = void> implements CodecDescriptor<P
   abstract readonly targetTypes: readonly string[];
   readonly meta?: CodecMeta;
   abstract readonly paramsSchema: StandardSchemaV1<P>;
+  readonly isParameterized: boolean; // derived from `paramsSchema !== voidParamsSchema`
   renderOutputType?(params: P): string | undefined;
   abstract factory(params: P): (ctx: CodecInstanceContext) => Codec;
 }
@@ -239,17 +241,6 @@ The legacy `defineCodec({...})` factory and the family-side `mkCodec({...})` ins
 - [ADR 171 — Parameterized native types in contracts](ADR%20171%20-%20Parameterized%20native%20types%20in%20contracts.md). Established `typeParams` on storage columns.
 - [ADR 168 — Postgres JSON and JSONB typed columns](ADR%20168%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md). Introduced typed JSON columns with Standard Schema. Per-library extensions (`@prisma-next/extension-arktype-json`) now own the typed JSON column shape.
 - [ADR 202 — Codec trait system](ADR%20202%20-%20Codec%20trait%20system.md). The trait system. The `'json-validator'` trait was a transitional gate for the now-deleted `JsonSchemaValidatorRegistry`; both the trait and the registry were retired — JSON-Schema validation lives uniformly inside the resolved codec's `decode` body.
-
-## Status — Unified descriptor authoring
-
-The registration-side migration this ADR's parent project deliberately deferred is complete. The framework now standardizes on:
-
-- **Class-based authoring** — descriptor class + codec class + per-codec column helper, tied with `satisfies`; `defineCodec({...})`, `mkCodec({...})`, `defineCodecGroup`, `defineCodecBundle`, `byScalar`, `dataTypes`, and the synthesis bridge `synthesizeNonParameterizedDescriptor` are all retired.
-- **Single registration slot.** Every contributor ships native `CodecDescriptor`s through one `codecs:` slot; the parallel `parameterizedCodecs:` slot and the legacy `CodecParamsDescriptor` are deleted.
-- **Narrow runtime `Codec` instance.** The `Codec` interface declares only `id` (proxied through the descriptor) and the four conversion methods (`encode`, `decode`, `encodeJson`, `decodeJson`). `traits`, `targetTypes`, `meta`, and `renderOutputType` live only on the descriptor.
-- **`ParamRef.refs` plumbed.** Every column-bound `ParamRef` carries `refs: { table; column }`; the builder-pipeline `validateParamRefRefs` pass enforces refs on every parameterized `ParamRef` before encode. Encode-side dispatch resolves through `forColumn(refs.table, refs.column)` for parameterized codec ids. `forCodecId` is retained only as the refs-less fallback for non-parameterized codec ids.
-- **No emit-shim.** The arktype-json `arktypeJsonEmitCodec` placeholder is deleted; the emit path consults `descriptorFor(codecId).renderOutputType` directly.
-- **JSON-Schema validation lives in `decode`.** The `JsonSchemaValidatorRegistry`, `buildJsonSchemaValidatorRegistry`, the `jsonSchemaValidators?` slot on `ExecutionContext`, and the `'json-validator'` `CodecTrait` are all deleted; per-library extensions (e.g. arktype-json) validate inline inside their `decode` body.
 
 ## Future work
 
