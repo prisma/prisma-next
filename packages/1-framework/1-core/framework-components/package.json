@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/framework-components",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "Framework component types, assembly logic, and stack creation for Prisma Next",

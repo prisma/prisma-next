@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/mongo-emitter",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "Mongo emitter hook for Prisma Next",

@@ -49,6 +49,8 @@ jobs:
         run: pnpm lint:rules:footprint
       - name: Validate package READMEs
         run: pnpm lint:docs
+      - name: Validate package manifests (license declarations)
+        run: pnpm lint:manifests
 
   fixtures:
     name: Fixtures
