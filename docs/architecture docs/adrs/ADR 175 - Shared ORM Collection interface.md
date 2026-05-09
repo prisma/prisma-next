@@ -1,5 +1,7 @@
 # ADR 175 — Shared ORM Collection interface
 
+> **Note (later supersession):** this ADR was written before [ADR 183 — Aggregation pipeline only, never find API](ADR%20183%20-%20Aggregation%20pipeline%20only,%20never%20find%20API.md). On the Mongo family, ORM reads compile to aggregation pipelines (`AggregateCommand`) only — `FindCommand` is not a peer compilation target. Wherever this ADR pairs `FindCommand / AggregateCommand`, read `AggregateCommand` only.
+
 ## At a glance
 
 The same chaining API works for both families. The consumer doesn't know (or care) whether the data lives in Postgres or MongoDB:
