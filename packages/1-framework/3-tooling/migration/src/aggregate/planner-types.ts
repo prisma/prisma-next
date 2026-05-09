@@ -1,0 +1,137 @@
+import type { Contract } from '@prisma-next/contract/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import type {
+  ControlFamilyInstance,
+  MigrationOperationPolicy,
+  MigrationPlan,
+  MigrationPlannerConflict,
+  MigrationPlanOperation,
+  TargetMigrationsCapability,
+} from '@prisma-next/framework-components/control';
+import type { Result } from '@prisma-next/utils/result';
+import type { ContractMarkerRecordLike } from './marker-types';
+import type { ContractSpaceAggregate } from './types';
+
+/**
+ * Caller-provided policy for {@link planAggregate}. Today this carries
+ * just one knob:
+ *
+ * - `ignoreGraphFor`: `Set<spaceId>`. For listed members, the planner
+ *   forces the **synth** strategy (synthesise a plan from the contract
+ *   IR via `familyInstance.createPlanner(...).plan(...)`) regardless of
+ *   whether a graph is available. The CLI's daily-driver `db init` /
+ *   `db update` pipelines pass `new Set([aggregate.app.spaceId])` to
+ *   keep today's app-space behaviour: the user's authored
+ *   `migrations/` directory is **not** walked for the app member, the
+ *   plan is synthesised on the fly. Extension members are walked.
+ *
+ *   Listing a member here whose `headRef.invariants` is non-empty is
+ *   a `policyConflict` — synth cannot satisfy authored invariants.
+ */
+export interface CallerPolicy {
+  readonly ignoreGraphFor: ReadonlySet<string>;
+}
+
+/**
+ * Snapshot of the live database state the planner needs to drive
+ * strategy selection.
+ *
+ * - `markersBySpaceId`: per-space marker rows. Absent entry = no
+ *   marker yet (greenfield space). The planner treats the marker's
+ *   `storageHash` as the graph-walk's `from` node, falling back to
+ *   {@link import('../constants').EMPTY_CONTRACT_HASH} when absent.
+ * - `schemaIntrospection`: the family's full live schema IR. Fed into
+ *   the synth strategy after per-space pre-projection via
+ *   {@link import('./project-schema-to-space').projectSchemaToSpace}.
+ *
+ * Callers (CLI commands) gather this via the family's
+ * `readAllMarkers` + `introspect` calls before invoking the planner.
+ * The planner itself does not touch the database.
+ */
+export interface AggregateCurrentDBState {
+  readonly markersBySpaceId: ReadonlyMap<string, ContractMarkerRecordLike | null>;
+  readonly schemaIntrospection: unknown;
+}
+
+/**
+ * Inputs to {@link planAggregate}.
+ *
+ * The planner is target-agnostic but family-aware: per-member synth
+ * delegates to the family's `createPlanner(familyInstance).plan(...)`,
+ * which is why `familyInstance`, `migrations` (the
+ * `TargetMigrationsCapability`), and `frameworkComponents` are all
+ * threaded through. (`frameworkComponents` is passed verbatim into
+ * `planner.plan(...)` per ADR 212; the planner does not interpret it.)
+ *
+ * The aggregate planner does **not** receive a `targetId` separately —
+ * it reads `aggregate.targetId` and stamps it onto every emitted
+ * `MigrationPlan` from construction. No placeholder, no patch step.
+ */
+export interface AggregatePlannerInput<TFamilyId extends string, TTargetId extends string> {
+  readonly aggregate: ContractSpaceAggregate;
+  readonly currentDBState: AggregateCurrentDBState;
+  readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
+  readonly migrations: TargetMigrationsCapability<
+    TFamilyId,
+    TTargetId,
+    ControlFamilyInstance<TFamilyId, unknown>
+  >;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
+  readonly callerPolicy: CallerPolicy;
+  readonly operationPolicy: MigrationOperationPolicy;
+}
+
+/**
+ * Per-member output of the aggregate planner. The runner ingests this
+ * shape directly via a thin `toRunnerInput` adapter at the CLI.
+ *
+ * - `plan`: ready-to-execute `MigrationPlan` with `targetId` already
+ *   set from `aggregate.targetId`.
+ * - `displayOps`: same operation list, surfaced separately so plan-mode
+ *   output can render without touching the runner-bound `plan`.
+ * - `destinationContract`: the typed contract value the runner uses
+ *   for post-apply verification. For the app member, the user's
+ *   contract; for extension members, the pinned `contract.json`.
+ * - `strategy`: which strategy produced this plan (`'graph-walk'` or
+ *   `'synth'`). Surfaced for diagnostics; not consumed by the runner.
+ */
+export interface AggregatePerSpacePlan {
+  readonly plan: MigrationPlan;
+  readonly displayOps: readonly MigrationPlanOperation[];
+  readonly destinationContract: Contract;
+  readonly strategy: 'graph-walk' | 'synth';
+}
+
+export interface AggregatePlannerSuccess {
+  readonly perSpace: ReadonlyMap<string, AggregatePerSpacePlan>;
+  /**
+   * `applyOrder` is the order the runner must walk per-space inputs.
+   * Mirrors the existing `concatenateSpaceApplyInputs` convention:
+   * extensions alphabetically by `spaceId`, then the app. Tests assert
+   * on `MultiSpaceRunnerFailure.failingSpace`, which is positional in
+   * the runner's input array — preserving the literal ordering keeps
+   * `failingSpace` attribution byte-for-byte.
+   */
+  readonly applyOrder: readonly string[];
+}
+
+/**
+ * Discriminated failure variants for {@link planAggregate}. Each
+ * variant short-circuits the plan; per-member errors carry the
+ * `spaceId` so the CLI can surface a precise envelope.
+ */
+export type AggregatePlannerError =
+  | { readonly kind: 'extensionPathUnreachable'; readonly spaceId: string; readonly target: string }
+  | {
+      readonly kind: 'extensionPathUnsatisfiable';
+      readonly spaceId: string;
+      readonly missingInvariants: readonly string[];
+    }
+  | {
+      readonly kind: 'appSynthFailure';
+      readonly spaceId: string;
+      readonly conflicts: readonly MigrationPlannerConflict[];
+    }
+  | { readonly kind: 'policyConflict'; readonly spaceId: string; readonly detail: string };
+
+export type AggregatePlannerOutput = Result<AggregatePlannerSuccess, AggregatePlannerError>;
