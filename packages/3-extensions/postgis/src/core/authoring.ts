@@ -1,4 +1,5 @@
 import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
+import { POSTGIS_GEOMETRY_CODEC_ID } from './constants';
 
 export const postgisAuthoringTypes = {
   postgis: {
@@ -6,7 +7,7 @@ export const postgisAuthoringTypes = {
       kind: 'typeConstructor',
       args: [{ kind: 'number', name: 'srid', integer: true, minimum: 0 }],
       output: {
-        codecId: 'pg/geometry@1',
+        codecId: POSTGIS_GEOMETRY_CODEC_ID,
         nativeType: 'geometry',
         typeParams: {
           srid: { kind: 'arg', index: 0 },

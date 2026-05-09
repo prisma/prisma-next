@@ -78,6 +78,10 @@ export function polygon(ring: ReadonlyArray<Position>, srid?: number): GeometryP
     throw new Error('polygon: ring positions cannot be undefined');
   }
   const closed = first[0] === last[0] && first[1] === last[1] ? ring : [...ring, first];
+  const distinct = new Set(closed.slice(0, -1).map(([x, y]) => `${x},${y}`));
+  if (distinct.size < 3) {
+    throw new Error('polygon: ring must contain at least 3 distinct positions');
+  }
   return srid !== undefined
     ? { type: 'Polygon', coordinates: [closed], srid }
     : { type: 'Polygon', coordinates: [closed] };

@@ -63,6 +63,16 @@ describe('postgis geojson constructors', () => {
         ]),
       ).toThrow('at least 3 positions');
     });
+
+    it('rejects already-closed rings with fewer than 3 distinct positions', () => {
+      expect(() =>
+        polygon([
+          [0, 0],
+          [1, 1],
+          [0, 0],
+        ]),
+      ).toThrow('at least 3 distinct positions');
+    });
   });
 
   describe('bboxPolygon', () => {
