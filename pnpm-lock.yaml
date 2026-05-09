@@ -944,6 +944,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../operations
+      '@prisma-next/ts-render':
+        specifier: workspace:*
+        version: link:../ts-render
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../0-foundation/utils
