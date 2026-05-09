@@ -1,10 +1,7 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
-import {
-  APP_SPACE_ID,
-  type ControlDriverInstance,
-} from '@prisma-next/framework-components/control';
+import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import type {
   AnyQueryAst,
   LoweredStatement,
@@ -94,6 +91,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    */
   async readMarker(
     driver: ControlDriverInstance<'sql', 'sqlite'>,
+    space: string,
   ): Promise<ContractMarkerRecord | null> {
     const exists = await driver.query(
       `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`,
@@ -124,7 +122,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
          invariants
        FROM _prisma_marker
        WHERE space = ?`,
-      [APP_SPACE_ID],
+      [space],
     );
 
     const row = result.rows[0];

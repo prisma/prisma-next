@@ -10,12 +10,14 @@ export interface SqlStatement {
 
 export interface WriteMarkerInput {
   /**
-   * Logical space identifier for this marker row. Defaults to
-   * {@link APP_SPACE_ID} (`'app'`) so existing single-app callers keep
-   * working without modification; per-space callers pass their space id
-   * explicitly.
+   * Logical space identifier for this marker row. Required at every
+   * call site so the type system surfaces every place that needs to
+   * thread the value (rather than letting an `?? APP_SPACE_ID`
+   * fall-through silently collapse multi-space markers onto the
+   * `'app'` row). App-plan callers pass {@link APP_SPACE_ID}
+   * (`'app'`); per-extension callers pass the extension's space id.
    */
-  readonly space?: string;
+  readonly space: string;
   readonly storageHash: string;
   readonly profileHash: string;
   readonly contractJson?: unknown;
@@ -64,7 +66,7 @@ export const ensureTableStatement: SqlStatement = {
   params: [],
 };
 
-export function readContractMarker(space: string = APP_SPACE_ID): MarkerStatement {
+export function readContractMarker(space: string): MarkerStatement {
   return {
     sql: `select
       core_hash,
@@ -118,7 +120,7 @@ export function writeContractMarker(input: WriteMarkerInput): WriteContractMarke
     expr: c.type ? `$${i + 2}::${c.type}` : `$${i + 2}`,
     param: c.param,
   }));
-  const params: readonly unknown[] = [input.space ?? APP_SPACE_ID, ...placed.map((c) => c.param)];
+  const params: readonly unknown[] = [input.space, ...placed.map((c) => c.param)];
 
   // `updated_at = now()` is a SQL literal with no parameter slot, so it
   // sits outside `placed` and is appended directly to each statement.

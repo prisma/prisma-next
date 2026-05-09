@@ -13,6 +13,7 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
+  APP_SPACE_ID,
   createControlStack,
   hasMigrations,
   hasOperationPreview,
@@ -402,7 +403,11 @@ class ControlClientImpl implements ControlClient {
 
   async readMarker(): Promise<ContractMarkerRecord | null> {
     const { driver, familyInstance } = await this.ensureConnected();
-    return familyInstance.readMarker({ driver });
+    // The CLI client's readMarker reads the app's marker. Per-extension
+    // readers go through the orchestrator's per-space planner / runner
+    // boundary, which threads the extension's space id through the
+    // family interface explicitly.
+    return familyInstance.readMarker({ driver, space: APP_SPACE_ID });
   }
 
   async migrationApply(options: MigrationApplyOptions): Promise<MigrationApplyResult> {

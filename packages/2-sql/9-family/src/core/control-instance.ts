@@ -20,6 +20,7 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
+  APP_SPACE_ID,
   SchemaTreeNode,
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
@@ -355,7 +356,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const contractProfileHash = contract.profileHash;
       const contractTarget = contract.target;
 
-      const marker = await getControlAdapter().readMarker(driver);
+      const marker = await getControlAdapter().readMarker(driver, APP_SPACE_ID);
 
       let missingCodecs: readonly string[] | undefined;
       let codecCoverageSkipped = false;
@@ -500,7 +501,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       await driver.query(ensureSchemaStatement.sql, ensureSchemaStatement.params);
       await driver.query(ensureTableStatement.sql, ensureTableStatement.params);
 
-      const existingMarker = await getControlAdapter().readMarker(driver);
+      const existingMarker = await getControlAdapter().readMarker(driver, APP_SPACE_ID);
 
       let markerCreated = false;
       let markerUpdated = false;
@@ -508,6 +509,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
       if (!existingMarker) {
         const write = writeContractMarker({
+          space: APP_SPACE_ID,
           storageHash: contractStorageHash,
           profileHash: contractProfileHash,
           contractJson: contractInput,
@@ -528,6 +530,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             profileHash: existingProfileHash,
           };
           const write = writeContractMarker({
+            space: APP_SPACE_ID,
             storageHash: contractStorageHash,
             profileHash: contractProfileHash,
             contractJson: contractInput,
@@ -576,8 +579,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
     async readMarker(options: {
       readonly driver: ControlDriverInstance<'sql', string>;
+      readonly space: string;
     }): Promise<ContractMarkerRecord | null> {
-      return getControlAdapter().readMarker(options.driver);
+      return getControlAdapter().readMarker(options.driver, options.space);
     },
     async introspect(options: {
       readonly driver: ControlDriverInstance<'sql', string>;

@@ -1,4 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -54,6 +55,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         policy: { allowedOperationClasses: ['additive'] },
         fromContract: fromContractWithHash('sha256:from'),
         frameworkComponents: [],
+        spaceId: APP_SPACE_ID,
       });
 
       expect(result.kind).toBe('success');
@@ -71,6 +73,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         policy: { allowedOperationClasses: ['additive'] },
         fromContract,
         frameworkComponents: [],
+        spaceId: APP_SPACE_ID,
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
@@ -87,6 +90,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         policy: { allowedOperationClasses: ['additive'] },
         fromContract: null,
         frameworkComponents: [],
+        spaceId: APP_SPACE_ID,
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
@@ -102,6 +106,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         policy: { allowedOperationClasses: ['additive'] },
         fromContract: null,
         frameworkComponents: [],
+        spaceId: APP_SPACE_ID,
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
@@ -119,6 +124,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         policy: { allowedOperationClasses: ['additive'] },
         fromContract: null,
         frameworkComponents: [],
+        spaceId: APP_SPACE_ID,
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
@@ -136,6 +142,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         policy: { allowedOperationClasses: ['additive'] },
         fromContract: fromContractWithHash('sha256:from'),
         frameworkComponents: [],
+        spaceId: APP_SPACE_ID,
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
@@ -152,11 +159,14 @@ describe('SqliteMigrationPlanner authoring surface', () => {
   describe('emptyMigration(context)', () => {
     it("identifies as the 'sqlite' target with no operations and the supplied destination hash", () => {
       const planner = createSqliteMigrationPlanner();
-      const empty = planner.emptyMigration({
-        packageDir: '/tmp/migration-pkg',
-        fromHash: null,
-        toHash: 'sha256:to',
-      });
+      const empty = planner.emptyMigration(
+        {
+          packageDir: '/tmp/migration-pkg',
+          fromHash: null,
+          toHash: 'sha256:to',
+        },
+        APP_SPACE_ID,
+      );
 
       expect(empty.targetId).toBe('sqlite');
       expect(empty.operations).toEqual([]);
@@ -165,11 +175,14 @@ describe('SqliteMigrationPlanner authoring surface', () => {
 
     it('renders a stub whose describe() carries from/to and whose operations list is empty', () => {
       const planner = createSqliteMigrationPlanner();
-      const empty = planner.emptyMigration({
-        packageDir: '/tmp/migration-pkg',
-        fromHash: 'sha256:from',
-        toHash: 'sha256:to',
-      });
+      const empty = planner.emptyMigration(
+        {
+          packageDir: '/tmp/migration-pkg',
+          fromHash: 'sha256:from',
+          toHash: 'sha256:to',
+        },
+        APP_SPACE_ID,
+      );
 
       const source = empty.renderTypeScript();
       expect(source).toContain("from '@prisma-next/target-sqlite/migration'");
@@ -189,6 +202,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         policy: { allowedOperationClasses: ['widening', 'destructive'] },
         fromContract: null,
         frameworkComponents: [],
+        spaceId: APP_SPACE_ID,
       });
 
       expect(result.kind).toBe('failure');

@@ -109,7 +109,10 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       if (!ensureResult.ok) {
         return ensureResult;
       }
-      const existingMarker = await this.family.readMarker({ driver });
+      const existingMarker = await this.family.readMarker({
+        driver,
+        space: options.plan.spaceId,
+      });
 
       // Validate plan origin matches existing marker (needs marker from DB)
       const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
@@ -590,6 +593,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   ): Promise<void> {
     const incomingInvariants = options.plan.providedInvariants ?? [];
     const writeStatements = buildMergeMarkerStatements({
+      space: options.plan.spaceId,
       storageHash: options.plan.destination.storageHash,
       profileHash:
         options.plan.destination.profileHash ??

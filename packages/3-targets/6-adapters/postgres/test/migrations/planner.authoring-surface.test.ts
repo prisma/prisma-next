@@ -4,9 +4,10 @@ import {
   extractCodecControlHooks,
   type NativeTypeExpander,
 } from '@prisma-next/family-sql/control';
-import type {
-  MigrationPlanner,
-  MigrationPlannerSuccessResult,
+import {
+  APP_SPACE_ID,
+  type MigrationPlanner,
+  type MigrationPlannerSuccessResult,
 } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor, {
@@ -67,6 +68,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
         policy: { allowedOperationClasses: ['additive'] },
         fromContract,
         frameworkComponents: [],
+        spaceId: APP_SPACE_ID,
       });
 
       if (result.kind !== 'success') {
@@ -87,11 +89,14 @@ describe('PostgresMigrationPlanner authoring surface', () => {
   describe('emptyMigration(context)', () => {
     it("identifies as the 'postgres' target with no operations and the supplied destination hash", () => {
       const planner = makeFrameworkPlanner();
-      const empty = planner.emptyMigration({
-        packageDir: '/tmp/migration-pkg',
-        fromHash: null,
-        toHash: 'sha256:to',
-      });
+      const empty = planner.emptyMigration(
+        {
+          packageDir: '/tmp/migration-pkg',
+          fromHash: null,
+          toHash: 'sha256:to',
+        },
+        APP_SPACE_ID,
+      );
 
       expect(empty.targetId).toBe('postgres');
       expect(empty.operations).toEqual([]);
@@ -100,11 +105,14 @@ describe('PostgresMigrationPlanner authoring surface', () => {
 
     it('renders a stub whose describe() carries from/to and whose operations list is empty', () => {
       const planner = makeFrameworkPlanner();
-      const empty = planner.emptyMigration({
-        packageDir: '/tmp/migration-pkg',
-        fromHash: 'sha256:from',
-        toHash: 'sha256:to',
-      });
+      const empty = planner.emptyMigration(
+        {
+          packageDir: '/tmp/migration-pkg',
+          fromHash: 'sha256:from',
+          toHash: 'sha256:to',
+        },
+        APP_SPACE_ID,
+      );
 
       const source = empty.renderTypeScript();
 

@@ -58,7 +58,7 @@ export const ensureLedgerTableStatement: SqlStatement = {
   params: [],
 };
 
-export function readMarkerStatement(space: string = APP_SPACE_ID): SqlStatement {
+export function readMarkerStatement(space: string): SqlStatement {
   return {
     sql: `SELECT
       core_hash,
@@ -77,11 +77,14 @@ export function readMarkerStatement(space: string = APP_SPACE_ID): SqlStatement 
 
 export interface WriteMarkerInput {
   /**
-   * Logical space identifier for this marker row. Defaults to
-   * {@link APP_SPACE_ID} (`'app'`) so existing single-app callers keep
-   * working without modification.
+   * Logical space identifier for this marker row. Required at every
+   * call site so the type system surfaces every place that needs to
+   * thread the value (rather than letting an `?? APP_SPACE_ID`
+   * fall-through silently collapse multi-space markers onto the
+   * `'app'` row). App-plan callers pass {@link APP_SPACE_ID}
+   * (`'app'`); per-extension callers pass the extension's space id.
    */
-  readonly space?: string;
+  readonly space: string;
   readonly storageHash: string;
   readonly profileHash: string;
   readonly contractJson?: unknown;
@@ -103,7 +106,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
   readonly update: SqlStatement;
 } {
   const params: readonly unknown[] = [
-    input.space ?? APP_SPACE_ID,
+    input.space,
     input.storageHash,
     input.profileHash,
     jsonParam(input.contractJson),
@@ -157,7 +160,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         input.appTag ?? null,
         jsonParam(input.meta ?? {}),
         jsonParam(input.invariants),
-        input.space ?? APP_SPACE_ID,
+        input.space,
       ],
     },
   };

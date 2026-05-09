@@ -74,7 +74,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
         if (!ensureResult.ok) {
           return ensureResult;
         }
-        const existingMarker = await this.readMarker(driver);
+        const existingMarker = await this.readMarker(driver, options.plan.spaceId);
 
         const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
         if (!markerCheck.ok) {
@@ -310,8 +310,9 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
 
   private async readMarker(
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
+    space: string,
   ): Promise<ContractMarkerRecord | null> {
-    const stmt = readMarkerStatement();
+    const stmt = readMarkerStatement(space);
     try {
       const result = await driver.query<ContractMarkerRow>(stmt.sql, stmt.params);
       const row = result.rows[0];
@@ -567,6 +568,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     for (const inv of options.plan.providedInvariants) merged.add(inv);
     const invariants = Array.from(merged).sort();
     const writeStatements = buildWriteMarkerStatements({
+      space: options.plan.spaceId,
       storageHash: options.plan.destination.storageHash,
       profileHash:
         options.plan.destination.profileHash ??

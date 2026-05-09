@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -55,6 +56,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           policy: INIT_ADDITIVE_POLICY,
           fromContract: null,
           frameworkComponents,
+          spaceId: APP_SPACE_ID,
         });
         expect(result.kind).toBe('success');
         if (result.kind !== 'success') {
@@ -115,6 +117,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           policy: INIT_ADDITIVE_POLICY,
           fromContract: null,
           frameworkComponents,
+          spaceId: APP_SPACE_ID,
         });
         if (initialPlan.kind !== 'success') {
           throw new Error('expected initial planner success');
@@ -129,6 +132,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
 
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [],

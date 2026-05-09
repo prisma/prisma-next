@@ -21,15 +21,24 @@ import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/ve
 export interface SqlControlAdapter<TTarget extends string = string>
   extends ControlAdapterInstance<'sql', TTarget> {
   /**
-   * Reads the contract marker from the database, returning `null` if the marker
-   * table or its row is missing. Implementations are responsible for the
-   * dialect-specific existence probe (e.g. Postgres `information_schema.tables`
-   * vs SQLite `sqlite_master`) and parameter placeholders.
+   * Reads the contract marker for `space` from the database, returning
+   * `null` if no marker row exists for that space (or if the marker
+   * table itself is missing). Implementations are responsible for the
+   * dialect-specific existence probe (e.g. Postgres
+   * `information_schema.tables` vs SQLite `sqlite_master`) and parameter
+   * placeholders.
+   *
+   * `space` is required so callers cannot accidentally fall through to
+   * the app's marker row when reading per-extension markers.
    *
    * @param driver - ControlDriverInstance for executing queries (target-specific)
+   * @param space - Contract space id whose marker row to read (e.g. `'app'`)
    * @returns Resolved marker record, or `null` if not yet stamped.
    */
-  readMarker(driver: ControlDriverInstance<'sql', TTarget>): Promise<ContractMarkerRecord | null>;
+  readMarker(
+    driver: ControlDriverInstance<'sql', TTarget>,
+    space: string,
+  ): Promise<ContractMarkerRecord | null>;
 
   /**
    * Introspects a database schema and returns a raw SqlSchemaIR.

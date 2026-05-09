@@ -98,6 +98,7 @@ export function createMigrationPlan<TTargetDetails>(
 ): SqlMigrationPlan<TTargetDetails> {
   return Object.freeze({
     targetId: options.targetId,
+    spaceId: options.spaceId,
     ...(options.origin !== undefined
       ? { origin: options.origin ? Object.freeze({ ...options.origin }) : null }
       : {}),

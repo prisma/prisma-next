@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import {
+  APP_SPACE_ID,
   createControlStack,
   hasOperationPreview,
   type MigrationPlanOperation,
@@ -279,6 +280,7 @@ async function executeMigrationPlanCommand(
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
       fromContract,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
     if (plannerResult.kind === 'failure') {
       return notOk(

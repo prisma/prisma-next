@@ -7,6 +7,7 @@ import {
 import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
 import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
@@ -42,6 +43,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result).toMatchObject({
@@ -73,6 +75,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -113,6 +116,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result).toMatchObject({
@@ -671,6 +675,7 @@ function planUserTableOperations(
     policy: INIT_ADDITIVE_POLICY,
     fromContract: null,
     frameworkComponents: options?.frameworkComponents ?? [],
+    spaceId: APP_SPACE_ID,
   });
   if (result.kind !== 'success') throw new Error('expected planner success');
   return result.plan.operations;

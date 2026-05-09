@@ -9,6 +9,7 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { describe, expect, it } from 'vitest';
@@ -114,6 +115,7 @@ describe('SQLite planner + introspection round-trip', () => {
         policy: { allowedOperationClasses: ['additive'] },
         fromContract: null,
         frameworkComponents: [],
+        spaceId: APP_SPACE_ID,
       });
 
       expect(result.kind).toBe('success');
@@ -172,6 +174,7 @@ describe('SQLite planner + introspection round-trip', () => {
         policy: { allowedOperationClasses: ['additive'] },
         fromContract: null,
         frameworkComponents: [],
+        spaceId: APP_SPACE_ID,
       });
 
       expect(result.kind).toBe('success');
@@ -228,6 +231,7 @@ describe('SQLite planner + introspection round-trip', () => {
         policy: { allowedOperationClasses: ['additive'] },
         fromContract: null,
         frameworkComponents: [],
+        spaceId: APP_SPACE_ID,
       });
 
       expect(result.kind).toBe('success');

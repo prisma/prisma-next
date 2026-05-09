@@ -353,6 +353,13 @@ export interface MigrationPlanner<
     readonly frameworkComponents: ReadonlyArray<
       TargetBoundComponentDescriptor<TFamilyId, TTargetId>
     >;
+    /**
+     * Contract space this plan applies to. Stamped onto the produced
+     * plan so the runner keys the marker row by the right space when
+     * executing. App-plan callers pass `APP_SPACE_ID` (`'app'`);
+     * per-extension callers pass the extension's space id.
+     */
+    readonly spaceId: string;
   }): MigrationPlannerResult;
 
   /**
@@ -361,8 +368,15 @@ export interface MigrationPlanner<
    * Used by `migration new` to scaffold a fresh `migration.ts`. The
    * returned plan has no operations; its `renderTypeScript()` yields a
    * stub the user can edit.
+   *
+   * `spaceId` is stamped onto the produced plan; reconciliation flows
+   * (`db init`, `db update`) and authoring flows (`migration new`) all
+   * pass it explicitly.
    */
-  emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface;
+  emptyMigration(
+    context: MigrationScaffoldContext,
+    spaceId: string,
+  ): MigrationPlanWithAuthoringSurface;
 }
 
 /**

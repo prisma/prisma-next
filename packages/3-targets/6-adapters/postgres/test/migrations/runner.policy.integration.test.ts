@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { expectNoMarkerOrLedgerWrites } from '../utils/dbAssertions';
@@ -51,6 +52,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
 
         const planWithPolicyViolation = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -112,6 +114,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
         // so the SQL bodies are arbitrary.
         const planWithDataOp = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           providedInvariants: [],
@@ -183,6 +186,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
         // Same operation structure as above, but now with a permissive policy
         const planWithDestructiveOp = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [

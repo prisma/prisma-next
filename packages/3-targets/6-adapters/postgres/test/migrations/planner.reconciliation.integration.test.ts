@@ -1,6 +1,9 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
+import {
+  APP_SPACE_ID,
+  type MigrationOperationPolicy,
+} from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -60,6 +63,7 @@ async function applyBaseline(
     policy: INIT_ADDITIVE_POLICY,
     fromContract: null,
     frameworkComponents,
+    spaceId: APP_SPACE_ID,
   });
   if (result.kind !== 'success') {
     throw new Error(`baseline planner failed: ${JSON.stringify(result)}`);
@@ -92,6 +96,7 @@ async function planAndExecute(
     policy: RECONCILIATION_POLICY,
     fromContract: null,
     frameworkComponents,
+    spaceId: APP_SPACE_ID,
   });
   if (planResult.kind !== 'success') {
     throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);

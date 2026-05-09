@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -34,6 +35,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
     const plan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [
@@ -109,6 +111,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
     const initPlan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [],
@@ -135,6 +138,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
     // True no-op self-edge: origin === destination, no ops, no invariants.
     const noOpPlan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: toPlanContractInfo(contract),
       destination: toPlanContractInfo(contract),
       operations: [],
@@ -179,6 +183,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
 
     const initPlan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [],
@@ -199,6 +204,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
 
     const selfEdgePlan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: toPlanContractInfo(contract),
       destination: toPlanContractInfo(contract),
       operations: [

@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import {
   buildMergeMarkerStatements,
@@ -59,6 +60,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [],
@@ -133,6 +135,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [],
@@ -183,6 +186,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         await executeStatement(driver!, ensureLedgerTableStatement);
 
         const mismatchedMarker = buildMergeMarkerStatements({
+          space: APP_SPACE_ID,
           storageHash: 'sha256:other-contract',
           profileHash: 'sha256:other-profile',
           contractJson: { storageHash: 'sha256:other-contract' },
@@ -195,6 +199,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: {
             storageHash: 'sha256:expected-origin',
             profileHash: 'sha256:expected-profile',
@@ -248,6 +253,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
         const invalidPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -309,6 +315,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
         const planWithFailingPostcheck = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -379,6 +386,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         // Create a plan with SQL that will fail (syntax error)
         const planWithInvalidSql = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -459,6 +467,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         // Create a plan that tries to insert duplicate email (will fail with constraint violation)
         const planWithConstraintViolation = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
