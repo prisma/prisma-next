@@ -1,6 +1,5 @@
 import type { Contract, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type { AnyCodecDescriptor, CodecDescriptor } from '@prisma-next/framework-components/codec';
-import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { ComponentDescriptor } from '@prisma-next/framework-components/components';
 import { checkContractComponentRequirements } from '@prisma-next/framework-components/components';
 import {
@@ -260,14 +259,12 @@ function validateTypeParams(
 
 /**
  * Collect every {@link CodecDescriptor} contributed by the SQL stack and
- * partition into "parameterized" vs "non-parameterized" by reference-
- * equality with the framework-supplied {@link voidParamsSchema}. Every
- * non-parameterized descriptor falls back to the singleton
- * `voidParamsSchema` for `paramsSchema`; parameterized descriptors author
- * their own
- * `paramsSchema`, so the singleton check classifies them as
- * parameterized regardless of how permissive the validator is. The
- * heuristic survives "validators that accept everything" (test stubs).
+ * partition into "parameterized" vs "non-parameterized" via the
+ * descriptor's own {@link CodecDescriptorImpl.isParameterized} getter
+ * (F12). The getter is the canonical discriminator — a `paramsSchema`
+ * identity check would misroute any descriptor that doesn't reuse the
+ * exact `voidParamsSchema` singleton (e.g. a non-parameterized codec
+ * authoring its own no-op schema).
  *
  * The unified descriptor list collapses the legacy split (a separate
  * slot used to register parameterized codecs) — every codec id resolves
@@ -293,8 +290,7 @@ function collectCodecDescriptors(contributors: ReadonlyArray<SqlStaticContributi
       seen.add(descriptor.codecId);
       all.push(descriptor);
 
-      if (descriptor.paramsSchema !== voidParamsSchema) {
-        // The descriptor authored its own params schema → parameterized.
+      if (descriptor.isParameterized) {
         // Cast widens the descriptor's heterogeneous `P` to the runtime
         // alias surface; consumers narrow per codec id at the dispatch
         // site, where the descriptor's own `paramsSchema` validates
