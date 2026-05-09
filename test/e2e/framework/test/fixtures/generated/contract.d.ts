@@ -32,7 +32,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:46a85cfb733bccaef4e3fc232d9d4bbdff9f106e0d409293a38da165658c1105'>;
+  StorageHashBase<'sha256:2e72bb4249046b5293d54aae3c84fa9049e05ca205e2ff10410e71c2c7b28260'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:adc296c2bde14cd4e6a8a85ba202108dc7a320b5870a14d7dd8e2d2e2f5a7f27'>;
 export type ProfileHash =
@@ -58,7 +58,7 @@ export type FieldOutputTypes = {
   readonly Embedding: {
     readonly id: CodecTypes['pg/int4@1']['output'];
     readonly embedding: Vector<1536>;
-    readonly profile: { age: number; name: string };
+    readonly profile: CodecTypes['pg/jsonb@1']['output'];
   };
   readonly Event: {
     readonly id: Char<36>;
@@ -116,7 +116,7 @@ export type FieldInputTypes = {
   readonly Embedding: {
     readonly id: CodecTypes['pg/int4@1']['input'];
     readonly embedding: CodecTypes['pg/vector@1']['input'];
-    readonly profile: CodecTypes['arktype/json@1']['input'];
+    readonly profile: CodecTypes['pg/jsonb@1']['input'];
   };
   readonly Event: {
     readonly id: CodecTypes['sql/char@1']['input'];
@@ -225,18 +225,8 @@ type ContractBase = ContractType<
           };
           readonly profile: {
             readonly nativeType: 'jsonb';
-            readonly codecId: 'arktype/json@1';
+            readonly codecId: 'pg/jsonb@1';
             readonly nullable: false;
-            readonly typeParams: {
-              readonly expression: '{ age: number, name: string }';
-              readonly jsonIr: {
-                readonly required: readonly [
-                  { readonly key: 'age'; readonly value: 'number' },
-                  { readonly key: 'name'; readonly value: 'string' },
-                ];
-                readonly domain: 'object';
-              };
-            };
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
@@ -571,20 +561,7 @@ type ContractBase = ContractType<
         };
         readonly profile: {
           readonly nullable: false;
-          readonly type: {
-            readonly kind: 'scalar';
-            readonly codecId: 'arktype/json@1';
-            readonly typeParams: {
-              readonly expression: '{ age: number, name: string }';
-              readonly jsonIr: {
-                readonly required: readonly [
-                  { readonly key: 'age'; readonly value: 'number' },
-                  { readonly key: 'name'; readonly value: 'string' },
-                ];
-                readonly domain: 'object';
-              };
-            };
-          };
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
         };
       };
       readonly relations: Record<string, never>;

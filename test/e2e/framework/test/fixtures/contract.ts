@@ -17,7 +17,6 @@ import {
   varcharColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import arktypeJsonPack from '@prisma-next/extension-arktype-json/pack';
 import { vector } from '@prisma-next/extension-pgvector/column-types';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
@@ -26,14 +25,8 @@ import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { uuidv7 } from '@prisma-next/ids';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
-import { type } from 'arktype';
 
 const postgresCodecLookup = extractCodecLookup([postgresAdapter, pgvectorPack, arktypeJsonPack]);
-
-const profileSchema = type({
-  name: 'string',
-  age: 'number',
-});
 
 const UserBase = model('User', {
   fields: {
@@ -144,7 +137,7 @@ export const contract = defineContract({
       fields: {
         id: field.column(int4Column).defaultSql('autoincrement()').id(),
         embedding: field.column(vector(1536)),
-        profile: field.column(arktypeJson(profileSchema)),
+        profile: field.column(jsonbColumn),
       },
     }).sql({ table: 'embedding' }),
   },
