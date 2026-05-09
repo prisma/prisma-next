@@ -198,10 +198,43 @@ The extension declares the following capabilities:
 
 - `pgvector.cosine`: Indicates support for cosine distance and similarity operations
 
+## Authoring (maintainers)
+
+The extension's contract + baseline migration are emitted on-disk inside
+this package using the same pipeline application authors use:
+
+- `pnpm build:contract-space` — runs `prisma-next contract emit` to
+  produce `<package>/contract.{json,d.ts}` from the TS source at
+  `src/contract-source.ts`.
+- `prisma-next migration plan` (run inside the package) — scaffolds a
+  new migration directory under `migrations/pgvector/<dirName>/` for
+  schema changes that touch tables / models. Note: pgvector's contract
+  declares only the parameterised `vector` native type under
+  `storage.types` (no tables / models), so the planner currently
+  refuses to scaffold the baseline migration; that directory was
+  hand-authored once (Migration subclass + seed `migration.json`
+  preserving the full `toContract`) and `node migration.ts` re-emits
+  `ops.json` + `migration.json` deterministically. Future migrations
+  that add tables / models can use `migration plan` directly.
+- `node migration.ts` (run inside the migration directory) — re-emits
+  `ops.json` + `migration.json` from the hand-edited subclass.
+- `refs/head.json` is hand-pinned with the latest migration's `to`
+  hash + `providedInvariants`.
+
+The descriptor at `src/exports/control.ts` then JSON-imports those
+artefacts and synthesises the framework's `MigrationPackage` shape
+(with `dirPath` resolved from `import.meta.url`).
+
+See [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
+("On-disk-in-package authoring convention") for the full rationale and
+[`packages/3-extensions/test-contract-space`](../test-contract-space)
+for the reference model.
+
 ## References
 
 - [pgvector documentation](https://github.com/pgvector/pgvector)
 - [Prisma Next Architecture Overview](../../../docs/Architecture%20Overview.md)
 - [Extension Packs Guide](../../../docs/reference/Extension-Packs-Naming-and-Layout.md)
+- [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
 
 Pack refs (`@prisma-next/extension-pgvector/pack`) are pure data objects generated from the hydrated manifest (`src/core/manifest.ts`), so TypeScript contract builders can enable the pgvector namespace in both emit and no-emit workflows without touching the filesystem.
