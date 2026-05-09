@@ -16,6 +16,7 @@ import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import { type ContractMarkerRow, parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
@@ -114,7 +115,8 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     const policyCheck = this.enforcePolicyCompatibility(options.policy, options.plan.operations);
     if (!policyCheck.ok) return policyCheck;
 
-    await this.ensureControlTables(driver);
+    const ensureResult = await this.ensureControlTables(driver);
+    if (!ensureResult.ok) return ensureResult;
     const existingMarker = await this.readMarker(driver, space);
 
     const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
@@ -137,7 +139,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       executedOperations = applyResult.value.executedOperations;
     }
 
-    if (space === 'app') {
+    if (space === APP_SPACE_ID) {
       const schemaIR = await this.family.introspect({
         driver,
         contract: options.destinationContract,
@@ -219,7 +221,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
         if (fkWasEnabled) {
           const fkIntegrityCheck = await this.verifyForeignKeyIntegrity(driver);
           if (!fkIntegrityCheck.ok) {
-            return notOk({ ...fkIntegrityCheck.failure, failingSpace: 'app' });
+            return notOk({ ...fkIntegrityCheck.failure, failingSpace: APP_SPACE_ID });
           }
         }
 

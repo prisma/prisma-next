@@ -15,6 +15,7 @@ import type {
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
@@ -142,7 +143,8 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     if (!policyCheck.ok) return policyCheck;
 
     await this.acquireLock(driver, lockKey);
-    await this.ensureControlTables(driver);
+    const ensureResult = await this.ensureControlTables(driver);
+    if (!ensureResult.ok) return ensureResult;
     const existingMarker = await this.family.readMarker({ driver, space });
 
     const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
@@ -166,7 +168,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     // matches the destination contract against the database, which
     // would flag every app-space table as "extra" when called against
     // an extension contract.
-    if (space === 'app') {
+    if (space === APP_SPACE_ID) {
       const schemaIR = await this.family.introspect({
         driver,
         contract: options.destinationContract,

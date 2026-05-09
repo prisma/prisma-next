@@ -194,7 +194,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
         meta: { note: 'preserved' },
       };
       const calls = [new RawSqlCall(op)];
-      const migration = new TypeScriptRenderableSqliteMigration(calls, META);
+      const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
 
       const tsSource = rewriteImports(migration.renderTypeScript());
       await writeFile(join(tmpDir, 'migration.ts'), tsSource);

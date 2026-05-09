@@ -6,7 +6,7 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
-import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
+import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -180,7 +180,7 @@ async function writePinnedExtensionArtefacts(args: {
     createdAt: '2026-01-01T00:00:00.000Z',
   };
   const ops = [...args.ops];
-  await writeExtensionMigrationPackage(spaceDir, {
+  await materialiseMigrationPackage(spaceDir, {
     dirName: args.migrationDirName,
     metadata: { ...baseMeta, migrationHash: computeMigrationHash(baseMeta, ops) },
     ops,
@@ -354,7 +354,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
           createdAt: '2026-02-01T00:00:00.000Z',
         };
         const ops = [...buildAdvanceOps()];
-        await writeExtensionMigrationPackage(join(baseline.migrationsDir, EXT_SPACE_ID), {
+        await materialiseMigrationPackage(join(baseline.migrationsDir, EXT_SPACE_ID), {
           dirName: '20260201T0000_add_note',
           metadata: { ...baseMeta, migrationHash: computeMigrationHash(baseMeta, ops) },
           ops,
@@ -452,7 +452,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
           createdAt: '2026-02-01T00:00:00.000Z',
         };
         const ops = [...buildFailingOps()];
-        await writeExtensionMigrationPackage(join(baseline.migrationsDir, EXT_SPACE_ID), {
+        await materialiseMigrationPackage(join(baseline.migrationsDir, EXT_SPACE_ID), {
           dirName: '20260201T0000_failing',
           metadata: { ...baseMeta, migrationHash: computeMigrationHash(baseMeta, ops) },
           ops,

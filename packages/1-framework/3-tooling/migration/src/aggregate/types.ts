@@ -1,6 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationGraph } from '../graph';
-import type { MigrationPackage } from '../package';
+import type { OnDiskMigrationPackage } from '../package';
 
 /**
  * Hydrated migration graph for a single contract space.
@@ -9,7 +9,7 @@ import type { MigrationPackage } from '../package';
  * deterministic tie-break order) reconstructed from a set of on-disk
  * migration packages. `packagesByMigrationHash` is the lookup table the
  * graph-walk strategy uses to resolve a path's edge sequence back to the
- * concrete `MigrationPackage` (and therefore the operation list) for
+ * concrete `OnDiskMigrationPackage` (and therefore the operation list) for
  * apply.
  *
  * Eagerly hydrated by the loader. Once a `ContractSpaceAggregate` exists,
@@ -18,7 +18,7 @@ import type { MigrationPackage } from '../package';
  */
 export interface HydratedMigrationGraph {
   readonly graph: MigrationGraph;
-  readonly packagesByMigrationHash: ReadonlyMap<string, MigrationPackage>;
+  readonly packagesByMigrationHash: ReadonlyMap<string, OnDiskMigrationPackage>;
 }
 
 /**

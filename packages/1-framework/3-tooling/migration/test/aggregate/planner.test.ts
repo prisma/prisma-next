@@ -14,7 +14,7 @@ import type { ContractSpaceAggregate, ContractSpaceMember } from '../../src/aggr
 import { EMPTY_CONTRACT_HASH } from '../../src/constants';
 import type { MigrationGraph } from '../../src/graph';
 import { reconstructGraph } from '../../src/migration-graph';
-import type { MigrationPackage } from '../../src/package';
+import type { OnDiskMigrationPackage } from '../../src/package';
 import { createAttestedPackage } from '../fixtures';
 
 const POLICY: MigrationOperationPolicy = {
@@ -34,7 +34,7 @@ function makeMember(args: {
   spaceId: string;
   contract?: Contract;
   headRef?: { hash: string; invariants: readonly string[] };
-  packages?: readonly MigrationPackage[];
+  packages?: readonly OnDiskMigrationPackage[];
 }): ContractSpaceMember {
   const contract = args.contract ?? createSqlContract({ target: 'postgres' });
   const packages = args.packages ?? [];

@@ -79,6 +79,7 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
     policy: input.operationPolicy,
     fromContract: null,
     frameworkComponents: input.frameworkComponents,
+    spaceId: input.member.spaceId,
   }) as MaybeAsyncPlannerResult);
 
   if (plannerResult.kind === 'failure') {
