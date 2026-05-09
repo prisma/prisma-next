@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import type {
   MigrationMetadata,
   MigrationPackage,
@@ -99,11 +99,16 @@ export async function writeMigrationPackage(
  * `materialise…` know they are persisting a struct-typed package
  * including its contract-snapshot side car.
  *
- * The function fails (via `writeMigrationPackage`'s underlying check)
- * if the target directory already exists, mirroring the strictness of
- * the app-space emit path. Callers wanting "create-or-overwrite"
- * semantics handle that at a higher level (e.g. the pinned-artefact
- * emission step, which lives outside the per-package writer).
+ * Overwrite-idempotent: the per-package directory is cleared before
+ * each emit, so re-running against the same `targetDir` produces
+ * byte-identical contents and never leaves stale files behind. The
+ * spec's "re-emitting the same package across runs / machines produces
+ * byte-identical files" guarantee (§ 3) covers both same-dir and
+ * fresh-dir re-emits. The lower-level {@link writeMigrationPackage}
+ * stays strict because the CLI authoring path (`migration plan` /
+ * `migration new`) deliberately refuses to clobber an existing
+ * authored migration; this helper is the re-emit path that is
+ * supposed to converge on a single canonical on-disk shape.
  *
  * @see specs/framework-mechanism.spec.md § 3 — Emission helper (T1.7).
  */
@@ -112,6 +117,7 @@ export async function materialiseMigrationPackage(
   pkg: MigrationPackage,
 ): Promise<void> {
   const dir = join(targetDir, pkg.dirName);
+  await rm(dir, { recursive: true, force: true });
   await writeMigrationPackage(dir, pkg.metadata, pkg.ops);
   await writeFile(join(dir, 'contract.json'), `${canonicalizeJson(pkg.metadata.toContract)}\n`, {
     flag: 'wx',
