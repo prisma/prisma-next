@@ -20,9 +20,13 @@ Every persona doc has these four sections, in this order:
    - **Prefer:** terms, framings, and patterns this persona reaches for.
    - **Avoid:** terms, framings, and anti-patterns this persona is allergic to. These are the cues that catch lens-specific defects (e.g. the architect's `Avoid` list is where typology-prefix anti-patterns get named).
 
-## Optional section (admitted in v1 because it carries weight)
+## Optional sections (admitted in v1 because they carry weight)
 
 6. **`## Out of scope for this lens`** — Bulleted list of the things this persona explicitly does *not* watch for, *not* produce, or *not* adjudicate. Cross-references the persona that owns each — e.g. *"Implementation correctness is the principal engineer's lens; surface to them rather than adjudicating."* This section is what keeps composite-skill orchestrators sane: it tells a persona when to defer rather than overreach. v1 personas should fill this section when there's a real risk of overreach (architect, devrel, OSS specialist), and may omit it when the persona is so narrow it can't overreach.
+
+7. **`## Probes`** — Numbered list of concrete *questions* the persona asks in specific situations during execution. Probes operationalise a role's cognitive habits as repeatable checks: where Vocabulary cues lists *language patterns* the persona reaches for or avoids, and Priorities names *what* the persona watches for first, Probes name *the question to fire when a specific trigger is hit*. Each probe should pair (a) a concrete trigger ("when you encounter a qualifier-style prefix on a type") with (b) a concrete question ("what does this distinguish it from?") and ideally (c) the criteria for a good answer (concrete / singular / structural / stable). This section exists because suspicion-as-value produces "I noticed concerns" output; suspicion-as-trigger-plus-question produces "this prefix performs a non-existent partition" output.
+
+   Not every persona needs probes. Review-class personas (architect, principal-engineer, devrel) typically benefit because their work is checking artefacts against a stance. Implementation-class personas (developer, and persona modes that primarily *produce* rather than *evaluate*) may not benefit and should omit the section rather than invent thin probes to fill it. The `architect` persona's `## Probes` section is the v1 reference example.
 
 ## Tone and length
 
@@ -46,3 +50,4 @@ Before landing a new persona doc, the author confirms:
 - The vocabulary cues include at least one `Avoid` item that's persona-specific (i.e. would feel out-of-place in another v1 persona's doc).
 - Word count is roughly one screen, not multiple.
 - The optional `Out of scope for this lens` section is present unless overreach is implausible.
+- The optional `Probes` section is present if the persona is review-class (architect, principal-engineer, devrel, etc.) and the role's cognitive habits decompose into trigger-plus-question pairs; omitted if the persona is implementation-class or the probes would be thin.
