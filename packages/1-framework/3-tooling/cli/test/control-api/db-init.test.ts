@@ -24,7 +24,11 @@ function createMockFamilyInstance() {
   } as unknown as ControlFamilyInstance<'sql', unknown>;
 }
 
-const dummyContract = { schemaVersion: '1', target: 'postgres' } as unknown as Contract;
+const dummyContract = {
+  schemaVersion: '1',
+  target: 'postgres',
+  storage: { storageHash: 'sha256:dummy', tables: {} },
+} as unknown as Contract;
 
 describe('executeDbInit', () => {
   it('passes fromContract: null to planner.plan (no prior contract under reconciliation)', async () => {
@@ -63,6 +67,7 @@ describe('executeDbInit', () => {
       migrations,
       frameworkComponents: [],
       migrationsDir: '/tmp/__test-db-init-migrations',
+      targetId: 'postgres',
     });
 
     expect(planFn).toHaveBeenCalledWith(

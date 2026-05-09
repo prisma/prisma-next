@@ -170,6 +170,21 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     });
   }
 
+  schemaVerifyAgainstSchema(options: {
+    readonly contract: unknown;
+    readonly schema: MongoSchemaIR;
+    readonly strict: boolean;
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', string>>;
+  }): VerifyDatabaseSchemaResult {
+    const validated = validateMongoContract<MongoContract>(options.contract);
+    return verifyMongoSchema({
+      contract: validated.contract,
+      schema: options.schema,
+      strict: options.strict,
+      frameworkComponents: options.frameworkComponents,
+    });
+  }
+
   async sign(options: {
     readonly driver: ControlDriverInstance<'mongo', string>;
     readonly contract: unknown;

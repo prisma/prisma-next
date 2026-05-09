@@ -18,8 +18,6 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
-import { runContractSpaceVerifierMarkerCheck } from '../utils/contract-space-verifier-marker-check';
-import { runContractSpaceVerifierPrecheck } from '../utils/contract-space-verifier-precheck';
 import {
   formatMigrationApplyOutput,
   formatMigrationJson,
@@ -117,40 +115,16 @@ async function executeDbInitCommand(
   const { client, config, contractJson, dbConnection, onProgress, contractPathAbsolute } =
     ctxResult.value;
 
-  // Per-space layout precheck (sub-spec § 4): catches the
-  // `declaredButUnmigrated` / `orphanPinnedDir` cases at the CLI surface
-  // before any database connection.
+  // The aggregate loader (loader → planner → runner pipeline) catches
+  // layout / drift / disjointness violations on its own; the legacy
+  // per-space precheck + marker-check helpers are no longer needed at
+  // this surface. Marker-vs-pinned drift surfaces through the planner's
+  // graph-walk strategy.
   const { migrationsDir } = resolveMigrationPaths(options.config, config);
-  const precheckResult = await runContractSpaceVerifierPrecheck({
-    migrationsDir,
-    extensionPacks: config.extensionPacks ?? [],
-  });
-  if (!precheckResult.ok) {
-    await client.close();
-    return notOk(precheckResult.failure);
-  }
 
   try {
-    // Marker-aware verifier (sub-spec § 4): connect explicitly so we
-    // can read marker rows before any apply work runs. Locks AC-13 +
-    // AM11 at the `db init` integration surface — `orphanMarker`,
-    // marker-vs-pinned `hashMismatch`, and `invariantsMismatch` — that
-    // the layout-only precheck cannot detect on its own. Mirrors the
-    // wiring already in place in `db verify`.
     await client.connect(dbConnection);
 
-    const markerRowsBySpace = await client.readAllMarkers();
-    const markerCheckResult = await runContractSpaceVerifierMarkerCheck({
-      migrationsDir,
-      extensionPacks: config.extensionPacks ?? [],
-      markerRowsBySpace,
-    });
-    if (!markerCheckResult.ok) {
-      return notOk(markerCheckResult.failure);
-    }
-
-    // Call dbInit on the already-connected client (omit `connection` —
-    // `client.connect()` throws if already connected).
     const result = await client.dbInit({
       contract: contractJson,
       mode: options.dryRun ? 'plan' : 'apply',

@@ -19,6 +19,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import type { Result } from '@prisma-next/utils/result';
+import type { ExecuteDbVerifyResult } from './operations/db-verify';
 
 // ============================================================================
 // Client Options
@@ -236,6 +237,23 @@ export interface DbUpdateOptions {
    */
   readonly migrationsDir: string;
   /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
+}
+
+/**
+ * Options for the dbVerify operation.
+ *
+ * Drives the loader → aggregate-verifier pipeline. `strict` maps to
+ * `verifyAggregate({ mode: 'strict' | 'lenient' })`; `skipSchema`
+ * mirrors the `--marker-only` CLI flag and short-circuits the schema
+ * portion of the verifier.
+ */
+export interface DbVerifyOptions {
+  readonly contract: unknown;
+  readonly migrationsDir: string;
+  readonly strict: boolean;
+  readonly skipSchema: boolean;
+  readonly connection?: unknown;
   readonly onProgress?: OnControlProgress;
 }
 
@@ -690,6 +708,21 @@ export interface ControlClient {
    * @throws If not connected, target doesn't support migrations, or infrastructure failure
    */
   dbUpdate(options: DbUpdateOptions): Promise<DbUpdateResult>;
+
+  /**
+   * Verifies the database against every contract space (app + extensions).
+   *
+   * Loader → aggregate-verifier pipeline:
+   * - The loader catches layout / drift / disjointness violations.
+   * - The aggregate verifier surfaces marker-vs-pinned drift and orphan
+   *   markers, and (unless `skipSchema` is true) per-space schema
+   *   verification with pre-projection (closes F23).
+   *
+   * @returns Result pattern: per-space schema results on success;
+   *          structured CLI error on marker / loader failure.
+   * @throws If not connected or infrastructure failure
+   */
+  dbVerify(options: DbVerifyOptions): Promise<ExecuteDbVerifyResult>;
 
   /**
    * Reads the contract marker from the database.

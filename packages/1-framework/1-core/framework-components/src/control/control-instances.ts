@@ -34,6 +34,24 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, string>>;
   }): Promise<VerifyDatabaseSchemaResult>;
 
+  /**
+   * Verify a contract against an already-introspected schema slice.
+   *
+   * Difference from {@link schemaVerify}: no `driver`, no introspection
+   * — the caller hands over the schema directly. Used by the aggregate
+   * verifier to invoke the family's verification logic per member,
+   * with the schema **pre-projected** to that member's claimed slice
+   * via {@link import('@prisma-next/migration-tools/aggregate').projectSchemaToSpace}.
+   *
+   * Synchronous — no I/O. Idempotent.
+   */
+  schemaVerifyAgainstSchema(options: {
+    readonly contract: unknown;
+    readonly schema: TSchemaIR;
+    readonly strict: boolean;
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, string>>;
+  }): VerifyDatabaseSchemaResult;
+
   sign(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;
     readonly contract: unknown;

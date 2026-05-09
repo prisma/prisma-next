@@ -1,0 +1,387 @@
+import type { Contract } from '@prisma-next/contract/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import type {
+  ControlDriverInstance,
+  ControlExtensionDescriptor,
+  ControlFamilyInstance,
+  MigrationOperationPolicy,
+  MigrationPlanOperation,
+  MultiSpaceCapableRunner,
+  MultiSpaceRunnerPerSpaceOptions,
+  OperationPreview,
+  TargetMigrationsCapability,
+} from '@prisma-next/framework-components/control';
+import {
+  hasMultiSpaceRunner,
+  hasOperationPreview,
+} from '@prisma-next/framework-components/control';
+import {
+  type AggregatePerSpacePlan,
+  type AggregatePlannerError,
+  type ContractSpaceAggregate,
+  planAggregate,
+} from '@prisma-next/migration-tools/aggregate';
+import { ifDefined } from '@prisma-next/utils/defined';
+import { notOk, ok } from '@prisma-next/utils/result';
+import { errorRunnerFailed } from '../../utils/cli-errors';
+import {
+  type BuildAggregateInputs,
+  buildContractSpaceAggregate,
+} from '../../utils/contract-space-aggregate-loader';
+import type {
+  DbInitFailure,
+  DbInitResult,
+  DbInitSuccess,
+  DbUpdateFailure,
+  DbUpdateResult,
+  DbUpdateSuccess,
+  OnControlProgress,
+} from '../types';
+import { stripOperations } from './migration-helpers';
+
+/**
+ * Span IDs emitted via `onProgress` during the aggregate apply flow.
+ * Mirrors the legacy {@link executePerSpaceDbApply} span identifiers
+ * verbatim so the structured-output renderer (and tests asserting on
+ * span ids) keep working unchanged.
+ */
+const SPAN_IDS = {
+  introspect: 'introspect',
+  plan: 'plan',
+  apply: 'apply',
+} as const;
+
+/**
+ * Inputs shared by `db init` and `db update` aggregate apply flows.
+ *
+ * Mirrors the legacy {@link executePerSpaceDbApply} option set but
+ * accepts the already-validated app contract + descriptor list — the
+ * loader gathers the rest from disk + descriptors. The CLI is the
+ * descriptor-import boundary (sub-spec § Loader).
+ */
+export interface ExecuteAggregateApplyOptions<TFamilyId extends string, TTargetId extends string> {
+  readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
+  readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
+  readonly contract: Contract;
+  readonly mode: 'plan' | 'apply';
+  readonly migrations: TargetMigrationsCapability<
+    TFamilyId,
+    TTargetId,
+    ControlFamilyInstance<TFamilyId, unknown>
+  >;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
+  readonly migrationsDir: string;
+  readonly extensionPacks: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
+  readonly targetId: TTargetId;
+  readonly policy: MigrationOperationPolicy;
+  readonly action: 'dbInit' | 'dbUpdate';
+  readonly onProgress?: OnControlProgress;
+}
+
+/**
+ * Loader → planner → runner pipeline shared by `db init` and `db update`.
+ *
+ * Replaces the legacy `executePerSpaceDbApply` orchestrator. The pipeline:
+ *
+ * 1. **Load**: build a {@link ContractSpaceAggregate} from the descriptor
+ *    set + on-disk pinned artefacts. Any layout / drift / disjointness /
+ *    integrity violation short-circuits with a structured error.
+ * 2. **Read DB state**: marker rows (`familyInstance.readAllMarkers`)
+ *    + introspected schema (`familyInstance.introspect`).
+ * 3. **Plan**: {@link planAggregate} chooses graph-walk vs synth per
+ *    member according to `callerPolicy.ignoreGraphFor`. The app member
+ *    is forced through synth (today's daily-driver behaviour); every
+ *    extension member walks its on-disk graph.
+ * 4. **Apply** (when `mode === 'apply'`): every per-space `MigrationPlan`
+ *    feeds into the runner's `executeAcrossSpaces` — one outer
+ *    transaction across every space; failure on any space rolls back
+ *    every space's writes.
+ */
+export async function executeAggregateApply<TFamilyId extends string, TTargetId extends string>(
+  options: ExecuteAggregateApplyOptions<TFamilyId, TTargetId>,
+): Promise<DbInitResult | DbUpdateResult> {
+  const {
+    driver,
+    familyInstance,
+    contract,
+    mode,
+    migrations,
+    frameworkComponents,
+    migrationsDir,
+    extensionPacks,
+    targetId,
+    policy,
+    action,
+    onProgress,
+  } = options;
+
+  // 1. Load aggregate from descriptors + on-disk state.
+  const loadInputs: BuildAggregateInputs<TFamilyId, TTargetId> = {
+    targetId,
+    migrationsDir,
+    appContract: contract,
+    extensionPacks,
+    validateContract: (json) => familyInstance.validateContract(json),
+  };
+  const loaded = await buildContractSpaceAggregate(loadInputs);
+  if (!loaded.ok) {
+    throw loaded.failure;
+  }
+  const aggregate = loaded.value;
+
+  // 2. Read live DB state (markers + schema).
+  const markerRows = await familyInstance.readAllMarkers({ driver });
+
+  onProgress?.({
+    action,
+    kind: 'spanStart',
+    spanId: SPAN_IDS.introspect,
+    label: 'Introspecting database schema',
+  });
+  const schemaIR = await familyInstance.introspect({ driver });
+  onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.introspect, outcome: 'ok' });
+
+  // 3. Plan via aggregate planner. App is forced through synth (today's
+  // `db init` / `db update` daily-driver behaviour); extensions walk
+  // their pinned migration graphs.
+  onProgress?.({
+    action,
+    kind: 'spanStart',
+    spanId: SPAN_IDS.plan,
+    label: 'Planning migration',
+  });
+  const planResult = await planAggregate<TFamilyId, TTargetId>({
+    aggregate,
+    currentDBState: { markersBySpaceId: markerRows, schemaIntrospection: schemaIR },
+    familyInstance,
+    migrations,
+    frameworkComponents,
+    callerPolicy: { ignoreGraphFor: new Set([aggregate.app.spaceId]) },
+    operationPolicy: policy,
+  });
+  if (!planResult.ok) {
+    onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.plan, outcome: 'error' });
+    return mapPlannerError(planResult.failure);
+  }
+  onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.plan, outcome: 'ok' });
+
+  const orderedResolutions = collectOrdered(planResult.value.applyOrder, planResult.value.perSpace);
+
+  // The destination's structural shape comes from the app's plan — its
+  // `destination` is the storage hash users see in CLI output.
+  const appResolution = orderedResolutions.find((r) => r.spaceId === aggregate.app.spaceId);
+  if (!appResolution) {
+    throw new Error(
+      'Aggregate planner returned no plan for the app member — the planner is supposed to always emit one.',
+    );
+  }
+  const appPlan = appResolution.entry.plan;
+
+  // 4. Plan-mode: surface aggregate operations without applying.
+  if (mode === 'plan') {
+    const aggregateOps = orderedResolutions.flatMap((r) => r.entry.displayOps);
+    const preview = hasOperationPreview(familyInstance)
+      ? familyInstance.toOperationPreview(aggregateOps)
+      : undefined;
+    const summary = `Planned ${aggregateOps.length} operation(s) across ${orderedResolutions.length} space(s)`;
+    return wrapPlanResult({
+      operations: aggregateOps,
+      destination: appPlan.destination,
+      preview,
+      summary,
+    });
+  }
+
+  // 5. Apply mode: dispatch into the multi-space runner.
+  const runner = migrations.createRunner(familyInstance);
+  if (!hasMultiSpaceRunner(runner)) {
+    throw errorRunnerFailed(
+      `Runner for target "${aggregate.targetId}" does not implement \`executeAcrossSpaces\``,
+      {
+        why: `${action === 'dbInit' ? 'db init' : 'db update'} requires multi-space-capable runners (today: every SQL family runner).`,
+      },
+    );
+  }
+
+  onProgress?.({
+    action,
+    kind: 'spanStart',
+    spanId: SPAN_IDS.apply,
+    label: 'Applying migration plan across spaces',
+  });
+
+  const perSpaceOptions: MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>[] =
+    orderedResolutions.map((r) => ({
+      space: r.spaceId,
+      plan: r.entry.plan,
+      driver,
+      destinationContract: r.entry.destinationContract,
+      policy,
+      executionChecks: { prechecks: false, postchecks: false, idempotencyChecks: false },
+      frameworkComponents,
+      // Per-space post-apply schema verification is non-strict: each
+      // space's `destinationContract` describes only its own slice; a
+      // strict verifier would treat every other space's tables as
+      // `extras`. Tolerant mode still catches missing tables / columns.
+      // SQL family runners read `strictVerification` via structural
+      // typing.
+      strictVerification: false,
+    })) as MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>[];
+
+  const runnerResult = await (
+    runner as MultiSpaceCapableRunner<TFamilyId, TTargetId>
+  ).executeAcrossSpaces({ driver, perSpaceOptions });
+
+  if (!runnerResult.ok) {
+    onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.apply, outcome: 'error' });
+    return buildRunnerFailure({
+      summary: runnerResult.failure.summary,
+      ...ifDefined('why', runnerResult.failure.why),
+      meta: {
+        ...(runnerResult.failure.meta ?? {}),
+        failingSpace: runnerResult.failure.failingSpace,
+      },
+    });
+  }
+  onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.apply, outcome: 'ok' });
+
+  const totalOpsPlanned = runnerResult.value.perSpaceResults.reduce(
+    (sum, r) => sum + r.value.operationsPlanned,
+    0,
+  );
+  const totalOpsExecuted = runnerResult.value.perSpaceResults.reduce(
+    (sum, r) => sum + r.value.operationsExecuted,
+    0,
+  );
+
+  const aggregateOps = orderedResolutions.flatMap((r) => r.entry.displayOps);
+  const summary =
+    action === 'dbInit'
+      ? `Applied ${totalOpsExecuted} operation(s) across ${orderedResolutions.length} space(s), database signed`
+      : totalOpsExecuted === 0
+        ? `Database already matches contract across ${orderedResolutions.length} space(s), signature updated`
+        : `Applied ${totalOpsExecuted} operation(s) across ${orderedResolutions.length} space(s), signature updated`;
+
+  return wrapApplyResult({
+    operations: aggregateOps,
+    destination: appPlan.destination,
+    operationsPlanned: totalOpsPlanned,
+    operationsExecuted: totalOpsExecuted,
+    summary,
+  });
+}
+
+interface OrderedResolution {
+  readonly spaceId: string;
+  readonly entry: AggregatePerSpacePlan;
+}
+
+function collectOrdered(
+  applyOrder: readonly string[],
+  perSpace: ReadonlyMap<string, AggregatePerSpacePlan>,
+): readonly OrderedResolution[] {
+  return applyOrder.map((spaceId) => {
+    const entry = perSpace.get(spaceId);
+    if (!entry) {
+      throw new Error(`Aggregate planner output missing per-space plan for "${spaceId}"`);
+    }
+    return { spaceId, entry };
+  });
+}
+
+function mapPlannerError(error: AggregatePlannerError): DbInitResult | DbUpdateResult {
+  if (error.kind === 'appSynthFailure') {
+    const failure: DbInitFailure | DbUpdateFailure = {
+      code: 'PLANNING_FAILED',
+      summary: 'Migration planning failed due to conflicts',
+      conflicts: error.conflicts,
+      why: undefined,
+      meta: undefined,
+    };
+    return notOk(failure) as DbInitResult | DbUpdateResult;
+  }
+  if (error.kind === 'extensionPathUnreachable') {
+    return buildRunnerFailure({
+      summary: `Cannot resolve apply path for extension space "${error.spaceId}"`,
+      why: `No path in the on-disk migration graph for extension space "${error.spaceId}" reaches the pinned head ref hash "${error.target}".`,
+      meta: { spaceId: error.spaceId, target: error.target },
+    });
+  }
+  if (error.kind === 'extensionPathUnsatisfiable') {
+    return buildRunnerFailure({
+      summary: `Cannot resolve apply path for extension space "${error.spaceId}"`,
+      why: `On-disk migration graph for extension space "${error.spaceId}" reaches the pinned head ref but does not cover required invariants: ${error.missingInvariants.join(', ')}.`,
+      meta: { spaceId: error.spaceId, missingInvariants: error.missingInvariants },
+    });
+  }
+  // policyConflict — surfaces as a runner-style failure naming the
+  // space; conceptually a configuration bug, but mapping it onto the
+  // existing failure surface keeps callers untouched.
+  return buildRunnerFailure({
+    summary: `Aggregate planner policy conflict for space "${error.spaceId}"`,
+    why: error.detail,
+    meta: { spaceId: error.spaceId },
+  });
+}
+
+function wrapPlanResult(args: {
+  readonly operations: readonly MigrationPlanOperation[];
+  readonly destination: { readonly storageHash: string; readonly profileHash?: string };
+  readonly preview: OperationPreview | undefined;
+  readonly summary: string;
+}): DbInitResult | DbUpdateResult {
+  const success: DbInitSuccess | DbUpdateSuccess = {
+    mode: 'plan',
+    plan: {
+      operations: stripOperations(args.operations),
+      ...ifDefined('preview', args.preview),
+    },
+    destination: {
+      storageHash: args.destination.storageHash,
+      ...ifDefined('profileHash', args.destination.profileHash),
+    },
+    summary: args.summary,
+  };
+  return ok(success);
+}
+
+function wrapApplyResult(args: {
+  readonly operations: readonly MigrationPlanOperation[];
+  readonly destination: { readonly storageHash: string; readonly profileHash?: string };
+  readonly operationsPlanned: number;
+  readonly operationsExecuted: number;
+  readonly summary: string;
+}): DbInitResult | DbUpdateResult {
+  const success: DbInitSuccess | DbUpdateSuccess = {
+    mode: 'apply',
+    plan: { operations: stripOperations(args.operations) },
+    destination: {
+      storageHash: args.destination.storageHash,
+      ...ifDefined('profileHash', args.destination.profileHash),
+    },
+    execution: {
+      operationsPlanned: args.operationsPlanned,
+      operationsExecuted: args.operationsExecuted,
+    },
+    marker: args.destination.profileHash
+      ? { storageHash: args.destination.storageHash, profileHash: args.destination.profileHash }
+      : { storageHash: args.destination.storageHash },
+    summary: args.summary,
+  };
+  return ok(success);
+}
+
+function buildRunnerFailure(args: {
+  readonly summary: string;
+  readonly why?: string;
+  readonly meta: Record<string, unknown>;
+}): DbInitResult | DbUpdateResult {
+  const failure: DbInitFailure | DbUpdateFailure = {
+    code: 'RUNNER_FAILED',
+    summary: args.summary,
+    why: args.why,
+    meta: args.meta,
+    conflicts: undefined,
+  };
+  return notOk(failure) as DbInitResult | DbUpdateResult;
+}

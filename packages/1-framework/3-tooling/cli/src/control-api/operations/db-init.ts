@@ -2,22 +2,30 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
+  ControlExtensionDescriptor,
   ControlFamilyInstance,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { DbInitResult, OnControlProgress } from '../types';
-import { executePerSpaceDbApply, type PerSpaceExtensionInput } from './db-apply-per-space';
+import { executeAggregateApply } from './db-apply-aggregate';
 
 /**
- * Options for executing dbInit operation.
+ * Options for executing the `db init` operation.
  *
- * `db init` always routes through {@link executePerSpaceDbApply} — even
- * when the workspace declares zero extension contract spaces — so the
- * orchestrator drives one symmetric path-resolver loop for both the
- * app and any extension spaces. {@link migrationsDir} is therefore
- * required (the per-space flow reads pinned `refs/head.json` and
- * extension destination contracts from this root).
+ * `db init` runs the loader → planner → runner pipeline:
+ *
+ * 1. {@link executeAggregateApply} loads a `ContractSpaceAggregate` via
+ *    {@link import('@prisma-next/migration-tools/aggregate').loadContractSpaceAggregate}
+ *    from the supplied descriptor set + on-disk pinned artefacts.
+ * 2. The aggregate planner runs with `callerPolicy.ignoreGraphFor`
+ *    pinned to the app member — synth strategy for the app, graph-walk
+ *    for every extension.
+ * 3. The runner's `executeAcrossSpaces` applies the per-space plans
+ *    inside one outer transaction.
+ *
+ * `extensionPacks` mirrors `Config.extensionPacks` (descriptor list).
+ * The loader (sub-spec § Loader) is the sole descriptor-import boundary.
  */
 export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
@@ -31,19 +39,21 @@ export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extend
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   /**
-   * On-disk migrations directory the per-space flow reads pinned
-   * artefacts from. Required — every `db init` walks the n=1 (app
-   * only) or n=k+1 (extensions + app) resolver list, and the resolver
-   * for any extension space reads its pinned `refs/head.json` from
-   * `<migrationsDir>/<space-id>/refs/head.json`.
+   * On-disk migrations directory the aggregate loader reads pinned
+   * artefacts from. Required.
    */
   readonly migrationsDir: string;
   /**
-   * Declared extension contract spaces. Defaults to an empty list,
-   * which routes the orchestrator through an n=1 (app-only) resolver
-   * path — same code path, just one resolver instead of k+1.
+   * Resolved adapter target id. Threaded through to the loader for
+   * target-consistency checks across descriptors and the app contract.
    */
-  readonly extensionContractSpaces?: ReadonlyArray<PerSpaceExtensionInput>;
+  readonly targetId: TTargetId;
+  /**
+   * Declared extension descriptors. Defaults to an empty list, which
+   * routes through the same loader → planner → runner pipeline with no
+   * extension members in the aggregate.
+   */
+  readonly extensionPacks?: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   /** Optional progress callback for observing operation progress */
   readonly onProgress?: OnControlProgress;
 }
@@ -51,38 +61,26 @@ export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extend
 /**
  * Execute `db init` against the configured contract.
  *
- * Always routes through {@link executePerSpaceDbApply} so the
- * single-space and multi-space behaviours share one loop. The
- * per-space flow walks an n=1 resolver list and is bit-equivalent for
- * the app-only case.
+ * Routes through the loader → planner → runner pipeline (sub-spec
+ * "Commit-by-commit § Commit 4"). Always additive-only; destructive
+ * changes belong to `db update`.
  */
 export async function executeDbInit<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbInitOptions<TFamilyId, TTargetId>,
 ): Promise<DbInitResult> {
-  const {
-    driver,
-    familyInstance,
-    contract,
-    mode,
-    migrations,
-    frameworkComponents,
-    migrationsDir,
-    extensionContractSpaces = [],
-    onProgress,
-  } = options;
-  const result = await executePerSpaceDbApply<TFamilyId, TTargetId>({
-    driver,
-    familyInstance,
-    contract,
-    mode,
-    migrations,
-    frameworkComponents,
-    migrationsDir,
-    extensionContractSpaces,
-    // db init is additive-only.
+  const result = await executeAggregateApply<TFamilyId, TTargetId>({
+    driver: options.driver,
+    familyInstance: options.familyInstance,
+    contract: options.contract,
+    mode: options.mode,
+    migrations: options.migrations,
+    frameworkComponents: options.frameworkComponents,
+    migrationsDir: options.migrationsDir,
+    targetId: options.targetId,
+    extensionPacks: options.extensionPacks ?? [],
     policy: { allowedOperationClasses: ['additive'] },
     action: 'dbInit',
-    ...ifDefined('onProgress', onProgress),
+    ...ifDefined('onProgress', options.onProgress),
   });
   return result as DbInitResult;
 }

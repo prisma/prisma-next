@@ -2,26 +2,27 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
+  ControlExtensionDescriptor,
   ControlFamilyInstance,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk } from '@prisma-next/utils/result';
 import type { DbUpdateResult, OnControlProgress } from '../types';
-import { executePerSpaceDbApply, type PerSpaceExtensionInput } from './db-apply-per-space';
+import { executeAggregateApply } from './db-apply-aggregate';
 
-// F12: db update allows additive, widening, and destructive operations.
 const DB_UPDATE_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 } as const;
 
 /**
- * Options for the executeDbUpdate operation.
+ * Options for the `db update` operation.
  *
- * `db update` always routes through {@link executePerSpaceDbApply} so
- * the single-space and multi-space behaviours share one loop.
- * {@link migrationsDir} is required; {@link extensionContractSpaces}
- * defaults to an empty list (n=1 app-only resolver path).
+ * Same loader → planner → runner pipeline as `db init`, but with the
+ * widened operation policy (additive + widening + destructive). The
+ * destructive-change confirmation gate runs at this layer: when
+ * `mode === 'apply'` and `acceptDataLoss` is `false`, the operation
+ * pre-plans, surfaces destructive ops to the caller, and aborts.
  */
 export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
@@ -35,63 +36,45 @@ export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId exte
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly acceptDataLoss?: boolean;
-  /**
-   * On-disk migrations directory the per-space flow reads pinned
-   * artefacts from.
-   */
   readonly migrationsDir: string;
-  /**
-   * Declared extension contract spaces. Defaults to an empty list.
-   */
-  readonly extensionContractSpaces?: ReadonlyArray<PerSpaceExtensionInput>;
-  /** Optional progress callback for observing operation progress. */
+  readonly targetId: TTargetId;
+  readonly extensionPacks?: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   readonly onProgress?: OnControlProgress;
 }
 
 /**
  * Execute `db update` against the configured contract.
  *
- * Always routes through {@link executePerSpaceDbApply}. Destructive
+ * Routes through the loader → planner → runner pipeline. Destructive
  * operations require either `acceptDataLoss: true` or a prior
  * `mode: 'plan'` invocation that surfaces the destructive ops; the
- * gate is implemented here at the orchestrator level so the per-space
- * applier remains policy-agnostic.
+ * confirmation gate is implemented here so the lower-level applier
+ * remains policy-agnostic.
  */
 export async function executeDbUpdate<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbUpdateOptions<TFamilyId, TTargetId>,
 ): Promise<DbUpdateResult> {
-  const {
-    driver,
-    familyInstance,
-    contract,
-    mode,
-    migrations,
-    frameworkComponents,
-    migrationsDir,
-    extensionContractSpaces = [],
-    acceptDataLoss,
-    onProgress,
-  } = options;
+  const sharedInputs = {
+    driver: options.driver,
+    familyInstance: options.familyInstance,
+    contract: options.contract,
+    migrations: options.migrations,
+    frameworkComponents: options.frameworkComponents,
+    migrationsDir: options.migrationsDir,
+    targetId: options.targetId,
+    extensionPacks: options.extensionPacks ?? [],
+    policy: DB_UPDATE_POLICY,
+    action: 'dbUpdate' as const,
+    ...ifDefined('onProgress', options.onProgress),
+  };
 
-  // Apply mode without `acceptDataLoss` first plans across every
-  // declared space and rejects if any destructive op is in the
-  // aggregate plan. Mirrors the legacy single-space `db update`
-  // contract — destructive changes surface to the user before any
-  // writes — but evaluated against the cross-space plan so the
-  // confirmation gate is consistent regardless of cardinality.
-  if (mode === 'apply' && !acceptDataLoss) {
-    const planResult = (await executePerSpaceDbApply<TFamilyId, TTargetId>({
-      driver,
-      familyInstance,
-      contract,
+  // Apply mode without acceptDataLoss: pre-plan to detect destructive
+  // operations across every space. Mirrors the legacy single-space
+  // behaviour but evaluated against the cross-space plan.
+  if (options.mode === 'apply' && !options.acceptDataLoss) {
+    const planResult = (await executeAggregateApply<TFamilyId, TTargetId>({
+      ...sharedInputs,
       mode: 'plan',
-      migrations,
-      frameworkComponents,
-      migrationsDir,
-      extensionContractSpaces,
-      policy: DB_UPDATE_POLICY,
-      action: 'dbUpdate',
-      ...ifDefined('onProgress', onProgress),
     })) as DbUpdateResult;
     if (!planResult.ok) return planResult;
     const destructiveOps = planResult.value.plan.operations
@@ -108,18 +91,9 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     }
   }
 
-  const result = (await executePerSpaceDbApply<TFamilyId, TTargetId>({
-    driver,
-    familyInstance,
-    contract,
-    mode,
-    migrations,
-    frameworkComponents,
-    migrationsDir,
-    extensionContractSpaces,
-    policy: DB_UPDATE_POLICY,
-    action: 'dbUpdate',
-    ...ifDefined('onProgress', onProgress),
+  const result = (await executeAggregateApply<TFamilyId, TTargetId>({
+    ...sharedInputs,
+    mode: options.mode,
   })) as DbUpdateResult;
   return result;
 }

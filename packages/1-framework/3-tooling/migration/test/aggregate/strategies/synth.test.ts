@@ -52,7 +52,7 @@ function makeStubPlan(targetId: string): MigrationPlanWithAuthoringSurface {
 }
 
 describe('synthStrategy', () => {
-  it('projects the live schema before passing it to the family planner', () => {
+  it('projects the live schema before passing it to the family planner', async () => {
     let observedSchema: unknown;
     const stubPlanner: MigrationPlanner<'sql', 'postgres'> = {
       plan: ({ schema }) => {
@@ -86,7 +86,7 @@ describe('synthStrategy', () => {
       },
     };
 
-    const outcome = synthStrategy({
+    const outcome = await synthStrategy({
       aggregateTargetId: 'postgres',
       member: appMember,
       otherMembers: [extMember],
@@ -108,7 +108,7 @@ describe('synthStrategy', () => {
     expect(Object.keys(observed.tables).sort()).toEqual(['app_user', 'orphan_table']);
   });
 
-  it('forwards planner failures verbatim', () => {
+  it('forwards planner failures verbatim', async () => {
     const stubPlanner: MigrationPlanner<'sql', 'postgres'> = {
       plan: () => ({
         kind: 'failure',
@@ -130,7 +130,7 @@ describe('synthStrategy', () => {
       contractToSchema: () => ({ tables: {} }),
     };
 
-    const outcome = synthStrategy({
+    const outcome = await synthStrategy({
       aggregateTargetId: 'postgres',
       member: makeMember('app', {}),
       otherMembers: [],

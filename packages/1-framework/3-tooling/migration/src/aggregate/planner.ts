@@ -73,7 +73,7 @@ export async function planAggregate<TFamilyId extends string, TTargetId extends 
     }
 
     if (ignoreGraph) {
-      const synthOutcome = synthStrategy({
+      const synthOutcome = await synthStrategy({
         aggregateTargetId: aggregate.targetId,
         member,
         otherMembers,
@@ -131,7 +131,7 @@ export async function planAggregate<TFamilyId extends string, TTargetId extends 
       });
     }
 
-    const synthOutcome = synthStrategy({
+    const synthOutcome = await synthStrategy({
       aggregateTargetId: aggregate.targetId,
       member,
       otherMembers,

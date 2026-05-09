@@ -26,9 +26,9 @@ import { notOk, ok } from '@prisma-next/utils/result';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { enrichContract } from './contract-enrichment';
 import { ContractValidationError } from './errors';
-import type { PerSpaceExtensionInput } from './operations/db-apply-per-space';
 import { executeDbInit } from './operations/db-init';
 import { executeDbUpdate } from './operations/db-update';
+import { type ExecuteDbVerifyResult, executeDbVerify } from './operations/db-verify';
 import { executeMigrationApply } from './operations/migration-apply';
 
 import type {
@@ -39,6 +39,7 @@ import type {
   DbInitResult,
   DbUpdateOptions,
   DbUpdateResult,
+  DbVerifyOptions,
   EmitOptions,
   EmitResult,
   IntrospectOptions,
@@ -49,27 +50,6 @@ import type {
   SignOptions,
   VerifyOptions,
 } from './types';
-
-/**
- * Collect extension descriptors that publish a `contractSpace` (project
- * spec § Approach — extensions opt into a schema contribution by exposing
- * `contractSpace` on their descriptor). The CLI passes the resulting list
- * into the per-space `db init` / `db update` flow so each extension's
- * pinned migration graph is walked alongside the app-space synthesis.
- *
- * Extensions without a `contractSpace` (codec-only, runtime-only, etc.)
- * are silently dropped — they still influence the app-space contract via
- * codec hooks and execution behaviours, but they do not own a marker row
- * or a per-space migration graph.
- */
-function collectExtensionContractSpaceInputs(
-  extensionPacks: ReadonlyArray<{ readonly id: string }> | undefined,
-): readonly PerSpaceExtensionInput[] {
-  if (!extensionPacks) return [];
-  return extensionPacks
-    .filter((pack) => (pack as { readonly contractSpace?: unknown }).contractSpace !== undefined)
-    .map((pack) => ({ id: pack.id }));
-}
 
 /**
  * Creates a programmatic control client for Prisma Next operations.
@@ -384,10 +364,6 @@ class ControlClientImpl implements ControlClient {
       throw new ContractValidationError(message, error);
     }
 
-    const extensionContractSpaces = collectExtensionContractSpaceInputs(
-      this.options.extensionPacks,
-    );
-
     return executeDbInit({
       driver,
       familyInstance,
@@ -396,7 +372,8 @@ class ControlClientImpl implements ControlClient {
       migrations: this.options.target.migrations,
       frameworkComponents,
       migrationsDir: options.migrationsDir,
-      extensionContractSpaces,
+      targetId: this.options.target.targetId,
+      extensionPacks: this.options.extensionPacks ?? [],
       ...ifDefined('onProgress', onProgress),
     });
   }
@@ -418,10 +395,6 @@ class ControlClientImpl implements ControlClient {
       throw new ContractValidationError(message, error);
     }
 
-    const extensionContractSpaces = collectExtensionContractSpaceInputs(
-      this.options.extensionPacks,
-    );
-
     return executeDbUpdate({
       driver,
       familyInstance,
@@ -430,8 +403,36 @@ class ControlClientImpl implements ControlClient {
       migrations: this.options.target.migrations,
       frameworkComponents,
       migrationsDir: options.migrationsDir,
-      extensionContractSpaces,
+      targetId: this.options.target.targetId,
+      extensionPacks: this.options.extensionPacks ?? [],
       ...ifDefined('acceptDataLoss', options.acceptDataLoss),
+      ...ifDefined('onProgress', onProgress),
+    });
+  }
+
+  async dbVerify(options: DbVerifyOptions): Promise<ExecuteDbVerifyResult> {
+    const { onProgress } = options;
+    await this.connectWithProgress(options.connection, 'schemaVerify', onProgress);
+    const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
+
+    let contract: Contract;
+    try {
+      contract = familyInstance.validateContract(options.contract);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContractValidationError(message, error);
+    }
+
+    return executeDbVerify({
+      driver,
+      familyInstance,
+      contract,
+      migrationsDir: options.migrationsDir,
+      targetId: this.options.target.targetId,
+      extensionPacks: this.options.extensionPacks ?? [],
+      frameworkComponents,
+      mode: options.strict ? 'strict' : 'lenient',
+      skipSchema: options.skipSchema,
       ...ifDefined('onProgress', onProgress),
     });
   }
