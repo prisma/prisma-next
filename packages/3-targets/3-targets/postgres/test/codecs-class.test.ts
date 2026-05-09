@@ -112,8 +112,8 @@ describe('codecs-class', () => {
       expect(codec.id).toBe(PG_FLOAT8_CODEC_ID);
     });
     it('encodes and decodes number values verbatim', async () => {
-      expect(await codec.encode(2.718281828, callCtx)).toBe(2.718281828);
-      expect(await codec.decode(2.718281828, callCtx)).toBe(2.718281828);
+      expect(await codec.encode(Math.E, callCtx)).toBe(Math.E);
+      expect(await codec.decode(Math.E, callCtx)).toBe(Math.E);
     });
   });
 
