@@ -1,5 +1,4 @@
 import type { RuntimeTargetInstance } from '@prisma-next/framework-components/execution';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlRuntimeTargetDescriptor } from '@prisma-next/sql-runtime';
 import { sqliteTargetDescriptorMeta } from './descriptor-meta';
 
@@ -10,8 +9,7 @@ const sqliteRuntimeTargetDescriptor: SqlRuntimeTargetDescriptor<
   SqliteRuntimeTargetInstance
 > = {
   ...sqliteTargetDescriptorMeta,
-  codecs: () => createCodecRegistry(),
-  parameterizedCodecs: () => [],
+  codecs: () => [],
   create(): SqliteRuntimeTargetInstance {
     return {
       familyId: 'sql',

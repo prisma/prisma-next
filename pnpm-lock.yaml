@@ -787,6 +787,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../utils
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
       arktype:
         specifier: 'catalog:'
         version: 2.1.29
@@ -977,9 +980,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../0-foundation/contract
-      '@prisma-next/contract-authoring':
+      '@prisma-next/framework-components':
         specifier: workspace:*
-        version: link:../contract
+        version: link:../../1-core/framework-components
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../0-foundation/utils
@@ -2189,6 +2192,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/utils
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
       arktype:
         specifier: 'catalog:'
         version: 2.1.29
@@ -2424,6 +2430,9 @@ importers:
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../2-sql/5-runtime
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
       arktype:
         specifier: ^2.1.29
         version: 2.1.29
@@ -2596,6 +2605,9 @@ importers:
       '@prisma-next/sql-schema-ir':
         specifier: workspace:*
         version: link:../../2-sql/1-core/schema-ir
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
       arktype:
         specifier: ^2.0.0
         version: 2.1.29
@@ -3065,6 +3077,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/utils
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
       arktype:
         specifier: ^2.0.0
         version: 2.1.29

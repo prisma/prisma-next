@@ -1,6 +1,5 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
   createExecutionContext,
@@ -55,8 +54,7 @@ describe('composed runtime mutation default generators', () => {
       version: '0.0.1',
       familyId: 'sql',
       targetId: 'postgres',
-      codecs: () => createCodecRegistry(),
-      parameterizedCodecs: () => [],
+      codecs: () => [],
       mutationDefaultGenerators: () => [
         {
           id: 'slugid',
@@ -98,8 +96,7 @@ describe('composed runtime mutation default generators', () => {
       version: '0.0.1',
       familyId: 'sql',
       targetId: 'postgres',
-      codecs: () => createCodecRegistry(),
-      parameterizedCodecs: () => [],
+      codecs: () => [],
       mutationDefaultGenerators: () => [
         {
           id: 'slugid',
@@ -145,8 +142,7 @@ describe('composed runtime mutation default generators', () => {
       version: '0.0.1',
       familyId: 'sql',
       targetId: 'postgres',
-      codecs: () => createCodecRegistry(),
-      parameterizedCodecs: () => [],
+      codecs: () => [],
       mutationDefaultGenerators: () => [
         { id: 'duplicate', generate: () => 'first', stability: 'field' },
       ],
@@ -160,8 +156,7 @@ describe('composed runtime mutation default generators', () => {
       version: '0.0.1',
       familyId: 'sql',
       targetId: 'postgres',
-      codecs: () => createCodecRegistry(),
-      parameterizedCodecs: () => [],
+      codecs: () => [],
       mutationDefaultGenerators: () => [
         { id: 'duplicate', generate: () => 'second', stability: 'field' },
       ],

@@ -6,8 +6,7 @@ function resolveBsonType(
   codecId: string,
   codecLookup: CodecLookup | undefined,
 ): string | undefined {
-  const codec = codecLookup?.get(codecId);
-  return codec?.targetTypes[0];
+  return codecLookup?.targetTypesFor(codecId)?.[0];
 }
 
 function fieldToBsonSchema(

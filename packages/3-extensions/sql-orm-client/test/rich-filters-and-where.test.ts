@@ -42,7 +42,10 @@ describe('SQL ORM rich AST filters', () => {
     expect(nameFilter).toMatchObject({
       op: 'eq',
       left: ColumnRef.of('users', 'name'),
-      right: ParamRef.of('Alice', { codecId: 'pg/text@1' }),
+      right: ParamRef.of('Alice', {
+        codecId: 'pg/text@1',
+        refs: { table: 'users', column: 'name' },
+      }),
     });
 
     expect(postsFilter?.kind).toBe('exists');

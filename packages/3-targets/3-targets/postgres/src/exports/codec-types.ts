@@ -1,26 +1,17 @@
 /**
  * Codec type definitions for the Postgres target.
  *
- * This file exports type-only definitions for codec input/output types.
- * These types are imported by generated `contract.d.ts` files for compile-time
- * type inference.
+ * This file is the public origin of `CodecTypes`. The `Resolve<...>` materialisation happens here (rather than in `core/codec-type-map.ts`) so the tsdown DTS bundler resolves consumer-side `.d.mts` references via this public entry point rather than a hash-named internal chunk (the `TS2742` family).
  *
- * Lives in `target-postgres` because codec types describe the target's value
- * space - both the control adapter (introspection / schema verification) and
- * the runtime adapter (encode/decode) share the same definitions, and the
- * target package is the natural home that both adapters depend on.
- *
- * Runtime codec implementations are provided by the runtime adapter's
- * codec registry, which is built from `core/codecs.ts`.
+ * Lives in `target-postgres` because codec types describe the target's value space — both the control adapter (introspection / schema verification) and the runtime adapter (encode/decode) share the same definitions, and the target package is the natural home that both adapters depend on.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { CodecTypes as CoreCodecTypes } from '../core/codecs';
+import type { ExtractedCodecTypes, Resolve } from '../core/codec-type-map';
 
-export type CodecTypes = CoreCodecTypes;
+export type CodecTypes = Resolve<ExtractedCodecTypes>;
 
 export type { JsonValue };
-export { dataTypes } from '../core/codecs';
 
 type Branded<T, Shape extends Record<string, unknown>> = T & {
   readonly [K in keyof Shape]: Shape[K];

@@ -1,4 +1,5 @@
 import type { JsonValue } from '@prisma-next/contract/types';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { describe, expect, it } from 'vitest';
 import type { CreateControlStackInput } from '../src/control/control-stack';
 import {
@@ -13,6 +14,8 @@ import {
   extractQueryOperationTypeImports,
   validateScalarTypeCodecIds,
 } from '../src/control/control-stack';
+import type { Codec } from '../src/shared/codec';
+import type { AnyCodecDescriptor } from '../src/shared/codec-descriptor';
 import type { CodecLookup } from '../src/shared/codec-types';
 import type { ComponentDescriptor } from '../src/shared/framework-components';
 
@@ -192,12 +195,7 @@ describe('assembleAuthoringContributions', () => {
   });
 
   it('rejects malformed descriptor values during merge instead of recursing into primitives', () => {
-    // A descriptor missing `output` fails the canonical leaf guard but is
-    // a plain object, so the walker would historically recurse INTO it
-    // and, on the second registration of the same path, try to walk
-    // through the inner `'fieldPreset'` string of the `kind` property —
-    // either silently mangling state or infinite-looping. The walker
-    // now rejects the malformed value with a clear path-aware error.
+    // A descriptor missing `output` fails the canonical leaf guard but is a plain object, so the walker would historically recurse INTO it and, on the second registration of the same path, try to walk through the inner `'fieldPreset'` string of the `kind` property — either silently mangling state or infinite-looping. The walker now rejects the malformed value with a clear path-aware error.
     expect(() =>
       assembleAuthoringContributions([
         createDescriptor({
@@ -253,26 +251,39 @@ describe('extractCodecLookup', () => {
   const stubCodec = (id: string) =>
     ({
       id,
-      targetTypes: [],
-      decode: (w: unknown) => w,
+      encode: async (v: unknown) => v,
+      decode: async (v: unknown) => v,
       encodeJson: (v: unknown) => v,
       decodeJson: (j: unknown) => j,
-    }) as unknown as import('../src/shared/codec-types').Codec;
+    }) as unknown as Codec;
 
-  it('builds a lookup from codec instances across descriptors', () => {
-    const codec1 = stubCodec('a@1');
-    const codec2 = stubCodec('b@1');
+  const stubDescriptor = (id: string): AnyCodecDescriptor => ({
+    codecId: id,
+    traits: [],
+    targetTypes: [],
+    paramsSchema: {
+      '~standard': {
+        version: 1,
+        vendor: 'test',
+        validate: () => ({ value: undefined }),
+      },
+    } as unknown as StandardSchemaV1<void>,
+    isParameterized: false,
+    factory: () => () => stubCodec(id),
+  });
+
+  it('builds a lookup from codec descriptors across components', () => {
     const lookup = extractCodecLookup([
-      { id: 'desc-1', types: { codecTypes: { codecInstances: [codec1] } } },
-      { id: 'desc-2', types: { codecTypes: { codecInstances: [codec2] } } },
+      { id: 'desc-1', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
+      { id: 'desc-2', types: { codecTypes: { codecDescriptors: [stubDescriptor('b@1')] } } },
     ]);
-    expect(lookup.get('a@1')).toBe(codec1);
-    expect(lookup.get('b@1')).toBe(codec2);
+    expect(lookup.get('a@1')?.id).toBe('a@1');
+    expect(lookup.get('b@1')?.id).toBe('b@1');
   });
 
   it('returns undefined for unknown codec ids', () => {
     const lookup = extractCodecLookup([
-      { id: 'desc', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
+      { id: 'desc', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
     ]);
     expect(lookup.get('z@1')).toBeUndefined();
   });
@@ -280,10 +291,10 @@ describe('extractCodecLookup', () => {
   it('throws on duplicate codec ids from different descriptors', () => {
     expect(() =>
       extractCodecLookup([
-        { id: 'desc-1', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
-        { id: 'desc-2', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
+        { id: 'desc-1', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
+        { id: 'desc-2', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
       ]),
-    ).toThrow(/Duplicate codec instance for codecId "a@1"/);
+    ).toThrow(/Duplicate codec descriptor for codecId "a@1"/);
   });
 });
 
@@ -513,7 +524,12 @@ describe('createControlStack', () => {
 describe('validateScalarTypeCodecIds', () => {
   it('returns errors for unregistered codec IDs', () => {
     const descriptors = new Map([['String', 'missing/codec@1']]);
-    const lookup = { get: () => undefined };
+    const lookup: CodecLookup = {
+      get: () => undefined,
+      targetTypesFor: () => undefined,
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => undefined,
+    };
     const errors = validateScalarTypeCodecIds(descriptors, lookup);
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatch(/Scalar type "String" references codec "missing\/codec@1"/);
@@ -526,13 +542,15 @@ describe('validateScalarTypeCodecIds', () => {
         id === 'test/text@1'
           ? {
               id,
-              targetTypes: ['text'],
               encode: async (v: unknown) => v,
               decode: async (v: unknown) => v,
               encodeJson: (v: unknown) => v as JsonValue,
               decodeJson: (v: JsonValue) => v,
             }
           : undefined,
+      targetTypesFor: (id: string) => (id === 'test/text@1' ? ['text'] : undefined),
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => undefined,
     };
     const errors = validateScalarTypeCodecIds(descriptors, lookup);
     expect(errors).toEqual([]);

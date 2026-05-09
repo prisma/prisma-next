@@ -24,6 +24,7 @@ import {
   TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
@@ -286,15 +287,11 @@ describe('Postgres adapter', () => {
     expect(sql).toContain('WHERE FALSE');
   });
 
-  it('exposes profile metadata: codecs registry, capabilities, and readMarkerStatement', () => {
+  it('exposes profile metadata: capabilities and readMarkerStatement', () => {
     expect(adapter.profile.target).toBe('postgres');
     expect(adapter.profile.id).toBe('postgres/default@1');
     expect(adapter.profile.capabilities['postgres']).toMatchObject({ lateral: true });
     expect(adapter.profile.capabilities['sql']).toMatchObject({ returning: true });
-
-    const codecs = adapter.profile.codecs();
-    expect(codecs.get('pg/text@1')).toBeDefined();
-    expect(codecs.has('pg/jsonb@1')).toBe(true);
 
     const marker = adapter.profile.readMarkerStatement();
     expect(marker.sql).toContain('from prisma_contract.marker');
@@ -306,15 +303,22 @@ describe('Postgres adapter', () => {
     expect(customAdapter.profile.id).toBe('postgres/custom@9');
   });
 
-  it('reports parameterized codec descriptors with paramsSchema for every entry', () => {
-    const descriptors = adapter.parameterizedCodecs();
-    expect(descriptors.length).toBeGreaterThan(0);
-    const ids = descriptors.map((d) => d.codecId);
-    expect(ids).toEqual(expect.arrayContaining(['pg/numeric@1', 'pg/timestamptz@1']));
-    for (const descriptor of descriptors) {
-      expect(descriptor.paramsSchema).toBeDefined();
-    }
-  });
+  it(
+    'contributes parameterized codec descriptors through the unified codecs slot',
+    async () => {
+      // The contributor protocol is unified: every codec descriptor (parameterized or not) flows through the runtime descriptor's `codecs:` slot. The adapter class itself no longer carries a dedicated parameterized-codec accessor — descriptor metadata lives on the runtime descriptor exported by the package.
+      // Uses `timeouts.coldTransformImport` because the dynamic `await import('../src/exports/runtime')` triggers vitest's first-pass transform of the runtime module graph (control stack, codec descriptors, descriptor-meta), which can exceed the default 200ms hook timeout on cold CI workers.
+      const runtimeMod = await import('../src/exports/runtime');
+      const descriptors = runtimeMod.default.codecs();
+      expect(descriptors.length).toBeGreaterThan(0);
+      const ids = descriptors.map((d: { codecId: string }) => d.codecId);
+      expect(ids).toEqual(expect.arrayContaining(['pg/numeric@1', 'pg/timestamptz@1']));
+      for (const descriptor of descriptors) {
+        expect(descriptor.paramsSchema).toBeDefined();
+      }
+    },
+    timeouts.coldTransformImport,
+  );
 
   it('renders DO UPDATE SET with param-ref values and UPDATE SET with column-ref values', () => {
     const insertWithParamUpdate = InsertAst.into(TableSource.named('user'))
@@ -377,15 +381,10 @@ describe('Postgres adapter', () => {
   });
 
   it('renders multi-row DEFAULT VALUES inserts as `(DEFAULT, …), (DEFAULT, …)` over the contract column order', () => {
-    // Phase C deleted the schema-typed JSON tests that incidentally
-    // covered `renderInsert`'s multi-row default-values branch (lines
-    // walking `defaultColumns` and emitting `(DEFAULT, …)` per row).
-    // Pin the multi-row default-values shape here so the function-
-    // coverage % stays above the 95% threshold.
+    // Phase C deleted the schema-typed JSON tests that incidentally covered `renderInsert`'s multi-row default-values branch (lines walking `defaultColumns` and emitting `(DEFAULT, …)` per row). Pin the multi-row default-values shape here so the function-coverage % stays above the 95% threshold.
     const ast = InsertAst.into(TableSource.named('user')).withRows([{}, {}]);
     const sql = adapter.lower(ast, { contract, params: [] }).sql;
-    // Column order matches the contract storage column order; every
-    // value is `DEFAULT` per row.
+    // Column order matches the contract storage column order; every value is `DEFAULT` per row.
     expect(sql).toMatch(/^INSERT INTO "user" \("[^"]+"(, "[^"]+")*\) VALUES /);
     expect(sql).toContain(' VALUES (DEFAULT, ');
     // Two rows of defaults, separated by `, `.
@@ -393,10 +392,7 @@ describe('Postgres adapter', () => {
   });
 
   it('renders BinaryExpr.in over a non-empty ListExpression as `IN ($1, $2, …)`', () => {
-    // The empty-list branch of `renderListLiteral` is covered by the
-    // existing distinct/exists/null-check test. Pin the non-empty list
-    // shape so `.values.map(...)` (param-ref + literal arms) stays
-    // covered after the Phase C test deletions.
+    // The empty-list branch of `renderListLiteral` is covered by the existing distinct/exists/null-check test. Pin the non-empty list shape so `.values.map(...)` (param-ref + literal arms) stays covered after the Phase C test deletions.
     const ast = SelectAst.from(TableSource.named('user'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
       .withWhere(
@@ -414,12 +410,7 @@ describe('Postgres adapter', () => {
   });
 
   it("readMarkerStatement's parseMarkerRow round-trips a contract marker row payload", () => {
-    // `parseMarkerRow` (an arrow on `adapter.profile`) is invoked at
-    // contract-load time by the runtime's startup verify path. A focused
-    // unit test pins the function-coverage entry without needing an
-    // end-to-end Postgres driver — the parser itself lives in
-    // `@prisma-next/sql-runtime` and is fully covered there; we only
-    // need to verify the adapter-side wrapper forwards correctly.
+    // `parseMarkerRow` (an arrow on `adapter.profile`) is invoked at contract-load time by the runtime's startup verify path. A focused unit test pins the function-coverage entry without needing an end-to-end Postgres driver — the parser itself lives in `@prisma-next/sql-runtime` and is fully covered there; we only need to verify the adapter-side wrapper forwards correctly.
     const markerRow = {
       core_hash: 'sha256:test-core',
       profile_hash: 'sha256:test-profile',

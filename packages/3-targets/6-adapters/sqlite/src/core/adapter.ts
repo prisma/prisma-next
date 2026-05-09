@@ -1,34 +1,31 @@
-import {
-  type Adapter,
-  type AdapterProfile,
-  type AggregateExpr,
-  type AnyExpression,
-  type AnyFromSource,
-  type AnyQueryAst,
-  type BinaryExpr,
-  type CodecParamsDescriptor,
-  type ColumnRef,
-  createCodecRegistry,
-  type DeleteAst,
-  type InsertAst,
-  type InsertValue,
-  type JoinAst,
-  type JoinOnExpr,
-  type JsonArrayAggExpr,
-  type JsonObjectExpr,
-  type ListExpression,
-  type LiteralExpr,
-  type LowererContext,
-  type NullCheckExpr,
-  type OperationExpr,
-  type OrderByItem,
-  type ProjectionItem,
-  type SelectAst,
-  type SubqueryExpr,
-  type UpdateAst,
+import type {
+  Adapter,
+  AdapterProfile,
+  AggregateExpr,
+  AnyExpression,
+  AnyFromSource,
+  AnyQueryAst,
+  BinaryExpr,
+  ColumnRef,
+  DeleteAst,
+  InsertAst,
+  InsertValue,
+  JoinAst,
+  JoinOnExpr,
+  JsonArrayAggExpr,
+  JsonObjectExpr,
+  ListExpression,
+  LiteralExpr,
+  LowererContext,
+  NullCheckExpr,
+  OperationExpr,
+  OrderByItem,
+  ProjectionItem,
+  SelectAst,
+  SubqueryExpr,
+  UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
-import { codecDefinitions } from '@prisma-next/target-sqlite/codecs';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
@@ -48,27 +45,17 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
   readonly targetId = 'sqlite' as const;
 
   readonly profile: AdapterProfile<'sqlite'>;
-  private readonly codecRegistry = (() => {
-    const registry = createCodecRegistry();
-    for (const definition of Object.values(codecDefinitions)) {
-      registry.register(definition.codec);
-    }
-    return registry;
-  })();
 
   constructor(options?: SqliteAdapterOptions) {
     this.profile = Object.freeze({
       id: options?.profileId ?? 'sqlite/default@1',
       target: 'sqlite',
       capabilities: defaultCapabilities,
-      codecs: () => this.codecRegistry,
       readMarkerStatement: () => ({
         sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from _prisma_marker where id = ?',
         params: [1],
       }),
-      // SQLite stores arrays as JSON-encoded TEXT (no native array type),
-      // so the driver returns `invariants` as a string. Decode before
-      // delegating to the shared row schema, which expects `string[]`.
+      // SQLite stores arrays as JSON-encoded TEXT (no native array type), so the driver returns `invariants` as a string. Decode before delegating to the shared row schema, which expects `string[]`.
       parseMarkerRow: (row: unknown) => {
         const raw = row as Record<string, unknown>;
         const invariants =
@@ -80,10 +67,6 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
     });
   }
 
-  parameterizedCodecs(): ReadonlyArray<CodecParamsDescriptor> {
-    return [];
-  }
-
   lower(ast: AnyQueryAst, context: LowererContext<SqliteContract>): SqliteLoweredStatement {
     return renderLoweredSql(ast, context.contract);
   }
@@ -92,9 +75,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
 /**
  * Lower a SQL query AST into a SQLite-flavored `{ sql, params }` payload.
  *
- * Shared between the runtime adapter (`SqliteAdapterImpl.lower`) and the
- * control adapter (`SqliteControlAdapter.lower`) so both produce
- * byte-identical SQL for the same AST and contract.
+ * Shared between the runtime adapter (`SqliteAdapterImpl.lower`) and the control adapter (`SqliteControlAdapter.lower`) so both produce byte-identical SQL for the same AST and contract.
  */
 export function renderLoweredSql(
   ast: AnyQueryAst,
@@ -248,8 +229,7 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
   }
 }
 
-// `excluded` is a pseudo-table in ON CONFLICT DO UPDATE that references the
-// row proposed for insertion. It is not quoted because it's a keyword.
+// `excluded` is a pseudo-table in ON CONFLICT DO UPDATE that references the row proposed for insertion. It is not quoted because it's a keyword.
 function renderColumn(ref: ColumnRef): string {
   if (ref.table === 'excluded') {
     return `excluded.${quoteIdentifier(ref.column)}`;

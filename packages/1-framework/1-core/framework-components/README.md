@@ -1,8 +1,6 @@
 # @prisma-next/framework-components
 
-> **Internal package.** This package is an implementation detail of [`prisma-next`](https://www.npmjs.com/package/prisma-next)
-> and is published only to support its runtime. Its API is unstable and may change
-> without notice. Do not depend on this package directly; install `prisma-next` instead.
+> **Internal package.** This package is an implementation detail of [`prisma-next`](https://www.npmjs.com/package/prisma-next) and is published only to support its runtime. Its API is unstable and may change without notice. Do not depend on this package directly; install `prisma-next` instead.
 
 Framework component types, authoring logic, control stack assembly, and emission SPI for Prisma Next.
 
@@ -31,7 +29,7 @@ import { RuntimeCore, runWithMiddleware, type RuntimeMiddleware } from '@prisma-
 
 The base `Codec` interface lands on the seam between **query-time** methods (per-row, IO-relevant) and **build-time** methods (per-contract-load):
 
-- Query-time: `encode(value): Promise<TWire>` and `decode(wire): Promise<TInput>` are required and **Promise-returning at the public boundary**, regardless of whether the codec body is synchronous or asynchronous. Family factories (`codec()` for SQL, `mongoCodec()` for Mongo) accept either sync or async author functions and lift sync ones to Promise-shaped methods, so authors write whichever shape is natural per method without annotations.
+- Query-time: `encode(value): Promise<TWire>` and `decode(wire): Promise<TInput>` are required and **Promise-returning at the public boundary**. Codec authors extend `CodecImpl` (per [ADR 208 — Higher-order codecs for parameterized types](../../../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)); a logically synchronous body still has to return a `Promise`-compatible value (mark the method `async`, or return `Promise.resolve(...)` explicitly). The runtime always awaits the result.
 - Build-time: `encodeJson`, `decodeJson`, and the optional `renderOutputType` are **synchronous** so `validateContract` and client construction stay synchronous.
 
 There is no `runtime` / `kind` / equivalent async marker on the interface and no `TRuntime` generic. The runtime always awaits the query-time methods. See [ADR 204 — Single-Path Async Codec Runtime](../../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) for the full design.
@@ -58,27 +56,28 @@ Codec authors who write `(value) => …` continue to compile via TypeScript's bi
 Family layers extend the context where they have a per-call concept that doesn't generalise. SQL declares `SqlCodecCallContext extends CodecCallContext { column?: SqlColumnRef }` (see `@prisma-next/sql-relational-core`); Mongo continues to use the framework type directly. Codec authors that take a `(value, ctx)` author signature can forward `ctx.signal` to network SDKs:
 
 ```ts
-// Sketch — actual factory lives in a family package (codec() / mongoCodec()).
-encode: async (v: string, ctx) =>
-  kms.encrypt({ plaintext: v }, { signal: ctx?.signal });
+// Sketch — codec authors extend `CodecImpl`; class methods receive `(value, ctx)`.
+async encode(v: string, ctx: CodecCallContext): Promise<EncryptedWire> {
+  return kms.encrypt({ plaintext: v }, { signal: ctx.signal });
+}
 ```
 
 Aborts surface to the caller as `RUNTIME.ABORTED` with `details.phase ∈ { 'encode', 'decode', 'stream' }`. Codec bodies that ignore the signal complete in the background (cooperative cancellation). The `runtimeAborted(phase, cause?)` envelope helper and the `raceAgainstAbort(work, signal, phase)` race helper are exported from `@prisma-next/framework-components/runtime`.
 
 See [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md) for the full design.
 
-## Higher-order codecs (`CodecDescriptor`, `CodecInstanceContext`, `synthesizeNonParameterizedDescriptor`)
+## Higher-order codecs (`CodecDescriptor`, `CodecInstanceContext`)
 
-Codec metadata, parameterized-codec registration, and runtime materialization live on a unified `CodecDescriptor<P>`:
+Codec metadata, parameterized-codec registration, and runtime materialization live on a unified `CodecDescriptor<P>` — the only registration shape framework consumers see:
 
 ```ts
 import type { CodecDescriptor, CodecInstanceContext } from '@prisma-next/framework-components/codec';
-import { synthesizeNonParameterizedDescriptor, voidParamsSchema } from '@prisma-next/framework-components/codec';
+import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 ```
 
-- `CodecDescriptor<P = void>` carries `codecId`, `traits`, `targetTypes`, `meta`, `paramsSchema: StandardSchemaV1<P>`, optional `renderOutputType`, and a curried `factory: (P) => (CodecInstanceContext) => Codec`. Non-parameterized codecs use `P = void` and a constant factory; parameterized codecs use a non-empty `P` (e.g. `{ length: number }` for pgvector).
+- `CodecDescriptor<P = void>` carries `codecId`, `traits`, `targetTypes`, `meta`, `paramsSchema: StandardSchemaV1<P>`, optional `renderOutputType`, and a curried `factory: (P) => (CodecInstanceContext) => Codec`. Non-parameterized codecs use `P = void` (with the framework-supplied `voidParamsSchema`) and a constant factory; parameterized codecs use a non-empty `P` (e.g. `{ length: number }` for pgvector).
 - `CodecInstanceContext` (family-agnostic, `{ name }` only) is supplied by the runtime when materializing a per-instance codec. Pack authors close over it inside the factory; they never construct it. This is the **per-materialization** context, sibling to the **per-call** `CodecCallContext` documented above. Family-specific extensions augment it — the SQL family ships `SqlCodecInstanceContext extends CodecInstanceContext` in `@prisma-next/sql-relational-core/ast`, adding `usedAt: ReadonlyArray<{ table; column }>` for SQL-domain codecs that need column-set metadata.
-- `synthesizeNonParameterizedDescriptor(codec)` wraps an existing `Codec` (with its async `encode`/`decode` per ADR 204) into a `CodecDescriptor<void>` whose constant factory returns the same shared codec instance for every column. The synthesis bridge keeps non-parameterized codec contributors on the legacy `codecs:` slot while the unified descriptor map remains the single read source for codec-id-keyed metadata.
+- Contributors expose their descriptors through `ComponentMetadata.types.codecTypes.codecDescriptors` and the unified `codecs: () => ReadonlyArray<CodecDescriptor>` slot. `extractCodecLookup` reads `targetTypes` / `meta` / `renderOutputType` directly off the descriptors — there is no parameterized vs. non-parameterized split and no synthesis bridge.
 
 `paramsSchema` is typed as Standard Schema (`StandardSchemaV1<P>`), not arktype-specific. arktype `Type`s satisfy the shape via their `~standard` getter, so existing arktype-typed descriptors satisfy the new shape transparently while `framework-components` itself takes no dependency on arktype.
 

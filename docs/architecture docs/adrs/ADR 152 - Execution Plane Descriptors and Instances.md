@@ -164,9 +164,8 @@ The SQL family extends base execution-plane descriptors with `SqlStaticContribut
 
 ```ts
 interface SqlStaticContributions {
-  codecs(): CodecRegistry
+  codecs(): ReadonlyArray<CodecDescriptor>
   operationSignatures(): ReadonlyArray<SqlOperationSignature>
-  parameterizedCodecs(): ReadonlyArray<RuntimeParameterizedCodecDescriptor>
 }
 ```
 

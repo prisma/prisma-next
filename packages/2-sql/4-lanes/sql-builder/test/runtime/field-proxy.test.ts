@@ -45,4 +45,25 @@ describe('createFieldProxy', () => {
     const proxy = createFieldProxy(usersScope);
     expect((proxy as Record<string, unknown>)['nonexistent']).toBeUndefined();
   });
+
+  it('attaches refs metadata for top-level fields backed by a unique namespace', () => {
+    const proxy = createFieldProxy(usersScope);
+    const idExpr = proxy.id as ExpressionImpl;
+
+    expect(idExpr.refs).toEqual({ table: 'users', column: 'id' });
+  });
+
+  it('omits refs for top-level fields when multiple namespaces own the field', () => {
+    const ambiguousScope = {
+      topLevel: { name: { codecId: 'pg/text@1', nullable: false } },
+      namespaces: {
+        users: { name: { codecId: 'pg/text@1', nullable: false } },
+        members: { name: { codecId: 'pg/text@1', nullable: false } },
+      },
+    } as const;
+    const proxy = createFieldProxy(ambiguousScope);
+    const nameExpr = proxy.name as ExpressionImpl;
+
+    expect(nameExpr.refs).toBeUndefined();
+  });
 });

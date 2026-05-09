@@ -5,21 +5,12 @@ import type {
 } from '@prisma-next/framework-components/execution';
 import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter } from '@prisma-next/mongo-lowering';
-import { buildStandardCodecRegistry, mongoStandardCodecs } from '../core/codecs';
+import { buildStandardCodecRegistry, mongoCodecDescriptors } from '../core/codecs';
 import { createMongoAdapter } from '../mongo-adapter';
 
 /**
- * adapter-mongo deliberately does NOT import the
- * `MongoRuntimeAdapterDescriptor` type alias from
- * `@prisma-next/mongo-runtime`. The adapter package is downstream of the
- * Mongo runtime package only conceptually; introducing a hard import would
- * create a workspace dependency cycle (`mongo-runtime` consumes the runtime
- * descriptor's `create(stack)` factory; `adapter-mongo` would then need
- * `mongo-runtime` to type the descriptor). The descriptor is shaped to
- * satisfy the framework's `RuntimeAdapterDescriptor` plus the structural
- * `MongoStaticContributions` (`codecs()`) that `@prisma-next/mongo-runtime`
- * narrows to at composition time. This mirrors the `target-postgres` ↔
- * `sql-runtime` decoupling pattern.
+ * adapter-mongo deliberately does NOT import the `MongoRuntimeAdapterDescriptor` type alias from `@prisma-next/mongo-runtime`. The adapter package is downstream of the Mongo runtime package only conceptually; introducing a hard import would create a workspace dependency cycle (`mongo-runtime` consumes the runtime descriptor's `create(stack)` factory; `adapter-mongo` would then need `mongo-runtime` to type the
+ * descriptor). The descriptor is shaped to satisfy the framework's `RuntimeAdapterDescriptor` plus the structural `MongoStaticContributions` (`codecs()`) that `@prisma-next/mongo-runtime` narrows to at composition time. This mirrors the `target-postgres` ↔ `sql-runtime` decoupling pattern.
  */
 
 interface MongoRuntimeAdapterInstance
@@ -40,7 +31,7 @@ const mongoRuntimeAdapterDescriptor: RuntimeAdapterDescriptor<
   version: '0.0.1',
   types: {
     codecTypes: {
-      codecInstances: [...mongoStandardCodecs],
+      codecDescriptors: mongoCodecDescriptors,
     },
   },
   codecs: buildStandardCodecRegistry,

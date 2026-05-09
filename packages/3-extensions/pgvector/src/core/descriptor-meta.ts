@@ -3,11 +3,12 @@ import {
   buildOperation,
   type CodecExpression,
   type Expression,
+  refsOf,
   toExpr,
 } from '@prisma-next/sql-relational-core/expression';
 import type { CodecTypes } from '../types/codec-types';
 import { pgvectorAuthoringTypes } from './authoring';
-import { codecDefinitions } from './codecs';
+import { pgvectorCodecRegistry } from './registry';
 
 const pgvectorTypeId = 'pg/vector@1' as const;
 
@@ -23,17 +24,19 @@ export function pgvectorQueryOperations<
       impl: (
         self: CodecExpression<'pg/vector@1', boolean, CT>,
         other: CodecExpression<'pg/vector@1', boolean, CT>,
-      ): Expression<{ codecId: 'pg/float8@1'; nullable: false }> =>
-        buildOperation({
+      ): Expression<{ codecId: 'pg/float8@1'; nullable: false }> => {
+        const selfRefs = refsOf(self);
+        return buildOperation({
           method: 'cosineDistance',
-          args: [toExpr(self, pgvectorTypeId), toExpr(other, pgvectorTypeId)],
+          args: [toExpr(self, pgvectorTypeId, selfRefs), toExpr(other, pgvectorTypeId, selfRefs)],
           returns: { codecId: 'pg/float8@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
             strategy: 'function',
             template: '{{self}} <=> {{arg0}}',
           },
-        }),
+        });
+      },
     },
     {
       method: 'cosineSimilarity',
@@ -41,17 +44,19 @@ export function pgvectorQueryOperations<
       impl: (
         self: CodecExpression<'pg/vector@1', boolean, CT>,
         other: CodecExpression<'pg/vector@1', boolean, CT>,
-      ): Expression<{ codecId: 'pg/float8@1'; nullable: false }> =>
-        buildOperation({
+      ): Expression<{ codecId: 'pg/float8@1'; nullable: false }> => {
+        const selfRefs = refsOf(self);
+        return buildOperation({
           method: 'cosineSimilarity',
-          args: [toExpr(self, pgvectorTypeId), toExpr(other, pgvectorTypeId)],
+          args: [toExpr(self, pgvectorTypeId, selfRefs), toExpr(other, pgvectorTypeId, selfRefs)],
           returns: { codecId: 'pg/float8@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
             strategy: 'function',
             template: '1 - ({{self}} <=> {{arg0}})',
           },
-        }),
+        });
+      },
     },
   ];
 }
@@ -72,7 +77,7 @@ const pgvectorPackMetaBase = {
   },
   types: {
     codecTypes: {
-      codecInstances: Object.values(codecDefinitions).map((def) => def.codec),
+      codecDescriptors: Array.from(pgvectorCodecRegistry.values()),
       import: {
         package: '@prisma-next/extension-pgvector/codec-types',
         named: 'CodecTypes',

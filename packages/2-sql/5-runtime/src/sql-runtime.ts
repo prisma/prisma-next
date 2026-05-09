@@ -17,7 +17,6 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
   AnyQueryAst,
-  CodecRegistry,
   ContractCodecRegistry,
   LoweredStatement,
   SqlCodecCallContext,
@@ -25,11 +24,9 @@ import type {
   SqlQueryable,
   SqlTransaction,
 } from '@prisma-next/sql-relational-core/ast';
+import { validateParamRefRefs } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type {
-  CodecDescriptorRegistry,
-  JsonSchemaValidatorRegistry,
-} from '@prisma-next/sql-relational-core/query-lane-context';
+import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeRow } from './codecs/decoding';
@@ -93,25 +90,15 @@ export interface Runtime extends RuntimeQueryable {
 export interface RuntimeConnection extends RuntimeQueryable {
   transaction(): Promise<RuntimeTransaction>;
   /**
-   * Returns the connection to the pool for reuse. Only call this when the
-   * connection is known to be in a clean state. If a transaction
-   * commit/rollback failed or the connection is otherwise suspect, call
-   * `destroy(reason)` instead.
+   * Returns the connection to the pool for reuse. Only call this when the connection is known to be in a clean state. If a transaction commit/rollback failed or the connection is otherwise suspect, call `destroy(reason)` instead.
    */
   release(): Promise<void>;
   /**
-   * Evicts the connection so it is never reused. Call this when the
-   * connection may be in an indeterminate state (e.g. a failed rollback
-   * leaving an open transaction, or a broken socket).
+   * Evicts the connection so it is never reused. Call this when the connection may be in an indeterminate state (e.g. a failed rollback leaving an open transaction, or a broken socket).
    *
-   * If teardown fails the error is propagated and the connection remains
-   * retryable, so the caller can decide whether to swallow the failure or
-   * retry cleanup. Calling destroy() or release() more than once after a
-   * successful teardown is caller error.
+   * If teardown fails the error is propagated and the connection remains retryable, so the caller can decide whether to swallow the failure or retry cleanup. Calling destroy() or release() more than once after a successful teardown is caller error.
    *
-   * `reason` is advisory context only. It may be surfaced to driver-level
-   * observability hooks (e.g. pg-pool's `'release'` event) but does not
-   * influence eviction behavior and is not rethrown.
+   * `reason` is advisory context only. It may be surfaced to driver-level observability hooks (e.g. pg-pool's `'release'` event) but does not influence eviction behavior and is not rethrown.
    */
   destroy(reason?: unknown): Promise<void>;
 }
@@ -133,6 +120,10 @@ function isExecutionPlan(plan: SqlExecutionPlan | SqlQueryPlan): plan is SqlExec
   return 'sql' in plan;
 }
 
+// v8 ignore next 2
+const noopLogSink = (): void => {};
+const noopLog: Log = { info: noopLogSink, warn: noopLogSink, error: noopLogSink };
+
 class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
   extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>
   implements Runtime
@@ -141,10 +132,8 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   private readonly driver: SqlDriver<unknown>;
   private readonly familyAdapter: RuntimeFamilyAdapter<Contract<SqlStorage>>;
-  private readonly codecRegistry: CodecRegistry;
   private readonly contractCodecs: ContractCodecRegistry;
   private readonly codecDescriptors: CodecDescriptorRegistry;
-  private readonly jsonSchemaValidators: JsonSchemaValidatorRegistry | undefined;
   private readonly sqlCtx: SqlMiddlewareContext;
   private readonly verify: RuntimeVerifyOptions;
   private codecRegistryValidated: boolean;
@@ -165,13 +154,8 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       contract: context.contract,
       mode: mode ?? 'strict',
       now: () => Date.now(),
-      log: log ?? {
-        info: () => {},
-        warn: () => {},
-        error: () => {},
-      },
-      // ctx is only invoked by runWithMiddleware with execs this runtime lowered;
-      // the framework parameter type is the cross-family base.
+      log: log ?? noopLog,
+      // ctx is only invoked by runWithMiddleware with execs this runtime lowered; the framework parameter type is the cross-family base.
       contentHash: (exec) => computeSqlContentHash(exec as SqlExecutionPlan),
     };
 
@@ -181,10 +165,8 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.adapter = adapter;
     this.driver = driver;
     this.familyAdapter = new SqlFamilyAdapter(context.contract, adapter.profile);
-    this.codecRegistry = context.codecs;
     this.contractCodecs = context.contractCodecs;
     this.codecDescriptors = context.codecDescriptors;
-    this.jsonSchemaValidators = context.jsonSchemaValidators;
     this.sqlCtx = sqlCtx;
     this.verify = verify;
     this.codecRegistryValidated = false;
@@ -199,33 +181,26 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   }
 
   /**
-   * Lower a `SqlQueryPlan` (AST + meta) into a `SqlExecutionPlan` with
-   * encoded parameters ready for the driver. This is the single point at
-   * which params transition from app-layer values to driver wire-format.
+   * Lower a `SqlQueryPlan` (AST + meta) into a `SqlExecutionPlan` with encoded parameters ready for the driver. This is the single point at which params transition from app-layer values to driver wire-format.
    *
-   * `ctx: SqlCodecCallContext` is forwarded to `encodeParams` so per-query
-   * cancellation reaches every codec body during parameter encoding. The
-   * framework abstract typed this as `CodecCallContext`; the SQL family
-   * narrows it to the SQL-specific extension. SQL params do not populate
-   * `ctx.column` — encode-side column metadata is the middleware's domain.
+   * `ctx: SqlCodecCallContext` is forwarded to `encodeParams` so per-query cancellation reaches every codec body during parameter encoding. The framework abstract typed this as `CodecCallContext`; the SQL family narrows it to the SQL-specific extension. SQL params do not populate `ctx.column` — encode-side column metadata is the middleware's domain.
    */
   protected override async lower(
     plan: SqlQueryPlan,
     ctx: SqlCodecCallContext,
   ): Promise<SqlExecutionPlan> {
+    validateParamRefRefs(plan.ast, this.codecDescriptors);
     const lowered = lowerSqlPlan(this.adapter, this.contract, plan);
     return Object.freeze({
       ...lowered,
-      params: await encodeParams(lowered, this.codecRegistry, ctx, this.contractCodecs),
+      params: await encodeParams(lowered, ctx, this.contractCodecs),
     });
   }
 
   /**
-   * Default driver invocation. Production execution paths override the
-   * queryable target (e.g. transaction or connection) by going through
-   * `executeAgainstQueryable`; this implementation supports any caller of
-   * `super.execute(plan)` and the abstract-base contract.
+   * Default driver invocation required by the abstract `RuntimeCore` contract. Every production path overrides `execute()` and routes through `executeAgainstQueryable`, so this hook is defensive only — subclasses that delegate back to `super.execute()` would land here.
    */
+  // v8 ignore next 6
   protected override runDriver(exec: SqlExecutionPlan): AsyncIterable<Record<string, unknown>> {
     return this.driver.execute<Record<string, unknown>>({
       sql: exec.sql,
@@ -234,13 +209,8 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   }
 
   /**
-   * SQL pre-compile hook. Runs the registered middleware `beforeCompile`
-   * chain over the plan's draft (AST + meta). Returns the original plan
-   * unchanged when no middleware rewrote the AST; otherwise returns a new
-   * plan carrying the rewritten AST and meta. The AST is the authoritative
-   * source of execution metadata, so a rewrite needs no sidecar
-   * reconciliation here — the lowering adapter and the encoder both walk
-   * the rewritten AST directly.
+   * SQL pre-compile hook. Runs the registered middleware `beforeCompile` chain over the plan's draft (AST + meta). Returns the original plan unchanged when no middleware rewrote the AST; otherwise returns a new plan carrying the rewritten AST and meta. The AST is the authoritative source of execution metadata, so a rewrite needs no sidecar reconciliation here — the lowering adapter and the encoder both walk the rewritten
+   * AST directly.
    */
   protected override async runBeforeCompile(plan: SqlQueryPlan): Promise<SqlQueryPlan> {
     const rewrittenDraft = await runBeforeCompileChain(
@@ -269,23 +239,24 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 
     const self = this;
     const signal = options?.signal;
-    // One ctx per execute() call — the same reference is shared by
-    // encodeParams (lower), decodeRow (per-row), and the stream loop's
-    // between-row checks. Per-cell ctx allocations inside decodeField add
-    // `column` for resolvable cells without re-wrapping the signal. The
-    // ctx object is always allocated; the `signal` field is only included
-    // when a signal was supplied (exactOptionalPropertyTypes).
+    // One ctx per execute() call — the same reference is shared by encodeParams (lower), decodeRow (per-row), and the stream loop's between-row checks. Per-cell ctx allocations inside decodeField add `column` for resolvable cells without re-wrapping the signal. The ctx object is always allocated; the `signal` field is only included when a signal was supplied (exactOptionalPropertyTypes).
     const codecCtx: SqlCodecCallContext = signal === undefined ? {} : { signal };
 
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       checkAborted(codecCtx, 'stream');
 
-      const exec: SqlExecutionPlan = isExecutionPlan(plan)
-        ? Object.freeze({
-            ...plan,
-            params: await encodeParams(plan, self.codecRegistry, codecCtx, self.contractCodecs),
-          })
-        : await self.lower(await self.runBeforeCompile(plan), codecCtx);
+      let exec: SqlExecutionPlan;
+      if (isExecutionPlan(plan)) {
+        if (plan.ast) {
+          validateParamRefRefs(plan.ast, self.codecDescriptors);
+        }
+        exec = Object.freeze({
+          ...plan,
+          params: await encodeParams(plan, codecCtx, self.contractCodecs),
+        });
+      } else {
+        exec = await self.lower(await self.runBeforeCompile(plan), codecCtx);
+      }
 
       self.familyAdapter.validatePlan(exec, self.contract);
       self._telemetry = null;
@@ -317,11 +288,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
             }),
         );
 
-        // Manually drive the driver's async iterator so the between-row
-        // abort check fires *before* requesting the next row. With a
-        // `for await...of` loop the runtime would await `iterator.next()`
-        // first, leaving a window where one extra row is pulled through
-        // the driver after the signal aborted.
+        // Manually drive the driver's async iterator so the between-row abort check fires *before* requesting the next row. With a `for await...of` loop the runtime would await `iterator.next()` first, leaving a window where one extra row is pulled through the driver after the signal aborted.
         const iterator = stream[Symbol.asyncIterator]();
         try {
           while (true) {
@@ -330,20 +297,11 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
             if (next.done) {
               break;
             }
-            const decodedRow = await decodeRow(
-              next.value,
-              exec,
-              self.codecRegistry,
-              self.jsonSchemaValidators,
-              codecCtx,
-              self.contractCodecs,
-            );
+            const decodedRow = await decodeRow(next.value, exec, codecCtx, self.contractCodecs);
             yield decodedRow as Row;
           }
         } finally {
-          // Best-effort iterator cleanup so the driver can release its
-          // resources whether the stream finished normally, threw, or was
-          // abandoned by the consumer.
+          // Best-effort iterator cleanup so the driver can release its resources whether the stream finished normally, threw, or was abandoned by the consumer.
           await iterator.return?.();
         }
 
@@ -421,14 +379,6 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   }
 
   private async verifyMarker(): Promise<void> {
-    if (this.verify.mode === 'always') {
-      this.verified = false;
-    }
-
-    if (this.verified) {
-      return;
-    }
-
     const readStatement = this.familyAdapter.markerReader.readMarkerStatement();
     const result = await this.driver.query(readStatement.sql, readStatement.params);
 
@@ -536,11 +486,7 @@ export async function withTransaction<R>(
   const destroyConnection = async (reason: unknown): Promise<void> => {
     if (connectionDisposed) return;
     connectionDisposed = true;
-    // SqlConnection.destroy() propagates teardown errors so callers can
-    // decide what to do with them. Here, we're already about to throw a
-    // more informative error describing why we're evicting the connection
-    // (rollback/commit failure), so swallowing the teardown error is the
-    // right call — surfacing it would mask the original cause.
+    // SqlConnection.destroy() propagates teardown errors so callers can decide what to do with them. Here, we're already about to throw a more informative error describing why we're evicting the connection (rollback/commit failure), so swallowing the teardown error is the right call — surfacing it would mask the original cause.
     await connection.destroy(reason).catch(() => undefined);
   };
 
@@ -569,17 +515,9 @@ export async function withTransaction<R>(
     try {
       await transaction.commit();
     } catch (commitError) {
-      // After a failed COMMIT the server-side transaction may be: (a) already
-      // committed (error on response path), (b) already rolled back (deferred
-      // constraint / serialization failure), or (c) still open (COMMIT never
-      // reached the server). Attempt a best-effort rollback to cover (c) and
-      // confirm the protocol is healthy.
+      // After a failed COMMIT the server-side transaction may be: (a) already committed (error on response path), (b) already rolled back (deferred constraint / serialization failure), or (c) still open (COMMIT never reached the server). Attempt a best-effort rollback to cover (c) and confirm the protocol is healthy.
       //
-      // If rollback succeeds, the server is definitely no longer in a
-      // transaction (no-op in (a)/(b), real cleanup in (c)) and we've just
-      // proved the connection round-trips correctly — it's safe to return
-      // to the pool. If rollback fails, the connection state is ambiguous
-      // (broken socket, protocol desync, etc.) and we must destroy it.
+      // If rollback succeeds, the server is definitely no longer in a transaction (no-op in (a)/(b), real cleanup in (c)) and we've just proved the connection round-trips correctly — it's safe to return to the pool. If rollback fails, the connection state is ambiguous (broken socket, protocol desync, etc.) and we must destroy it.
       try {
         await transaction.rollback();
       } catch {

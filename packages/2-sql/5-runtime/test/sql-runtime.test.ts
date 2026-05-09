@@ -7,17 +7,10 @@ import {
   type RuntimeExtensionInstance,
 } from '@prisma-next/framework-components/execution';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type {
-  Codec,
-  CodecRegistry,
-  SqlDriver,
-  SqlExecuteRequest,
-} from '@prisma-next/sql-relational-core/ast';
+import type { Codec, SqlDriver, SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
   ColumnRef,
-  codec,
-  createCodecRegistry,
   LiteralExpr,
   ParamRef,
   ProjectionItem,
@@ -37,6 +30,8 @@ import type {
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime, withTransaction } from '../src/sql-runtime';
 import { createAsyncSecretCodec, decryptSecret } from './seeded-secret-codec';
+import { defineTestCodec } from './test-codec';
+import { descriptorsFromCodecs } from './utils';
 
 const runtimeSecretSeed = 'sql-runtime-secret';
 
@@ -65,20 +60,18 @@ interface DriverMockSpies {
 
 type MockSqlDriver = SqlDriver & { __spies: DriverMockSpies };
 
-function createStubCodecs(extraCodecs: readonly Codec<string>[] = []): CodecRegistry {
-  const registry = createCodecRegistry();
-  registry.register(
-    codec({
+function createStubCodecs(
+  extraCodecs: readonly Codec<string>[] = [],
+): ReadonlyArray<Codec<string>> {
+  return [
+    defineTestCodec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
       encode: (v: number) => v,
       decode: (w: number) => w,
     }),
-  );
-  for (const extraCodec of extraCodecs) {
-    registry.register(extraCodec);
-  }
-  return registry;
+    ...extraCodecs,
+  ];
 }
 
 function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
@@ -86,13 +79,11 @@ function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
   return {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    __codecs: codecs,
     profile: {
       id: 'test-profile',
       target: 'postgres',
       capabilities: {},
-      codecs() {
-        return codecs;
-      },
       readMarkerStatement() {
         return {
           sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where id = $1',
@@ -171,8 +162,7 @@ function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => createCodecRegistry(),
-    parameterizedCodecs: () => [],
+    codecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -182,15 +172,14 @@ function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
 function createTestAdapterDescriptor(
   adapter: ReturnType<typeof createStubAdapter>,
 ): SqlRuntimeAdapterDescriptor<'postgres'> {
-  const codecRegistry = adapter.profile.codecs();
+  const codecRegistry = adapter.__codecs;
   return {
     kind: 'adapter',
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => codecRegistry,
-    parameterizedCodecs: () => [],
+    codecs: () => descriptorsFromCodecs(codecRegistry),
     create() {
       return Object.assign(
         { familyId: 'sql' as const, targetId: 'postgres' as const },
@@ -406,8 +395,7 @@ describe('createRuntime', () => {
 
   it('rejects a Mongo middleware with a clear error', () => {
     const { stackInstance, context, driver } = createTestSetup();
-    // Simulate a caller bypassing the SqlMiddleware type constraint (e.g. dynamically-loaded
-    // middleware). Static typing already rejects familyId: 'mongo'; this tests the runtime guard.
+    // Simulate a caller bypassing the SqlMiddleware type constraint (e.g. dynamically-loaded middleware). Static typing already rejects familyId: 'mongo'; this tests the runtime guard.
     const mongoMiddleware = { name: 'mongo-mw', familyId: 'mongo' } as unknown as SqlMiddleware;
     expect(() =>
       createRuntime({
@@ -617,7 +605,7 @@ describe('createRuntime', () => {
   );
 
   it('wraps async parameter encoding failures before the driver runs', async () => {
-    const failingCodec = codec({
+    const failingCodec = defineTestCodec({
       typeId: 'test/failing-secret@1',
       targetTypes: ['text'],
       encode: async (_value: string) => {
@@ -746,9 +734,7 @@ describe('withTransaction', () => {
 
     expect(driver.__spies.transactionCommit).toHaveBeenCalledOnce();
     expect(driver.__spies.transactionRollback).toHaveBeenCalledOnce();
-    // A successful rollback after a failed commit means the server is no
-    // longer in a transaction and the connection round-tripped cleanly, so
-    // it is safe to return to the pool rather than evict it.
+    // A successful rollback after a failed commit means the server is no longer in a transaction and the connection round-tripped cleanly, so it is safe to return to the pool rather than evict it.
     expect(driver.__spies.connectionRelease).toHaveBeenCalledOnce();
     expect(driver.__spies.connectionDestroy).not.toHaveBeenCalled();
   });

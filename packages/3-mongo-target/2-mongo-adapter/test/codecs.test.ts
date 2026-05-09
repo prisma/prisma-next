@@ -5,6 +5,7 @@ import { MONGO_DOUBLE_CODEC_ID, MONGO_VECTOR_CODEC_ID } from '../src/core/codec-
 import {
   mongoBooleanCodec,
   mongoDateCodec,
+  mongoDescriptorById,
   mongoDoubleCodec,
   mongoInt32Codec,
   mongoObjectIdCodec,
@@ -72,33 +73,45 @@ describe('mongoDateCodec', () => {
   });
 });
 
-describe('codec traits', () => {
+describe('codec traits (descriptor-side)', () => {
   it('objectId has equality trait', () => {
-    expect(mongoObjectIdCodec.traits).toEqual(['equality']);
+    expect(mongoDescriptorById(mongoObjectIdCodec.id)?.traits).toEqual(['equality']);
   });
 
   it('string has equality, order, textual traits', () => {
-    expect(mongoStringCodec.traits).toEqual(['equality', 'order', 'textual']);
+    expect(mongoDescriptorById(mongoStringCodec.id)?.traits).toEqual([
+      'equality',
+      'order',
+      'textual',
+    ]);
   });
 
   it('int32 has equality, order, numeric traits', () => {
-    expect(mongoInt32Codec.traits).toEqual(['equality', 'order', 'numeric']);
+    expect(mongoDescriptorById(mongoInt32Codec.id)?.traits).toEqual([
+      'equality',
+      'order',
+      'numeric',
+    ]);
   });
 
   it('double has equality, order, numeric traits', () => {
-    expect(mongoDoubleCodec.traits).toEqual(['equality', 'order', 'numeric']);
+    expect(mongoDescriptorById(mongoDoubleCodec.id)?.traits).toEqual([
+      'equality',
+      'order',
+      'numeric',
+    ]);
   });
 
   it('boolean has equality, boolean traits', () => {
-    expect(mongoBooleanCodec.traits).toEqual(['equality', 'boolean']);
+    expect(mongoDescriptorById(mongoBooleanCodec.id)?.traits).toEqual(['equality', 'boolean']);
   });
 
   it('date has equality, order traits', () => {
-    expect(mongoDateCodec.traits).toEqual(['equality', 'order']);
+    expect(mongoDescriptorById(mongoDateCodec.id)?.traits).toEqual(['equality', 'order']);
   });
 
   it('vector has equality trait', () => {
-    expect(mongoVectorCodec.traits).toEqual(['equality']);
+    expect(mongoDescriptorById(mongoVectorCodec.id)?.traits).toEqual(['equality']);
   });
 });
 
@@ -143,29 +156,65 @@ describe('mongoDateCodec', () => {
   });
 });
 
-describe('mongoVectorCodec.renderOutputType', () => {
+describe('mongo vector descriptor renderOutputType', () => {
+  // The descriptor list is heterogeneous (`CodecDescriptor` with default `P = void`); the per-codec `P` for vector is `Record<string, unknown>` — narrow back here to invoke the renderer with concrete typeParams.
+  const renderVector = mongoDescriptorById(mongoVectorCodec.id)?.renderOutputType as
+    | ((typeParams: Record<string, unknown>) => string | undefined)
+    | undefined;
+
   it('renders Vector<length> when length is present', () => {
-    expect(mongoVectorCodec.renderOutputType!({ length: 1536 })).toBe('Vector<1536>');
+    expect(renderVector?.({ length: 1536 })).toBe('Vector<1536>');
   });
 
   it('renders Vector<length> with small dimension', () => {
-    expect(mongoVectorCodec.renderOutputType!({ length: 3 })).toBe('Vector<3>');
+    expect(renderVector?.({ length: 3 })).toBe('Vector<3>');
   });
 
   it('returns undefined when length is absent', () => {
-    expect(mongoVectorCodec.renderOutputType!({})).toBeUndefined();
+    expect(renderVector?.({})).toBeUndefined();
   });
 
   it('throws on NaN length', () => {
-    expect(() => mongoVectorCodec.renderOutputType!({ length: Number.NaN })).toThrow(
+    expect(() => renderVector?.({ length: Number.NaN })).toThrow(
       /expected positive integer "length"/,
     );
   });
 
   it('throws on non-integer length', () => {
-    expect(() => mongoVectorCodec.renderOutputType!({ length: 3.5 })).toThrow(
-      /expected positive integer "length"/,
-    );
+    expect(() => renderVector?.({ length: 3.5 })).toThrow(/expected positive integer "length"/);
+  });
+
+  it('throws on zero length', () => {
+    expect(() => renderVector?.({ length: 0 })).toThrow(/expected positive integer "length"/);
+  });
+
+  it('throws on negative length', () => {
+    expect(() => renderVector?.({ length: -1 })).toThrow(/expected positive integer "length"/);
+  });
+});
+
+describe('mongo descriptor factory', () => {
+  it('descriptor.factory()(ctx) returns the underlying MongoCodec', () => {
+    const descriptor = mongoDescriptorById(mongoStringCodec.id);
+    expect(descriptor).toBeDefined();
+    if (!descriptor) return;
+    const make = (descriptor.factory as () => () => unknown)();
+    const codec = make();
+    expect(codec).toBe(mongoStringCodec);
+  });
+
+  it('every standard mongo codec descriptor materializes its codec via factory', () => {
+    for (const descriptor of [
+      mongoDescriptorById(mongoObjectIdCodec.id),
+      mongoDescriptorById(mongoVectorCodec.id),
+      mongoDescriptorById(mongoDateCodec.id),
+    ]) {
+      expect(descriptor).toBeDefined();
+      if (!descriptor) continue;
+      const make = (descriptor.factory as () => () => unknown)();
+      expect(typeof make).toBe('function');
+      expect(make()).toBeDefined();
+    }
   });
 });
 
@@ -176,8 +225,7 @@ describe('vector operation descriptors (production-defined)', () => {
   });
 
   it('mongoVectorNearOperation.impl returns undefined as a placeholder', () => {
-    // Mongo does not yet lower the vector `near` operation; the impl is a
-    // placeholder so the descriptor satisfies the shared shape.
+    // Mongo does not yet lower the vector `near` operation; the impl is a placeholder so the descriptor satisfies the shared shape.
     expect((mongoVectorNearOperation.impl as () => unknown)()).toBeUndefined();
   });
 

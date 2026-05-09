@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ColumnRef, LiteralExpr, OperationExpr, ParamRef } from '../src/ast/types';
-import { buildOperation, type Expression, toExpr } from '../src/expression';
+import { ColumnRef, IdentifierRef, LiteralExpr, OperationExpr, ParamRef } from '../src/ast/types';
+import { buildOperation, type Expression, refsOf, toExpr } from '../src/expression';
 
 const infixLowering = {
   targetFamily: 'sql',
@@ -49,6 +49,51 @@ describe('toExpr', () => {
     const result = toExpr(value);
     expect(result).toBeInstanceOf(ParamRef);
     expect((result as ParamRef).value).toBe(value);
+  });
+
+  it('threads refs onto the resulting ParamRef when provided', () => {
+    const result = toExpr('alice@example.com', 'sql/varchar@1', {
+      table: 'user',
+      column: 'email',
+    });
+    expect(result).toBeInstanceOf(ParamRef);
+    const ref = result as ParamRef;
+    expect(ref.codecId).toBe('sql/varchar@1');
+    expect(ref.refs).toEqual({ table: 'user', column: 'email' });
+  });
+});
+
+describe('refsOf', () => {
+  it('reads refs from a ColumnRef AST', () => {
+    const expr: Expression<{ codecId: 'pg/text@1'; nullable: false }> = {
+      returnType: { codecId: 'pg/text@1', nullable: false },
+      buildAst: () => ColumnRef.of('user', 'email'),
+    };
+    expect(refsOf(expr)).toEqual({ table: 'user', column: 'email' });
+  });
+
+  it('reads refs from an Expression wrapper that carries refs metadata directly', () => {
+    const expr: Expression<{ codecId: 'pg/text@1'; nullable: false }> & {
+      refs: { table: string; column: string };
+    } = {
+      returnType: { codecId: 'pg/text@1', nullable: false },
+      buildAst: () => IdentifierRef.of('email'),
+      refs: { table: 'user', column: 'email' },
+    };
+    expect(refsOf(expr)).toEqual({ table: 'user', column: 'email' });
+  });
+
+  it('returns undefined for an Expression backed by a non-column AST and no refs metadata', () => {
+    const expr: Expression<{ codecId: 'pg/text@1'; nullable: false }> = {
+      returnType: { codecId: 'pg/text@1', nullable: false },
+      buildAst: () => LiteralExpr.of('foo'),
+    };
+    expect(refsOf(expr)).toBeUndefined();
+  });
+
+  it('returns undefined for raw values', () => {
+    expect(refsOf('plain string')).toBeUndefined();
+    expect(refsOf(42)).toBeUndefined();
   });
 });
 

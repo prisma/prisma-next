@@ -1,14 +1,27 @@
+/**
+ * Codec model: interfaces (consumer surface) plus abstract `Impl` classes (codec-author surface) plus the column packager.
+ *
+ * Consumers depend on the interfaces: {@link Codec}, {@link CodecDescriptor}, {@link AnyCodecDescriptor}, {@link ColumnSpec}, {@link ColumnTypeDescriptor}.
+ *
+ * Codec authors `extend` the abstract bases: {@link CodecImpl} and {@link CodecDescriptorImpl}. They write a per-codec column helper that calls `descriptor.factory(...)` directly and tie the helper to its descriptor with `satisfies ColumnHelperFor<D>` (or `ColumnHelperForStrict<D>`).
+ */
+
+export type { Codec } from '../shared/codec';
+export { CodecImpl } from '../shared/codec';
+export type { AnyCodecDescriptor, CodecDescriptor } from '../shared/codec-descriptor';
+export { CodecDescriptorImpl } from '../shared/codec-descriptor';
 export type {
-  Codec,
   CodecCallContext,
-  CodecDescriptor,
   CodecInstanceContext,
   CodecLookup,
   CodecMeta,
   CodecTrait,
 } from '../shared/codec-types';
-export {
-  emptyCodecLookup,
-  synthesizeNonParameterizedDescriptor,
-  voidParamsSchema,
-} from '../shared/codec-types';
+export { emptyCodecLookup, voidParamsSchema } from '../shared/codec-types';
+export type {
+  ColumnHelperFor,
+  ColumnHelperForStrict,
+  ColumnSpec,
+  ColumnTypeDescriptor,
+} from '../shared/column-spec';
+export { column } from '../shared/column-spec';

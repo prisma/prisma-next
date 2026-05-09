@@ -22,6 +22,7 @@
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/utils": "workspace:*",
+    "@standard-schema/spec": "^1.1.0",
     "arktype": "catalog:",
     "ts-toolbelt": "^9.6.0"
   },
@@ -41,6 +42,7 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./ast": "./dist/exports/ast.mjs",
+    "./codec-descriptor-registry": "./dist/exports/codec-descriptor-registry.mjs",
     "./errors": "./dist/exports/errors.mjs",
     "./expression": "./dist/exports/expression.mjs",
     "./plan": "./dist/exports/plan.mjs",

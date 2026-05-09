@@ -96,10 +96,9 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
   version: '1.2.3-test',
 };
 
-/** Controlled test-only descriptor — intentionally uses pg/vector@1 with maximum: 2000 rather
- *  than importing the real pgvector pack, so interpreter unit tests stay layer-isolated.
- *  Real-pack parity is covered by
- *  `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`. */
+/**
+ * Controlled test-only descriptor — intentionally uses pg/vector@1 with maximum: 2000 rather than importing the real pgvector pack, so interpreter unit tests stay layer-isolated. Real-pack parity is covered by `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`.
+ */
 export const pgvectorAuthoringContributions = {
   field: {},
   type: {
@@ -178,10 +177,12 @@ const targetTypesByCodecId: Record<string, readonly string[]> = {
 
 export const postgresCodecLookup: CodecLookup = {
   get: (id: string) => {
-    const targetTypes = targetTypesByCodecId[id];
-    if (!targetTypes) return undefined;
-    return { id, targetTypes } as ReturnType<CodecLookup['get']>;
+    if (!targetTypesByCodecId[id]) return undefined;
+    return { id } as ReturnType<CodecLookup['get']>;
   },
+  targetTypesFor: (id: string) => targetTypesByCodecId[id],
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
 };
 
 export function createPostgresTestContext(

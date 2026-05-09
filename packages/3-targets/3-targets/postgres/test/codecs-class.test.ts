@@ -1,0 +1,409 @@
+import { describe, expect, it } from 'vitest';
+import {
+  PG_BIT_CODEC_ID,
+  PG_BOOL_CODEC_ID,
+  PG_ENUM_CODEC_ID,
+  PG_FLOAT4_CODEC_ID,
+  PG_FLOAT8_CODEC_ID,
+  PG_INT2_CODEC_ID,
+  PG_INT4_CODEC_ID,
+  PG_INT8_CODEC_ID,
+  PG_INTERVAL_CODEC_ID,
+  PG_JSON_CODEC_ID,
+  PG_JSONB_CODEC_ID,
+  PG_NUMERIC_CODEC_ID,
+  PG_TEXT_CODEC_ID,
+  PG_TIME_CODEC_ID,
+  PG_TIMESTAMP_CODEC_ID,
+  PG_TIMESTAMPTZ_CODEC_ID,
+  PG_TIMETZ_CODEC_ID,
+  PG_VARBIT_CODEC_ID,
+} from '../src/core/codec-ids';
+import {
+  pgBitDescriptor,
+  pgBoolDescriptor,
+  pgEnumDescriptor,
+  pgFloat4Descriptor,
+  pgFloat8Descriptor,
+  pgInt2Descriptor,
+  pgInt4Descriptor,
+  pgInt8Descriptor,
+  pgIntervalDescriptor,
+  pgJsonbDescriptor,
+  pgJsonDescriptor,
+  pgNumericDescriptor,
+  pgTextDescriptor,
+  pgTimeDescriptor,
+  pgTimestampDescriptor,
+  pgTimestamptzDescriptor,
+  pgTimetzDescriptor,
+  pgVarbitDescriptor,
+} from '../src/core/codecs';
+
+const instanceCtx = { name: '<test>' };
+const callCtx = {};
+
+describe('codecs-class', () => {
+  describe('pg/text@1', () => {
+    const codec = pgTextDescriptor.factory()(instanceCtx);
+
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_TEXT_CODEC_ID);
+    });
+
+    it('encodes and decodes string values verbatim', async () => {
+      expect(await codec.encode('hello', callCtx)).toBe('hello');
+      expect(await codec.decode('hello', callCtx)).toBe('hello');
+    });
+
+    it('round-trips through JSON identity', () => {
+      expect(codec.encodeJson('hello')).toBe('hello');
+      expect(codec.decodeJson('hello')).toBe('hello');
+    });
+  });
+
+  describe('pg/int4@1', () => {
+    const codec = pgInt4Descriptor.factory()(instanceCtx);
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_INT4_CODEC_ID);
+    });
+    it('encodes and decodes number values verbatim', async () => {
+      expect(await codec.encode(42, callCtx)).toBe(42);
+      expect(await codec.decode(42, callCtx)).toBe(42);
+    });
+  });
+
+  describe('pg/int2@1', () => {
+    const codec = pgInt2Descriptor.factory()(instanceCtx);
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_INT2_CODEC_ID);
+    });
+    it('encodes and decodes number values verbatim', async () => {
+      expect(await codec.encode(7, callCtx)).toBe(7);
+      expect(await codec.decode(7, callCtx)).toBe(7);
+    });
+  });
+
+  describe('pg/int8@1', () => {
+    const codec = pgInt8Descriptor.factory()(instanceCtx);
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_INT8_CODEC_ID);
+    });
+    it('encodes and decodes number values verbatim', async () => {
+      expect(await codec.encode(9_999_999_999, callCtx)).toBe(9_999_999_999);
+      expect(await codec.decode(9_999_999_999, callCtx)).toBe(9_999_999_999);
+    });
+  });
+
+  describe('pg/float4@1', () => {
+    const codec = pgFloat4Descriptor.factory()(instanceCtx);
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_FLOAT4_CODEC_ID);
+    });
+    it('encodes and decodes number values verbatim', async () => {
+      expect(await codec.encode(3.14, callCtx)).toBe(3.14);
+      expect(await codec.decode(3.14, callCtx)).toBe(3.14);
+    });
+  });
+
+  describe('pg/float8@1', () => {
+    const codec = pgFloat8Descriptor.factory()(instanceCtx);
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_FLOAT8_CODEC_ID);
+    });
+    it('encodes and decodes number values verbatim', async () => {
+      expect(await codec.encode(Math.E, callCtx)).toBe(Math.E);
+      expect(await codec.decode(Math.E, callCtx)).toBe(Math.E);
+    });
+  });
+
+  describe('pg/bool@1', () => {
+    const codec = pgBoolDescriptor.factory()(instanceCtx);
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_BOOL_CODEC_ID);
+    });
+    it('encodes and decodes boolean values verbatim', async () => {
+      expect(await codec.encode(true, callCtx)).toBe(true);
+      expect(await codec.decode(false, callCtx)).toBe(false);
+    });
+  });
+
+  describe('pg/numeric@1', () => {
+    const codec = pgNumericDescriptor.factory({ precision: 10, scale: 2 })(instanceCtx);
+
+    it('id proxies through the descriptor (independent of params)', () => {
+      expect(codec.id).toBe(PG_NUMERIC_CODEC_ID);
+    });
+
+    it('encodes string verbatim', async () => {
+      expect(await codec.encode('123.45', callCtx)).toBe('123.45');
+    });
+
+    it('decodes string verbatim and coerces number to string', async () => {
+      expect(await codec.decode('123.45', callCtx)).toBe('123.45');
+      expect(await codec.decode(123 as unknown as string, callCtx)).toBe('123');
+    });
+
+    it('renderOutputType returns Numeric<precision, scale>', () => {
+      expect(pgNumericDescriptor.renderOutputType?.({ precision: 10, scale: 2 })).toBe(
+        'Numeric<10, 2>',
+      );
+    });
+
+    it('renderOutputType returns Numeric<precision> when scale absent', () => {
+      expect(pgNumericDescriptor.renderOutputType?.({ precision: 10 })).toBe('Numeric<10>');
+    });
+  });
+
+  describe('pg/timestamp@1', () => {
+    const codec = pgTimestampDescriptor.factory({ precision: 3 })(instanceCtx);
+
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_TIMESTAMP_CODEC_ID);
+    });
+
+    it('round-trips Date values', async () => {
+      const instant = new Date('2024-01-15T10:30:00Z');
+      expect(await codec.encode(instant, callCtx)).toBe(instant);
+      expect(await codec.decode(instant, callCtx)).toBe(instant);
+    });
+
+    it('serializes Date to ISO 8601 string for JSON', () => {
+      const instant = new Date('2024-01-15T10:30:00Z');
+      expect(codec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000Z');
+      expect(codec.decodeJson('2024-01-15T10:30:00.000Z')).toEqual(instant);
+    });
+
+    it('throws on invalid JSON input', () => {
+      expect(() => codec.decodeJson(42)).toThrow(/Expected ISO date string/);
+      expect(() => codec.decodeJson('not-a-date')).toThrow(/Invalid ISO date string/);
+    });
+
+    it('renderOutputType returns Timestamp<precision>', () => {
+      expect(pgTimestampDescriptor.renderOutputType?.({ precision: 3 })).toBe('Timestamp<3>');
+    });
+
+    it('renderOutputType returns bare Timestamp when precision absent', () => {
+      expect(pgTimestampDescriptor.renderOutputType?.({})).toBe('Timestamp');
+    });
+  });
+
+  describe('pg/timestamptz@1', () => {
+    const codec = pgTimestamptzDescriptor.factory({ precision: 6 })(instanceCtx);
+
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_TIMESTAMPTZ_CODEC_ID);
+    });
+
+    it('round-trips Date values', async () => {
+      const instant = new Date('2024-01-15T10:30:00Z');
+      expect(await codec.encode(instant, callCtx)).toBe(instant);
+      expect(await codec.decode(instant, callCtx)).toBe(instant);
+    });
+
+    it('round-trips through JSON via ISO 8601', () => {
+      const instant = new Date('2024-01-15T10:30:00Z');
+      expect(codec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000Z');
+      expect(codec.decodeJson('2024-01-15T10:30:00.000Z')).toEqual(instant);
+    });
+
+    it('throws on invalid JSON input with pg/timestamptz@1 label', () => {
+      expect(() => codec.decodeJson(42)).toThrow(/pg\/timestamptz@1/);
+    });
+  });
+
+  describe('pg/time@1', () => {
+    const codec = pgTimeDescriptor.factory({ precision: 2 })(instanceCtx);
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_TIME_CODEC_ID);
+    });
+    it('round-trips strings verbatim', async () => {
+      expect(await codec.encode('10:30:00', callCtx)).toBe('10:30:00');
+      expect(await codec.decode('10:30:00', callCtx)).toBe('10:30:00');
+    });
+    it('renderOutputType formats Time<precision>', () => {
+      expect(pgTimeDescriptor.renderOutputType?.({ precision: 2 })).toBe('Time<2>');
+    });
+  });
+
+  describe('pg/timetz@1', () => {
+    const codec = pgTimetzDescriptor.factory({})(instanceCtx);
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_TIMETZ_CODEC_ID);
+    });
+    it('round-trips strings verbatim', async () => {
+      expect(await codec.encode('10:30:00+00', callCtx)).toBe('10:30:00+00');
+      expect(await codec.decode('10:30:00+00', callCtx)).toBe('10:30:00+00');
+    });
+  });
+
+  describe('pg/bit@1', () => {
+    const codec = pgBitDescriptor.factory({ length: 8 })(instanceCtx);
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_BIT_CODEC_ID);
+    });
+    it('round-trips bit strings verbatim', async () => {
+      expect(await codec.encode('10101010', callCtx)).toBe('10101010');
+      expect(await codec.decode('10101010', callCtx)).toBe('10101010');
+    });
+    it('renderOutputType returns Bit<length>', () => {
+      expect(pgBitDescriptor.renderOutputType?.({ length: 8 })).toBe('Bit<8>');
+    });
+    it('renderOutputType returns undefined when length absent', () => {
+      expect(pgBitDescriptor.renderOutputType?.({})).toBeUndefined();
+    });
+  });
+
+  describe('pg/varbit@1', () => {
+    const codec = pgVarbitDescriptor.factory({ length: 16 })(instanceCtx);
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_VARBIT_CODEC_ID);
+    });
+    it('round-trips bit strings verbatim', async () => {
+      expect(await codec.encode('1010', callCtx)).toBe('1010');
+      expect(await codec.decode('1010', callCtx)).toBe('1010');
+    });
+    it('renderOutputType returns VarBit<length>', () => {
+      expect(pgVarbitDescriptor.renderOutputType?.({ length: 16 })).toBe('VarBit<16>');
+    });
+  });
+
+  describe('pg/interval@1', () => {
+    const codec = pgIntervalDescriptor.factory({})(instanceCtx);
+
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_INTERVAL_CODEC_ID);
+    });
+
+    it('encodes string verbatim', async () => {
+      expect(await codec.encode('1 day', callCtx)).toBe('1 day');
+    });
+
+    it('decodes string verbatim', async () => {
+      expect(await codec.decode('1 day', callCtx)).toBe('1 day');
+    });
+
+    it('decodes object form to JSON string', async () => {
+      expect(await codec.decode({ days: 1 } as unknown as string, callCtx)).toBe('{"days":1}');
+    });
+  });
+
+  describe('pg/enum@1', () => {
+    const codec = pgEnumDescriptor.factory({ values: ['red', 'green', 'blue'] })(instanceCtx);
+
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_ENUM_CODEC_ID);
+    });
+
+    it('round-trips string variants verbatim', async () => {
+      expect(await codec.encode('red', callCtx)).toBe('red');
+      expect(await codec.decode('green', callCtx)).toBe('green');
+    });
+
+    it("renderOutputType returns 'a' | 'b' | 'c' literal union", () => {
+      expect(pgEnumDescriptor.renderOutputType?.({ values: ['red', 'green', 'blue'] })).toBe(
+        "'red' | 'green' | 'blue'",
+      );
+    });
+  });
+
+  describe('pg/json@1', () => {
+    const codec = pgJsonDescriptor.factory()(instanceCtx);
+
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_JSON_CODEC_ID);
+    });
+
+    it('encodes JsonValue to JSON string', async () => {
+      expect(await codec.encode({ key: 'value' }, callCtx)).toBe('{"key":"value"}');
+    });
+
+    it('decodes JSON string to value', async () => {
+      expect(await codec.decode('{"key":"value"}', callCtx)).toEqual({ key: 'value' });
+    });
+
+    it('decode passes through already-decoded values', async () => {
+      expect(await codec.decode({ key: 'value' }, callCtx)).toEqual({ key: 'value' });
+    });
+  });
+
+  describe('pg/jsonb@1', () => {
+    const codec = pgJsonbDescriptor.factory()(instanceCtx);
+
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(PG_JSONB_CODEC_ID);
+    });
+
+    it('encodes JsonValue to JSON string', async () => {
+      expect(await codec.encode([1, 2, 3], callCtx)).toBe('[1,2,3]');
+    });
+
+    it('decodes JSON string to value', async () => {
+      expect(await codec.decode('[1,2,3]', callCtx)).toEqual([1, 2, 3]);
+    });
+
+    it('decode passes through already-decoded values', async () => {
+      expect(await codec.decode([1, 2, 3], callCtx)).toEqual([1, 2, 3]);
+    });
+  });
+
+  describe('descriptor metadata', () => {
+    it('codec ids match the PG_*_CODEC_ID constants', () => {
+      expect(pgTextDescriptor.codecId).toBe(PG_TEXT_CODEC_ID);
+      expect(pgInt4Descriptor.codecId).toBe(PG_INT4_CODEC_ID);
+      expect(pgInt2Descriptor.codecId).toBe(PG_INT2_CODEC_ID);
+      expect(pgInt8Descriptor.codecId).toBe(PG_INT8_CODEC_ID);
+      expect(pgFloat4Descriptor.codecId).toBe(PG_FLOAT4_CODEC_ID);
+      expect(pgFloat8Descriptor.codecId).toBe(PG_FLOAT8_CODEC_ID);
+      expect(pgBoolDescriptor.codecId).toBe(PG_BOOL_CODEC_ID);
+      expect(pgNumericDescriptor.codecId).toBe(PG_NUMERIC_CODEC_ID);
+      expect(pgTimestampDescriptor.codecId).toBe(PG_TIMESTAMP_CODEC_ID);
+      expect(pgTimestamptzDescriptor.codecId).toBe(PG_TIMESTAMPTZ_CODEC_ID);
+      expect(pgTimeDescriptor.codecId).toBe(PG_TIME_CODEC_ID);
+      expect(pgTimetzDescriptor.codecId).toBe(PG_TIMETZ_CODEC_ID);
+      expect(pgBitDescriptor.codecId).toBe(PG_BIT_CODEC_ID);
+      expect(pgVarbitDescriptor.codecId).toBe(PG_VARBIT_CODEC_ID);
+      expect(pgIntervalDescriptor.codecId).toBe(PG_INTERVAL_CODEC_ID);
+      expect(pgEnumDescriptor.codecId).toBe(PG_ENUM_CODEC_ID);
+      expect(pgJsonDescriptor.codecId).toBe(PG_JSON_CODEC_ID);
+      expect(pgJsonbDescriptor.codecId).toBe(PG_JSONB_CODEC_ID);
+    });
+
+    it('exposes nativeType meta keyed under db.sql.postgres', () => {
+      expect(pgTextDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('text');
+      expect(pgInt4Descriptor.meta?.db?.sql?.postgres?.nativeType).toBe('integer');
+      expect(pgInt2Descriptor.meta?.db?.sql?.postgres?.nativeType).toBe('smallint');
+      expect(pgInt8Descriptor.meta?.db?.sql?.postgres?.nativeType).toBe('bigint');
+      expect(pgFloat4Descriptor.meta?.db?.sql?.postgres?.nativeType).toBe('real');
+      expect(pgFloat8Descriptor.meta?.db?.sql?.postgres?.nativeType).toBe('double precision');
+      expect(pgBoolDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('boolean');
+      expect(pgNumericDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('numeric');
+      expect(pgTimestampDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe(
+        'timestamp without time zone',
+      );
+      expect(pgTimestamptzDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe(
+        'timestamp with time zone',
+      );
+      expect(pgTimeDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('time');
+      expect(pgTimetzDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('timetz');
+      expect(pgBitDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('bit');
+      expect(pgVarbitDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('bit varying');
+      expect(pgIntervalDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('interval');
+      expect(pgJsonDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('json');
+      expect(pgJsonbDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('jsonb');
+    });
+
+    it('exposes traits and targetTypes for each codec', () => {
+      expect(pgTextDescriptor.traits).toEqual(['equality', 'order', 'textual']);
+      expect(pgInt4Descriptor.traits).toEqual(['equality', 'order', 'numeric']);
+      expect(pgBoolDescriptor.traits).toEqual(['equality', 'boolean']);
+      expect(pgJsonDescriptor.traits).toEqual([]);
+      expect(pgJsonbDescriptor.traits).toEqual(['equality']);
+
+      expect(pgTextDescriptor.targetTypes).toEqual(['text']);
+      expect(pgNumericDescriptor.targetTypes).toEqual(['numeric', 'decimal']);
+      expect(pgBitDescriptor.targetTypes).toEqual(['bit']);
+      expect(pgVarbitDescriptor.targetTypes).toEqual(['bit varying']);
+    });
+  });
+});

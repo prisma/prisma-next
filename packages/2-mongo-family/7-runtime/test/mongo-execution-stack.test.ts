@@ -1,6 +1,6 @@
 import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { isRuntimeError } from '@prisma-next/framework-components/runtime';
-import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
+import { mongoCodec, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
 import { describe, expect, it } from 'vitest';
 import {
@@ -38,7 +38,7 @@ describe('createMongoExecutionStack', () => {
       familyId: 'mongo',
       targetId: 'mongo',
       version: '0.0.1',
-      codecs: () => createMongoCodecRegistry(),
+      codecs: () => newMongoCodecRegistry(),
       create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
     };
     const stack = createMongoExecutionStack({
@@ -65,7 +65,6 @@ describe('createMongoExecutionContext', () => {
   it('folds extension-pack codec contributions into the same registry', () => {
     const customCodec = mongoCodec({
       typeId: 'test/custom@1',
-      targetTypes: ['custom'],
       decode: (wire: string) => `decoded:${wire}`,
       encode: (value: string) => value,
     });
@@ -76,7 +75,7 @@ describe('createMongoExecutionContext', () => {
       targetId: 'mongo',
       version: '0.0.1',
       codecs: () => {
-        const registry = createMongoCodecRegistry();
+        const registry = newMongoCodecRegistry();
         registry.register(customCodec);
         return registry;
       },
@@ -95,7 +94,6 @@ describe('createMongoExecutionContext', () => {
   it('throws RUNTIME.DUPLICATE_CODEC when two contributors declare the same codec id', () => {
     const conflictingCodec = mongoCodec({
       typeId: 'mongo/string@1',
-      targetTypes: ['string'],
       decode: (wire: string) => wire,
       encode: (value: string) => value,
     });
@@ -106,7 +104,7 @@ describe('createMongoExecutionContext', () => {
       targetId: 'mongo',
       version: '0.0.1',
       codecs: () => {
-        const registry = createMongoCodecRegistry();
+        const registry = newMongoCodecRegistry();
         registry.register(conflictingCodec);
         return registry;
       },
@@ -151,9 +149,9 @@ describe('createMongoExecutionContext', () => {
 });
 
 describe('runtime adapter descriptor', () => {
-  it('declares the seven standard Mongo codec instances on codecInstances', () => {
-    const codecInstances = mongoRuntimeAdapter.types?.codecTypes?.codecInstances ?? [];
-    expect(codecInstances.map((c) => c.id).sort()).toEqual([...STANDARD_CODEC_IDS].sort());
+  it('declares the seven standard Mongo codec descriptors on codecDescriptors', () => {
+    const codecDescriptors = mongoRuntimeAdapter.types?.codecTypes?.codecDescriptors ?? [];
+    expect(codecDescriptors.map((d) => d.codecId).sort()).toEqual([...STANDARD_CODEC_IDS].sort());
   });
 
   it('create(stack) returns an instance whose lower() delegates to the standard adapter', async () => {
