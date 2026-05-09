@@ -52,7 +52,7 @@ export const contract = defineContract({
     }).sql(({ cols, constraints }) => ({
       table: 'items',
       indexes: [
-        constraints.index(cols.body, {
+        constraints.index([cols.body], {
           name: 'item_body_bm25_idx',
           type: 'bm25',
           options: { key_field: 'id' },
