@@ -59,13 +59,53 @@ The persona doc shape every file follows is documented at [`personas/_shape.md`]
 
 ## Composite skills
 
-A **composite skill** is a skill that orchestrates other (atomic) skills. The convention:
+A **composite skill** is a skill whose work spans more than one persona. There are two shapes:
 
-1. The composite skill names its **own** persona — typically `tech-lead`, since orchestration is the tech-lead lens. Other orchestrator personas are allowed if a composite genuinely needs one (e.g. a PM-orchestrated discovery composite); skill authors choose.
-2. The composite delegates to atomic single-persona sub-skills, in declared order, on declared artefacts.
-3. Each sub-skill names its **own** persona via its **own** load instruction in its body. Persona is **not** propagated by the orchestrator; every skill is independent on read.
+- **Shape A — decomposition into atomic sub-skills.** The composite skill orchestrates separate sub-skills, each of which names its own persona. Used when each lens produces a *separable artefact* (e.g. a system-design review *file*, a code review *file*, a walkthrough *file*) that the composite then surfaces side-by-side.
+- **Shape B — in-skill lens transitions within a continuous workflow.** The composite skill is *one* skill body; it loads multiple personas at declared boundaries within that body, with the orchestrator persona reloaded at synthesis points. Used when the work is a *continuous activity* (a discussion, an investigation, a multi-pass review of a single artefact) where cross-pollination between lenses is load-bearing — e.g. the architect surfaces a typology concern that the principal engineer needs to weigh against operability without the lens transition resetting the conversation.
 
-This keeps the persona-skill binding clean (each skill is independently legible), pushes "who runs what when" into composition where conflict-handling and result-merging will eventually live, and makes every skill self-describing on read.
+Both shapes preserve the same load-bearing principles:
+
+1. The composite skill names its **own** orchestrator persona explicitly — typically `tech-lead`, since orchestration is the tech-lead lens. Other orchestrator personas are allowed if a composite genuinely needs one (e.g. a PM-orchestrated discovery composite); skill authors choose.
+2. Every persona load is **visible in the skill body** — at the top for Shape A, at every workflow boundary for Shape B. There is no silent persona inheritance.
+3. **Persona is not propagated.** In Shape A, each sub-skill loads its own persona via its own load instruction; the composite's orchestrator persona does not flow into the sub-skills. In Shape B, each transition is its own load instruction; the agent re-loads at every boundary rather than pretending the prior persona is still in effect.
+4. Each composite is **self-describing on read.** A reader of the composite's SKILL.md should be able to reconstruct, without inference, which persona is loaded at which moment and which artefacts (or workflow phases) each is responsible for.
+
+### Shape A — decomposition into atomic sub-skills
+
+The composite delegates to atomic single-persona sub-skills, in declared order, on declared artefacts. The classic example is a multi-output review: `/drive-pr-local-review` (composite, adopts `tech-lead`) delegates in order to `review-system-design` (architect → `system-design-review.md`), `review-implementation` (principal-engineer → `code-review.md`), and `review-walkthrough` (tech-lead → `walkthrough.md`).
+
+**Mechanic:** the composite SKILL.md adopts its orchestrator persona at the top of its body, then names the sub-skills it delegates to in declared order. Each sub-skill is itself a stand-alone skill with its own SKILL.md and its own load instruction. Composite and sub-skills are independently invokable — the composite is leverage on top of the atomic surfaces, not a substitute for them.
+
+### Shape B — in-skill lens transitions within a continuous workflow
+
+The composite is one skill body; it loads its orchestrator persona at the top, then names transition boundaries within the workflow at which a different persona is adopted. The orchestrator persona is reloaded at synthesis points (typically at the start, between transitions, and at the end of the workflow) so the agent returns to the meta-judgement frame for routing-and-packaging work between lens-shifts.
+
+**Mechanic:** the composite SKILL.md body contains explicit persona-load instructions at the workflow boundaries. The standard load-instruction wording (per `§ Resolution rule`) is used at each transition — for example: *"Begin by adopting the architect persona (see the drive-agent-personas skill). When architect-class concerns are settled, adopt the principal-engineer persona for the buildability/operability pass. At synthesis, reload the tech-lead persona to package the outcome."* Each transition is its own load instruction; the agent re-loads at each boundary rather than carrying the prior persona through.
+
+The classic example is `drive-design-discussion`, which sequences `architect` (typology, naming, bounded contexts, conceptual integrity) → `principal-engineer` (failure modes, blast radius, operability, cost) within a single Q&A workflow, with `tech-lead` reloaded at synthesis. Cross-pollination is preserved because the conversation is continuous: a typology concern raised under architect can be referenced from the principal-engineer pass without re-adjudication, and a buildability concern raised under principal-engineer can reference back to architect framing.
+
+**Future-extensibility.** As v2+ personas are admitted (security, QA, etc.), additional persona-load steps slot into the workflow at appropriate points. The Shape-B composite SKILL.md should make this localised — adding a security-persona pass between architect and principal-engineer should be a single insertion at the right boundary, not a restructure of the workflow.
+
+### When to choose A vs B
+
+The choice is driven by the *unit of output* and the *load-bearing-ness of cross-pollination*.
+
+**Choose Shape A when:**
+
+- Each lens produces a *separable artefact* (a file, a deliverable) the composite surfaces side-by-side.
+- The lenses' work is *independently auditable* — a reader of the architect's artefact does not need the principal-engineer's artefact in hand to evaluate it.
+- Cross-pollination is *not* load-bearing: each lens can do its work cleanly off the shared inputs without needing to react to the other lenses' surfaces in real time.
+- The composite is *leverage on top of* the atomic skills — both the composite and the atomic skills are independently invokable and useful.
+
+**Choose Shape B when:**
+
+- The work is a *continuous activity* (a discussion, an investigation, a multi-pass review of a single artefact) rather than a set of side-by-side artefact deliveries.
+- Cross-pollination is *load-bearing*: the value of the second lens depends on having the first lens's concerns *in the conversation*, not just *in a sibling file*. Splitting into atomic sub-skills would lose the property that *"the architect raised X; how does the engineer feel about that?"* is a natural follow-up question, not a separate-skill invocation.
+- The natural unit of output is *one synthesised result* (a refined design, a triaged plan, a single review verdict) rather than several side-by-side artefacts.
+- A reader who only invoked one of the lenses-in-isolation (e.g. only the architect pass) would get less than half the value of the composite — the composite is not factorable without losing what makes it work.
+
+**When in doubt:** start with Shape A. Decomposition is more legible by default — each sub-skill is its own surface, each lens's work is its own file. Promote to Shape B only when you can articulate why cross-pollination is load-bearing for *this* workflow. The principal cost of Shape B is conversational continuity that doesn't decompose cleanly into auditable artefacts; the principal benefit is preserving lens-to-lens cross-talk that Shape A would lose.
 
 ## Heuristic for admitting v2+ personas
 
