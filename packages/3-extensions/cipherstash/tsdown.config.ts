@@ -8,5 +8,6 @@ export default defineConfig({
     'src/exports/column-types.ts',
     'src/exports/middleware.ts',
     'src/exports/migration.ts',
+    'src/exports/operation-types.ts',
   ],
 });

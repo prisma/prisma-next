@@ -44,6 +44,20 @@ export const cipherstashPackMeta = {
     codecTypes: {
       codecInstances: [cipherstashStringCodecMetadata],
     },
+    operationTypes: {
+      import: {
+        package: '@prisma-next/extension-cipherstash/operation-types',
+        named: 'OperationTypes',
+        alias: 'CipherstashOperationTypes',
+      },
+    },
+    queryOperationTypes: {
+      import: {
+        package: '@prisma-next/extension-cipherstash/operation-types',
+        named: 'QueryOperationTypes',
+        alias: 'CipherstashQueryOperationTypes',
+      },
+    },
     storage: [
       {
         typeId: CIPHERSTASH_STRING_CODEC_ID,

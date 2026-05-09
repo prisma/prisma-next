@@ -487,6 +487,18 @@
       "plane": "migration"
     },
     {
+      "glob": "packages/3-extensions/cipherstash/src/exports/operation-types.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/cipherstash/src/types/**",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/3-extensions/cipherstash/src/middleware/**",
       "domain": "extensions",
       "layer": "adapters",
