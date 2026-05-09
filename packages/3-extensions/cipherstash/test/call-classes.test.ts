@@ -25,7 +25,7 @@ import {
   type CipherstashSearchIndex,
   cipherstashAddSearchConfig,
   cipherstashRemoveSearchConfig,
-} from '../src/core/migration-call-classes';
+} from '../src/migration/call-classes';
 
 const TABLE = 'user';
 const FIELD = 'email';

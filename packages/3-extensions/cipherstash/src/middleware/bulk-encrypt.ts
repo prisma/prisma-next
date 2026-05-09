@@ -49,16 +49,16 @@ import type {
 } from '@prisma-next/sql-relational-core/middleware';
 import type { SqlMiddleware } from '@prisma-next/sql-runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { checkCipherstashAborted, raceCipherstashAbort } from '../core/abort';
-import { CIPHERSTASH_STRING_CODEC_ID } from '../core/constants';
+import { checkCipherstashAborted, raceCipherstashAbort } from '../execution/abort';
 import {
   EncryptedString,
   getInternalHandle,
   setHandleCiphertext,
   setHandleRoutingKey,
-} from '../core/envelope';
-import { type BulkEncryptTarget, groupByRoutingKey } from '../core/routing';
-import type { CipherstashSdk } from '../core/sdk';
+} from '../execution/envelope';
+import { type BulkEncryptTarget, groupByRoutingKey } from '../execution/routing';
+import type { CipherstashSdk } from '../execution/sdk';
+import { CIPHERSTASH_STRING_CODEC_ID } from '../extension-metadata/constants';
 
 /**
  * Construct the bulk-encrypt middleware. The returned middleware is

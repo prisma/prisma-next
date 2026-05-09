@@ -43,8 +43,8 @@ import {
   verifyContractSpaces,
 } from '@prisma-next/migration-tools/spaces';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { CIPHERSTASH_SPACE_ID } from '../src/core/constants';
 import cipherstashExtensionDescriptor from '../src/exports/control';
+import { CIPHERSTASH_SPACE_ID } from '../src/extension-metadata/constants';
 
 const cipherstashContractSpace = cipherstashExtensionDescriptor.contractSpace!;
 const cipherstashContract = cipherstashContractSpace.contractJson;

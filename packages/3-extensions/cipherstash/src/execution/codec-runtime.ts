@@ -33,7 +33,7 @@
 
 import type { Codec, SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
 import { codec } from '@prisma-next/sql-relational-core/ast';
-import { CIPHERSTASH_STRING_CODEC_ID } from './constants';
+import { CIPHERSTASH_STRING_CODEC_ID } from '../extension-metadata/constants';
 import { EncryptedString, getInternalHandle } from './envelope';
 import type { CipherstashSdk } from './sdk';
 

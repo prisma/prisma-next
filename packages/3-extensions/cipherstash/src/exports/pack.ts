@@ -10,4 +10,4 @@
  * Mirrors `packages/3-extensions/pgvector/src/exports/pack.ts`.
  */
 
-export { cipherstashPackMeta as default } from '../core/descriptor-meta';
+export { cipherstashPackMeta as default } from '../extension-metadata/descriptor-meta';

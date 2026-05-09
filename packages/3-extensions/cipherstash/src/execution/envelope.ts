@@ -134,7 +134,7 @@ export class EncryptedString {
   /**
    * Construct a read-side envelope from a wire ciphertext + the column
    * identity + the SDK used to decrypt the cell. Called from the codec
-   * `decode` body; intentionally exported from `core/envelope.ts` for
+   * `decode` body; intentionally exported from `execution/envelope.ts` for
    * the codec and for tests, but not re-exported from any subpath.
    */
   static fromInternal(args: EncryptedStringFromInternalArgs): EncryptedString {

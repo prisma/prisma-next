@@ -4,7 +4,7 @@
  * The cipherstash storage codec must NOT advertise the framework's
  * `equality` trait. Re-adding it without re-routing through the
  * cipherstash-namespaced operator surface (`cipherstashEq` /
- * `cipherstashIlike` in `src/core/operators.ts`) silently re-introduces
+ * `cipherstashIlike` in `src/execution/operators.ts`) silently re-introduces
  * a wrong-SQL footgun on cipherstash columns:
  *
  *   - `COMPARISON_METHODS_META.eq` (in `packages/3-extensions/sql-orm-client/
@@ -32,10 +32,10 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { cipherstashStringCodecMetadata } from '../src/core/codec-metadata';
-import { createCipherstashStringCodec } from '../src/core/codec-runtime';
-import { createParameterizedCodecDescriptors } from '../src/core/parameterized';
-import type { CipherstashSdk } from '../src/core/sdk';
+import { createCipherstashStringCodec } from '../src/execution/codec-runtime';
+import { createParameterizedCodecDescriptors } from '../src/execution/parameterized';
+import type { CipherstashSdk } from '../src/execution/sdk';
+import { cipherstashStringCodecMetadata } from '../src/extension-metadata/codec-metadata';
 
 function emptySdk(): CipherstashSdk {
   return {

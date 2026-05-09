@@ -26,34 +26,34 @@
 
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
-import { createCipherstashStringCodec } from '../core/codec-runtime';
-import { CIPHERSTASH_SPACE_ID } from '../core/constants';
-import { cipherstashQueryOperations } from '../core/operators';
-import { createParameterizedCodecDescriptors } from '../core/parameterized';
-import type { CipherstashSdk } from '../core/sdk';
+import { createCipherstashStringCodec } from '../execution/codec-runtime';
+import { cipherstashQueryOperations } from '../execution/operators';
+import { createParameterizedCodecDescriptors } from '../execution/parameterized';
+import type { CipherstashSdk } from '../execution/sdk';
+import { CIPHERSTASH_SPACE_ID } from '../extension-metadata/constants';
 
-export type { CipherstashStringCodec } from '../core/codec-runtime';
+export type { CipherstashStringCodec } from '../execution/codec-runtime';
 export {
   CIPHERSTASH_STRING_CODEC_ID,
   createCipherstashStringCodec,
-} from '../core/codec-runtime';
-export type { DecryptAllOptions } from '../core/decrypt-all';
-export { decryptAll } from '../core/decrypt-all';
-export type { EncryptedStringFromInternalArgs } from '../core/envelope';
-export { EncryptedString } from '../core/envelope';
-export type { CipherstashStringParams } from '../core/parameterized';
+} from '../execution/codec-runtime';
+export type { DecryptAllOptions } from '../execution/decrypt-all';
+export { decryptAll } from '../execution/decrypt-all';
+export type { EncryptedStringFromInternalArgs } from '../execution/envelope';
+export { EncryptedString } from '../execution/envelope';
+export type { CipherstashStringParams } from '../execution/parameterized';
 export {
   createParameterizedCodecDescriptors,
   encryptedStringParamsSchema,
   renderEncryptedStringOutputType,
-} from '../core/parameterized';
+} from '../execution/parameterized';
 export type {
   CipherstashBulkDecryptArgs,
   CipherstashBulkEncryptArgs,
   CipherstashRoutingKey,
   CipherstashSdk,
   CipherstashSingleDecryptArgs,
-} from '../core/sdk';
+} from '../execution/sdk';
 
 export const CIPHERSTASH_EXTENSION_VERSION = '0.0.1' as const;
 

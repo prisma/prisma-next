@@ -17,12 +17,15 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { CIPHERSTASH_SPACE_ID, CIPHERSTASH_STRING_CODEC_ID } from '../src/core/constants';
-import type { CipherstashSdk } from '../src/core/sdk';
+import type { CipherstashSdk } from '../src/execution/sdk';
 import {
   CIPHERSTASH_EXTENSION_VERSION,
   createCipherstashRuntimeDescriptor,
 } from '../src/exports/runtime';
+import {
+  CIPHERSTASH_SPACE_ID,
+  CIPHERSTASH_STRING_CODEC_ID,
+} from '../src/extension-metadata/constants';
 
 function emptySdk(): CipherstashSdk {
   return {

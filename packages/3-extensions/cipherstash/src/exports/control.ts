@@ -49,14 +49,14 @@ import baselineMetadata from '../../migrations/cipherstash/20260601T0000_install
 import baselineOps from '../../migrations/cipherstash/20260601T0000_install_eql_bundle/ops.json' with {
   type: 'json',
 };
-import headRef from '../../refs/head.json' with { type: 'json' };
-import { cipherstashStringCodecHooks } from '../core/cipherstash-codec';
+import headRef from '../../migrations/cipherstash/refs/head.json' with { type: 'json' };
 import {
   CIPHERSTASH_BASELINE_MIGRATION_NAME,
   CIPHERSTASH_SPACE_ID,
   CIPHERSTASH_STRING_CODEC_ID,
-} from '../core/constants';
-import { cipherstashPackMeta } from '../core/descriptor-meta';
+} from '../extension-metadata/constants';
+import { cipherstashPackMeta } from '../extension-metadata/descriptor-meta';
+import { cipherstashStringCodecHooks } from '../migration/cipherstash-codec';
 
 /**
  * Resolve a migration package's on-disk path from this descriptor module's

@@ -52,7 +52,7 @@ import {
   CIPHERSTASH_SPACE_ID,
   EQL_V2_CONFIGURATION_STATE_TYPE,
   EQL_V2_CONFIGURATION_TABLE,
-} from '../src/core/constants';
+} from '../src/extension-metadata/constants';
 
 interface SyntheticVersion {
   readonly contract: Contract<SqlStorage>;

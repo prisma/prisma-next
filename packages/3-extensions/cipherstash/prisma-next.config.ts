@@ -19,8 +19,8 @@ import { defineConfig } from '@prisma-next/cli/config-types';
 import sql from '@prisma-next/family-sql/control';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgres from '@prisma-next/target-postgres/control';
-import { contract } from './src/contract-source';
-import { CIPHERSTASH_SPACE_ID } from './src/core/constants';
+import { contract } from './src/contract/source';
+import { CIPHERSTASH_SPACE_ID } from './src/extension-metadata/constants';
 
 export default defineConfig({
   family: sql,

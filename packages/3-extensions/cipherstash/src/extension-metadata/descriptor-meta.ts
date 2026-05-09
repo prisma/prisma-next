@@ -1,7 +1,7 @@
 /**
  * Pack metadata for the cipherstash extension.
  *
- * Mirrors `packages/3-extensions/pgvector/src/core/descriptor-meta.ts` —
+ * Mirrors `packages/3-extensions/pgvector/src/extension-metadata/descriptor-meta.ts` —
  * the metadata block that gets serialized into `contract.json`'s
  * `extensionPacks.cipherstash` slot at emit time.
  *
@@ -21,7 +21,7 @@
  * by TML-2397.
  */
 
-import { cipherstashAuthoringTypes } from './authoring';
+import { cipherstashAuthoringTypes } from '../contract/authoring';
 import { cipherstashStringCodecMetadata } from './codec-metadata';
 import {
   CIPHERSTASH_SPACE_ID,

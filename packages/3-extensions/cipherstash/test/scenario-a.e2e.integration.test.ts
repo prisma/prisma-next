@@ -80,6 +80,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import cipherstashExtensionDescriptor from '../src/exports/control';
 import {
   CIPHERSTASH_INVARIANTS,
   CIPHERSTASH_SPACE_ID,
@@ -87,9 +88,8 @@ import {
   EQL_V2_CONFIGURATION_TABLE,
   EQL_V2_ENCRYPTED_TYPE,
   EQL_V2_SCHEMA,
-} from '../src/core/constants';
-import { EQL_BUNDLE_SQL } from '../src/core/eql-bundle';
-import cipherstashExtensionDescriptor from '../src/exports/control';
+} from '../src/extension-metadata/constants';
+import { EQL_BUNDLE_SQL } from '../src/migration/eql-bundle';
 
 const cipherstashContractSpace = cipherstashExtensionDescriptor.contractSpace!;
 const cipherstashContract = cipherstashContractSpace.contractJson;

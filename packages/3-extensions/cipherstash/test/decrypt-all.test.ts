@@ -26,18 +26,18 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { decryptAll } from '../src/core/decrypt-all';
+import { decryptAll } from '../src/execution/decrypt-all';
 import {
   EncryptedString,
   type EncryptedStringFromInternalArgs,
   isHandleDecrypted,
-} from '../src/core/envelope';
+} from '../src/execution/envelope';
 import type {
   CipherstashBulkDecryptArgs,
   CipherstashBulkEncryptArgs,
   CipherstashSdk,
   CipherstashSingleDecryptArgs,
-} from '../src/core/sdk';
+} from '../src/execution/sdk';
 
 interface CounterSdk extends CipherstashSdk {
   readonly bulkDecryptCalls: CipherstashBulkDecryptArgs[];

@@ -79,7 +79,7 @@ import {
   type ScopeField,
   toExpr,
 } from '@prisma-next/sql-relational-core/expression';
-import { CIPHERSTASH_STRING_CODEC_ID } from './constants';
+import { CIPHERSTASH_STRING_CODEC_ID } from '../extension-metadata/constants';
 import { EncryptedString, setHandleRoutingKey } from './envelope';
 
 /**

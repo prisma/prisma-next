@@ -8,7 +8,7 @@
  * (see `../exports/column-types`) to an identical `ColumnTypeDescriptor`
  * so PSL- and TS-authored contracts emit byte-identical `contract.json`.
  *
- * Mirrors `packages/3-extensions/pgvector/src/core/authoring.ts`. The
+ * Mirrors `packages/3-extensions/pgvector/src/contract/authoring.ts`. The
  * cipherstash variant differs in three respects:
  *   (a) `cipherstash` is the namespace,
  *   (b) the constructor takes a single object argument with two
@@ -19,7 +19,10 @@
  */
 
 import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
-import { CIPHERSTASH_STRING_CODEC_ID, EQL_V2_ENCRYPTED_TYPE } from './constants';
+import {
+  CIPHERSTASH_STRING_CODEC_ID,
+  EQL_V2_ENCRYPTED_TYPE,
+} from '../extension-metadata/constants';
 
 export const cipherstashAuthoringTypes = {
   cipherstash: {

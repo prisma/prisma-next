@@ -26,14 +26,14 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { describe, expect, it } from 'vitest';
+import cipherstashExtensionDescriptor from '../src/exports/control';
 import {
   CIPHERSTASH_BASELINE_MIGRATION_NAME,
   CIPHERSTASH_INVARIANTS,
   CIPHERSTASH_SPACE_ID,
   EQL_V2_CONFIGURATION_TABLE,
-} from '../src/core/constants';
-import { EQL_BUNDLE_SQL } from '../src/core/eql-bundle';
-import cipherstashExtensionDescriptor from '../src/exports/control';
+} from '../src/extension-metadata/constants';
+import { EQL_BUNDLE_SQL } from '../src/migration/eql-bundle';
 
 describe('cipherstash extension descriptor (on-disk-in-package authoring)', () => {
   it('identifies as a SQL extension targeted at postgres', () => {

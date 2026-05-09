@@ -36,8 +36,8 @@
 export type {
   CipherstashSearchConfigArgs,
   CipherstashSearchIndex,
-} from '../core/migration-call-classes';
+} from '../migration/call-classes';
 export {
   cipherstashAddSearchConfig,
   cipherstashRemoveSearchConfig,
-} from '../core/migration-call-classes';
+} from '../migration/call-classes';

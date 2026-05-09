@@ -2,7 +2,7 @@
  * TS contract factory for cipherstash-encrypted string columns.
  *
  * Counterpart to the PSL constructor `cipherstash.EncryptedString({...})`
- * registered in `../core/authoring.ts`. Both factories produce the same
+ * registered in `../contract/authoring.ts`. Both factories produce the same
  * `ColumnTypeDescriptor` shape so PSL- and TS-authored contracts emit
  * byte-identical `contract.json` (verified by the parity fixture under
  * `test/integration/test/authoring/parity/cipherstash-encrypted-string/`).
@@ -12,7 +12,10 @@
  * constructor's `false` defaults declared via `AuthoringArgRef.default`.
  */
 
-import { CIPHERSTASH_STRING_CODEC_ID, EQL_V2_ENCRYPTED_TYPE } from '../core/constants';
+import {
+  CIPHERSTASH_STRING_CODEC_ID,
+  EQL_V2_ENCRYPTED_TYPE,
+} from '../extension-metadata/constants';
 
 /**
  * Search-mode parameters for `encryptedString({...})`. Both flags are

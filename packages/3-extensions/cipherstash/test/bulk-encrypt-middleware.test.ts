@@ -38,14 +38,14 @@ import { createSqlParamRefMutator } from '@prisma-next/sql-relational-core/middl
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type { SqlMiddlewareContext } from '@prisma-next/sql-runtime';
 import { describe, expect, it, vi } from 'vitest';
-import { CIPHERSTASH_STRING_CODEC_ID } from '../src/core/constants';
-import { EncryptedString, getInternalHandle, setHandleRoutingKey } from '../src/core/envelope';
+import { EncryptedString, getInternalHandle, setHandleRoutingKey } from '../src/execution/envelope';
 import type {
   CipherstashBulkDecryptArgs,
   CipherstashBulkEncryptArgs,
   CipherstashSdk,
   CipherstashSingleDecryptArgs,
-} from '../src/core/sdk';
+} from '../src/execution/sdk';
+import { CIPHERSTASH_STRING_CODEC_ID } from '../src/extension-metadata/constants';
 import { bulkEncryptMiddleware } from '../src/middleware/bulk-encrypt';
 
 const baseMeta: PlanMeta = {

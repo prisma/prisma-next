@@ -8,7 +8,7 @@
  * `eql_v2` schema, the `eql_v2_configuration_state` enum, the
  * `eql_v2_encrypted` composite, the `eql_v2.bloom_filter` /
  * `hmac_256` / `blake3` domains, plus the ORE composites — is created
- * by the vendored EQL bundle SQL (see `../../../src/core/eql-bundle.ts`,
+ * by the vendored EQL bundle SQL (see `../../../src/migration/eql-bundle.ts`,
  * which re-exports the bundle from `eql-install.generated.ts`
  * byte-for-byte per project spec NFR4 / AC7). The bundle also creates
  * the `eql_v2_configuration` table itself, so the planner-emitted
@@ -22,8 +22,8 @@
  * `migration.json` after edits via `node migration.ts`.
  */
 import { Migration, MigrationCLI, rawSql } from '@prisma-next/target-postgres/migration';
-import { CIPHERSTASH_INVARIANTS } from '../../../src/core/constants';
-import { EQL_BUNDLE_SQL } from '../../../src/core/eql-bundle';
+import { CIPHERSTASH_INVARIANTS } from '../../../src/extension-metadata/constants';
+import { EQL_BUNDLE_SQL } from '../../../src/migration/eql-bundle';
 
 const INSTALL_LABEL = 'Install EQL bundle (functions, operators, casts, op classes, schema, types)';
 

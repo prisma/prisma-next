@@ -3,7 +3,7 @@
  *
  * The factory must produce a `ColumnTypeDescriptor` byte-identical to
  * the lowering output of the PSL constructor `cipherstash.EncryptedString`
- * registered in `core/authoring.ts`. The full byte-equality is verified
+ * registered in `contract/authoring.ts`. The full byte-equality is verified
  * by the integration parity fixture (T2.7); these unit tests pin the
  * shape locally so a regression is caught in the package suite first.
  */

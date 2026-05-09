@@ -35,14 +35,14 @@ import { createSqlParamRefMutator } from '@prisma-next/sql-relational-core/middl
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type { SqlMiddlewareContext } from '@prisma-next/sql-runtime';
 import { describe, expect, it, vi } from 'vitest';
-import { CIPHERSTASH_STRING_CODEC_ID } from '../src/core/constants';
-import { decryptAll } from '../src/core/decrypt-all';
+import { decryptAll } from '../src/execution/decrypt-all';
 import {
   EncryptedString,
   type EncryptedStringFromInternalArgs,
   setHandleRoutingKey,
-} from '../src/core/envelope';
-import type { CipherstashSdk } from '../src/core/sdk';
+} from '../src/execution/envelope';
+import type { CipherstashSdk } from '../src/execution/sdk';
+import { CIPHERSTASH_STRING_CODEC_ID } from '../src/extension-metadata/constants';
 import { bulkEncryptMiddleware } from '../src/middleware/bulk-encrypt';
 
 interface CounterSdk extends CipherstashSdk {

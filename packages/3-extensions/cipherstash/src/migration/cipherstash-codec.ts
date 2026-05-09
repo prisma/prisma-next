@@ -43,12 +43,12 @@
 
 import type { CodecControlHooks, FieldEventContext } from '@prisma-next/family-sql/control';
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
-import { CIPHERSTASH_STRING_CODEC_ID } from './constants';
+import { CIPHERSTASH_STRING_CODEC_ID } from '../extension-metadata/constants';
 import {
   type CipherstashSearchIndex,
   cipherstashAddSearchConfig,
   cipherstashRemoveSearchConfig,
-} from './migration-call-classes';
+} from './call-classes';
 
 type FlagName = 'equality' | 'freeTextSearch';
 

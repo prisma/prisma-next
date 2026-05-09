@@ -5,7 +5,7 @@
  * `@prisma-next/extension-cipherstash/operation-types` subpath. The
  * contract emitter pulls these via the `types.operationTypes` /
  * `types.queryOperationTypes` import declarations on
- * `cipherstashPackMeta` (see `../core/descriptor-meta.ts`); user code
+ * `cipherstashPackMeta` (see `../extension-metadata/descriptor-meta.ts`); user code
  * may also import them directly when authoring TS-side type
  * compositions.
  *

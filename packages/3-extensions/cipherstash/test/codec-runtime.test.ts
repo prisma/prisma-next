@@ -14,13 +14,13 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CIPHERSTASH_STRING_CODEC_ID,
   createCipherstashStringCodec,
-} from '../src/core/codec-runtime';
-import { EncryptedString, getInternalHandle, setHandleCiphertext } from '../src/core/envelope';
+} from '../src/execution/codec-runtime';
+import { EncryptedString, getInternalHandle, setHandleCiphertext } from '../src/execution/envelope';
 import {
   createParameterizedCodecDescriptors,
   encryptedStringParamsSchema,
-} from '../src/core/parameterized';
-import type { CipherstashSdk } from '../src/core/sdk';
+} from '../src/execution/parameterized';
+import type { CipherstashSdk } from '../src/execution/sdk';
 
 function emptySdk(): CipherstashSdk {
   return {
@@ -56,7 +56,7 @@ describe('createCipherstashStringCodec — registration shape — AC-CODEC1', ()
     // `equality` and lowers to standard SQL `=`, which is wrong for
     // EQL ciphers (randomized nonces). Equality search on cipherstash
     // columns is delivered exclusively via the cipherstash-namespaced
-    // `cipherstashEq` operator (see `src/core/operators.ts`). Re-adding
+    // `cipherstashEq` operator (see `src/execution/operators.ts`). Re-adding
     // a trait here without re-routing through the namespaced operator
     // would silently re-introduce the wrong-SQL footgun.
     const codec = createCipherstashStringCodec(emptySdk());

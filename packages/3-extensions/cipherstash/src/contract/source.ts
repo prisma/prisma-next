@@ -28,7 +28,7 @@
  * `eql_v2_encrypted` composite, the `eql_v2.bloom_filter` / `hmac_256`
  * / `blake3` domains, and the various `ore_*` composites — is created
  * by the `installEqlBundle` migration op (which carries the vendored
- * bundle SQL byte-for-byte; see `./core/eql-bundle.ts`). The
+ * bundle SQL byte-for-byte; see `./migration/eql-bundle.ts`). The
  * structural `cipherstash:create-*-v1` no-op ops register the
  * invariantIds the verifier needs so its `applied_invariants` gate
  * passes.
@@ -44,7 +44,7 @@
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
-import { EQL_V2_CONFIGURATION_TABLE } from './core/constants';
+import { EQL_V2_CONFIGURATION_TABLE } from '../extension-metadata/constants';
 
 export const contract = defineContract(
   {

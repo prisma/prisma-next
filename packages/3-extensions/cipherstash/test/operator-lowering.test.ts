@@ -22,7 +22,7 @@
  *   (`cipherstashEq` / `cipherstashIlike`) so the registrations
  *   coexist with the framework`s built-in `eq` / `ilike` rather than
  *   overriding them — the framework registry rejects same-method
- *   collisions and we don`t override operators. See `src/core/operators.ts`
+ *   collisions and we don`t override operators. See `src/execution/operators.ts`
  *   for the trade-off rationale and the gap that follow-up framework
  *   work (per-codec where-binding rewrite SPI) would close.
  *
@@ -78,11 +78,14 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
-import { CIPHERSTASH_STRING_CODEC_ID, EQL_V2_ENCRYPTED_TYPE } from '../src/core/constants';
-import { EncryptedString, getInternalHandle } from '../src/core/envelope';
-import { cipherstashQueryOperations } from '../src/core/operators';
-import type { CipherstashSdk } from '../src/core/sdk';
+import { EncryptedString, getInternalHandle } from '../src/execution/envelope';
+import { cipherstashQueryOperations } from '../src/execution/operators';
+import type { CipherstashSdk } from '../src/execution/sdk';
 import { createCipherstashRuntimeDescriptor } from '../src/exports/runtime';
+import {
+  CIPHERSTASH_STRING_CODEC_ID,
+  EQL_V2_ENCRYPTED_TYPE,
+} from '../src/extension-metadata/constants';
 
 // Minimal SDK stub. Operator lowering doesn't talk to the SDK — the codec
 // captures it lazily for the read-side decrypt path — but
@@ -337,7 +340,7 @@ describe('createCipherstashRuntimeDescriptor — queryOperations registration', 
     // Names are cipherstash-prefixed so they coexist with the
     // framework`s built-in `eq` / `ilike` registrations rather than
     // overriding them. The trade-off is documented in
-    // `src/core/operators.ts`'s top-level docblock.
+    // `src/execution/operators.ts`'s top-level docblock.
     const descriptor = createCipherstashRuntimeDescriptor({ sdk: emptySdk() });
     const ops = descriptor.queryOperations?.() ?? [];
     const methods = ops.map((op) => op.method).sort();

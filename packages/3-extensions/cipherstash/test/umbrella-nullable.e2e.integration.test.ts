@@ -100,6 +100,9 @@ import postgresTargetControl from '@prisma-next/target-postgres/control';
 import postgresTargetRuntime from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { decryptAll } from '../src/execution/decrypt-all';
+import { cipherstashQueryOperations } from '../src/execution/operators';
+import cipherstashExtensionDescriptor from '../src/exports/control';
 import {
   CIPHERSTASH_INVARIANTS,
   CIPHERSTASH_SPACE_ID,
@@ -107,10 +110,7 @@ import {
   EQL_V2_CONFIGURATION_TABLE,
   EQL_V2_ENCRYPTED_TYPE,
   EQL_V2_SCHEMA,
-} from '../src/core/constants';
-import { decryptAll } from '../src/core/decrypt-all';
-import { cipherstashQueryOperations } from '../src/core/operators';
-import cipherstashExtensionDescriptor from '../src/exports/control';
+} from '../src/extension-metadata/constants';
 
 // Forward-port (M3.5 R2): the cipherstash contract / baseline migration / head ref
 // now flow through on-disk JSON via the descriptor's contractSpace, replacing the

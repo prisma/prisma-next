@@ -11,8 +11,8 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { EncryptedString } from '../src/core/envelope';
-import type { CipherstashSdk } from '../src/core/sdk';
+import { EncryptedString } from '../src/execution/envelope';
+import type { CipherstashSdk } from '../src/execution/sdk';
 
 function emptySdk(): CipherstashSdk {
   return {

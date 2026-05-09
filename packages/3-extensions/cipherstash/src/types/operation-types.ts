@@ -3,7 +3,7 @@
  *
  * Mirrors `packages/3-extensions/pgvector/src/types/operation-types.ts` —
  * the type-only counterpart to `cipherstashQueryOperations()` in
- * `../core/operators.ts`. Where pgvector projects `cosineDistance` /
+ * `../execution/operators.ts`. Where pgvector projects `cosineDistance` /
  * `cosineSimilarity` onto `pg/vector@1` columns, cipherstash projects
  * `cipherstashEq` / `cipherstashIlike` onto `cipherstash/string@1`
  * columns.
@@ -12,10 +12,10 @@
  * `QueryOperationTypes`) get composed into the consuming application's
  * generated `contract.d.ts` by the contract emitter, via the
  * `types.operationTypes` / `types.queryOperationTypes` import
- * declarations on the cipherstash pack-meta (`../core/descriptor-meta.ts`).
+ * declarations on the cipherstash pack-meta (`../extension-metadata/descriptor-meta.ts`).
  *
  * Return-codec id is `pg/bool@1` — pinned to what `eqlOperator` actually
- * builds at runtime (`../core/operators.ts:170-183`, `PG_BOOL_CODEC_ID`
+ * builds at runtime (`../execution/operators.ts:170-183`, `PG_BOOL_CODEC_ID`
  * constant). Both operators are non-nullable predicates suitable for a
  * WHERE clause.
  */
@@ -53,7 +53,7 @@ export type OperationTypes = {
  *
  * Both operators take an encrypted-string `self` and a plaintext-or-
  * envelope `other`/`pattern`; the runtime implementation
- * (`eqlOperator` in `../core/operators.ts`) wraps the user-supplied
+ * (`eqlOperator` in `../execution/operators.ts`) wraps the user-supplied
  * second argument in an `EncryptedString` envelope, stamps the
  * column's routing context, and lowers to `eql_v2.eq` / `eql_v2.ilike`.
  *
@@ -70,7 +70,7 @@ export type QueryOperationTypes<CT extends CodecTypesBase> = SqlQueryOperationTy
         self: CodecExpression<CipherstashStringCodec, boolean, CT>,
         // The runtime wraps the second argument in an `EncryptedString`
         // envelope at lowering time (`asEncryptedParam` in
-        // `../core/operators.ts`); plain strings and pre-built
+        // `../execution/operators.ts`); plain strings and pre-built
         // envelopes both work. We type it as `pg/text@1` so callers
         // can pass a plain string literal — the cipherstash extension
         // doesn`t ship a `codec-types` surface declaring an `input`

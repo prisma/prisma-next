@@ -16,7 +16,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { cipherstashAuthoringTypes } from '../src/core/authoring';
+import { cipherstashAuthoringTypes } from '../src/contract/authoring';
 import cipherstashPack from '../src/exports/pack';
 
 describe('cipherstash pack authoring contributions', () => {

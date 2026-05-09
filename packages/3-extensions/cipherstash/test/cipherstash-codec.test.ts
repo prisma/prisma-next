@@ -34,9 +34,9 @@ import {
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
-import { cipherstashStringCodecHooks } from '../src/core/cipherstash-codec';
-import { CIPHERSTASH_STRING_CODEC_ID } from '../src/core/constants';
 import cipherstashExtensionDescriptor from '../src/exports/control';
+import { CIPHERSTASH_STRING_CODEC_ID } from '../src/extension-metadata/constants';
+import { cipherstashStringCodecHooks } from '../src/migration/cipherstash-codec';
 
 const TABLE = 'User';
 const FIELD = 'email';

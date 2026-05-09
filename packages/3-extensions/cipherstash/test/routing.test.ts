@@ -18,13 +18,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { EncryptedString, setHandleRoutingKey } from '../src/core/envelope';
+import { EncryptedString, setHandleRoutingKey } from '../src/execution/envelope';
 import {
   type BulkEncryptTarget,
   getRoutingKey,
   groupByRoutingKey,
   routingKeyId,
-} from '../src/core/routing';
+} from '../src/execution/routing';
 
 function makeTarget(plaintext: string, table: string, column: string): BulkEncryptTarget {
   const envelope = EncryptedString.from(plaintext);
