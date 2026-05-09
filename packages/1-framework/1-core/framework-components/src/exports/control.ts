@@ -1,3 +1,4 @@
+export type { ImportRequirement } from '@prisma-next/ts-render';
 export type {
   MigratableTargetDescriptor,
   OperationPreviewCapable,

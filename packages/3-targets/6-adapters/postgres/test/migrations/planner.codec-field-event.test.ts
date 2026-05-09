@@ -1,12 +1,52 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { CodecControlHooks } from '@prisma-next/family-sql/control';
+import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import type {
+  ImportRequirement,
+  MigrationOperationClass,
+  OpFactoryCall,
+} from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
+
+/**
+ * Minimal `OpFactoryCall` stub used by the codec-hook fixtures below.
+ *
+ * The codec contract (ADR 195 / ADR 212) specifies that hook returns
+ * `OpFactoryCall[]` — Calls that self-render to TypeScript and
+ * self-lower to a runtime op via `toOp()`. The planner-wiring tests
+ * here only need a Call that lowers to a deterministic op; the
+ * render/import surfaces are exercised by cipherstash's
+ * `migration-call-classes.test.ts` (the production consumer of the
+ * hook). Keeping a stub here avoids importing cipherstash machinery
+ * into the postgres adapter test surface.
+ */
+class CodecOpStub implements OpFactoryCall {
+  readonly factoryName = 'codecHookStub' as const;
+  readonly operationClass: MigrationOperationClass;
+  readonly label: string;
+  readonly #op: SqlMigrationPlanOperation<unknown>;
+
+  constructor(op: SqlMigrationPlanOperation<unknown>) {
+    this.operationClass = op.operationClass;
+    this.label = op.label;
+    this.#op = op;
+  }
+
+  renderTypeScript(): string {
+    return `/* codec-hook stub: ${this.#op.id} */`;
+  }
+  importRequirements(): readonly ImportRequirement[] {
+    return [];
+  }
+  toOp(): SqlMigrationPlanOperation<unknown> {
+    return this.#op;
+  }
+}
 
 const emptySchema: SqlSchemaIR = { tables: {} };
 
@@ -62,7 +102,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
 
     const hooks: CodecControlHooks = {
       onFieldEvent: (event, ctx) => [
-        {
+        new CodecOpStub({
           id: `codec.${event}.${ctx.tableName}.${ctx.fieldName}`,
           label: `${event} hook on ${ctx.tableName}.${ctx.fieldName}`,
           operationClass: 'additive',
@@ -71,7 +111,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
           precheck: [],
           execute: [{ description: 'codec side-effect', sql: '-- codec side-effect' }],
           postcheck: [],
-        },
+        }),
       ],
     };
 
@@ -126,7 +166,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
 
     const hooks: CodecControlHooks = {
       onFieldEvent: (event, ctx) => [
-        {
+        new CodecOpStub({
           id: `codec.${event}.${ctx.tableName}.${ctx.fieldName}`,
           label: 'hook',
           operationClass: 'additive',
@@ -135,7 +175,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
           precheck: [],
           execute: [{ description: 'side', sql: '-- side' }],
           postcheck: [],
-        },
+        }),
       ],
     };
     const frameworkComponents = makeFrameworkComponents(hooks);
