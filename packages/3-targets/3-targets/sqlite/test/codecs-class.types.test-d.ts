@@ -1,10 +1,9 @@
 /**
- * Type tests for the SQLite target codecs (TML-2357).
+ * Type tests for the SQLite target codecs.
  *
  * Mirrors `packages/3-targets/3-targets/postgres/test/codecs-class.types.test-d.ts`.
  *
- * Coverage selection: every SQLite codec is non-parameterized, so the tests focus on representative codecs that exercise distinct input/wire types — a numeric (`integer`), a typed `Date` mapping (`datetime`, wire `string` ≠ input `Date`), a binary mapping (`blob`, wire `Uint8Array`), and a bigint mapping (`bigint`, wire `number | bigint` ≠ input `bigint`). The framework-level type discipline is exercised in Phase A's
- * `framework-components/test/codec.types.test-d.ts`.
+ * Coverage selection: every SQLite codec is non-parameterized, so the tests focus on representative codecs that exercise distinct input/wire types — a numeric (`integer`), a typed `Date` mapping (`datetime`, wire `string` ≠ input `Date`), a binary mapping (`blob`, wire `Uint8Array`), and a bigint mapping (`bigint`, wire `number | bigint` ≠ input `bigint`). The framework-level type discipline is exercised in `framework-components/test/codec.types.test-d.ts`.
  */
 
 import {
@@ -32,8 +31,6 @@ import {
   sqliteIntegerColumn,
   sqliteIntegerDescriptor,
 } from '../src/core/codecs';
-
-// ---------------------------------------------------------------------------Literal preservation through direct invocation. ---------------------------------------------------------------------------
 
 test('sqliteInteger: descriptor.factory() returns typed (ctx) => SqliteIntegerCodec', () => {
   const factory = sqliteIntegerDescriptor.factory();
@@ -68,8 +65,6 @@ test('sqliteBigint: column preserves the (number|bigint) wire / bigint input spl
   const col = sqliteBigintColumn();
   expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteBigintCodec>();
 });
-
-// ---------------------------------------------------------------------------satisfies discipline catches wiring mistakes. ---------------------------------------------------------------------------
 
 sqliteIntegerColumn satisfies ColumnHelperFor<SqliteIntegerDescriptor>;
 sqliteIntegerColumn satisfies ColumnHelperForStrict<SqliteIntegerDescriptor>;

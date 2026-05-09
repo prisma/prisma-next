@@ -16,12 +16,10 @@ import type {
 import { defineTestCodec } from './test-codec';
 import { createStubAdapter, createTestContext } from './utils';
 
-// Phase B of the codec-registry-unification project introduces two runtime registries:
+// The codec-registry layer exposes two runtime registries:
 //
-// - `ContractCodecRegistry` (`context.contractCodecs`): per-column resolved-codec dispatch with `forColumn(table, column)` and a codec-id-keyed fallback `forCodecId(codecId)` (the AC-5-deferred carve-out for sites without a column ref).
+// - `ContractCodecRegistry` (`context.contractCodecs`): per-column resolved-codec dispatch with `forColumn(table, column)` and a codec-id-keyed fallback `forCodecId(codecId)` for sites without a column ref.
 // - `CodecDescriptorRegistry` (`context.codecDescriptors`): codec-id-keyed metadata read with `descriptorFor(codecId)` — non-branching for parameterized vs. non-parameterized codecs (every non-parameterized codec is auto-lifted into a synthesized `CodecDescriptor<void>`).
-//
-// See spec § Decision and AC-3, AC-4.
 
 function makeVectorCodec(meta?: Record<string, unknown>): Codec {
   const baseCodec = defineTestCodec({

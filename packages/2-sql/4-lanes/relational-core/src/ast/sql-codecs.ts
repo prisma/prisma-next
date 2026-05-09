@@ -48,8 +48,6 @@ import {
   sqlVarcharRenderOutputType,
 } from './sql-codec-helpers';
 
-// ---------------------------------------------------------------------------Params schemas — JSON-boundary metadata, not runtime conversion behaviour. Optional keys (`'length?'` / `'precision?'`) match the matching `TParams` type so each schema is structurally assignable to `StandardSchemaV1<TParams>` directly (no cast helper needed). ---------------------------------------------------------------------------
-
 type LengthParams = { readonly length?: number };
 type PrecisionParams = { readonly precision?: number };
 
@@ -60,8 +58,6 @@ const lengthParamsSchema = arktype({
 const precisionParamsSchema = arktype({
   'precision?': 'number.integer >= 0 & number.integer <= 6',
 }) satisfies StandardSchemaV1<PrecisionParams>;
-
-// ---------------------------------------------------------------------------sql/text@1 — non-parameterized, JSON-safe (string). ---------------------------------------------------------------------------
 
 export class SqlTextCodec extends CodecImpl<
   typeof SQL_TEXT_CODEC_ID,
@@ -101,8 +97,6 @@ export const sqlTextColumn = () =>
 sqlTextColumn satisfies ColumnHelperFor<SqlTextDescriptor>;
 sqlTextColumn satisfies ColumnHelperForStrict<SqlTextDescriptor>;
 
-// ---------------------------------------------------------------------------sql/int@1 — non-parameterized, JSON-safe (number). ---------------------------------------------------------------------------
-
 export class SqlIntCodec extends CodecImpl<
   typeof SQL_INT_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
@@ -141,8 +135,6 @@ export const sqlIntColumn = () =>
 sqlIntColumn satisfies ColumnHelperFor<SqlIntDescriptor>;
 sqlIntColumn satisfies ColumnHelperForStrict<SqlIntDescriptor>;
 
-// ---------------------------------------------------------------------------sql/float@1 — non-parameterized, JSON-safe (number). ---------------------------------------------------------------------------
-
 export class SqlFloatCodec extends CodecImpl<
   typeof SQL_FLOAT_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
@@ -180,8 +172,6 @@ export const sqlFloatColumn = () =>
 
 sqlFloatColumn satisfies ColumnHelperFor<SqlFloatDescriptor>;
 sqlFloatColumn satisfies ColumnHelperForStrict<SqlFloatDescriptor>;
-
-// ---------------------------------------------------------------------------sql/char@1 — length-parameterized, JSON-safe (string). Params are JSON-only metadata; the codec is parameter-stateless (decode trims trailing spaces regardless of length), so the codec constructor takes only the descriptor. ---------------------------------------------------------------------------
 
 export class SqlCharCodec extends CodecImpl<
   typeof SQL_CHAR_CODEC_ID,
@@ -224,8 +214,6 @@ export const sqlCharColumn = (params: LengthParams = {}) =>
 sqlCharColumn satisfies ColumnHelperFor<SqlCharDescriptor>;
 sqlCharColumn satisfies ColumnHelperForStrict<SqlCharDescriptor>;
 
-// ---------------------------------------------------------------------------sql/varchar@1 — length-parameterized, JSON-safe (string). ---------------------------------------------------------------------------
-
 export class SqlVarcharCodec extends CodecImpl<
   typeof SQL_VARCHAR_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
@@ -266,8 +254,6 @@ export const sqlVarcharColumn = (params: LengthParams = {}) =>
 
 sqlVarcharColumn satisfies ColumnHelperFor<SqlVarcharDescriptor>;
 sqlVarcharColumn satisfies ColumnHelperForStrict<SqlVarcharDescriptor>;
-
-// ---------------------------------------------------------------------------sql/timestamp@1 — precision-parameterized, NOT JSON-safe (Date). Custom `encodeJson`/`decodeJson` round-trip through ISO-8601 strings. ---------------------------------------------------------------------------
 
 export class SqlTimestampCodec extends CodecImpl<
   typeof SQL_TIMESTAMP_CODEC_ID,

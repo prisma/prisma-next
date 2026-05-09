@@ -30,7 +30,7 @@ function buildPlan(): SqlExecutionPlan {
   };
 }
 
-describe('decodeRow — runtime-envelope passthrough (F40)', () => {
+describe('decodeRow — runtime-envelope passthrough', () => {
   it('rethrows codec-authored RUNTIME.DECODE_FAILED without wrapping', async () => {
     const original = runtimeError('RUNTIME.DECODE_FAILED', 'codec-authored failure', {
       table: 'users',

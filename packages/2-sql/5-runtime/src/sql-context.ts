@@ -236,8 +236,7 @@ function validateTypeParams(
 }
 
 /**
- * Collect every {@link CodecDescriptor} contributed by the SQL stack and partition into "parameterized" vs "non-parameterized" via the descriptor's own {@link CodecDescriptorImpl.isParameterized} getter (F12). The getter is the canonical discriminator — a `paramsSchema` identity check would misroute any descriptor that doesn't reuse the exact `voidParamsSchema` singleton (e.g. a non-parameterized codec authoring its
- * own no-op schema).
+ * Collect every {@link CodecDescriptor} contributed by the SQL stack and partition into "parameterized" vs "non-parameterized" via the descriptor's own {@link CodecDescriptorImpl.isParameterized} getter. The getter is the canonical discriminator — a `paramsSchema` identity check would misroute any descriptor that doesn't reuse the exact `voidParamsSchema` singleton (e.g. a non-parameterized codec authoring its own no-op schema).
  *
  * The unified descriptor list collapses the legacy split (a separate slot used to register parameterized codecs) — every codec id resolves through the same map (codec-registry-unification spec § Decision).
  */
@@ -437,8 +436,7 @@ function buildContractCodecRegistry(
             resolvedCodec = parameterizedDescriptor.factory(validatedParams)(ctx);
           }
         } else if (!isParameterized) {
-          // Non-parameterized column. F42: materialize a fresh codec instance per `forColumn(table, column)` entry with a column-specific `SqlCodecInstanceContext`. The pre-populated `byCodecId` representative (built with the synthetic `<shared:codecId>` context and empty `usedAt`) is reserved for `forCodecId()` refs-less fallbacks; reusing it for column-bound dispatch would erase per-column diagnostics for any descriptor whose
-          // factory reads `CodecInstanceContext`.
+          // Non-parameterized column: materialize a fresh codec instance per `forColumn(table, column)` entry with a column-specific `SqlCodecInstanceContext`. The pre-populated `byCodecId` representative (built with the synthetic `<shared:codecId>` context and empty `usedAt`) is reserved for `forCodecId()` refs-less fallbacks; reusing it for column-bound dispatch would erase per-column diagnostics for any descriptor whose factory reads `CodecInstanceContext`.
           const ctx: SqlCodecInstanceContext = {
             name: `<col:${tableName}.${columnName}>`,
             usedAt: [{ table: tableName, column: columnName }],

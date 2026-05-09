@@ -25,8 +25,6 @@ import {
   voidParamsSchema,
 } from '../src/exports/codec';
 
-// ---------------------------------------------------------------------------Inline fixture: non-parameterized codec. ---------------------------------------------------------------------------
-
 class Int4FixtureCodec extends CodecImpl<'demo/int4@1', readonly ['equality'], number, number> {
   async encode(value: number, _ctx: CodecCallContext): Promise<number> {
     return value;
@@ -59,8 +57,6 @@ const int4Fixture = () =>
 
 int4Fixture satisfies ColumnHelperFor<Int4FixtureDescriptor>;
 int4Fixture satisfies ColumnHelperForStrict<Int4FixtureDescriptor>;
-
-// ---------------------------------------------------------------------------Inline fixture: parameterized codec with literal preservation (pgvector-shaped). ---------------------------------------------------------------------------
 
 type VectorParams = { readonly length: number };
 const vectorFixtureParamsSchema: StandardSchemaV1<VectorParams> = {
@@ -125,8 +121,6 @@ const vectorFixture = <N extends number>(length: N) =>
 vectorFixture satisfies ColumnHelperFor<VectorFixtureDescriptor>;
 vectorFixture satisfies ColumnHelperForStrict<VectorFixtureDescriptor>;
 
-// ---------------------------------------------------------------------------AC-CB-2: literal preservation through direct invocation ---------------------------------------------------------------------------
-
 test('descriptor factory call preserves method-level generic literal', () => {
   const factory = vectorFixtureDescriptor.factory({ length: 1536 });
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => VectorFixtureCodec<1536>>();
@@ -169,8 +163,6 @@ test('ColumnInputType extracts the codec TInput', () => {
   expectTypeOf<ColumnInputType<ReturnType<typeof int4Fixture>>>().toEqualTypeOf<number>();
 });
 
-// ---------------------------------------------------------------------------AC-CB-3: satisfies discipline catches wiring mistakes ---------------------------------------------------------------------------
-
 test('coarse satisfies catches wrong typeParams shape', () => {
   const brokenTypeParamsHelper = <N extends number>(length: N) =>
     column(
@@ -194,8 +186,6 @@ test('strict satisfies catches wrong codec wired in', () => {
   wrongCodecHelper satisfies ColumnHelperForStrict<VectorFixtureDescriptor>;
 });
 
-// ---------------------------------------------------------------------------nativeType slot — F5: helper passes the database-native type, not the codec id ---------------------------------------------------------------------------
-
 test('column packs the helper-supplied nativeType (non-parameterized)', () => {
   const col = int4Fixture();
   expectTypeOf(col.nativeType).toEqualTypeOf<string>();
@@ -214,11 +204,8 @@ test('column packs the helper-supplied nativeType (parameterized)', () => {
   }
 });
 
-// ---------------------------------------------------------------------------Heterogeneous-storage variance erasure ---------------------------------------------------------------------------
-
 test('AnyCodecDescriptor stores parameterized + non-parameterized descriptors without casts', () => {
-  // AC-CB-5: heterogeneous storage uses `AnyCodecDescriptor` (variance-erased `CodecDescriptor<any>` per spec § Q-3c). `CodecDescriptor<P>` is invariant in `P`, so concrete subclasses are NOT assignable to `CodecDescriptor<unknown>` — an `as` cast at the storage boundary would mask the variance violation. The `AnyCodecDescriptor` form removes the cast and the assignments typecheck directly because
-  // `CodecDescriptorImpl<TParams>` is structurally compatible with `CodecDescriptor<any>` regardless of `TParams`.
+  // Heterogeneous storage uses `AnyCodecDescriptor` (variance-erased `CodecDescriptor<any>`). `CodecDescriptor<P>` is invariant in `P`, so concrete subclasses are NOT assignable to `CodecDescriptor<unknown>` — an `as` cast at the storage boundary would mask the variance violation. The `AnyCodecDescriptor` form removes the cast and the assignments typecheck directly because `CodecDescriptorImpl<TParams>` is structurally compatible with `CodecDescriptor<any>` regardless of `TParams`.
   const reg = new Map<string, AnyCodecDescriptor>();
   reg.set(int4FixtureDescriptor.codecId, int4FixtureDescriptor);
   reg.set(vectorFixtureDescriptor.codecId, vectorFixtureDescriptor);

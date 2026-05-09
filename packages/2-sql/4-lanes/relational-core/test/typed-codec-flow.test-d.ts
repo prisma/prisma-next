@@ -30,15 +30,11 @@ import type {
   sqlVarcharDescriptor,
 } from '../src/ast/sql-codecs';
 
-// ---------------------------------------------------------------------------Round-trip extractor: descriptor -> resolved codec instance. ---------------------------------------------------------------------------
-
 type ResolvedCodec<D> = D extends {
   factory: (...args: never[]) => (ctx: CodecInstanceContext) => infer R;
 }
   ? R
   : never;
-
-// ---------------------------------------------------------------------------AC-CB-2: descriptor round-trip preserves the full codec shape. ---------------------------------------------------------------------------
 
 test('non-parameterized SQL base codec — sqlInt round-trips to typed Codec', () => {
   type Resolved = ResolvedCodec<typeof sqlIntDescriptor>;
@@ -55,8 +51,6 @@ test('parameterized SQL base codec — sqlVarchar round-trips to typed Codec', (
     Codec<'sql/varchar@1', readonly ['equality', 'order', 'textual'], string, string>
   >();
 });
-
-// ---------------------------------------------------------------------------Inline extension axis: a custom-Wire/custom-Input descriptor proves the round-trip carries arbitrary `TWire` / `TInput` literals through. ---------------------------------------------------------------------------
 
 class TestVectorCodec extends CodecImpl<'test/vector@1', readonly ['equality'], string, number[]> {
   async encode(value: number[], _ctx: CodecCallContext): Promise<string> {
@@ -92,8 +86,6 @@ test('extension-style descriptor round-trips with custom Wire/Input', () => {
     Codec<'test/vector@1', readonly ['equality'], string, number[]>
   >();
 });
-
-// ---------------------------------------------------------------------------Negative tests — wrong-shape codecs do not satisfy the round-trip target. ---------------------------------------------------------------------------
 
 test('wrong codec id breaks the round-trip equality', () => {
   type Resolved = ResolvedCodec<typeof sqlIntDescriptor>;

@@ -41,8 +41,6 @@ type UserUnique = UniqueConstraintCriterion<Contract, 'User'>;
 type UserWhere = ShorthandWhereFilter<Contract, 'User'>;
 type UserInferRoot = InferRootRow<Contract, 'User'>;
 
-// ---------------------------------------------------------------------------Read surfaces — DefaultModelRow / InferRootRow row fields are plain T ---------------------------------------------------------------------------
-
 test('DefaultModelRow exposes plain `string` for pg/text@1 columns', () => {
   expectTypeOf<UserRow['name']>().toEqualTypeOf<string>();
   expectTypeOf<UserRow['email']>().toEqualTypeOf<string>();
@@ -99,8 +97,6 @@ test('Collection.all().firstOrThrow() resolves to a plain row (no Promise<T> on 
   expectTypeOf<IsPromiseLike<Row['name']>>().toEqualTypeOf<false>();
 });
 
-// ---------------------------------------------------------------------------Write surfaces accept plain T ---------------------------------------------------------------------------
-
 test('CreateInput accepts plain `string` for pg/text@1 fields', () => {
   expectTypeOf<UserCreate['name']>().toEqualTypeOf<string>();
   expectTypeOf<UserCreate['email']>().toEqualTypeOf<string>();
@@ -130,8 +126,6 @@ test('ShorthandWhereFilter accepts plain T (or null/undefined) for filterable fi
   expectTypeOf<UserWhere['email']>().toEqualTypeOf<string | null | undefined>();
   expectTypeOf<UserWhere['id']>().toEqualTypeOf<number | null | undefined>();
 });
-
-// ---------------------------------------------------------------------------Negative tests — no Promise<T> leak; one shared field type-map ---------------------------------------------------------------------------
 
 test('no DefaultModelRow field position resolves to a Promise<T>', () => {
   expectTypeOf<IsPromiseLike<UserRow['name']>>().toEqualTypeOf<false>();

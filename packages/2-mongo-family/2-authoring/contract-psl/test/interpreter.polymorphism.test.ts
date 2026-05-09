@@ -578,7 +578,7 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
       expect(conflict?.span?.end.offset).toBeGreaterThan(conflict?.span?.start.offset ?? 0);
     });
 
-    it('emits PSL_INDEX_FIELD_NOT_FOUND when a variant indexes a base-inherited field (AC-M3-07)', () => {
+    it('emits PSL_INDEX_FIELD_NOT_FOUND when a variant indexes a base-inherited field', () => {
       const result = interpret(`
         model Task {
           id    ObjectId @id @map("_id")

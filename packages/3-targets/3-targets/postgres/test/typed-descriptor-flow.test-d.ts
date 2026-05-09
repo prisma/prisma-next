@@ -1,9 +1,9 @@
 /**
- * Constructive type tests for the postgres per-target descriptor record layer (TML-2357).
+ * Constructive type tests for the postgres per-target descriptor record layer.
  *
  * Coverage:
  * - the internal descriptor list (`codecDescriptors`) narrows to `readonly AnyCodecDescriptor[]`, so heterogeneous descriptor storage works without per-codec branching;
- * - trait literals survive on each descriptor class — the M0 R5 {@link DescriptorCodecTraits} fix reads `traits` directly off the descriptor, so the literal tuple shape (`readonly ['equality', 'order', 'numeric']`) is preserved rather than widened to `readonly CodecTrait[]`;
+ * - trait literals survive on each descriptor class — {@link DescriptorCodecTraits} reads `traits` directly off the descriptor, so the literal tuple shape (`readonly ['equality', 'order', 'numeric']`) is preserved rather than widened to `readonly CodecTrait[]`;
  * - the resolved `CodecTypes` projection contains the codec-id keys consumers reference at the no-emit authoring chain.
  *
  * Negative coverage (`// @ts-expect-error`) proves that a regression in trait preservation or a missing codec id breaks the test compile.
@@ -20,8 +20,6 @@ import {
 } from '../src/core/codecs';
 import type { CodecTypes } from '../src/exports/codec-types';
 
-// ---------------------------------------------------------------------------Heterogeneous descriptor storage narrows to AnyCodecDescriptor. ---------------------------------------------------------------------------
-
 test('codecDescriptors narrows to readonly AnyCodecDescriptor[]', () => {
   expectTypeOf(codecDescriptors).toEqualTypeOf<readonly AnyCodecDescriptor[]>();
 });
@@ -29,8 +27,6 @@ test('codecDescriptors narrows to readonly AnyCodecDescriptor[]', () => {
 test('list entries extend AnyCodecDescriptor', () => {
   expectTypeOf<(typeof codecDescriptors)[number]>().toExtend<AnyCodecDescriptor>();
 });
-
-// ---------------------------------------------------------------------------Trait literals preserved on individual descriptors (M0 R5 fix). ---------------------------------------------------------------------------
 
 test('pgInt4Descriptor.traits is a readonly literal tuple, not widened', () => {
   type Traits = PgInt4Descriptor['traits'];
@@ -51,8 +47,6 @@ test('pgNumericDescriptor.codecId is the literal `pg/numeric@1`', () => {
   expectTypeOf(pgNumericDescriptor.codecId).toEqualTypeOf<'pg/numeric@1'>();
 });
 
-// ---------------------------------------------------------------------------CodecTypes projection contains the expected codec-id keys. ---------------------------------------------------------------------------
-
 test('CodecTypes is keyed by codec id and exposes input/output/traits', () => {
   expectTypeOf<CodecTypes['pg/int4@1']>().toExtend<{
     readonly input: number;
@@ -65,8 +59,6 @@ test('CodecTypes is keyed by codec id and exposes input/output/traits', () => {
     readonly output: string;
   }>();
 });
-
-// ---------------------------------------------------------------------------Negative tests. ---------------------------------------------------------------------------
 
 test('widened trait shape on pgInt4 fails the equality check', () => {
   type Traits = PgInt4Descriptor['traits'];

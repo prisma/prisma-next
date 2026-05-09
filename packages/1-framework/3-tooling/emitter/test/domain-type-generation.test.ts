@@ -1002,8 +1002,7 @@ describe('resolveFieldType', () => {
 });
 
 describe('generateBothFieldTypesMaps with resolveFieldTypeParams', () => {
-  // Phase A: SQL `typeRef`-shaped columns carry their `typeParams` on a named `storage.types[ref]` entry rather than inline on the framework's domain `ContractField`. The framework emit path consults a per-family resolver (`EmissionSpi.resolveFieldTypeParams`) to recover those typeParams so the codec's `renderOutputType` runs and the parameterized output type is emitted instead of the generic `CodecTypes[...]['output']`
-  // fallback.
+  // SQL `typeRef`-shaped columns carry their `typeParams` on a named `storage.types[ref]` entry rather than inline on the framework's domain `ContractField`. The framework emit path consults a per-family resolver (`EmissionSpi.resolveFieldTypeParams`) to recover those typeParams so the codec's `renderOutputType` runs and the parameterized output type is emitted instead of the generic `CodecTypes[...]['output']` fallback.
 
   it('uses resolved typeParams from the family resolver when domain field has none', () => {
     const lookup = stubCodecLookup({

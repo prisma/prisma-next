@@ -39,8 +39,6 @@ import {
   SQLITE_TEXT_CODEC_ID,
 } from './codec-ids';
 
-// ---------------------------------------------------------------------------sqlite/text@1 — non-parameterized, JSON-safe (string). ---------------------------------------------------------------------------
-
 export class SqliteTextCodec extends CodecImpl<
   typeof SQLITE_TEXT_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
@@ -78,8 +76,6 @@ export const sqliteTextColumn = () =>
 
 sqliteTextColumn satisfies ColumnHelperFor<SqliteTextDescriptor>;
 sqliteTextColumn satisfies ColumnHelperForStrict<SqliteTextDescriptor>;
-
-// ---------------------------------------------------------------------------sqlite/integer@1 — non-parameterized, JSON-safe (number). ---------------------------------------------------------------------------
 
 export class SqliteIntegerCodec extends CodecImpl<
   typeof SQLITE_INTEGER_CODEC_ID,
@@ -119,8 +115,6 @@ export const sqliteIntegerColumn = () =>
 sqliteIntegerColumn satisfies ColumnHelperFor<SqliteIntegerDescriptor>;
 sqliteIntegerColumn satisfies ColumnHelperForStrict<SqliteIntegerDescriptor>;
 
-// ---------------------------------------------------------------------------sqlite/real@1 — non-parameterized, JSON-safe (number). ---------------------------------------------------------------------------
-
 export class SqliteRealCodec extends CodecImpl<
   typeof SQLITE_REAL_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
@@ -158,8 +152,6 @@ export const sqliteRealColumn = () =>
 
 sqliteRealColumn satisfies ColumnHelperFor<SqliteRealDescriptor>;
 sqliteRealColumn satisfies ColumnHelperForStrict<SqliteRealDescriptor>;
-
-// ---------------------------------------------------------------------------sqlite/blob@1 — non-parameterized; wire is `Uint8Array`, JSON form is base64 (round-trip through `Buffer`). ---------------------------------------------------------------------------
 
 export class SqliteBlobCodec extends CodecImpl<
   typeof SQLITE_BLOB_CODEC_ID,
@@ -202,15 +194,13 @@ export const sqliteBlobColumn = () =>
 sqliteBlobColumn satisfies ColumnHelperFor<SqliteBlobDescriptor>;
 sqliteBlobColumn satisfies ColumnHelperForStrict<SqliteBlobDescriptor>;
 
-// ---------------------------------------------------------------------------sqlite/datetime@1 — non-parameterized; SQLite stores datetimes as TEXT (ISO-8601), so the wire type is `string` even though the input type is `Date`. JSON round-trip uses the same ISO-8601 string form. ---------------------------------------------------------------------------
-
 export class SqliteDatetimeCodec extends CodecImpl<
   typeof SQLITE_DATETIME_CODEC_ID,
   readonly ['equality', 'order'],
   string,
   Date
 > {
-  // Reject `Invalid Date` (NaN-time) at every decode ingress so consumers never receive a Date object whose downstream operations silently produce NaN. Mirrors F35's stricter ISO-8601 validation on the postgres timestamp helpers.
+  // Reject `Invalid Date` (NaN-time) at every decode ingress so consumers never receive a Date object whose downstream operations silently produce NaN. Mirrors the stricter ISO-8601 validation on the postgres timestamp helpers.
   private parseDate(value: string): Date {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
@@ -253,8 +243,6 @@ export const sqliteDatetimeColumn = () =>
 sqliteDatetimeColumn satisfies ColumnHelperFor<SqliteDatetimeDescriptor>;
 sqliteDatetimeColumn satisfies ColumnHelperForStrict<SqliteDatetimeDescriptor>;
 
-// ---------------------------------------------------------------------------sqlite/json@1 — non-parameterized; SQLite stores JSON as TEXT. Wire accepts both string (already serialized) and a parsed `JsonValue`; decode normalizes to `JsonValue`. Input type is `JsonValue`; encode `JSON.stringify`s. ---------------------------------------------------------------------------
-
 export class SqliteJsonCodec extends CodecImpl<
   typeof SQLITE_JSON_CODEC_ID,
   readonly ['equality'],
@@ -292,8 +280,6 @@ export const sqliteJsonColumn = () =>
 
 sqliteJsonColumn satisfies ColumnHelperFor<SqliteJsonDescriptor>;
 sqliteJsonColumn satisfies ColumnHelperForStrict<SqliteJsonDescriptor>;
-
-// ---------------------------------------------------------------------------sqlite/bigint@1 — non-parameterized; wire accepts `number | bigint`, decode normalizes to `bigint`. JSON form is the bigint stringified. ---------------------------------------------------------------------------
 
 export class SqliteBigintCodec extends CodecImpl<
   typeof SQLITE_BIGINT_CODEC_ID,
@@ -335,9 +321,6 @@ export const sqliteBigintColumn = () =>
 
 sqliteBigintColumn satisfies ColumnHelperFor<SqliteBigintDescriptor>;
 sqliteBigintColumn satisfies ColumnHelperForStrict<SqliteBigintDescriptor>;
-
-// ---------------------------------------------------------------------------Internal descriptor list. Iterated in emit-stable order; the package's public consumer surface (`sqliteCodecRegistry`, exposed via `core/registry.ts`) wraps this list in a `CodecDescriptorRegistry`. The codec-id-keyed type-level counterpart used by `ExtractCodecTypes` to derive `CodecTypes` lives in `exports/codec-types.ts`.
-// ---------------------------------------------------------------------------
 
 export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   sqlCharDescriptor,

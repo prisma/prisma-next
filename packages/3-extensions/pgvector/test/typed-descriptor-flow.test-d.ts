@@ -7,8 +7,6 @@ import { expectTypeOf, test } from 'vitest';
 import { codecDescriptors, type PgVectorDescriptor, pgVectorDescriptor } from '../src/core/codecs';
 import type { CodecTypes } from '../src/exports/codec-types';
 
-// ---------------------------------------------------------------------------Heterogeneous descriptor storage narrows to AnyCodecDescriptor. ---------------------------------------------------------------------------
-
 test('codecDescriptors narrows to readonly AnyCodecDescriptor[]', () => {
   expectTypeOf(codecDescriptors).toEqualTypeOf<readonly AnyCodecDescriptor[]>();
 });
@@ -16,8 +14,6 @@ test('codecDescriptors narrows to readonly AnyCodecDescriptor[]', () => {
 test('list entries extend AnyCodecDescriptor', () => {
   expectTypeOf<(typeof codecDescriptors)[number]>().toExtend<AnyCodecDescriptor>();
 });
-
-// ---------------------------------------------------------------------------Trait literals preserved on the pgvector descriptor (M0 R5 fix). ---------------------------------------------------------------------------
 
 test('pgVectorDescriptor.traits is the readonly literal tuple', () => {
   type Traits = PgVectorDescriptor['traits'];
@@ -29,8 +25,6 @@ test('pgVectorDescriptor.codecId is the literal `pg/vector@1`', () => {
   expectTypeOf(pgVectorDescriptor.codecId).toEqualTypeOf<'pg/vector@1'>();
 });
 
-// ---------------------------------------------------------------------------CodecTypes projection contains the expected codec-id key. ---------------------------------------------------------------------------
-
 test('CodecTypes is keyed by codec id and exposes input/output/traits', () => {
   expectTypeOf<CodecTypes['pg/vector@1']>().toExtend<{
     readonly input: number[];
@@ -38,8 +32,6 @@ test('CodecTypes is keyed by codec id and exposes input/output/traits', () => {
     readonly traits: 'equality';
   }>();
 });
-
-// ---------------------------------------------------------------------------Negative tests. ---------------------------------------------------------------------------
 
 test('widened trait shape on pgVector fails the equality check', () => {
   type Traits = PgVectorDescriptor['traits'];

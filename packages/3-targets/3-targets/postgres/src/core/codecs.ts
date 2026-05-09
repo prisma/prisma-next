@@ -80,9 +80,6 @@ import {
   PG_VARCHAR_CODEC_ID,
 } from './codec-ids';
 
-// ---------------------------------------------------------------------------Params schemas + types — JSON-boundary metadata, not runtime conversion behaviour. Optional keys (`'length?'` / `'precision?'` / `'scale?'`) match the matching `TParams` type so each schema is structurally assignable to `StandardSchemaV1<TParams>` directly (no cast helper needed).
-// ---------------------------------------------------------------------------
-
 type LengthParams = { readonly length?: number };
 type PrecisionParams = { readonly precision?: number };
 type NumericParams = { readonly precision: number; readonly scale?: number };
@@ -124,8 +121,6 @@ const PG_INTERVAL_META = { db: { sql: { postgres: { nativeType: 'interval' } } }
 const PG_JSON_META = { db: { sql: { postgres: { nativeType: 'json' } } } } as const;
 const PG_JSONB_META = { db: { sql: { postgres: { nativeType: 'jsonb' } } } } as const;
 
-// ---------------------------------------------------------------------------pg/text@1 — non-parameterized, JSON-safe (string). ---------------------------------------------------------------------------
-
 export class PgTextCodec extends CodecImpl<
   typeof PG_TEXT_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
@@ -164,8 +159,6 @@ export const pgTextColumn = () =>
 
 pgTextColumn satisfies ColumnHelperFor<PgTextDescriptor>;
 pgTextColumn satisfies ColumnHelperForStrict<PgTextDescriptor>;
-
-// ---------------------------------------------------------------------------pg/int4@1 — non-parameterized, JSON-safe (number). ---------------------------------------------------------------------------
 
 export class PgInt4Codec extends CodecImpl<
   typeof PG_INT4_CODEC_ID,
@@ -206,8 +199,6 @@ export const pgInt4Column = () =>
 pgInt4Column satisfies ColumnHelperFor<PgInt4Descriptor>;
 pgInt4Column satisfies ColumnHelperForStrict<PgInt4Descriptor>;
 
-// ---------------------------------------------------------------------------pg/int2@1 — non-parameterized, JSON-safe (number). ---------------------------------------------------------------------------
-
 export class PgInt2Codec extends CodecImpl<
   typeof PG_INT2_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
@@ -246,8 +237,6 @@ export const pgInt2Column = () =>
 
 pgInt2Column satisfies ColumnHelperFor<PgInt2Descriptor>;
 pgInt2Column satisfies ColumnHelperForStrict<PgInt2Descriptor>;
-
-// ---------------------------------------------------------------------------pg/int8@1 — non-parameterized, JSON-safe (number). ---------------------------------------------------------------------------
 
 export class PgInt8Codec extends CodecImpl<
   typeof PG_INT8_CODEC_ID,
@@ -288,8 +277,6 @@ export const pgInt8Column = () =>
 pgInt8Column satisfies ColumnHelperFor<PgInt8Descriptor>;
 pgInt8Column satisfies ColumnHelperForStrict<PgInt8Descriptor>;
 
-// ---------------------------------------------------------------------------pg/float4@1 — non-parameterized, JSON-safe (number). ---------------------------------------------------------------------------
-
 export class PgFloat4Codec extends CodecImpl<
   typeof PG_FLOAT4_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
@@ -328,8 +315,6 @@ export const pgFloat4Column = () =>
 
 pgFloat4Column satisfies ColumnHelperFor<PgFloat4Descriptor>;
 pgFloat4Column satisfies ColumnHelperForStrict<PgFloat4Descriptor>;
-
-// ---------------------------------------------------------------------------pg/float8@1 — non-parameterized, JSON-safe (number). ---------------------------------------------------------------------------
 
 export class PgFloat8Codec extends CodecImpl<
   typeof PG_FLOAT8_CODEC_ID,
@@ -370,8 +355,6 @@ export const pgFloat8Column = () =>
 pgFloat8Column satisfies ColumnHelperFor<PgFloat8Descriptor>;
 pgFloat8Column satisfies ColumnHelperForStrict<PgFloat8Descriptor>;
 
-// ---------------------------------------------------------------------------pg/bool@1 — non-parameterized, JSON-safe (boolean). ---------------------------------------------------------------------------
-
 export class PgBoolCodec extends CodecImpl<
   typeof PG_BOOL_CODEC_ID,
   readonly ['equality', 'boolean'],
@@ -410,8 +393,6 @@ export const pgBoolColumn = () =>
 
 pgBoolColumn satisfies ColumnHelperFor<PgBoolDescriptor>;
 pgBoolColumn satisfies ColumnHelperForStrict<PgBoolDescriptor>;
-
-// ---------------------------------------------------------------------------pg/numeric@1 — precision/scale-parameterized, JSON-safe (string). Wire accepts string|number; encode passes through, decode coerces number to string. Params (`precision`, `scale`) only inform the emit-path renderer; the codec is parameter-stateless. ---------------------------------------------------------------------------
 
 export class PgNumericCodec extends CodecImpl<
   typeof PG_NUMERIC_CODEC_ID,
@@ -455,9 +436,6 @@ export const pgNumericColumn = (params: NumericParams) =>
 pgNumericColumn satisfies ColumnHelperFor<PgNumericDescriptor>;
 pgNumericColumn satisfies ColumnHelperForStrict<PgNumericDescriptor>;
 
-// ---------------------------------------------------------------------------pg/timestamp@1 — precision-parameterized, NOT JSON-safe (Date). Custom encodeJson/decodeJson round-trip through ISO-8601 strings. Params are JSON-only metadata; the codec is parameter-stateless (precision only informs `renderOutputType` for the contract.d.ts emit path).
-// ---------------------------------------------------------------------------
-
 export class PgTimestampCodec extends CodecImpl<
   typeof PG_TIMESTAMP_CODEC_ID,
   readonly ['equality', 'order'],
@@ -500,8 +478,6 @@ export const pgTimestampColumn = (params: PrecisionParams = {}) =>
 
 pgTimestampColumn satisfies ColumnHelperFor<PgTimestampDescriptor>;
 pgTimestampColumn satisfies ColumnHelperForStrict<PgTimestampDescriptor>;
-
-// ---------------------------------------------------------------------------pg/timestamptz@1 — same shape as pg/timestamp@1 with timezone semantics. ---------------------------------------------------------------------------
 
 export class PgTimestamptzCodec extends CodecImpl<
   typeof PG_TIMESTAMPTZ_CODEC_ID,
@@ -551,8 +527,6 @@ export const pgTimestamptzColumn = (params: PrecisionParams = {}) =>
 pgTimestamptzColumn satisfies ColumnHelperFor<PgTimestamptzDescriptor>;
 pgTimestamptzColumn satisfies ColumnHelperForStrict<PgTimestamptzDescriptor>;
 
-// ---------------------------------------------------------------------------pg/time@1 — precision-parameterized, JSON-safe (string). ---------------------------------------------------------------------------
-
 export class PgTimeCodec extends CodecImpl<
   typeof PG_TIME_CODEC_ID,
   readonly ['equality', 'order'],
@@ -595,8 +569,6 @@ export const pgTimeColumn = (params: PrecisionParams = {}) =>
 
 pgTimeColumn satisfies ColumnHelperFor<PgTimeDescriptor>;
 pgTimeColumn satisfies ColumnHelperForStrict<PgTimeDescriptor>;
-
-// ---------------------------------------------------------------------------pg/timetz@1 — precision-parameterized, JSON-safe (string). ---------------------------------------------------------------------------
 
 export class PgTimetzCodec extends CodecImpl<
   typeof PG_TIMETZ_CODEC_ID,
@@ -641,8 +613,6 @@ export const pgTimetzColumn = (params: PrecisionParams = {}) =>
 pgTimetzColumn satisfies ColumnHelperFor<PgTimetzDescriptor>;
 pgTimetzColumn satisfies ColumnHelperForStrict<PgTimetzDescriptor>;
 
-// ---------------------------------------------------------------------------pg/bit@1 — length-parameterized, JSON-safe (string). Length is JSON-only metadata; codec is parameter-stateless. ---------------------------------------------------------------------------
-
 export class PgBitCodec extends CodecImpl<
   typeof PG_BIT_CODEC_ID,
   readonly ['equality', 'order'],
@@ -685,8 +655,6 @@ export const pgBitColumn = (params: LengthParams = {}) =>
 pgBitColumn satisfies ColumnHelperFor<PgBitDescriptor>;
 pgBitColumn satisfies ColumnHelperForStrict<PgBitDescriptor>;
 
-// ---------------------------------------------------------------------------pg/varbit@1 — length-parameterized, JSON-safe (string). ---------------------------------------------------------------------------
-
 export class PgVarbitCodec extends CodecImpl<
   typeof PG_VARBIT_CODEC_ID,
   readonly ['equality', 'order'],
@@ -728,8 +696,6 @@ export const pgVarbitColumn = (params: LengthParams = {}) =>
 
 pgVarbitColumn satisfies ColumnHelperFor<PgVarbitDescriptor>;
 pgVarbitColumn satisfies ColumnHelperForStrict<PgVarbitDescriptor>;
-
-// ---------------------------------------------------------------------------pg/bytea@1 — non-parameterized, JSON-safe via base64 round-trip. ---------------------------------------------------------------------------
 
 export class PgByteaCodec extends CodecImpl<
   typeof PG_BYTEA_CODEC_ID,
@@ -780,8 +746,6 @@ export const pgByteaColumn = () =>
 pgByteaColumn satisfies ColumnHelperFor<PgByteaDescriptor>;
 pgByteaColumn satisfies ColumnHelperForStrict<PgByteaDescriptor>;
 
-// ---------------------------------------------------------------------------pg/interval@1 — precision-parameterized, JSON-safe (string). Wire accepts string|object form; decode normalizes object to JSON string. ---------------------------------------------------------------------------
-
 export class PgIntervalCodec extends CodecImpl<
   typeof PG_INTERVAL_CODEC_ID,
   readonly ['equality', 'order'],
@@ -824,9 +788,6 @@ export const pgIntervalColumn = (params: PrecisionParams = {}) =>
 
 pgIntervalColumn satisfies ColumnHelperFor<PgIntervalDescriptor>;
 pgIntervalColumn satisfies ColumnHelperForStrict<PgIntervalDescriptor>;
-
-// ---------------------------------------------------------------------------pg/enum@1 — values-parameterized, JSON-safe (string). `values` is JSON-only metadata for the renderOutputType emit path; the codec is parameter-stateless. The descriptor declares a `paramsSchema` so the descriptor surface is consistent across all codec ids (validators are JSON-boundary metadata; the schema accepts optional `values`).
-// ---------------------------------------------------------------------------
 
 const enumParamsSchema = arktype({
   'values?': 'string[]',
@@ -873,8 +834,6 @@ export const pgEnumColumn = (params: EnumParams = {}) =>
 pgEnumColumn satisfies ColumnHelperFor<PgEnumDescriptor>;
 pgEnumColumn satisfies ColumnHelperForStrict<PgEnumDescriptor>;
 
-// ---------------------------------------------------------------------------pg/json@1 — non-parameterized; wire is string|JsonValue, input is JsonValue. encode JSON.stringifies; decode JSON.parses if string, passes through otherwise. ---------------------------------------------------------------------------
-
 export class PgJsonCodec extends CodecImpl<
   typeof PG_JSON_CODEC_ID,
   readonly [],
@@ -913,8 +872,6 @@ export const pgJsonColumn = () =>
 
 pgJsonColumn satisfies ColumnHelperFor<PgJsonDescriptor>;
 pgJsonColumn satisfies ColumnHelperForStrict<PgJsonDescriptor>;
-
-// ---------------------------------------------------------------------------pg/jsonb@1 — non-parameterized; same shape as pg/json@1 plus `equality` trait. ---------------------------------------------------------------------------
 
 export class PgJsonbCodec extends CodecImpl<
   typeof PG_JSONB_CODEC_ID,
@@ -955,7 +912,6 @@ export const pgJsonbColumn = () =>
 pgJsonbColumn satisfies ColumnHelperFor<PgJsonbDescriptor>;
 pgJsonbColumn satisfies ColumnHelperForStrict<PgJsonbDescriptor>;
 
-// ---------------------------------------------------------------------------pg-alias descriptors. These four codec ids (`pg/char@1`, `pg/varchar@1`, `pg/int@1`, `pg/float@1`) are pure aliases over the matching SQL base codec (`sql/char@1`, `sql/varchar@1`, `sql/int@1`, `sql/float@1`) — they reuse the base encode/decode/render behaviour but expose a postgres-scoped codec id, distinct `targetTypes`, and per-target
 // `meta`. The factories instantiate the SQL-base codec class (`SqlCharCodec` etc.) passing `this` (the pg-alias descriptor) so `codec.id` resolves to the pg-alias codec id via `CodecImpl`'s `descriptor.codecId` proxy. ---------------------------------------------------------------------------
 
 const PG_CHAR_META = { db: { sql: { postgres: { nativeType: 'character' } } } } as const;
@@ -1048,7 +1004,6 @@ export const pgFloatColumn = () =>
 
 pgFloatColumn satisfies ColumnHelperFor<PgFloatDescriptor>;
 
-// ---------------------------------------------------------------------------Internal descriptor list. The list view iterates descriptors in emit-stable order; the package's public consumer surface (`postgresCodecRegistry`, exposed via `core/registry.ts`) wraps this list in a `CodecDescriptorRegistry`. The codec-id-keyed `codecDescriptorMap` in `exports/codec-types.ts` is the type-level counterpart used by
 // `ExtractCodecTypes` to derive `CodecTypes`. ---------------------------------------------------------------------------
 
 export const codecDescriptors: readonly AnyCodecDescriptor[] = [

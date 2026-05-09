@@ -1,11 +1,9 @@
 /**
- * Framework-components-level runtime tests for the `CodecImpl.id` proxy through `descriptor.codecId` (AC-CB-4).
+ * Framework-components-level runtime tests for the `CodecImpl.id` proxy through `descriptor.codecId`.
  *
- * The class-based codec hierarchy declares `Codec.id` on the abstract `CodecImpl` base as a getter that returns `this.descriptor.codecId`. AC-CB-4 requires "a round-trip test confirms…" the proxy works at runtime — type-level assertions don't exercise the getter, so a regression where someone wires `id` to a hardcoded literal or forgets to pass `super(descriptor)` would slip through type checks.
+ * The class-based codec hierarchy declares `Codec.id` on the abstract `CodecImpl` base as a getter that returns `this.descriptor.codecId`. Type-level assertions don't exercise the getter, so a regression where someone wires `id` to a hardcoded literal or forgets to pass `super(descriptor)` would slip through type checks — these runtime round-trip tests catch that.
  *
  * The proxy is also the load-bearing aliasing mechanism: an alias-style descriptor that overrides `codecId` produces codec instances whose `id` reads the alias's id (per spec § Class hierarchy aliasing). The third test below specifically exercises this regression vector.
- *
- * Refs: TML-2357.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
@@ -112,8 +110,7 @@ test('CodecImpl.id proxies through descriptor.codecId (parameterized)', ({ expec
 });
 
 test('alias descriptor produces codec whose id reads the alias codecId', ({ expect }) => {
-  // Spec § Class hierarchy aliasing: an alias descriptor instantiates the same concrete codec class (`Int4FixtureCodec`) but passes itself as the descriptor reference. `CodecImpl.id` proxies through `this.descriptor.codecId`, so the runtime id reads the alias's id even though the codec class hardcodes `'demo/int4@1'` in its type-level `Id` parameter. This is the regression vector AC-CB-4's runtime test exists to catch —
-  // a future change that pinned `id` to the codec class's `Id` type literal would silently break aliasing.
+  // Spec § Class hierarchy aliasing: an alias descriptor instantiates the same concrete codec class (`Int4FixtureCodec`) but passes itself as the descriptor reference. `CodecImpl.id` proxies through `this.descriptor.codecId`, so the runtime id reads the alias's id even though the codec class hardcodes `'demo/int4@1'` in its type-level `Id` parameter. This test pins that regression vector — a future change that pinned `id` to the codec class's `Id` type literal would silently break aliasing.
   //
   // The alias extends `CodecDescriptorImpl<void>` directly (not `Int4FixtureDescriptor`) because `Int4FixtureDescriptor.codecId` is narrowed to the literal `'demo/int4@1'`; subclasses can't override it with a different literal under TypeScript's structural overrides.
   class AliasedInt4Descriptor extends CodecDescriptorImpl<void> {

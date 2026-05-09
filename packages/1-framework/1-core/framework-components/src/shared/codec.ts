@@ -39,7 +39,7 @@ export interface Codec<
 > {
   /** Unique codec identifier in `namespace/name@version` format (e.g. `pg/timestamptz@1`). The factory sets this to the descriptor's `codecId`; consumers use it as a back-reference for descriptor lookups and for decode-error diagnostics. */
   readonly id: Id;
-  /** Phantom carrier for the `TTraits` generic; type-only, undefined at runtime. Runtime traits live on {@link CodecDescriptor.traits}. Implemented as a string-key phantom (`__codecTraits`) rather than `unique symbol` so bundlers that split `.d.ts` chunks do not strand symbol identity on chunk-private paths (same TS2742 family as the F8 `Resolve<T>` materialisation). */
+  /** Phantom carrier for the `TTraits` generic; type-only, undefined at runtime. Runtime traits live on {@link CodecDescriptor.traits}. Implemented as a string-key phantom (`__codecTraits`) rather than `unique symbol` so bundlers that split `.d.ts` chunks do not strand symbol identity on chunk-private paths (the same `TS2742` family that the public re-export of `CodecTypes` works around). */
   readonly __codecTraits?: TTraits;
   /** Converts a JS value to the wire format expected by the database driver. Always Promise-returning at the boundary. The {@link CodecCallContext} is supplied by the runtime on every call (allocated once per `runtime.execute()`); family layers may narrow the ctx to extend it (e.g. SQL adds `column`). Author-side single-arg `(value) => …` functions remain legal via TypeScript's bivariance for trailing parameters. */
   encode(value: TInput, ctx: CodecCallContext): Promise<TWire>;

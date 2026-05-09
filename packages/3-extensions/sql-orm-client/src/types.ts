@@ -22,8 +22,6 @@ import type { ComputeColumnJsType, RuntimeScope } from '@prisma-next/sql-relatio
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { RowSelection } from './collection-internal-types';
 
-// ---------------------------------------------------------------------------Comparison / Filter / Order / Include ---------------------------------------------------------------------------
-
 export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
 
 export interface IncludeScalar<Result> extends RowSelection<Result> {
@@ -62,8 +60,6 @@ export interface IncludeExpr {
   readonly scalar: IncludeScalar<unknown> | undefined;
   readonly combine: Readonly<Record<string, IncludeCombineBranch>> | undefined;
 }
-
-// ---------------------------------------------------------------------------CollectionState — plain data, no query builder types ---------------------------------------------------------------------------
 
 export interface CollectionState {
   readonly filters: readonly AnyExpression[];
@@ -109,8 +105,6 @@ export type DefaultCollectionTypeState = {
   readonly variantName: undefined;
 };
 
-// ---------------------------------------------------------------------------CollectionContext — bundles lane context + runtime ---------------------------------------------------------------------------
-
 export interface RuntimeConnection extends RuntimeScope {
   release?(): Promise<void>;
   transaction?(): Promise<RuntimeTransaction>;
@@ -130,8 +124,6 @@ export interface CollectionContext<TContract extends Contract<SqlStorage>> {
   readonly runtime: RuntimeQueryable;
   readonly context: ExecutionContext<TContract>;
 }
-
-// ---------------------------------------------------------------------------ModelAccessor — type-safe proxy for where() callbacks ---------------------------------------------------------------------------
 
 export type ComparisonMethodFns<T> = {
   eq(value: T): AnyExpression;
@@ -159,8 +151,6 @@ export type ComparisonMethods<T, Traits> = {
     ? K
     : never]: ComparisonMethodFns<T>[K];
 };
-
-// ---------------------------------------------------------------------------Extension operation result — returned by calling an extension method ---------------------------------------------------------------------------
 
 type QueryOperationReturnTraits<
   Returns,
@@ -264,8 +254,6 @@ type FieldOperations<
       }
     : unknown
   : unknown;
-
-// ---------------------------------------------------------------------------COMPARISON_METHODS_META — single source of truth for traits + factories ---------------------------------------------------------------------------
 
 /**
  * Resolve the unique column ref carried by `left` so its surrounding `ParamRef` can dispatch through `forColumn`. The previous implementation only matched bare `column-ref` expressions, which lost refs the moment the expression got wrapped (`upper(f.id)`, `BinaryExpr`, function-call expressions, etc.) — and column-aware dispatch (AC-5) silently degraded for any predicate that touched a computed column.
@@ -430,13 +418,9 @@ export type ModelAccessor<
   ModelName extends string,
 > = ScalarModelAccessor<TContract, ModelName> & RelationModelAccessor<TContract, ModelName>;
 
-// ---------------------------------------------------------------------------DefaultModelRow — all scalar fields with JS types ---------------------------------------------------------------------------
-
 export type DefaultModelRow<TContract extends Contract<SqlStorage>, ModelName extends string> = {
   [K in keyof FieldsOf<TContract, ModelName> & string]: FieldJsType<TContract, ModelName, K>;
 };
-
-// ---------------------------------------------------------------------------InferRootRow — discriminated union for polymorphic base models ---------------------------------------------------------------------------
 
 type Simplify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -558,8 +542,6 @@ export type ShorthandWhereFilter<
     | undefined;
 }>;
 
-// ---------------------------------------------------------------------------Helpers for extracting fields / types from the contract ---------------------------------------------------------------------------
-
 type ModelsOf<TContract extends Contract<SqlStorage>> =
   TContract['models'] extends Record<string, unknown> ? TContract['models'] : Record<string, never>;
 
@@ -672,8 +654,6 @@ type FieldStorageColumn<
   ModelName extends string,
   FieldName extends string,
 > = ResolvedStorageColumn<TContract, ModelName, FieldName>;
-
-// ---------------------------------------------------------------------------Field trait resolution from contract CodecTypes ---------------------------------------------------------------------------
 
 type FieldCodecId<
   TContract extends Contract<SqlStorage>,
@@ -794,8 +774,6 @@ export type CreateInput<TContract extends Contract<SqlStorage>, ModelName extend
     Pick<DefaultModelRow<TContract, ModelName>, OptionalCreateFieldNames<TContract, ModelName>>
   > &
   RelationMutationFields<TContract, ModelName>;
-
-// ---------------------------------------------------------------------------Polymorphic write gating ---------------------------------------------------------------------------
 
 type IsPolymorphicBase<TContract extends Contract<SqlStorage>, ModelName extends string> = ModelDef<
   TContract,
@@ -1067,8 +1045,6 @@ export type MutationUpdateInput<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
 > = Partial<DefaultModelRow<TContract, ModelName>> & RelationMutationFields<TContract, ModelName>;
-
-// ---------------------------------------------------------------------------Relation helpers ---------------------------------------------------------------------------
 
 type ModelRelations<TContract extends Contract<SqlStorage>, ModelName extends string> = ModelDef<
   TContract,

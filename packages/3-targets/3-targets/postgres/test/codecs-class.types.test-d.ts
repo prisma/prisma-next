@@ -1,9 +1,9 @@
 /**
- * Type tests for the Postgres target codecs (TML-2357).
+ * Type tests for the Postgres target codecs.
  *
  * Mirrors `packages/2-sql/4-lanes/relational-core/test/ast/sql-codecs.types.test-d.ts`.
  *
- * Coverage selection per the M0 brief: representative codecs only, since the framework-level type discipline is exercised in Phase A tests at framework-components/test/codec.types.test-d.ts. Per-target coverage focuses on:
+ * Representative codecs only — the framework-level type discipline is exercised in `framework-components/test/codec.types.test-d.ts`. Per-target coverage focuses on:
  *
  * - one void-param codec (`pgInt4`)
  * - one length-param codec (`pgBit`)
@@ -38,8 +38,6 @@ import {
   pgTimestamptzColumn,
   pgTimestamptzDescriptor,
 } from '../src/core/codecs';
-
-// ---------------------------------------------------------------------------Literal preservation through direct invocation. ---------------------------------------------------------------------------
 
 test('pgInt4: descriptor.factory() returns typed (ctx) => PgInt4Codec', () => {
   const factory = pgInt4Descriptor.factory();
@@ -93,8 +91,6 @@ test('pgNumeric: column helper preserves typed codecFactory + composite params',
     readonly scale?: number;
   }>();
 });
-
-// ---------------------------------------------------------------------------satisfies discipline catches wiring mistakes. ---------------------------------------------------------------------------
 
 pgInt4Column satisfies ColumnHelperFor<PgInt4Descriptor>;
 pgInt4Column satisfies ColumnHelperForStrict<PgInt4Descriptor>;

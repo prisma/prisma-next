@@ -297,7 +297,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     release.resolve('done');
   });
 
-  it('passes through RUNTIME.DECODE_FAILED unchanged when the codec body throws (no double-wrap, AC-ERR4)', async () => {
+  it('passes through RUNTIME.DECODE_FAILED unchanged when the codec body throws (no double-wrap)', async () => {
     const cause = new Error('decode boom');
     const registry = [
       defineTestCodec({

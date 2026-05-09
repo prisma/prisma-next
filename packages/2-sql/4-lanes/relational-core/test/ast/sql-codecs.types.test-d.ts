@@ -32,8 +32,6 @@ import {
   sqlTimestampDescriptor,
 } from '../../src/ast/sql-codecs';
 
-// ---------------------------------------------------------------------------AC-CB-2: literal preservation through direct invocation ---------------------------------------------------------------------------
-
 test('sqlText: descriptor.factory() returns typed (ctx) => SqlTextCodec', () => {
   const factory = sqlTextDescriptor.factory();
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqlTextCodec>();
@@ -72,8 +70,6 @@ test('sqlTimestamp: column helper preserves typed codecFactory + precision param
   expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqlTimestampCodec>();
   expectTypeOf(col.typeParams).toEqualTypeOf<{ readonly precision?: number }>();
 });
-
-// ---------------------------------------------------------------------------AC-CB-3: satisfies discipline catches wiring mistakes ---------------------------------------------------------------------------
 
 sqlTextColumn satisfies ColumnHelperFor<SqlTextDescriptor>;
 sqlTextColumn satisfies ColumnHelperForStrict<SqlTextDescriptor>;

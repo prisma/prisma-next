@@ -1,7 +1,7 @@
 /**
  * Codec type definitions for the Postgres target.
  *
- * This file is the public origin of `CodecTypes`. The `Resolve<...>` materialisation happens here (rather than in `core/codec-type-map.ts`) so the tsdown DTS bundler resolves consumer-side `.d.mts` references via this public entry point rather than a hash-named internal chunk — the same `TS2742` family the F8 fix closed (TML-2357).
+ * This file is the public origin of `CodecTypes`. The `Resolve<...>` materialisation happens here (rather than in `core/codec-type-map.ts`) so the tsdown DTS bundler resolves consumer-side `.d.mts` references via this public entry point rather than a hash-named internal chunk (the `TS2742` family).
  *
  * Lives in `target-postgres` because codec types describe the target's value space — both the control adapter (introspection / schema verification) and the runtime adapter (encode/decode) share the same definitions, and the target package is the natural home that both adapters depend on.
  */

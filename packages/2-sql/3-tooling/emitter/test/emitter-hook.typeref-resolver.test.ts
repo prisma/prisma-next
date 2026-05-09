@@ -4,7 +4,7 @@ import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
 
-// Phase A integration test (F01 from Phase A review): exercise the real SQL emitter walk end-to-end for the typeRef-resolver path. Confirms that `sqlEmission.resolveFieldTypeParams` walks `storage.fields → storage.tables[t] .columns[c] → storage.types[ref].typeParams` and that the framework emit path (`generateContractDts`) consults the resolver via the `EmissionSpi.resolveFieldTypeParams` hook plumbed in TA.1-TA.2.
+// Integration test for the typeRef-resolver path: exercise the real SQL emitter walk end-to-end. Confirms that `sqlEmission.resolveFieldTypeParams` walks `storage.fields → storage.tables[t].columns[c] → storage.types[ref].typeParams` and that the framework emit path (`generateContractDts`) consults the resolver via the `EmissionSpi.resolveFieldTypeParams` hook.
 
 function createContract(overrides: Partial<Contract>): Contract {
   return {

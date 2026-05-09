@@ -160,7 +160,7 @@ describe('resolveValue — CodecCallContext threading', () => {
     release.resolve('done');
   });
 
-  it('passes RUNTIME.ENCODE_FAILED from a codec body through unchanged when the body throws before the runtime sees the abort (AC-ERR4)', async () => {
+  it('passes RUNTIME.ENCODE_FAILED from a codec body through unchanged when the body throws before the runtime sees the abort', async () => {
     const cause = new Error('codec specific failure');
     const registry = newMongoCodecRegistry();
     registry.register(

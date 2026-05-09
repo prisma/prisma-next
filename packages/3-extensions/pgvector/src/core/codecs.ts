@@ -1,15 +1,13 @@
 /**
- * pgvector extension codec (TML-2357).
+ * pgvector extension codec.
  *
  * Mirrors the patterns in `postgres/codecs-class.ts` and `sqlite/codecs-class.ts` for the single `pg/vector@1` codec. Three artifacts:
  *
- * 1. `PgVectorCodec` extends {@link CodecImpl} with the runtime encode/decode/encodeJson/decodeJson conversions inline. Conversions are simple enough (PostgreSQL `[1,2,3]` text format) that no shared helper module is warranted; the class body is the source of truth. 2. `PgVectorDescriptor` extends {@link CodecDescriptorImpl} with the codec id, traits, target types, params schema (`{ length: number }`, validated against
- * {@link VECTOR_MAX_DIM}), `meta` (postgres `nativeType: 'vector'`), and the emit-path `renderOutputType` producing `Vector<${length}>`. 3. `pgVectorColumn(length)` per-codec column helper invoking `descriptor.factory({ length })` directly + passing the bare nativeType `'vector'` per F5's convention. The family-layer {@link expandNativeType} hook renders the parameterized form (`vector(1536)`) at emit/verify time from
- * `nativeType` + `typeParams`.
+ * 1. `PgVectorCodec` extends {@link CodecImpl} with the runtime encode/decode/encodeJson/decodeJson conversions inline. Conversions are simple enough (PostgreSQL `[1,2,3]` text format) that no shared helper module is warranted; the class body is the source of truth.
+ * 2. `PgVectorDescriptor` extends {@link CodecDescriptorImpl} with the codec id, traits, target types, params schema (`{ length: number }`, validated against {@link VECTOR_MAX_DIM}), `meta` (postgres `nativeType: 'vector'`), and the emit-path `renderOutputType` producing `Vector<${length}>`.
+ * 3. `pgVectorColumn(length)` per-codec column helper invoking `descriptor.factory({ length })` directly + passing the bare `nativeType: 'vector'`. The family-layer {@link expandNativeType} hook renders the parameterized form (`vector(1536)`) at emit/verify time from `nativeType` + `typeParams`.
  *
- * After TML-2357 this is the canonical source of pgvector codec metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec` carriers retired with the deletion sweep.
- *
- * Audit: `length` threads into the runtime codec via the constructor so encode/decode/encodeJson/decodeJson can enforce the declared dimension at every ingress path. Without this, `vector(3)` and `vector(1536)` would produce codecs with identical behaviour and a dimension-mismatched value would round-trip undetected — that's the dispatch-correctness symptom F22 / F26 also touch (cluster closure).
+ * `length` threads into the runtime codec via the constructor so encode/decode/encodeJson/decodeJson enforce the declared dimension at every ingress path. Without this, `vector(3)` and `vector(1536)` would produce codecs with identical behaviour and a dimension-mismatched value would round-trip undetected.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
@@ -28,8 +26,6 @@ import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from './constants';
 
-// ---------------------------------------------------------------------------Params schema + types. ---------------------------------------------------------------------------
-
 type VectorParams = { readonly length: number };
 
 const vectorParamsSchema = arktype({
@@ -46,8 +42,6 @@ const vectorParamsSchema = arktype({
 }) satisfies StandardSchemaV1<VectorParams>;
 
 const PG_VECTOR_META = { db: { sql: { postgres: { nativeType: 'vector' } } } } as const;
-
-// ---------------------------------------------------------------------------pg/vector@1 — length-parameterized, JSON-safe (number[]). Wire is the PostgreSQL `[v1,v2,...]` text format. ---------------------------------------------------------------------------
 
 export class PgVectorCodec extends CodecImpl<
   typeof VECTOR_CODEC_ID,
@@ -134,16 +128,13 @@ export const pgVectorDescriptor = new PgVectorDescriptor();
 /**
  * Per-codec column helper for `pg/vector@1`. Generic over `N extends number` so the column site preserves the dimension literal in `typeParams` (e.g. `pgVectorColumn(1536)` packs `typeParams: { length: 1536 }`).
  *
- * Passes the bare `nativeType: 'vector'`; the family-layer `expandNativeType` hook renders the parameterized form (`vector(1536)`) at emit/verify time from `nativeType` + `typeParams`. This matches the F5 convention validated by the reviewer's M0 R2 verdict.
+ * Passes the bare `nativeType: 'vector'`; the family-layer `expandNativeType` hook renders the parameterized form (`vector(1536)`) at emit/verify time from `nativeType` + `typeParams`.
  */
 export const pgVectorColumn = <N extends number>(length: N) =>
   column(pgVectorDescriptor.factory({ length }), pgVectorDescriptor.codecId, { length }, 'vector');
 
 pgVectorColumn satisfies ColumnHelperFor<PgVectorDescriptor>;
 pgVectorColumn satisfies ColumnHelperForStrict<PgVectorDescriptor>;
-
-// ---------------------------------------------------------------------------Internal descriptor registration. Single entry today: `pg/vector@1`. The codec-id-keyed type-level map drives `ExtractCodecTypes` to derive `CodecTypes` (input/output/traits projection used by downstream consumers). The list view feeds the package-scoped `pgvectorCodecRegistry` exposed via `core/registry.ts`.
-// ---------------------------------------------------------------------------
 
 const codecDescriptorMap = {
   vector: pgVectorDescriptor,

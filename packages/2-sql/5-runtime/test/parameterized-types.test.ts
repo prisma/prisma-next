@@ -224,8 +224,7 @@ describe('parameterized types', () => {
     });
   });
 
-  // Phase B note: `init` was the predecessor hook returning a helper. The unified descriptor uses `factory: (P) => (CodecInstanceContext) => Codec`; per-instance state lives in the resolved codec returned by the factory. The `TypeHelperRegistry` (`context.types`) carries the resolved codec for every typed instance — or, for codec ids without a parameterized descriptor, the raw `StorageTypeInstance` for typeParams
-  // metadata.
+  // The unified descriptor uses `factory: (P) => (CodecInstanceContext) => Codec`; per-instance state lives in the resolved codec returned by the factory. The `TypeHelperRegistry` (`context.types`) carries the resolved codec for every typed instance — or, for codec ids without a parameterized descriptor, the raw `StorageTypeInstance` for typeParams metadata.
   describe('factory for type helpers', () => {
     function createPgVectorExt(opts?: {
       paramsSchema?: Type<{ length: number }>;

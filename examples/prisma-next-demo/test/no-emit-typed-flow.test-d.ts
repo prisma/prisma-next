@@ -1,7 +1,7 @@
 /**
- * AC-CB-6: end-to-end no-emit authoring chain type tests (TML-2357).
+ * End-to-end no-emit authoring chain type tests.
  *
- * The no-emit chain is the strongest evidence M0's typed flow works as designed: authoring a contract via the TS callback surface (`defineContract` + `field.*` builders) produces a contract whose model + field types flow through to the SQL builder lane, so that:
+ * The no-emit chain is the strongest evidence the typed flow works as designed: authoring a contract via the TS callback surface (`defineContract` + `field.*` builders) produces a contract whose model + field types flow through to the SQL builder lane, so that:
  *
  * - `field.id.uuidv4()` resolves to a string-shaped field;
  * - `fns.eq(f.id, '<uuid string>')` typechecks at the where clause;
@@ -14,21 +14,16 @@ import { expectTypeOf, test } from 'vitest';
 import type { contract } from '../prisma/contract';
 import { sql } from '../src/prisma-no-emit/context';
 
-// ---------------------------------------------------------------------------1. `field.id.uuidv4()` produces a string-shaped field on the User model. ---------------------------------------------------------------------------
-
 test('field.id.uuidv4() produces a string-typed id field on User', () => {
   type UserStorageFields = (typeof contract.models)['User']['storage']['fields'];
   expectTypeOf<UserStorageFields>().toHaveProperty('id');
   type IdField = UserStorageFields['id'];
   expectTypeOf<IdField>().toHaveProperty('column');
-  // AC-CB-6 leaf-type assertion: the column resolves to a string at the typed-leaf boundary, not just "has a column property". Without this assertion the test would pass for any field whose IR carries a `column` slot, defeating the no-emit-chain evidence claim. Use `toExtend` rather than `toEqualTypeOf` because the storage field type narrows the column to `string` at the leaf — a stricter codec type that resolves to a
-  // string-extending shape is acceptable.
+  // Assert the column resolves to a string at the typed-leaf boundary, not just "has a column property". Without this assertion the test would pass for any field whose IR carries a `column` slot, defeating the no-emit-chain evidence claim. Use `toExtend` rather than `toEqualTypeOf` because the storage field type narrows the column to `string` at the leaf — a stricter codec type that resolves to a string-extending shape is acceptable.
   expectTypeOf<IdField['column']>().toExtend<string>();
   // Confirm the column is *not* `never` (which is the failure mode if the codec lookup mis-resolves and the type system widens to bottom).
   expectTypeOf<IdField['column']>().not.toBeNever();
 });
-
-// ---------------------------------------------------------------------------2. SQL builder where-clause typechecks string id with `fns.eq`. ---------------------------------------------------------------------------
 
 test('fns.eq(f.id, "<uuid>") typechecks on the User table', () => {
   const plan = sql.user
@@ -39,8 +34,6 @@ test('fns.eq(f.id, "<uuid>") typechecks on the User table', () => {
   expectTypeOf(plan).not.toBeNever();
 });
 
-// ---------------------------------------------------------------------------3. Negative test: passing a number to `fns.eq(f.id, …)` fails. ---------------------------------------------------------------------------
-
 test('fns.eq(f.id, 1234) fails to typecheck — id is a string, not a number', () => {
   sql.user
     .select('id', 'email')
@@ -49,8 +42,6 @@ test('fns.eq(f.id, 1234) fails to typecheck — id is a string, not a number', (
     .limit(1)
     .build();
 });
-
-// ---------------------------------------------------------------------------4. Authoring chain: model relations + field selection typecheck. ---------------------------------------------------------------------------
 
 test('authoring chain preserves model + field types end-to-end', () => {
   expectTypeOf<keyof typeof contract.models>().toExtend<'User' | 'Post'>();

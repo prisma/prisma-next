@@ -26,8 +26,6 @@ import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { ArkErrors, ark, type Type, type } from 'arktype';
 
-// ---------------------------------------------------------------------------Codec id + native-type constants. Public — re-exported through `exports/codecs.ts` so contributor packs / runtime / control-stack assembly modules import the canonical literal without duplicating it. ---------------------------------------------------------------------------
-
 /** Codec id for arktype-backed JSON columns. Library-bound, not target-bound. */
 export const ARKTYPE_JSON_CODEC_ID = 'arktype/json@1' as const;
 
@@ -48,8 +46,6 @@ export type ArktypeJsonTypeParams = {
   readonly jsonIr: object;
 };
 
-// ---------------------------------------------------------------------------Schema-shape narrow + structural guard for the column-author surface. Kept private (not re-exported); callers receive arktype `Type<unknown>` at the public boundary. ---------------------------------------------------------------------------
-
 type ArktypeSchemaLike = ((value: unknown) => unknown) & {
   readonly expression: string;
 };
@@ -59,8 +55,6 @@ function isArktypeSchemaLike(value: unknown): value is ArktypeSchemaLike {
   const expression = (value as { readonly expression?: unknown }).expression;
   return typeof expression === 'string';
 }
-
-// ---------------------------------------------------------------------------Shared encode/decode pipeline. Free functions (rather than methods) keep the validation / serialization helpers schema-locality-free so both `ArktypeJsonCodecClass` methods and the descriptor factory can converge on one implementation. ---------------------------------------------------------------------------
 
 function validateSchema<TInferred>(schema: ArktypeSchemaLike, value: unknown): TInferred {
   const result = schema(value);
@@ -119,8 +113,6 @@ function renderArktypeJsonOutputType(params: ArktypeJsonTypeParams): string {
   const expression = params.expression.trim();
   return expression.length > 0 ? expression : 'unknown';
 }
-
-// ---------------------------------------------------------------------------arktype/json@1 — non-parameterized at the codec class level (the schema is constructor-captured, not a runtime params record); parameterized at the descriptor level (typeParams record carries expression + jsonIr in contract.json). ---------------------------------------------------------------------------
 
 export class ArktypeJsonCodecClass<TInferred> extends CodecImpl<
   typeof ARKTYPE_JSON_CODEC_ID,
@@ -221,7 +213,5 @@ arktypeJsonColumn satisfies ColumnHelperFor<ArktypeJsonDescriptor>;
  * Codec instance returned by `arktypeJsonColumn(schema).codecFactory(ctx)` and by `arktypeJsonDescriptor.factory(typeParams)(ctx)`. The `TInferred` slot carries the arktype schema's inferred output type at the column-author site; descriptor-side factories erase to `unknown`.
  */
 export type ArktypeJsonCodec<TInferred> = ArktypeJsonCodecClass<TInferred>;
-
-// ---------------------------------------------------------------------------Internal descriptor list. Single entry: `arktype/json@1`. Wrapped in a `CodecDescriptorRegistry` by `core/registry.ts`; the arktype-json contributor pack's `codecs:` slot consumes via that registry. ---------------------------------------------------------------------------
 
 export const codecDescriptors: readonly AnyCodecDescriptor[] = [arktypeJsonDescriptor];

@@ -13,7 +13,7 @@ type AsyncVectorCodec = {
 };
 
 function asAsyncCodec(length: number): AsyncVectorCodec {
-  // After F29, pgvector's runtime codec enforces the declared dimension; tests instantiate the codec at the dimension matching their value array.
+  // pgvector's runtime codec enforces the declared dimension; tests instantiate the codec at the dimension matching their value array.
   return pgVectorDescriptor.factory({ length })({
     name: 'test',
   }) as unknown as AsyncVectorCodec;
@@ -91,7 +91,7 @@ describe('pgvector codecs', () => {
     );
   });
 
-  it('rejects encoding when value length mismatches declared dimension (F29)', async () => {
+  it('rejects encoding when value length mismatches declared dimension', async () => {
     const vectorCodec = asAsyncCodec(3);
     await expect(vectorCodec.encode([1, 2])).rejects.toThrow(
       'Vector length mismatch: expected 3, got 2',
@@ -101,7 +101,7 @@ describe('pgvector codecs', () => {
     );
   });
 
-  it('rejects decoding when wire length mismatches declared dimension (F29)', async () => {
+  it('rejects decoding when wire length mismatches declared dimension', async () => {
     const vectorCodec = asAsyncCodec(3);
     await expect(vectorCodec.decode('[1,2]')).rejects.toThrow(
       'Vector length mismatch: expected 3, got 2',

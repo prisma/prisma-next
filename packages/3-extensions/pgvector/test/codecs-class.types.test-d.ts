@@ -25,8 +25,6 @@ import {
   pgVectorDescriptor,
 } from '../src/core/codecs';
 
-// ---------------------------------------------------------------------------Literal preservation through direct invocation. ---------------------------------------------------------------------------
-
 test('pgVector: descriptor.factory(params) returns typed (ctx) => PgVectorCodec', () => {
   const factory = pgVectorDescriptor.factory({ length: 1536 });
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgVectorCodec>();
@@ -48,8 +46,6 @@ test('pgVector: column helper carries bare nativeType (family layer expands at e
     throw new Error(`length literal not preserved: ${col.typeParams.length}`);
   }
 });
-
-// ---------------------------------------------------------------------------satisfies discipline catches wiring mistakes. ---------------------------------------------------------------------------
 
 pgVectorColumn satisfies ColumnHelperFor<PgVectorDescriptor>;
 pgVectorColumn satisfies ColumnHelperForStrict<PgVectorDescriptor>;

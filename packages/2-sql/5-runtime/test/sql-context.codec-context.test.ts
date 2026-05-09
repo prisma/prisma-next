@@ -9,9 +9,9 @@ import type { SqlRuntimeExtensionDescriptor } from '../src/sql-context';
 import { createStubAdapter, createTestContext } from './utils';
 
 /**
- * F42 — `forColumn(table, column)` dispatch must materialize a fresh codec instance with a column-specific `SqlCodecInstanceContext`. The pre-populated `byCodecId` representative is reserved for `forCodecId` refs-less fallbacks; reusing it for column-bound dispatch erases the per-column context any descriptor whose factory reads `CodecInstanceContext` (for diagnostics, telemetry, or per-column behaviour) would expect.
+ * `forColumn(table, column)` dispatch must materialize a fresh codec instance with a column-specific `SqlCodecInstanceContext`. The pre-populated `byCodecId` representative is reserved for `forCodecId` refs-less fallbacks; reusing it for column-bound dispatch erases the per-column context any descriptor whose factory reads `CodecInstanceContext` (for diagnostics, telemetry, or per-column behaviour) would expect.
  */
-describe('buildContractCodecRegistry — per-column codec instance context (F42)', () => {
+describe('buildContractCodecRegistry — per-column codec instance context', () => {
   function createCtxCapturingExtension(captures: SqlCodecInstanceContext[]): {
     descriptor: SqlRuntimeExtensionDescriptor<'postgres'>;
     instances: Array<{ ctx: SqlCodecInstanceContext; codec: Codec }>;

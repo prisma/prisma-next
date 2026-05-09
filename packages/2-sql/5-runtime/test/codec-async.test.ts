@@ -382,9 +382,8 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     expect(result['name']).toBe('decoded:alice');
   });
 
-  it('codec.decode that throws JSON-Schema validation envelope passes the runtime envelope through unchanged (F40)', async () => {
-    // Post-M4: validation lives in the resolved codec's `decode` body (e.g. arktype-json validates against its rehydrated schema and throws `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` directly). The runtime no longer maintains a parallel validator registry. F40 closes the prior double-wrap regression: codec-authored runtime envelopes (DECODE_FAILED, ABORTED, JSON_SCHEMA_VALIDATION_FAILED, …) carry their own per-codec context,
-    // so `decodeField` rethrows them unchanged instead of coercing them into a fresh `RUNTIME.DECODE_FAILED` (which would have erased the original code and details).
+  it('codec.decode that throws JSON-Schema validation envelope passes the runtime envelope through unchanged', async () => {
+    // Validation lives in the resolved codec's `decode` body (e.g. arktype-json validates against its rehydrated schema and throws `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` directly). The runtime no longer maintains a parallel validator registry. Codec-authored runtime envelopes (DECODE_FAILED, ABORTED, JSON_SCHEMA_VALIDATION_FAILED, …) carry their own per-codec context, so `decodeField` rethrows them unchanged instead of coercing them into a fresh `RUNTIME.DECODE_FAILED` (which would erase the original code and details).
     const registry = [
       defineTestCodec<'pg/inline-validating-json@1', readonly [], string, JsonValue>({
         typeId: 'pg/inline-validating-json@1',
