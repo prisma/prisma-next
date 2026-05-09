@@ -67,33 +67,40 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     action: 'dbUpdate' as const,
     ...ifDefined('onProgress', options.onProgress),
   };
-
-  // Apply mode without acceptDataLoss: pre-plan to detect destructive
-  // operations across every space. Mirrors the legacy single-space
-  // behaviour but evaluated against the cross-space plan.
   if (options.mode === 'apply' && !options.acceptDataLoss) {
-    const planResult = (await executeAggregateApply<TFamilyId, TTargetId>({
-      ...sharedInputs,
-      mode: 'plan',
-    })) as DbUpdateResult;
-    if (!planResult.ok) return planResult;
-    const destructiveOps = planResult.value.plan.operations
-      .filter((op) => op.operationClass === 'destructive')
-      .map((op) => ({ id: op.id, label: op.label }));
-    if (destructiveOps.length > 0) {
-      return notOk({
-        code: 'DESTRUCTIVE_CHANGES',
-        summary: `Planned ${destructiveOps.length} destructive operation(s) that require confirmation`,
-        why: 'Destructive operations require confirmation — re-run with -y to accept',
-        conflicts: undefined,
-        meta: { destructiveOperations: destructiveOps },
-      });
-    }
+    const gate = await guardDestructiveChanges<TFamilyId, TTargetId>(sharedInputs);
+    if (gate !== null) return gate;
   }
-
-  const result = (await executeAggregateApply<TFamilyId, TTargetId>({
+  return (await executeAggregateApply<TFamilyId, TTargetId>({
     ...sharedInputs,
     mode: options.mode,
   })) as DbUpdateResult;
-  return result;
+}
+
+/**
+ * Pre-plan once when running `db update apply` without `acceptDataLoss`.
+ * Surfaces destructive operations across every space; if any are
+ * planned, returns a `DESTRUCTIVE_CHANGES` failure that the CLI shows
+ * as a confirmation prompt. Returns `null` when the apply is safe to
+ * run.
+ */
+async function guardDestructiveChanges<TFamilyId extends string, TTargetId extends string>(
+  sharedInputs: Omit<Parameters<typeof executeAggregateApply<TFamilyId, TTargetId>>[0], 'mode'>,
+): Promise<DbUpdateResult | null> {
+  const planResult = (await executeAggregateApply<TFamilyId, TTargetId>({
+    ...sharedInputs,
+    mode: 'plan',
+  })) as DbUpdateResult;
+  if (!planResult.ok) return planResult;
+  const destructiveOps = planResult.value.plan.operations
+    .filter((op) => op.operationClass === 'destructive')
+    .map((op) => ({ id: op.id, label: op.label }));
+  if (destructiveOps.length === 0) return null;
+  return notOk({
+    code: 'DESTRUCTIVE_CHANGES',
+    summary: `Planned ${destructiveOps.length} destructive operation(s) that require confirmation`,
+    why: 'Destructive operations require confirmation — re-run with -y to accept',
+    conflicts: undefined,
+    meta: { destructiveOperations: destructiveOps },
+  });
 }

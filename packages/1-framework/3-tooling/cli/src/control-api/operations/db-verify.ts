@@ -91,104 +91,137 @@ export type ExecuteDbVerifyResult = Result<ExecuteDbVerifySuccess, CliStructured
 export async function executeDbVerify<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbVerifyOptions<TFamilyId, TTargetId>,
 ): Promise<ExecuteDbVerifyResult> {
-  const {
-    driver,
-    familyInstance,
-    contract,
-    migrationsDir,
-    targetId,
-    extensionPacks,
-    frameworkComponents,
-    mode,
-    skipSchema,
-    skipMarker,
-    onProgress,
-  } = options;
-
-  const loadInputs: BuildAggregateInputs<TFamilyId, TTargetId> = {
-    targetId,
-    migrationsDir,
-    appContract: contract,
-    extensionPacks,
-    validateContract: (json) => familyInstance.validateContract(json),
-  };
-  const loaded = await buildContractSpaceAggregate(loadInputs);
-  if (!loaded.ok) {
-    return notOk(loaded.failure);
-  }
+  const { driver, familyInstance, onProgress, skipSchema, skipMarker } = options;
+  const loaded = await buildContractSpaceAggregate(buildLoadInputs(options));
+  if (!loaded.ok) return notOk(loaded.failure);
   const aggregate = loaded.value;
 
   const markersBySpaceId = await familyInstance.readAllMarkers({ driver });
+  const schemaIntrospection = skipSchema
+    ? null
+    : await runIntrospection({ driver, familyInstance, onProgress });
 
-  let schemaIntrospection: unknown = null;
-  if (!skipSchema) {
-    onProgress?.({
-      action: 'schemaVerify',
-      kind: 'spanStart',
-      spanId: SPAN_IDS.introspect,
-      label: 'Introspecting database schema',
-    });
-    try {
-      schemaIntrospection = await familyInstance.introspect({ driver });
-      onProgress?.({
-        action: 'schemaVerify',
-        kind: 'spanEnd',
-        spanId: SPAN_IDS.introspect,
-        outcome: 'ok',
-      });
-    } catch (error) {
-      onProgress?.({
-        action: 'schemaVerify',
-        kind: 'spanEnd',
-        spanId: SPAN_IDS.introspect,
-        outcome: 'error',
-      });
-      throw error;
-    }
-  }
-
-  onProgress?.({
-    action: 'schemaVerify',
-    kind: 'spanStart',
-    spanId: SPAN_IDS.verify,
-    label: 'Verifying contract spaces',
-  });
-
-  // When `skipSchema` is true, the verifier still runs `schemaCheck`,
-  // but the callback short-circuits with a synthetic ok result —
-  // callers (CLI marker-only path) discard the schema map anyway.
-  const verifyResult: AggregateVerifierOutput<VerifyDatabaseSchemaResult> = verifyAggregate({
+  emitVerifySpan(onProgress, 'spanStart');
+  const verifyResult = verifyAggregate({
     aggregate,
     markersBySpaceId,
     schemaIntrospection,
-    mode,
-    verifySchemaForMember: (
-      projectedSchema: unknown,
-      member: ContractSpaceMember,
-      verifyMode: 'strict' | 'lenient',
-    ): VerifyDatabaseSchemaResult => {
-      if (skipSchema) {
-        return buildSkippedSchemaResult(member);
-      }
-      return familyInstance.schemaVerifyAgainstSchema({
-        contract: member.contract,
-        // The family's `TSchemaIR` is opaque to migration-tools; the
-        // aggregate verifier passes through whatever we hand it. The
-        // family expects its own IR shape on the way back.
-        schema: projectedSchema as never,
-        strict: verifyMode === 'strict',
-        frameworkComponents,
-      });
-    },
+    mode: options.mode,
+    verifySchemaForMember: createPerMemberVerifier(options),
   });
+  return finaliseVerifyResult({ verifyResult, aggregate, skipMarker, onProgress });
+}
 
-  if (!verifyResult.ok) {
+function buildLoadInputs<TFamilyId extends string, TTargetId extends string>(
+  options: ExecuteDbVerifyOptions<TFamilyId, TTargetId>,
+): BuildAggregateInputs<TFamilyId, TTargetId> {
+  return {
+    targetId: options.targetId,
+    migrationsDir: options.migrationsDir,
+    appContract: options.contract,
+    extensionPacks: options.extensionPacks,
+    validateContract: (json) => options.familyInstance.validateContract(json),
+  };
+}
+
+async function runIntrospection<TFamilyId extends string, TTargetId extends string>(args: {
+  driver: ControlDriverInstance<TFamilyId, TTargetId>;
+  familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
+  onProgress: OnControlProgress | undefined;
+}): Promise<unknown> {
+  const { driver, familyInstance, onProgress } = args;
+  onProgress?.({
+    action: 'schemaVerify',
+    kind: 'spanStart',
+    spanId: SPAN_IDS.introspect,
+    label: 'Introspecting database schema',
+  });
+  try {
+    const result = await familyInstance.introspect({ driver });
     onProgress?.({
       action: 'schemaVerify',
       kind: 'spanEnd',
-      spanId: SPAN_IDS.verify,
+      spanId: SPAN_IDS.introspect,
+      outcome: 'ok',
+    });
+    return result;
+  } catch (error) {
+    onProgress?.({
+      action: 'schemaVerify',
+      kind: 'spanEnd',
+      spanId: SPAN_IDS.introspect,
       outcome: 'error',
     });
+    throw error;
+  }
+}
+
+/**
+ * Build the per-member schema callback handed to the aggregate verifier.
+ * When `skipSchema` is true the callback short-circuits with a synthetic
+ * `ok` result so the verifier still runs the (cheap) schemaCheck loop
+ * without invoking the family's verification path.
+ */
+function createPerMemberVerifier<TFamilyId extends string, TTargetId extends string>(
+  options: ExecuteDbVerifyOptions<TFamilyId, TTargetId>,
+): (
+  projectedSchema: unknown,
+  member: ContractSpaceMember,
+  verifyMode: 'strict' | 'lenient',
+) => VerifyDatabaseSchemaResult {
+  const { skipSchema, familyInstance, frameworkComponents } = options;
+  return (projectedSchema, member, verifyMode) => {
+    if (skipSchema) return buildSkippedSchemaResult(member);
+    return familyInstance.schemaVerifyAgainstSchema({
+      contract: member.contract,
+      // The family's `TSchemaIR` is opaque to migration-tools; the
+      // aggregate verifier passes through whatever we hand it. The
+      // family expects its own IR shape on the way back.
+      schema: projectedSchema as never,
+      strict: verifyMode === 'strict',
+      frameworkComponents,
+    });
+  };
+}
+
+function emitVerifySpan(
+  onProgress: OnControlProgress | undefined,
+  kind: 'spanStart' | 'spanEndOk' | 'spanEndError',
+): void {
+  if (kind === 'spanStart') {
+    onProgress?.({
+      action: 'schemaVerify',
+      kind: 'spanStart',
+      spanId: SPAN_IDS.verify,
+      label: 'Verifying contract spaces',
+    });
+    return;
+  }
+  onProgress?.({
+    action: 'schemaVerify',
+    kind: 'spanEnd',
+    spanId: SPAN_IDS.verify,
+    outcome: kind === 'spanEndOk' ? 'ok' : 'error',
+  });
+}
+
+/**
+ * Map an {@link AggregateVerifierOutput} to the operation's
+ * {@link ExecuteDbVerifyResult}, applying the `skipMarker` policy used
+ * by the CLI's `--schema-only` mode.
+ */
+function finaliseVerifyResult(args: {
+  verifyResult: AggregateVerifierOutput<VerifyDatabaseSchemaResult>;
+  aggregate: {
+    readonly app: { readonly spaceId: string };
+    readonly extensions: ReadonlyArray<{ readonly spaceId: string }>;
+  };
+  skipMarker: boolean;
+  onProgress: OnControlProgress | undefined;
+}): ExecuteDbVerifyResult {
+  const { verifyResult, aggregate, skipMarker, onProgress } = args;
+  if (!verifyResult.ok) {
+    emitVerifySpan(onProgress, 'spanEndError');
     return notOk(
       new CliStructuredError('5002', 'Aggregate verifier introspection failed', {
         domain: 'MIG',
@@ -198,32 +231,17 @@ export async function executeDbVerify<TFamilyId extends string, TTargetId extend
       }),
     );
   }
-
-  const markerCheck = verifyResult.value.markerCheck;
   const markerError = skipMarker
     ? null
-    : mapMarkerCheckFailures(aggregate.app.spaceId, markerCheck);
+    : mapMarkerCheckFailures(aggregate.app.spaceId, verifyResult.value.markerCheck);
   if (markerError !== null) {
-    onProgress?.({
-      action: 'schemaVerify',
-      kind: 'spanEnd',
-      spanId: SPAN_IDS.verify,
-      outcome: 'error',
-    });
+    emitVerifySpan(onProgress, 'spanEndError');
     return notOk(markerError);
   }
-
-  onProgress?.({
-    action: 'schemaVerify',
-    kind: 'spanEnd',
-    spanId: SPAN_IDS.verify,
-    outcome: 'ok',
-  });
-
-  const memberOrder = [aggregate.app.spaceId, ...aggregate.extensions.map((e) => e.spaceId)];
+  emitVerifySpan(onProgress, 'spanEndOk');
   return ok({
     schemaResults: verifyResult.value.schemaCheck.perSpace,
-    memberOrder,
+    memberOrder: [aggregate.app.spaceId, ...aggregate.extensions.map((e) => e.spaceId)],
     appSpaceId: aggregate.app.spaceId,
   });
 }

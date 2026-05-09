@@ -27,6 +27,7 @@ import {
   errorTargetMismatch,
   errorUnexpected,
 } from '../utils/cli-errors';
+import { combineSchemaResults } from '../utils/combine-schema-results';
 import {
   addGlobalOptions,
   maskConnectionUrl,
@@ -436,63 +437,6 @@ async function executeDbVerifyCommand(
   } finally {
     await client.close();
   }
-}
-
-/**
- * Collapse the aggregate verifier's per-space schema results into a
- * single {@link VerifyDatabaseSchemaResult} for the existing CLI
- * display surface. Concatenates issues across members; sums counts;
- * uses the app member's result as the structural envelope (storage
- * hash, target).
- */
-function combineSchemaResults(
-  perSpace: ReadonlyMap<string, VerifyDatabaseSchemaResult>,
-  appSpaceId: string,
-  strict: boolean,
-): VerifyDatabaseSchemaResult {
-  const appResult = perSpace.get(appSpaceId) ?? perSpace.values().next().value;
-  if (appResult === undefined) {
-    throw new Error('Aggregate verifier returned no schema results — this is a wiring bug.');
-  }
-
-  let okAll = true;
-  let issues: VerifyDatabaseSchemaResult['schema']['issues'] = [];
-  const counts = { pass: 0, warn: 0, fail: 0, totalNodes: 0 };
-  const childRoots: Array<VerifyDatabaseSchemaResult['schema']['root']> = [];
-  for (const [, result] of perSpace) {
-    if (!result.ok) okAll = false;
-    issues = [...issues, ...result.schema.issues];
-    counts.pass += result.schema.counts.pass;
-    counts.warn += result.schema.counts.warn;
-    counts.fail += result.schema.counts.fail;
-    counts.totalNodes += result.schema.counts.totalNodes;
-    childRoots.push(result.schema.root);
-  }
-
-  return {
-    ok: okAll,
-    ...(okAll ? {} : { code: appResult.code ?? 'PN-RUN-3010' }),
-    summary: appResult.summary,
-    contract: appResult.contract,
-    target: appResult.target,
-    schema: {
-      issues,
-      root: {
-        status: okAll ? 'pass' : 'fail',
-        kind: 'aggregate',
-        name: 'aggregate',
-        contractPath: '',
-        code: 'AGGREGATE',
-        message: okAll ? 'Aggregate schema matches' : 'Aggregate schema mismatch',
-        expected: undefined,
-        actual: undefined,
-        children: childRoots,
-      },
-      counts,
-    },
-    meta: { strict },
-    timings: { total: 0 },
-  };
 }
 
 async function executeDbSchemaOnlyVerifyCommand(

@@ -31,6 +31,7 @@ export {
   type AggregateVerifierSuccess,
   type MarkerCheckResult,
   type MarkerCheckSection,
+  type OrphanElement,
   type SchemaCheckSection,
   verifyAggregate,
 } from '../aggregate/verifier';
