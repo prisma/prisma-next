@@ -221,17 +221,17 @@ A task spec at [`specs/contract-space-aggregate-spec.md`](./specs/contract-space
 
 **Tasks:**
 
-- [ ] **T2.5.1** Introduce `@prisma-next/migration-tools/aggregate` types + loader. Sub-spec § "Commit 1". Folds today's layout precheck, integrity checks, drift detection, and disjointness check into a single load step. Drift is fatal.
-- [ ] **T2.5.2** Aggregate planner with graph-walk and synth strategies. Sub-spec § "Commit 2". Strategy selection is `callerPolicy.ignoreGraphFor`-driven, with explicit `extensionPathUnsatisfiable` / `policyConflict` error variants.
-- [ ] **T2.5.3** Aggregate verifier (`markerCheck` + `schemaCheck` bundled, boolean strict mode). Sub-spec § "Commit 3". Closes F23 via per-member pre-projection of the live schema.
-- [ ] **T2.5.4** Rewire `db init` / `db update` / `db verify` as `loader → planner → runner` (or `loader → verifier`) pipelines. Sub-spec § "Commit 4".
-- [ ] **T2.5.5** Delete deprecated surfaces (`db-apply-per-space.ts`, `contract-space-verifier-{precheck,marker-check}.ts`, `contract-space-migrate-pass.ts` — its `db init`/`db update`/`db verify`-facing portions, `concatenateSpaceApplyInputs` re-export). Sub-spec § "Commit 5".
-- [ ] **T2.5.6** Integration tests + docs:
-  - New `cli.db-verify.aggregate-schema.test.ts` locking F23 behaviourally.
-  - New `cli.loader.drift.test.ts` locking drift-as-fatal.
-  - Postgres CLI per-space e2e (resolves F07; pairs with M3 T3.6 live-Postgres + EQL coverage).
-  - ADR 211 table refresh (no architectural-claim changes; column refresh for which command rejects which violation kind under the new pipeline).
-  - Sub-spec § "Commit 6".
+- [x] **T2.5.1** Introduce `@prisma-next/migration-tools/aggregate` types + loader. Sub-spec § "Commit 1". Folds today's layout precheck, integrity checks, drift detection, and disjointness check into a single load step. Drift is fatal. — landed M2.5 R1, commit `3ecf4ed17`.
+- [x] **T2.5.2** Aggregate planner with graph-walk and synth strategies. Sub-spec § "Commit 2". Strategy selection is `callerPolicy.ignoreGraphFor`-driven, with explicit `extensionPathUnsatisfiable` / `policyConflict` error variants. — landed M2.5 R1, commit `01c9b8e9d`.
+- [x] **T2.5.3** Aggregate verifier (`markerCheck` + `schemaCheck` bundled, boolean strict mode). Sub-spec § "Commit 3". Closes F23 via per-member pre-projection of the live schema. — landed M2.5 R1, commit `f55218ac0`. Notably introduced a `skipMarker` boolean on the verifier-wiring path so `db verify --schema-only` continues to bypass marker reads (preserves user-facing flag per sub-spec § Watchpoints, item 8); rationale recorded in `wip/unattended-decisions.md` § 5.
+- [x] **T2.5.4** Rewire `db init` / `db update` / `db verify` as `loader → planner → runner` (or `loader → verifier`) pipelines. Sub-spec § "Commit 4". — landed M2.5 R1, commit `934bc7ed6`. `combineSchemaResults` preserves the per-family summary string verbatim (avoids user-visible regression in either SQL or Mongo phrasing); rationale in `wip/unattended-decisions.md` § 4.
+- [x] **T2.5.5** Delete deprecated surfaces (`db-apply-per-space.ts`, `contract-space-verifier-{precheck,marker-check}.ts`, `contract-space-migrate-pass.ts` — its `db init`/`db update`/`db verify`-facing portions, `concatenateSpaceApplyInputs` re-export). Sub-spec § "Commit 5". — landed M2.5 R1, commit `2dca1a527`. A follow-up fixup (`2924591e2`) restored the orphan-marker preflight that was lost in the deletion (regression vs AC13 caught during gate run); now lives in `db-apply-aggregate.ts` as `detectOrphanMarkers`, preserving error code `5002`.
+- [x] **T2.5.6** Integration tests + docs:
+  - [x] New `cli.db-verify.aggregate-schema.test.ts` locking F23 behaviourally.
+  - [x] New `cli.loader.drift.test.ts` locking drift-as-fatal.
+  - [x] Postgres CLI per-space e2e (resolves F07; pairs with M3 T3.6 live-Postgres + EQL coverage).
+  - [ ] ADR 211 refresh — **deferred to M5 T5.3** (the new "Contract spaces" ADR is authored at close-out; rationale in `wip/unattended-decisions.md` § 3 + sub-spec § "Docs to update").
+  - Landed M2.5 R1, commit `a2dce5c12`.
 
 **Validation gate (M2.5):**
 

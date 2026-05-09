@@ -448,7 +448,7 @@ Land in this order. Each commit leaves the workspace green on `pnpm typecheck` +
 
 **Docs to update:**
 
-- `docs/architecture docs/adrs/ADR 211 - Contract spaces.md` — verify the table at lines 267-270 still accurately describes which command rejects which violation kind. With the new pipeline, every load-bearing check happens at the loader; ADR table may need a column-by-column refresh. Update or annotate as needed; the ADR's architectural claims do not change.
+- **No durable ADR refresh in this slice.** The "Contract spaces" ADR has not been authored yet — `plan.md` Milestone 5 task **T5.3** schedules its creation as part of project close-out. The post-M2.5 pipeline shape (loader → planner → runner; loader → verifier; ambient `targetId`; aggregate-aware schema verification) is the canonical reading the close-out ADR must capture; that work folds in at T5.3, not here.
 - `projects/extension-contract-spaces/spec.md` — no changes (the project spec captures the user-facing behaviour, which is unchanged).
 
 **Validation:** `pnpm typecheck` ✓; `pnpm test:packages` ✓; `pnpm test:integration` ✓; `pnpm test:e2e` ✓; `pnpm lint:deps` ✓; `pnpm build` ✓.
