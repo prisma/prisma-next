@@ -216,3 +216,10 @@ pnpm lint:deps
 - The orchestration uses Cursor's `Task` tool with `resume` for subagent continuity. The implementer + reviewer subagent IDs land in `reviews/code-review.md § Subagent IDs` after R1 spawns them.
 - ADR amendments (T1.8, T2.4) ride with their implementing milestone's PR rather than landing in a separate doc-only PR.
 - TML-2435 cancellation (T2.5) waits for the PR to be in-flight (post-`SATISFIED`) so the ticket reference points at a real PR.
+
+## Pre-existing items surfaced during execution (out of scope for this PR)
+
+The following surfaced during m1 R1 implementation/review and were verified pre-existing on the rebased branch (i.e. they pre-date m1 and are not introduced by CR-1 work). They are out-of-scope for this PR; the implementer is **not** to address them in subsequent rounds.
+
+- **E1 — `ExtensionMigrationPackage` TS2614 in three cipherstash e2e integration tests.** `storage-roundtrip.e2e.integration.test.ts`, `umbrella.e2e.integration.test.ts`, `umbrella-nullable.e2e.integration.test.ts` carry a type-only import `ExtensionMigrationPackage` from `@prisma-next/family-sql/control` that errors `TS2614: Module ... has no exported member ...`. Verified missing from the family-sql barrel at `7f651eb62` and at HEAD; tests run + pass at runtime; the import is type-only. Pre-existing post-rebase artefact; track separately. **Action:** file as a follow-up Linear ticket (test infra hardening) referencing the failing test paths; out-of-scope for Project 1 CR follow-ups.
+- **E2 — `pnpm test:packages` cold-run flakes.** Cold-cache runs reproduce 2-3 transient failures across `target-mongo`, `extension-cipherstash`, occasionally `cli` / `adapter-postgres`. Failures are timing-bound (100ms `beforeEach` hooks + temp-dir races; 8s render-typescript test timeout). Each failing package, run individually, passes 100% of tests. After per-package warm-up runs, full sweep reports 113/113. None of the failing tests touch CR-1 surfaces. **Action:** file as a follow-up Linear ticket (test infra hardening — hook timeouts + temp-dir handling); out-of-scope for Project 1 CR follow-ups.
