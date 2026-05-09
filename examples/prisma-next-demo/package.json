@@ -39,11 +39,11 @@
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
-    "arktype": "^2.1.29",
+    "arktype": "^2.2.0",
     "dotenv": "^16.4.5",
     "pg": "catalog:",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",

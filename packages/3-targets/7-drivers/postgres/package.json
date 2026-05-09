@@ -23,9 +23,9 @@
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/utils": "workspace:*",
-    "arktype": "^2.0.0",
+    "arktype": "^2.2.0",
     "pg": "catalog:",
-    "pg-cursor": "^2.10.5"
+    "pg-cursor": "^2.19.0"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
