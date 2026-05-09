@@ -37,15 +37,18 @@
     "@prisma-next/target-postgres": "workspace:*",
     "arktype": "^2.1.29",
     "dotenv": "^16.4.5",
+    "leaflet": "^1.9.4",
     "next": "^15.3.1",
     "pg": "catalog:",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "react-leaflet": "^5.0.0"
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
+    "@types/leaflet": "^1.9.12",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "@types/react": "^19.2.14",
