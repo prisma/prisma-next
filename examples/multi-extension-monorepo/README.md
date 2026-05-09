@@ -52,14 +52,14 @@ examples/multi-extension-monorepo/
 ├── packages/
 │   ├── audit/                         ← internal "package" #1
 │   │   ├── constants.ts
-│   │   ├── contract.ts
-│   │   ├── migrations.ts
-│   │   └── control.ts                 ← `auditExtensionDescriptor`
-│   └── feature-flags/                 ← internal "package" #2
-│       ├── constants.ts
-│       ├── contract.ts
-│       ├── migrations.ts
-│       └── control.ts                 ← `featureFlagsExtensionDescriptor`
+│   │   ├── contract-source.ts         ← TS authoring entry-point
+│   │   ├── prisma-next.config.ts      ← `prisma-next contract emit` driver
+│   │   ├── contract.json              ← emitted (do not edit)
+│   │   ├── contract.d.ts              ← emitted (do not edit)
+│   │   ├── refs/head.json             ← hand-pinned head ref
+│   │   ├── migrations/audit/<dir>/    ← emitted migration package
+│   │   └── control.ts                 ← `auditExtensionDescriptor` (JSON-import wiring)
+│   └── feature-flags/                 ← internal "package" #2 (same shape)
 ├── app/
 │   └── contract.ts                    ← application contract (declares `User`)
 └── test/
@@ -71,3 +71,53 @@ examples/multi-extension-monorepo/
 ```sh
 pnpm --filter @prisma-next/example-multi-extension-monorepo test
 ```
+
+## Authoring (maintainers)
+
+Each internal "package" under `packages/` follows the **on-disk-in-package
+authoring** convention introduced in M3.5 (project:
+`extension-contract-spaces`, ADR 211). The same pipeline application
+authors use is applied per-subdirectory:
+
+1. Edit `packages/<pkg>/contract-source.ts` (the TS entry-point that calls
+   `defineContract` from `@prisma-next/sql-contract-ts/contract-builder`).
+2. Re-emit the canonical contract artefacts (`contract.json`,
+   `contract.d.ts`) from inside the subdirectory:
+
+   ```sh
+   cd packages/<pkg>
+   pnpm exec prisma-next contract emit
+   ```
+
+   `prisma-next.config.ts` in the subdirectory wires the emit pipeline
+   to the contract source.
+3. If the schema (or its set of typed objects) changed, scaffold a new
+   migration directory:
+
+   ```sh
+   pnpm exec prisma-next migration plan --name <slug>
+   ```
+
+   Then hand-edit the generated `migrations/<pkg>/<dir>/migration.ts`'s
+   `operations` getter so each op carries the package's stable
+   `<pkg>:<change>-vN` invariantId (project FR11 — invariantIds cannot be
+   renamed once published). Re-emit `ops.json` + `migration.json`:
+
+   ```sh
+   node migrations/<pkg>/<dir>/migration.ts
+   # or, on Node < 24:
+   pnpm exec tsx migrations/<pkg>/<dir>/migration.ts
+   ```
+
+4. Update `refs/head.json` to point at the new contract `storageHash`
+   plus the union of `providedInvariants` across all migrations.
+5. The descriptor at `packages/<pkg>/control.ts` is **JSON-import wiring**
+   over the on-disk artefacts; no manual edits are required for routine
+   schema changes.
+
+The `multi-space.e2e.integration.test.ts` consumes both descriptors
+through their public `contractSpace` surface — pulling
+`{contractJson, migrations, headRef}` directly — so the only thing the
+test depends on at the source level are `constants.ts` (for
+`<PKG>_SPACE_ID`, table names, etc.) and `control.ts` (the descriptor
+itself).
