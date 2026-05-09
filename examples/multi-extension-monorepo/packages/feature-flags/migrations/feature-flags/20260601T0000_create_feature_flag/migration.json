@@ -2,7 +2,9 @@
   "from": null,
   "to": "sha256:107ce92788984cad3aff9ee860e328048f14e156869ae418ba9ec96f31d6f4df",
   "labels": [],
-  "providedInvariants": ["feature-flags:create-feature_flag-v1"],
+  "providedInvariants": [
+    "feature-flags:create-feature_flag-v1"
+  ],
   "createdAt": "2026-05-09T04:27:33.360Z",
   "fromContract": null,
   "toContract": {
@@ -64,7 +66,9 @@
           "foreignKeys": [],
           "indexes": [],
           "primaryKey": {
-            "columns": ["key"]
+            "columns": [
+              "key"
+            ]
           },
           "uniques": []
         }

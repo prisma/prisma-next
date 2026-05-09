@@ -2,7 +2,9 @@
   "from": null,
   "to": "sha256:998b6036c01edd2f370b78adb2c2ab2d5130e6b701c680621c2d8a866f7ffca5",
   "labels": [],
-  "providedInvariants": ["audit:create-audit_event-v1"],
+  "providedInvariants": [
+    "audit:create-audit_event-v1"
+  ],
   "createdAt": "2026-05-09T04:24:04.431Z",
   "fromContract": null,
   "toContract": {
@@ -79,7 +81,9 @@
           "foreignKeys": [],
           "indexes": [],
           "primaryKey": {
-            "columns": ["id"]
+            "columns": [
+              "id"
+            ]
           },
           "uniques": []
         }
