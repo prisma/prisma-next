@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 import {
+  Circle,
   CircleMarker,
   MapContainer,
   Polygon,
@@ -231,9 +232,9 @@ export function PostgisMap(props: Props) {
       {showQueryPoint ? (
         <>
           {showRadius && radiusMeters !== undefined ? (
-            <CircleMarker
+            <Circle
               center={toLatLng(queryPoint)}
-              radius={Math.min(40, Math.max(8, radiusMeters / 80))}
+              radius={radiusMeters}
               pathOptions={{
                 color: POINT_COLOR,
                 weight: 1,

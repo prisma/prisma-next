@@ -4,8 +4,7 @@ import pg from 'pg';
 async function dropDatabase() {
   const databaseUrl = process.env['DATABASE_URL'];
   if (!databaseUrl) {
-    console.error('DATABASE_URL environment variable is required');
-    process.exit(1);
+    throw new Error('DATABASE_URL environment variable is required');
   }
 
   const client = new pg.Client({ connectionString: databaseUrl });
@@ -22,12 +21,12 @@ async function dropDatabase() {
     console.log('✔ Dropped prisma_contract schema');
 
     console.log('\nDatabase reset complete');
-  } catch (error) {
-    console.error('Error:', error);
-    process.exit(1);
   } finally {
     await client.end();
   }
 }
 
-dropDatabase();
+dropDatabase().catch((error) => {
+  console.error('Fatal error while resetting database:', error);
+  process.exitCode = 1;
+});

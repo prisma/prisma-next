@@ -80,28 +80,39 @@ export async function resetTestDatabase(contract: unknown): Promise<void> {
   }
 }
 
+function isSqlDriver(candidate: unknown): candidate is SqlDriver<unknown> {
+  return (
+    typeof candidate === 'object' &&
+    candidate !== null &&
+    typeof (candidate as { connect?: unknown }).connect === 'function' &&
+    typeof (candidate as { acquireConnection?: unknown }).acquireConnection === 'function' &&
+    typeof (candidate as { close?: unknown }).close === 'function'
+  );
+}
+
 export async function buildTestRuntime(
-  executionStack: unknown,
-  context: unknown,
+  executionStack: Parameters<typeof instantiateExecutionStack>[0],
+  context: CreateRuntimeOptions['context'],
 ): Promise<Runtime> {
   const stackInstance = instantiateExecutionStack(
-    executionStack as Parameters<typeof instantiateExecutionStack>[0],
+    executionStack,
   ) as CreateRuntimeOptions['stackInstance'];
-  const driver = stackInstance.driver as unknown as SqlDriver<unknown>;
-  if (!driver) {
+  const candidateDriver: unknown = stackInstance.driver;
+  if (!isSqlDriver(candidateDriver)) {
     throw new Error('Driver descriptor missing from execution stack');
   }
+  const driver = candidateDriver;
   const pool = new pg.Pool({ connectionString: TEST_DATABASE_URL });
   try {
     await driver.connect({ kind: 'pgPool', pool });
+    return createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
   } catch (error) {
     await pool.end();
     throw error;
   }
-  return createRuntime({
-    stackInstance,
-    context: context as CreateRuntimeOptions['context'],
-    driver,
-    verify: { mode: 'onFirstUse', requireMarker: false },
-  });
 }

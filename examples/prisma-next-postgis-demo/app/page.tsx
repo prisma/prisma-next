@@ -1,12 +1,11 @@
 import { point, polygon } from '@prisma-next/extension-postgis/geojson';
-import {
-  findCafesInBbox,
-  findCafesInNeighborhood,
-  findCafesNearPoint,
-  findCafesWithinRadius,
-  findNeighborhoodForPoint,
-  findRoutesIntersecting,
-} from '../src/queries';
+import Link from 'next/link';
+import { findCafesInBbox } from '../src/queries/find-cafes-in-bbox';
+import { findCafesInNeighborhood } from '../src/queries/find-cafes-in-neighborhood';
+import { findCafesNearPoint } from '../src/queries/find-cafes-near-point';
+import { findCafesWithinRadius } from '../src/queries/find-cafes-within-radius';
+import { findNeighborhoodForPoint } from '../src/queries/find-neighborhood-for-point';
+import { findRoutesIntersecting } from '../src/queries/find-routes-intersecting';
 import { cafes, neighborhoods, routes } from '../src/seed-data';
 import { PostgisMap } from './components/map-client';
 import { getPostgisVersion, getRuntime } from './lib/db';
@@ -236,7 +235,7 @@ function TabLink({
   }
   next.set('q', queryId);
   return (
-    <a href={`/?${next.toString()}`} className={active ? 'tab tab-active' : 'tab'}>
+    <Link href={`/?${next.toString()}`} className={active ? 'tab tab-active' : 'tab'}>
       <span className="tab-glyph" aria-hidden>
         <KindGlyph kind={meta.kind} />
       </span>
@@ -244,7 +243,7 @@ function TabLink({
         <span className="tab-title">{meta.title}</span>
         <span className="tab-tagline">{meta.tagline}</span>
       </span>
-    </a>
+    </Link>
   );
 }
 
@@ -267,9 +266,9 @@ function PresetLink({
   if (active === 'within') next.set('radius', String(radius));
   if (active === 'near') next.set('limit', String(limit));
   return (
-    <a className="preset" href={`/?${next.toString()}`}>
+    <Link className="preset" href={`/?${next.toString()}`}>
       {preset.label}
-    </a>
+    </Link>
   );
 }
 
