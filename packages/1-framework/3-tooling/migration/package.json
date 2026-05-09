@@ -90,6 +90,10 @@
       "types": "./dist/exports/spaces.d.mts",
       "import": "./dist/exports/spaces.mjs"
     },
+    "./aggregate": {
+      "types": "./dist/exports/aggregate.d.mts",
+      "import": "./dist/exports/aggregate.mjs"
+    },
     "./package.json": "./package.json"
   },
   "repository": {
