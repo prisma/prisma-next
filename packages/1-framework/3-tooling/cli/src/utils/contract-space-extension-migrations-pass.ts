@@ -65,7 +65,7 @@ export interface ContractSpaceExtensionMigrationsPassResult {
  * overwrites authored migration content, ensuring re-running
  * `migrate` does not corrupt or churn extension migration packages.
  *
- * Pinned per-space artefacts (`contract.json`, `contract.d.ts`,
+ * Per-space artefacts (`contract.json`, `contract.d.ts`,
  * `refs/head.json`) are emitted by
  * {@link import('./contract-space-migrate-pass').runContractSpaceMigratePass}
  * separately — they cover the head-pointer side of the ledger. This

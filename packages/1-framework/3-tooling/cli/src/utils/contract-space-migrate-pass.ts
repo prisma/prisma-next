@@ -1,7 +1,7 @@
 import {
   detectSpaceContractDrift,
-  emitPinnedSpaceArtefacts,
-  readPinnedContractHash,
+  emitContractSpaceArtefacts,
+  readContractSpaceHeadRef,
   type SpaceContractDriftResult,
 } from '@prisma-next/migration-tools/spaces';
 
@@ -12,7 +12,7 @@ import {
  * family in the future); this helper only needs the structural shape of
  * `contractSpace`, so it accepts an `unknown`-typed `contractJson` and
  * a structurally-typed `headRef`. SQL-family callers pass the same
- * `Contract<SqlStorage>` value through unchanged — `emitPinnedSpaceArtefacts`
+ * `Contract<SqlStorage>` value through unchanged — `emitContractSpaceArtefacts`
  * already serialises through `canonicalizeJson` and is framework-neutral.
  *
  * @see specs/framework-mechanism.spec.md § 3 — Per-space helper location.
@@ -42,19 +42,19 @@ export interface ContractSpaceMigratePassResult {
 }
 
 /**
- * Run drift detection + pinned-artefact emission for every loaded
+ * Run drift detection + on-disk artefact emission for every loaded
  * extension space at `migrate` time.
  *
  * Per sub-spec § 3:
  *
  * - For each declared extension that exposes a `contractSpace`:
- *   - Read the pinned head hash from `migrations/<spaceId>/refs/head.json`
+ *   - Read the on-disk head hash from `migrations/<spaceId>/refs/head.json`
  *     (returns `null` on first emit).
  *   - Compare against the descriptor's `headRef.hash` via
  *     `detectSpaceContractDrift`. The `kind` discriminant decides whether
  *     the user sees a warning (`drift`), a no-op silent emit (`firstEmit`,
  *     `noDrift`), or nothing at all.
- *   - Always re-emit the pinned artefacts (`contract.json`, `contract.d.ts`,
+ *   - Always re-emit the on-disk artefacts (`contract.json`, `contract.d.ts`,
  *     `refs/head.json`). The framework owns these files and the helper is
  *     idempotent.
  *
@@ -65,9 +65,9 @@ export interface ContractSpaceMigratePassResult {
  * Extension migration packages (the descriptor's pre-canned `migrations`
  * array → `migrations/<spaceId>/<dirName>/`) are intentionally not
  * materialised here — that interaction will be wired in a follow-on round
- * once the runner-side single-tx slice (sub-spec § 6) is in place. Pinned
- * artefacts on disk are sufficient to lock the drift-warning behaviour
- * and the always-on re-pin AC for R2.
+ * once the runner-side single-tx slice (sub-spec § 6) is in place.
+ * On-disk artefacts are sufficient to lock the drift-warning behaviour
+ * and the always-on re-emit AC for R2.
  *
  * @see specs/framework-mechanism.spec.md § 3 — Drift detection (T1.9).
  */
@@ -81,14 +81,14 @@ export async function runContractSpaceMigratePass(
     if (pack.contractSpace === undefined) continue;
     const { contractJson, headRef } = pack.contractSpace;
 
-    const pinnedHash = await readPinnedContractHash(inputs.migrationsDir, pack.id);
+    const onDiskHeadRef = await readContractSpaceHeadRef(inputs.migrationsDir, pack.id);
     const drift = detectSpaceContractDrift(pack.id, {
       descriptorHash: headRef.hash,
-      pinnedHash,
+      priorHeadHash: onDiskHeadRef?.hash ?? null,
     });
     drifts.push(drift);
 
-    await emitPinnedSpaceArtefacts(inputs.migrationsDir, pack.id, {
+    await emitContractSpaceArtefacts(inputs.migrationsDir, pack.id, {
       contract: contractJson,
       contractDts: buildPlaceholderContractDts(pack.id),
       headRef: { hash: headRef.hash, invariants: headRef.invariants },
@@ -105,7 +105,7 @@ export async function runContractSpaceMigratePass(
  * structured-output envelope `warnings[]`, etc.).
  *
  * Locks AM7 — drift warning surfaces the extension name and the diff
- * direction (descriptor → pinned).
+ * direction (descriptor → on-disk head).
  */
 export function formatContractSpaceDriftWarning(drift: SpaceContractDriftResult): string {
   if (drift.kind !== 'drift') {
@@ -113,22 +113,22 @@ export function formatContractSpaceDriftWarning(drift: SpaceContractDriftResult)
   }
   return (
     `Contract-space drift detected for "${drift.spaceId}": descriptor hash ` +
-    `${drift.descriptorHash} differs from pinned hash ${drift.pinnedHash ?? '<none>'}. ` +
-    `The pinned files under migrations/${drift.spaceId}/ will be refreshed to match the descriptor.`
+    `${drift.descriptorHash} differs from on-disk head hash ${drift.priorHeadHash ?? '<none>'}. ` +
+    `The on-disk artefacts under migrations/${drift.spaceId}/ will be refreshed to match the descriptor.`
   );
 }
 
 /**
- * Placeholder `.d.ts` content for an extension space's pinned mirror.
+ * Placeholder `.d.ts` content for an extension space's on-disk mirror.
  *
  * Rendering a fully-typed `.d.ts` for an extension contract requires the
  * SQL-family renderer with the codec / typemap registry threaded
  * through; that integration is tracked under sub-spec Open Question 3
  * (see `projects/extension-contract-spaces/specs/framework-mechanism.spec.md`).
  *
- * Until that ships, the pinned `.d.ts` is a `@ts-nocheck` stub. The
+ * Until that ships, the on-disk `.d.ts` is a `@ts-nocheck` stub. The
  * spec gap closing alongside the typed renderer is **AC2 / AC14**
- * (byte-equivalence of pinned per-space artefacts under `migrate`):
+ * (byte-equivalence of per-space artefacts under `migrate`):
  * a placeholder cannot be byte-equal to a fully-rendered `.d.ts` from
  * the same descriptor, so AC2 / AC14 are PARTIAL today and become
  * fully-PASS once OQ3 closes.

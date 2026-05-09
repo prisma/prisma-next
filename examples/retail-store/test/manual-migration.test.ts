@@ -10,7 +10,7 @@ import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { resolve } from 'pathe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import AddProductValidation from '../migrations/20260415_add-product-validation/migration';
+import AddProductValidation from '../migrations/app/20260415_add-product-validation/migration';
 
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -23,7 +23,10 @@ function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
   );
 }
 
-const migrationDir = resolve(import.meta.dirname, '../migrations/20260415_add-product-validation');
+const migrationDir = resolve(
+  import.meta.dirname,
+  '../migrations/app/20260415_add-product-validation',
+);
 
 describe(
   'hand-authored migration (20260415_add-product-validation)',

@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -22,7 +22,7 @@ describe('runContractSpaceMigratePass', () => {
     await rm(migrationsDir, { recursive: true, force: true });
   });
 
-  it('emits pinned artefacts on first emit and reports kind=firstEmit', async () => {
+  it('emits on-disk artefacts on first emit and reports kind=firstEmit', async () => {
     const out = await runContractSpaceMigratePass({
       migrationsDir,
       extensionPacks: [
@@ -47,8 +47,8 @@ describe('runContractSpaceMigratePass', () => {
     expect(dts).toContain('@ts-nocheck');
   });
 
-  it('reports kind=noDrift when descriptor matches pinned (idempotent re-pin)', async () => {
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+  it('reports kind=noDrift when descriptor matches the on-disk head (idempotent re-pin)', async () => {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { v: 1 },
       contractDts: '\n',
       headRef: { hash: HASH_A, invariants: [] },
@@ -70,8 +70,8 @@ describe('runContractSpaceMigratePass', () => {
     expect(out.drifts.map((d) => d.kind)).toEqual(['noDrift']);
   });
 
-  it('reports kind=drift when descriptor hash diverges from pinned (locks AM7)', async () => {
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+  it('reports kind=drift when descriptor hash diverges from the on-disk head (locks AM7)', async () => {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { v: 1 },
       contractDts: '\n',
       headRef: { hash: HASH_A, invariants: [] },
@@ -99,7 +99,7 @@ describe('runContractSpaceMigratePass', () => {
       expect(warning).toContain(HASH_B);
     }
 
-    // Pinned hash on disk is refreshed to descriptor hash.
+    // Head hash on disk is refreshed to descriptor hash.
     const headJson = JSON.parse(
       await readFile(join(migrationsDir, 'cipherstash', 'refs', 'head.json'), 'utf-8'),
     );
@@ -148,7 +148,7 @@ describe('formatContractSpaceDriftWarning', () => {
         kind: 'noDrift',
         spaceId: 'x',
         descriptorHash: HASH_A,
-        pinnedHash: HASH_A,
+        priorHeadHash: HASH_A,
       }),
     ).toThrow();
   });

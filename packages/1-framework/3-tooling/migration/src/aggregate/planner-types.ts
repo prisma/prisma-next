@@ -91,7 +91,7 @@ export interface AggregatePlannerInput<TFamilyId extends string, TTargetId exten
  *   output can render without touching the runner-bound `plan`.
  * - `destinationContract`: the typed contract value the runner uses
  *   for post-apply verification. For the app member, the user's
- *   contract; for extension members, the pinned `contract.json`.
+ *   contract; for extension members, the on-disk `contract.json`.
  * - `strategy`: which strategy produced this plan (`'graph-walk'` or
  *   `'synth'`). Surfaced for diagnostics; not consumed by the runner.
  */

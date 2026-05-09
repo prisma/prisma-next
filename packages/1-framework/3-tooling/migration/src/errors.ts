@@ -160,17 +160,6 @@ export function errorInvalidSpaceId(spaceId: string): MigrationToolsError {
   );
 }
 
-export function errorPinnedArtefactsAppSpace(): MigrationToolsError {
-  return new MigrationToolsError(
-    'MIGRATION.PINNED_ARTEFACTS_APP_SPACE',
-    'Pinned per-space artefacts do not apply to the app space',
-    {
-      why: "Pinned `contract.json`/`contract.d.ts`/`refs/head.json` files only exist for extension spaces under `migrations/<space-id>/`. The app space's canonical contract lives at the project root (`contract.json`) — `emitPinnedSpaceArtefacts` is the wrong helper for it.",
-      fix: 'Pass an extension space id, or use the app-space contract emit pipeline for the project-root `contract.json` / `contract.d.ts`.',
-    },
-  );
-}
-
 export function errorDescriptorHeadHashMismatch(args: {
   readonly extensionId: string;
   readonly recomputedHash: string;
@@ -182,7 +171,7 @@ export function errorDescriptorHeadHashMismatch(args: {
     "Extension descriptor's headRef.hash does not match its contractJson",
     {
       why: `Extension "${extensionId}" publishes a \`contractSpace\` whose \`headRef.hash\` (${headRefHash}) does not match the canonical hash recomputed from \`contractSpace.contractJson\` (${recomputedHash}). This means the extension descriptor was published with stale \`headRef.hash\` — typically because the contract was bumped without rerunning the extension's emit pipeline.`,
-      fix: 'Re-run the extension authoring pipeline so `contractJson.storage.storageHash` and `headRef.hash` agree, then republish the extension. If you are the extension author and you intentionally bumped `contractJson`, recompute and update `headRef.hash` (and refresh any pinned migration metadata that derives from it).',
+      fix: 'Re-run the extension authoring pipeline so `contractJson.storage.storageHash` and `headRef.hash` agree, then republish the extension. If you are the extension author and you intentionally bumped `contractJson`, recompute and update `headRef.hash` (and refresh any on-disk migration metadata that derives from it).',
       details: { extensionId, recomputedHash, headRefHash },
     },
   );

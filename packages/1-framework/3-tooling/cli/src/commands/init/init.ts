@@ -569,7 +569,7 @@ async function runInstall(ctx: {
   /**
    * FR2.1 — set when the user already declares `@types/node` directly in
    * `dependencies` or `devDependencies`. We then skip adding it so a
-   * pinned major (e.g. `^18` for a Node 18 runtime) survives `init`
+   * locked major (e.g. `^18` for a Node 18 runtime) survives `init`
    * unchanged. Transitive presence is intentionally ignored: detecting
    * it requires lockfile introspection and the realistic clobber risk
    * is the direct-pin case.
@@ -585,7 +585,7 @@ async function runInstall(ctx: {
   // Pin it as a devDep rather than relying on a transitive resolution
   // through `dotenv` (whose types bundle is internal and not guaranteed
   // across versions). Skip when the user already declares `@types/node`
-  // directly so a pinned major (e.g. `^18` for a Node 18 runtime) is
+  // directly so a locked major (e.g. `^18` for a Node 18 runtime) is
   // preserved. Listed last so the install log still leads with the
   // user-relevant `prisma-next` line.
   const devDeps = hasTypesNode ? ['prisma-next'] : ['prisma-next', '@types/node'];

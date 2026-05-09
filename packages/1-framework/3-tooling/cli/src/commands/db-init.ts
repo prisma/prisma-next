@@ -118,7 +118,7 @@ async function executeDbInitCommand(
   // The aggregate loader (loader → planner → runner pipeline) catches
   // layout / drift / disjointness violations on its own; the legacy
   // per-space precheck + marker-check helpers are no longer needed at
-  // this surface. Marker-vs-pinned drift surfaces through the planner's
+  // this surface. Marker-vs-on-disk drift surfaces through the planner's
   // graph-walk strategy.
   const { migrationsDir } = resolveMigrationPaths(options.config, config);
 

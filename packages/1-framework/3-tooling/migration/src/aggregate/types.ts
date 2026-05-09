@@ -28,17 +28,17 @@ export interface HydratedMigrationGraph {
  * - `spaceId`: `'app'` for the application, otherwise the extension's
  *   id (validated against `[a-z][a-z0-9_-]{0,63}`).
  * - `contract`: the validated contract value for this member. For the
- *   app, the user's authored contract; for an extension, the pinned
+ *   app, the user's authored contract; for an extension, the on-disk
  *   `migrations/<spaceId>/contract.json`. Both have already passed the
  *   family's `validateContract` at the loader boundary.
  * - `headRef.hash`: the storage hash this member is targeting. For the
  *   app, equals `contract.storage.storageHash`. For extensions, the
- *   pinned `refs/head.json.hash`.
+ *   on-disk `refs/head.json.hash`.
  * - `headRef.invariants`: alphabetically sorted, deduplicated invariant
  *   ids declared on the head ref. Empty for the app member (the app's
  *   plan is synthesised from the contract IR, no invariants required).
  * - `migrations`: the hydrated migration graph for this space. Possibly
- *   empty (an extension whose pinned head ref points at the
+ *   empty (an extension whose on-disk head ref points at the
  *   empty-contract sentinel and ships no migrations yet, or the app
  *   when the user hasn't authored any).
  */

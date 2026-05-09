@@ -3,14 +3,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { canonicalizeJson } from '../src/canonicalize-json';
-import { emitPinnedSpaceArtefacts } from '../src/emit-pinned-space-artefacts';
+import { emitContractSpaceArtefacts } from '../src/emit-contract-space-artefacts';
 import { MigrationToolsError } from '../src/errors';
+import { APP_SPACE_ID } from '../src/space-layout';
 
-describe('emitPinnedSpaceArtefacts', () => {
+describe('emitContractSpaceArtefacts', () => {
   let migrationsDir: string;
 
   beforeEach(async () => {
-    migrationsDir = await mkdtemp(join(tmpdir(), 'pinned-artefacts-'));
+    migrationsDir = await mkdtemp(join(tmpdir(), 'space-artefacts-'));
   });
 
   afterEach(async () => {
@@ -18,7 +19,7 @@ describe('emitPinnedSpaceArtefacts', () => {
   });
 
   it('writes contract.json, contract.d.ts, and refs/head.json under migrations/<spaceId>/', async () => {
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { foo: 1 },
       contractDts: 'export interface Contract {}\n',
       headRef: { hash: 'sha256:empty', invariants: [] },
@@ -34,7 +35,7 @@ describe('emitPinnedSpaceArtefacts', () => {
 
   it('serialises contract.json as the canonical-JSON form of the supplied contract', async () => {
     const contract = { z: 1, a: { y: 2, x: 3 } };
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract,
       contractDts: '\n',
       headRef: { hash: 'sha256:empty', invariants: [] },
@@ -46,7 +47,7 @@ describe('emitPinnedSpaceArtefacts', () => {
 
   it('writes contract.d.ts verbatim from the caller-supplied string', async () => {
     const dts = `// rendered by the caller\nexport type Contract = { kind: 'cipherstash' };\n`;
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: {},
       contractDts: dts,
       headRef: { hash: 'sha256:empty', invariants: [] },
@@ -57,7 +58,7 @@ describe('emitPinnedSpaceArtefacts', () => {
   });
 
   it('serialises refs/head.json with sorted invariants and trailing newline', async () => {
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: {},
       contractDts: '\n',
       headRef: {
@@ -75,15 +76,15 @@ describe('emitPinnedSpaceArtefacts', () => {
     });
   });
 
-  it('overwrites pre-existing pinned files (the framework owns these files)', async () => {
+  it('overwrites pre-existing artefact files (the framework owns these files)', async () => {
     const dir = join(migrationsDir, 'cipherstash');
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { v: 1 },
       contractDts: 'v1\n',
       headRef: { hash: 'sha256:empty', invariants: ['inv-v1'] },
     });
 
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { v: 2 },
       contractDts: 'v2\n',
       headRef: {
@@ -105,13 +106,13 @@ describe('emitPinnedSpaceArtefacts', () => {
 
   it('overwrites stray files left over from earlier runs (e.g. invariants reduced to []) ', async () => {
     const dir = join(migrationsDir, 'cipherstash');
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: {},
       contractDts: '\n',
       headRef: { hash: 'sha256:empty', invariants: ['old'] },
     });
 
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: {},
       contractDts: '\n',
       headRef: { hash: 'sha256:empty', invariants: [] },
@@ -130,8 +131,8 @@ describe('emitPinnedSpaceArtefacts', () => {
       headRef: { hash: 'sha256:empty', invariants: ['b', 'a'] },
     };
 
-    await emitPinnedSpaceArtefacts(dirA, 'cipherstash', args);
-    await emitPinnedSpaceArtefacts(dirB, 'cipherstash', args);
+    await emitContractSpaceArtefacts(dirA, 'cipherstash', args);
+    await emitContractSpaceArtefacts(dirB, 'cipherstash', args);
 
     const aContract = await readFile(join(dirA, 'cipherstash', 'contract.json'), 'utf-8');
     const bContract = await readFile(join(dirB, 'cipherstash', 'contract.json'), 'utf-8');
@@ -150,7 +151,7 @@ describe('emitPinnedSpaceArtefacts', () => {
     const invariants = ['z', 'a', 'm'];
     const snapshot = [...invariants];
 
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: {},
       contractDts: '\n',
       headRef: { hash: 'sha256:empty', invariants },
@@ -159,26 +160,28 @@ describe('emitPinnedSpaceArtefacts', () => {
     expect(invariants).toEqual(snapshot);
   });
 
-  it('rejects the app space (pinned artefacts apply only to extension spaces)', async () => {
-    let captured: unknown;
-    try {
-      await emitPinnedSpaceArtefacts(migrationsDir, 'app', {
-        contract: {},
-        contractDts: '\n',
-        headRef: { hash: 'sha256:empty', invariants: [] },
-      });
-    } catch (err) {
-      captured = err;
-    }
+  it('accepts the app space and writes under migrations/<APP_SPACE_ID>/ (M2.5b AC6)', async () => {
+    // Pre-M2.5b the helper rejected the app space; the layout is now
+    // uniform — every space, including the app, gets the same on-disk
+    // shape under `migrations/<spaceId>/`.
+    await emitContractSpaceArtefacts(migrationsDir, APP_SPACE_ID, {
+      contract: { kind: 'app' },
+      contractDts: 'export type AppContract = unknown;\n',
+      headRef: { hash: 'sha256:app', invariants: [] },
+    });
 
-    expect(MigrationToolsError.is(captured)).toBe(true);
-    expect((captured as MigrationToolsError).code).toBe('MIGRATION.PINNED_ARTEFACTS_APP_SPACE');
+    const dir = join(migrationsDir, APP_SPACE_ID);
+    const entries = (await readdir(dir)).sort();
+    expect(entries).toEqual(['contract.d.ts', 'contract.json', 'refs']);
+
+    const head = JSON.parse(await readFile(join(dir, 'refs', 'head.json'), 'utf-8'));
+    expect(head).toEqual({ hash: 'sha256:app', invariants: [] });
   });
 
   it('rejects an invalid space id', async () => {
     let captured: unknown;
     try {
-      await emitPinnedSpaceArtefacts(migrationsDir, 'INVALID', {
+      await emitContractSpaceArtefacts(migrationsDir, 'INVALID', {
         contract: {},
         contractDts: '\n',
         headRef: { hash: 'sha256:empty', invariants: [] },
@@ -194,7 +197,7 @@ describe('emitPinnedSpaceArtefacts', () => {
   it('creates the migrations dir + space dir + refs dir if they do not yet exist', async () => {
     const fresh = join(migrationsDir, 'fresh-project', 'migrations');
 
-    await emitPinnedSpaceArtefacts(fresh, 'cipherstash', {
+    await emitContractSpaceArtefacts(fresh, 'cipherstash', {
       contract: {},
       contractDts: '\n',
       headRef: { hash: 'sha256:empty', invariants: [] },
@@ -204,14 +207,14 @@ describe('emitPinnedSpaceArtefacts', () => {
     expect(entries).toEqual(['contract.d.ts', 'contract.json', 'refs']);
   });
 
-  it('preserves user-authored migration directories alongside the pinned files', async () => {
+  it('preserves user-authored migration directories alongside the artefact files', async () => {
     const dir = join(migrationsDir, 'cipherstash');
     const userMigration = join(dir, '20260101T0000_baseline');
-    await writeFile(`${dir}-marker`, 'noop'); // ensure mkdir creates dir
+    await writeFile(`${dir}-marker`, 'noop');
     await mkdir(userMigration, { recursive: true });
     await writeFile(join(userMigration, 'migration.json'), '{}');
 
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: {},
       contractDts: '\n',
       headRef: { hash: 'sha256:empty', invariants: [] },

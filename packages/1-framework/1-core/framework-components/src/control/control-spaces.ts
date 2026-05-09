@@ -23,7 +23,7 @@ import type { MigrationMetadata, MigrationPlanOperation } from './control-migrat
 export const APP_SPACE_ID = 'app' as const;
 
 /**
- * Pinned head ref for a contract space — the `(hash, invariants)` tuple
+ * Head ref for a contract space — the `(hash, invariants)` tuple
  * a runner targets when applying that space's migration graph. Identical
  * in shape to the on-disk `migrations/<space-id>/refs/head.json` the
  * framework writes per loaded extension, and to the app-space

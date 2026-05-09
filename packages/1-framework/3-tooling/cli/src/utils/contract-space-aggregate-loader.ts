@@ -31,7 +31,7 @@ type ExtensionPackForAggregate = {
  * `DeclaredExtensionEntry[]` shape.
  *
  * The loader hashes `contractSpace.contractJson` to compare against the
- * pinned `refs/head.json.hash` (drift detection). Rather than re-running
+ * on-disk `refs/head.json.hash` (drift detection). Rather than re-running
  * the canonical-JSON + SHA-256 pipeline at the CLI surface, we look up
  * the descriptor's pre-computed `headRef.hash` via reference identity
  * on the contract JSON value — the loader passes the same
@@ -77,7 +77,7 @@ export function mapLoadAggregateError(error: LoadAggregateError): CliStructuredE
     return new CliStructuredError('5001', summary, {
       domain: 'MIG',
       why: `The on-disk \`migrations/\` directory and your \`extensionPacks\` declaration are not in agreement.\n${lines.join('\n')}`,
-      fix: 'Run `prisma-next migrate` to materialise pinned artefacts for declared extensions, or remove the orphan directory.',
+      fix: 'Run `prisma-next migrate` to materialise on-disk artefacts for declared extensions, or remove the orphan directory.',
       docsUrl: 'https://pris.ly/contract-spaces',
       meta: {
         violations: error.violations.map((v) => ({
@@ -90,15 +90,15 @@ export function mapLoadAggregateError(error: LoadAggregateError): CliStructuredE
   if (error.kind === 'driftViolation') {
     return new CliStructuredError('5002', `Contract-space drift detected for "${error.spaceId}"`, {
       domain: 'MIG',
-      why: `The pinned contract for space "${error.spaceId}" (hash ${error.pinnedHash}) does not match the live extension descriptor (hash ${error.liveHash}).`,
-      fix: 'Run `prisma-next migrate` to refresh the pinned artefacts to match the live descriptor.',
+      why: `The on-disk contract for space "${error.spaceId}" (hash ${error.priorHeadHash}) does not match the live extension descriptor (hash ${error.liveHash}).`,
+      fix: 'Run `prisma-next migrate` to refresh the on-disk artefacts to match the live descriptor.',
       docsUrl: 'https://pris.ly/contract-spaces',
       meta: {
         violations: [
           {
             kind: 'drift',
             spaceId: error.spaceId,
-            pinnedHash: error.pinnedHash,
+            priorHeadHash: error.priorHeadHash,
             liveHash: error.liveHash,
           },
         ],
@@ -134,7 +134,7 @@ export function mapLoadAggregateError(error: LoadAggregateError): CliStructuredE
       {
         domain: 'MIG',
         why: error.detail,
-        fix: 'Run `prisma-next migrate` to refresh pinned artefacts, or restore the on-disk `migrations/` directory from version control.',
+        fix: 'Run `prisma-next migrate` to refresh on-disk artefacts, or restore the on-disk `migrations/` directory from version control.',
         docsUrl: 'https://pris.ly/contract-spaces',
         meta: {
           violations: [{ kind: 'integrity', spaceId: error.spaceId, detail: error.detail }],
@@ -149,7 +149,7 @@ export function mapLoadAggregateError(error: LoadAggregateError): CliStructuredE
       {
         domain: 'MIG',
         why: error.detail,
-        fix: 'Run `prisma-next migrate` to refresh pinned artefacts, or fix the extension descriptor producing the invalid contract.',
+        fix: 'Run `prisma-next migrate` to refresh on-disk artefacts, or fix the extension descriptor producing the invalid contract.',
         meta: {
           violations: [{ kind: 'validation', spaceId: error.spaceId, detail: error.detail }],
         },

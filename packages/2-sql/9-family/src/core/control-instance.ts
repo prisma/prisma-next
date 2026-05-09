@@ -323,7 +323,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   // `headRef.hash` that matches the canonical hash recomputed from its
   // `contractJson`. A stale value would silently corrupt every downstream
   // boundary that trusts `headRef.hash` as the canonical identity (drift
-  // detection, pinned artefact emission, runner marker writes). Failing
+  // detection, on-disk artefact emission, runner marker writes). Failing
   // fast at descriptor-load time turns "extension author shipped an
   // inconsistent descriptor" into an explicit, actionable error
   // (`MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH`) rather than a confusing

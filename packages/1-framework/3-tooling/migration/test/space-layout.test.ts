@@ -63,8 +63,9 @@ describe('assertValidSpaceId', () => {
 });
 
 describe('spaceMigrationDirectory', () => {
-  it("returns the project's migrations dir unchanged for the app space", () => {
-    expect(spaceMigrationDirectory('/p/migrations', APP_SPACE_ID)).toBe('/p/migrations');
+  it('appends the app space id as a subdirectory (uniform with extensions)', () => {
+    // M2.5b: the app no longer has a special-case layout. AC1.
+    expect(spaceMigrationDirectory('/p/migrations', APP_SPACE_ID)).toBe('/p/migrations/app');
   });
 
   it('appends the space id as a subdirectory for an extension space', () => {
@@ -79,7 +80,7 @@ describe('spaceMigrationDirectory', () => {
     );
   });
 
-  it('does not validate the app space id (always allowed)', () => {
+  it('accepts the app space id (it matches the validation pattern)', () => {
     expect(() => spaceMigrationDirectory('/p/migrations', APP_SPACE_ID)).not.toThrow();
   });
 });

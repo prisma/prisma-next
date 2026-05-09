@@ -10,7 +10,7 @@ import {
   loadContractSpaceAggregate,
 } from '../../src/aggregate/loader';
 import { EMPTY_CONTRACT_HASH } from '../../src/constants';
-import { emitPinnedSpaceArtefacts } from '../../src/emit-pinned-space-artefacts';
+import { emitContractSpaceArtefacts } from '../../src/emit-contract-space-artefacts';
 import { spaceMigrationDirectory } from '../../src/space-layout';
 import { writeTestPackage } from '../fixtures';
 
@@ -32,7 +32,7 @@ function stubHash(value: unknown): string {
  *
  * For the success path we hand back a typed `Contract` produced by
  * `createSqlContract` so downstream invariant checks
- * (`pinnedContract.target`, table extraction) succeed.
+ * (`spaceContract.target`, table extraction) succeed.
  */
 function makeIdentityValidator(byJson: ReadonlyMap<string, Contract>) {
   return (json: unknown): Contract => {
@@ -119,14 +119,14 @@ describe('loadContractSpaceAggregate', () => {
   describe('layoutViolation', () => {
     it('bundles every layout offence in a single layoutViolation', async () => {
       // Pin a directory for an extension the user did NOT declare in
-      // extensionPacks — that's an orphanPinnedDir.
-      await emitPinnedSpaceArtefacts(migrationsDir, 'orphan_ext', {
+      // extensionPacks — that's an orphanSpaceDir.
+      await emitContractSpaceArtefacts(migrationsDir, 'orphan_ext', {
         contract: { id: 'orphan' },
         contractDts: '\n',
         headRef: { hash: EMPTY_CONTRACT_HASH, invariants: [] },
       });
 
-      // Declare an extension with a contract space that has NO pinned
+      // Declare an extension with a contract space that has NO on-disk
       // directory on disk — that's a declaredButUnmigrated.
       const result = await loadContractSpaceAggregate(
         buildInput({
@@ -148,7 +148,7 @@ describe('loadContractSpaceAggregate', () => {
       // Both offences are surfaced in one error rather than fixed one
       // commit at a time (preserves the M2 R6 R3 verifier behaviour).
       expect([...failure.violations].sort((a, b) => a.spaceId.localeCompare(b.spaceId))).toEqual([
-        { kind: 'orphanPinnedDir', spaceId: 'orphan_ext' },
+        { kind: 'orphanSpaceDir', spaceId: 'orphan_ext' },
         { kind: 'declaredButUnmigrated', spaceId: 'unmigrated_ext' },
       ]);
     });
@@ -156,17 +156,17 @@ describe('loadContractSpaceAggregate', () => {
 
   describe('integrityFailure', () => {
     it('reports integrityFailure when refs/head.json is missing for a declared extension', async () => {
-      // Create the pinned dir minus the head.json — `readPinnedHeadRef`
+      // Create the contract-space dir minus the head.json — `readContractSpaceHeadRef`
       // returns null and the loader treats this as integrity (the layout
       // precheck only sees the directory exists).
       const dir = join(migrationsDir, 'cipherstash');
-      // Layout precheck looks for the directory, but readPinnedHeadRef
+      // Layout precheck looks for the directory, but readContractSpaceHeadRef
       // returns null when refs/head.json doesn't exist; the loader then
       // surfaces it as integrityFailure (not layoutViolation).
       const { mkdir, writeFile } = await import('node:fs/promises');
       await mkdir(dir, { recursive: true });
-      // Write contract.json so readPinnedSpaceContract doesn't fire first;
-      // and write a placeholder so listPinnedSpaceDirectories sees it.
+      // Write contract.json so readContractSpaceContract doesn't fire first;
+      // and write a placeholder so listContractSpaceDirectories sees it.
       await writeFile(join(dir, 'contract.json'), '{}');
 
       const declaredExtension: DeclaredExtensionEntry = {
@@ -188,21 +188,21 @@ describe('loadContractSpaceAggregate', () => {
       expect(failure.detail).toContain('refs/head.json');
     });
 
-    it('reports integrityFailure when the pinned head ref is not in the on-disk migration graph', async () => {
+    it('reports integrityFailure when the on-disk head ref is not in the on-disk migration graph', async () => {
       // Pin a head ref whose hash matches the descriptor's hash (so
       // drift does not fire) but that no migration package walks to.
       const cipherContract = { id: 'cipher' };
-      const pinnedHash = stubHash(cipherContract);
-      await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+      const priorHeadHash = stubHash(cipherContract);
+      await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
         contract: cipherContract,
         contractDts: '\n',
         headRef: {
-          hash: pinnedHash,
+          hash: priorHeadHash,
           invariants: [],
         },
       });
       // Write a single migration package whose `to` is something else;
-      // this leaves the graph non-empty but missing the pinned hash.
+      // this leaves the graph non-empty but missing the on-disk head hash.
       await writeTestPackage(
         join(spaceMigrationDirectory(migrationsDir, 'cipherstash'), '20260101T0000_init'),
         { from: null, to: 'sha256:cipher-real-head' },
@@ -235,15 +235,15 @@ describe('loadContractSpaceAggregate', () => {
   });
 
   describe('validationFailure', () => {
-    it('reports validationFailure when the pinned contract.json fails validation', async () => {
+    it('reports validationFailure when the on-disk contract.json fails validation', async () => {
       const cipherContract = { id: 'cipher' };
-      await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+      await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
         contract: cipherContract,
         contractDts: '\n',
         headRef: { hash: EMPTY_CONTRACT_HASH, invariants: [] },
       });
 
-      // Validator throws for the pinned contract — simulates ArkType
+      // Validator throws for the on-disk contract — simulates ArkType
       // surfacing a structural failure for a corrupt contract.json.
       const failingValidator = (_json: unknown): Contract => {
         throw new Error('storage.tables.users is missing');
@@ -272,22 +272,22 @@ describe('loadContractSpaceAggregate', () => {
   });
 
   describe('driftViolation', () => {
-    it('reports driftViolation (fatal) when descriptor hash differs from the pinned hash', async () => {
-      const pinnedJson = { id: 'cipher', version: 1 };
+    it('reports driftViolation (fatal) when descriptor hash differs from the on-disk head hash', async () => {
+      const spaceContractJson = { id: 'cipher', version: 1 };
       const liveJson = { id: 'cipher', version: 2 };
 
       // The framework's emit pipeline normally writes the same hash that
       // matches the descriptor's contract; here we simulate post-emit
       // drift by pinning a stale hash.
-      await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
-        contract: pinnedJson,
+      await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
+        contract: spaceContractJson,
         contractDts: '\n',
-        headRef: { hash: stubHash(pinnedJson), invariants: [] },
+        headRef: { hash: stubHash(spaceContractJson), invariants: [] },
       });
 
       const validator = makeIdentityValidator(
         new Map([
-          [JSON.stringify(pinnedJson), createSqlContract({ target: 'postgres' })],
+          [JSON.stringify(spaceContractJson), createSqlContract({ target: 'postgres' })],
           [JSON.stringify(liveJson), createSqlContract({ target: 'postgres' })],
         ]),
       );
@@ -312,7 +312,7 @@ describe('loadContractSpaceAggregate', () => {
       expect(failure.kind).toBe('driftViolation');
       if (failure.kind !== 'driftViolation') return;
       expect(failure.spaceId).toBe('cipherstash');
-      expect(failure.pinnedHash).toBe(stubHash(pinnedJson));
+      expect(failure.priorHeadHash).toBe(stubHash(spaceContractJson));
       expect(failure.liveHash).toBe(stubHash(liveJson));
     });
   });
@@ -330,16 +330,16 @@ describe('loadContractSpaceAggregate', () => {
       });
 
       const cipherJson = { id: 'cipher-collides' };
-      const cipherPinnedHash = stubHash(cipherJson);
-      await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+      const cipherHeadHash = stubHash(cipherJson);
+      await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
         contract: cipherJson,
         contractDts: '\n',
-        headRef: { hash: cipherPinnedHash, invariants: [] },
+        headRef: { hash: cipherHeadHash, invariants: [] },
       });
-      // Migration so the graph contains the pinned head ref node.
+      // Migration so the graph contains the on-disk head ref node.
       await writeTestPackage(
         join(spaceMigrationDirectory(migrationsDir, 'cipherstash'), '20260101T0000_init'),
-        { from: null, to: cipherPinnedHash },
+        { from: null, to: cipherHeadHash },
       );
 
       const validator = makeIdentityValidator(new Map([[JSON.stringify(cipherJson), extContract]]));
@@ -382,32 +382,32 @@ describe('loadContractSpaceAggregate', () => {
       // sentinel because no migrations have been authored yet — the
       // loader tolerates an empty graph when the head ref equals
       // EMPTY_CONTRACT_HASH (greenfield extensions).
-      const cipherPinnedHash = stubHash(cipherJson);
-      const pgvectorPinnedHash = stubHash(pgvectorJson);
-      await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+      const cipherHeadHash = stubHash(cipherJson);
+      const pgvectorHeadHash = stubHash(pgvectorJson);
+      await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
         contract: cipherJson,
         contractDts: '\n',
         headRef: {
-          hash: cipherPinnedHash,
+          hash: cipherHeadHash,
           invariants: ['cipher:create-v1', 'a-cipher-inv'],
         },
       });
-      await emitPinnedSpaceArtefacts(migrationsDir, 'pgvector', {
+      await emitContractSpaceArtefacts(migrationsDir, 'pgvector', {
         contract: pgvectorJson,
         contractDts: '\n',
         headRef: {
-          hash: pgvectorPinnedHash,
+          hash: pgvectorHeadHash,
           invariants: [],
         },
       });
-      // Migrations so each space's graph contains the pinned head ref.
+      // Migrations so each space's graph contains the on-disk head ref.
       await writeTestPackage(
         join(spaceMigrationDirectory(migrationsDir, 'cipherstash'), '20260101T0000_init'),
-        { from: null, to: cipherPinnedHash },
+        { from: null, to: cipherHeadHash },
       );
       await writeTestPackage(
         join(spaceMigrationDirectory(migrationsDir, 'pgvector'), '20260101T0000_init'),
-        { from: null, to: pgvectorPinnedHash },
+        { from: null, to: pgvectorHeadHash },
       );
 
       const cipherContract = createSqlContract({
@@ -464,11 +464,11 @@ describe('loadContractSpaceAggregate', () => {
       // complete.
       expect(cipherMember?.headRef.invariants).toEqual(['a-cipher-inv', 'cipher:create-v1']);
       expect(cipherMember?.contract).toBe(cipherContract);
-      expect(cipherMember?.headRef.hash).toBe(cipherPinnedHash);
+      expect(cipherMember?.headRef.hash).toBe(cipherHeadHash);
       // Graph is hydrated from the on-disk packages: one migration
       // package implies two nodes (EMPTY_CONTRACT_HASH source plus the
       // head ref target).
-      expect(cipherMember?.migrations.graph.nodes.has(cipherPinnedHash)).toBe(true);
+      expect(cipherMember?.migrations.graph.nodes.has(cipherHeadHash)).toBe(true);
       expect(cipherMember?.migrations.graph.nodes.has(EMPTY_CONTRACT_HASH)).toBe(true);
       expect(cipherMember?.migrations.packagesByMigrationHash.size).toBe(1);
 

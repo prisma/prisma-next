@@ -41,10 +41,10 @@ const INVARIANT_ID = 'backfill-user-name';
 const BACKFILLED_NAME = 'unknown';
 
 /**
- * Writes a `migrations/refs/<name>.json` file directly. The current
- * `migration ref set` command always writes `invariants: []`, so e2e tests
- * that need ref-side invariants edit the JSON file by hand (matching the
- * spec's "edit JSON manually for v1" deferred item).
+ * Writes a `migrations/<APP_SPACE_ID>/refs/<name>.json` file directly.
+ * The current `migration ref set` command always writes `invariants: []`,
+ * so e2e tests that need ref-side invariants edit the JSON file by hand
+ * (matching the spec's "edit JSON manually for v1" deferred item).
  */
 function writeRefFile(
   ctx: JourneyContext,
@@ -52,7 +52,7 @@ function writeRefFile(
   hash: string,
   invariants: readonly string[],
 ): void {
-  const refsDir = join(ctx.testDir, 'migrations', 'refs');
+  const refsDir = join(ctx.testDir, 'migrations', 'app', 'refs');
   mkdirSync(refsDir, { recursive: true });
   const file = join(refsDir, `${name}.json`);
   writeFileSync(file, `${JSON.stringify({ hash, invariants }, null, 2)}\n`, 'utf-8');
@@ -145,7 +145,7 @@ withTempDir(({ createTempDir }) => {
         const planResult = await runMigrationPlan(ctx, ['--name', 'add-required-name']);
         expect(planResult.exitCode, 'O.03: plan add-required-name').toBe(0);
 
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const migrationDirName = readdirSync(migrationsDir)
           .filter((d) => d.includes('add_required_name'))
           .sort()
@@ -279,7 +279,7 @@ withTempDir(({ createTempDir }) => {
           'P.02: plan',
         ).toBe(0);
 
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const migrationDir = join(
           migrationsDir,
           readdirSync(migrationsDir)
@@ -364,7 +364,7 @@ withTempDir(({ createTempDir }) => {
         expect((await runContractEmit(ctx)).exitCode, 'Q.02: emit CA').toBe(0);
         const planA = await runMigrationPlan(ctx, ['--name', 'branch-a-with-invariant']);
         expect(planA.exitCode, 'Q.02: plan branch A').toBe(0);
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const branchADir = join(
           migrationsDir,
           readdirSync(migrationsDir)
@@ -469,7 +469,7 @@ withTempDir(({ createTempDir }) => {
           'R.02: plan',
         ).toBe(0);
 
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const migrationDir = join(
           migrationsDir,
           readdirSync(migrationsDir)
@@ -584,7 +584,7 @@ withTempDir(({ createTempDir }) => {
         ]);
         expect(newResult.exitCode, 'S.02: migration new --from <c1>').toBe(0);
 
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const migrationDir = join(
           migrationsDir,
           readdirSync(migrationsDir)
@@ -739,7 +739,7 @@ MigrationCLI.run(import.meta.url, M);
           c1Hash,
         ]);
         expect(newResult.exitCode, 'T.02: migration new --from <c1>').toBe(0);
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const migrationDir = join(
           migrationsDir,
           readdirSync(migrationsDir)

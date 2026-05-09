@@ -5,58 +5,58 @@ const HASH_A = 'sha256:000000000000000000000000000000000000000000000000000000000
 const HASH_B = 'sha256:0000000000000000000000000000000000000000000000000000000000000bbb';
 
 describe('detectSpaceContractDrift', () => {
-  it("returns 'noDrift' when descriptor hash equals pinned hash", () => {
+  it("returns 'noDrift' when descriptor hash equals on-disk head hash", () => {
     const result = detectSpaceContractDrift('cipherstash', {
       descriptorHash: HASH_A,
-      pinnedHash: HASH_A,
+      priorHeadHash: HASH_A,
     });
 
     expect(result).toEqual({
       kind: 'noDrift',
       spaceId: 'cipherstash',
       descriptorHash: HASH_A,
-      pinnedHash: HASH_A,
+      priorHeadHash: HASH_A,
     });
   });
 
-  it("returns 'firstEmit' when there is no pinned file yet (pinnedHash null)", () => {
+  it("returns 'firstEmit' when there is no on-disk artefact yet (priorHeadHash null)", () => {
     const result = detectSpaceContractDrift('cipherstash', {
       descriptorHash: HASH_A,
-      pinnedHash: null,
+      priorHeadHash: null,
     });
 
     expect(result).toEqual({
       kind: 'firstEmit',
       spaceId: 'cipherstash',
       descriptorHash: HASH_A,
-      pinnedHash: null,
+      priorHeadHash: null,
     });
   });
 
-  it("returns 'drift' when descriptor hash differs from pinned hash", () => {
+  it("returns 'drift' when descriptor hash differs from on-disk head hash", () => {
     const result = detectSpaceContractDrift('cipherstash', {
       descriptorHash: HASH_B,
-      pinnedHash: HASH_A,
+      priorHeadHash: HASH_A,
     });
 
     expect(result).toEqual({
       kind: 'drift',
       spaceId: 'cipherstash',
       descriptorHash: HASH_B,
-      pinnedHash: HASH_A,
+      priorHeadHash: HASH_A,
     });
   });
 
   it('preserves the supplied spaceId verbatim in the result', () => {
     const result = detectSpaceContractDrift('audit-trail-v2', {
       descriptorHash: HASH_A,
-      pinnedHash: HASH_B,
+      priorHeadHash: HASH_B,
     });
     expect(result.spaceId).toBe('audit-trail-v2');
   });
 
   it('does not mutate the inputs object', () => {
-    const inputs = { descriptorHash: HASH_A, pinnedHash: HASH_B };
+    const inputs = { descriptorHash: HASH_A, priorHeadHash: HASH_B };
     const snapshot = { ...inputs };
     detectSpaceContractDrift('cipherstash', inputs);
     expect(inputs).toEqual(snapshot);
@@ -65,7 +65,7 @@ describe('detectSpaceContractDrift', () => {
   it('treats two visually-equal-but-distinct strings byte-for-byte (no normalisation)', () => {
     const result = detectSpaceContractDrift('cipherstash', {
       descriptorHash: 'sha256:abc',
-      pinnedHash: 'sha256:ABC',
+      priorHeadHash: 'sha256:ABC',
     });
     expect(result.kind).toBe('drift');
   });
@@ -76,7 +76,7 @@ describe('detectSpaceContractDrift', () => {
     // through verbatim for the caller to format.
     const result = detectSpaceContractDrift('Whatever You Like', {
       descriptorHash: HASH_A,
-      pinnedHash: HASH_A,
+      priorHeadHash: HASH_A,
     });
     expect(result.spaceId).toBe('Whatever You Like');
   });

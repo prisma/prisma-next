@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  listPinnedSpaceDirectories,
+  type ContractSpaceHeadRecord,
+  listContractSpaceDirectories,
   type SpaceMarkerRecord,
-  type SpacePinnedHashRecord,
   verifyContractSpaces,
 } from '../src/verify-contract-spaces';
 
-describe('listPinnedSpaceDirectories', () => {
+describe('listContractSpaceDirectories', () => {
   let projectMigrationsDir: string;
 
   async function makeMigrationDir(name: string): Promise<void> {
@@ -17,12 +17,12 @@ describe('listPinnedSpaceDirectories', () => {
     await writeFile(join(projectMigrationsDir, name, 'migration.json'), '{}');
   }
 
-  async function makePinnedSpaceDir(name: string): Promise<void> {
+  async function makeContractSpaceDir(name: string): Promise<void> {
     await mkdir(join(projectMigrationsDir, name), { recursive: true });
   }
 
   beforeEach(async () => {
-    projectMigrationsDir = await mkdtemp(join(tmpdir(), 'list-pinned-'));
+    projectMigrationsDir = await mkdtemp(join(tmpdir(), 'list-contract-space-'));
   });
 
   afterEach(async () => {
@@ -31,14 +31,14 @@ describe('listPinnedSpaceDirectories', () => {
 
   it('returns an empty list when the migrations directory does not exist', async () => {
     const missing = join(projectMigrationsDir, 'does-not-exist');
-    expect(await listPinnedSpaceDirectories(missing)).toEqual([]);
+    expect(await listContractSpaceDirectories(missing)).toEqual([]);
   });
 
   it('excludes timestamp-shaped migration directories that contain migration.json', async () => {
     await makeMigrationDir('20260101T0000_baseline');
     await makeMigrationDir('20260507T1100_add_users');
 
-    expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual([]);
+    expect(await listContractSpaceDirectories(projectMigrationsDir)).toEqual([]);
   });
 
   it('excludes a space-id-shaped directory when it contains migration.json', async () => {
@@ -47,38 +47,38 @@ describe('listPinnedSpaceDirectories', () => {
     // freely name their migration directories.
     await makeMigrationDir('cipherstash');
 
-    expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual([]);
+    expect(await listContractSpaceDirectories(projectMigrationsDir)).toEqual([]);
   });
 
   it('includes a timestamp-shaped directory with no migration.json (verifier no longer trusts the name)', async () => {
-    await makePinnedSpaceDir('20260101T0000_baseline');
-    await makePinnedSpaceDir('cipherstash');
+    await makeContractSpaceDir('20260101T0000_baseline');
+    await makeContractSpaceDir('cipherstash');
 
-    expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual([
+    expect(await listContractSpaceDirectories(projectMigrationsDir)).toEqual([
       '20260101T0000_baseline',
       'cipherstash',
     ]);
   });
 
   it('returns extension-space subdirectories sorted alphabetically', async () => {
-    await makePinnedSpaceDir('pgvector');
-    await makePinnedSpaceDir('cipherstash');
-    await makePinnedSpaceDir('audit');
+    await makeContractSpaceDir('pgvector');
+    await makeContractSpaceDir('cipherstash');
+    await makeContractSpaceDir('audit');
 
-    expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual([
+    expect(await listContractSpaceDirectories(projectMigrationsDir)).toEqual([
       'audit',
       'cipherstash',
       'pgvector',
     ]);
   });
 
-  it('returns pinned-space dirs alongside skipping migration dirs', async () => {
+  it('returns contract-space dirs alongside skipping migration dirs', async () => {
     await makeMigrationDir('20260101T0000_baseline');
-    await makePinnedSpaceDir('cipherstash');
+    await makeContractSpaceDir('cipherstash');
     await makeMigrationDir('20260507T1100_add_users');
-    await makePinnedSpaceDir('pgvector');
+    await makeContractSpaceDir('pgvector');
 
-    expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual([
+    expect(await listContractSpaceDirectories(projectMigrationsDir)).toEqual([
       'cipherstash',
       'pgvector',
     ]);
@@ -86,60 +86,60 @@ describe('listPinnedSpaceDirectories', () => {
 
   it('skips files (only directory entries are reported)', async () => {
     await writeFile(join(projectMigrationsDir, 'cipherstash'), 'i am a file');
-    await makePinnedSpaceDir('pgvector');
+    await makeContractSpaceDir('pgvector');
 
-    expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual(['pgvector']);
+    expect(await listContractSpaceDirectories(projectMigrationsDir)).toEqual(['pgvector']);
   });
 
   it('skips dot-prefixed directories', async () => {
     await mkdir(join(projectMigrationsDir, '.git'));
     await mkdir(join(projectMigrationsDir, '.tmp'));
-    await makePinnedSpaceDir('cipherstash');
+    await makeContractSpaceDir('cipherstash');
 
-    expect(await listPinnedSpaceDirectories(projectMigrationsDir)).toEqual(['cipherstash']);
+    expect(await listContractSpaceDirectories(projectMigrationsDir)).toEqual(['cipherstash']);
   });
 });
 
 describe('verifyContractSpaces', () => {
-  const cipherstashPinned: SpacePinnedHashRecord = {
+  const cipherstashHead: ContractSpaceHeadRecord = {
     hash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
     invariants: ['cipherstash:install-v1'],
   };
-  const pgvectorPinned: SpacePinnedHashRecord = {
+  const pgvectorHead: ContractSpaceHeadRecord = {
     hash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
     invariants: ['pgvector:install-v1'],
   };
 
-  const markerOf = (pinned: SpacePinnedHashRecord): SpaceMarkerRecord => ({
-    hash: pinned.hash,
-    invariants: [...pinned.invariants],
+  const markerOf = (head: ContractSpaceHeadRecord): SpaceMarkerRecord => ({
+    hash: head.hash,
+    invariants: [...head.invariants],
   });
 
   it("returns ok for today's single-app project (no extensions, no extra dirs, no extra markers)", () => {
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app']),
-      pinnedDirsOnDisk: [],
-      pinnedHashesBySpace: new Map(),
+      spaceDirsOnDisk: [],
+      headRefsBySpace: new Map(),
       markerRowsBySpace: new Map(),
     });
     expect(result.ok).toBe(true);
   });
 
-  it('returns ok when loadedSpaces match pinned dirs and marker rows exactly', () => {
+  it('returns ok when loadedSpaces match contract-space dirs and marker rows exactly', () => {
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app', 'cipherstash']),
-      pinnedDirsOnDisk: ['cipherstash'],
-      pinnedHashesBySpace: new Map([['cipherstash', cipherstashPinned]]),
-      markerRowsBySpace: new Map([['cipherstash', markerOf(cipherstashPinned)]]),
+      spaceDirsOnDisk: ['cipherstash'],
+      headRefsBySpace: new Map([['cipherstash', cipherstashHead]]),
+      markerRowsBySpace: new Map([['cipherstash', markerOf(cipherstashHead)]]),
     });
     expect(result.ok).toBe(true);
   });
 
-  it('rejects when extensionPacks declares a space without a pinned dir on disk (declaredButUnmigrated)', () => {
+  it('rejects when extensionPacks declares a space without a contract-space dir on disk (declaredButUnmigrated)', () => {
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app', 'cipherstash']),
-      pinnedDirsOnDisk: [],
-      pinnedHashesBySpace: new Map(),
+      spaceDirsOnDisk: [],
+      headRefsBySpace: new Map(),
       markerRowsBySpace: new Map(),
     });
     expect(result.ok).toBe(false);
@@ -151,18 +151,18 @@ describe('verifyContractSpaces', () => {
     });
   });
 
-  it('rejects when a pinned dir on disk is not in extensionPacks (orphanPinnedDir)', () => {
+  it('rejects when a contract-space dir on disk is not in extensionPacks (orphanSpaceDir)', () => {
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app']),
-      pinnedDirsOnDisk: ['cipherstash'],
-      pinnedHashesBySpace: new Map([['cipherstash', cipherstashPinned]]),
+      spaceDirsOnDisk: ['cipherstash'],
+      headRefsBySpace: new Map([['cipherstash', cipherstashHead]]),
       markerRowsBySpace: new Map(),
     });
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.violations).toHaveLength(1);
     expect(result.violations[0]).toMatchObject({
-      kind: 'orphanPinnedDir',
+      kind: 'orphanSpaceDir',
       spaceId: 'cipherstash',
     });
   });
@@ -170,9 +170,9 @@ describe('verifyContractSpaces', () => {
   it('rejects when a marker row exists for a space not in extensionPacks (orphanMarker)', () => {
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app']),
-      pinnedDirsOnDisk: [],
-      pinnedHashesBySpace: new Map(),
-      markerRowsBySpace: new Map([['cipherstash', markerOf(cipherstashPinned)]]),
+      spaceDirsOnDisk: [],
+      headRefsBySpace: new Map(),
+      markerRowsBySpace: new Map([['cipherstash', markerOf(cipherstashHead)]]),
     });
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -183,15 +183,15 @@ describe('verifyContractSpaces', () => {
     });
   });
 
-  it('rejects when marker hash does not match pinned hash for a loaded space (hashMismatch)', () => {
+  it('rejects when marker hash does not match on-disk head hash for a loaded space (hashMismatch)', () => {
     const driftedMarker: SpaceMarkerRecord = {
       hash: 'sha256:00000000000000000000000000000000000000000000000000000000000000ff',
-      invariants: cipherstashPinned.invariants,
+      invariants: cipherstashHead.invariants,
     };
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app', 'cipherstash']),
-      pinnedDirsOnDisk: ['cipherstash'],
-      pinnedHashesBySpace: new Map([['cipherstash', cipherstashPinned]]),
+      spaceDirsOnDisk: ['cipherstash'],
+      headRefsBySpace: new Map([['cipherstash', cipherstashHead]]),
       markerRowsBySpace: new Map([['cipherstash', driftedMarker]]),
     });
     expect(result.ok).toBe(false);
@@ -200,21 +200,21 @@ describe('verifyContractSpaces', () => {
       expect.objectContaining({
         kind: 'hashMismatch',
         spaceId: 'cipherstash',
-        pinnedHash: cipherstashPinned.hash,
+        priorHeadHash: cipherstashHead.hash,
         markerHash: driftedMarker.hash,
       }),
     );
   });
 
-  it("rejects when marker invariants don't cover pinned invariants (invariantsMismatch)", () => {
+  it("rejects when marker invariants don't cover on-disk invariants (invariantsMismatch)", () => {
     const partialMarker: SpaceMarkerRecord = {
-      hash: cipherstashPinned.hash,
+      hash: cipherstashHead.hash,
       invariants: [],
     };
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app', 'cipherstash']),
-      pinnedDirsOnDisk: ['cipherstash'],
-      pinnedHashesBySpace: new Map([['cipherstash', cipherstashPinned]]),
+      spaceDirsOnDisk: ['cipherstash'],
+      headRefsBySpace: new Map([['cipherstash', cipherstashHead]]),
       markerRowsBySpace: new Map([['cipherstash', partialMarker]]),
     });
     expect(result.ok).toBe(false);
@@ -230,14 +230,14 @@ describe('verifyContractSpaces', () => {
   it('aggregates multiple violations across spaces deterministically (alphabetical by spaceId)', () => {
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app', 'cipherstash']),
-      pinnedDirsOnDisk: ['orphan-z', 'orphan-a'],
-      pinnedHashesBySpace: new Map([
-        ['orphan-a', cipherstashPinned],
-        ['orphan-z', pgvectorPinned],
+      spaceDirsOnDisk: ['orphan-z', 'orphan-a'],
+      headRefsBySpace: new Map([
+        ['orphan-a', cipherstashHead],
+        ['orphan-z', pgvectorHead],
       ]),
       markerRowsBySpace: new Map([
-        ['orphan-marker-1', markerOf(cipherstashPinned)],
-        ['orphan-marker-2', markerOf(pgvectorPinned)],
+        ['orphan-marker-1', markerOf(cipherstashHead)],
+        ['orphan-marker-2', markerOf(pgvectorHead)],
       ]),
     });
 
@@ -248,8 +248,8 @@ describe('verifyContractSpaces', () => {
       'declaredButUnmigrated:cipherstash',
       'orphanMarker:orphan-marker-1',
       'orphanMarker:orphan-marker-2',
-      'orphanPinnedDir:orphan-a',
-      'orphanPinnedDir:orphan-z',
+      'orphanSpaceDir:orphan-a',
+      'orphanSpaceDir:orphan-z',
     ]);
   });
 
@@ -260,10 +260,10 @@ describe('verifyContractSpaces', () => {
     };
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app', 'pgvector']),
-      pinnedDirsOnDisk: ['orphan'],
-      pinnedHashesBySpace: new Map([['orphan', cipherstashPinned]]),
+      spaceDirsOnDisk: ['orphan'],
+      headRefsBySpace: new Map([['orphan', cipherstashHead]]),
       markerRowsBySpace: new Map([
-        ['ghost', markerOf(cipherstashPinned)],
+        ['ghost', markerOf(cipherstashHead)],
         ['pgvector', driftedMarker],
       ]),
     });
@@ -283,18 +283,18 @@ describe('verifyContractSpaces', () => {
     };
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app']),
-      pinnedDirsOnDisk: [],
-      pinnedHashesBySpace: new Map(),
+      spaceDirsOnDisk: [],
+      headRefsBySpace: new Map(),
       markerRowsBySpace: new Map([['app', appMarker]]),
     });
     expect(result.ok).toBe(true);
   });
 
-  it('does not flag a missing app-space pinned dir (app pinning lives at the project root, not under migrations/)', () => {
+  it('does not flag a missing app-space contract-space dir (app pinning lives at the project root, not under migrations/)', () => {
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app']),
-      pinnedDirsOnDisk: [],
-      pinnedHashesBySpace: new Map(),
+      spaceDirsOnDisk: [],
+      headRefsBySpace: new Map(),
       markerRowsBySpace: new Map(),
     });
     expect(result.ok).toBe(true);
@@ -306,9 +306,9 @@ describe('verifyContractSpaces', () => {
     // call itself — the inputs are pre-resolved by the caller.
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app', 'cipherstash']),
-      pinnedDirsOnDisk: ['cipherstash'],
-      pinnedHashesBySpace: new Map([['cipherstash', cipherstashPinned]]),
-      markerRowsBySpace: new Map([['cipherstash', markerOf(cipherstashPinned)]]),
+      spaceDirsOnDisk: ['cipherstash'],
+      headRefsBySpace: new Map([['cipherstash', cipherstashHead]]),
+      markerRowsBySpace: new Map([['cipherstash', markerOf(cipherstashHead)]]),
     });
     expect(result.ok).toBe(true);
   });

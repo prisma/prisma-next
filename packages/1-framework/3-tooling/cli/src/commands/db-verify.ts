@@ -358,7 +358,7 @@ async function executeDbVerifyCommand(
     // marker / target / hash failure surface (`PN-RUN-3001/3002/3003`).
     // The aggregate verifier (run below for the per-space marker /
     // schema checks) does not duplicate this: it concerns itself with
-    // marker-vs-pinned and orphan-marker drift, not the
+    // marker-vs-on-disk and orphan-marker drift, not the
     // hash-mismatch-against-the-app-contract lane that today's
     // `client.verify` covers.
     const verifyResult = await client.verify({

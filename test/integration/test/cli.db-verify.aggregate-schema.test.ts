@@ -6,7 +6,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   ensureSchemaStatement,
@@ -56,13 +56,13 @@ async function writePinnedExtensionDir(testDir: string): Promise<string> {
   const migrationsDir = join(testDir, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
 
-  // The pinned head ref's invariants must be derivable from the
+  // The on-disk head ref's invariants must be derivable from the
   // on-disk ops (`deriveProvidedInvariants`) — that derivation only
   // counts data-class ops. The test extension's baseline op is
   // additive, so its declared invariants live in memory only and do
   // not survive a disk round-trip. For the F23 verify test we drop
   // the pinned invariants (the schema verifier doesn't consult them).
-  await emitPinnedSpaceArtefacts(migrationsDir, EXT_SPACE_ID, {
+  await emitContractSpaceArtefacts(migrationsDir, EXT_SPACE_ID, {
     contract: extContractJson,
     contractDts: '// placeholder for test\nexport {};\n',
     headRef: { hash: extHeadRef.hash, invariants: [] },

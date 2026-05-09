@@ -82,7 +82,7 @@ export interface ExecuteAggregateApplyOptions<TFamilyId extends string, TTargetI
  * The pipeline:
  *
  * 1. **Load**: build a {@link ContractSpaceAggregate} from the descriptor
- *    set + on-disk pinned artefacts. Any layout / drift / disjointness /
+ *    set + on-disk on-disk artefacts. Any layout / drift / disjointness /
  *    integrity violation short-circuits with a structured error.
  * 2. **Read DB state**: marker rows (`familyInstance.readAllMarkers`)
  *    + introspected schema (`familyInstance.introspect`).
@@ -153,7 +153,7 @@ export async function executeAggregateApply<TFamilyId extends string, TTargetId 
 
   // 3. Plan via aggregate planner. App is forced through synth (today's
   // `db init` / `db update` daily-driver behaviour); extensions walk
-  // their pinned migration graphs.
+  // their on-disk migration graphs.
   onProgress?.({
     action,
     kind: 'spanStart',
@@ -362,14 +362,14 @@ function mapPlannerError(error: AggregatePlannerError): DbInitResult | DbUpdateR
   if (error.kind === 'extensionPathUnreachable') {
     return buildRunnerFailure({
       summary: `Cannot resolve apply path for extension space "${error.spaceId}"`,
-      why: `No path in the on-disk migration graph for extension space "${error.spaceId}" reaches the pinned head ref hash "${error.target}".`,
+      why: `No path in the on-disk migration graph for extension space "${error.spaceId}" reaches the on-disk head ref hash "${error.target}".`,
       meta: { spaceId: error.spaceId, target: error.target },
     });
   }
   if (error.kind === 'extensionPathUnsatisfiable') {
     return buildRunnerFailure({
       summary: `Cannot resolve apply path for extension space "${error.spaceId}"`,
-      why: `On-disk migration graph for extension space "${error.spaceId}" reaches the pinned head ref but does not cover required invariants: ${error.missingInvariants.join(', ')}.`,
+      why: `On-disk migration graph for extension space "${error.spaceId}" reaches the on-disk head ref but does not cover required invariants: ${error.missingInvariants.join(', ')}.`,
       meta: { spaceId: error.spaceId, missingInvariants: error.missingInvariants },
     });
   }

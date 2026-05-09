@@ -2,20 +2,20 @@
  * "Deletable `node_modules`" fixture for AC-15 / TC-26.
  *
  * Locks in the property that the per-space verifier and runner **read
- * only the user's repo** — pinned `contract.json` / `contract.d.ts` /
+ * only the user's repo** — on-disk `contract.json` / `contract.d.ts` /
  * `refs/head.json` files under `migrations/<space-id>/` plus the live
  * marker rows. Neither helper imports the extension descriptor module,
  * so the absence of `node_modules` (or any other path that resolves the
  * descriptor) does not affect verify / apply outcomes.
  *
  * Scoped to the framework helpers shipped in this round
- * (`emitPinnedSpaceArtefacts` + `listPinnedSpaceDirectories` +
+ * (`emitContractSpaceArtefacts` + `listContractSpaceDirectories` +
  * `verifyContractSpaces` + `concatenateSpaceApplyInputs`). The test
  * intentionally **does not import** the synthetic
  * `test-contract-space` fixture (today hosted under
  * `test/integration/test/contract-space-fixture/`) — that is the
  * point. The test invents a `'test-contract-space'` space id inline
- * and runs the helpers against pinned files on disk plus a fake set of
+ * and runs the helpers against on-disk artefacts on disk plus a fake set of
  * marker rows.
  *
  * @see specs/framework-mechanism.spec.md § 4 — Verifier (T1.5).
@@ -33,11 +33,11 @@ import { verifyAggregate } from '../src/aggregate/verifier';
 import { canonicalizeJson } from '../src/canonicalize-json';
 import { concatenateSpaceApplyInputs } from '../src/concatenate-space-apply-inputs';
 import {
-  emitPinnedSpaceArtefacts,
-  listPinnedSpaceDirectories,
+  type ContractSpaceHeadRecord,
+  emitContractSpaceArtefacts,
+  listContractSpaceDirectories,
   type SpaceApplyInput,
   type SpaceMarkerRecord,
-  type SpacePinnedHashRecord,
   verifyContractSpaces,
 } from '../src/exports/spaces';
 import { writeTestPackage } from './fixtures';
@@ -59,7 +59,7 @@ interface ProjectFixture {
   readonly nodeModulesPath: string;
 }
 
-async function setupProjectWithPinnedTestSpace(): Promise<ProjectFixture> {
+async function setupProjectWithTestSpace(): Promise<ProjectFixture> {
   const projectRoot = await mkdtemp(join(tmpdir(), 'no-descriptor-'));
   const projectMigrationsDir = join(projectRoot, 'migrations');
   const nodeModulesPath = join(projectRoot, 'node_modules');
@@ -73,7 +73,7 @@ async function setupProjectWithPinnedTestSpace(): Promise<ProjectFixture> {
     recursive: true,
   });
 
-  await emitPinnedSpaceArtefacts(projectMigrationsDir, TEST_SPACE_ID, {
+  await emitContractSpaceArtefacts(projectMigrationsDir, TEST_SPACE_ID, {
     contract: testContract,
     contractDts: testContractDts,
     headRef: { hash: TEST_HEAD_HASH, invariants: [TEST_INVARIANT] },
@@ -86,7 +86,7 @@ describe('per-space verifier + runner against a project with deleted node_module
   let fixture: ProjectFixture;
 
   beforeEach(async () => {
-    fixture = await setupProjectWithPinnedTestSpace();
+    fixture = await setupProjectWithTestSpace();
     await rm(fixture.nodeModulesPath, { recursive: true, force: true });
     const remaining = await readdir(fixture.projectRoot);
     expect(remaining.includes('node_modules')).toBe(false);
@@ -96,29 +96,29 @@ describe('per-space verifier + runner against a project with deleted node_module
     await rm(fixture.projectRoot, { recursive: true, force: true });
   });
 
-  it('listPinnedSpaceDirectories discovers the test space without descriptor access', async () => {
-    const dirs = await listPinnedSpaceDirectories(fixture.projectMigrationsDir);
+  it('listContractSpaceDirectories discovers the test space without descriptor access', async () => {
+    const dirs = await listContractSpaceDirectories(fixture.projectMigrationsDir);
     expect(dirs).toEqual([TEST_SPACE_ID]);
   });
 
-  it('verifyContractSpaces returns ok when pinned files + marker rows match — no descriptor needed', async () => {
-    const pinnedRaw = await readFile(
+  it('verifyContractSpaces returns ok when on-disk artefacts + marker rows match — no descriptor needed', async () => {
+    const spaceContractRaw = await readFile(
       join(fixture.projectMigrationsDir, TEST_SPACE_ID, 'contract.json'),
       'utf-8',
     );
-    expect(pinnedRaw.trimEnd()).toBe(canonicalizeJson(testContract));
+    expect(spaceContractRaw.trimEnd()).toBe(canonicalizeJson(testContract));
 
     const headRaw = await readFile(
       join(fixture.projectMigrationsDir, TEST_SPACE_ID, 'refs', 'head.json'),
       'utf-8',
     );
-    const headJson = JSON.parse(headRaw) as SpacePinnedHashRecord;
+    const headJson = JSON.parse(headRaw) as ContractSpaceHeadRecord;
 
-    const dirs = await listPinnedSpaceDirectories(fixture.projectMigrationsDir);
+    const dirs = await listContractSpaceDirectories(fixture.projectMigrationsDir);
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app', TEST_SPACE_ID]),
-      pinnedDirsOnDisk: dirs,
-      pinnedHashesBySpace: new Map([[TEST_SPACE_ID, headJson]]),
+      spaceDirsOnDisk: dirs,
+      headRefsBySpace: new Map([[TEST_SPACE_ID, headJson]]),
       markerRowsBySpace: new Map<string, SpaceMarkerRecord>([
         [TEST_SPACE_ID, { hash: headJson.hash, invariants: [...headJson.invariants] }],
       ]),
@@ -128,7 +128,7 @@ describe('per-space verifier + runner against a project with deleted node_module
   });
 
   it('verifyContractSpaces flags hash drift on the test space, again without descriptor access', async () => {
-    const dirs = await listPinnedSpaceDirectories(fixture.projectMigrationsDir);
+    const dirs = await listContractSpaceDirectories(fixture.projectMigrationsDir);
 
     const driftedMarker: SpaceMarkerRecord = {
       hash: 'sha256:00000000000000000000000000000000000000000000000000000000deadbeef',
@@ -137,11 +137,11 @@ describe('per-space verifier + runner against a project with deleted node_module
 
     const result = verifyContractSpaces({
       loadedSpaces: new Set(['app', TEST_SPACE_ID]),
-      pinnedDirsOnDisk: dirs,
-      pinnedHashesBySpace: new Map([
+      spaceDirsOnDisk: dirs,
+      headRefsBySpace: new Map([
         [
           TEST_SPACE_ID,
-          { hash: TEST_HEAD_HASH, invariants: [TEST_INVARIANT] } satisfies SpacePinnedHashRecord,
+          { hash: TEST_HEAD_HASH, invariants: [TEST_INVARIANT] } satisfies ContractSpaceHeadRecord,
         ],
       ]),
       markerRowsBySpace: new Map([[TEST_SPACE_ID, driftedMarker]]),
@@ -219,12 +219,12 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
     // value here is the same shape the validator will return; the
     // hashContract callback hashes it to HEAD_HASH so drift detection
     // sees no drift.
-    const pinnedContract = createSqlContract({
+    const spaceContract = createSqlContract({
       target: 'postgres',
       storage: { tables: { test_box: { columns: { x: {}, y: {} } } } },
     });
-    await emitPinnedSpaceArtefacts(migrationsDir, TEST_SPACE_ID, {
-      contract: pinnedContract as unknown as Record<string, unknown>,
+    await emitContractSpaceArtefacts(migrationsDir, TEST_SPACE_ID, {
+      contract: spaceContract as unknown as Record<string, unknown>,
       contractDts: '// rendered .d.ts\nexport interface Contract {}\n',
       headRef: { hash: HEAD_HASH, invariants: [] },
     });
@@ -235,7 +235,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       from: null,
       to: HEAD_HASH,
       fromContract: null,
-      toContract: pinnedContract,
+      toContract: spaceContract,
     });
 
     await rm(join(projectRoot, 'node_modules'), { recursive: true, force: true });
@@ -248,11 +248,11 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
   });
 
   it('loader → verifier walk to completion with node_modules removed', async () => {
-    // Reconstruct the same pinned contract value the writer used (the
+    // Reconstruct the same on-disk contract value the writer used (the
     // emitter rounds it through the canonical-JSON pipeline; the test
     // hands the validator back an identity value structurally identical
     // to what was written).
-    const pinnedContract = createSqlContract({
+    const spaceContract = createSqlContract({
       target: 'postgres',
       storage: { tables: { test_box: { columns: { x: {}, y: {} } } } },
     });
@@ -265,7 +265,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       {
         id: TEST_SPACE_ID,
         targetId: 'postgres',
-        contractSpace: { contractJson: pinnedContract as unknown as Record<string, unknown> },
+        contractSpace: { contractJson: spaceContract as unknown as Record<string, unknown> },
       },
     ];
 

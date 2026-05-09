@@ -43,7 +43,7 @@ export interface SqlControlAdapter<TTarget extends string = string>
   /**
    * Reads every marker row from `prisma_contract.marker` (one per
    * contract space) and returns them keyed by `space`. Used by the
-   * per-space verifier to detect marker-vs-pinned drift and orphan
+   * per-space verifier to detect marker-vs-on-disk drift and orphan
    * marker rows. Returns an empty map when the marker table does not
    * yet exist (fresh database / never-signed project).
    */

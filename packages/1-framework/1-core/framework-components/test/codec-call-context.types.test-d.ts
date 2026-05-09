@@ -46,7 +46,7 @@ test('encode/decode call sites accept an explicit ctx (signal optional inside th
   void decodeWithEmptyCtx;
 });
 
-// ADR 204 walk-back constraints — pinned here so future refactors cannot reintroduce a `TRuntime` generic, a discriminator field, conditional return types, or other shape complications on the public Codec.
+// ADR 204 walk-back constraints — captured here so future refactors cannot reintroduce a `TRuntime` generic, a discriminator field, conditional return types, or other shape complications on the public Codec.
 
 test('Codec carries no `runtime` or `kind` discriminator field', () => {
   type CodecKeys = keyof Codec;

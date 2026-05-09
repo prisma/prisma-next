@@ -8,7 +8,7 @@ function hasErrnoCode(error: unknown, code: string): boolean {
 }
 
 /**
- * List the per-space pinned subdirectories under
+ * List the per-space subdirectories under
  * `<projectRoot>/migrations/`. Returns space-id directory names (sorted
  * alphabetically) — i.e. any non-dot-prefixed subdirectory whose root
  * does **not** contain a `migration.json` manifest. The manifest is the
@@ -23,7 +23,7 @@ function hasErrnoCode(error: unknown, code: string): boolean {
  * (verifier) feeds the result into {@link verifyContractSpaces} alongside
  * the loaded-space set and the marker rows.
  */
-export async function listPinnedSpaceDirectories(
+export async function listContractSpaceDirectories(
   projectMigrationsDir: string,
 ): Promise<readonly string[]> {
   let entries: { readonly name: string; readonly isDirectory: boolean }[];
@@ -61,12 +61,12 @@ export async function listPinnedSpaceDirectories(
 }
 
 /**
- * Pinned head value (`(hash, invariants)`) for one contract space.
+ * On-disk head value (`(hash, invariants)`) for one contract space.
  * The verifier compares this against the marker row for the same space
  * to detect drift between the user-emitted artefacts and the live DB
  * marker.
  */
-export interface SpacePinnedHashRecord {
+export interface ContractSpaceHeadRecord {
   readonly hash: string;
   readonly invariants: readonly string[];
 }
@@ -92,20 +92,20 @@ export interface VerifyContractSpacesInputs {
   readonly loadedSpaces: ReadonlySet<string>;
 
   /**
-   * Pinned per-space subdirectories observed under
+   * Per-space subdirectories observed under
    * `<projectRoot>/migrations/`. Resolved via
-   * {@link listPinnedSpaceDirectories}.
+   * {@link listContractSpaceDirectories}.
    */
-  readonly pinnedDirsOnDisk: readonly string[];
+  readonly spaceDirsOnDisk: readonly string[];
 
   /**
-   * Pinned head ref per space, keyed by space id. Caller reads
+   * Head ref per space, keyed by space id. Caller reads
    * `<projectRoot>/migrations/<space-id>/contract.json` and
-   * `refs/head.json` (or, for app-space if its pinned shape ever moves
-   * under `migrations/`, the equivalent files) to construct this map.
-   * Spaces with no pinned dir on disk simply omit a map entry.
+   * `<projectRoot>/migrations/<space-id>/refs/head.json` to construct
+   * this map. Spaces with no contract-space dir on disk simply omit a
+   * map entry.
    */
-  readonly pinnedHashesBySpace: ReadonlyMap<string, SpacePinnedHashRecord>;
+  readonly headRefsBySpace: ReadonlyMap<string, ContractSpaceHeadRecord>;
 
   /**
    * Marker rows keyed by `space`. Caller reads them from the
@@ -126,21 +126,21 @@ export type SpaceVerifierViolation =
       readonly remediation: string;
     }
   | {
-      readonly kind: 'orphanPinnedDir';
+      readonly kind: 'orphanSpaceDir';
       readonly spaceId: string;
       readonly remediation: string;
     }
   | {
       readonly kind: 'hashMismatch';
       readonly spaceId: string;
-      readonly pinnedHash: string;
+      readonly priorHeadHash: string;
       readonly markerHash: string;
       readonly remediation: string;
     }
   | {
       readonly kind: 'invariantsMismatch';
       readonly spaceId: string;
-      readonly pinnedInvariants: readonly string[];
+      readonly onDiskInvariants: readonly string[];
       readonly markerInvariants: readonly string[];
       readonly remediation: string;
     };
@@ -157,21 +157,22 @@ export type VerifyContractSpacesResult =
  * Algorithm:
  *
  * - For every extension space declared in `loadedSpaces` (`'app'`
- *   excluded — its pinned `contract.json` lives at the project root):
- *   - If no pinned dir on disk → `declaredButUnmigrated`.
+ *   excluded — the per-space verifier is scoped to extension members;
+ *   the app is verified through the aggregate path):
+ *   - If no contract-space dir on disk → `declaredButUnmigrated`.
  *   - Else if `markerRowsBySpace` lacks an entry → no violation here;
  *     the live-DB compare done outside this helper is where the
  *     absence shows up.
- *   - Else compare marker hash / invariants vs. pinned hash /
+ *   - Else compare marker hash / invariants vs. on-disk head hash /
  *     invariants → `hashMismatch` / `invariantsMismatch` on drift.
- * - For every pinned dir on disk that is not in `loadedSpaces` →
- *   `orphanPinnedDir`.
+ * - For every contract-space dir on disk that is not in `loadedSpaces` →
+ *   `orphanSpaceDir`.
  * - For every marker row whose `space` is not in `loadedSpaces` →
  *   `orphanMarker`. The app-space marker is always loaded (`'app'` is
  *   in `loadedSpaces` by definition).
  *
  * Output is deterministic: violations are sorted first by `kind`
- * (`declaredButUnmigrated` → `orphanMarker` → `orphanPinnedDir` →
+ * (`declaredButUnmigrated` → `orphanMarker` → `orphanSpaceDir` →
  * `hashMismatch` → `invariantsMismatch`) then by `spaceId`. Two callers
  * passing equivalent inputs see byte-identical violation lists.
  *
@@ -187,7 +188,7 @@ export function verifyContractSpaces(
   for (const spaceId of [...inputs.loadedSpaces].sort()) {
     if (spaceId === APP_SPACE_ID) continue;
 
-    if (!inputs.pinnedDirsOnDisk.includes(spaceId)) {
+    if (!inputs.spaceDirsOnDisk.includes(spaceId)) {
       violations.push({
         kind: 'declaredButUnmigrated',
         spaceId,
@@ -196,43 +197,43 @@ export function verifyContractSpaces(
       continue;
     }
 
-    const pinned = inputs.pinnedHashesBySpace.get(spaceId);
+    const head = inputs.headRefsBySpace.get(spaceId);
     const marker = inputs.markerRowsBySpace.get(spaceId);
-    if (!pinned || !marker) {
+    if (!head || !marker) {
       continue;
     }
 
-    if (pinned.hash !== marker.hash) {
+    if (head.hash !== marker.hash) {
       violations.push({
         kind: 'hashMismatch',
         spaceId,
-        pinnedHash: pinned.hash,
+        priorHeadHash: head.hash,
         markerHash: marker.hash,
-        remediation: `Marker row for space '${spaceId}' is keyed at ${marker.hash}, but the pinned ${join('migrations', spaceId, 'contract.json')} resolves to ${pinned.hash}. Run \`prisma-next db update\` to advance the database, or \`prisma-next migrate\` if the descriptor was bumped without re-emitting.`,
+        remediation: `Marker row for space '${spaceId}' is keyed at ${marker.hash}, but the on-disk ${join('migrations', spaceId, 'contract.json')} resolves to ${head.hash}. Run \`prisma-next db update\` to advance the database, or \`prisma-next migrate\` if the descriptor was bumped without re-emitting.`,
       });
       continue;
     }
 
-    const pinnedInvariants = [...pinned.invariants].sort();
+    const onDiskInvariants = [...head.invariants].sort();
     const markerInvariants = new Set(marker.invariants);
-    const missing = pinnedInvariants.filter((id) => !markerInvariants.has(id));
+    const missing = onDiskInvariants.filter((id) => !markerInvariants.has(id));
     if (missing.length > 0) {
       violations.push({
         kind: 'invariantsMismatch',
         spaceId,
-        pinnedInvariants,
+        onDiskInvariants,
         markerInvariants: [...marker.invariants].sort(),
         remediation: `Marker row for space '${spaceId}' is missing invariants [${missing.map((s) => JSON.stringify(s)).join(', ')}]. Run \`prisma-next db update\` to apply the corresponding data-transform migrations.`,
       });
     }
   }
 
-  for (const dir of [...inputs.pinnedDirsOnDisk].sort()) {
+  for (const dir of [...inputs.spaceDirsOnDisk].sort()) {
     if (!inputs.loadedSpaces.has(dir)) {
       violations.push({
-        kind: 'orphanPinnedDir',
+        kind: 'orphanSpaceDir',
         spaceId: dir,
-        remediation: `Orphan pinned directory \`${join('migrations', dir)}/\` for an extension not in extensionPacks; remove the directory or re-add the extension.`,
+        remediation: `Orphan contract-space directory \`${join('migrations', dir)}/\` for an extension not in extensionPacks; remove the directory or re-add the extension.`,
       });
     }
   }
@@ -254,7 +255,7 @@ export function verifyContractSpaces(
   const kindOrder: Record<SpaceVerifierViolation['kind'], number> = {
     declaredButUnmigrated: 0,
     orphanMarker: 1,
-    orphanPinnedDir: 2,
+    orphanSpaceDir: 2,
     hashMismatch: 3,
     invariantsMismatch: 4,
   };

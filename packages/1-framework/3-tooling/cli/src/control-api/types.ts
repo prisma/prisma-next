@@ -194,7 +194,7 @@ export interface DbInitOptions {
   readonly connection?: unknown;
   /**
    * On-disk migrations directory. Always required — every `db init`
-   * routes through the per-space flow, which reads pinned
+   * routes through the per-space flow, which reads on-disk
    * `refs/head.json` and extension destination contracts from this
    * root.
    */
@@ -231,7 +231,7 @@ export interface DbUpdateOptions {
   readonly acceptDataLoss?: boolean;
   /**
    * On-disk migrations directory. Always required — every `db update`
-   * routes through the per-space flow, which reads pinned
+   * routes through the per-space flow, which reads on-disk
    * `refs/head.json` and extension destination contracts from this
    * root.
    */
@@ -715,7 +715,7 @@ export interface ControlClient {
    *
    * Loader → aggregate-verifier pipeline:
    * - The loader catches layout / drift / disjointness violations.
-   * - The aggregate verifier surfaces marker-vs-pinned drift and orphan
+   * - The aggregate verifier surfaces marker-vs-on-disk drift and orphan
    *   markers, and (unless `skipSchema` is true) per-space schema
    *   verification with pre-projection (closes F23).
    *
@@ -735,7 +735,7 @@ export interface ControlClient {
 
   /**
    * Reads every marker row (one per contract space). Used by the
-   * per-space verifier to detect orphan marker rows and marker-vs-pinned
+   * per-space verifier to detect orphan marker rows and marker-vs-on-disk
    * drift after a database connection has been established.
    */
   readAllMarkers(): Promise<ReadonlyMap<string, ContractMarkerRecord>>;

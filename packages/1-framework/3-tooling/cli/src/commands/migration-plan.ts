@@ -101,10 +101,8 @@ async function executeMigrationPlanCommand(
   startTime: number,
 ): Promise<Result<MigrationPlanResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative } = resolveMigrationPaths(
-    options.config,
-    config,
-  );
+  const { configPath, migrationsDir, appMigrationsDir, appMigrationsRelative } =
+    resolveMigrationPaths(options.config, config);
 
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
@@ -113,7 +111,7 @@ async function executeMigrationPlanCommand(
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'contract', value: contractPath },
-      { label: 'migrations', value: migrationsRelative },
+      { label: 'migrations', value: appMigrationsRelative },
     ];
     if (options.from) {
       details.push({ label: 'from', value: options.from });
@@ -179,7 +177,7 @@ async function executeMigrationPlanCommand(
   let fromContractSourceDir: string | null = null;
 
   try {
-    const { bundles, graph } = await loadMigrationPackages(migrationsDir);
+    const { bundles, graph } = await loadMigrationPackages(appMigrationsDir);
 
     if (options.from) {
       const resolved = resolveBundleByPrefix(bundles, options.from);
@@ -188,11 +186,11 @@ async function executeMigrationPlanCommand(
         return notOk(
           f.reason === 'ambiguous'
             ? errorRuntime('Multiple matching migrations found', {
-                why: `Prefix "${options.from}" matches ${f.count} migrations in ${migrationsRelative}`,
+                why: `Prefix "${options.from}" matches ${f.count} migrations in ${appMigrationsRelative}`,
                 fix: 'Provide a longer prefix to disambiguate, or omit --from to use the latest migration target.',
               })
             : errorRuntime('Starting contract not found', {
-                why: `No migration with to hash matching "${options.from}" exists in ${migrationsRelative}`,
+                why: `No migration with to hash matching "${options.from}" exists in ${appMigrationsRelative}`,
                 fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the latest migration target.',
               }),
         );
@@ -229,11 +227,11 @@ async function executeMigrationPlanCommand(
     );
   }
 
-  // Per-space migrate pass: drift detection + pinned artefact emission for
+  // Per-space migrate pass: drift detection + on-disk artefact emission for
   // every loaded extension that exposes a `contractSpace`. Runs *before*
   // the app-space no-op check so that an extension bump alone (with no
   // structural app-space change) still re-pins extension artefacts on
-  // disk. Drift warnings are non-fatal — the pinned files are refreshed
+  // disk. Drift warnings are non-fatal — the on-disk artefacts are refreshed
   // and the user is notified that the bump is being captured.
   const extensionInputs: readonly MigrateExtensionInput[] = (config.extensionPacks ?? []).map(
     (pack) => {
@@ -312,7 +310,7 @@ async function executeMigrationPlanCommand(
   const timestamp = new Date();
   const slug = options.name ?? 'migration';
   const dirName = formatMigrationDirName(timestamp, slug);
-  const packageDir = join(migrationsDir, dirName);
+  const packageDir = join(appMigrationsDir, dirName);
 
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash' | 'providedInvariants'> = {
     from: fromHash,

@@ -1,6 +1,9 @@
-import { readPinnedHeadRef } from './read-pinned-head-ref';
+import { readContractSpaceHeadRef } from './read-contract-space-head-ref';
 import { APP_SPACE_ID } from './space-layout';
-import { listPinnedSpaceDirectories, type SpacePinnedHashRecord } from './verify-contract-spaces';
+import {
+  type ContractSpaceHeadRecord,
+  listContractSpaceDirectories,
+} from './verify-contract-spaces';
 
 /**
  * Disk-side inputs to {@link import('./verify-contract-spaces').verifyContractSpaces}
@@ -9,20 +12,20 @@ import { listPinnedSpaceDirectories, type SpacePinnedHashRecord } from './verify
  * verifier.
  */
 export interface DiskContractSpaceState {
-  /** Pinned directory names observed under `<projectMigrationsDir>/`. */
-  readonly pinnedDirsOnDisk: readonly string[];
-  /** Pinned head-ref `(hash, invariants)` per extension space. */
-  readonly pinnedHashesBySpace: ReadonlyMap<string, SpacePinnedHashRecord>;
+  /** Contract-space directory names observed under `<projectMigrationsDir>/`. */
+  readonly spaceDirsOnDisk: readonly string[];
+  /** Head-ref `(hash, invariants)` per extension space. */
+  readonly headRefsBySpace: ReadonlyMap<string, ContractSpaceHeadRecord>;
 }
 
 /**
  * Read the on-disk state the per-space verifier needs:
  *
- * - The list of pinned space directories under
+ * - The list of contract-space directories under
  *   `<projectMigrationsDir>/` (via
- *   {@link import('./verify-contract-spaces').listPinnedSpaceDirectories}).
- * - The pinned `(hash, invariants)` for each declared extension space
- *   (via {@link readPinnedHeadRef}; missing pinned files are simply
+ *   {@link import('./verify-contract-spaces').listContractSpaceDirectories}).
+ * - The on-disk head ref `(hash, invariants)` for each declared extension space
+ *   (via {@link readContractSpaceHeadRef}; missing on-disk artefacts are simply
  *   omitted — the verifier reports them as `declaredButUnmigrated`).
  *
  * Synchronous in spirit but async due to filesystem reads. Reads only
@@ -38,22 +41,22 @@ export async function gatherDiskContractSpaceState(args: {
   /**
    * Set of space ids the project declares: `'app'` plus each entry in
    * `extensionPacks` whose descriptor exposes a `contractSpace`. The
-   * helper reads pinned data only for the extension members.
+   * helper reads on-disk head data only for the extension members.
    */
   readonly loadedSpaceIds: ReadonlySet<string>;
 }): Promise<DiskContractSpaceState> {
   const { projectMigrationsDir, loadedSpaceIds } = args;
 
-  const pinnedDirsOnDisk = await listPinnedSpaceDirectories(projectMigrationsDir);
+  const spaceDirsOnDisk = await listContractSpaceDirectories(projectMigrationsDir);
 
-  const pinnedHashesBySpace = new Map<string, SpacePinnedHashRecord>();
+  const headRefsBySpace = new Map<string, ContractSpaceHeadRecord>();
   for (const spaceId of loadedSpaceIds) {
     if (spaceId === APP_SPACE_ID) continue;
-    const pinned = await readPinnedHeadRef(projectMigrationsDir, spaceId);
-    if (pinned !== null) {
-      pinnedHashesBySpace.set(spaceId, pinned);
+    const head = await readContractSpaceHeadRef(projectMigrationsDir, spaceId);
+    if (head !== null) {
+      headRefsBySpace.set(spaceId, head);
     }
   }
 
-  return { pinnedDirsOnDisk, pinnedHashesBySpace };
+  return { spaceDirsOnDisk, headRefsBySpace };
 }

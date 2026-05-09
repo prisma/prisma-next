@@ -107,7 +107,7 @@ interface TamperFixture {
 async function setupTamperFixture(): Promise<TamperFixture> {
   const cwd = await mkdtemp(join(tmpdir(), 'cli-tamper-'));
 
-  const migrationsDir = join(cwd, 'migrations');
+  const migrationsDir = join(cwd, 'migrations', 'app');
   await mkdir(migrationsDir, { recursive: true });
   const packageDir = join(migrationsDir, PACKAGE_DIR_NAME);
 
@@ -146,7 +146,7 @@ async function setupTamperFixture(): Promise<TamperFixture> {
     }),
   );
 
-  return { cwd, packageDir, relativePackageDir: join('migrations', PACKAGE_DIR_NAME) };
+  return { cwd, packageDir, relativePackageDir: join('migrations', 'app', PACKAGE_DIR_NAME) };
 }
 
 /**

@@ -55,7 +55,7 @@ async function runMigrationPlan(testDir: string, args: readonly string[]): Promi
 }
 
 function getLatestMigrationDir(testDir: string): string | undefined {
-  const migrationsDir = join(testDir, 'migrations');
+  const migrationsDir = join(testDir, 'migrations', 'app');
   const dirs = readdirSync(migrationsDir).filter((d) => !d.startsWith('.'));
   if (dirs.length === 0) return undefined;
   let newest = dirs[0]!;
@@ -74,7 +74,7 @@ function getLatestMigrationDir(testDir: string): string | undefined {
 async function selfEmitLatestMigration(testDir: string): Promise<void> {
   const latest = getLatestMigrationDir(testDir);
   if (!latest) return;
-  const migrationTs = join(testDir, 'migrations', latest, 'migration.ts');
+  const migrationTs = join(testDir, 'migrations', 'app', latest, 'migration.ts');
   await execFileAsync(TSX_BIN, [migrationTs], { cwd: testDir });
 }
 
@@ -385,7 +385,7 @@ withTempDir(({ createTempDir }) => {
             expect(getExitCode()).toBe(1);
 
             // Marker must remain at the first migration hash (resume point).
-            const migrationsDir = join(testDir, 'migrations');
+            const migrationsDir = join(testDir, 'migrations', 'app');
             const packages = await readMigrationsDir(migrationsDir);
             const firstMigration = packages.find((p) => p.metadata.from === null);
             const secondMigration = packages.find(

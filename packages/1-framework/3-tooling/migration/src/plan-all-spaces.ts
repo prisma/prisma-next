@@ -7,7 +7,7 @@ import { errorDuplicateSpaceId } from './errors';
  *
  * - `priorContract` is `null` for a space that has never been emitted
  *   (no `migrations/<space-id>/contract.json` on disk yet); otherwise it
- *   is the canonical contract value pinned for that space.
+ *   is the canonical contract value emitted for that space.
  * - `newContract` is the canonical contract value the planner is about
  *   to emit for that space — for app-space, the just-emitted root
  *   `contract.json`; for an extension space, the descriptor's
@@ -47,7 +47,7 @@ export interface SpacePlanOutput<TPackage> {
  *
  * Synchronous: the underlying per-space planner (target's
  * `MigrationPlanner.plan(...)`) is synchronous; callers that need to
- * resolve async I/O (e.g. reading pinned `contract.json` from disk)
+ * resolve async I/O (e.g. reading on-disk `contract.json` from disk)
  * resolve it before calling `planAllSpaces` and pass the materialised
  * inputs through.
  */

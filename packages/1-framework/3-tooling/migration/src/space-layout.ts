@@ -33,21 +33,16 @@ export function assertValidSpaceId(spaceId: string): asserts spaceId is ValidSpa
 /**
  * Resolve the migrations subdirectory for a given contract space.
  *
- * - **App space** (`spaceId === APP_SPACE_ID`) keeps today's layout: the
- *   project's `migrations/` directory is the migrations directory, no
- *   subdirectory.
- * - **Extension space** lands under `<projectMigrationsDir>/<spaceId>/`.
- *   The space id is validated against {@link SPACE_ID_PATTERN} because
- *   it becomes a filesystem directory name verbatim.
+ * Every contract space — including the app space (default `'app'`) —
+ * lands under `<projectMigrationsDir>/<spaceId>/`. The space id is
+ * validated against {@link SPACE_ID_PATTERN} because it becomes a
+ * filesystem directory name verbatim.
  *
  * `projectMigrationsDir` is the project's top-level `migrations/`
  * directory; the helper does not assume anything about its absolute /
  * relative shape and is symmetric with `pathe.join`.
  */
 export function spaceMigrationDirectory(projectMigrationsDir: string, spaceId: string): string {
-  if (spaceId === APP_SPACE_ID) {
-    return projectMigrationsDir;
-  }
   assertValidSpaceId(spaceId);
   return join(projectMigrationsDir, spaceId);
 }

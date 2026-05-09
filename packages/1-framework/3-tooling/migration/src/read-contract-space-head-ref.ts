@@ -1,37 +1,32 @@
 import { readFile } from 'node:fs/promises';
+import type { ContractSpaceHeadRef } from '@prisma-next/framework-components/control';
 import { join } from 'pathe';
-import { errorInvalidJson, errorInvalidRefFile, errorPinnedArtefactsAppSpace } from './errors';
-import { APP_SPACE_ID, assertValidSpaceId } from './space-layout';
+import { errorInvalidJson, errorInvalidRefFile } from './errors';
+import { assertValidSpaceId } from './space-layout';
+
+export type { ContractSpaceHeadRef };
 
 function hasErrnoCode(error: unknown, code: string): boolean {
   return error instanceof Error && (error as { code?: string }).code === code;
 }
 
 /**
- * Pinned head-ref record — the `(hash, invariants)` pair the framework
- * wrote into `<projectMigrationsDir>/<spaceId>/refs/head.json` on the last
- * `migrate` for this space.
- */
-export interface PinnedHeadRef {
-  readonly hash: string;
-  readonly invariants: readonly string[];
-}
-
-/**
- * Read the full pinned head ref (`hash` + `invariants`) for an extension
- * space. Companion to {@link import('./read-pinned-contract-hash').readPinnedContractHash}
- * — same parsing rules, but surfaces both fields rather than only the
- * hash so the verifier can compare invariants against marker rows.
+ * Read the head ref (`hash` + `invariants`) for a contract space from
+ * `<projectMigrationsDir>/<spaceId>/refs/head.json`.
  *
- * Returns `null` when the pinned file does not exist (first emit).
+ * Returns `null` when the file does not exist (first emit). Surfaces
+ * `MIGRATION.INVALID_JSON` / `MIGRATION.INVALID_REF_FILE` on a corrupt
+ * `refs/head.json` so callers can distinguish "no head ref on disk"
+ * (returns `null`) from "head ref present but unreadable" (throws).
+ *
+ * Validates the space id against `[a-z][a-z0-9_-]{0,63}` for the same
+ * filesystem-safety reasons as the rest of the per-space helpers. The
+ * helper is uniform across the app and extension spaces.
  */
-export async function readPinnedHeadRef(
+export async function readContractSpaceHeadRef(
   projectMigrationsDir: string,
   spaceId: string,
-): Promise<PinnedHeadRef | null> {
-  if (spaceId === APP_SPACE_ID) {
-    throw errorPinnedArtefactsAppSpace();
-  }
+): Promise<ContractSpaceHeadRef | null> {
   assertValidSpaceId(spaceId);
 
   const filePath = join(projectMigrationsDir, spaceId, 'refs', 'head.json');

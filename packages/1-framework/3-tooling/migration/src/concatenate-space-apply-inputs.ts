@@ -10,8 +10,8 @@ import { APP_SPACE_ID } from './space-layout';
  * and the helper preserves it through the concatenation.
  *
  * - `migrationDirectory` is the on-disk migration directory for the
- *   space — `<projectRoot>/migrations` for `'app'` and
- *   `<projectRoot>/migrations/<space-id>` for an extension space.
+ *   space — `<projectRoot>/migrations/<space-id>` (uniform; the app
+ *   subspaces under its own `<APP_SPACE_ID>/` directory).
  * - `currentMarkerHash` and `currentMarkerInvariants` are the values
  *   read from the `prisma_contract.marker` row keyed by `space = <space-id>`
  *   (T1.1). `null` hash = no marker row yet.

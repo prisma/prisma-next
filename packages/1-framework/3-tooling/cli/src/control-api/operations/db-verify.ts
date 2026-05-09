@@ -77,7 +77,7 @@ export type ExecuteDbVerifyResult = Result<ExecuteDbVerifySuccess, CliStructured
  * `marker-only`, `schema-only`).
  *
  * 1. **Load**: build a {@link import('@prisma-next/migration-tools/aggregate').ContractSpaceAggregate}
- *    from descriptors + on-disk pinned artefacts. Layout / drift /
+ *    from descriptors + on-disk on-disk artefacts. Layout / drift /
  *    integrity / disjointness violations short-circuit with a
  *    structured CLI error.
  * 2. **Read DB state**: marker rows + (when `skipSchema` is `false`)
@@ -307,7 +307,7 @@ function mapMarkerCheckFailures(
         remediation:
           spaceId === appSpaceId
             ? 'Run `prisma-next db update` to advance the marker, or roll the database back to the recorded hash.'
-            : `Apply pinned migrations under \`migrations/${spaceId}/\` to advance the marker, or remove the conflicting marker row.`,
+            : `Apply on-disk migrations under \`migrations/${spaceId}/\` to advance the marker, or remove the conflicting marker row.`,
       });
       continue;
     }

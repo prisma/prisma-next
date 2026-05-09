@@ -70,7 +70,7 @@ async function executeMigrationNewCommand(
   options: MigrationNewOptions,
 ): Promise<Result<MigrationNewResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { migrationsDir, migrationsRelative } = resolveMigrationPaths(options.config, config);
+  const { appMigrationsDir, appMigrationsRelative } = resolveMigrationPaths(options.config, config);
 
   const contractPathAbsolute = resolveContractPath(config);
 
@@ -120,7 +120,7 @@ async function executeMigrationNewCommand(
   let fromContractSourceDir: string | null = null;
 
   try {
-    const packages = await readMigrationsDir(migrationsDir);
+    const packages = await readMigrationsDir(appMigrationsDir);
 
     if (packages.length > 0) {
       const graph = reconstructGraph(packages);
@@ -130,7 +130,7 @@ async function executeMigrationNewCommand(
         if (!match) {
           return notOk(
             errorRuntime('Starting contract not found', {
-              why: `No migration with to hash matching "${options.from}" exists in ${migrationsRelative}`,
+              why: `No migration with to hash matching "${options.from}" exists in ${appMigrationsRelative}`,
               fix: 'Check that the --from hash matches a known migration target hash.',
             }),
           );
@@ -171,7 +171,7 @@ async function executeMigrationNewCommand(
   const timestamp = new Date();
   const slug = options.name ?? 'migration';
   const dirName = formatMigrationDirName(timestamp, slug);
-  const packageDir = join(migrationsDir, dirName);
+  const packageDir = join(appMigrationsDir, dirName);
 
   // `migration new` scaffolds an empty `migration.ts` for the user to
   // fill, so we attest over `ops: []`. Re-running self-emit after the

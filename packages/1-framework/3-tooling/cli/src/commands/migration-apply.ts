@@ -110,7 +110,7 @@ async function executeMigrationApplyCommand(
   startTime: number,
 ): Promise<Result<MigrationApplyResult, CliStructuredErrorType>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative, refsDir } = resolveMigrationPaths(
+  const { configPath, appMigrationsDir, appMigrationsRelative, refsDir } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -173,7 +173,7 @@ async function executeMigrationApplyCommand(
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
-      { label: 'migrations', value: migrationsRelative },
+      { label: 'migrations', value: appMigrationsRelative },
     ];
     if (typeof dbConnection === 'string') {
       details.push({
@@ -197,7 +197,7 @@ async function executeMigrationApplyCommand(
   // Read migrations and build migration chain model (offline — no DB needed)
   let migrations: Awaited<ReturnType<typeof loadMigrationPackages>>;
   try {
-    migrations = await loadMigrationPackages(migrationsDir);
+    migrations = await loadMigrationPackages(appMigrationsDir);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
@@ -248,9 +248,9 @@ async function executeMigrationApplyCommand(
       if (marker?.storageHash) {
         return notOk(
           errorRuntime('Database has state but no migrations exist', {
-            why: `The database marker hash "${marker.storageHash}" exists but no migrations were found in ${migrationsRelative}`,
+            why: `The database marker hash "${marker.storageHash}" exists but no migrations were found in ${appMigrationsRelative}`,
             fix: 'Ensure the migrations directory is correct. If the database was managed with `db init` or `db update`, run `prisma-next db sign` to update the marker.',
-            meta: { markerHash: marker.storageHash, migrationsDir: migrationsRelative },
+            meta: { markerHash: marker.storageHash, migrationsDir: appMigrationsRelative },
           }),
         );
       }
@@ -258,9 +258,9 @@ async function executeMigrationApplyCommand(
       if (destinationHash !== EMPTY_CONTRACT_HASH) {
         return notOk(
           errorRuntime('Current contract has no planned migrations', {
-            why: `No migrations were found in ${migrationsRelative}, but current contract hash is "${destinationHash}"`,
+            why: `No migrations were found in ${appMigrationsRelative}, but current contract hash is "${destinationHash}"`,
             fix: 'Run `prisma-next migration plan` to create a migration for the current contract.',
-            meta: { destinationHash, migrationsDir: migrationsRelative },
+            meta: { destinationHash, migrationsDir: appMigrationsRelative },
           }),
         );
       }
@@ -295,7 +295,7 @@ async function executeMigrationApplyCommand(
     if (markerHash !== undefined && !migrations.graph.nodes.has(markerHash)) {
       return notOk(
         errorRuntime('Database marker does not match any known migration', {
-          why: `The database marker hash "${markerHash}" is not found in the migration history at ${migrationsRelative}`,
+          why: `The database marker hash "${markerHash}" is not found in the migration history at ${appMigrationsRelative}`,
           fix: 'Ensure the migrations directory matches this database. If the database was managed with `db init` or `db update`, run `prisma-next db sign` to update the marker.',
           meta: { markerHash, knownNodes: [...migrations.graph.nodes] },
         }),
@@ -305,7 +305,7 @@ async function executeMigrationApplyCommand(
     if (!migrations.graph.nodes.has(destinationHash)) {
       return notOk(
         errorRuntime('Current contract has no planned migration path', {
-          why: `Current contract hash "${destinationHash}" is not present in the migration history at ${migrationsRelative}`,
+          why: `Current contract hash "${destinationHash}" is not present in the migration history at ${appMigrationsRelative}`,
           fix: 'Run `prisma-next migration plan` to create a migration for the current contract, then re-run apply.',
           meta: { destinationHash, knownNodes: [...migrations.graph.nodes] },
         }),

@@ -1,21 +1,11 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'pathe';
 import { canonicalizeJson } from './canonicalize-json';
-import { errorPinnedArtefactsAppSpace } from './errors';
-import { APP_SPACE_ID, assertValidSpaceId } from './space-layout';
+import type { ContractSpaceHeadRef } from './read-contract-space-head-ref';
+import { assertValidSpaceId } from './space-layout';
 
 /**
- * Pinned head reference for a contract space — `(hash, invariants)`.
- * Mirrors {@link import('./refs').RefEntry} but is redeclared locally so
- * callers can construct the input without depending on the refs module.
- */
-export interface PinnedSpaceHeadRef {
-  readonly hash: string;
-  readonly invariants: readonly string[];
-}
-
-/**
- * Inputs for {@link emitPinnedSpaceArtefacts}.
+ * Inputs for {@link emitContractSpaceArtefacts}.
  *
  * - `contract` is the canonical contract value the framework just emitted
  *   for the space; it is serialised through {@link canonicalizeJson}, so
@@ -29,19 +19,19 @@ export interface PinnedSpaceHeadRef {
  *   needs), so this helper accepts the text verbatim and writes it out
  *   without further transformation.
  *
- * - `headRef` is the pinned head reference for the space.
+ * - `headRef` is the head reference for the space.
  *   `invariants` are sorted alphabetically before serialisation so two
  *   callers passing the same set in different orders produce
  *   byte-identical `refs/head.json`.
  */
-export interface PinnedSpaceArtefactInputs {
+export interface ContractSpaceArtefactInputs {
   readonly contract: unknown;
   readonly contractDts: string;
-  readonly headRef: PinnedSpaceHeadRef;
+  readonly headRef: ContractSpaceHeadRef;
 }
 
 /**
- * Emit the pinned per-space artefacts (`contract.json`, `contract.d.ts`,
+ * Emit the per-space artefacts (`contract.json`, `contract.d.ts`,
  * `refs/head.json`) under `<projectMigrationsDir>/<spaceId>/`.
  *
  * Always-overwrite: the framework owns these files; running `migrate`
@@ -49,27 +39,20 @@ export interface PinnedSpaceArtefactInputs {
  * helper does not check pre-existing contents — re-emit always wins.
  *
  * Path layout matches the convention in
- * [`spaceMigrationDirectory`](./space-layout.ts), with two restrictions
- * specific to pinned artefacts:
- *
- * - Rejects the app space (`spaceId === APP_SPACE_ID`): the app space's
- *   canonical `contract.json` lives at the project root, not under
- *   `migrations/`. Callers that want to emit it use the app-space
- *   contract emit pipeline.
- * - Validates `spaceId` against `[a-z][a-z0-9_-]{0,63}` via
- *   {@link assertValidSpaceId} for the same filesystem-safety reasons.
+ * [`spaceMigrationDirectory`](./space-layout.ts). The space id is
+ * validated against `[a-z][a-z0-9_-]{0,63}` via
+ * {@link assertValidSpaceId} for filesystem-safety reasons; the helper
+ * accepts every space uniformly (including the app space, default
+ * `'app'`).
  *
  * The migrations directory and space subdirectory are created if they
  * do not yet exist (`mkdir { recursive: true }`).
  */
-export async function emitPinnedSpaceArtefacts(
+export async function emitContractSpaceArtefacts(
   projectMigrationsDir: string,
   spaceId: string,
-  inputs: PinnedSpaceArtefactInputs,
+  inputs: ContractSpaceArtefactInputs,
 ): Promise<void> {
-  if (spaceId === APP_SPACE_ID) {
-    throw errorPinnedArtefactsAppSpace();
-  }
   assertValidSpaceId(spaceId);
 
   const dir = join(projectMigrationsDir, spaceId);

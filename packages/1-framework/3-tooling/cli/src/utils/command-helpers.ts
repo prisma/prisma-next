@@ -7,6 +7,7 @@ import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import type { PathDecision } from '@prisma-next/migration-tools/migration-graph';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
+import { APP_SPACE_ID, spaceMigrationDirectory } from '@prisma-next/migration-tools/spaces';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -79,6 +80,16 @@ export function resolveContractPath(config: { contract?: { output?: string } }):
 /**
  * Resolves the migrations directory and config path from CLI options.
  * Shared by migration-apply, migration-plan, and migration-status.
+ *
+ * - `migrationsDir` is the project's top-level `migrations/` directory
+ *   (the root that the aggregate loader walks for every contract space).
+ * - `appMigrationsDir` is the app subspace directory under it
+ *   (`<migrationsDir>/<APP_SPACE_ID>/`). Every per-app reader / writer
+ *   (`migration new`, `migration plan`, `migration apply`,
+ *   `migration status`, `migration show`, `migration ref`) operates on
+ *   this directory. Extensions own their own `migrations/<spaceId>/`.
+ * - `refsDir` is the app's refs directory (`<appMigrationsDir>/refs/`).
+ *   The framework does not maintain refs at the migrations root.
  */
 export function resolveMigrationPaths(
   configOption: string | undefined,
@@ -87,6 +98,8 @@ export function resolveMigrationPaths(
   configPath: string;
   migrationsDir: string;
   migrationsRelative: string;
+  appMigrationsDir: string;
+  appMigrationsRelative: string;
   refsDir: string;
 } {
   const configPath = configOption
@@ -97,8 +110,17 @@ export function resolveMigrationPaths(
     config.migrations?.dir ?? 'migrations',
   );
   const migrationsRelative = relative(process.cwd(), migrationsDir);
-  const refsDir = resolve(migrationsDir, 'refs');
-  return { configPath, migrationsDir, migrationsRelative, refsDir };
+  const appMigrationsDir = spaceMigrationDirectory(migrationsDir, APP_SPACE_ID);
+  const appMigrationsRelative = relative(process.cwd(), appMigrationsDir);
+  const refsDir = resolve(appMigrationsDir, 'refs');
+  return {
+    configPath,
+    migrationsDir,
+    migrationsRelative,
+    appMigrationsDir,
+    appMigrationsRelative,
+    refsDir,
+  };
 }
 
 /**

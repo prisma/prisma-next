@@ -67,7 +67,7 @@ export async function planAggregate<TFamilyId extends string, TTargetId extends 
       const conflict: AggregatePlannerError = {
         kind: 'policyConflict',
         spaceId: member.spaceId,
-        detail: `\`callerPolicy.ignoreGraphFor\` requested for space "${member.spaceId}", but the member declares non-empty head-ref invariants (${member.headRef.invariants.join(', ')}). Synthesising a plan from the contract IR cannot satisfy authored invariants — the graph must be walked. Either remove "${member.spaceId}" from \`ignoreGraphFor\` or amend the pinned head ref to declare zero invariants.`,
+        detail: `\`callerPolicy.ignoreGraphFor\` requested for space "${member.spaceId}", but the member declares non-empty head-ref invariants (${member.headRef.invariants.join(', ')}). Synthesising a plan from the contract IR cannot satisfy authored invariants — the graph must be walked. Either remove "${member.spaceId}" from \`ignoreGraphFor\` or amend the on-disk head ref to declare zero invariants.`,
       };
       return notOk(conflict);
     }

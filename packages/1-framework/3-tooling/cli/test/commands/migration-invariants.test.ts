@@ -95,7 +95,7 @@ function setupConfigMock(
 
 async function setupDivergentFixture(): Promise<InvariantFixture & { refHash: string }> {
   const cwd = await mkdtemp(join(tmpdir(), 'cli-invariant-'));
-  const migrationsDir = join(cwd, 'migrations');
+  const migrationsDir = join(cwd, 'migrations', 'app');
   await mkdir(migrationsDir, { recursive: true });
 
   const REF_HASH = `sha256:${'b'.repeat(64)}`;
@@ -157,7 +157,7 @@ async function setupFixture(opts: {
 }): Promise<InvariantFixture> {
   const cwd = await mkdtemp(join(tmpdir(), 'cli-invariant-'));
 
-  const migrationsDir = join(cwd, 'migrations');
+  const migrationsDir = join(cwd, 'migrations', 'app');
   await mkdir(migrationsDir, { recursive: true });
 
   const packageDir = join(migrationsDir, '00001_create_users');

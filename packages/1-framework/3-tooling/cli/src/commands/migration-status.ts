@@ -369,7 +369,7 @@ async function executeMigrationStatusCommand(
   ui: TerminalUI,
 ): Promise<Result<MigrationStatusResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative, refsDir } = resolveMigrationPaths(
+  const { configPath, appMigrationsDir, appMigrationsRelative, refsDir } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -414,7 +414,7 @@ async function executeMigrationStatusCommand(
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
-      { label: 'migrations', value: migrationsRelative },
+      { label: 'migrations', value: appMigrationsRelative },
     ];
     if (dbConnection && hasDriver) {
       details.push({ label: 'database', value: maskConnectionUrl(String(dbConnection)) });
@@ -454,7 +454,7 @@ async function executeMigrationStatusCommand(
   let bundles: readonly OnDiskMigrationPackage[];
   let graph: MigrationGraph;
   try {
-    ({ bundles, graph } = await loadMigrationPackages(migrationsDir));
+    ({ bundles, graph } = await loadMigrationPackages(appMigrationsDir));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));

@@ -17,9 +17,9 @@ import { executeAggregateApply } from './db-apply-aggregate';
  *
  * 1. {@link executeAggregateApply} loads a `ContractSpaceAggregate` via
  *    {@link import('@prisma-next/migration-tools/aggregate').loadContractSpaceAggregate}
- *    from the supplied descriptor set + on-disk pinned artefacts.
+ *    from the supplied descriptor set + on-disk on-disk artefacts.
  * 2. The aggregate planner runs with `callerPolicy.ignoreGraphFor`
- *    pinned to the app member — synth strategy for the app, graph-walk
+ *    locked to the app member — synth strategy for the app, graph-walk
  *    for every extension.
  * 3. The runner's `executeAcrossSpaces` applies the per-space plans
  *    inside one outer transaction.
@@ -39,7 +39,7 @@ export interface ExecuteDbInitOptions<TFamilyId extends string, TTargetId extend
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   /**
-   * On-disk migrations directory the aggregate loader reads pinned
+   * On-disk migrations directory the aggregate loader reads on-disk
    * artefacts from. Required.
    */
   readonly migrationsDir: string;

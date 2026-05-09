@@ -25,7 +25,7 @@ export interface DescriptorSelfConsistencyInputs {
  * over `(target, targetFamily, storage)`. Mismatch indicates the
  * extension author bumped `contractJson` without rerunning emit, leaving
  * the descriptor's `headRef.hash` stale; the consumer-side helpers
- * (drift detection, pinned artefact emission, runner marker writes) all
+ * (drift detection, on-disk artefact emission, runner marker writes) all
  * trust `headRef.hash` as the canonical identity, so a stale value would
  * silently corrupt every downstream boundary.
  *

@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { emitPinnedSpaceArtefacts } from '../src/emit-pinned-space-artefacts';
+import { emitContractSpaceArtefacts } from '../src/emit-contract-space-artefacts';
 import { gatherDiskContractSpaceState } from '../src/gather-disk-contract-space-state';
 
 describe('gatherDiskContractSpaceState', () => {
@@ -22,17 +22,17 @@ describe('gatherDiskContractSpaceState', () => {
       projectMigrationsDir: missing,
       loadedSpaceIds: new Set(['app']),
     });
-    expect(state.pinnedDirsOnDisk).toEqual([]);
-    expect(state.pinnedHashesBySpace.size).toBe(0);
+    expect(state.spaceDirsOnDisk).toEqual([]);
+    expect(state.headRefsBySpace.size).toBe(0);
   });
 
-  it('lists pinned dirs on disk and reads pinned head refs for declared spaces', async () => {
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+  it('lists contract-space dirs on disk and reads on-disk head refs for declared spaces', async () => {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { id: 'cipher' },
       contractDts: '\n',
       headRef: { hash: 'sha256:cipher', invariants: ['cipher:create-v1'] },
     });
-    await emitPinnedSpaceArtefacts(migrationsDir, 'pgvector', {
+    await emitContractSpaceArtefacts(migrationsDir, 'pgvector', {
       contract: { id: 'pgvector' },
       contractDts: '\n',
       headRef: { hash: 'sha256:pgvector', invariants: ['pgvector:install-v1'] },
@@ -43,19 +43,19 @@ describe('gatherDiskContractSpaceState', () => {
       loadedSpaceIds: new Set(['app', 'cipherstash', 'pgvector']),
     });
 
-    expect([...state.pinnedDirsOnDisk]).toEqual(['cipherstash', 'pgvector']);
-    expect(state.pinnedHashesBySpace.get('cipherstash')).toEqual({
+    expect([...state.spaceDirsOnDisk]).toEqual(['cipherstash', 'pgvector']);
+    expect(state.headRefsBySpace.get('cipherstash')).toEqual({
       hash: 'sha256:cipher',
       invariants: ['cipher:create-v1'],
     });
-    expect(state.pinnedHashesBySpace.get('pgvector')).toEqual({
+    expect(state.headRefsBySpace.get('pgvector')).toEqual({
       hash: 'sha256:pgvector',
       invariants: ['pgvector:install-v1'],
     });
   });
 
-  it('omits declared spaces with no pinned dir on disk (verifier reports declaredButUnmigrated)', async () => {
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+  it('omits declared spaces with no contract-space dir on disk (verifier reports declaredButUnmigrated)', async () => {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { id: 'cipher' },
       contractDts: '\n',
       headRef: { hash: 'sha256:cipher', invariants: [] },
@@ -66,22 +66,22 @@ describe('gatherDiskContractSpaceState', () => {
       loadedSpaceIds: new Set(['app', 'cipherstash', 'pgvector']),
     });
 
-    expect(state.pinnedHashesBySpace.has('cipherstash')).toBe(true);
-    expect(state.pinnedHashesBySpace.has('pgvector')).toBe(false);
-    // Pinned dir listing reflects what is on disk irrespective of declaration.
-    expect([...state.pinnedDirsOnDisk]).toEqual(['cipherstash']);
+    expect(state.headRefsBySpace.has('cipherstash')).toBe(true);
+    expect(state.headRefsBySpace.has('pgvector')).toBe(false);
+    // Contract-space dir listing reflects what is on disk irrespective of declaration.
+    expect([...state.spaceDirsOnDisk]).toEqual(['cipherstash']);
   });
 
-  it('does not read pinned hashes for the app space', async () => {
+  it('does not read on-disk head hashes for the app space', async () => {
     const state = await gatherDiskContractSpaceState({
       projectMigrationsDir: migrationsDir,
       loadedSpaceIds: new Set(['app']),
     });
-    expect(state.pinnedHashesBySpace.has('app')).toBe(false);
+    expect(state.headRefsBySpace.has('app')).toBe(false);
   });
 
-  it('reports orphan pinned dirs (on disk but not declared) — caller passes both lists to verifyContractSpaces', async () => {
-    await emitPinnedSpaceArtefacts(migrationsDir, 'cipherstash', {
+  it('reports orphan contract-space dirs (on disk but not declared) — caller passes both lists to verifyContractSpaces', async () => {
+    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
       contract: { id: 'cipher' },
       contractDts: '\n',
       headRef: { hash: 'sha256:cipher', invariants: [] },
@@ -93,8 +93,8 @@ describe('gatherDiskContractSpaceState', () => {
     });
 
     // The directory is on disk; the helper does not filter by declaration —
-    // verifyContractSpaces will surface this as orphanPinnedDir.
-    expect([...state.pinnedDirsOnDisk]).toEqual(['cipherstash']);
-    expect(state.pinnedHashesBySpace.has('cipherstash')).toBe(false);
+    // verifyContractSpaces will surface this as orphanSpaceDir.
+    expect([...state.spaceDirsOnDisk]).toEqual(['cipherstash']);
+    expect(state.headRefsBySpace.has('cipherstash')).toBe(false);
   });
 });

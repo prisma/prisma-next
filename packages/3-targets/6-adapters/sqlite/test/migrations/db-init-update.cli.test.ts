@@ -10,7 +10,7 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -25,7 +25,7 @@ import {
 
 /**
  * End-to-end coverage for the CLI aggregate `db init` / `db update`
- * pipeline against a real SQLite database with on-disk pinned
+ * pipeline against a real SQLite database with on-disk
  * artefacts.
  *
  * Locks the CLI-level half of:
@@ -146,11 +146,11 @@ function buildFailingOps(): readonly MigrationPlanOperation[] {
   ];
 }
 
-interface PinnedArtefactSetup {
+interface ContractSpaceArtefactSetup {
   readonly migrationsDir: string;
 }
 
-async function writePinnedExtensionArtefacts(args: {
+async function writeExtensionContractSpaceArtefacts(args: {
   readonly tmpDir: string;
   readonly contract: Contract<SqlStorage>;
   readonly headHash: string;
@@ -161,11 +161,11 @@ async function writePinnedExtensionArtefacts(args: {
   readonly ops: readonly MigrationPlanOperation[];
   readonly toContract: Contract<SqlStorage>;
   readonly providedInvariants: readonly string[];
-}): Promise<PinnedArtefactSetup> {
+}): Promise<ContractSpaceArtefactSetup> {
   const migrationsDir = join(args.tmpDir, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
 
-  await emitPinnedSpaceArtefacts(migrationsDir, EXT_SPACE_ID, {
+  await emitContractSpaceArtefacts(migrationsDir, EXT_SPACE_ID, {
     contract: args.contract,
     contractDts: '// placeholder\nexport {};\n',
     headRef: { hash: args.headHash, invariants: [...args.invariants] },
@@ -196,10 +196,10 @@ async function writePinnedExtensionArtefacts(args: {
  * Build a structurally-valid `SqlControlExtensionDescriptor` with the
  * `contractSpace` field the aggregate loader inspects. The descriptor's
  * `contractJson` is the same reference the test will pass to the loader,
- * and `headRef.hash` matches the on-disk pinned head ref so drift
+ * and `headRef.hash` matches the on-disk on-disk head ref so drift
  * detection passes. Other descriptor fields (`create`, `migrations`)
  * are unused on the `db init` / `db update` path — the loader reads
- * pinned migrations from disk and `create()` is only invoked on the
+ * migrations from disk and `create()` is only invoked on the
  * `migrate` path. They are stubbed minimally to satisfy the type.
  */
 function buildExtensionPack(args: {
@@ -246,8 +246,8 @@ describe(
       return db.path.replace(/\/test\.db$/, '');
     }
 
-    async function setupBaselinePinned(tmpDir: string): Promise<PinnedArtefactSetup> {
-      return writePinnedExtensionArtefacts({
+    async function setupBaseline(tmpDir: string): Promise<ContractSpaceArtefactSetup> {
+      return writeExtensionContractSpaceArtefacts({
         tmpDir,
         contract: extContractV1,
         headHash: extContractV1.storage.storageHash,
@@ -263,7 +263,7 @@ describe(
 
     it('initialises both spaces atomically on a fresh database (locks AM9, AM11 prerequisites)', async () => {
       const tmpDir = createTmpDir();
-      const { migrationsDir } = await setupBaselinePinned(tmpDir);
+      const { migrationsDir } = await setupBaseline(tmpDir);
 
       const result = await executeDbInit({
         driver: testDb!.driver,
@@ -309,9 +309,9 @@ describe(
       expect(helperTable.rows[0]!.cnt).toBe(1);
     });
 
-    it('advances only the bumped extension space when re-running with a new pinned head (locks AM10)', async () => {
+    it('advances only the bumped extension space when re-running with a new head (locks AM10)', async () => {
       const tmpDir = createTmpDir();
-      const baseline = await setupBaselinePinned(tmpDir);
+      const baseline = await setupBaseline(tmpDir);
 
       const initResult = await executeDbInit({
         driver: testDb!.driver,
@@ -335,7 +335,7 @@ describe(
       // migration package. The on-disk graph now has two edges
       // (null→v1, v1→v2); the marker is at v1 so only the second edge
       // walks.
-      await emitPinnedSpaceArtefacts(baseline.migrationsDir, EXT_SPACE_ID, {
+      await emitContractSpaceArtefacts(baseline.migrationsDir, EXT_SPACE_ID, {
         contract: extContractV2,
         contractDts: '// placeholder\nexport {};\n',
         headRef: { hash: extContractV2.storage.storageHash, invariants: [] },
@@ -405,7 +405,7 @@ describe(
 
     it('fires the codec onFieldEvent hook on app-space field add through the aggregate pipeline (M2 R1 wiring still flows through the synth strategy)', async () => {
       const tmpDir = createTmpDir();
-      const { migrationsDir } = await setupBaselinePinned(tmpDir);
+      const { migrationsDir } = await setupBaseline(tmpDir);
 
       const HOOKED_CODEC = 'cs/string@1';
       const hookFiredFor: string[] = [];
@@ -497,7 +497,7 @@ describe(
 
     it('rolls back ALL spaces and preserves pre-execution markers when any space fails (locks AM4-rollback CLI half)', async () => {
       const tmpDir = createTmpDir();
-      const baseline = await setupBaselinePinned(tmpDir);
+      const baseline = await setupBaseline(tmpDir);
 
       const initResult = await executeDbInit({
         driver: testDb!.driver,
@@ -524,7 +524,7 @@ describe(
       const extHashBefore = markersBefore.rows.find((r) => r.space === EXT_SPACE_ID)!.core_hash;
 
       // Bump extension to v2 with a *failing* op.
-      await emitPinnedSpaceArtefacts(baseline.migrationsDir, EXT_SPACE_ID, {
+      await emitContractSpaceArtefacts(baseline.migrationsDir, EXT_SPACE_ID, {
         contract: extContractV2,
         contractDts: '// placeholder\nexport {};\n',
         headRef: { hash: extContractV2.storage.storageHash, invariants: [] },

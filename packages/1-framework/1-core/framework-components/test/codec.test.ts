@@ -110,7 +110,7 @@ test('CodecImpl.id proxies through descriptor.codecId (parameterized)', ({ expec
 });
 
 test('alias descriptor produces codec whose id reads the alias codecId', ({ expect }) => {
-  // Spec § Class hierarchy aliasing: an alias descriptor instantiates the same concrete codec class (`Int4FixtureCodec`) but passes itself as the descriptor reference. `CodecImpl.id` proxies through `this.descriptor.codecId`, so the runtime id reads the alias's id even though the codec class hardcodes `'demo/int4@1'` in its type-level `Id` parameter. This test pins that regression vector — a future change that pinned `id` to the codec class's `Id` type literal would silently break aliasing.
+  // Spec § Class hierarchy aliasing: an alias descriptor instantiates the same concrete codec class (`Int4FixtureCodec`) but passes itself as the descriptor reference. `CodecImpl.id` proxies through `this.descriptor.codecId`, so the runtime id reads the alias's id even though the codec class hardcodes `'demo/int4@1'` in its type-level `Id` parameter. This test locks that regression vector — a future change that locked `id` to the codec class's `Id` type literal would silently break aliasing.
   //
   // The alias extends `CodecDescriptorImpl<void>` directly (not `Int4FixtureDescriptor`) because `Int4FixtureDescriptor.codecId` is narrowed to the literal `'demo/int4@1'`; subclasses can't override it with a different literal under TypeScript's structural overrides.
   class AliasedInt4Descriptor extends CodecDescriptorImpl<void> {

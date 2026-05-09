@@ -2,7 +2,10 @@ import { EMPTY_CONTRACT_HASH } from './constants';
 import { readMigrationsDir } from './io';
 import { findPathWithDecision, reconstructGraph } from './migration-graph';
 import type { MigrationOps } from './package';
-import { type PinnedHeadRef, readPinnedHeadRef } from './read-pinned-head-ref';
+import {
+  type ContractSpaceHeadRef,
+  readContractSpaceHeadRef,
+} from './read-contract-space-head-ref';
 import { spaceMigrationDirectory } from './space-layout';
 
 /**
@@ -14,7 +17,7 @@ import { spaceMigrationDirectory } from './space-layout';
 export type ExtensionSpaceApplyPathOutcome =
   | {
       readonly kind: 'ok';
-      readonly pinnedHeadRef: PinnedHeadRef;
+      readonly contractSpaceHeadRef: ContractSpaceHeadRef;
       /**
        * Sorted, deduplicated invariant ids covered by the walked path.
        * Mirrors the on-disk `providedInvariants` summed across edges and
@@ -23,7 +26,7 @@ export type ExtensionSpaceApplyPathOutcome =
       readonly providedInvariants: readonly string[];
       /**
        * Path operations in apply order. Empty when the marker is already
-       * at the pinned head (no-op).
+       * at the recorded head (no-op).
        */
       readonly pathOps: MigrationOps;
       /**
@@ -33,14 +36,14 @@ export type ExtensionSpaceApplyPathOutcome =
        */
       readonly walkedMigrationDirs: readonly string[];
     }
-  | { readonly kind: 'unreachable'; readonly pinnedHeadRef: PinnedHeadRef }
+  | { readonly kind: 'unreachable'; readonly contractSpaceHeadRef: ContractSpaceHeadRef }
   | {
       readonly kind: 'unsatisfiable';
-      readonly pinnedHeadRef: PinnedHeadRef;
+      readonly contractSpaceHeadRef: ContractSpaceHeadRef;
       readonly missing: readonly string[];
       readonly structuralPath: readonly { readonly dirName: string; readonly to: string }[];
     }
-  | { readonly kind: 'pinnedHeadRefMissing' };
+  | { readonly kind: 'contractSpaceHeadRefMissing' };
 
 /**
  * Inputs to {@link computeExtensionSpaceApplyPath}. The helper is
@@ -63,7 +66,7 @@ export interface ComputeExtensionSpaceApplyPathInputs {
 /**
  * Compute the apply path for an extension contract space — the shortest
  * sequence of on-disk migration packages that walks the live marker
- * forward to the pinned head ref hash, covering every required
+ * forward to the on-disk head ref hash, covering every required
  * invariant.
  *
  * Reads only on-disk artefacts (`migrations/<spaceId>/refs/head.json`
@@ -73,12 +76,12 @@ export interface ComputeExtensionSpaceApplyPathInputs {
  *
  * Behaviour:
  * - Returns `{ kind: 'ok', pathOps: [], … }` when the marker is already
- *   at the pinned head and no required invariants are missing.
+ *   at the recorded head and no required invariants are missing.
  * - Returns `{ kind: 'unreachable' }` when the marker hash is not
- *   structurally connected to the pinned head in the graph.
+ *   structurally connected to the recorded head in the graph.
  * - Returns `{ kind: 'unsatisfiable', missing, … }` when the marker is
  *   reachable but no path covers the required invariants.
- * - Returns `{ kind: 'pinnedHeadRefMissing' }` when the per-space
+ * - Returns `{ kind: 'contractSpaceHeadRefMissing' }` when the per-space
  *   `refs/head.json` is absent — the precheck verifier should already
  *   have rejected this case, but the helper is defensive so callers can
  *   surface a coherent error rather than throw.
@@ -88,9 +91,9 @@ export async function computeExtensionSpaceApplyPath(
 ): Promise<ExtensionSpaceApplyPathOutcome> {
   const { projectMigrationsDir, spaceId, currentMarkerHash, currentMarkerInvariants } = inputs;
 
-  const pinnedHeadRef = await readPinnedHeadRef(projectMigrationsDir, spaceId);
-  if (pinnedHeadRef === null) {
-    return { kind: 'pinnedHeadRefMissing' };
+  const contractSpaceHeadRef = await readContractSpaceHeadRef(projectMigrationsDir, spaceId);
+  if (contractSpaceHeadRef === null) {
+    return { kind: 'contractSpaceHeadRefMissing' };
   }
 
   const spaceDir = spaceMigrationDirectory(projectMigrationsDir, spaceId);
@@ -102,18 +105,18 @@ export async function computeExtensionSpaceApplyPath(
   // hits the baseline migration whose `from` is EMPTY_CONTRACT_HASH.
   const fromHash = currentMarkerHash ?? EMPTY_CONTRACT_HASH;
   const required = new Set(
-    pinnedHeadRef.invariants.filter((id) => !currentMarkerInvariants.includes(id)),
+    contractSpaceHeadRef.invariants.filter((id) => !currentMarkerInvariants.includes(id)),
   );
 
-  const outcome = findPathWithDecision(graph, fromHash, pinnedHeadRef.hash, { required });
+  const outcome = findPathWithDecision(graph, fromHash, contractSpaceHeadRef.hash, { required });
 
   if (outcome.kind === 'unreachable') {
-    return { kind: 'unreachable', pinnedHeadRef };
+    return { kind: 'unreachable', contractSpaceHeadRef };
   }
   if (outcome.kind === 'unsatisfiable') {
     return {
       kind: 'unsatisfiable',
-      pinnedHeadRef,
+      contractSpaceHeadRef,
       missing: outcome.missing,
       structuralPath: outcome.structuralPath.map(({ dirName, to }) => ({ dirName, to })),
     };
@@ -141,7 +144,7 @@ export async function computeExtensionSpaceApplyPath(
 
   return {
     kind: 'ok',
-    pinnedHeadRef,
+    contractSpaceHeadRef,
     providedInvariants: [...providedInvariantsSet].sort(),
     pathOps,
     walkedMigrationDirs,

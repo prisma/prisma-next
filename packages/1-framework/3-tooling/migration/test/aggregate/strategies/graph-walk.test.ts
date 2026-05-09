@@ -32,7 +32,7 @@ function makeMember(
 }
 
 describe('graphWalkStrategy', () => {
-  it('walks the shortest path from the live marker to the pinned head ref', () => {
+  it('walks the shortest path from the live marker to the on-disk head ref', () => {
     const headHash = 'sha256:cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
 

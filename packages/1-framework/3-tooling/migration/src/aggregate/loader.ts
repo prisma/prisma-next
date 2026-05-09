@@ -5,10 +5,10 @@ import { detectSpaceContractDrift } from '../detect-space-contract-drift';
 import { readMigrationsDir } from '../io';
 import { reconstructGraph } from '../migration-graph';
 import type { OnDiskMigrationPackage } from '../package';
-import { readPinnedHeadRef } from '../read-pinned-head-ref';
-import { readPinnedSpaceContract } from '../read-pinned-space-contract';
+import { readContractSpaceContract } from '../read-contract-space-contract';
+import { readContractSpaceHeadRef } from '../read-contract-space-head-ref';
 import { APP_SPACE_ID, spaceMigrationDirectory } from '../space-layout';
-import { listPinnedSpaceDirectories } from '../verify-contract-spaces';
+import { listContractSpaceDirectories } from '../verify-contract-spaces';
 import type { ContractSpaceAggregate, ContractSpaceMember, HydratedMigrationGraph } from './types';
 
 /**
@@ -35,7 +35,7 @@ export type AggregateContractHasher = (contract: unknown) => string;
  * - `contractSpace` — present iff the descriptor declares a contract
  *   space (extensions can ship without one and remain runtime-only /
  *   codec-only). Drift detection compares the descriptor's
- *   `contractJson` hash against the on-disk pinned hash; the loader
+ *   `contractJson` hash against the on-disk on-disk head hash; the loader
  *   rejects drift fatally.
  *
  * Typed structurally so the migration-tools layer stays framework-neutral.
@@ -93,7 +93,7 @@ export type LoadAggregateError =
   | {
       readonly kind: 'driftViolation';
       readonly spaceId: string;
-      readonly pinnedHash: string;
+      readonly priorHeadHash: string;
       readonly liveHash: string;
     }
   | {
@@ -114,15 +114,15 @@ export type LoadAggregateError =
  * at a time across re-runs.
  *
  * - `declaredButUnmigrated`: extension declared in `extensionPacks` with
- *   a `contractSpace` but no pinned dir on disk. Remediation:
+ *   a `contractSpace` but no contract-space dir on disk. Remediation:
  *   `prisma-next migrate`.
- * - `orphanPinnedDir`: pinned dir under `migrations/` for an extension
+ * - `orphanSpaceDir`: contract-space dir under `migrations/` for an extension
  *   not in `extensionPacks`. Remediation: remove the directory, or
  *   re-add the extension to `extensionPacks`.
  */
 export type LayoutViolation =
   | { readonly kind: 'declaredButUnmigrated'; readonly spaceId: string }
-  | { readonly kind: 'orphanPinnedDir'; readonly spaceId: string };
+  | { readonly kind: 'orphanSpaceDir'; readonly spaceId: string };
 
 export type LoadAggregateOutput = Result<
   { readonly aggregate: ContractSpaceAggregate },
@@ -145,9 +145,9 @@ interface LoadedExtensionState {
  * pipeline: callers read `extensionPacks` from `Config`, validate the
  * app contract, and pass everything through. The loader composes
  * existing migration-tools primitives — layout precheck (via
- * {@link listPinnedSpaceDirectories}), integrity checks (via
- * {@link readMigrationsDir} / {@link readPinnedHeadRef} /
- * {@link readPinnedSpaceContract} / `validateContract`), drift detection
+ * {@link listContractSpaceDirectories}), integrity checks (via
+ * {@link readMigrationsDir} / {@link readContractSpaceHeadRef} /
+ * {@link readContractSpaceContract} / `validateContract`), drift detection
  * (via {@link detectSpaceContractDrift}), and disjointness — into a
  * single typed value.
  *
@@ -182,17 +182,23 @@ export async function loadContractSpaceAggregate(
   // 2. Layout precheck: bundle every layout offence at once.
   const declaredWithSpace = input.declaredExtensions.filter((e) => e.contractSpace !== undefined);
   const declaredSpaceIds = new Set(declaredWithSpace.map((e) => e.id));
-  const pinnedDirs = await listPinnedSpaceDirectories(input.migrationsDir);
-  const pinnedDirSet = new Set(pinnedDirs);
+  const allDirs = await listContractSpaceDirectories(input.migrationsDir);
+  // The app member is implicitly declared (it is always part of the
+  // aggregate); its `migrations/<APP_SPACE_ID>/` directory may exist or
+  // not (greenfield projects start with neither). Filter it out of the
+  // orphan / declared-but-unmigrated checks so the layout precheck is
+  // about extensions only.
+  const extensionDirsOnDisk = allDirs.filter((d) => d !== APP_SPACE_ID);
+  const spaceDirSet = new Set(extensionDirsOnDisk);
 
   const layoutViolations: LayoutViolation[] = [];
-  for (const dir of pinnedDirs) {
+  for (const dir of extensionDirsOnDisk) {
     if (!declaredSpaceIds.has(dir)) {
-      layoutViolations.push({ kind: 'orphanPinnedDir', spaceId: dir });
+      layoutViolations.push({ kind: 'orphanSpaceDir', spaceId: dir });
     }
   }
   for (const id of [...declaredSpaceIds].sort()) {
-    if (!pinnedDirSet.has(id)) {
+    if (!spaceDirSet.has(id)) {
       layoutViolations.push({ kind: 'declaredButUnmigrated', spaceId: id });
     }
   }
@@ -203,18 +209,18 @@ export async function loadContractSpaceAggregate(
   // 3-5. Per-extension: read + validate + integrity-check + drift.
   const loadedExtensions: LoadedExtensionState[] = [];
   for (const entry of [...declaredWithSpace].sort((a, b) => a.id.localeCompare(b.id))) {
-    const headRef = await readPinnedHeadRef(input.migrationsDir, entry.id);
+    const headRef = await readContractSpaceHeadRef(input.migrationsDir, entry.id);
     if (headRef === null) {
       return notOk({
         kind: 'integrityFailure',
         spaceId: entry.id,
-        detail: `Pinned \`refs/head.json\` is missing for extension space "${entry.id}".`,
+        detail: `Head ref \`refs/head.json\` is missing for extension space "${entry.id}".`,
       });
     }
 
-    let pinnedContractRaw: unknown;
+    let spaceContractRaw: unknown;
     try {
-      pinnedContractRaw = await readPinnedSpaceContract(input.migrationsDir, entry.id);
+      spaceContractRaw = await readContractSpaceContract(input.migrationsDir, entry.id);
     } catch (error) {
       return notOk({
         kind: 'integrityFailure',
@@ -223,9 +229,9 @@ export async function loadContractSpaceAggregate(
       });
     }
 
-    let pinnedContract: Contract;
+    let spaceContract: Contract;
     try {
-      pinnedContract = input.validateContract(pinnedContractRaw);
+      spaceContract = input.validateContract(spaceContractRaw);
     } catch (error) {
       return notOk({
         kind: 'validationFailure',
@@ -234,28 +240,28 @@ export async function loadContractSpaceAggregate(
       });
     }
 
-    if (pinnedContract.target !== input.targetId) {
+    if (spaceContract.target !== input.targetId) {
       return notOk({
         kind: 'targetMismatch',
         spaceId: entry.id,
         expected: input.targetId,
-        actual: pinnedContract.target,
+        actual: spaceContract.target,
       });
     }
 
-    // Drift: compare descriptor's live `contractJson` to pinned
+    // Drift: compare descriptor's live `contractJson` to on-disk
     // `refs/head.json.hash`.
     if (entry.contractSpace) {
       const liveHash = input.hashContract(entry.contractSpace.contractJson);
       const drift = detectSpaceContractDrift(entry.id, {
         descriptorHash: liveHash,
-        pinnedHash: headRef.hash,
+        priorHeadHash: headRef.hash,
       });
       if (drift.kind === 'drift') {
         return notOk({
           kind: 'driftViolation',
           spaceId: entry.id,
-          pinnedHash: drift.pinnedHash ?? '',
+          priorHeadHash: drift.priorHeadHash ?? '',
           liveHash: drift.descriptorHash,
         });
       }
@@ -286,24 +292,24 @@ export async function loadContractSpaceAggregate(
       });
     }
 
-    // The pinned head ref must be reachable in the graph. Empty graphs
+    // The on-disk head ref must be reachable in the graph. Empty graphs
     // are tolerated only when the head ref points at the empty-contract
     // sentinel (a never-emitted extension space; not a typical scenario
-    // because the layout precheck would have flagged the missing pinned
+    // because the layout precheck would have flagged the missing
     // dir, but defensible).
     if (graph.nodes.size === 0) {
       if (headRef.hash !== EMPTY_CONTRACT_HASH) {
         return notOk({
           kind: 'integrityFailure',
           spaceId: entry.id,
-          detail: `Pinned head ref "${headRef.hash}" is not present in the (empty) on-disk migration graph.`,
+          detail: `Head ref "${headRef.hash}" is not present in the (empty) on-disk migration graph.`,
         });
       }
     } else if (!graph.nodes.has(headRef.hash)) {
       return notOk({
         kind: 'integrityFailure',
         spaceId: entry.id,
-        detail: `Pinned head ref "${headRef.hash}" is not present in the on-disk migration graph.`,
+        detail: `Head ref "${headRef.hash}" is not present in the on-disk migration graph.`,
       });
     }
 
@@ -313,7 +319,7 @@ export async function loadContractSpaceAggregate(
 
     loadedExtensions.push({
       entry,
-      contract: pinnedContract,
+      contract: spaceContract,
       headRefHash: headRef.hash,
       headRefInvariants: [...headRef.invariants].sort(),
       migrations: { graph, packagesByMigrationHash },

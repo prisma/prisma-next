@@ -7,7 +7,7 @@ import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/cont
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -25,7 +25,7 @@ import {
 /**
  * End-to-end coverage for the CLI aggregate `db init` / `db update`
  * pipeline against a real Postgres database (PGlite via dev-database)
- * with on-disk pinned artefacts.
+ * with on-disk on-disk artefacts.
  *
  * Postgres equivalent of the SQLite `db-init-update.cli.test.ts`.
  *
@@ -143,12 +143,12 @@ function buildFailingOps(): readonly MigrationPlanOperation[] {
   ];
 }
 
-interface PinnedArtefactSetup {
+interface ContractSpaceArtefactSetup {
   readonly migrationsDir: string;
   readonly tmpRoot: string;
 }
 
-async function writePinnedExtensionArtefacts(args: {
+async function writeExtensionContractSpaceArtefacts(args: {
   readonly tmpRoot: string;
   readonly contract: Contract<SqlStorage>;
   readonly headHash: string;
@@ -158,11 +158,11 @@ async function writePinnedExtensionArtefacts(args: {
   readonly toHash: string;
   readonly ops: readonly MigrationPlanOperation[];
   readonly toContract: Contract<SqlStorage>;
-}): Promise<PinnedArtefactSetup> {
+}): Promise<ContractSpaceArtefactSetup> {
   const migrationsDir = join(args.tmpRoot, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
 
-  await emitPinnedSpaceArtefacts(migrationsDir, EXT_SPACE_ID, {
+  await emitContractSpaceArtefacts(migrationsDir, EXT_SPACE_ID, {
     contract: args.contract,
     contractDts: '// placeholder\nexport {};\n',
     headRef: { hash: args.headHash, invariants: [...args.invariants] },
@@ -242,8 +242,8 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
     return dir;
   }
 
-  async function setupBaselinePinned(tmp: string): Promise<PinnedArtefactSetup> {
-    return writePinnedExtensionArtefacts({
+  async function setupBaseline(tmp: string): Promise<ContractSpaceArtefactSetup> {
+    return writeExtensionContractSpaceArtefacts({
       tmpRoot: tmp,
       contract: extContractV1,
       headHash: extContractV1.storage.storageHash,
@@ -261,7 +261,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
     async () => {
       const drv = await freshDriver();
       const tmp = await freshTmpDir('init');
-      const { migrationsDir } = await setupBaselinePinned(tmp);
+      const { migrationsDir } = await setupBaseline(tmp);
 
       const result = await executeDbInit({
         driver: drv,
@@ -314,7 +314,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
     async () => {
       const drv = await freshDriver();
       const tmp = await freshTmpDir('update');
-      const baseline = await setupBaselinePinned(tmp);
+      const baseline = await setupBaseline(tmp);
 
       const initResult = await executeDbInit({
         driver: drv,
@@ -337,7 +337,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
       // Bump extension to v2: emit the v2 head ref and a follow-on
       // migration package. The graph now has two edges (null→v1, v1→v2);
       // the marker is at v1 so only the second edge walks.
-      await emitPinnedSpaceArtefacts(baseline.migrationsDir, EXT_SPACE_ID, {
+      await emitContractSpaceArtefacts(baseline.migrationsDir, EXT_SPACE_ID, {
         contract: extContractV2,
         contractDts: '// placeholder\nexport {};\n',
         headRef: { hash: extContractV2.storage.storageHash, invariants: [] },
@@ -408,7 +408,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
     async () => {
       const drv = await freshDriver();
       const tmp = await freshTmpDir('rollback');
-      const baseline = await setupBaselinePinned(tmp);
+      const baseline = await setupBaseline(tmp);
 
       const initResult = await executeDbInit({
         driver: drv,
@@ -435,7 +435,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
       const extHashBefore = markersBefore.rows.find((r) => r.space === EXT_SPACE_ID)!.core_hash;
 
       // Bump extension to v2 with a failing op.
-      await emitPinnedSpaceArtefacts(baseline.migrationsDir, EXT_SPACE_ID, {
+      await emitContractSpaceArtefacts(baseline.migrationsDir, EXT_SPACE_ID, {
         contract: extContractV2,
         contractDts: '// placeholder\nexport {};\n',
         headRef: { hash: extContractV2.storage.storageHash, invariants: [] },
