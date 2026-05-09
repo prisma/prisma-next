@@ -21,7 +21,7 @@
     "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "@types/node": "catalog:",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.4.2",
     "pg": "catalog:"
   }
 }

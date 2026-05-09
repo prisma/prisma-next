@@ -31,7 +31,7 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-sqlite": "workspace:*",
     "arktype": "^2.1.29",
-    "dotenv": "^16.4.5"
+    "dotenv": "^17.4.2"
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
