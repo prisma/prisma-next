@@ -1,10 +1,6 @@
 #!/usr/bin/env -S node
-import {
-  createTable,
-  Migration,
-  MigrationCLI,
-  rawSql,
-} from '@prisma-next/target-postgres/migration';
+import { cipherstashAddSearchConfig } from '@prisma-next/extension-cipherstash/migration';
+import { createTable, Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
 
 export default class M extends Migration {
   override describe() {
@@ -25,36 +21,8 @@ export default class M extends Migration {
         ],
         { columns: ['id'] },
       ),
-      rawSql({
-        id: 'cipherstash-codec.user.email.add-search-config.unique',
-        label: 'Register cipherstash search config (unique) for user.email',
-        operationClass: 'additive',
-        invariantId: 'cipherstash-codec:user.email:add-search-config:unique@v1',
-        target: { id: 'postgres' },
-        precheck: [],
-        execute: [
-          {
-            description: 'Register cipherstash unique search config for user.email',
-            sql: "SELECT eql_v2.add_search_config('user', 'email', 'unique', 'text');",
-          },
-        ],
-        postcheck: [],
-      }),
-      rawSql({
-        id: 'cipherstash-codec.user.email.add-search-config.match',
-        label: 'Register cipherstash search config (match) for user.email',
-        operationClass: 'additive',
-        invariantId: 'cipherstash-codec:user.email:add-search-config:match@v1',
-        target: { id: 'postgres' },
-        precheck: [],
-        execute: [
-          {
-            description: 'Register cipherstash match search config for user.email',
-            sql: "SELECT eql_v2.add_search_config('user', 'email', 'match', 'text');",
-          },
-        ],
-        postcheck: [],
-      }),
+      cipherstashAddSearchConfig({ table: 'user', column: 'email', index: 'unique' }),
+      cipherstashAddSearchConfig({ table: 'user', column: 'email', index: 'match' }),
     ];
   }
 }

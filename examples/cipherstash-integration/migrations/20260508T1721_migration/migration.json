@@ -1,6 +1,12 @@
 {
   "from": null,
   "to": "sha256:fa4b91dbc8e079a775b010fc5ca3616d3713afa64b1b9c97eedf4aa90cc0bf39",
+  "labels": [],
+  "providedInvariants": [
+    "cipherstash-codec:user.email:add-search-config:match@v1",
+    "cipherstash-codec:user.email:add-search-config:unique@v1"
+  ],
+  "createdAt": "2026-05-08T17:21:42.729Z",
   "fromContract": null,
   "toContract": {
     "schemaVersion": "1",
@@ -120,11 +126,5 @@
     "applied": [],
     "plannerVersion": "2.0.0"
   },
-  "labels": [],
-  "createdAt": "2026-05-08T17:21:42.729Z",
-  "providedInvariants": [
-    "cipherstash-codec:user.email:add-search-config:match@v1",
-    "cipherstash-codec:user.email:add-search-config:unique@v1"
-  ],
   "migrationHash": "sha256:d6a43cb0fb6e3328892eb3670c517896d121410257d370f150b9d16243d97e58"
 }

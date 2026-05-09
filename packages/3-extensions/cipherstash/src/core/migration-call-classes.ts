@@ -67,6 +67,7 @@ export interface CipherstashSearchConfigArgs {
 }
 
 type CipherstashOp = SqlMigrationPlanOperation<unknown>;
+type OpStep = CipherstashOp['execute'][number];
 
 /**
  * Escape a string so it can be embedded inside a Postgres single-quoted
@@ -87,14 +88,62 @@ function invariantIdFor(
   return `cipherstash-codec:${tableName}.${fieldName}:${action}:${indexName}@v1`;
 }
 
+/**
+ * Base class for cipherstash migration IR nodes.
+ *
+ * Each instance is *both* an `OpFactoryCall` (renderable to TypeScript,
+ * lowerable to a runtime op via `toOp()`) and a structurally-valid
+ * {@link CipherstashOp} — `id`, `label`, `operationClass`,
+ * `invariantId`, `target`, `precheck`, `execute`, `postcheck` are
+ * stored as enumerable own properties, populated in the concrete
+ * subclass constructors. So when the planner-rendered `migration.ts`
+ * runs and the user's `operations` getter returns Call instances
+ * directly, both `MigrationOpSchema` validation (which checks `id` /
+ * `label` / `operationClass`) and `JSON.stringify` (which writes
+ * `ops.json`) see the runtime op shape unchanged.
+ *
+ * The cipherstash-specific identity fields (`factoryName`, `table`,
+ * `column`, `index`, `castAs`) live on the subclass prototype as
+ * accessor getters and on a per-instance backing record kept in a
+ * private slot (`#args`). Accessor properties on the class are
+ * non-enumerable, and the backing record is a private field, so
+ * `Object.keys(call)` and `canonicalizeJson(...)` see only the op
+ * fields — `ops.json` and `migrationHash` stay byte-stable across the
+ * pre/post CR-1 representation switch.
+ */
 abstract class CipherstashOpFactoryCallNode extends TsExpression implements OpFactoryCall {
-  abstract readonly factoryName: string;
+  abstract get factoryName(): string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
-  abstract toOp(): CipherstashOp;
+  abstract readonly id: string;
+  abstract readonly invariantId: string;
+  abstract readonly target: { readonly id: string };
+  abstract readonly precheck: readonly OpStep[];
+  abstract readonly execute: readonly OpStep[];
+  abstract readonly postcheck: readonly OpStep[];
 
   importRequirements(): readonly ImportRequirement[] {
     return [{ moduleSpecifier: CIPHERSTASH_MIGRATION_MODULE, symbol: this.factoryName }];
+  }
+
+  /**
+   * Re-expose the runtime op view for callers that prefer to lower
+   * Calls explicitly (notably {@link renderOps} on the postgres lane).
+   * The returned object is a plain copy of this Call's op-shaped
+   * fields, matching the shape `buildAddOp` / `buildRemoveOp`
+   * produced pre-CR-1.
+   */
+  toOp(): CipherstashOp {
+    return {
+      id: this.id,
+      label: this.label,
+      operationClass: this.operationClass,
+      invariantId: this.invariantId,
+      target: this.target,
+      precheck: this.precheck,
+      execute: this.execute,
+      postcheck: this.postcheck,
+    };
   }
 
   protected freeze(): void {
@@ -108,14 +157,28 @@ abstract class CipherstashOpFactoryCallNode extends TsExpression implements OpFa
  * eql_v2.add_search_config('<table>', '<column>', '<index>',
  * '<castAs>')` op, classified `'additive'`.
  */
-export class CipherstashAddSearchConfigCall extends CipherstashOpFactoryCallNode {
-  readonly factoryName = 'cipherstashAddSearchConfig' as const;
-  readonly operationClass = 'additive' as const;
+interface AddArgs {
   readonly table: string;
   readonly column: string;
   readonly index: CipherstashSearchIndex;
   readonly castAs: string;
+}
+
+export class CipherstashAddSearchConfigCall extends CipherstashOpFactoryCallNode {
+  readonly id: string;
   readonly label: string;
+  readonly operationClass: 'additive';
+  readonly invariantId: string;
+  readonly target: { readonly id: string };
+  readonly precheck: readonly OpStep[];
+  readonly execute: readonly OpStep[];
+  readonly postcheck: readonly OpStep[];
+
+  // Private slot keeps the renderer-side args off the enumerable
+  // own-property surface; the public accessors below expose them
+  // read-only on the prototype, so neither `Object.keys` nor
+  // `canonicalizeJson` walks them.
+  readonly #args: AddArgs;
 
   constructor(
     table: string,
@@ -124,38 +187,54 @@ export class CipherstashAddSearchConfigCall extends CipherstashOpFactoryCallNode
     castAs: string = DEFAULT_CAST_AS,
   ) {
     super();
-    this.table = table;
-    this.column = column;
-    this.index = index;
-    this.castAs = castAs;
+    this.#args = { table, column, index, castAs };
+    // Property assignment order matches the literal record
+    // `buildAddOp` produced pre-CR-1 (id → label → operationClass →
+    // invariantId → target → precheck → execute → postcheck), so
+    // `JSON.stringify(call)` lays out keys in the same byte order the
+    // baseline `ops.json` carries.
+    this.id = `cipherstash-codec.${table}.${column}.add-search-config.${index}`;
     this.label = `Register cipherstash search config (${index}) for ${table}.${column}`;
+    this.operationClass = 'additive';
+    this.invariantId = invariantIdFor(table, column, 'add-search-config', index);
+    this.target = { id: 'postgres' };
+    this.precheck = [];
+    this.execute = [
+      {
+        description: `Register cipherstash ${index} search config for ${table}.${column}`,
+        sql: `SELECT eql_v2.add_search_config(${sqlLiteral(table)}, ${sqlLiteral(column)}, ${sqlLiteral(index)}, ${sqlLiteral(castAs)});`,
+      },
+    ];
+    this.postcheck = [];
     this.freeze();
   }
 
-  toOp(): CipherstashOp {
-    return {
-      id: `cipherstash-codec.${this.table}.${this.column}.add-search-config.${this.index}`,
-      label: this.label,
-      operationClass: 'additive',
-      invariantId: invariantIdFor(this.table, this.column, 'add-search-config', this.index),
-      target: { id: 'postgres' },
-      precheck: [],
-      execute: [
-        {
-          description: `Register cipherstash ${this.index} search config for ${this.table}.${this.column}`,
-          sql: `SELECT eql_v2.add_search_config(${sqlLiteral(this.table)}, ${sqlLiteral(this.column)}, ${sqlLiteral(this.index)}, ${sqlLiteral(this.castAs)});`,
-        },
-      ],
-      postcheck: [],
-    };
+  get factoryName(): 'cipherstashAddSearchConfig' {
+    return 'cipherstashAddSearchConfig';
+  }
+
+  get table(): string {
+    return this.#args.table;
+  }
+
+  get column(): string {
+    return this.#args.column;
+  }
+
+  get index(): CipherstashSearchIndex {
+    return this.#args.index;
+  }
+
+  get castAs(): string {
+    return this.#args.castAs;
   }
 
   renderTypeScript(): string {
     const args = {
-      table: this.table,
-      column: this.column,
-      index: this.index,
-      ...(this.castAs !== DEFAULT_CAST_AS ? { castAs: this.castAs } : {}),
+      table: this.#args.table,
+      column: this.#args.column,
+      index: this.#args.index,
+      ...(this.#args.castAs !== DEFAULT_CAST_AS ? { castAs: this.#args.castAs } : {}),
     };
     return `cipherstashAddSearchConfig(${jsonToTsSource(args)})`;
   }
@@ -171,46 +250,64 @@ export class CipherstashAddSearchConfigCall extends CipherstashOpFactoryCallNode
  * three identifying fields; the cast was applied at the index's add
  * site.
  */
-export class CipherstashRemoveSearchConfigCall extends CipherstashOpFactoryCallNode {
-  readonly factoryName = 'cipherstashRemoveSearchConfig' as const;
-  readonly operationClass = 'destructive' as const;
+interface RemoveArgs {
   readonly table: string;
   readonly column: string;
   readonly index: CipherstashSearchIndex;
+}
+
+export class CipherstashRemoveSearchConfigCall extends CipherstashOpFactoryCallNode {
+  readonly id: string;
   readonly label: string;
+  readonly operationClass: 'destructive';
+  readonly invariantId: string;
+  readonly target: { readonly id: string };
+  readonly precheck: readonly OpStep[];
+  readonly execute: readonly OpStep[];
+  readonly postcheck: readonly OpStep[];
+
+  readonly #args: RemoveArgs;
 
   constructor(table: string, column: string, index: CipherstashSearchIndex) {
     super();
-    this.table = table;
-    this.column = column;
-    this.index = index;
+    this.#args = { table, column, index };
+    this.id = `cipherstash-codec.${table}.${column}.remove-search-config.${index}`;
     this.label = `Remove cipherstash search config (${index}) for ${table}.${column}`;
+    this.operationClass = 'destructive';
+    this.invariantId = invariantIdFor(table, column, 'remove-search-config', index);
+    this.target = { id: 'postgres' };
+    this.precheck = [];
+    this.execute = [
+      {
+        description: `Remove cipherstash ${index} search config for ${table}.${column}`,
+        sql: `SELECT eql_v2.remove_search_config(${sqlLiteral(table)}, ${sqlLiteral(column)}, ${sqlLiteral(index)});`,
+      },
+    ];
+    this.postcheck = [];
     this.freeze();
   }
 
-  toOp(): CipherstashOp {
-    return {
-      id: `cipherstash-codec.${this.table}.${this.column}.remove-search-config.${this.index}`,
-      label: this.label,
-      operationClass: 'destructive',
-      invariantId: invariantIdFor(this.table, this.column, 'remove-search-config', this.index),
-      target: { id: 'postgres' },
-      precheck: [],
-      execute: [
-        {
-          description: `Remove cipherstash ${this.index} search config for ${this.table}.${this.column}`,
-          sql: `SELECT eql_v2.remove_search_config(${sqlLiteral(this.table)}, ${sqlLiteral(this.column)}, ${sqlLiteral(this.index)});`,
-        },
-      ],
-      postcheck: [],
-    };
+  get factoryName(): 'cipherstashRemoveSearchConfig' {
+    return 'cipherstashRemoveSearchConfig';
+  }
+
+  get table(): string {
+    return this.#args.table;
+  }
+
+  get column(): string {
+    return this.#args.column;
+  }
+
+  get index(): CipherstashSearchIndex {
+    return this.#args.index;
   }
 
   renderTypeScript(): string {
     return `cipherstashRemoveSearchConfig(${jsonToTsSource({
-      table: this.table,
-      column: this.column,
-      index: this.index,
+      table: this.#args.table,
+      column: this.#args.column,
+      index: this.#args.index,
     })})`;
   }
 }
@@ -222,6 +319,13 @@ export class CipherstashRemoveSearchConfigCall extends CipherstashOpFactoryCallN
  * search-config alongside a `createTable` / `addColumn`. The
  * `Encrypted<string>` codec hook calls this factory automatically when
  * planning a contract diff that adds a `searchable: true` column.
+ *
+ * Returns the {@link CipherstashAddSearchConfigCall} IR node, which
+ * implements `OpFactoryCall` and is itself a `SqlMigrationPlanOperation`
+ * (its readonly op-shaped fields are populated in the constructor) — so
+ * the same value flows through both the renderer (planner-time IR) and
+ * the runtime ops list (`Migration.operations`) without an extra
+ * lowering step at the call site.
  */
 export function cipherstashAddSearchConfig(
   args: CipherstashSearchConfigArgs,
@@ -237,6 +341,9 @@ export function cipherstashAddSearchConfig(
 /**
  * Public factory: invert {@link cipherstashAddSearchConfig} for the
  * same (table, column, index) tuple.
+ *
+ * Returns the {@link CipherstashRemoveSearchConfigCall} IR node — see
+ * {@link cipherstashAddSearchConfig} for the rationale.
  */
 export function cipherstashRemoveSearchConfig(
   args: CipherstashSearchConfigArgs,
