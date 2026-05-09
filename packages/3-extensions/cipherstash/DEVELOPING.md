@@ -59,10 +59,9 @@ packages/3-extensions/cipherstash/
 
 ## Tracked follow-ups
 
-| Linear ticket                                                                                                                                          | Surface                                                                                          |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| [TML-2435](https://linear.app/prisma-company/issue/TML-2435/cipherstash-ship-queryoperationtypes-export-so-cipherstasheq)                              | Ship `QueryOperationTypes` export so `cipherstashEq` / `cipherstashIlike` appear at the type level on cipherstash column accessors (mirrors `@prisma-next/extension-pgvector/operation-types`). Until this lands consumers (e.g. `examples/cipherstash-integration/src/index.ts`) bridge with a small local `CipherstashColumnSurface` cast. |
-| [TML-2388](https://linear.app/prisma-company/issue/TML-2388)                                                                                           | Codec-SDK binding refactor — pull the per-tenant SDK binding out of the codec factory closure into the descriptor seam so multi-tenant deployments don't re-author the codec per tenant.                                                                              |
+| Linear ticket                                                | Surface                                                                                                                                                                  |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [TML-2388](https://linear.app/prisma-company/issue/TML-2388) | Codec-SDK binding refactor — pull the per-tenant SDK binding out of the codec factory closure into the descriptor seam so multi-tenant deployments don't re-author the codec per tenant. |
 
 ## Design choices worth knowing
 
