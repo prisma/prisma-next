@@ -12,6 +12,7 @@ import type {
   SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
+import { makeAliasResolver } from './alias-resolver';
 
 type ColumnRef = { table: string; column: string };
 
@@ -54,14 +55,16 @@ function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> 
 function resolveProjectionCodec(
   item: ProjectionItem,
   contractCodecs: ContractCodecRegistry | undefined,
+  aliasResolver: (alias: string) => string,
 ): Codec | undefined {
   if (contractCodecs) {
     if (item.expr.kind === 'column-ref') {
-      const byColumn = contractCodecs.forColumn(item.expr.table, item.expr.column);
-      if (byColumn) return byColumn;
+      const byColumn = contractCodecs.forColumn(aliasResolver(item.expr.table), item.expr.column);
+      // Only honour `byColumn` when its codec id agrees with `item.codecId`. They can legitimately disagree when an `OperationExpr`-shaped projection carries a single inner column-ref but transforms the value's codec (e.g. `cosineDistance(col, x)` projects `pg/float8@1` while the inner column-ref points at a `pg/vector@1` column).
+      if (byColumn && (item.codecId === undefined || byColumn.id === item.codecId)) return byColumn;
     } else if (item.refs) {
-      const byColumn = contractCodecs.forColumn(item.refs.table, item.refs.column);
-      if (byColumn) return byColumn;
+      const byColumn = contractCodecs.forColumn(aliasResolver(item.refs.table), item.refs.column);
+      if (byColumn && (item.codecId === undefined || byColumn.id === item.codecId)) return byColumn;
     }
   }
   if (item.codecId) {
@@ -97,19 +100,26 @@ function buildDecodeContext(
   const codecs = new Map<string, Codec>();
   const columnRefs = new Map<string, ColumnRef>();
   const includeAliases = new Set<string>();
+  const aliasResolver = makeAliasResolver(plan.ast);
 
   for (const item of projection) {
     aliases.push(item.alias);
 
-    const codec = resolveProjectionCodec(item, contractCodecs);
+    const codec = resolveProjectionCodec(item, contractCodecs, aliasResolver);
     if (codec) {
       codecs.set(item.alias, codec);
     }
 
     if (item.expr.kind === 'column-ref') {
-      columnRefs.set(item.alias, { table: item.expr.table, column: item.expr.column });
+      columnRefs.set(item.alias, {
+        table: aliasResolver(item.expr.table),
+        column: item.expr.column,
+      });
     } else if (item.refs) {
-      columnRefs.set(item.alias, { table: item.refs.table, column: item.refs.column });
+      columnRefs.set(item.alias, {
+        table: aliasResolver(item.refs.table),
+        column: item.refs.column,
+      });
     } else if (item.expr.kind === 'subquery' || item.expr.kind === 'json-array-agg') {
       includeAliases.add(item.alias);
     }

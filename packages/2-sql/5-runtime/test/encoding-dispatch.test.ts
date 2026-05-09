@@ -142,6 +142,41 @@ describe('encodeParam — column-aware dispatch', () => {
     expect(wire).toBe('column:0.1');
   });
 
+  it('falls back to forCodecId when forColumn returns a codec whose id disagrees with paramRef.codecId', async () => {
+    // Reproduces the regression behind `cosineDistance(col, x).lt(1)`: the ORM lifts a column ref out of an `OperationExpr` that changed the codec id, leaving a `ParamRef` whose `refs` point at a vector column but whose declared `codecId` is `pg/float8@1`. Encoding the float literal through the vector codec (because `forColumn` agreed with the refs but not the codec id) produced "Vector value must be an array of numbers".
+    const vectorCodec = defineTestCodec({
+      typeId: 'pgvector/vector@1',
+      encode: (v: number[]) => `vec:${v.join(',')}`,
+      decode: (w: string) => w.split(',').map(Number),
+    });
+    const float8Codec = defineTestCodec({
+      typeId: 'pg/float8@1',
+      encode: (v: number) => `f8:${v}`,
+      decode: (w: string) => Number(w),
+    });
+
+    const contractCodecs: ContractCodecRegistry = {
+      forColumn: () => vectorCodec,
+      forCodecId: () => float8Codec,
+    };
+
+    const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
+
+    const wire = await encodeParam(
+      1,
+      {
+        codecId: 'pg/float8@1',
+        name: 'p0',
+        refs: { table: 'post', column: 'embedding' },
+      },
+      0,
+      ctx,
+      contractCodecs,
+    );
+
+    expect(wire).toBe('f8:1');
+  });
+
   it('null/undefined values bypass codec dispatch entirely', async () => {
     let invoked = false;
     const codec: Codec = defineTestCodec({

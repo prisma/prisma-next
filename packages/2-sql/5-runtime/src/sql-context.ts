@@ -396,7 +396,8 @@ function buildContractCodecRegistry(
       name: `<shared:${descriptor.codecId}>`,
       usedAt: [],
     };
-    const factory = descriptor.factory as unknown as (
+    // Call `factory` *as a method on the descriptor* — `descriptor.factory(undefined)` — rather than detaching it into a local. Several descriptors implement `factory` as a class method whose body returns an arrow that captures `this` (`return () => new SomeCodec(this);`), and detaching loses that binding so the codec ends up with an `undefined` descriptor and `codec.id` throws.
+    const factory = descriptor.factory.bind(descriptor) as unknown as (
       params: unknown,
     ) => (ctx: SqlCodecInstanceContext) => Codec;
     try {
@@ -443,7 +444,8 @@ function buildContractCodecRegistry(
             usedAt: [{ table: tableName, column: columnName }],
           };
           // The descriptor's `P` is `void` for non-parameterized codecs; the runtime's `void` value is `undefined`. The cast narrows the descriptor's family-agnostic `CodecInstanceContext` slot to the SQL `SqlCodecInstanceContext` we pass at this call site — function-argument contravariance makes the narrow safe.
-          const voidFactory = descriptor.factory as unknown as (
+          // `bind` preserves the `this`-on-descriptor invariant — several descriptors implement `factory` as a class method whose body returns an arrow that captures `this`; detaching loses the binding and produces a codec whose `descriptor` is `undefined`.
+          const voidFactory = descriptor.factory.bind(descriptor) as unknown as (
             params: undefined,
           ) => (ctx: SqlCodecInstanceContext) => Codec;
           resolvedCodec = voidFactory(undefined)(ctx);

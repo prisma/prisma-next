@@ -11,6 +11,7 @@ import {
   type SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
+import { makeAliasResolver } from './alias-resolver';
 
 interface ParamMetadata {
   readonly codecId: string | undefined;
@@ -39,11 +40,17 @@ const NO_METADATA: ParamMetadata = Object.freeze({
 function resolveParamCodec(
   metadata: ParamMetadata,
   contractCodecs: ContractCodecRegistry | undefined,
+  aliasResolver: (alias: string) => string,
 ): Codec | undefined {
   if (!metadata.codecId) return undefined;
   if (metadata.refs && contractCodecs) {
-    const byColumn = contractCodecs.forColumn(metadata.refs.table, metadata.refs.column);
-    if (byColumn) return byColumn;
+    const byColumn = contractCodecs.forColumn(
+      aliasResolver(metadata.refs.table),
+      metadata.refs.column,
+    );
+    // Only honour `byColumn` when its codec id agrees with the `ParamRef`'s declared `codecId`. They can legitimately disagree when a heuristic (e.g. the ORM's `refsFromLeft`) lifts column refs out of an `OperationExpr` that changed the codec id — e.g. `cosineDistance(p.embedding, x).lt(1)` carries `refs={post,embedding}` (a vector column) but the comparison side's codec is `pg/float8@1`. Trusting `byColumn` blindly would dispatch the float
+    // literal through the vector codec.
+    if (byColumn && byColumn.id === metadata.codecId) return byColumn;
   }
   return contractCodecs?.forCodecId(metadata.codecId);
 }
@@ -91,6 +98,7 @@ export async function encodeParam(
     paramIndex,
     ctx,
     contractCodecs,
+    (alias) => alias,
   );
 }
 
@@ -100,12 +108,13 @@ async function encodeParamValue(
   paramIndex: number,
   ctx: SqlCodecCallContext,
   contractCodecs: ContractCodecRegistry | undefined,
+  aliasResolver: (alias: string) => string,
 ): Promise<unknown> {
   if (value === null || value === undefined) {
     return null;
   }
 
-  const codec = resolveParamCodec(metadata, contractCodecs);
+  const codec = resolveParamCodec(metadata, contractCodecs, aliasResolver);
   if (!codec) {
     return value;
   }
@@ -151,9 +160,18 @@ export async function encodeParams(
     }
   }
 
+  const aliasResolver = makeAliasResolver(plan.ast);
+
   const tasks: Promise<unknown>[] = new Array(paramCount);
   for (let i = 0; i < paramCount; i++) {
-    tasks[i] = encodeParamValue(plan.params[i], metadata[i] ?? NO_METADATA, i, ctx, contractCodecs);
+    tasks[i] = encodeParamValue(
+      plan.params[i],
+      metadata[i] ?? NO_METADATA,
+      i,
+      ctx,
+      contractCodecs,
+      aliasResolver,
+    );
   }
 
   const settled = await raceAgainstAbort(Promise.all(tasks), signal, 'encode');
