@@ -8,11 +8,17 @@ import {
   SQL_VARCHAR_CODEC_ID,
 } from '../../src/ast/sql-codec-helpers';
 import {
+  sqlCharColumn,
   sqlCharDescriptor,
+  sqlFloatColumn,
   sqlFloatDescriptor,
+  sqlIntColumn,
   sqlIntDescriptor,
+  sqlTextColumn,
   sqlTextDescriptor,
+  sqlTimestampColumn,
   sqlTimestampDescriptor,
+  sqlVarcharColumn,
   sqlVarcharDescriptor,
 } from '../../src/ast/sql-codecs';
 
@@ -49,6 +55,11 @@ describe('sql-codecs', () => {
       expect(await codec.encode(42, callCtx)).toBe(42);
       expect(await codec.decode(42, callCtx)).toBe(42);
     });
+
+    it('round-trips through JSON identity', () => {
+      expect(codec.encodeJson(42)).toBe(42);
+      expect(codec.decodeJson(42)).toBe(42);
+    });
   });
 
   describe('sql/float@1', () => {
@@ -61,6 +72,11 @@ describe('sql-codecs', () => {
     it('encodes and decodes number values', async () => {
       expect(await codec.encode(3.14, callCtx)).toBe(3.14);
       expect(await codec.decode(3.14, callCtx)).toBe(3.14);
+    });
+
+    it('round-trips through JSON identity', () => {
+      expect(codec.encodeJson(3.14)).toBe(3.14);
+      expect(codec.decodeJson(3.14)).toBe(3.14);
     });
   });
 
@@ -78,6 +94,11 @@ describe('sql-codecs', () => {
     it('trims trailing spaces on decode', async () => {
       expect(await codec.decode('user_001                            ', callCtx)).toBe('user_001');
       expect(await codec.decode('user_001', callCtx)).toBe('user_001');
+    });
+
+    it('round-trips through JSON identity', () => {
+      expect(codec.encodeJson('user_001')).toBe('user_001');
+      expect(codec.decodeJson('user_001')).toBe('user_001');
     });
 
     it('renderOutputType returns Char<length>', () => {
@@ -101,8 +122,17 @@ describe('sql-codecs', () => {
       expect(await codec.decode('hello', callCtx)).toBe('hello');
     });
 
+    it('round-trips through JSON identity', () => {
+      expect(codec.encodeJson('hello')).toBe('hello');
+      expect(codec.decodeJson('hello')).toBe('hello');
+    });
+
     it('renderOutputType returns Varchar<length>', () => {
       expect(sqlVarcharDescriptor.renderOutputType?.({ length: 255 })).toBe('Varchar<255>');
+    });
+
+    it('renderOutputType returns undefined when length absent', () => {
+      expect(sqlVarcharDescriptor.renderOutputType?.({})).toBeUndefined();
     });
   });
 
@@ -136,6 +166,59 @@ describe('sql-codecs', () => {
 
     it('renderOutputType returns bare Timestamp when precision absent', () => {
       expect(sqlTimestampDescriptor.renderOutputType?.({})).toBe('Timestamp');
+    });
+  });
+
+  describe('column helpers', () => {
+    it('sqlTextColumn produces a ColumnSpec with text nativeType and no typeParams', () => {
+      const spec = sqlTextColumn();
+      expect(spec.codecId).toBe(SQL_TEXT_CODEC_ID);
+      expect(spec.nativeType).toBe('text');
+      expect(spec.typeParams).toBeUndefined();
+    });
+
+    it('sqlIntColumn produces a ColumnSpec with int nativeType', () => {
+      const spec = sqlIntColumn();
+      expect(spec.codecId).toBe(SQL_INT_CODEC_ID);
+      expect(spec.nativeType).toBe('int');
+    });
+
+    it('sqlFloatColumn produces a ColumnSpec with float nativeType', () => {
+      const spec = sqlFloatColumn();
+      expect(spec.codecId).toBe(SQL_FLOAT_CODEC_ID);
+      expect(spec.nativeType).toBe('float');
+    });
+
+    it('sqlCharColumn defaults typeParams to {} when invoked without arguments', () => {
+      const spec = sqlCharColumn();
+      expect(spec.codecId).toBe(SQL_CHAR_CODEC_ID);
+      expect(spec.nativeType).toBe('char');
+      expect(spec.typeParams).toEqual({});
+    });
+
+    it('sqlCharColumn carries the explicit length param', () => {
+      const spec = sqlCharColumn({ length: 16 });
+      expect(spec.typeParams).toEqual({ length: 16 });
+    });
+
+    it('sqlVarcharColumn defaults typeParams to {} when invoked without arguments', () => {
+      const spec = sqlVarcharColumn();
+      expect(spec.typeParams).toEqual({});
+    });
+
+    it('sqlVarcharColumn carries the explicit length param', () => {
+      const spec = sqlVarcharColumn({ length: 64 });
+      expect(spec.typeParams).toEqual({ length: 64 });
+    });
+
+    it('sqlTimestampColumn defaults typeParams to {} when invoked without arguments', () => {
+      const spec = sqlTimestampColumn();
+      expect(spec.typeParams).toEqual({});
+    });
+
+    it('sqlTimestampColumn carries the explicit precision param', () => {
+      const spec = sqlTimestampColumn({ precision: 6 });
+      expect(spec.typeParams).toEqual({ precision: 6 });
     });
   });
 

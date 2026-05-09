@@ -9,7 +9,7 @@ import {
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { introspectSchema } from '../src/core/introspect-schema';
+import { introspectSchema, isDefaultIdIndex } from '../src/core/introspect-schema';
 
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;
@@ -244,6 +244,135 @@ describe('introspectSchema', () => {
         const matchingLiveIdx = liveUsers.indexes.find((li) => indexesEquivalent(li, contractIdx));
         expect(matchingLiveIdx).toBeDefined();
       }
+    });
+  });
+
+  describe('defensive parsing paths (synthesized inputs)', () => {
+    type IndexDoc = Record<string, unknown>;
+    type CollectionInfo = Record<string, unknown>;
+
+    function makeDb(
+      collections: ReadonlyArray<{
+        readonly info: CollectionInfo;
+        readonly indexes: readonly IndexDoc[];
+      }>,
+    ): Db {
+      const fake = {
+        listCollections: () => ({
+          toArray: async () => collections.map((c) => c.info),
+        }),
+        collection: (name: string) => ({
+          listIndexes: () => ({
+            toArray: async () => {
+              const found = collections.find(
+                (c) => (c.info['name'] as string | undefined) === name,
+              );
+              return found ? [...found.indexes] : [];
+            },
+          }),
+        }),
+      };
+      return fake as unknown as Db;
+    }
+
+    it('isDefaultIdIndex returns false when the doc lacks a `key` field', () => {
+      expect(isDefaultIdIndex({ name: 'no_key' })).toBe(false);
+    });
+
+    it('isDefaultIdIndex returns true for the canonical _id_ index spec', () => {
+      expect(isDefaultIdIndex({ key: { _id: 1 } })).toBe(true);
+    });
+
+    it('treats a non-jsonSchema validator as no validator', async () => {
+      const fakeDb = makeDb([
+        {
+          info: {
+            name: 'audit',
+            options: { validator: { $expr: { $gt: ['$amount', 0] } } },
+          },
+          indexes: [],
+        },
+      ]);
+      const ir = await introspectSchema(fakeDb);
+      expect(ir.collection('audit')!.validator).toBeUndefined();
+    });
+
+    it('falls back to validation defaults when level/action are absent', async () => {
+      const fakeDb = makeDb([
+        {
+          info: {
+            name: 'products',
+            options: { validator: { $jsonSchema: { bsonType: 'object' } } },
+          },
+          indexes: [],
+        },
+      ]);
+      const ir = await introspectSchema(fakeDb);
+      const validator = ir.collection('products')!.validator!;
+      expect(validator.validationLevel).toBe('strict');
+      expect(validator.validationAction).toBe('error');
+    });
+
+    it('returns no collection options when the info has no options bag', async () => {
+      const fakeDb = makeDb([{ info: { name: 'plain' }, indexes: [] }]);
+      const ir = await introspectSchema(fakeDb);
+      expect(ir.collection('plain')!.options).toBeUndefined();
+    });
+
+    it('forwards timeseries options when present', async () => {
+      const fakeDb = makeDb([
+        {
+          info: {
+            name: 'metrics',
+            options: {
+              timeseries: { timeField: 'ts', metaField: 'tags', granularity: 'minutes' },
+            },
+          },
+          indexes: [],
+        },
+      ]);
+      const ir = await introspectSchema(fakeDb);
+      expect(ir.collection('metrics')!.options!.timeseries).toEqual({
+        timeField: 'ts',
+        metaField: 'tags',
+        granularity: 'minutes',
+      });
+    });
+
+    it('forwards collation, changeStreamPreAndPostImages, and clusteredIndex options when present', async () => {
+      const fakeDb = makeDb([
+        {
+          info: {
+            name: 'configured',
+            options: {
+              collation: { locale: 'en_US' },
+              changeStreamPreAndPostImages: { enabled: true },
+              clusteredIndex: { name: 'ix' },
+            },
+          },
+          indexes: [],
+        },
+      ]);
+      const ir = await introspectSchema(fakeDb);
+      const opts = ir.collection('configured')!.options!;
+      expect(opts.collation).toEqual({ locale: 'en_US' });
+      expect(opts.changeStreamPreAndPostImages).toEqual({ enabled: true });
+      expect(opts.clusteredIndex).toEqual({ name: 'ix' });
+    });
+
+    it('keeps capped options without `max` when max is omitted', async () => {
+      const fakeDb = makeDb([
+        {
+          info: {
+            name: 'capped_no_max',
+            options: { capped: true, size: 4096 },
+          },
+          indexes: [],
+        },
+      ]);
+      const ir = await introspectSchema(fakeDb);
+      const capped = ir.collection('capped_no_max')!.options!.capped;
+      expect(capped).toEqual({ size: 4096 });
     });
   });
 });

@@ -18,7 +18,12 @@ function parseIndexKeys(keySpec: Record<string, unknown>): MongoIndexKey[] {
   return keys;
 }
 
-function isDefaultIdIndex(doc: Document): boolean {
+/**
+ * Exported for unit tests to exercise the defensive `!key` guard; not part of
+ * the public API. Callers in this package use it via the `introspectSchema`
+ * pipeline only.
+ */
+export function isDefaultIdIndex(doc: Document): boolean {
   const key = doc['key'] as Record<string, unknown> | undefined;
   if (!key) return false;
   const entries = Object.entries(key);

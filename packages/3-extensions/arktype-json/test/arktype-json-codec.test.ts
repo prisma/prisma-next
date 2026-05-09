@@ -70,6 +70,21 @@ describe('arktypeJsonColumn(schema)', () => {
     // @ts-expect-error -- deliberately malformed input for the call-site guard
     expect(() => arktypeJsonColumn(notASchema)).toThrow(/callable arktype Type/);
   });
+
+  it('rejects callable values that are missing `expression: string`', () => {
+    const callableWithoutExpression = (v: unknown) => v;
+    expect(() => arktypeJsonColumn(callableWithoutExpression as never)).toThrow(
+      /missing `expression: string`/,
+    );
+  });
+
+  it('rejects callable schemas that are missing the `json` IR', () => {
+    const fakeSchema = Object.assign((v: unknown) => v, {
+      expression: 'unknown',
+      json: 'not-an-object',
+    });
+    expect(() => arktypeJsonColumn(fakeSchema as never)).toThrow(/missing `json` IR/);
+  });
 });
 
 describe('arktypeJsonColumn encode/encodeJson agreement', () => {
@@ -138,6 +153,12 @@ describe('arktypeJsonDescriptor.factory(params)', () => {
     const col = arktypeJsonColumn(productSchema);
     const rendered = arktypeJsonDescriptor.renderOutputType(col.typeParams);
     expect(rendered).toBe(productSchema.expression);
+  });
+
+  it("renderOutputType falls back to 'unknown' when the expression is whitespace-only", () => {
+    expect(arktypeJsonDescriptor.renderOutputType({ expression: '   ', jsonIr: {} })).toBe(
+      'unknown',
+    );
   });
 
   it('throws on corrupt jsonIr at factory time', () => {

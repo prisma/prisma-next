@@ -1,18 +1,23 @@
 import {
+  BinaryExpr,
+  ColumnRef,
   type DeleteAst,
   type DoUpdateSetConflictAction,
   type InsertAst,
   ParamRef,
+  ParamRef as ParamRefClass,
   type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
   compileDeleteCount,
+  compileDeleteReturning,
   compileInsertCount,
   compileInsertCountSplit,
   compileInsertReturning,
   compileInsertReturningSplit,
   compileUpdateCount,
+  compileUpdateReturning,
   compileUpsertReturning,
 } from '../src/query-plan';
 import { withReturningCapability } from './collection-fixtures';
@@ -288,5 +293,94 @@ describe('query plan mutations', () => {
     expect(deletePlan.ast.kind).toBe('delete');
     expect((deletePlan.ast as DeleteAst).where).toBeUndefined();
     expect(deletePlan.params).toEqual([]);
+  });
+
+  describe('split helpers reject empty rows', () => {
+    it('compileInsertReturningSplit() rejects an empty rows array', () => {
+      const contract = withReturningCapability(getTestContract());
+      expect(() => compileInsertReturningSplit(contract, 'users', [], undefined)).toThrowError(
+        /at least one row/,
+      );
+    });
+
+    it('compileInsertCountSplit() rejects an empty rows array', () => {
+      const contract = getTestContract();
+      expect(() => compileInsertCountSplit(contract, 'users', [])).toThrowError(/at least one row/);
+    });
+  });
+
+  describe('UPDATE / DELETE WHERE preservation', () => {
+    function eqOnUserId(value: number) {
+      return BinaryExpr.eq(
+        ColumnRef.of('users', 'id'),
+        ParamRefClass.of(value, {
+          name: 'id',
+          codecId: 'pg/int4@1',
+          refs: { table: 'users', column: 'id' },
+        }),
+      );
+    }
+
+    it('compileUpdateReturning() preserves WHERE when filters are present', () => {
+      const contract = withReturningCapability(getTestContract());
+      const plan = compileUpdateReturning(
+        contract,
+        'users',
+        { name: 'Alice' },
+        [eqOnUserId(7)],
+        undefined,
+      );
+      expect(plan.ast.kind).toBe('update');
+      expect((plan.ast as UpdateAst).where).toBeDefined();
+      expect(plan.params).toEqual(['Alice', 7]);
+    });
+
+    it('compileUpdateCount() preserves WHERE when filters are present', () => {
+      const contract = getTestContract();
+      const plan = compileUpdateCount(contract, 'users', { name: 'Bob' }, [eqOnUserId(9)]);
+      expect((plan.ast as UpdateAst).where).toBeDefined();
+      expect(plan.params).toEqual(['Bob', 9]);
+    });
+
+    it('compileDeleteReturning() preserves WHERE when filters are present and omits when empty', () => {
+      const contract = withReturningCapability(getTestContract());
+      const planWithWhere = compileDeleteReturning(contract, 'users', [eqOnUserId(3)], undefined);
+      expect((planWithWhere.ast as DeleteAst).where).toBeDefined();
+      expect(planWithWhere.params).toEqual([3]);
+
+      const planNoWhere = compileDeleteReturning(contract, 'users', [], undefined);
+      expect((planNoWhere.ast as DeleteAst).where).toBeUndefined();
+      expect(planNoWhere.params).toEqual([]);
+    });
+  });
+
+  describe('table/column resolution errors', () => {
+    it('compileUpdateCount() rejects an unknown table', () => {
+      const contract = getTestContract();
+      expect(() => compileUpdateCount(contract, 'missing_table', { name: 'X' }, [])).toThrowError(
+        /Unknown table "missing_table"/,
+      );
+    });
+
+    it('compileUpdateCount() rejects an unknown column for the table', () => {
+      const contract = getTestContract();
+      expect(() =>
+        compileUpdateCount(contract, 'users', { not_a_real_column: 'X' }, []),
+      ).toThrowError(/Unknown column "not_a_real_column" in table "users"/);
+    });
+
+    it('compileInsertCount() rejects an unknown table', () => {
+      const contract = getTestContract();
+      expect(() => compileInsertCount(contract, 'missing_table', [{ id: 1 }])).toThrowError(
+        /Unknown table "missing_table"/,
+      );
+    });
+
+    it('compileInsertCount() rejects an unknown column on an insert row', () => {
+      const contract = getTestContract();
+      expect(() =>
+        compileInsertCount(contract, 'users', [{ id: 1, not_a_real_column: 'X' }]),
+      ).toThrowError(/Unknown column "not_a_real_column" in table "users"/);
+    });
   });
 });

@@ -193,6 +193,31 @@ describe('mongo vector descriptor renderOutputType', () => {
   });
 });
 
+describe('mongo descriptor factory', () => {
+  it('descriptor.factory()(ctx) returns the underlying MongoCodec', () => {
+    const descriptor = mongoDescriptorById(mongoStringCodec.id);
+    expect(descriptor).toBeDefined();
+    if (!descriptor) return;
+    const make = (descriptor.factory as () => () => unknown)();
+    const codec = make();
+    expect(codec).toBe(mongoStringCodec);
+  });
+
+  it('every standard mongo codec descriptor materializes its codec via factory', () => {
+    for (const descriptor of [
+      mongoDescriptorById(mongoObjectIdCodec.id),
+      mongoDescriptorById(mongoVectorCodec.id),
+      mongoDescriptorById(mongoDateCodec.id),
+    ]) {
+      expect(descriptor).toBeDefined();
+      if (!descriptor) continue;
+      const make = (descriptor.factory as () => () => unknown)();
+      expect(typeof make).toBe('function');
+      expect(make()).toBeDefined();
+    }
+  });
+});
+
 describe('vector operation descriptors (production-defined)', () => {
   it('mongoVectorNearOperation has method near', () => {
     expect(mongoVectorNearOperation.method).toBe('near');

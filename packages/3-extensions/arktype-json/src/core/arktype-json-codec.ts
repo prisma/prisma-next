@@ -98,10 +98,12 @@ function rehydrateSchema(jsonIr: object): ArktypeSchemaLike {
   } catch (error) {
     throw runtimeError(
       'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+      /* c8 ignore next — the `String(error)` fallback covers throws of non-Error values; arktype only throws Error subclasses, so this branch is defensive only. */
       `Failed to rehydrate arktype schema from contract IR: ${error instanceof Error ? error.message : String(error)}`,
       { codecId: ARKTYPE_JSON_CODEC_ID, jsonIr },
     );
   }
+  /* c8 ignore start — defensive: ark.schema either throws (handled above) or returns a callable Type with `expression: string`. The structural guard is kept so a future ark internal change can't silently slip a non-callable past us. */
   if (!isArktypeSchemaLike(rehydrated)) {
     throw runtimeError(
       'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
@@ -109,6 +111,7 @@ function rehydrateSchema(jsonIr: object): ArktypeSchemaLike {
       { codecId: ARKTYPE_JSON_CODEC_ID, jsonIr },
     );
   }
+  /* c8 ignore stop */
   return rehydrated;
 }
 

@@ -1,11 +1,15 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { pgVectorDescriptor } from '../src/core/codecs';
+import { pgVectorColumn, pgVectorDescriptor } from '../src/core/codecs';
+import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from '../src/core/constants';
 
 // The pgvector codec authors `encode`/`decode` synchronously; codecs route through `Promise`-returning methods at the boundary. The tests below cast through the Promise-returning shape and `await` every call so unit-level coverage stays aligned with the codec contract: `Codec<Id, TTraits, TWire, TInput>` — encode/decode return Promise.
 type AsyncVectorCodec = {
   readonly encode: (value: number[]) => Promise<string>;
   readonly decode: (wire: string) => Promise<number[]>;
+  readonly encodeJson: (value: number[]) => JsonValue;
+  readonly decodeJson: (json: JsonValue) => number[];
 };
 
 function asAsyncCodec(length: number): AsyncVectorCodec {
@@ -118,5 +122,86 @@ describe('pgvector codecs', () => {
     expect(await codec.encode([0.1, 0.2, 0.3])).toBe('[0.1,0.2,0.3]');
     expect(await codec.encode([1, 2, 3, 4, 5])).toBe('[1,2,3,4,5]');
     expect(await codec.decode('[0.4,0.5]')).toEqual([0.4, 0.5]);
+  });
+
+  it('rejects decoding when the wire payload contains a non-number token', async () => {
+    const vectorCodec = asAsyncCodec(3);
+    await expect(vectorCodec.decode('[1,foo,3]')).rejects.toThrow(
+      /Invalid vector value: "foo" is not a number/,
+    );
+  });
+
+  describe('encodeJson / decodeJson', () => {
+    it('returns the value array unchanged on encodeJson when length matches', () => {
+      const codec = asAsyncCodec(3);
+      const value = [0.1, 0.2, 0.3];
+      const encoded = codec.encodeJson(value);
+      expect(encoded).toEqual(value);
+    });
+
+    it('round-trips through decodeJson back to the same array', () => {
+      const codec = asAsyncCodec(3);
+      const json = codec.encodeJson([0.1, 0.2, 0.3]);
+      expect(codec.decodeJson(json)).toEqual([0.1, 0.2, 0.3]);
+    });
+
+    it('rejects encodeJson when the value is not an array', () => {
+      const codec = asAsyncCodec(3);
+      expect(() => codec.encodeJson('nope' as unknown as number[])).toThrow(
+        'Vector value must be an array of numbers',
+      );
+    });
+
+    it('rejects decodeJson when the JSON payload is not a number array of the declared length', () => {
+      const codec = asAsyncCodec(3);
+      expect(() => codec.decodeJson([1, 2] as unknown as JsonValue)).toThrow(
+        /Vector length mismatch/,
+      );
+      expect(() => codec.decodeJson([1, 'two', 3] as unknown as JsonValue)).toThrow(
+        'Vector value must contain only numbers',
+      );
+    });
+  });
+
+  describe('pgVectorColumn helper', () => {
+    it('produces a ColumnSpec with the codec id, vector nativeType, and length typeParams', () => {
+      const spec = pgVectorColumn(1536);
+      expect(spec.codecId).toBe(VECTOR_CODEC_ID);
+      expect(spec.nativeType).toBe('vector');
+      expect(spec.typeParams).toEqual({ length: 1536 });
+    });
+
+    it('produces a codec factory that materializes a working PgVectorCodec', async () => {
+      const spec = pgVectorColumn(3);
+      const codec = spec.codecFactory({
+        name: 'embedding',
+      }) as unknown as AsyncVectorCodec;
+      expect(await codec.encode([0.1, 0.2, 0.3])).toBe('[0.1,0.2,0.3]');
+    });
+  });
+
+  describe('paramsSchema', () => {
+    const validate = (params: unknown) =>
+      pgVectorDescriptor.paramsSchema['~standard'].validate(params);
+
+    it('accepts a positive integer length within the allowed range', () => {
+      const result = validate({ length: 1536 });
+      expect('issues' in result ? result.issues : null).toBeFalsy();
+    });
+
+    it('rejects non-integer length values', () => {
+      const result = validate({ length: 1.5 });
+      expect('issues' in result && result.issues).toBeTruthy();
+    });
+
+    it('rejects length values below 1', () => {
+      const result = validate({ length: 0 });
+      expect('issues' in result && result.issues).toBeTruthy();
+    });
+
+    it('rejects length values above VECTOR_MAX_DIM', () => {
+      const result = validate({ length: VECTOR_MAX_DIM + 1 });
+      expect('issues' in result && result.issues).toBeTruthy();
+    });
   });
 });

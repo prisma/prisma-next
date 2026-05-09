@@ -33,6 +33,14 @@ describe('query plan meta', () => {
     });
   });
 
+  it('omits profileHash from plan meta when the contract carries none', () => {
+    const { profileHash: _omit, ...rest } = baseContract;
+    const noProfileContract = rest as typeof baseContract;
+    const meta = buildOrmPlanMeta(noProfileContract);
+    expect(meta).not.toHaveProperty('profileHash');
+    expect(meta).toMatchObject({ lane: 'orm-client' });
+  });
+
   it('produces a plan whose meta carries no execution-metadata sidecars', () => {
     const ast = SelectAst.from(TableSource.named('users'))
       .withProjection([

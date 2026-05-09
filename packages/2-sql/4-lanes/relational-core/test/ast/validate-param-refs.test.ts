@@ -87,4 +87,16 @@ describe('validateParamRefRefs', () => {
 
     expect(() => validateParamRefRefs(ast, registry)).toThrowError(/<anonymous>/);
   });
+
+  it('passes when codecId is unknown to the registry (descriptorFor returns undefined)', () => {
+    const sparseRegistry: CodecDescriptorRegistry = {
+      descriptorFor: () => undefined,
+      *values() {},
+      byTargetType: () => Object.freeze([]),
+    };
+    const ref = ParamRef.of('hello', { name: 'p1', codecId: 'unknown/codec@1' });
+    const ast = selectWithWhere(BinaryExpr.eq(ColumnRef.of('user', 'email'), ref));
+
+    expect(() => validateParamRefRefs(ast, sparseRegistry)).not.toThrow();
+  });
 });
