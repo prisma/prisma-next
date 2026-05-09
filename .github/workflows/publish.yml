@@ -27,7 +27,7 @@ jobs:
     # Safety net: only publish from main, even though push trigger is already constrained
     if: github.ref == 'refs/heads/main'
     permissions:
-      contents: read
+      contents: write # Required to create the GitHub Release + tag for stable publishes
       id-token: write # Required for npm OIDC Trusted Publishing
 
     steps:
@@ -106,3 +106,20 @@ jobs:
         env:
           NPM_CONFIG_PROVENANCE: "true"
         run: pnpm -r publish --access public --tag "${{ steps.version.outputs.tag }}" --no-git-checks
+
+      # Emit a GitHub Release for stable publishes only (dist-tag `latest`).
+      # Dev / PR / beta builds publish to npm but do not produce a Release —
+      # those would drown out the changelog signal. The Release is created at
+      # $GITHUB_SHA so the tag points at the same commit the publish ran from.
+      # `--generate-notes` populates the body from merged-PR titles since the
+      # previous release tag (auto-discovered).
+      - name: Create GitHub Release for stable publishes
+        if: ${{ steps.version.outputs.tag == 'latest' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --generate-notes
