@@ -85,14 +85,14 @@ Note: cross-space *SQL writes* are still possible inside an op's body (e.g. `INS
 
 Hook-returned values are `OpFactoryCall[]`; each Call's `toOp()` lowers to an `SqlMigrationPlanOperation<TTargetDetails>` carrying an `invariantId` of the codec's choice. The `invariantId` ends up in the marker's `applied_invariants` set after apply, which makes the hook participate in [ADR 208](./ADR%20208%20-%20Invariant-aware%20migration%20routing.md)'s ref-driven routing.
 
-By convention, codec-emitted invariantIds carry a `<extension>-codec:` prefix and identify the column being acted on:
+By convention, codec-emitted invariantIds carry a `<extension>-codec:` prefix and identify the column being acted on, plus a final segment naming any sub-operation the codec emitted for that column. For cipherstash that final segment is the EQL search index (`unique` / `match`) — the codec emits one op per enabled search-flag in `Encrypted<string>`'s `typeParams` (`equality: true` → `unique`, `freeTextSearch: true` → `match`), so each op needs its own invariantId to participate in ref-driven routing independently:
 
 ```
-cipherstash-codec:User.email:add-search-config@v1
-cipherstash-codec:User.email:remove-search-config@v1
+cipherstash-codec:user.email:add-search-config:unique@v1
+cipherstash-codec:user.email:remove-search-config:unique@v1
 ```
 
-The convention keeps codec-emitted invariantIds visually distinct from extension-space invariantIds (`cipherstash:install-eql-bundle-v1`).
+The table segment is the storage-table identifier as it appears in the contract (lowercase `user` in the example app, matching PSL's default `@@map` behavior). The convention keeps codec-emitted invariantIds visually distinct from extension-space invariantIds (`cipherstash:install-eql-bundle-v1`).
 
 ### Wiring
 
