@@ -3,7 +3,8 @@
  *
  * The extension package is treated as a self-contained "project" for
  * the CLI: `prisma-next contract emit` writes
- * `<package>/contract.{json,d.ts}`; `prisma-next migration plan` writes
+ * `<package>/src/contract/contract.{json,d.ts}` (colocated with the
+ * `contract.prisma` source); `prisma-next migration plan` writes
  * `<package>/migrations/cipherstash/<dirName>/...`. The descriptor at
  * `src/exports/control.ts` then JSON-imports those artefacts.
  *
@@ -16,16 +17,18 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
 import sql from '@prisma-next/family-sql/control';
-import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
+import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
-import { contract } from './src/contract/source';
 import { CIPHERSTASH_SPACE_ID } from './src/extension-metadata/constants';
 
 export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
-  contract: typescriptContract(contract, 'contract.json'),
+  contract: prismaContract('./src/contract/contract.prisma', {
+    output: 'src/contract/contract.json',
+    target: postgres,
+  }),
   migrations: {
     dir: `migrations/${CIPHERSTASH_SPACE_ID}`,
   },
