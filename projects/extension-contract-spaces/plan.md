@@ -250,6 +250,39 @@ A task spec at [`specs/contract-space-aggregate-spec.md`](./specs/contract-space
 
 **Status (M2.5):** **SATISFIED** at HEAD `0fed9678f` (M2.5 R2). All 15 sub-spec ACs PASS; M2.5 R1 findings F1–F4 resolved (`8f291d4ab` for F1+F2+F3, `0fed9678f` for F4). Reviewer artefacts under [`reviews/m2.5/`](./reviews/m2.5/) (code-review, system-design-review, walkthrough — all gitignored, local-only). One residual surfaced as Open Item #9 (orphan-table redundancy across aggregate + per-member surfaces in strict mode); not blocking M2.5 close, scoped to revisit during M3+ if it manifests.
 
+### Milestone 2.5b: Contract-space on-disk shape (single-commit slice on top of M2.5)
+
+Single-commit slice landing two pre-launch shape locks on top of the M2.5 aggregate: subspace the app's migrations under `migrations/<appSpaceId>/` (uniform with extensions; deletes the app-vs-extension asymmetry in `spaceMigrationDirectory` and the `errorPinnedArtefactsAppSpace` rejection in artefact emission), and drop the antonym-less "pinned" qualifier from the artefact-emitter helper / type / file-name surface. M3 / M4 / M5 cascade-rebase onto the amended M2.5 head once SATISFIED — that re-rebase is operator-mechanical and out of scope for this loop.
+
+**Sub-spec:** [`specs/contract-space-on-disk-shape.spec.md`](./specs/contract-space-on-disk-shape.spec.md) is authoritative. Tasks correspond to its § Required changes (1–5); the milestone is SATISFIED when its 8 ACs (AC1–AC8) all PASS and the validation gate below is green.
+
+**Tasks (mapped from sub-spec § Required changes):**
+
+- [ ] **T2.5b.1** Flatten `spaceMigrationDirectory` in `packages/1-framework/3-tooling/migration/src/space-layout.ts` — delete the `if (spaceId === APP_SPACE_ID) return projectMigrationsDir` branch; uniform `join(root, spaceId)`. (Sub-spec § Required changes #1; satisfies AC1, AC8.)
+- [ ] **T2.5b.2** Drop the app-space rejection in artefact emission and rename to `emitContractSpaceArtefacts` — file rename `emit-pinned-space-artefacts.ts` → `emit-contract-space-artefacts.ts`, identifier renames (`emitPinnedSpaceArtefacts` → `emitContractSpaceArtefacts`, `PinnedSpaceArtefactInputs` → `ContractSpaceArtefactInputs`), delete `errorPinnedArtefactsAppSpace`. (Sub-spec § Required changes #2 + #4; satisfies AC4, AC5, AC6.)
+- [ ] **T2.5b.3** Verify `db init` / `db update` route their first-app-migration writer through `spaceMigrationDirectory(<root>, <appSpaceId>)` — with T2.5b.1 in place this should be automatic; spot-check no caller hardcodes the root-level path. (Sub-spec § Required changes #3; satisfies AC2.)
+- [ ] **T2.5b.4** Sweep the rest of the "pinned" qualifier surface — sibling readers (`read-pinned-space-contract.ts`, `read-pinned-contract-hash.ts`, `read-pinned-head-ref.ts` and their `.test.ts` peers) renamed; drop the `PinnedSpaceHeadRef` redeclared mirror in favour of importing `ContractSpaceHeadRef` directly from `@prisma-next/framework-components/control` (verify layering); JSDoc / comment-string rephrase pass. Spec § Open questions 1 + 2 are implementer's call in flight. (Sub-spec § Required changes #4; satisfies AC4, AC5.)
+- [ ] **T2.5b.5** Relocate in-tree fixtures, examples, integration tests, and CLI snapshot tests that hardcode `migrations/<package>/` paths for the app to `migrations/<appSpaceId>/<package>/`. Aggregate loader's space-discovery walk goes uniform (drop any app-vs-extension special case). (Sub-spec § Required changes #5; satisfies AC2, AC3.)
+
+**Validation gate:**
+
+- `pnpm typecheck`
+- `pnpm test:packages`
+- `pnpm test:integration`
+- `pnpm test:e2e` (CLI snapshot tests in `test/e2e/` exercise migration-directory layouts)
+- `pnpm lint:deps`
+- `pnpm build` (rename safety — `dist/*.d.mts` consumers across `migration-tools` and `cli`)
+- `rg -i 'pinned' packages/ --type ts` returns zero matches outside ADR-text-only references (AC4)
+- `rg 'emitPinnedSpaceArtefacts|PinnedSpaceArtefactInputs|PinnedSpaceHeadRef|errorPinnedArtefactsAppSpace' packages/ test/ examples/` returns zero matches (AC5)
+- `rg 'spaceId === APP_SPACE_ID' packages/` returns zero matches in path-construction sites (AC8)
+- One-shot grep audit for hardcoded `migrations/<package>/` patterns in `test/`, `examples/` (Sub-spec § Risk — hidden hardcoded path)
+
+**Out of scope (this slice):**
+
+- "Artefact" → "artifact" spelling normalisation — folded into M5 T5.10 close-out hygiene; files renamed here keep the "artefact" spelling (e.g. `emit-contract-space-artefacts.ts`) and pick up a second `git mv` on M5.
+- Cascade re-rebase of M3 / M4 / M5 onto the amended M2.5 head — operator-mechanical follow-on after this slice reaches SATISFIED; not part of the iterate-implement-review loop.
+- Configurable `appSpaceId` (TML-2457) — default stays `'app'`; this slice is forward-compatible.
+
 ### Milestone 3: Migrate cipherstash to contract space
 
 Migrate the cipherstash extension to a contract space, unblocking TML-2373. Cipherstash's `databaseDependencies.init` is removed; the `strictVerification: false` workaround is reverted.
