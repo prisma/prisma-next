@@ -135,11 +135,19 @@ Namespaced operator method names should be `<extensionId><CapitalizedFrameworkOp
 
 The framework does not enforce this convention syntactically — it enforces only the no-shadowing rule. Extension authors are expected to follow it for ergonomic consistency.
 
-## Type-level visibility (current limitation)
+## Type-level visibility
 
-As of May 2026, namespaced replacement operators are runtime-bound but require the extension to ship a `QueryOperationTypes` export (see [Extension-Packs-Naming-and-Layout](../../reference/Extension-Packs-Naming-and-Layout.md)) so the framework's model-accessor type machinery can synthesize them at the type level. Extensions that have not yet shipped this export carry a documented type-side gap that consumers bridge with a small local cast; cipherstash carries one such gap tracked under [TML-2435](https://linear.app/prisma-company/issue/TML-2435/cipherstash-ship-queryoperationtypes-export-so-cipherstasheq).
+Namespaced replacement operators MUST also project type-visibility through a `QueryOperationTypes` export so the framework's model-accessor type machinery and the SQL query builder can synthesize them at the type level. Without this projection the runtime registration is invisible to TypeScript and consumers bridge the gap with ad-hoc casts at every call site, which (i) defeats the type-level loud-failure property this ADR's runtime half exists to deliver — a missing operator at the type level is indistinguishable from a missing operator at runtime, both yielding `Property 'cipherstashEq' does not exist`-style messages — and (ii) accumulates as a documented surface gap that's easy to forget as more codecs adopt the pattern.
 
-This ADR mandates the runtime + trait-declaration pattern; the type-side `QueryOperationTypes` export is an authoring obligation under the extension-packs reference doc, not a requirement of this ADR.
+The convention mirrors the runtime registration:
+
+- Declare both `OperationTypes` (codec-keyed, read by the model accessor for `db.<model>.where(...)` filter shapes) and `QueryOperationTypes` (flat, read by the SQL builder's `Functions<QC>` for `(f, fns) => fns.<extensionOp>(...)` callbacks) under a stable subpath. The convention is `@prisma-next/extension-<id>/operation-types`. See [`packages/3-extensions/pgvector/src/types/operation-types.ts`](../../../packages/3-extensions/pgvector/src/types/operation-types.ts) and [`packages/3-extensions/cipherstash/src/types/operation-types.ts`](../../../packages/3-extensions/cipherstash/src/types/operation-types.ts) for the canonical shape.
+- Wire `types.operationTypes` and `types.queryOperationTypes` import declarations on the extension's pack-meta. The contract emitter reads these at emit time and threads the import + intersection composition through to the consuming application's generated `contract.d.ts` automatically — so an application that declares a cipherstash-using contract gets `cipherstashEq` / `cipherstashIlike` projected onto `cipherstash/string@1` columns without authoring any wiring of its own.
+- The `self: { codecId: '<storage-codec>' }` shape gates each operator to columns of the matching codec at the type level. Composing with the framework's existing model-accessor synthesis means the `<extensionOp>` is discoverable on the right columns and absent from the wrong ones — the same loud-failure property the runtime half delivers, projected into the type system.
+
+Cipherstash and pgvector are the canonical examples of the pattern. Cipherstash carried a documented runtime-only gap (TML-2435) until this requirement landed alongside the namespaced-operator runtime work in May 2026 (the gap is closed; the cast wrapper that bridged it has been removed from the example app).
+
+The runtime + trait-declaration pattern this ADR mandates and the type-visibility requirement above are companion mechanisms — extensions that ship one without the other re-open the discoverability hole that motivated the namespaced replacement pattern in the first place.
 
 ## Non-goals
 
@@ -158,7 +166,7 @@ This ADR mandates the runtime + trait-declaration pattern; the type-side `QueryO
 
 ### Trade-offs
 
-- **Discoverability gap until `QueryOperationTypes` lands.** Extensions that haven't yet shipped the type-side export carry a cast burden on consumers (cipherstash currently; tracked under TML-2435).
+- **`QueryOperationTypes` is now an authoring obligation.** Extensions ship the type-side projection alongside the runtime registration, with a small mechanical cost: a new `src/types/operation-types.ts` declaration, a `/operation-types` subpath, a `types.{operationTypes,queryOperationTypes}` block on the pack-meta. The cost is paid once per extension; the consuming application gets type-visibility for free.
 - **API surface duplication for similar semantics.** `cipherstashEq` and `pg/text`'s built-in `eq` mean structurally similar things but live in different namespaces. This is the intended trade — collapsing them into one would re-open the wrong-SQL footgun.
 - **Naming-convention discipline.** The framework doesn't enforce `<extensionId><Op>` syntactically — extension authors are responsible for following the convention. A pull-request reviewer is the backstop.
 
