@@ -16,7 +16,7 @@
  *
  * Pure fixture means: no live Postgres, no PGlite — the test computes
  * the on-disk shape and asserts on it. The two passes invoked here
- * (`emitPinnedSpaceArtefacts` + `materialiseExtensionMigrationPackageIfMissing`)
+ * (`emitContractSpaceArtefacts` + `materialiseExtensionMigrationPackageIfMissing`)
  * are the *exact* primitives the CLI's `runContractSpaceMigratePass`
  * + `runContractSpaceExtensionMigrationsPass` call. Calling them
  * directly keeps cipherstash's test cone independent of the CLI
@@ -40,10 +40,10 @@ import type {
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   materialiseExtensionMigrationPackageIfMissing,
-  writeExtensionMigrationPackage,
+  materialiseMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import {
-  emitPinnedSpaceArtefacts,
+  emitContractSpaceArtefacts,
   spaceMigrationDirectory,
 } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -230,14 +230,14 @@ async function pinDescriptorVersion(
   version: SyntheticVersion,
   options: { readonly write: 'pinnedOnly' | 'pinnedAndMigrations' },
 ): Promise<void> {
-  await emitPinnedSpaceArtefacts(fixture.migrationsDir, CIPHERSTASH_SPACE_ID, {
+  await emitContractSpaceArtefacts(fixture.migrationsDir, CIPHERSTASH_SPACE_ID, {
     contract: version.contract,
     contractDts: version.contractDts,
     headRef: { hash: version.headRef.hash, invariants: [...version.headRef.invariants] },
   });
   if (options.write === 'pinnedAndMigrations') {
     for (const pkg of version.migrations) {
-      await writeExtensionMigrationPackage(fixture.cipherstashSpaceDir, pkg);
+      await materialiseMigrationPackage(fixture.cipherstashSpaceDir, pkg);
     }
   }
 }

@@ -31,14 +31,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   materialiseExtensionMigrationPackageIfMissing,
-  writeExtensionMigrationPackage,
+  materialiseMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import {
-  emitPinnedSpaceArtefacts,
-  listPinnedSpaceDirectories,
-  readPinnedHeadRef,
+  type ContractSpaceHeadRecord,
+  emitContractSpaceArtefacts,
+  listContractSpaceDirectories,
+  readContractSpaceHeadRef,
   type SpaceMarkerRecord,
-  type SpacePinnedHashRecord,
   spaceMigrationDirectory,
   verifyContractSpaces,
 } from '@prisma-next/migration-tools/spaces';
@@ -78,13 +78,13 @@ async function setupProject(): Promise<ProjectFixture> {
     JSON.stringify({ name: '@prisma-next/extension-cipherstash', version: '0.0.1' }),
   );
 
-  await emitPinnedSpaceArtefacts(migrationsDir, CIPHERSTASH_SPACE_ID, {
+  await emitContractSpaceArtefacts(migrationsDir, CIPHERSTASH_SPACE_ID, {
     contract: cipherstashContract,
     contractDts: '// rendered .d.ts for cipherstash contract space\nexport interface Contract {}\n',
     headRef: { hash: cipherstashHeadRef.hash, invariants: [...cipherstashHeadRef.invariants] },
   });
 
-  await writeExtensionMigrationPackage(cipherstashSpaceDir, cipherstashBaselineMigration);
+  await materialiseMigrationPackage(cipherstashSpaceDir, cipherstashBaselineMigration);
 
   return {
     projectRoot,
@@ -117,13 +117,13 @@ describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor
       expect(remaining.includes('extension-cipherstash')).toBe(false);
     });
 
-    it('listPinnedSpaceDirectories discovers cipherstash from disk', async () => {
-      const dirs = await listPinnedSpaceDirectories(fixture.migrationsDir);
+    it('listContractSpaceDirectories discovers cipherstash from disk', async () => {
+      const dirs = await listContractSpaceDirectories(fixture.migrationsDir);
       expect(dirs).toContain(CIPHERSTASH_SPACE_ID);
     });
 
-    it('readPinnedHeadRef returns the cipherstash head ref from disk', async () => {
-      const headRef = await readPinnedHeadRef(fixture.migrationsDir, CIPHERSTASH_SPACE_ID);
+    it('readContractSpaceHeadRef returns the cipherstash head ref from disk', async () => {
+      const headRef = await readContractSpaceHeadRef(fixture.migrationsDir, CIPHERSTASH_SPACE_ID);
       expect(headRef).not.toBeNull();
       expect(headRef?.hash).toBe(cipherstashHeadRef.hash);
       expect([...(headRef?.invariants ?? [])].sort()).toEqual(
@@ -132,8 +132,8 @@ describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor
     });
 
     it('verifyContractSpaces returns ok when pinned files + marker rows match', async () => {
-      const dirs = await listPinnedSpaceDirectories(fixture.migrationsDir);
-      const pinnedHash: SpacePinnedHashRecord = {
+      const dirs = await listContractSpaceDirectories(fixture.migrationsDir);
+      const pinnedHash: ContractSpaceHeadRecord = {
         hash: cipherstashHeadRef.hash,
         invariants: [...cipherstashHeadRef.invariants],
       };
@@ -153,7 +153,7 @@ describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor
     });
 
     it('verifyContractSpaces flags hash drift on cipherstash without descriptor access', async () => {
-      const dirs = await listPinnedSpaceDirectories(fixture.migrationsDir);
+      const dirs = await listContractSpaceDirectories(fixture.migrationsDir);
       const driftedMarker: SpaceMarkerRecord = {
         hash: 'sha256:00000000000000000000000000000000000000000000000000000000deadbeef',
         invariants: [...cipherstashHeadRef.invariants],
@@ -168,7 +168,7 @@ describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor
             {
               hash: cipherstashHeadRef.hash,
               invariants: [...cipherstashHeadRef.invariants],
-            } satisfies SpacePinnedHashRecord,
+            } satisfies ContractSpaceHeadRecord,
           ],
         ]),
         markerRowsBySpace: new Map([[CIPHERSTASH_SPACE_ID, driftedMarker]]),

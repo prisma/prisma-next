@@ -74,8 +74,8 @@ import sqlFamilyDescriptor, {
 } from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
-import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
+import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
@@ -263,14 +263,14 @@ async function setupTestProject(args: {
   const migrationsDir = join(projectRoot, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
 
-  await emitPinnedSpaceArtefacts(migrationsDir, CIPHERSTASH_SPACE_ID, {
+  await emitContractSpaceArtefacts(migrationsDir, CIPHERSTASH_SPACE_ID, {
     contract: cipherstashContract,
     contractDts: '// rendered .d.ts for cipherstash contract space\nexport interface Contract {}\n',
     headRef: { hash: cipherstashHeadRef.hash, invariants: [...cipherstashHeadRef.invariants] },
   });
 
   const cipherstashSpaceDir = join(migrationsDir, CIPHERSTASH_SPACE_ID);
-  await writeExtensionMigrationPackage(cipherstashSpaceDir, args.migration);
+  await materialiseMigrationPackage(cipherstashSpaceDir, args.migration);
 
   return {
     projectRoot,

@@ -125,7 +125,7 @@ export async function materialiseMigrationPackage(
 }
 
 /**
- * Idempotent variant of {@link writeExtensionMigrationPackage}: writes the
+ * Idempotent variant of {@link materialiseMigrationPackage}: writes the
  * package only if `<targetDir>/<pkg.dirName>/` does not already exist on
  * disk; returns `{ written: false }` when the package directory is
  * present (no rewrite, no comparison — by-existence skip is the
@@ -134,7 +134,7 @@ export async function materialiseMigrationPackage(
  *
  * Concretely:
  *   - existing dir → skip silently, return `{ written: false }`.
- *   - missing dir → write three files via {@link writeExtensionMigrationPackage},
+ *   - missing dir → write three files via {@link materialiseMigrationPackage},
  *     return `{ written: true }`.
  *   - any other I/O error from `stat` → propagated unchanged (callers
  *     expect ENOENT to be the only "not present" signal).
@@ -150,13 +150,13 @@ export async function materialiseMigrationPackage(
  */
 export async function materialiseExtensionMigrationPackageIfMissing(
   targetDir: string,
-  pkg: MigrationPackageContents,
+  pkg: MigrationPackage,
 ): Promise<{ readonly written: boolean }> {
   const pkgDir = join(targetDir, pkg.dirName);
   if (await pathExists(pkgDir)) {
     return { written: false };
   }
-  await writeExtensionMigrationPackage(targetDir, pkg);
+  await materialiseMigrationPackage(targetDir, pkg);
   return { written: true };
 }
 

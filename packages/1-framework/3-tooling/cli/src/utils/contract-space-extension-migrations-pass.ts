@@ -9,7 +9,7 @@ import {
 
 /**
  * In-memory authored migration package shipped by an extension descriptor.
- * Mirrors `MigrationPackageContents` from `@prisma-next/migration-tools/io`
+ * Mirrors `MigrationPackage` from `@prisma-next/migration-tools/io`
  * (the on-disk shape minus `dirPath`); redeclared structurally here so
  * the CLI helper does not couple to the SQL family's `ExtensionMigrationPackage`
  * type — any family that ships pre-built migration packages can pass them
