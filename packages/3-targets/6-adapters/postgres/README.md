@@ -133,11 +133,7 @@ flowchart TD
 
 - Exports raw JSON helpers:
   - `jsonColumn`, `jsonbColumn` — untyped raw JSON / JSONB column descriptors
-  - For schema-typed JSON columns, use the per-library extension package
-    (`@prisma-next/extension-arktype-json` for arktype). The
-    schema-accepting `json(schema)` / `jsonb(schema)` overloads
-    previously shipped here retired in Phase C of the
-    codec-registry-unification project.
+  - For schema-typed JSON columns, use the per-library extension package (`@prisma-next/extension-arktype-json` for arktype). The schema-accepting `json(schema)` / `jsonb(schema)` overloads previously shipped here retired in Phase C of the codec-registry-unification project.
 
 ## Dependencies
 
@@ -300,12 +296,8 @@ table('event', (t) =>
 
 ### Typed fallback behavior
 
-- For schema-typed columns, use a per-library extension package
-  (e.g. `@prisma-next/extension-arktype-json`). The emit-path renderer
-  reads the schema's `expression` from typeParams and produces a concrete
-  TS type in `contract.d.ts`.
-- For untyped columns (`jsonColumn`, `jsonbColumn`), the emitted type
-  falls back to `JsonValue`.
+- For schema-typed columns, use a per-library extension package (e.g. `@prisma-next/extension-arktype-json`). The emit-path renderer reads the schema's `expression` from typeParams and produces a concrete TS type in `contract.d.ts`.
+- For untyped columns (`jsonColumn`, `jsonbColumn`), the emitted type falls back to `JsonValue`.
 - Runtime values still encode/decode as JSON-compatible values.
 
 ## Exports

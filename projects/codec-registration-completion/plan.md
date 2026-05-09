@@ -283,35 +283,11 @@ Done after M4 lands cleanly. Per [drive-project-workflow](../../.cursor/rules/dr
 
 ## Close-out outcome (post-orchestrator interrupt)
 
-The original plan above (steps 1–4 of the project-wide close-out) was executed with one
-deviation. Step 3 ("delete `projects/codec-registration-completion/`") was reverted
-mid-close-out by an orchestrator directive: the project directory is retained in-tree
-as a historical record rather than removed.
+The original plan above (steps 1–4 of the project-wide close-out) was executed with one deviation. Step 3 ("delete `projects/codec-registration-completion/`") was reverted mid-close-out by an orchestrator directive: the project directory is retained in-tree as a historical record rather than removed.
 
 What landed on the close-out branch:
 
-- **Step 1 — doc migration**: ADR 208 rewritten to describe Pattern E (class-form
-  `CodecImpl` + `CodecDescriptorImpl` + per-codec column helper) as the canonical
-  authoring shape; new contributor reference at
-  [`docs/reference/codec-authoring-guide.md`](../../docs/reference/codec-authoring-guide.md);
-  retrospective notes added to ADRs 184/186/202/204/205 explaining that their
-  `defineCodec({...})` examples reflect the prior surface and pointing to ADR 208 +
-  the authoring guide for current practice.
-- **Step 2 — reference cleanup (revised)**: project-internal milestone/phase markers
-  (`(TML-2357 M0 Phase B5/C)` etc.) in code comments and docblocks were replaced with
-  the durable Linear ticket id `(TML-2357)`. References that point into this
-  directory remain only inside the directory itself (self-references in `plan.md` and
-  `specs/`); no external file links into `projects/codec-registration-completion/**`.
-- **Step 3 — directory deletion**: **NOT executed.** A deletion commit
-  (`aacf58dccf7347d460ae01f02db1b4d2a8d23300`) was created and immediately reverted
-  by `5b0113a5afbdf93a5c03ed6b70c3546aa367d657`. The five tracked spec/plan files in
-  this directory were restored from the prior commit. The gitignored `reviews/`
-  contents (review artifacts created during execution; never tracked by git) are not
-  recoverable; per the original close-out triage they were classified as transient
-  review artifacts.
-- **Step 4 — Linear**: TML-2357 will auto-close on PR merge via branch name + PR
-  title link. Two follow-up tickets filed during close-out triage:
-  [TML-2402](https://linear.app/prisma-company/issue/TML-2402) (parallel-execution
-  flake, P3) and [TML-2403](https://linear.app/prisma-company/issue/TML-2403)
-  (turbo cache-keying gap, P4). Both are pre-existing/operational, not regressions
-  introduced by this project.
+- **Step 1 — doc migration**: ADR 208 rewritten to describe Pattern E (class-form `CodecImpl` + `CodecDescriptorImpl` + per-codec column helper) as the canonical authoring shape; new contributor reference at [`docs/reference/codec-authoring-guide.md`](../../docs/reference/codec-authoring-guide.md); retrospective notes added to ADRs 184/186/202/204/205 explaining that their `defineCodec({...})` examples reflect the prior surface and pointing to ADR 208 + the authoring guide for current practice.
+- **Step 2 — reference cleanup (revised)**: project-internal milestone/phase markers (`(TML-2357 M0 Phase B5/C)` etc.) in code comments and docblocks were replaced with the durable Linear ticket id `(TML-2357)`. References that point into this directory remain only inside the directory itself (self-references in `plan.md` and `specs/`); no external file links into `projects/codec-registration-completion/**`.
+- **Step 3 — directory deletion**: **NOT executed.** A deletion commit (`aacf58dccf7347d460ae01f02db1b4d2a8d23300`) was created and immediately reverted by `5b0113a5afbdf93a5c03ed6b70c3546aa367d657`. The five tracked spec/plan files in this directory were restored from the prior commit. The gitignored `reviews/` contents (review artifacts created during execution; never tracked by git) are not recoverable; per the original close-out triage they were classified as transient review artifacts.
+- **Step 4 — Linear**: TML-2357 will auto-close on PR merge via branch name + PR title link. Two follow-up tickets filed during close-out triage: [TML-2402](https://linear.app/prisma-company/issue/TML-2402) (parallel-execution flake, P3) and [TML-2403](https://linear.app/prisma-company/issue/TML-2403) (turbo cache-keying gap, P4). Both are pre-existing/operational, not regressions introduced by this project.

@@ -730,8 +730,7 @@ const _plan = sql<Contract, CodecTypes>({ contract, adapter })
 type Row = ResultType<typeof _plan>;  // _plan indicates it's intentionally unused
 ```
 
-**Biome Configuration:**
-The `noUnusedVariables` rule is configured to ignore variables starting with `_` via the `ignorePattern: '^_'` option.
+**Biome Configuration:** The `noUnusedVariables` rule is configured to ignore variables starting with `_` via the `ignorePattern: '^_'` option.
 
 ### Empty Object Types
 
