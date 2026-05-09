@@ -53,7 +53,8 @@
     "tsx": "^4.20.6",
     "turbo": "^2.6.1",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "pkg-pr-new": "0.0.71"
   },
   "engines": {
     "node": ">=24"

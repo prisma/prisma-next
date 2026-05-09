@@ -79,6 +79,9 @@ importers:
       lint-staged:
         specifier: ^16.2.6
         version: 16.2.6
+      pkg-pr-new:
+        specifier: 0.0.71
+        version: 0.0.71
       tslib:
         specifier: ^2.8.1
         version: 2.8.1
@@ -7403,6 +7406,10 @@ packages:
     resolution: {integrity: sha512-HRDzbaKjC+AOWVXxAU/x54COGeIv9eb+6CkDSQoNTt4XyWoIJvuPsXizxu/Fr23EiekbtZwmh1IcIG/l/a10GQ==}
     engines: {node: '>=8'}
 
+  pkg-pr-new@0.0.71:
+    resolution: {integrity: sha512-Ln7I7NaOXN6CjBLVrNqsWOo6mIaNW4chH4eCR2t4tnQSmYtyQiWCqlMG6bL2JYCT1MOiKEiDObnnzePGh0TNFQ==}
+    hasBin: true
+
   pkg-types@2.3.0:
     resolution: {integrity: sha512-SIqCzDRg0s9npO5XQ3tNZioRY1uK06lA41ynBC1YmFTmnY6FjUjVt6s4LoADmwoig1qqD0oK8h1p/8mlMx8Oig==}
 
@@ -11459,6 +11466,8 @@ snapshots:
   pkg-dir@4.2.0:
     dependencies:
       find-up: 4.1.0
+
+  pkg-pr-new@0.0.71: {}
 
   pkg-types@2.3.0:
     dependencies:
