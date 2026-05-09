@@ -113,13 +113,25 @@ jobs:
       # $GITHUB_SHA so the tag points at the same commit the publish ran from.
       # `--generate-notes` populates the body from merged-PR titles since the
       # previous release tag (auto-discovered).
+      #
+      # Idempotent on workflow rerun: if a Release for `v$VERSION` already exists
+      # (e.g. a previous run published to npm but failed before this step), edit
+      # it in place rather than re-creating it. `gh release edit` doesn't support
+      # `--generate-notes`, so on rerun the existing notes are preserved — that's
+      # the right trade-off versus failing the rerun outright.
       - name: Create GitHub Release for stable publishes
         if: ${{ steps.version.outputs.tag == 'latest' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          gh release create "v$VERSION" \
-            --target "$GITHUB_SHA" \
-            --title "v$VERSION" \
-            --generate-notes
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            gh release edit "v$VERSION" \
+              --target "$GITHUB_SHA" \
+              --title "v$VERSION"
+          else
+            gh release create "v$VERSION" \
+              --target "$GITHUB_SHA" \
+              --title "v$VERSION" \
+              --generate-notes
+          fi
