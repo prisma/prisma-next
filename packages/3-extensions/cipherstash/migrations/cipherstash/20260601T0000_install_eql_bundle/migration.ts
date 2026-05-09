@@ -50,11 +50,6 @@ interface MakeOpArgs {
   readonly id: string;
   readonly label: string;
   readonly invariantId: string;
-  readonly target: {
-    readonly schema: string;
-    readonly objectType: 'table' | 'type' | 'domain' | 'enum' | 'extension';
-    readonly name: string;
-  };
   readonly executeSql: string;
 }
 
@@ -64,7 +59,7 @@ function makeOp(args: MakeOpArgs) {
     label: args.label,
     operationClass: 'additive',
     invariantId: args.invariantId,
-    target: { id: 'postgres', details: args.target },
+    target: { id: 'postgres' },
     precheck: [],
     execute: [{ description: args.label, sql: args.executeSql }],
     postcheck: [],
@@ -85,32 +80,24 @@ export default class M extends Migration {
         id: 'cipherstash.install-eql-bundle',
         label: 'Install EQL bundle (functions, operators, casts, op classes, schema, types)',
         invariantId: CIPHERSTASH_INVARIANTS.installBundle,
-        target: { schema: EQL_V2_SCHEMA, objectType: 'extension', name: 'eql_v2' },
         executeSql: EQL_BUNDLE_SQL,
       }),
       makeOp({
         id: `cipherstash.create-${EQL_V2_CONFIGURATION_STATE_TYPE}`,
         label: `Register invariant for enum ${EQL_V2_CONFIGURATION_STATE_TYPE} (created by EQL bundle)`,
         invariantId: CIPHERSTASH_INVARIANTS.createConfigurationState,
-        target: {
-          schema: 'public',
-          objectType: 'enum',
-          name: EQL_V2_CONFIGURATION_STATE_TYPE,
-        },
         executeSql: STRUCTURAL_OP_NOOP_SQL,
       }),
       makeOp({
         id: `cipherstash.create-${EQL_V2_CONFIGURATION_TABLE}`,
         label: `Register invariant for table ${EQL_V2_CONFIGURATION_TABLE} (created by EQL bundle)`,
         invariantId: CIPHERSTASH_INVARIANTS.createConfiguration,
-        target: { schema: 'public', objectType: 'table', name: EQL_V2_CONFIGURATION_TABLE },
         executeSql: STRUCTURAL_OP_NOOP_SQL,
       }),
       makeOp({
         id: `cipherstash.create-${EQL_V2_ENCRYPTED_TYPE}`,
         label: `Register invariant for composite type ${EQL_V2_ENCRYPTED_TYPE} (created by EQL bundle)`,
         invariantId: CIPHERSTASH_INVARIANTS.createEncrypted,
-        target: { schema: 'public', objectType: 'type', name: EQL_V2_ENCRYPTED_TYPE },
         executeSql: STRUCTURAL_OP_NOOP_SQL,
       }),
       ...EQL_V2_DOMAIN_TYPES.map((name) =>
@@ -118,7 +105,6 @@ export default class M extends Migration {
           id: `cipherstash.create-${EQL_V2_SCHEMA}-${name}`,
           label: `Register invariant for domain ${EQL_V2_SCHEMA}.${name} (created by EQL bundle)`,
           invariantId: CIPHERSTASH_INVARIANTS.createDomain(name),
-          target: { schema: EQL_V2_SCHEMA, objectType: 'domain', name },
           executeSql: STRUCTURAL_OP_NOOP_SQL,
         }),
       ),
@@ -127,7 +113,6 @@ export default class M extends Migration {
           id: `cipherstash.create-${EQL_V2_SCHEMA}-${name}`,
           label: `Register invariant for composite type ${EQL_V2_SCHEMA}.${name} (created by EQL bundle)`,
           invariantId: CIPHERSTASH_INVARIANTS.createOreComposite(name),
-          target: { schema: EQL_V2_SCHEMA, objectType: 'type', name },
           executeSql: STRUCTURAL_OP_NOOP_SQL,
         }),
       ),
