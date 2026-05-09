@@ -33,7 +33,7 @@ describe('buildContractCodecRegistry — per-column codec instance context (F42)
       // `usedAt` so the factory parameter is typed as the SQL-extended
       // context. The cast through `unknown` mirrors what production SQL
       // extensions do (see pgvector's family-agnostic factory cast).
-      factory: ((_params: void) => (ctx: SqlCodecInstanceContext) => {
+      factory: ((_params: undefined) => (ctx: SqlCodecInstanceContext) => {
         captures.push(ctx);
         const codec: Codec = {
           id: 'test/captures-ctx@1',
