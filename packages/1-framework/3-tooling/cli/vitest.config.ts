@@ -17,6 +17,12 @@ export default defineConfig({
     setupFiles: ['./test/setup.ts'],
     env: {
       CI: 'true',
+      // Disable ANSI colors so snapshot tests in test/utils/formatters/ stay
+      // stable regardless of how vitest is invoked (per-package vs. root
+      // projects, where TTY/FORCE_COLOR detection differs). Some renderer
+      // call sites in src/utils/formatters/graph-render.ts bypass the
+      // explicit `colorize: false` wrapper and call colorette directly.
+      NO_COLOR: '1',
     },
     coverage: {
       provider: 'v8',
