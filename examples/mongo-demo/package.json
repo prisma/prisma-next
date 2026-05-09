@@ -40,10 +40,10 @@
     "@types/node": "catalog:",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react-swc": "^4.2.3",
+    "@vitejs/plugin-react-swc": "^4.3.0",
     "mongodb-memory-server": "catalog:",
     "pathe": "^2.0.3",
-    "tsx": "^4.19.2",
+    "tsx": "^4.21.0",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
