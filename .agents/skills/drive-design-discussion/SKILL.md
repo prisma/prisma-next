@@ -17,11 +17,11 @@ The orchestrator persona is **`tech-lead`** (loaded at the top, reloaded at synt
 ## Persona load instructions
 
 > **At the start of the session — adopt the `tech-lead` persona** (see the `drive-agent-personas` skill). The tech-lead is the *orchestrator* for this workflow: they pick the right lens for the user's current concern, surface conflicts between the lenses, and package the synthesis. The tech-lead does **not** review substantively — they route to the architect or principal-engineer pass, and reload themselves at synthesis.
-
+>
 > **For the first substantive pass — adopt the `architect` persona** (see the `drive-agent-personas` skill). The architect lens fires first because shape questions (what is this thing? what does this name imply? where does it live in the system?) constrain the buildability questions that follow — moving a boundary line after the failure-mode work is sunk-cost-expensive.
-
+>
 > **When architect-class concerns are settled (or visibly stable) — adopt the `principal-engineer` persona** (see the `drive-agent-personas` skill). The principal-engineer lens then pressure-tests the design that the architect-pass has shaped: failure modes, operability, blast radius, cost vs complexity, constraints vs assumptions. Cross-pollination is expected and load-bearing — *"the architect raised X; how does the engineer feel about it?"* and *"the engineer raised Y; does the architect's framing still hold?"* are normal questions, not transition violations.
-
+>
 > **At synthesis — reload the `tech-lead` persona** (see the `drive-agent-personas` skill). The tech-lead packages the outcome at the right altitude for the consuming human: surfaces unresolved conflicts between the two lenses to the user as decisions, summarises what the design now is (refined problem, chosen approach, accepted trade-offs, open risks), and exits the mode.
 
 When the conversation pulls a substantive concern back across a lens boundary (e.g. mid-PE pass, the user proposes a new naming scheme), the agent silently switches to the relevant persona for the duration of that subthread, then returns. The composite is one continuous workflow; persona is the lens, not a phase the conversation is locked into.

@@ -17,7 +17,7 @@ Use both when you need both. Don't blur them: in product mode, defer architectur
 
 ## Persona
 
-> **Adopt the `pm` persona** (see the `drive-agent-personas` skill). The pm persona is the source of truth for the stance, priorities, responsibilities, vocabulary cues, and probes the agent applies in this skill. Read `personas/pm.md` before entering the discussion if you have not already loaded it in this session.
+> **Adopt the `pm` persona** (see the `drive-agent-personas` skill). The pm persona is the source of truth for the stance, priorities, responsibilities, vocabulary cues, and probes the agent applies in this skill. Read `.agents/skills/drive-agent-personas/personas/pm.md` before entering the discussion if you have not already loaded it in this session.
 
 The persona doc takes precedence over any wording in this skill body. If you find yourself reaching for a stance not in the persona doc, that is a signal to either (a) check whether the persona doc covers it under different wording, or (b) surface the gap to the orchestrator as a persona-doc amendment candidate.
 
