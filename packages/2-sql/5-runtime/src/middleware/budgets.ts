@@ -25,14 +25,17 @@ function hasAggregateWithoutGroupBy(ast: SelectAst): boolean {
   return ast.projection.some((item) => item.expr.kind === 'aggregate');
 }
 
-function primaryTableFromAst(ast: SelectAst): string | undefined {
+function primaryTableFromAst(ast: SelectAst): string {
   switch (ast.from.kind) {
     case 'table-source':
       return ast.from.name;
     case 'derived-table-source':
       return ast.from.alias;
+    // v8 ignore next 4
     default:
-      return undefined;
+      throw new Error(
+        `Unsupported source kind: ${(ast.from satisfies never as { kind: string }).kind}`,
+      );
   }
 }
 
@@ -41,17 +44,12 @@ function estimateRowsFromAst(
   tableRows: Record<string, number>,
   defaultTableRows: number,
   hasAggregateWithoutGroup: boolean,
-): number | null {
+): number {
   if (hasAggregateWithoutGroup) {
     return 1;
   }
 
-  const table = primaryTableFromAst(ast);
-  if (!table) {
-    return null;
-  }
-
-  const tableEstimate = tableRows[table] ?? defaultTableRows;
+  const tableEstimate = tableRows[primaryTableFromAst(ast)] ?? defaultTableRows;
 
   if (ast.limit !== undefined) {
     return Math.min(ast.limit, tableEstimate);
@@ -136,31 +134,19 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
     const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
 
     if (isUnbounded) {
-      if (estimated !== null && estimated >= maxRows) {
-        emitBudgetViolation(
-          runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
-            source: 'ast',
-            estimatedRows: estimated,
-            maxRows,
-          }),
-          shouldBlock,
-          ctx,
-        );
-        return;
-      }
-
+      const details =
+        estimated >= maxRows
+          ? { source: 'ast', estimatedRows: estimated, maxRows }
+          : { source: 'ast', maxRows };
       emitBudgetViolation(
-        runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
-          source: 'ast',
-          maxRows,
-        }),
+        runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', details),
         shouldBlock,
         ctx,
       );
       return;
     }
 
-    if (estimated !== null && estimated > maxRows) {
+    if (estimated > maxRows) {
       emitBudgetViolation(
         runtimeError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
           source: 'ast',

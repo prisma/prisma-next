@@ -120,6 +120,10 @@ function isExecutionPlan(plan: SqlExecutionPlan | SqlQueryPlan): plan is SqlExec
   return 'sql' in plan;
 }
 
+// v8 ignore next 2
+const noopLogSink = (): void => {};
+const noopLog: Log = { info: noopLogSink, warn: noopLogSink, error: noopLogSink };
+
 class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
   extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>
   implements Runtime
@@ -150,11 +154,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       contract: context.contract,
       mode: mode ?? 'strict',
       now: () => Date.now(),
-      log: log ?? {
-        info: () => {},
-        warn: () => {},
-        error: () => {},
-      },
+      log: log ?? noopLog,
       // ctx is only invoked by runWithMiddleware with execs this runtime lowered; the framework parameter type is the cross-family base.
       contentHash: (exec) => computeSqlContentHash(exec as SqlExecutionPlan),
     };
@@ -198,8 +198,9 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   }
 
   /**
-   * Default driver invocation. Production execution paths override the queryable target (e.g. transaction or connection) by going through `executeAgainstQueryable`; this implementation supports any caller of `super.execute(plan)` and the abstract-base contract.
+   * Default driver invocation required by the abstract `RuntimeCore` contract. Every production path overrides `execute()` and routes through `executeAgainstQueryable`, so this hook is defensive only — subclasses that delegate back to `super.execute()` would land here.
    */
+  // v8 ignore next 6
   protected override runDriver(exec: SqlExecutionPlan): AsyncIterable<Record<string, unknown>> {
     return this.driver.execute<Record<string, unknown>>({
       sql: exec.sql,
@@ -378,14 +379,6 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   }
 
   private async verifyMarker(): Promise<void> {
-    if (this.verify.mode === 'always') {
-      this.verified = false;
-    }
-
-    if (this.verified) {
-      return;
-    }
-
     const readStatement = this.familyAdapter.markerReader.readMarkerStatement();
     const result = await this.driver.query(readStatement.sql, readStatement.params);
 
