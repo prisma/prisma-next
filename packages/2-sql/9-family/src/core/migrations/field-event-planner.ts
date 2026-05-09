@@ -1,12 +1,15 @@
 /**
  * Codec lifecycle hook planner — runs `onFieldEvent` for every per-field
- * delta between two contracts and concatenates the returned ops in a
- * deterministic order.
+ * delta between two contracts and concatenates the returned `OpFactoryCall`
+ * instances in a deterministic order.
  *
  * Wired by each target's planner (`PostgresMigrationPlanner`,
- * `SqliteMigrationPlanner`) so codec-emitted ops are inlined alongside
- * structural DDL in the app-space migration's `ops.json`. Pure, target-
- * agnostic, and only ever invoked at the app-space emitter; extension-space
+ * `SqliteMigrationPlanner`) so codec-emitted Calls are inlined alongside
+ * the target's structural Calls in the planner IR. The planner's
+ * `renderCallsToTypeScript` then emits each Call's `renderTypeScript()`
+ * into the app-space migration; `toOp()` derives the runtime op for
+ * `ops.json` (ADR 195's two-renderer pattern). Pure, target-agnostic,
+ * and only ever invoked at the app-space emitter; extension-space
  * planning never reaches this helper (sub-spec § 5).
  *
  * Ordering rules (sub-spec § 5):
@@ -14,7 +17,7 @@
  * - Events are grouped by phase: `'added'` → `'dropped'` → `'altered'`.
  * - Within each phase, entries are sorted alphabetically by
  *   `(tableName, fieldName)`.
- * - The hook's returned ops are appended in the order the hook returned them.
+ * - The hook's returned Calls are appended in the order the hook returned them.
  *
  * `'altered'` is suppressed when only `codecId` differs (codec rotation is a
  * v1 non-goal).
@@ -23,13 +26,9 @@
  */
 
 import type { Contract } from '@prisma-next/contract/types';
+import type { OpFactoryCall } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
-import type {
-  CodecControlHooks,
-  FieldEvent,
-  FieldEventContext,
-  SqlMigrationPlanOperation,
-} from './types';
+import type { CodecControlHooks, FieldEvent, FieldEventContext } from './types';
 
 export interface PlanFieldEventOperationsOptions {
   /**
@@ -43,12 +42,10 @@ export interface PlanFieldEventOperationsOptions {
   readonly newContract: Contract<SqlStorage>;
   /**
    * Codec-id keyed map of control hooks, as produced by
-   * {@link import('./assembly').extractCodecControlHooks}. Hooks carry
-   * `unknown` target details after extraction; the caller casts the
-   * helper's returned ops to its target's `SqlMigrationPlanOperation`
-   * specialisation at the integration boundary, mirroring how
-   * `storageTypePlanCallStrategy` lifts `planTypeOperations` results into
-   * `RawSqlCall`.
+   * {@link import('./assembly').extractCodecControlHooks}. Hooks return
+   * framework-level `OpFactoryCall` instances (ADR 195); the caller
+   * splices them into its target's planner IR alongside the target's
+   * structural calls.
    */
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
 }
@@ -64,7 +61,7 @@ interface FieldEntry {
 
 export function planFieldEventOperations(
   options: PlanFieldEventOperationsOptions,
-): readonly SqlMigrationPlanOperation<unknown>[] {
+): readonly OpFactoryCall[] {
   const priorTables = options.priorContract?.storage.tables ?? {};
   const newTables = options.newContract.storage.tables;
 
@@ -101,18 +98,18 @@ export function planFieldEventOperations(
     }
   }
 
-  const ops: SqlMigrationPlanOperation<unknown>[] = [];
-  appendOps('added', added, options.codecHooks, ops, (e) => e.newField?.codecId);
-  appendOps('dropped', dropped, options.codecHooks, ops, (e) => e.priorField?.codecId);
-  appendOps('altered', altered, options.codecHooks, ops, (e) => e.newField?.codecId);
-  return ops;
+  const calls: OpFactoryCall[] = [];
+  appendCalls('added', added, options.codecHooks, calls, (e) => e.newField?.codecId);
+  appendCalls('dropped', dropped, options.codecHooks, calls, (e) => e.priorField?.codecId);
+  appendCalls('altered', altered, options.codecHooks, calls, (e) => e.newField?.codecId);
+  return calls;
 }
 
-function appendOps(
+function appendCalls(
   event: FieldEvent,
   entries: readonly FieldEntry[],
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
-  ops: SqlMigrationPlanOperation<unknown>[],
+  calls: OpFactoryCall[],
   pickCodecId: (entry: FieldEntry) => string | undefined,
 ): void {
   for (const entry of entries) {
@@ -122,7 +119,7 @@ function appendOps(
     if (!hook?.onFieldEvent) continue;
     const ctx = buildContext(event, entry);
     const emitted = hook.onFieldEvent(event, ctx);
-    for (const op of emitted) ops.push(op);
+    for (const call of emitted) calls.push(call);
   }
 }
 

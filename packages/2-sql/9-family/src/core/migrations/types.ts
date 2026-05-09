@@ -15,6 +15,7 @@ import type {
   MigrationRunnerFailure,
   MigrationRunnerSuccessValue,
   OperationContext,
+  OpFactoryCall,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import type { MigrationPackage } from '@prisma-next/migration-tools/package';
@@ -137,21 +138,26 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
   /**
    * Reacts to per-field added / dropped / altered events as the app-space
    * emitter diffs the prior contract against the new contract. Returned
-   * ops are inlined into the app-space migration's `ops.json` alongside
-   * the user's structural ops.
+   * Calls flow through the planner's IR alongside the target's structural
+   * DDL — the renderer emits each Call's `renderTypeScript()` into the
+   * generated `migration.ts`, and `toOp()` derives the runtime op for
+   * `ops.json`.
    *
-   * Synchronous. Each returned op must carry its own `invariantId`. Hooks
-   * are dispatched per `(table, field)` based on the field's `codecId`
-   * (the new field's codec for `'added'` / `'altered'`; the prior field's
-   * codec for `'dropped'`).
+   * Returning the framework `OpFactoryCall` interface (rather than a flat
+   * `SqlMigrationPlanOperation[]`) is what lets codec contributions
+   * render as factory calls (e.g. `cipherstashAddSearchConfig({...})`)
+   * instead of `rawSql({...})` blocks. Each Call must implement the
+   * full interface from `@prisma-next/framework-components/control` —
+   * see ADR 195 for the two-renderer pattern.
+   *
+   * Synchronous. Hooks are dispatched per `(table, field)` based on the
+   * field's `codecId` (the new field's codec for `'added'` / `'altered'`;
+   * the prior field's codec for `'dropped'`).
    *
    * See `docs/architecture docs/adrs/ADR 212 - Codec lifecycle hooks.md`
    * for the wiring contract and the deterministic ordering rule.
    */
-  onFieldEvent?: (
-    event: FieldEvent,
-    ctx: FieldEventContext,
-  ) => readonly SqlMigrationPlanOperation<TTargetDetails>[];
+  onFieldEvent?: (event: FieldEvent, ctx: FieldEventContext) => readonly OpFactoryCall[];
 }
 
 /**

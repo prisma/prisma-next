@@ -29,6 +29,7 @@ import { profileHash } from '@prisma-next/contract/types';
 import {
   extractCodecControlHooks,
   planFieldEventOperations,
+  type SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
@@ -65,7 +66,16 @@ function ctx(args: {
 }
 
 describe('cipherstashStringCodecHooks.onFieldEvent — flag → index mapping', () => {
-  const onFieldEvent = cipherstashStringCodecHooks.onFieldEvent!;
+  // The hook returns `OpFactoryCall` instances (ADR 195). These tests
+  // verify the runtime op shape, so we lower each Call to its op via
+  // `.toOp()` once at the test boundary and assert against the
+  // resulting array. Render-side / class-side coverage lives in
+  // migration-call-classes.test.ts.
+  const onFieldEventCalls = cipherstashStringCodecHooks.onFieldEvent!;
+  const onFieldEvent: (
+    ...args: Parameters<typeof onFieldEventCalls>
+  ) => readonly SqlMigrationPlanOperation<unknown>[] = (...args) =>
+    onFieldEventCalls(...args).map((c) => c.toOp() as SqlMigrationPlanOperation<unknown>);
 
   describe("event 'added' — one add op per enabled flag", () => {
     it('emits add_search_config(unique) when typeParams.equality is true', () => {
@@ -338,7 +348,7 @@ describe('planFieldEventOperations driving the cipherstash hook', () => {
       codecHooks,
     });
     expect(ops).toHaveLength(2);
-    const ids = ops.map((op) => op.invariantId).sort();
+    const ids = ops.map((c) => c.toOp().invariantId).sort();
     expect(ids).toEqual([
       'cipherstash-codec:User.email:add-search-config:match@v1',
       'cipherstash-codec:User.email:add-search-config:unique@v1',
@@ -356,7 +366,7 @@ describe('planFieldEventOperations driving the cipherstash hook', () => {
       codecHooks,
     });
     expect(ops).toHaveLength(2);
-    const ids = ops.map((op) => op.invariantId).sort();
+    const ids = ops.map((c) => c.toOp().invariantId).sort();
     expect(ids).toEqual([
       'cipherstash-codec:User.email:remove-search-config:match@v1',
       'cipherstash-codec:User.email:remove-search-config:unique@v1',

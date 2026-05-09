@@ -2,7 +2,6 @@ import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
   SqlMigrationPlannerPlanOptions,
-  SqlMigrationPlanOperation,
   SqlPlannerFailureResult,
 } from '@prisma-next/family-sql/control';
 import {
@@ -21,10 +20,8 @@ import type {
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
-import { RawSqlCall } from './op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
-import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -152,27 +149,25 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return plannerFailure(result.failure);
     }
 
-    // Codec lifecycle hook (T2.2): inline `onFieldEvent`-emitted ops after
+    // Codec lifecycle hook: inline `onFieldEvent`-emitted Calls after
     // structural DDL. Sub-spec § 5 fixes the ordering as
-    // `structural → added → dropped → altered`, with within-group sorting by
-    // `(tableName, fieldName)` deterministic for byte-stable re-emits.
-    // Hook fires only at the application emitter — extension-space planning
-    // (M2 R2) never reaches this helper.
-    const fieldEventOps = planFieldEventOperations({
+    // `structural → added → dropped → altered`, with within-group sorting
+    // by `(tableName, fieldName)` deterministic for byte-stable re-emits.
+    // Hook fires only at the application emitter — extension-space
+    // planning never reaches this helper.
+    //
+    // Codec hooks return framework-level `OpFactoryCall` instances (ADR
+    // 195). They flow into the Postgres call list as first-class IR
+    // nodes — `renderCallsToTypeScript` calls each Call's
+    // `renderTypeScript()` polymorphically, and `renderOps` derives the
+    // runtime op via `toOp()`. No `RawSqlCall` wrap; codec contributions
+    // render as factory calls in the user's `migration.ts`.
+    const fieldEventCalls = planFieldEventOperations({
       priorContract: options.fromContract,
       newContract: options.contract,
       codecHooks,
     });
-    // `extractCodecControlHooks` erases target-details to `unknown`; codec
-    // authors target a specific lane (here, postgres) and produce ops whose
-    // target-details are `PostgresPlanTargetDetails`-shaped by construction.
-    // The cast re-specializes the type at this trust boundary.
-    const calls = [
-      ...result.value.calls,
-      ...fieldEventOps.map(
-        (op) => new RawSqlCall(op as SqlMigrationPlanOperation<PostgresPlanTargetDetails>),
-      ),
-    ];
+    const calls = [...result.value.calls, ...fieldEventCalls];
 
     return Object.freeze({
       kind: 'success' as const,
