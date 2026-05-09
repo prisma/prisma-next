@@ -28,7 +28,7 @@ We are still establishing public response-time and patch-time SLOs; the 5-busine
 In scope — we accept reports against any of the following published packages:
 
 - The umbrella package `prisma-next`.
-- All `@prisma-next/*` packages published to npm (currently 58 packages, including all `target-*`, `adapter-*`, `driver-*`, `extension-*`, `mongo-*`, `sql-*`, and the framework / authoring / tooling packages).
+- All `@prisma-next/*` packages published to npm — including the `target-*`, `adapter-*`, `driver-*`, `extension-*`, `mongo-*`, and `sql-*` families, plus the framework / authoring / tooling packages. The canonical list is whichever `@prisma-next/*` packages appear on npm under that scope at any given time.
 
 Out of scope (please do not file vulnerability reports for these):
 
