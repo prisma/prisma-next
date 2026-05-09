@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -41,7 +41,7 @@ describe('materialiseMigrationPackage', () => {
     expect(contractRaw).toBe(`${canonicalizeJson(metadata.toContract)}\n`);
   });
 
-  it('produces byte-identical output across two writes of the same package (idempotency)', async () => {
+  it('produces byte-identical output across two writes of the same package to different dirs', async () => {
     const ops = createTestOps();
     const metadata = createTestMetadata({}, ops);
     const pkg = { dirName: 'baseline', metadata, ops };
@@ -62,6 +62,34 @@ describe('materialiseMigrationPackage', () => {
     const aContract = await readFile(join(dirA, pkg.dirName, 'contract.json'), 'utf-8');
     const bContract = await readFile(join(dirB, pkg.dirName, 'contract.json'), 'utf-8');
     expect(aContract).toBe(bContract);
+  });
+
+  it('overwrites the per-package directory idempotently and removes stale files', async () => {
+    const ops = createTestOps();
+    const metadata = createTestMetadata({}, ops);
+    const pkg = { dirName: 'baseline', metadata, ops };
+    const dir = join(tmpDir, pkg.dirName);
+
+    await materialiseMigrationPackage(tmpDir, pkg);
+
+    const firstManifest = await readFile(join(dir, 'migration.json'), 'utf-8');
+    const firstOps = await readFile(join(dir, 'ops.json'), 'utf-8');
+    const firstContract = await readFile(join(dir, 'contract.json'), 'utf-8');
+
+    await writeFile(join(dir, 'stale.json'), '{"stale":true}\n');
+    expect((await readdir(dir)).sort()).toEqual([
+      'contract.json',
+      'migration.json',
+      'ops.json',
+      'stale.json',
+    ]);
+
+    await materialiseMigrationPackage(tmpDir, pkg);
+
+    expect(await readFile(join(dir, 'migration.json'), 'utf-8')).toBe(firstManifest);
+    expect(await readFile(join(dir, 'ops.json'), 'utf-8')).toBe(firstOps);
+    expect(await readFile(join(dir, 'contract.json'), 'utf-8')).toBe(firstContract);
+    expect((await readdir(dir)).sort()).toEqual(['contract.json', 'migration.json', 'ops.json']);
   });
 
   it('creates the target directory if it does not yet exist', async () => {
