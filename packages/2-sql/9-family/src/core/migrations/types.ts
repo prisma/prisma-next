@@ -461,8 +461,9 @@ export interface SqlMigrationRunner<TTargetDetails> {
   /**
    * Apply per-space plans across multiple contract spaces inside a
    * single outer transaction. The caller orders the input list
-   * (typically via {@link import('@prisma-next/migration-tools/spaces').concatenateSpaceApplyInputs});
-   * the runner is responsible for opening / committing the outer
+   * (typically via the aggregate planner's `applyOrder`: extensions
+   * alphabetical, then app); the runner is responsible for opening
+   * / committing the outer
    * transaction (and any target-specific connection-level setup such
    * as the SQLite FK pragma toggle). A failure on any space rolls
    * back every space's writes.

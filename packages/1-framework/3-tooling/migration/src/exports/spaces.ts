@@ -7,10 +7,7 @@ export {
   computeExtensionSpaceApplyPath,
   type ExtensionSpaceApplyPathOutcome,
 } from '../compute-extension-space-apply-path';
-export {
-  concatenateSpaceApplyInputs,
-  type SpaceApplyInput,
-} from '../concatenate-space-apply-inputs';
+export type { SpaceApplyInput } from '../concatenate-space-apply-inputs';
 export {
   type DetectSpaceContractDriftInputs,
   detectSpaceContractDrift,

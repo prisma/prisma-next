@@ -1,8 +1,11 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { executePerSpaceDbApply } from '@prisma-next/cli/control-api';
+import { executeDbInit, executeDbUpdate } from '@prisma-next/cli/control-api';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { CodecControlHooks } from '@prisma-next/family-sql/control';
+import type {
+  CodecControlHooks,
+  SqlControlExtensionDescriptor,
+} from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
@@ -21,28 +24,26 @@ import {
 } from './fixtures/runner-fixtures';
 
 /**
- * End-to-end T2.5 — drives the CLI per-space `db init` / `db update`
- * flow (`executePerSpaceDbApply`, sub-spec § 6) against a real SQLite
- * database with on-disk pinned artefacts.
+ * End-to-end coverage for the CLI aggregate `db init` / `db update`
+ * pipeline against a real SQLite database with on-disk pinned
+ * artefacts.
  *
- * Locks the CLI-level half of AM4-rollback + AM9 + AM10 + AM11, and
- * substantially advances AM12 (the runner-level half is covered by
- * `runner.multi-space.test.ts`). Companion to the unit-level tests in
- * `@prisma-next/cli` that mock the planner / runner.
+ * Locks the CLI-level half of:
  *
- * @see projects/extension-contract-spaces/specs/framework-mechanism.spec.md
- *   § 6.
+ * - AM4 (rollback semantics) — multi-space failure rolls back every
+ *   space's writes and preserves pre-execution markers.
+ * - AM9 (atomic init across spaces).
+ * - AM10 (only the bumped extension advances on a follow-up update).
+ * - AM11 (codec hooks fire through the aggregate-pipeline path —
+ *   loader → `planAggregate` synth strategy → `frameworkComponents`).
+ *
+ * Companion to the unit-level tests in `@prisma-next/cli` that mock
+ * the planner / runner. The runner-level half of AM12 is locked by
+ * `runner.multi-space.test.ts`.
  */
 
 const EXT_SPACE_ID = 'test_contract_space_sqlite';
 const EXT_BASELINE_DIR = '20260101T0000_create_helper';
-
-// The on-disk `providedInvariants` aggregate only counts `data`-class
-// ops with an `invariantId` (see
-// `migration-tools/src/invariants.ts.deriveProvidedInvariants`). The
-// synthetic ops here are additive DDL, so we keep `providedInvariants`
-// empty + no required invariants on the head ref. Invariant gating is
-// covered by dedicated tests in `migration-tools` and the planner.
 
 function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
   return {
@@ -79,12 +80,6 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
 const extContractV1 = buildExtensionContract(1);
 const extContractV2 = buildExtensionContract(2);
 
-// SQL-family planner ops carry runtime-specific fields (`target`,
-// `precheck`, `execute`, `postcheck`) on top of the framework-level
-// `MigrationPlanOperation` shape. Tests author the runtime shape and
-// cast to `MigrationPlanOperation` because the on-disk `ops.json`
-// schema is intentionally light (sub-spec § 1, AM3) — the SQL runner
-// reads the additional fields at execution time.
 function buildBaselineOps(): readonly MigrationPlanOperation[] {
   return [
     {
@@ -197,8 +192,41 @@ async function writePinnedExtensionArtefacts(args: {
   return { migrationsDir };
 }
 
+/**
+ * Build a structurally-valid `SqlControlExtensionDescriptor` with the
+ * `contractSpace` field the aggregate loader inspects. The descriptor's
+ * `contractJson` is the same reference the test will pass to the loader,
+ * and `headRef.hash` matches the on-disk pinned head ref so drift
+ * detection passes. Other descriptor fields (`create`, `migrations`)
+ * are unused on the `db init` / `db update` path — the loader reads
+ * pinned migrations from disk and `create()` is only invoked on the
+ * `migrate` path. They are stubbed minimally to satisfy the type.
+ */
+function buildExtensionPack(args: {
+  readonly contractJson: Contract<SqlStorage>;
+  readonly headHash: string;
+}): SqlControlExtensionDescriptor<'sqlite'> {
+  const stubInstance = {
+    familyId: 'sql' as const,
+    targetId: 'sqlite' as const,
+  };
+  return {
+    kind: 'extension',
+    id: EXT_SPACE_ID,
+    familyId: 'sql',
+    targetId: 'sqlite',
+    version: '0.0.0-test',
+    contractSpace: {
+      contractJson: args.contractJson,
+      migrations: [],
+      headRef: { hash: args.headHash, invariants: [] },
+    },
+    create: () => stubInstance,
+  } as unknown as SqlControlExtensionDescriptor<'sqlite'>;
+}
+
 describe(
-  'executePerSpaceDbApply (CLI per-space db init/update) - sqlite',
+  'db init / db update aggregate pipeline (CLI) - sqlite',
   { timeout: timeouts.databaseOperation },
   () => {
     let testDb: TestDatabase | undefined;
@@ -213,8 +241,6 @@ describe(
 
     function createTmpDir(): string {
       const db = createTestDatabase();
-      // Re-use the createTestDatabase tmp area to keep cleanup centralised:
-      // its cleanup() rmrf's the directory.
       testDb = db;
       tmpDirCleanup = undefined;
       return db.path.replace(/\/test\.db$/, '');
@@ -239,7 +265,7 @@ describe(
       const tmpDir = createTmpDir();
       const { migrationsDir } = await setupBaselinePinned(tmpDir);
 
-      const result = await executePerSpaceDbApply({
+      const result = await executeDbInit({
         driver: testDb!.driver,
         familyInstance,
         contract: appContract,
@@ -247,9 +273,13 @@ describe(
         migrations: sqliteTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir,
-        extensionContractSpaces: [{ id: EXT_SPACE_ID }],
-        policy: { allowedOperationClasses: ['additive'] },
-        action: 'dbInit',
+        targetId: 'sqlite',
+        extensionPacks: [
+          buildExtensionPack({
+            contractJson: extContractV1,
+            headHash: extContractV1.storage.storageHash,
+          }),
+        ],
       });
 
       if (!result.ok) {
@@ -283,8 +313,7 @@ describe(
       const tmpDir = createTmpDir();
       const baseline = await setupBaselinePinned(tmpDir);
 
-      // First apply: both spaces initialised at v1.
-      const initResult = await executePerSpaceDbApply({
+      const initResult = await executeDbInit({
         driver: testDb!.driver,
         familyInstance,
         contract: appContract,
@@ -292,9 +321,13 @@ describe(
         migrations: sqliteTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: baseline.migrationsDir,
-        extensionContractSpaces: [{ id: EXT_SPACE_ID }],
-        policy: { allowedOperationClasses: ['additive'] },
-        action: 'dbInit',
+        targetId: 'sqlite',
+        extensionPacks: [
+          buildExtensionPack({
+            contractJson: extContractV1,
+            headHash: extContractV1.storage.storageHash,
+          }),
+        ],
       });
       expect(initResult.ok).toBe(true);
 
@@ -326,7 +359,7 @@ describe(
         });
       }
 
-      const updateResult = await executePerSpaceDbApply({
+      const updateResult = await executeDbUpdate({
         driver: testDb!.driver,
         familyInstance,
         contract: appContract,
@@ -334,9 +367,14 @@ describe(
         migrations: sqliteTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: baseline.migrationsDir,
-        extensionContractSpaces: [{ id: EXT_SPACE_ID }],
-        policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
-        action: 'dbUpdate',
+        targetId: 'sqlite',
+        extensionPacks: [
+          buildExtensionPack({
+            contractJson: extContractV2,
+            headHash: extContractV2.storage.storageHash,
+          }),
+        ],
+        acceptDataLoss: true,
       });
       if (!updateResult.ok) {
         throw new Error(
@@ -351,12 +389,10 @@ describe(
       expect(markers.rows.find((r) => r.space === 'app')!.core_hash).toBe(
         appContract.storage.storageHash,
       );
-      // The extension marker advances to v2.
       expect(markers.rows.find((r) => r.space === EXT_SPACE_ID)!.core_hash).toBe(
         extContractV2.storage.storageHash,
       );
 
-      // The new column is present.
       const helperTables = await testDb!.driver.query<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='_ext_helper'",
       );
@@ -367,7 +403,7 @@ describe(
       expect(helperCols.rows.map((c) => c.name).sort()).toEqual(['id', 'note']);
     });
 
-    it('fires the codec onFieldEvent hook on app-space field add through the per-space db init flow (M2 R1 wiring still flows through T2.3)', async () => {
+    it('fires the codec onFieldEvent hook on app-space field add through the aggregate pipeline (M2 R1 wiring still flows through the synth strategy)', async () => {
       const tmpDir = createTmpDir();
       const { migrationsDir } = await setupBaselinePinned(tmpDir);
 
@@ -396,9 +432,6 @@ describe(
         },
       };
 
-      // Override the app contract's `email` codec to one that has a
-      // hook attached. The hook returns an additional op; we then
-      // verify the planner inlined it into the executed plan.
       const hookedAppContract: Contract<SqlStorage> = {
         ...appContract,
         storage: {
@@ -430,7 +463,7 @@ describe(
         types: { codecTypes: { controlPlaneHooks: { [HOOKED_CODEC]: hooks } } },
       } as TargetBoundComponentDescriptor<'sql', 'sqlite'>;
 
-      const result = await executePerSpaceDbApply({
+      const result = await executeDbInit({
         driver: testDb!.driver,
         familyInstance,
         contract: hookedAppContract,
@@ -438,9 +471,13 @@ describe(
         migrations: sqliteTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents, codecHookComponent],
         migrationsDir,
-        extensionContractSpaces: [{ id: EXT_SPACE_ID }],
-        policy: { allowedOperationClasses: ['additive'] },
-        action: 'dbInit',
+        targetId: 'sqlite',
+        extensionPacks: [
+          buildExtensionPack({
+            contractJson: extContractV1,
+            headHash: extContractV1.storage.storageHash,
+          }),
+        ],
       });
 
       if (!result.ok) {
@@ -448,14 +485,12 @@ describe(
       }
       expect(result.ok).toBe(true);
 
-      // The codec hook fired for the new `email` field added in the
-      // app-space contract.
       expect(hookFiredFor).toContain('added:user.email');
 
       // The codec-emitted op was included in the aggregate operations
       // surfaced to the caller (proves the codec hook flows through
-      // `executePerSpaceDbApply` → planner.plan → `frameworkComponents`,
-      // i.e. the M2 R1 wiring still works under the per-space surface).
+      // executeDbInit → planAggregate (synth strategy) →
+      // frameworkComponents).
       const ids = result.value.plan.operations.map((op) => op.id);
       expect(ids).toContain('codec.added.user.email');
     });
@@ -464,8 +499,7 @@ describe(
       const tmpDir = createTmpDir();
       const baseline = await setupBaselinePinned(tmpDir);
 
-      // First apply: both spaces initialised at v1.
-      const initResult = await executePerSpaceDbApply({
+      const initResult = await executeDbInit({
         driver: testDb!.driver,
         familyInstance,
         contract: appContract,
@@ -473,9 +507,13 @@ describe(
         migrations: sqliteTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: baseline.migrationsDir,
-        extensionContractSpaces: [{ id: EXT_SPACE_ID }],
-        policy: { allowedOperationClasses: ['additive'] },
-        action: 'dbInit',
+        targetId: 'sqlite',
+        extensionPacks: [
+          buildExtensionPack({
+            contractJson: extContractV1,
+            headHash: extContractV1.storage.storageHash,
+          }),
+        ],
       });
       expect(initResult.ok).toBe(true);
 
@@ -510,7 +548,7 @@ describe(
         });
       }
 
-      const updateResult = await executePerSpaceDbApply({
+      const updateResult = await executeDbUpdate({
         driver: testDb!.driver,
         familyInstance,
         contract: appContract,
@@ -518,9 +556,14 @@ describe(
         migrations: sqliteTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: baseline.migrationsDir,
-        extensionContractSpaces: [{ id: EXT_SPACE_ID }],
-        policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
-        action: 'dbUpdate',
+        targetId: 'sqlite',
+        extensionPacks: [
+          buildExtensionPack({
+            contractJson: extContractV2,
+            headHash: extContractV2.storage.storageHash,
+          }),
+        ],
+        acceptDataLoss: true,
       });
 
       expect(updateResult.ok).toBe(false);
@@ -528,7 +571,6 @@ describe(
       expect(updateResult.failure.code).toBe('RUNNER_FAILED');
       expect(updateResult.failure.meta).toMatchObject({ failingSpace: EXT_SPACE_ID });
 
-      // Both markers preserved at their pre-`executeAcrossSpaces` values.
       const markersAfter = await testDb!.driver.query<{ space: string; core_hash: string }>(
         'SELECT space, core_hash FROM _prisma_marker ORDER BY space',
       );
