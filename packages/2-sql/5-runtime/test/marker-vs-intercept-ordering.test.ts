@@ -24,13 +24,9 @@ import { defineTestCodec } from './test-codec';
 import { descriptorsFromCodecs } from './utils';
 
 /**
- * Pins the ordering invariant from spec AC L239: marker verification runs
- * upstream of `runWithMiddleware`, so a hash-mismatched query throws
- * `CONTRACT.MARKER_MISMATCH` before any `intercept` hook can answer it.
+ * Pins the ordering invariant from spec AC L239: marker verification runs upstream of `runWithMiddleware`, so a hash-mismatched query throws `CONTRACT.MARKER_MISMATCH` before any `intercept` hook can answer it.
  *
- * If a future refactor moves marker verification into the orchestrator,
- * this test fails — surfacing the regression that would otherwise let a
- * cache hit serve stale-schema results.
+ * If a future refactor moves marker verification into the orchestrator, this test fails — surfacing the regression that would otherwise let a cache hit serve stale-schema results.
  */
 
 const testContract: Contract<SqlStorage> = {
@@ -82,9 +78,7 @@ function createStubAdapter(codecs: ReadonlyArray<Codec<string>>) {
 }
 
 function createStaleMarkerDriver(): SqlDriver {
-  // Driver returns a marker row with a `core_hash` that does not match the
-  // contract's `storage.storageHash`, simulating a database whose schema is
-  // out of date relative to the running runtime.
+  // Driver returns a marker row with a `core_hash` that does not match the contract's `storage.storageHash`, simulating a database whose schema is out of date relative to the running runtime.
   const query = vi.fn().mockResolvedValue({
     rows: [
       {

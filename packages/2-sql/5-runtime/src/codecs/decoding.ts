@@ -41,30 +41,13 @@ function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> 
 /**
  * Resolve the per-cell codec for a projection item.
  *
- * When a `(table, column)` ref is available — either implicit on a
- * `column-ref` expression or carried explicitly via `item.refs` for
- * column-bound non-`column-ref` projections — prefer
- * `contractCodecs.forColumn(table, column)`: that returns the per-
- * instance codec materialized from the descriptor's factory for that
- * column, encoding any per-instance state (typeParams like vector
- * length, schema validators, etc.).
+ * When a `(table, column)` ref is available — either implicit on a `column-ref` expression or carried explicitly via `item.refs` for column-bound non-`column-ref` projections — prefer `contractCodecs.forColumn(table, column)`: that returns the per-instance codec materialized from the descriptor's factory for that column, encoding any per-instance state (typeParams like vector length, schema validators, etc.).
  *
- * The wrong-instance risk for parameterized codecs that F22 originally
- * flagged is closed off structurally:
+ * The wrong-instance risk for parameterized codecs that F22 originally flagged is closed off structurally:
  *
- * 1. `buildContractCodecRegistry` pre-populates `byCodecId` with one
- *    canonical instance per non-parameterized descriptor; parameterized
- *    descriptors are intentionally absent.
- * 2. `forCodecId` rejects ambiguous parameterized fallbacks
- *    (`ambiguousCodecIds`).
- * 3. The non-ambiguous parameterized case stores the column-correct
- *    per-instance codec under `byCodecId`, so the fall-through still
- *    resolves to the right instance.
+ * 1. `buildContractCodecRegistry` pre-populates `byCodecId` with one canonical instance per non-parameterized descriptor; parameterized descriptors are intentionally absent. 2. `forCodecId` rejects ambiguous parameterized fallbacks (`ambiguousCodecIds`). 3. The non-ambiguous parameterized case stores the column-correct per-instance codec under `byCodecId`, so the fall-through still resolves to the right instance.
  *
- * The `forCodecId` fallback otherwise covers projections that are
- * *not* column-bound (computed projections, raw SQL aliases) but still
- * carry a `codecId` (ADR 205 stamps every `ProjectionItem` with the
- * producer's codec id).
+ * The `forCodecId` fallback otherwise covers projections that are *not* column-bound (computed projections, raw SQL aliases) but still carry a `codecId` (ADR 205 stamps every `ProjectionItem` with the producer's codec id).
  *
  * Codec-registry-unification spec § AC-4 / AC-5.
  */
@@ -206,23 +189,11 @@ function decodeIncludeAggregate(alias: string, wireValue: unknown): unknown {
 }
 
 /**
- * Decodes a single field. Single-armed: every cell takes the same path —
- * `codec.decode → await → return plain value` — so sync- and async-
- * authored codecs are indistinguishable to callers. JSON-Schema
- * validation, when required, lives inside the resolved codec's `decode`
- * body (e.g. `arktype-json` validates against its rehydrated schema and
- * throws `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` from `decode` directly);
- * there is no separate validator-registry pass.
+ * Decodes a single field. Single-armed: every cell takes the same path — `codec.decode → await → return plain value` — so sync- and async-authored codecs are indistinguishable to callers. JSON-Schema validation, when required, lives inside the resolved codec's `decode` body (e.g. `arktype-json` validates against its rehydrated schema and throws `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` from `decode` directly); there is
+ * no separate validator-registry pass.
  *
- * The row-level `rowCtx` is repackaged into a per-cell
- * `SqlCodecCallContext` whose `column = { table, name }` is a structural
- * projection of the per-cell `ColumnRef = { table, column }` resolved from
- * the AST-backed `DecodeContext` (the same resolution `wrapDecodeFailure`
- * uses for envelope construction — one resolution per cell, two consumers).
- * Cells the runtime cannot resolve to a single underlying column (aggregate
- * aliases, computed projections without a simple ref) get
- * `column: undefined`, matching the spec contract that the runtime never
- * silently defaults this field.
+ * The row-level `rowCtx` is repackaged into a per-cell `SqlCodecCallContext` whose `column = { table, name }` is a structural projection of the per-cell `ColumnRef = { table, column }` resolved from the AST-backed `DecodeContext` (the same resolution `wrapDecodeFailure` uses for envelope construction — one resolution per cell, two consumers). Cells the runtime cannot resolve to a single underlying column (aggregate
+ * aliases, computed projections without a simple ref) get `column: undefined`, matching the spec contract that the runtime never silently defaults this field.
  */
 async function decodeField(
   alias: string,
@@ -241,15 +212,8 @@ async function decodeField(
 
   const ref = decodeCtx.columnRefs.get(alias);
 
-  // Per-cell ctx: the cell-level `column` is a `SqlColumnRef = { table, name }`
-  // projection of the resolved `ColumnRef = { table, column }` (same
-  // resolution `wrapDecodeFailure` uses below — no double work). Cells the
-  // runtime cannot resolve (aggregate aliases, computed projections without
-  // a simple ref) drop the `column` field entirely — explicitly cleared so
-  // a previously-populated `rowCtx.column` cannot leak through to unrelated
-  // cells. Destructuring (rather than `column: undefined`) is required
-  // because `SqlCodecCallContext.column` is declared `column?: SqlColumnRef`
-  // under `exactOptionalPropertyTypes`.
+  // Per-cell ctx: the cell-level `column` is a `SqlColumnRef = { table, name }` projection of the resolved `ColumnRef = { table, column }` (same resolution `wrapDecodeFailure` uses below — no double work). Cells the runtime cannot resolve (aggregate aliases, computed projections without a simple ref) drop the `column` field entirely — explicitly cleared so a previously-populated `rowCtx.column` cannot leak through to
+  // unrelated cells. Destructuring (rather than `column: undefined`) is required because `SqlCodecCallContext.column` is declared `column?: SqlColumnRef` under `exactOptionalPropertyTypes`.
   let cellCtx: SqlCodecCallContext;
   if (ref) {
     cellCtx = { ...rowCtx, column: { table: ref.table, name: ref.column } };
@@ -261,12 +225,7 @@ async function decodeField(
   try {
     return await codec.decode(wireValue, cellCtx);
   } catch (error) {
-    // Codec-authored runtime envelopes (e.g. `RUNTIME.DECODE_FAILED` thrown
-    // from inside the codec body, or `RUNTIME.ABORTED` raised via
-    // `CodecCallContext.signal` per ADR 207) carry their own per-codec
-    // context — wrapping them again would erase that context and coerce
-    // the abort intent into a generic decode failure. Pass them through
-    // unchanged; only foreign errors get the `wrapDecodeFailure` envelope.
+    // Codec-authored runtime envelopes (e.g. `RUNTIME.DECODE_FAILED` thrown from inside the codec body, or `RUNTIME.ABORTED` raised via `CodecCallContext.signal` per ADR 207) carry their own per-codec context — wrapping them again would erase that context and coerce the abort intent into a generic decode failure. Pass them through unchanged; only foreign errors get the `wrapDecodeFailure` envelope.
     if (isRuntimeError(error)) {
       throw error;
     }
@@ -275,22 +234,13 @@ async function decodeField(
 }
 
 /**
- * Decodes a row by dispatching all per-cell codec calls concurrently via
- * `Promise.all`. Each cell follows the single-armed `decodeField` path.
- * Failures are wrapped in `RUNTIME.DECODE_FAILED` with `{ table, column,
- * codec }` (or `{ alias, codec }` when no column ref is resolvable) and the
- * original error attached on `cause`.
+ * Decodes a row by dispatching all per-cell codec calls concurrently via `Promise.all`. Each cell follows the single-armed `decodeField` path. Failures are wrapped in `RUNTIME.DECODE_FAILED` with `{ table, column, codec }` (or `{ alias, codec }` when no column ref is resolvable) and the original error attached on `cause`.
  *
  * When `rowCtx.signal` is provided:
  *
- * - **Already-aborted at entry** short-circuits with `RUNTIME.ABORTED`
- *   (`{ phase: 'decode' }`) before any `codec.decode` call is made.
- * - **Mid-flight aborts** race the per-cell `Promise.all` against the
- *   signal so the runtime returns promptly even when codec bodies ignore
- *   it. In-flight bodies that ignore the signal complete in the
- *   background (cooperative cancellation).
- * - Existing `RUNTIME.DECODE_FAILED` envelopes from codec bodies pass
- *   through unchanged (no double wrap).
+ * - **Already-aborted at entry** short-circuits with `RUNTIME.ABORTED` (`{ phase: 'decode' }`) before any `codec.decode` call is made.
+ * - **Mid-flight aborts** race the per-cell `Promise.all` against the signal so the runtime returns promptly even when codec bodies ignore it. In-flight bodies that ignore the signal complete in the background (cooperative cancellation).
+ * - Existing `RUNTIME.DECODE_FAILED` envelopes from codec bodies pass through unchanged (no double wrap).
  */
 export async function decodeRow(
   row: Record<string, unknown>,
@@ -335,8 +285,7 @@ export async function decodeRow(
 
   const settled = await raceAgainstAbort(Promise.all(tasks), signal, 'decode');
 
-  // Include aggregates are decoded synchronously after concurrent codec
-  // dispatch settles, so any decode failures upstream propagate first.
+  // Include aggregates are decoded synchronously after concurrent codec dispatch settles, so any decode failures upstream propagate first.
   for (const entry of includeIndices) {
     settled[entry.index] = decodeIncludeAggregate(entry.alias, entry.value);
   }

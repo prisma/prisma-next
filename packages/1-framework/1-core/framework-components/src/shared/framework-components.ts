@@ -13,10 +13,7 @@ export interface ComponentMetadata {
   /**
    * Capabilities this component provides.
    *
-   * For adapters, capabilities must be declared on the adapter descriptor (so they are emitted into
-   * the contract) and also exposed in runtime adapter code (e.g. `adapter.profile.capabilities`);
-   * keep these declarations in sync. Targets are identifiers/descriptors and typically do not
-   * declare capabilities.
+   * For adapters, capabilities must be declared on the adapter descriptor (so they are emitted into the contract) and also exposed in runtime adapter code (e.g. `adapter.profile.capabilities`); keep these declarations in sync. Targets are identifiers/descriptors and typically do not declare capabilities.
    */
   readonly capabilities?: Record<string, unknown>;
 
@@ -24,30 +21,23 @@ export interface ComponentMetadata {
   readonly types?: {
     readonly codecTypes?: {
       /**
-       * Base codec types import spec.
-       * Optional: adapters typically provide this, extensions usually don't.
+       * Base codec types import spec. Optional: adapters typically provide this, extensions usually don't.
        */
       readonly import?: TypesImportSpec;
       /**
        * Additional type-only imports for parameterized codec branded types.
        *
-       * These imports are included in generated `contract.d.ts` but are NOT treated as
-       * codec type maps (i.e., they should not be intersected into `export type CodecTypes = ...`).
+       * These imports are included in generated `contract.d.ts` but are NOT treated as codec type maps (i.e., they should not be intersected into `export type CodecTypes = ...`).
        *
        * Example: `Vector<N>` for pgvector codecs that emit `Vector<1536>`
        */
       readonly typeImports?: ReadonlyArray<TypesImportSpec>;
       /**
-       * Optional control-plane hooks keyed by codecId.
-       * Used by family-specific planners/verifiers to handle storage types.
+       * Optional control-plane hooks keyed by codecId. Used by family-specific planners/verifiers to handle storage types.
        */
       readonly controlPlaneHooks?: Record<string, unknown>;
       /**
-       * Codec descriptors contributed by this component. Source of truth
-       * for codec-id-keyed metadata (`traits`, `targetTypes`, `meta`,
-       * `renderOutputType`) consumed by `extractCodecLookup`, and used to
-       * materialize representative `Codec` instances for codec-dispatched
-       * type rendering during emission.
+       * Codec descriptors contributed by this component. Source of truth for codec-id-keyed metadata (`traits`, `targetTypes`, `meta`, `renderOutputType`) consumed by `extractCodecLookup`, and used to materialize representative `Codec` instances for codec-dispatched type rendering during emission.
        */
       readonly codecDescriptors?: ReadonlyArray<AnyCodecDescriptor>;
     };
@@ -64,21 +54,17 @@ export interface ComponentMetadata {
   /**
    * Optional pure-data authoring contributions exposed by this component.
    *
-   * These contributions are safe to include on pack refs and descriptors because
-   * they contain only declarative metadata. Higher-level authoring packages may
-   * project them into concrete helper functions for TS-first workflows.
+   * These contributions are safe to include on pack refs and descriptors because they contain only declarative metadata. Higher-level authoring packages may project them into concrete helper functions for TS-first workflows.
    */
   readonly authoring?: AuthoringContributions;
 
   /**
-   * Scalar type name to codec ID mapping contributed by this component.
-   * Assembled by `createControlStack` with duplicate detection.
+   * Scalar type name to codec ID mapping contributed by this component. Assembled by `createControlStack` with duplicate detection.
    */
   readonly scalarTypeDescriptors?: ReadonlyMap<string, string>;
 
   /**
-   * Mutation default function handlers and generator descriptors contributed
-   * by this component. Assembled by `createControlStack` with duplicate detection.
+   * Mutation default function handlers and generator descriptors contributed by this component. Assembled by `createControlStack` with duplicate detection.
    */
   readonly controlMutationDefaults?: ControlMutationDefaults;
 }
@@ -86,13 +72,9 @@ export interface ComponentMetadata {
 /**
  * Base descriptor for any framework component.
  *
- * All component descriptors share these fundamental properties that identify
- * the component and provide its metadata. This interface is extended by
- * specific descriptor types (FamilyDescriptor, TargetDescriptor, etc.).
+ * All component descriptors share these fundamental properties that identify the component and provide its metadata. This interface is extended by specific descriptor types (FamilyDescriptor, TargetDescriptor, etc.).
  *
- * @template Kind - Discriminator literal identifying the component type.
- *   Built-in kinds are 'family', 'target', 'adapter', 'driver', 'extension',
- *   but the type accepts any string to allow ecosystem extensions.
+ * @template Kind - Discriminator literal identifying the component type. Built-in kinds are 'family', 'target', 'adapter', 'driver', 'extension', but the type accepts any string to allow ecosystem extensions.
  *
  * @example
  * ```ts
@@ -166,14 +148,12 @@ export function checkContractComponentRequirements(
 /**
  * Descriptor for a family component.
  *
- * A "family" represents a category of data sources with shared semantics
- * (e.g., SQL databases, document stores). Families define:
+ * A "family" represents a category of data sources with shared semantics (e.g., SQL databases, document stores). Families define:
  * - Query semantics and operations (SELECT, INSERT, find, aggregate, etc.)
  * - Contract structure (tables vs collections, columns vs fields)
  * - Type system and codecs
  *
- * Families are the top-level grouping. Each family contains multiple targets
- * (e.g., SQL family contains Postgres, MySQL, SQLite targets).
+ * Families are the top-level grouping. Each family contains multiple targets (e.g., SQL family contains Postgres, MySQL, SQLite targets).
  *
  * Extended by plane-specific descriptors:
  * - `ControlFamilyDescriptor` - adds `emission` for CLI/tooling operations
@@ -198,13 +178,11 @@ export interface FamilyDescriptor<TFamilyId extends string> extends ComponentDes
 /**
  * Descriptor for a target component.
  *
- * A "target" represents a specific database or data store within a family
- * (e.g., Postgres, MySQL, MongoDB). Targets define:
+ * A "target" represents a specific database or data store within a family (e.g., Postgres, MySQL, MongoDB). Targets define:
  * - Native type mappings (e.g., Postgres int4 → TypeScript number)
  * - Target-specific capabilities (e.g., RETURNING, LATERAL joins)
  *
- * Targets are bound to a family and provide the target-specific implementation
- * details that adapters and drivers use.
+ * Targets are bound to a family and provide the target-specific implementation details that adapters and drivers use.
  *
  * Extended by plane-specific descriptors:
  * - `ControlTargetDescriptor` - adds optional `migrations` capability
@@ -232,8 +210,7 @@ export interface TargetDescriptor<TFamilyId extends string, TTargetId extends st
 }
 
 /**
- * Base shape for any pack reference.
- * Pack refs are pure JSON-friendly objects safe to import in authoring flows.
+ * Base shape for any pack reference. Pack refs are pure JSON-friendly objects safe to import in authoring flows.
  */
 export interface PackRefBase<Kind extends string, TFamilyId extends string>
   extends ComponentMetadata {
@@ -277,14 +254,12 @@ export type DriverPackRef<
 /**
  * Descriptor for an adapter component.
  *
- * An "adapter" provides the protocol and dialect implementation for a target.
- * Adapters handle:
+ * An "adapter" provides the protocol and dialect implementation for a target. Adapters handle:
  * - SQL/query generation (lowering AST to target-specific syntax)
  * - Codec registration (encoding/decoding between JS and wire types)
  * - Type mappings and coercions
  *
- * Adapters are bound to a specific family+target combination and work with
- * any compatible driver for that target.
+ * Adapters are bound to a specific family+target combination and work with any compatible driver for that target.
  *
  * Extended by plane-specific descriptors:
  * - `ControlAdapterDescriptor` - control-plane factory
@@ -314,16 +289,13 @@ export interface AdapterDescriptor<TFamilyId extends string, TTargetId extends s
 /**
  * Descriptor for a driver component.
  *
- * A "driver" provides the connection and execution layer for a target.
- * Drivers handle:
+ * A "driver" provides the connection and execution layer for a target. Drivers handle:
  * - Connection management (pooling, timeouts, retries)
  * - Query execution (sending SQL/commands, receiving results)
  * - Transaction management
  * - Wire protocol communication
  *
- * Drivers are bound to a specific family+target and work with any compatible
- * adapter. Multiple drivers can exist for the same target (e.g., node-postgres
- * vs postgres.js for Postgres).
+ * Drivers are bound to a specific family+target and work with any compatible adapter. Multiple drivers can exist for the same target (e.g., node-postgres vs postgres.js for Postgres).
  *
  * Extended by plane-specific descriptors:
  * - `ControlDriverDescriptor` - creates driver from connection URL
@@ -358,8 +330,7 @@ export interface DriverDescriptor<TFamilyId extends string, TTargetId extends st
  * - Custom types and codecs (e.g., vector type)
  * - Extended query capabilities
  *
- * Extensions are bound to a specific family+target and are registered in the
- * config alongside the core components. Multiple extensions can be used together.
+ * Extensions are bound to a specific family+target and are registered in the config alongside the core components. Multiple extensions can be used together.
  *
  * Extended by plane-specific descriptors:
  * - `ControlExtensionDescriptor` - control-plane extension factory

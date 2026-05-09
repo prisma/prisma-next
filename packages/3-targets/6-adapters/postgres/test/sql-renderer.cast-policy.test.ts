@@ -24,10 +24,7 @@ const emptyLookup: CodecLookup = {
   renderOutputTypeFor: () => undefined,
 };
 
-// `Codec`-side static metadata (`targetTypes` / `meta` / `renderOutputType`)
-// retired with the SQL `Codec` narrow (TML-2357); these tests
-// supply the metadata side-by-side with the codec instance to build the
-// `CodecLookup` directly.
+// `Codec`-side static metadata (`targetTypes` / `meta` / `renderOutputType`) retired with the SQL `Codec` narrow (TML-2357); these tests supply the metadata side-by-side with the codec instance to build the `CodecLookup` directly.
 interface CodecMetadata {
   readonly targetTypes?: readonly string[];
   readonly meta?: {
@@ -153,12 +150,7 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('throws a clear error when the codec lookup has no entry for the codecId', () => {
-    // A `codecId` on a `ParamRef` that resolves to no codec in the assembled
-    // lookup is a stack-configuration failure, not a fallback opportunity:
-    // it almost always means an extension pack is missing from the runtime
-    // stack. Surface it loudly at lower-time so callers fix the configuration
-    // rather than silently emitting an uncast `$N` or guessing from contract
-    // storage. (See ADR 205 § "Adapters built without a stack".)
+    // A `codecId` on a `ParamRef` that resolves to no codec in the assembled lookup is a stack-configuration failure, not a fallback opportunity: it almost always means an extension pack is missing from the runtime stack. Surface it loudly at lower-time so callers fix the configuration rather than silently emitting an uncast `$N` or guessing from contract storage. (See ADR 205 § "Adapters built without a stack".)
     const lookup = emptyLookup;
 
     const ast = selectWithParam('tag', 'app/test-foo@1', 'tagged');
@@ -201,9 +193,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
       decode: (wire: string): string => wire,
     });
 
-    // Codec-side static metadata (`targetTypes` / `meta`) lives on
-    // the codec descriptor (TML-2357); contributors expose
-    // it via `types.codecTypes.codecDescriptors`.
+    // Codec-side static metadata (`targetTypes` / `meta`) lives on the codec descriptor (TML-2357); contributors expose it via `types.codecTypes.codecDescriptors`.
     const geographyDescriptor = {
       codecId: 'app/geography@1',
       traits: [],
@@ -240,10 +230,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
   });
 
   it('emits $1::vector when pgvector is installed via stack.extensionPacks', async () => {
-    // Smoke test for the M2 wiring fix: `pgvectorRuntimeDescriptor` exposes
-    // its codecs via `types.codecTypes.codecDescriptors`, so the adapter's
-    // runtime-plane lookup picks up `pg/vector@1` and the renderer emits
-    // the cast. Without the wiring fix this regresses to `$1`.
+    // Smoke test for the M2 wiring fix: `pgvectorRuntimeDescriptor` exposes its codecs via `types.codecTypes.codecDescriptors`, so the adapter's runtime-plane lookup picks up `pg/vector@1` and the renderer emits the cast. Without the wiring fix this regresses to `$1`.
     const pgvectorRuntime = (await import('@prisma-next/extension-pgvector/runtime')).default;
 
     const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });

@@ -51,8 +51,7 @@ import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import { lowerAggExpr, lowerFilter, lowerPipeline, lowerStage } from '../src/lowering';
 
-// Default fixtures: tests that don't exercise codecs use an empty registry
-// and an empty ctx. Tests that need codec encoding shadow `registry` locally.
+// Default fixtures: tests that don't exercise codecs use an empty registry and an empty ctx. Tests that need codec encoding shadow `registry` locally.
 const registry = newMongoCodecRegistry();
 const ctx: CodecCallContext = {};
 

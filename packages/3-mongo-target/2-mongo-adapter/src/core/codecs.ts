@@ -67,8 +67,7 @@ export const mongoVectorCodec = mongoCodec({
 /**
  * The canonical set of Mongo wire-type codecs.
  *
- * Single source of truth for both control- and runtime-plane adapter
- * descriptors. Don't duplicate this list — import it.
+ * Single source of truth for both control- and runtime-plane adapter descriptors. Don't duplicate this list — import it.
  */
 export const mongoStandardCodecs = [
   mongoObjectIdCodec,
@@ -83,10 +82,7 @@ export const mongoStandardCodecs = [
 /**
  * Build a {@link CodecDescriptor} for a Mongo wire-type codec.
  *
- * Wraps an existing {@link MongoCodec} instance into a descriptor whose
- * factory hands out the same shared codec. Mongo's full migration to
- * descriptor-first authoring is tracked under TML-2324; for now the
- * descriptor view is composed from the existing `mongoCodec()` outputs.
+ * Wraps an existing {@link MongoCodec} instance into a descriptor whose factory hands out the same shared codec. Mongo's full migration to descriptor-first authoring is tracked under TML-2324; for now the descriptor view is composed from the existing `mongoCodec()` outputs.
  */
 function descriptorFor<Id extends string>(
   codec: MongoCodec<Id, readonly CodecTrait[]>,
@@ -96,11 +92,7 @@ function descriptorFor<Id extends string>(
     readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
   },
 ): CodecDescriptor {
-  // The descriptor's `P` is structurally `Record<string, unknown>` for
-  // codecs that take params (Mongo `vector`); non-parameterized codecs
-  // ignore the slot. Cast through `unknown` to fit the
-  // `CodecDescriptor` slot's `(params: P) => …` typing without leaking
-  // a per-codec `P` into the heterogeneous descriptor list.
+  // The descriptor's `P` is structurally `Record<string, unknown>` for codecs that take params (Mongo `vector`); non-parameterized codecs ignore the slot. Cast through `unknown` to fit the `CodecDescriptor` slot's `(params: P) => …` typing without leaking a per-codec `P` into the heterogeneous descriptor list.
   const renderOutputType = metadata.renderOutputType as
     | CodecDescriptor['renderOutputType']
     | undefined;
@@ -130,10 +122,7 @@ const renderVectorOutputType = (typeParams: Record<string, unknown>): string | u
 };
 
 /**
- * Mongo wire-type codec descriptors. Static metadata for `traits`,
- * `targetTypes`, and `renderOutputType` lives here (the descriptor
- * shape) — `MongoCodec` itself is narrow and only carries the four
- * conversion methods (TML-2357).
+ * Mongo wire-type codec descriptors. Static metadata for `traits`, `targetTypes`, and `renderOutputType` lives here (the descriptor shape) — `MongoCodec` itself is narrow and only carries the four conversion methods (TML-2357).
  */
 export const mongoCodecDescriptors: ReadonlyArray<CodecDescriptor> = [
   descriptorFor(mongoObjectIdCodec, { traits: ['equality'], targetTypes: ['objectId'] }),
@@ -159,22 +148,16 @@ export const mongoCodecDescriptors: ReadonlyArray<CodecDescriptor> = [
 ];
 
 /**
- * Lookup descriptor metadata by codec id — used by tests and for
- * descriptor-side reads of static metadata.
+ * Lookup descriptor metadata by codec id — used by tests and for descriptor-side reads of static metadata.
  */
 export function mongoDescriptorById(codecId: string): CodecDescriptor | undefined {
   return mongoCodecDescriptors.find((d) => d.codecId === codecId);
 }
 
 /**
- * Build a {@link MongoCodecRegistry} preloaded with the standard Mongo
- * wire-type codecs.
+ * Build a {@link MongoCodecRegistry} preloaded with the standard Mongo wire-type codecs.
  *
- * Single point of truth for adapter-side codec construction: used by the
- * legacy synchronous `createMongoAdapter()` factory and by the runtime
- * adapter descriptor's `codecs()` getter. Userland code obtains a registry
- * via the framework's execution-stack composition (see
- * `createMongoExecutionContext`) instead of calling this directly.
+ * Single point of truth for adapter-side codec construction: used by the legacy synchronous `createMongoAdapter()` factory and by the runtime adapter descriptor's `codecs()` getter. Userland code obtains a registry via the framework's execution-stack composition (see `createMongoExecutionContext`) instead of calling this directly.
  */
 export function buildStandardCodecRegistry(): MongoCodecRegistry {
   const registry = newMongoCodecRegistry();

@@ -29,21 +29,11 @@ import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql
 import type { PostgresContract } from './types';
 
 /**
- * Postgres native types whose unknown-OID parameter inference is reliable in
- * arbitrary expression positions. Parameters bound to a codec whose
- * `meta.db.sql.postgres.nativeType` falls in this set are emitted as plain
- * `$N`; everything else (including `json`, `jsonb`, extension types like
- * `vector`, and unknown user types) is emitted as `$N::<nativeType>` so the
- * planner picks an unambiguous overload.
+ * Postgres native types whose unknown-OID parameter inference is reliable in arbitrary expression positions. Parameters bound to a codec whose `meta.db.sql.postgres.nativeType` falls in this set are emitted as plain `$N`; everything else (including `json`, `jsonb`, extension types like `vector`, and unknown user types) is emitted as `$N::<nativeType>` so the planner picks an unambiguous overload.
  *
- * `json` / `jsonb` are intentionally excluded despite being Postgres builtins:
- * their operator overloads make context inference unreliable in expression
- * positions (e.g. `$1 -> 'key'` is ambiguous between the two).
+ * `json` / `jsonb` are intentionally excluded despite being Postgres builtins: their operator overloads make context inference unreliable in expression positions (e.g. `$1 -> 'key'` is ambiguous between the two).
  *
- * Spellings match the on-disk `meta.db.sql.postgres.nativeType` values in
- * `@prisma-next/target-postgres`'s codec definitions, not the `udt_name`
- * abbreviations that ADR 205 used as illustrative shorthand. The lookup-based
- * cast policy compares against these strings directly.
+ * Spellings match the on-disk `meta.db.sql.postgres.nativeType` values in `@prisma-next/target-postgres`'s codec definitions, not the `udt_name` abbreviations that ADR 205 used as illustrative shorthand. The lookup-based cast policy compares against these strings directly.
  */
 const POSTGRES_INFERRABLE_NATIVE_TYPES: ReadonlySet<string> = new Set([
   // Numeric
@@ -89,10 +79,7 @@ function renderTypedParam(
         "if it's a builtin.",
     );
   }
-  // The framework `CodecLookup.metaFor` returns the family-agnostic
-  // `CodecMeta` whose `db` is `Record<string, unknown>`. The SQL family
-  // populates a narrower shape with `db.sql.<dialect>.nativeType:
-  // string`; navigate that path defensively and string-check the leaf.
+  // The framework `CodecLookup.metaFor` returns the family-agnostic `CodecMeta` whose `db` is `Record<string, unknown>`. The SQL family populates a narrower shape with `db.sql.<dialect>.nativeType: string`; navigate that path defensively and string-check the leaf.
   const meta = codecLookup.metaFor(codecId);
   const dbRecord = meta?.db;
   const sqlBlock = isRecord(dbRecord) ? dbRecord['sql'] : undefined;
@@ -109,10 +96,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Per-render carrier threaded through every helper. Bundles the param-index
- * map (for `$N` numbering) and the assembled-stack `codecLookup` (for
- * cast policy at the `renderTypedParam` chokepoint). Carrying both on a
- * single value keeps helper signatures stable.
+ * Per-render carrier threaded through every helper. Bundles the param-index map (for `$N` numbering) and the assembled-stack `codecLookup` (for cast policy at the `renderTypedParam` chokepoint). Carrying both on a single value keeps helper signatures stable.
  */
 interface ParamIndexMap {
   readonly indexMap: Map<ParamRef, number>;
@@ -122,9 +106,7 @@ interface ParamIndexMap {
 /**
  * Render a SQL query AST to a Postgres-flavored `{ sql, params }` payload.
  *
- * Shared between the runtime (`PostgresAdapterImpl.lower`) and control
- * (`PostgresControlAdapter.lower`) entrypoints so emit-time and run-time
- * paths produce byte-identical output for the same AST.
+ * Shared between the runtime (`PostgresAdapterImpl.lower`) and control (`PostgresControlAdapter.lower`) entrypoints so emit-time and run-time paths produce byte-identical output for the same AST.
  */
 export function renderLoweredSql(
   ast: AnyQueryAst,
@@ -315,15 +297,9 @@ function renderNullCheck(
 }
 
 /**
- * Atomic expression kinds whose rendered SQL is already self-delimited
- * (a column reference, parameter, literal, function call, aggregate, etc.)
- * and therefore does not need surrounding parentheses when used as the
- * left operand of a postfix predicate like `IS NULL` or `IS NOT NULL`,
- * or as either operand of a binary infix operator.
+ * Atomic expression kinds whose rendered SQL is already self-delimited (a column reference, parameter, literal, function call, aggregate, etc.) and therefore does not need surrounding parentheses when used as the left operand of a postfix predicate like `IS NULL` or `IS NOT NULL`, or as either operand of a binary infix operator.
  *
- * Anything not in this set is treated as composite (binary, AND/OR/NOT,
- * EXISTS, nested IS NULL, subqueries, operation templates) and gets
- * wrapped to preserve grouping.
+ * Anything not in this set is treated as composite (binary, AND/OR/NOT, EXISTS, nested IS NULL, subqueries, operation templates) and gets wrapped to preserve grouping.
  */
 function isAtomicExpressionKind(kind: AnyExpression['kind']): boolean {
   switch (kind) {
@@ -577,12 +553,7 @@ function renderOperation(
     return renderExpr(arg, contract, pim);
   });
 
-  // Resolve `{{self}}` and `{{argN}}` from the original template in a single
-  // pass. Doing this with sequential `String.prototype.replace` calls is
-  // unsafe: a substituted fragment can itself contain text that matches a
-  // later token (e.g. an arg literal containing the substring `{{arg1}}`),
-  // and the next iteration would corrupt it. A single regex callback never
-  // re-scans already-substituted output.
+  // Resolve `{{self}}` and `{{argN}}` from the original template in a single pass. Doing this with sequential `String.prototype.replace` calls is unsafe: a substituted fragment can itself contain text that matches a later token (e.g. an arg literal containing the substring `{{arg1}}`), and the next iteration would corrupt it. A single regex callback never re-scans already-substituted output.
   return expr.lowering.template.replace(
     /\{\{self\}\}|\{\{arg(\d+)\}\}/g,
     (token, argIndex: string | undefined) => {

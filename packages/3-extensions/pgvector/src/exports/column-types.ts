@@ -1,16 +1,14 @@
 /**
  * Column type descriptors for pgvector extension.
  *
- * These descriptors provide both codecId and nativeType for use in contract authoring.
- * They are derived from the same source of truth as codec definitions and manifests.
+ * These descriptors provide both codecId and nativeType for use in contract authoring. They are derived from the same source of truth as codec definitions and manifests.
  */
 
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from '../core/constants';
 
 /**
- * Static vector column descriptor without dimension.
- * Use `vector(N)` for dimensioned vectors that produce `vector(N)` DDL.
+ * Static vector column descriptor without dimension. Use `vector(N)` for dimensioned vectors that produce `vector(N)` DDL.
  */
 export const vectorColumn = {
   codecId: VECTOR_CODEC_ID,
@@ -25,7 +23,6 @@ export const vectorColumn = {
  * .column('embedding', { type: vector(1536), nullable: false })
  * // Produces: nativeType: 'vector', typeParams: { length: 1536 }
  * ```
- *
  * @param length - The dimension of the vector (e.g., 1536 for OpenAI embeddings)
  * @returns A column type descriptor with `typeParams.length` set
  * @throws {RangeError} If length is not an integer in the range [1, VECTOR_MAX_DIM]

@@ -5,13 +5,10 @@
  *
  * Coverage selection:
  *
- * - literal preservation through `descriptor.factory({ length })` — `N`
- *   flows from the call site into the helper's `typeParams`.
- * - column helper preserves the typed `codecFactory` and the
- *   `{ length: N }` typeParams literal.
+ * - literal preservation through `descriptor.factory({ length })` — `N` flows from the call site into the helper's `typeParams`.
+ * - column helper preserves the typed `codecFactory` and the `{ length: N }` typeParams literal.
  * - positive `satisfies ColumnHelperFor` and `ColumnHelperForStrict`.
- * - one negative `// @ts-expect-error` for a wrong-shape malformed
- *   helper.
+ * - one negative `// @ts-expect-error` for a wrong-shape malformed helper.
  */
 
 import {
@@ -28,9 +25,7 @@ import {
   pgVectorDescriptor,
 } from '../src/core/codecs';
 
-// ---------------------------------------------------------------------------
-// Literal preservation through direct invocation.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Literal preservation through direct invocation. ---------------------------------------------------------------------------
 
 test('pgVector: descriptor.factory(params) returns typed (ctx) => PgVectorCodec', () => {
   const factory = pgVectorDescriptor.factory({ length: 1536 });
@@ -54,9 +49,7 @@ test('pgVector: column helper carries bare nativeType (family layer expands at e
   }
 });
 
-// ---------------------------------------------------------------------------
-// satisfies discipline catches wiring mistakes.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------satisfies discipline catches wiring mistakes. ---------------------------------------------------------------------------
 
 pgVectorColumn satisfies ColumnHelperFor<PgVectorDescriptor>;
 pgVectorColumn satisfies ColumnHelperForStrict<PgVectorDescriptor>;

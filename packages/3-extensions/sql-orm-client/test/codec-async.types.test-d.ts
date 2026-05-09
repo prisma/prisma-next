@@ -1,24 +1,13 @@
 /**
  * Type-level coverage for the ORM-client async-codec boundary.
  *
- * These assertions encode the invariant that ORM-client read and write
- * surfaces always present plain `T` values to consumers — never `Promise<T>`
- * or `T | Promise<T>` — even though codec query-time methods (`encode` /
- * `decode`) are Promise-returning at the boundary. The Promise lift lives
- * inside `sql-runtime`'s decode-once-per-row contract; the orm-client
- * itself never adds (or removes) a Promise wrapper, so the type-level
- * surfaces here stay plain by construction.
+ * These assertions encode the invariant that ORM-client read and write surfaces always present plain `T` values to consumers — never `Promise<T>` or `T | Promise<T>` — even though codec query-time methods (`encode` / `decode`) are Promise-returning at the boundary. The Promise lift lives inside `sql-runtime`'s decode-once-per-row contract; the orm-client itself never adds (or removes) a Promise wrapper, so the
+ * type-level surfaces here stay plain by construction.
  *
  * Coverage:
- * - **Row shape**: `DefaultModelRow` / `InferRootRow` carry plain `T` for
- *   both `.first()` and `for await` consumption paths.
- * - **Write surfaces**: `CreateInput`, `MutationUpdateInput`,
- *   `UniqueConstraintCriterion`, and `ShorthandWhereFilter` carry plain
- *   `T` for field positions.
- * - **Negative tests**: no `Promise<T>` form leaks into a row-shape
- *   position (read or write). The ORM client uses one field type-map
- *   (rooted in `DefaultModelRow`); there is no read/write split for codec
- *   output types.
+ * - **Row shape**: `DefaultModelRow` / `InferRootRow` carry plain `T` for both `.first()` and `for await` consumption paths.
+ * - **Write surfaces**: `CreateInput`, `MutationUpdateInput`, `UniqueConstraintCriterion`, and `ShorthandWhereFilter` carry plain `T` for field positions.
+ * - **Negative tests**: no `Promise<T>` form leaks into a row-shape position (read or write). The ORM client uses one field type-map (rooted in `DefaultModelRow`); there is no read/write split for codec output types.
  */
 
 import { expectTypeOf, test } from 'vitest';
@@ -33,17 +22,9 @@ import type {
 } from '../src/types';
 import type { Contract } from './fixtures/generated/contract';
 
-// `User.address` is jsonb-backed (a value object whose fields and the field
-// itself flow through the `pg/jsonb@1` codec); `User.invitedById` is int4 and
-// nullable. Both codecs are lifted to async dispatch at the codec
-// boundary regardless of whether the author wrote sync or async functions, so
-// these columns are representative of "async codec columns" at the runtime
-// boundary.
+// `User.address` is jsonb-backed (a value object whose fields and the field itself flow through the `pg/jsonb@1` codec); `User.invitedById` is int4 and nullable. Both codecs are lifted to async dispatch at the codec boundary regardless of whether the author wrote sync or async functions, so these columns are representative of "async codec columns" at the runtime boundary.
 //
-// See `packages/1-framework/1-core/framework-components/src/shared/codec.ts`
-// (`Codec` interface — `encode`/`decode` return `Promise<…>`) — every author
-// function is wrapped at the class boundary, which means every column is an
-// "async codec" at the runtime layer.
+// See `packages/1-framework/1-core/framework-components/src/shared/codec.ts` (`Codec` interface — `encode`/`decode` return `Promise<…>`) — every author function is wrapped at the class boundary, which means every column is an "async codec" at the runtime layer.
 
 type AddressShape = {
   readonly street: string;
@@ -60,9 +41,7 @@ type UserUnique = UniqueConstraintCriterion<Contract, 'User'>;
 type UserWhere = ShorthandWhereFilter<Contract, 'User'>;
 type UserInferRoot = InferRootRow<Contract, 'User'>;
 
-// ---------------------------------------------------------------------------
-// Read surfaces — DefaultModelRow / InferRootRow row fields are plain T
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Read surfaces — DefaultModelRow / InferRootRow row fields are plain T ---------------------------------------------------------------------------
 
 test('DefaultModelRow exposes plain `string` for pg/text@1 columns', () => {
   expectTypeOf<UserRow['name']>().toEqualTypeOf<string>();
@@ -120,9 +99,7 @@ test('Collection.all().firstOrThrow() resolves to a plain row (no Promise<T> on 
   expectTypeOf<IsPromiseLike<Row['name']>>().toEqualTypeOf<false>();
 });
 
-// ---------------------------------------------------------------------------
-// Write surfaces accept plain T
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Write surfaces accept plain T ---------------------------------------------------------------------------
 
 test('CreateInput accepts plain `string` for pg/text@1 fields', () => {
   expectTypeOf<UserCreate['name']>().toEqualTypeOf<string>();
@@ -142,10 +119,7 @@ test('MutationUpdateInput accepts plain `string` for pg/text@1 fields', () => {
 });
 
 test('UniqueConstraintCriterion variants carry plain T for unique columns', () => {
-  // User has unique(id) [PK] and unique(email).
-  // Use toExtend to keep the assertion robust against minor representation
-  // differences (e.g. readonly modifiers / discriminated arrangement) while
-  // still pinning the field types to plain T.
+  // User has unique(id) [PK] and unique(email). Use toExtend to keep the assertion robust against minor representation differences (e.g. readonly modifiers / discriminated arrangement) while still pinning the field types to plain T.
   expectTypeOf<UserUnique>().toExtend<{ readonly id: number } | { readonly email: string }>();
   expectTypeOf<{ readonly id: number }>().toExtend<UserUnique>();
   expectTypeOf<{ readonly email: string }>().toExtend<UserUnique>();
@@ -157,9 +131,7 @@ test('ShorthandWhereFilter accepts plain T (or null/undefined) for filterable fi
   expectTypeOf<UserWhere['id']>().toEqualTypeOf<number | null | undefined>();
 });
 
-// ---------------------------------------------------------------------------
-// Negative tests — no Promise<T> leak; one shared field type-map
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Negative tests — no Promise<T> leak; one shared field type-map ---------------------------------------------------------------------------
 
 test('no DefaultModelRow field position resolves to a Promise<T>', () => {
   expectTypeOf<IsPromiseLike<UserRow['name']>>().toEqualTypeOf<false>();
@@ -191,12 +163,7 @@ test('no ShorthandWhereFilter field position resolves to a Promise<T>', () => {
   expectTypeOf<IsPromiseLike<NonNullable<UserWhere['id']>>>().toEqualTypeOf<false>();
 });
 
-// One field type-map shared by read and write surfaces: `CreateInput` and
-// `MutationUpdateInput` are both derived from `DefaultModelRow`, which means
-// the field-type source of truth is identical for reads and writes. The
-// assertions below pin the field types to a single shape so that any future
-// drift (e.g. introducing a `DefaultModelInputRow` with `Promise<T>` shapes)
-// would break this test.
+// One field type-map shared by read and write surfaces: `CreateInput` and `MutationUpdateInput` are both derived from `DefaultModelRow`, which means the field-type source of truth is identical for reads and writes. The assertions below pin the field types to a single shape so that any future drift (e.g. introducing a `DefaultModelInputRow` with `Promise<T>` shapes) would break this test.
 
 test('CreateInput field types match DefaultModelRow field types (one type-map)', () => {
   expectTypeOf<NonNullable<UserCreate['name']>>().toEqualTypeOf<UserRow['name']>();

@@ -433,9 +433,7 @@ describe('TS and PSL authoring parity', () => {
     expect(tsLines).toBeLessThanOrEqual(Math.ceil(pslLines * 1.6));
   });
 
-  // The shared timestamp parity schema both SQL targets exercise. Lives at
-  // module scope so the per-target tests below read as data + a single
-  // call into `expectTimestampParity`.
+  // The shared timestamp parity schema both SQL targets exercise. Lives at module scope so the per-target tests below read as data + a single call into `expectTimestampParity`.
   const timestampParityPslSchema = `model User {
   id Int @id
   email String

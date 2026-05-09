@@ -1,15 +1,9 @@
 /**
  * Shared encode/decode/render constants for the Postgres target codecs.
  *
- * The codec implementations live in `codecs.ts`
- * (TML-2357). This file retains the conversion helpers + emit-path
- * type renderers that the codec methods compose with — keeping
- * a single source of truth for non-trivial conversions while the codec
- * methods provide the framework-required `Promise<…>` boundary.
+ * The codec implementations live in `codecs.ts` (TML-2357). This file retains the conversion helpers + emit-path type renderers that the codec methods compose with — keeping a single source of truth for non-trivial conversions while the codec methods provide the framework-required `Promise<…>` boundary.
  *
- * Trivial identity passthroughs are inlined directly in the codec
- * methods; only conversions with shape (custom JSON round-trip, decode
- * normalisation, parameterised renderers) live here.
+ * Trivial identity passthroughs are inlined directly in the codec methods; only conversions with shape (custom JSON round-trip, decode normalisation, parameterised renderers) live here.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
@@ -77,11 +71,7 @@ export const pgNumericRenderOutputType = (typeParams: {
   return `Numeric<${precision}, ${scale}>`;
 };
 
-// ISO 8601 UTC: `YYYY-MM-DDTHH:MM:SS[.mmm…]Z`. Trailing `Z` is required;
-// fractional seconds are optional. Other `Date`-parseable formats
-// (`January 15, 2024`, `01/15/2024`, etc.) are intentionally rejected
-// because those formats are implementation-defined and not the
-// documented contract for `pg/timestamp@1` / `pg/timestamptz@1`.
+// ISO 8601 UTC: `YYYY-MM-DDTHH:MM:SS[.mmm…]Z`. Trailing `Z` is required; fractional seconds are optional. Other `Date`-parseable formats (`January 15, 2024`, `01/15/2024`, etc.) are intentionally rejected because those formats are implementation-defined and not the documented contract for `pg/timestamp@1` / `pg/timestamptz@1`.
 const ISO_8601_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 
 export const pgTimestampEncodeJson = (value: Date): JsonValue => value.toISOString();

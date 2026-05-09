@@ -10,11 +10,7 @@ import { defineTestCodec } from './test-codec';
 /**
  * Encode-side dispatch (AC-5):
  *
- * `encodeParam` consults `paramRef.refs` and resolves through
- * `contractCodecs.forColumn(refs.table, refs.column)` when present. The
- * codec-id-keyed fallback (`forCodecId`) is reserved for refs-less
- * non-parameterized codec ids — parameterized codec ids reaching encode
- * without refs are caught by `validateParamRefRefs` upstream.
+ * `encodeParam` consults `paramRef.refs` and resolves through `contractCodecs.forColumn(refs.table, refs.column)` when present. The codec-id-keyed fallback (`forCodecId`) is reserved for refs-less non-parameterized codec ids — parameterized codec ids reaching encode without refs are caught by `validateParamRefRefs` upstream.
  */
 describe('encodeParam — column-aware dispatch', () => {
   it('resolves the per-instance parameterized codec via forColumn when paramRef.refs is populated', async () => {

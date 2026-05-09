@@ -179,8 +179,7 @@ describe('decodeMongoRow', () => {
         },
       },
     };
-    // A driver row where `addr` came back as an array (e.g. an unexpanded
-    // `$lookup` pre-`$unwind`) is yielded verbatim rather than walked into.
+    // A driver row where `addr` came back as an array (e.g. an unexpanded `$lookup` pre-`$unwind`) is yielded verbatim rather than walked into.
     const arrayRow = { addr: [{ city: 'X' }] };
     const arrayOut = await decodeMongoRow(arrayRow, shape, registry, 'c');
     expect(arrayOut).toEqual({ addr: [{ city: 'X' }] });
@@ -252,10 +251,7 @@ describe('decodeMongoRow', () => {
         typeId: 'throws-string@1',
         encode: (v: string) => v,
         decode: () => {
-          // Codec authors throwing a non-Error happens — the wrapper has
-          // to render something for the message. The cast is a deliberate
-          // exercise of `wrapDecodeFailure`'s `error instanceof Error`
-          // false-branch (pure type-system: `throw` accepts `unknown`).
+          // Codec authors throwing a non-Error happens — the wrapper has to render something for the message. The cast is a deliberate exercise of `wrapDecodeFailure`'s `error instanceof Error` false-branch (pure type-system: `throw` accepts `unknown`).
           throw 'string-error' as unknown as Error;
         },
       }),
@@ -334,9 +330,7 @@ describe('decodeMongoRow', () => {
   });
 
   it('passes through row fields the shape does not describe', async () => {
-    // Polymorphic variants and sidecar fields the contract does not enumerate
-    // round-trip verbatim. The shape is a partial lane-vouched description;
-    // drop semantics belongs to projection, not to structural decode.
+    // Polymorphic variants and sidecar fields the contract does not enumerate round-trip verbatim. The shape is a partial lane-vouched description; drop semantics belongs to projection, not to structural decode.
     const registry = registryWithDefaults();
     const shape: MongoResultShape = {
       kind: 'document',
@@ -356,11 +350,7 @@ describe('decodeMongoRow', () => {
   });
 
   it('passes through subdocument keys the nested document shape does not describe', async () => {
-    // The pass-through invariant is structurally additive at every depth, not
-    // just the top level. A nested `kind: 'document'` slot decodes the keys
-    // its `fields` enumerates and round-trips the rest. ADR 209 promises
-    // future lane work threading concrete value-object subtrees is purely
-    // additive, which requires this.
+    // The pass-through invariant is structurally additive at every depth, not just the top level. A nested `kind: 'document'` slot decodes the keys its `fields` enumerates and round-trips the rest. ADR 209 promises future lane work threading concrete value-object subtrees is purely additive, which requires this.
     const registry = registryWithDefaults();
     const shape: MongoResultShape = {
       kind: 'document',

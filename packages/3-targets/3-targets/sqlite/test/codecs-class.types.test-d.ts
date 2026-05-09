@@ -3,13 +3,7 @@
  *
  * Mirrors `packages/3-targets/3-targets/postgres/test/codecs-class.types.test-d.ts`.
  *
- * Coverage selection: every SQLite codec is non-parameterized, so the
- * tests focus on representative codecs that exercise distinct
- * input/wire types — a numeric (`integer`), a typed `Date` mapping
- * (`datetime`, wire `string` ≠ input `Date`), a binary mapping
- * (`blob`, wire `Uint8Array`), and a bigint mapping (`bigint`, wire
- * `number | bigint` ≠ input `bigint`). The framework-level type
- * discipline is exercised in Phase A's
+ * Coverage selection: every SQLite codec is non-parameterized, so the tests focus on representative codecs that exercise distinct input/wire types — a numeric (`integer`), a typed `Date` mapping (`datetime`, wire `string` ≠ input `Date`), a binary mapping (`blob`, wire `Uint8Array`), and a bigint mapping (`bigint`, wire `number | bigint` ≠ input `bigint`). The framework-level type discipline is exercised in Phase A's
  * `framework-components/test/codec.types.test-d.ts`.
  */
 
@@ -39,9 +33,7 @@ import {
   sqliteIntegerDescriptor,
 } from '../src/core/codecs';
 
-// ---------------------------------------------------------------------------
-// Literal preservation through direct invocation.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Literal preservation through direct invocation. ---------------------------------------------------------------------------
 
 test('sqliteInteger: descriptor.factory() returns typed (ctx) => SqliteIntegerCodec', () => {
   const factory = sqliteIntegerDescriptor.factory();
@@ -77,9 +69,7 @@ test('sqliteBigint: column preserves the (number|bigint) wire / bigint input spl
   expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteBigintCodec>();
 });
 
-// ---------------------------------------------------------------------------
-// satisfies discipline catches wiring mistakes.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------satisfies discipline catches wiring mistakes. ---------------------------------------------------------------------------
 
 sqliteIntegerColumn satisfies ColumnHelperFor<SqliteIntegerDescriptor>;
 sqliteIntegerColumn satisfies ColumnHelperForStrict<SqliteIntegerDescriptor>;
@@ -94,10 +84,7 @@ sqliteBigintColumn satisfies ColumnHelperFor<SqliteBigintDescriptor>;
 sqliteBigintColumn satisfies ColumnHelperForStrict<SqliteBigintDescriptor>;
 
 test('strict satisfies catches wrong codec wired in', () => {
-  // Wire the integer descriptor's factory into the bigint descriptor's
-  // slot. Coarse satisfies passes (both have `void` typeParams); strict
-  // satisfies fails because the codec types differ
-  // (SqliteIntegerCodec ≠ SqliteBigintCodec).
+  // Wire the integer descriptor's factory into the bigint descriptor's slot. Coarse satisfies passes (both have `void` typeParams); strict satisfies fails because the codec types differ (SqliteIntegerCodec ≠ SqliteBigintCodec).
   const wrongCodecHelper = () =>
     column(sqliteIntegerDescriptor.factory(), sqliteBigintDescriptor.codecId, undefined, 'integer');
   wrongCodecHelper satisfies ColumnHelperFor<SqliteBigintDescriptor>;

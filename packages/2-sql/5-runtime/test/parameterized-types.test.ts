@@ -24,19 +24,12 @@ function vectorCodecInstance(meta?: Record<string, unknown>): Codec {
     decode: (w: number[]) => w,
   });
   if (!meta) return baseCodec;
-  // The narrow `Codec` shape is conversion-only (TML-2357).
-  // The `meta` here is a test-side sentinel attached to the codec object
-  // so a downstream assertion can verify that the runtime materialization
-  // path threads the *exact same instance* the factory returned (via
-  // `toBe(taggedCodec)`); it is intentionally not part of the codec's
-  // declared shape. Cast through `unknown` to keep the augmentation
-  // visible to the assertion without re-introducing a `meta` slot.
+  // The narrow `Codec` shape is conversion-only (TML-2357). The `meta` here is a test-side sentinel attached to the codec object so a downstream assertion can verify that the runtime materialization path threads the *exact same instance* the factory returned (via `toBe(taggedCodec)`); it is intentionally not part of the codec's declared shape. Cast through `unknown` to keep the augmentation visible to the assertion
+  // without re-introducing a `meta` slot.
   return { ...baseCodec, meta } as unknown as Codec;
 }
 
-// =============================================================================
-// Test helpers
-// =============================================================================
+// ============================================================================= Test helpers =============================================================================
 
 function createParamTypesTestContract(
   options?: Partial<{
@@ -80,9 +73,7 @@ function createParamTypesTestContract(
   };
 }
 
-// =============================================================================
-// Tests: Parameterized type validation
-// =============================================================================
+// ============================================================================= Tests: Parameterized type validation =============================================================================
 
 describe('parameterized types', () => {
   describe('storage.types validation', () => {
@@ -233,12 +224,8 @@ describe('parameterized types', () => {
     });
   });
 
-  // Phase B note: `init` was the predecessor hook returning a helper. The
-  // unified descriptor uses `factory: (P) => (CodecInstanceContext) => Codec`; per-instance
-  // state lives in the resolved codec returned by the factory. The
-  // `TypeHelperRegistry` (`context.types`) carries the resolved codec for
-  // every typed instance — or, for codec ids without a parameterized
-  // descriptor, the raw `StorageTypeInstance` for typeParams metadata.
+  // Phase B note: `init` was the predecessor hook returning a helper. The unified descriptor uses `factory: (P) => (CodecInstanceContext) => Codec`; per-instance state lives in the resolved codec returned by the factory. The `TypeHelperRegistry` (`context.types`) carries the resolved codec for every typed instance — or, for codec ids without a parameterized descriptor, the raw `StorageTypeInstance` for typeParams
+  // metadata.
   describe('factory for type helpers', () => {
     function createPgVectorExt(opts?: {
       paramsSchema?: Type<{ length: number }>;
@@ -294,9 +281,7 @@ describe('parameterized types', () => {
       });
 
       expect(context.types['Vector1536']).toBe(taggedCodec);
-      // The factory returned the `taggedCodec` instance with its
-      // test-side `meta` sentinel; the runtime materialization path
-      // preserves the exact instance, so the sentinel is still there.
+      // The factory returned the `taggedCodec` instance with its test-side `meta` sentinel; the runtime materialization path preserves the exact instance, so the sentinel is still there.
       expect(
         (
           context.types['Vector1536'] as unknown as {
@@ -309,10 +294,7 @@ describe('parameterized types', () => {
     it('threads ctx (name + usedAt) through to the factory', () => {
       const observedCtxs: SqlCodecInstanceContext[] = [];
       const sharedCodec = vectorCodecInstance();
-      // SQL extensions that read `usedAt` author against the SQL-extended
-      // ctx; the descriptor's factory slot is family-agnostic, so we cast
-      // through the base. This mirrors what production SQL extensions do
-      // (see `pgvector/src/exports/runtime.ts`'s family-agnostic cast).
+      // SQL extensions that read `usedAt` author against the SQL-extended ctx; the descriptor's factory slot is family-agnostic, so we cast through the base. This mirrors what production SQL extensions do (see `pgvector/src/exports/runtime.ts`'s family-agnostic cast).
       const sqlFactory = (_params: { length: number }) => (ctx: SqlCodecInstanceContext) => {
         observedCtxs.push(ctx);
         return sharedCodec;
@@ -345,21 +327,14 @@ describe('parameterized types', () => {
         extensionPacks: [extensionDescriptor],
       });
 
-      // Skip the representative-materialization call sql-context.ts
-      // makes per descriptor for the legacy `forCodecId` fallback (named
-      // `<shared:pg/vector@1>` with empty `usedAt`); locate the per-
-      // column factory call by the type-instance ctx the test contract
-      // declares.
+      // Skip the representative-materialization call sql-context.ts makes per descriptor for the legacy `forCodecId` fallback (named `<shared:pg/vector@1>` with empty `usedAt`); locate the per-column factory call by the type-instance ctx the test contract declares.
       const perColumnCtx = observedCtxs.find((ctx) => ctx.name === 'Vector1536');
       expect(perColumnCtx?.name).toBe('Vector1536');
       expect(perColumnCtx?.usedAt).toEqual([{ table: 'test', column: 'embedding' }]);
     });
 
     it('stores full type instance for codec ids without a parameterized descriptor', () => {
-      // No extension contributes a parameterized descriptor for
-      // `pg/vector@1`. The named instance can't be materialized; the
-      // helper falls back to the raw type instance for callers that need
-      // typeParams metadata.
+      // No extension contributes a parameterized descriptor for `pg/vector@1`. The named instance can't be materialized; the helper falls back to the raw type instance for callers that need typeParams metadata.
       const contract = createParamTypesTestContract({
         types: {
           Vector1536: {

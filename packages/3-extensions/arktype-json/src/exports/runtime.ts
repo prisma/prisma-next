@@ -1,13 +1,9 @@
 /**
  * Runtime-plane extension descriptor for arktype-json.
  *
- * Registers `arktypeJsonCodec` (the unified `CodecDescriptor`) through
- * the SQL runtime's `codecs:` slot. Per TML-2357 the
- * dedicated parameterized-codec slot retired — the unified descriptor
- * map dispatches every codec id, parameterized or not.
+ * Registers `arktypeJsonCodec` (the unified `CodecDescriptor`) through the SQL runtime's `codecs:` slot. Per TML-2357 the dedicated parameterized-codec slot retired — the unified descriptor map dispatches every codec id, parameterized or not.
  *
- * Lives at the runtime-plane entrypoint so `src/core/**` stays free of
- * runtime-plane imports (per `.cursor/rules/multi-plane-entrypoints.mdc`).
+ * Lives at the runtime-plane entrypoint so `src/core/**` stays free of runtime-plane imports (per `.cursor/rules/multi-plane-entrypoints.mdc`).
  */
 
 import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';

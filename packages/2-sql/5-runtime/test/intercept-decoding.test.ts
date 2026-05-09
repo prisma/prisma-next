@@ -29,14 +29,9 @@ import { defineTestCodec } from './test-codec';
 import { descriptorsFromCodecs } from './utils';
 
 /**
- * Documents the contract: when a `SqlMiddleware.intercept` hook short-circuits
- * execution and returns raw rows, those rows go through the SQL runtime's
- * normal codec decode pass — exactly as if they had come from the driver.
+ * Documents the contract: when a `SqlMiddleware.intercept` hook short-circuits execution and returns raw rows, those rows go through the SQL runtime's normal codec decode pass — exactly as if they had come from the driver.
  *
- * The cache middleware (TML-2143 M3) relies on this: it stores raw (undecoded)
- * rows on first execution, then returns them from `intercept` on subsequent
- * executions. Decoding happens once per row consumption regardless of whether
- * the row originated from the driver or the cache.
+ * The cache middleware (TML-2143 M3) relies on this: it stores raw (undecoded) rows on first execution, then returns them from `intercept` on subsequent executions. Decoding happens once per row consumption regardless of whether the row originated from the driver or the cache.
  */
 
 const testContract: Contract<SqlStorage> = {
@@ -52,9 +47,7 @@ const testContract: Contract<SqlStorage> = {
 };
 
 /**
- * A JSON codec that takes wire-format strings and decodes them into parsed
- * objects. Used to demonstrate that intercepted rows containing JSON-encoded
- * values come back to the consumer as parsed objects.
+ * A JSON codec that takes wire-format strings and decodes them into parsed objects. Used to demonstrate that intercepted rows containing JSON-encoded values come back to the consumer as parsed objects.
  */
 function createJsonCodecs(): ReadonlyArray<Codec<string>> {
   return [
@@ -101,8 +94,7 @@ function createStubAdapter(codecs: ReadonlyArray<Codec<string>>) {
 
 function createMockDriver(): SqlDriver {
   const rootExecute = vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
-    // Default driver path; real test cases below either intercept (skipping
-    // this) or assert it was called.
+    // Default driver path; real test cases below either intercept (skipping this) or assert it was called.
     yield {} as Record<string, unknown>;
   });
 
@@ -190,10 +182,7 @@ function createTestSetup(middleware: readonly SqlMiddleware[]) {
 }
 
 /**
- * Builds an execution plan whose AST projection maps the named alias to the
- * JSON codec via `ProjectionItem.codecId`, so any row yielded for this plan
- * (driver or intercepted) is decoded through the JSON codec before reaching
- * the consumer.
+ * Builds an execution plan whose AST projection maps the named alias to the JSON codec via `ProjectionItem.codecId`, so any row yielded for this plan (driver or intercepted) is decoded through the JSON codec before reaching the consumer.
  */
 function createJsonProjectionPlan(alias: string): SqlExecutionPlan {
   const ast = SelectAst.from(TableSource.named('users')).withProjection([
@@ -220,8 +209,7 @@ describe('intercepted rows go through codec decoding', () => {
       name: 'mock-cache',
       familyId: 'sql',
       async intercept() {
-        // Raw wire row, as the driver would have produced it: a string
-        // containing JSON-encoded data.
+        // Raw wire row, as the driver would have produced it: a string containing JSON-encoded data.
         return { rows: [{ profile: wireValue }] };
       },
     };
@@ -231,8 +219,7 @@ describe('intercepted rows go through codec decoding', () => {
 
     const out = await runtime.execute(plan).toArray();
 
-    // The consumer must see the *decoded* value (a parsed object), not the
-    // raw wire string.
+    // The consumer must see the *decoded* value (a parsed object), not the raw wire string.
     expect(out).toEqual([{ profile: { name: 'Alice', tags: ['admin', 'staff'] } }]);
     expect(driver.execute).not.toHaveBeenCalled();
   });

@@ -197,8 +197,7 @@ describe('resolveValue — CodecCallContext threading', () => {
     const controller = new AbortController();
     const reason = new Error('level race wins');
 
-    // Top-level object with two leaves at the same level — Promise.all races
-    // against the abort signal at this level.
+    // Top-level object with two leaves at the same level — Promise.all races against the abort signal at this level.
     const doc = {
       a: new MongoParamRef('a', { codecId: 'test/level-blocker@1' }),
       b: new MongoParamRef('b', { codecId: 'test/level-blocker@1' }),

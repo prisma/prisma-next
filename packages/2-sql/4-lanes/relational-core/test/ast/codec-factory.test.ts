@@ -93,8 +93,5 @@ describe('defineTestCodec — query-time methods are Promise-returning', () => {
     expect(decodedJson).not.toBeInstanceOf(Promise);
   });
 
-  // `renderOutputType` is a `CodecDescriptor`-side concern (TML-2357) — the legacy `defineTestCodec()` factory accepts the field for
-  // back-compat with existing call sites but the produced codec
-  // instance no longer carries it. The descriptor side is exercised by
-  // `sql-codecs.test.ts`.
+  // `renderOutputType` is a `CodecDescriptor`-side concern (TML-2357) — the legacy `defineTestCodec()` factory accepts the field for back-compat with existing call sites but the produced codec instance no longer carries it. The descriptor side is exercised by `sql-codecs.test.ts`.
 });

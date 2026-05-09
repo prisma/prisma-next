@@ -1,7 +1,5 @@
 /**
- * Constructive type tests for the sqlite per-target descriptor record
- * layer (TML-2357). Mirrors the postgres
- * test (`packages/3-targets/3-targets/postgres/test/typed-descriptor-flow.test-d.ts`).
+ * Constructive type tests for the sqlite per-target descriptor record layer (TML-2357). Mirrors the postgres test (`packages/3-targets/3-targets/postgres/test/typed-descriptor-flow.test-d.ts`).
  */
 
 import type { AnyCodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
@@ -15,9 +13,7 @@ import {
 } from '../src/core/codecs';
 import type { CodecTypes } from '../src/exports/codec-types';
 
-// ---------------------------------------------------------------------------
-// Heterogeneous descriptor storage narrows to AnyCodecDescriptor.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Heterogeneous descriptor storage narrows to AnyCodecDescriptor. ---------------------------------------------------------------------------
 
 test('codecDescriptors narrows to readonly AnyCodecDescriptor[]', () => {
   expectTypeOf(codecDescriptors).toEqualTypeOf<readonly AnyCodecDescriptor[]>();
@@ -27,9 +23,7 @@ test('list entries extend AnyCodecDescriptor', () => {
   expectTypeOf<(typeof codecDescriptors)[number]>().toExtend<AnyCodecDescriptor>();
 });
 
-// ---------------------------------------------------------------------------
-// Trait literals preserved on individual descriptors (M0 R5 fix).
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Trait literals preserved on individual descriptors (M0 R5 fix). ---------------------------------------------------------------------------
 
 test('sqliteIntegerDescriptor.traits is a readonly literal tuple, not widened', () => {
   type Traits = SqliteIntegerDescriptor['traits'];
@@ -50,9 +44,7 @@ test('sqliteDatetimeDescriptor.codecId is the literal `sqlite/datetime@1`', () =
   expectTypeOf(sqliteDatetimeDescriptor.codecId).toEqualTypeOf<'sqlite/datetime@1'>();
 });
 
-// ---------------------------------------------------------------------------
-// CodecTypes projection contains the expected codec-id keys.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------CodecTypes projection contains the expected codec-id keys. ---------------------------------------------------------------------------
 
 test('CodecTypes is keyed by codec id and exposes input/output/traits', () => {
   expectTypeOf<CodecTypes['sqlite/integer@1']>().toExtend<{
@@ -66,9 +58,7 @@ test('CodecTypes is keyed by codec id and exposes input/output/traits', () => {
   }>();
 });
 
-// ---------------------------------------------------------------------------
-// Negative tests.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Negative tests. ---------------------------------------------------------------------------
 
 test('widened trait shape on sqliteInteger fails the equality check', () => {
   type Traits = SqliteIntegerDescriptor['traits'];

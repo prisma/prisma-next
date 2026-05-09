@@ -87,9 +87,7 @@ function extractExtensionPackMeta(
 }
 
 /**
- * Enriches a raw contract with framework-derived metadata:
- * capabilities from all component descriptors and extension pack metadata
- * from extension descriptors. Produces deterministically sorted output.
+ * Enriches a raw contract with framework-derived metadata: capabilities from all component descriptors and extension pack metadata from extension descriptors. Produces deterministically sorted output.
  */
 export function enrichContract(
   ir: Contract,

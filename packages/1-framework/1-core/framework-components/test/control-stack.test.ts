@@ -195,12 +195,7 @@ describe('assembleAuthoringContributions', () => {
   });
 
   it('rejects malformed descriptor values during merge instead of recursing into primitives', () => {
-    // A descriptor missing `output` fails the canonical leaf guard but is
-    // a plain object, so the walker would historically recurse INTO it
-    // and, on the second registration of the same path, try to walk
-    // through the inner `'fieldPreset'` string of the `kind` property —
-    // either silently mangling state or infinite-looping. The walker
-    // now rejects the malformed value with a clear path-aware error.
+    // A descriptor missing `output` fails the canonical leaf guard but is a plain object, so the walker would historically recurse INTO it and, on the second registration of the same path, try to walk through the inner `'fieldPreset'` string of the `kind` property — either silently mangling state or infinite-looping. The walker now rejects the malformed value with a clear path-aware error.
     expect(() =>
       assembleAuthoringContributions([
         createDescriptor({

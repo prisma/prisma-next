@@ -1,20 +1,11 @@
 /**
- * Internal codec descriptor map and `CodecTypes` materialisation for the
- * Postgres target.
+ * Internal codec descriptor map and `CodecTypes` materialisation for the Postgres target.
  *
- * Why this lives in `core/` even though the public origin of
- * `CodecTypes` is `exports/codec-types.ts`:
+ * Why this lives in `core/` even though the public origin of `CodecTypes` is `exports/codec-types.ts`:
  *
- * - The descriptor map (`codecDescriptorMap`) and the `Resolve<T>`
- *   helper are implementation detail; they shouldn't appear on the
- *   public package surface.
- * - The `CodecTypes` *materialisation* (the `Resolve<...>` application)
- *   must still happen at the public boundary so tsdown's DTS bundler
- *   resolves consumer-side `pack.d.mts` references via the public entry
- *   point rather than a hash-named internal chunk (the `TS2742` family
- *   F8 closed). `exports/codec-types.ts` re-exports `CodecTypes` from
- *   here as a type alias, which preserves the materialisation site at
- *   the public surface.
+ * - The descriptor map (`codecDescriptorMap`) and the `Resolve<T>` helper are implementation detail; they shouldn't appear on the public package surface.
+ * - The `CodecTypes` *materialisation* (the `Resolve<...>` application) must still happen at the public boundary so tsdown's DTS bundler resolves consumer-side `pack.d.mts` references via the public entry point rather than a hash-named internal chunk (the `TS2742` family F8 closed). `exports/codec-types.ts` re-exports `CodecTypes` from here as a type alias, which preserves the materialisation site at the public
+ * surface.
  */
 
 import type { ExtractCodecTypes } from '@prisma-next/sql-relational-core/ast';

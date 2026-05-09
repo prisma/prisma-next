@@ -456,10 +456,7 @@ describe('MongoAdapter with codec registry', () => {
   });
 });
 
-// Regression: createMongoAdapter() must remain synchronous. Even though
-// the adapter's `lower()` method is async, the construction path stays
-// sync so that `mongo({...})` clients can be instantiated without
-// `await`.
+// Regression: createMongoAdapter() must remain synchronous. Even though the adapter's `lower()` method is async, the construction path stays sync so that `mongo({...})` clients can be instantiated without `await`.
 describe('createMongoAdapter (sync construction regression)', () => {
   it('returns a non-Promise adapter at runtime', () => {
     const adapter = createMongoAdapter();
@@ -469,9 +466,7 @@ describe('createMongoAdapter (sync construction regression)', () => {
   });
 
   it('binds to a synchronous MongoAdapter type at the call site', () => {
-    // Compile-time guard: createMongoAdapter must return MongoAdapter directly,
-    // never a Promise. If it ever becomes Promise-returning, this fails to
-    // compile (caught by the test-file typecheck pass).
+    // Compile-time guard: createMongoAdapter must return MongoAdapter directly, never a Promise. If it ever becomes Promise-returning, this fails to compile (caught by the test-file typecheck pass).
     expectTypeOf<ReturnType<typeof createMongoAdapter>>().toEqualTypeOf<MongoAdapter>();
     expectTypeOf<ReturnType<typeof createMongoAdapter>>().not.toEqualTypeOf<
       Promise<MongoAdapter>

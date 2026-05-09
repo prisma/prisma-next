@@ -2,20 +2,14 @@ import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { pgVectorDescriptor } from '../src/core/codecs';
 
-// The pgvector codec authors `encode`/`decode` synchronously; codecs
-// route through `Promise`-returning methods at the boundary. The
-// tests below cast through the Promise-returning shape and `await` every
-// call so unit-level coverage stays aligned with the codec contract:
-//   `Codec<Id, TTraits, TWire, TInput>` — encode/decode return Promise.
+// The pgvector codec authors `encode`/`decode` synchronously; codecs route through `Promise`-returning methods at the boundary. The tests below cast through the Promise-returning shape and `await` every call so unit-level coverage stays aligned with the codec contract: `Codec<Id, TTraits, TWire, TInput>` — encode/decode return Promise.
 type AsyncVectorCodec = {
   readonly encode: (value: number[]) => Promise<string>;
   readonly decode: (wire: string) => Promise<number[]>;
 };
 
 function asAsyncCodec(length: number): AsyncVectorCodec {
-  // After F29, pgvector's runtime codec enforces the declared
-  // dimension; tests instantiate the codec at the dimension matching
-  // their value array.
+  // After F29, pgvector's runtime codec enforces the declared dimension; tests instantiate the codec at the dimension matching their value array.
   return pgVectorDescriptor.factory({ length })({
     name: 'test',
   }) as unknown as AsyncVectorCodec;

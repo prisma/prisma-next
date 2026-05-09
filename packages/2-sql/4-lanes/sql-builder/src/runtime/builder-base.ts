@@ -111,11 +111,7 @@ export function combineWhereExprs(exprs: readonly AstExpression[]): AstExpressio
 }
 
 /**
- * Same uniqueness rule as the field-proxy's `findUniqueNamespaceFor`:
- * when exactly one namespace owns a top-level field, the binding is
- * unambiguous. Used by `select('col', ...)` to attach `refs` metadata to
- * the resulting `ProjectionItem` while keeping the AST as `IdentifierRef`
- * (so SQL renders unchanged).
+ * Same uniqueness rule as the field-proxy's `findUniqueNamespaceFor`: when exactly one namespace owns a top-level field, the binding is unambiguous. Used by `select('col', ...)` to attach `refs` metadata to the resulting `ProjectionItem` while keeping the AST as `IdentifierRef` (so SQL renders unchanged).
  */
 function findUniqueNamespaceFor(scope: Scope, fieldName: string): string | undefined {
   let found: string | undefined;

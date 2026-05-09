@@ -28,8 +28,7 @@ const defaultCapabilities = Object.freeze({
 class PostgresAdapterImpl
   implements Adapter<AnyQueryAst, PostgresContract, PostgresLoweredStatement>
 {
-  // These fields make the adapter instance structurally compatible with
-  // RuntimeAdapterInstance<'sql', 'postgres'> without introducing a runtime-plane dependency.
+  // These fields make the adapter instance structurally compatible with RuntimeAdapterInstance<'sql', 'postgres'> without introducing a runtime-plane dependency.
   readonly familyId = 'sql' as const;
   readonly targetId = 'postgres' as const;
 
@@ -46,8 +45,7 @@ class PostgresAdapterImpl
         sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where id = $1',
         params: [1],
       }),
-      // Postgres' driver hydrates `text[]` columns as native JS arrays, so
-      // the row is already in the shape the shared parser expects.
+      // Postgres' driver hydrates `text[]` columns as native JS arrays, so the row is already in the shape the shared parser expects.
       parseMarkerRow: (row: unknown) => parseContractMarkerRow(row),
     });
   }

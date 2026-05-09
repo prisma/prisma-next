@@ -31,8 +31,7 @@ const codecIdByScalar = {
   datetime: SQLITE_DATETIME_CODEC_ID,
   json: SQLITE_JSON_CODEC_ID,
   bigint: SQLITE_BIGINT_CODEC_ID,
-  // SQL base codecs are also registered via the contributor's
-  // `codecs:` slot, so the package-scoped registry resolves them.
+  // SQL base codecs are also registered via the contributor's `codecs:` slot, so the package-scoped registry resolves them.
   char: SQL_CHAR_CODEC_ID,
   varchar: SQL_VARCHAR_CODEC_ID,
   int: SQL_INT_CODEC_ID,
@@ -47,9 +46,7 @@ function codecForScalar(scalar: ScalarName): Codec {
   if (!descriptor) {
     throw new Error(`No descriptor registered for codec id ${codecId}`);
   }
-  // Codec runtime is per-instance-stateless for every codec under test;
-  // pass `undefined as never` to satisfy parameterized descriptors
-  // (SQL char/varchar/int/float carry typed param shapes).
+  // Codec runtime is per-instance-stateless for every codec under test; pass `undefined as never` to satisfy parameterized descriptors (SQL char/varchar/int/float carry typed param shapes).
   const factory = (descriptor as AnyCodecDescriptor).factory(undefined as never);
   return factory(SYNTH_CTX) as Codec;
 }

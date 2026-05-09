@@ -128,8 +128,7 @@ describe('resolveValue', () => {
 
       const resultPromise = resolveValue(doc, registry, noCtx);
 
-      // Both encode functions must have started before either resolves —
-      // i.e. dispatch is concurrent, not sequential.
+      // Both encode functions must have started before either resolves — i.e. dispatch is concurrent, not sequential.
       await new Promise((r) => setImmediate(r));
       expect(callOrder).toEqual(['encode-a-start', 'encode-b-start']);
 

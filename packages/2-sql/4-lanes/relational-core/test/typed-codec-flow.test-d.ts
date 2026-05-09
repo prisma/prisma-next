@@ -1,25 +1,14 @@
 /**
- * Constructive type tests at the descriptor round-trip layer
- * (TML-2357).
+ * Constructive type tests at the descriptor round-trip layer (TML-2357).
  *
- * The descriptor surface is the canonical path from a
- * `CodecDescriptor<P>` instance to its resolved `Codec` shape. These
- * tests pin that round-trip end-to-end at the SQL base codec layer:
- * given a concrete descriptor, the resolved codec exactly equals
- * `Codec<Id, Traits, Wire, Input>` with the literal Id, the readonly
- * trait tuple preserved, and Wire / Input fixed.
+ * The descriptor surface is the canonical path from a `CodecDescriptor<P>` instance to its resolved `Codec` shape. These tests pin that round-trip end-to-end at the SQL base codec layer: given a concrete descriptor, the resolved codec exactly equals `Codec<Id, Traits, Wire, Input>` with the literal Id, the readonly trait tuple preserved, and Wire / Input fixed.
  *
  * Coverage:
- *   - one non-parameterized SQL base codec (`sqlInt`)
- *   - one parameterized SQL base codec (`sqlVarchar`)
- *   - one inline "extension" descriptor exercising a custom Wire/Input
- *     pair via {@link CodecDescriptorImpl}; this stands in for the
- *     extension-codec axis covered concretely by `pgVector` in the
- *     per-target descriptor flow tests (T0.D.2).
+ * - one non-parameterized SQL base codec (`sqlInt`)
+ * - one parameterized SQL base codec (`sqlVarchar`)
+ * - one inline "extension" descriptor exercising a custom Wire/Input pair via {@link CodecDescriptorImpl}; this stands in for the extension-codec axis covered concretely by `pgVector` in the per-target descriptor flow tests (T0.D.2).
  *
- * Negative coverage uses `// @ts-expect-error` so a regression in the
- * round-trip mapping (e.g. trait widening, Wire/Input drift, codec id
- * mismatch) breaks the test type-check rather than passing silently.
+ * Negative coverage uses `// @ts-expect-error` so a regression in the round-trip mapping (e.g. trait widening, Wire/Input drift, codec id mismatch) breaks the test type-check rather than passing silently.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
@@ -41,9 +30,7 @@ import type {
   sqlVarcharDescriptor,
 } from '../src/ast/sql-codecs';
 
-// ---------------------------------------------------------------------------
-// Round-trip extractor: descriptor -> resolved codec instance.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Round-trip extractor: descriptor -> resolved codec instance. ---------------------------------------------------------------------------
 
 type ResolvedCodec<D> = D extends {
   factory: (...args: never[]) => (ctx: CodecInstanceContext) => infer R;
@@ -51,9 +38,7 @@ type ResolvedCodec<D> = D extends {
   ? R
   : never;
 
-// ---------------------------------------------------------------------------
-// AC-CB-2: descriptor round-trip preserves the full codec shape.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------AC-CB-2: descriptor round-trip preserves the full codec shape. ---------------------------------------------------------------------------
 
 test('non-parameterized SQL base codec — sqlInt round-trips to typed Codec', () => {
   type Resolved = ResolvedCodec<typeof sqlIntDescriptor>;
@@ -71,10 +56,7 @@ test('parameterized SQL base codec — sqlVarchar round-trips to typed Codec', (
   >();
 });
 
-// ---------------------------------------------------------------------------
-// Inline extension axis: a custom-Wire/custom-Input descriptor proves the
-// round-trip carries arbitrary `TWire` / `TInput` literals through.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Inline extension axis: a custom-Wire/custom-Input descriptor proves the round-trip carries arbitrary `TWire` / `TInput` literals through. ---------------------------------------------------------------------------
 
 class TestVectorCodec extends CodecImpl<'test/vector@1', readonly ['equality'], string, number[]> {
   async encode(value: number[], _ctx: CodecCallContext): Promise<string> {
@@ -111,9 +93,7 @@ test('extension-style descriptor round-trips with custom Wire/Input', () => {
   >();
 });
 
-// ---------------------------------------------------------------------------
-// Negative tests — wrong-shape codecs do not satisfy the round-trip target.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Negative tests — wrong-shape codecs do not satisfy the round-trip target. ---------------------------------------------------------------------------
 
 test('wrong codec id breaks the round-trip equality', () => {
   type Resolved = ResolvedCodec<typeof sqlIntDescriptor>;
@@ -132,8 +112,7 @@ test('wrong wire type breaks the round-trip equality', () => {
 });
 
 test('widened trait union breaks the round-trip equality', () => {
-  // Read traits off the descriptor — the codec instance carries them on
-  // an optional phantom slot which is not always preserved by inference.
+  // Read traits off the descriptor — the codec instance carries them on an optional phantom slot which is not always preserved by inference.
   type DescTraits = (typeof sqlIntDescriptor)['traits'];
   expectTypeOf<DescTraits>().toEqualTypeOf<readonly ['equality', 'order', 'numeric']>();
   // @ts-expect-error -- sqlInt traits include `numeric`, not just `['equality']`

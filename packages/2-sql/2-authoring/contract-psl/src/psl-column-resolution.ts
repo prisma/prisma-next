@@ -72,16 +72,9 @@ export function getAuthoringTypeConstructor(
 }
 
 /**
- * Walks `authoringContributions.field` segment-by-segment and returns the
- * field-preset descriptor at the resolved path, or `undefined` if no descriptor
- * is registered.
+ * Walks `authoringContributions.field` segment-by-segment and returns the field-preset descriptor at the resolved path, or `undefined` if no descriptor is registered.
  *
- * Symmetric with `getAuthoringTypeConstructor`. Field presets are strictly
- * richer than type constructors — they can contribute `default` /
- * `executionDefaults` / `id` / `unique` / `nullable` in addition to the
- * `codecId` / `nativeType` / `typeParams` triple. PSL resolution tries field
- * presets first, then falls back to type constructors on miss (see
- * `resolveFieldTypeDescriptor`).
+ * Symmetric with `getAuthoringTypeConstructor`. Field presets are strictly richer than type constructors — they can contribute `default` / `executionDefaults` / `id` / `unique` / `nullable` in addition to the `codecId` / `nativeType` / `typeParams` triple. PSL resolution tries field presets first, then falls back to type constructors on miss (see `resolveFieldTypeDescriptor`).
  */
 export function getAuthoringFieldPreset(
   contributions: AuthoringContributions | undefined,
@@ -100,9 +93,7 @@ export function getAuthoringFieldPreset(
 }
 
 /**
- * Returns the namespace prefix of `attributeName` if it references an
- * unrecognized extension namespace, otherwise `undefined`. A namespace is
- * considered recognized when it is:
+ * Returns the namespace prefix of `attributeName` if it references an unrecognized extension namespace, otherwise `undefined`. A namespace is considered recognized when it is:
  *
  * - `db` (native-type spec, always allowed),
  * - the active family id (e.g. `sql`),
@@ -110,10 +101,7 @@ export function getAuthoringFieldPreset(
  * - a registered field-preset namespace (e.g. `temporal`),
  * - present in `composedExtensions`.
  *
- * Family/target/field-preset namespaces are exempted so that e.g. `@sql.foo`
- * surfaces as PSL_UNSUPPORTED_*_ATTRIBUTE (the attribute isn't defined)
- * rather than PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (the namespace is already
- * composed).
+ * Family/target/field-preset namespaces are exempted so that e.g. `@sql.foo` surfaces as PSL_UNSUPPORTED_*_ATTRIBUTE (the attribute isn't defined) rather than PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (the namespace is already composed).
  */
 export function checkUncomposedNamespace(
   attributeName: string,
@@ -142,12 +130,9 @@ export function checkUncomposedNamespace(
 }
 
 /**
- * Pushes the canonical `PSL_EXTENSION_NAMESPACE_NOT_COMPOSED` diagnostic for a
- * subject (attribute, model attribute, or type constructor) that references an
- * extension namespace which is not composed in the current contract.
+ * Pushes the canonical `PSL_EXTENSION_NAMESPACE_NOT_COMPOSED` diagnostic for a subject (attribute, model attribute, or type constructor) that references an extension namespace which is not composed in the current contract.
  *
- * The `data` payload carries the missing namespace so machine consumers
- * (agents, IDE extensions, CLI auto-fix) don't have to parse the prose.
+ * The `data` payload carries the missing namespace so machine consumers (agents, IDE extensions, CLI auto-fix) don't have to parse the prose.
  */
 export function reportUncomposedNamespace(input: {
   readonly subjectLabel: string;
@@ -166,10 +151,7 @@ export function reportUncomposedNamespace(input: {
 }
 
 /**
- * Pushes the canonical `PSL_UNKNOWN_FIELD_PRESET` diagnostic when a typoed
- * preset name is referenced inside a registered field-preset namespace. The
- * `data` payload exposes the namespace and full helper path so machine
- * consumers (agents, IDE extensions) don't have to parse the prose.
+ * Pushes the canonical `PSL_UNKNOWN_FIELD_PRESET` diagnostic when a typoed preset name is referenced inside a registered field-preset namespace. The `data` payload exposes the namespace and full helper path so machine consumers (agents, IDE extensions) don't have to parse the prose.
  */
 export function reportUnknownFieldPreset(input: {
   readonly entityLabel: string;
@@ -292,16 +274,9 @@ export function resolvePslTypeConstructorDescriptor(input: {
 }
 
 /**
- * Instantiates a field-preset call against its descriptor, coercing PSL AST
- * arguments into the descriptor's typed argument shape and returning the
- * preset's full set of contract contributions.
+ * Instantiates a field-preset call against its descriptor, coercing PSL AST arguments into the descriptor's typed argument shape and returning the preset's full set of contract contributions.
  *
- * Symmetric with `instantiatePslTypeConstructor` but richer: a field preset
- * can contribute `default`, `executionDefaults`, `id`, `unique`, and
- * `nullable` in addition to the storage-type triple. PSL → typed-args
- * coercion happens here (via `mapPslHelperArgs`) so that
- * `instantiateAuthoringFieldPreset` itself stays typed-input-only and TS
- * keeps its zero-runtime-validation cost.
+ * Symmetric with `instantiatePslTypeConstructor` but richer: a field preset can contribute `default`, `executionDefaults`, `id`, `unique`, and `nullable` in addition to the storage-type triple. PSL → typed-args coercion happens here (via `mapPslHelperArgs`) so that `instantiateAuthoringFieldPreset` itself stays typed-input-only and TS keeps its zero-runtime-validation cost.
  */
 export function instantiatePslFieldPreset(input: {
   readonly call: PslTypeConstructorCall;
@@ -365,10 +340,7 @@ export function instantiatePslFieldPreset(input: {
 }
 
 /**
- * Contract contributions a field preset adds beyond the bare storage-type
- * triple. Set when a field is resolved through the field-preset dispatch
- * path; absent when resolved through the type-constructor path or as a
- * scalar/enum/named-type lookup.
+ * Contract contributions a field preset adds beyond the bare storage-type triple. Set when a field is resolved through the field-preset dispatch path; absent when resolved through the type-constructor path or as a scalar/enum/named-type lookup.
  */
 export type FieldPresetContributions = {
   readonly nullable: boolean;
@@ -400,9 +372,7 @@ export function resolveFieldTypeDescriptor(input: {
   readonly entityLabel: string;
 }): ResolveFieldTypeResult {
   if (input.field.typeConstructor) {
-    // Field presets carry richer semantics than type constructors, so a field
-    // preset match is the complete answer. Shared composition rejects exact
-    // cross-registry collisions before PSL resolution can observe them.
+    // Field presets carry richer semantics than type constructors, so a field preset match is the complete answer. Shared composition rejects exact cross-registry collisions before PSL resolution can observe them.
     const presetDescriptor = getAuthoringFieldPreset(
       input.authoringContributions,
       input.field.typeConstructor.path,
@@ -778,11 +748,7 @@ export function lowerDefaultForField(input: {
     return {};
   }
 
-  // Preset-only generators (e.g. `timestampNow`) co-register their codec
-  // through the preset descriptor, so they don't carry an
-  // `applicableCodecIds` list. Such a generator surfacing on the
-  // `@default(...)` lowering path is itself the bug — emit a diagnostic
-  // pointing the user at the correct authoring surface.
+  // Preset-only generators (e.g. `timestampNow`) co-register their codec through the preset descriptor, so they don't carry an `applicableCodecIds` list. Such a generator surfacing on the `@default(...)` lowering path is itself the bug — emit a diagnostic pointing the user at the correct authoring surface.
   if (generatorDescriptor.applicableCodecIds === undefined) {
     input.diagnostics.push({
       code: 'PSL_INVALID_DEFAULT_APPLICABILITY',

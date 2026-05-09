@@ -13,17 +13,9 @@ export type {
 } from '@prisma-next/framework-components/codec';
 
 /**
- * SQL-family addressing of a single column. The decode site populates a
- * `SqlColumnRef` whenever it can resolve the cell to a single underlying
- * `(table, column)` (the typical case for projected columns from a
- * single-table source); cells the runtime cannot resolve (aggregate
- * aliases, include aggregate fields, computed projections without a
- * simple ref) get `column = undefined`.
+ * SQL-family addressing of a single column. The decode site populates a `SqlColumnRef` whenever it can resolve the cell to a single underlying `(table, column)` (the typical case for projected columns from a single-table source); cells the runtime cannot resolve (aggregate aliases, include aggregate fields, computed projections without a simple ref) get `column = undefined`.
  *
- * The shape is a structural projection of the runtime's `ColumnRef` so
- * the SQL decode site can reuse the resolution it already performs for
- * `RUNTIME.DECODE_FAILED` envelope construction without allocating
- * twice per cell.
+ * The shape is a structural projection of the runtime's `ColumnRef` so the SQL decode site can reuse the resolution it already performs for `RUNTIME.DECODE_FAILED` envelope construction without allocating twice per cell.
  */
 export interface SqlColumnRef {
   readonly table: string;
@@ -31,49 +23,29 @@ export interface SqlColumnRef {
 }
 
 /**
- * SQL-family per-call context. Extends the framework {@link CodecCallContext}
- * (which carries `signal` only) with `column?: SqlColumnRef`, populated
- * on **decode** call sites that can resolve a single underlying column
- * ref. Encode call sites currently leave `column` undefined (encode-time
- * column context is the middleware's domain).
+ * SQL-family per-call context. Extends the framework {@link CodecCallContext} (which carries `signal` only) with `column?: SqlColumnRef`, populated on **decode** call sites that can resolve a single underlying column ref. Encode call sites currently leave `column` undefined (encode-time column context is the middleware's domain).
  *
- * SQL codec authors writing codec methods observe this type
- * via {@link SqlCodec}. The framework codec dispatch surface (and Mongo)
- * sees only the base `CodecCallContext`.
+ * SQL codec authors writing codec methods observe this type via {@link SqlCodec}. The framework codec dispatch surface (and Mongo) sees only the base `CodecCallContext`.
  */
 export interface SqlCodecCallContext extends CodecCallContext {
   readonly column?: SqlColumnRef;
 }
 
 /**
- * SQL-family per-instance context. Extends the framework
- * {@link CodecInstanceContext} (`name` only) with `usedAt`, the set of
- * `(table, column)` pairs the resolved codec serves.
+ * SQL-family per-instance context. Extends the framework {@link CodecInstanceContext} (`name` only) with `usedAt`, the set of `(table, column)` pairs the resolved codec serves.
  *
- * - For `typeRef` columns sharing one named `storage.types` instance, the
- *   array lists every referencing column — a column-scoped stateful codec
- *   (e.g. encryption) can derive aggregated per-instance state across all
- *   the columns sharing the named instance.
- * - For inline-`typeParams` columns, the array has exactly one entry —
- *   the column that owns the inline params.
- * - For shared non-parameterized codecs, the array carries one
- *   representative entry (the column that triggered materialization);
- *   the codec is shared across every column with that codec id, so the
- *   `usedAt` is informational only.
+ * - For `typeRef` columns sharing one named `storage.types` instance, the array lists every referencing column — a column-scoped stateful codec (e.g. encryption) can derive aggregated per-instance state across all the columns sharing the named instance.
+ * - For inline-`typeParams` columns, the array has exactly one entry — the column that owns the inline params.
+ * - For shared non-parameterized codecs, the array carries one representative entry (the column that triggered materialization); the codec is shared across every column with that codec id, so the `usedAt` is informational only.
  *
- * SQL extensions consuming `usedAt` (e.g. column-scoped state derivation)
- * type their factory parameter as `SqlCodecInstanceContext`. Extensions
- * that don't read `usedAt` type their factory parameter as the
- * family-agnostic {@link CodecInstanceContext} — a `SqlCodecInstanceContext`
- * is structurally assignable to the base.
+ * SQL extensions consuming `usedAt` (e.g. column-scoped state derivation) type their factory parameter as `SqlCodecInstanceContext`. Extensions that don't read `usedAt` type their factory parameter as the family-agnostic {@link CodecInstanceContext} — a `SqlCodecInstanceContext` is structurally assignable to the base.
  */
 export interface SqlCodecInstanceContext extends CodecInstanceContext {
   readonly usedAt: ReadonlyArray<{ readonly table: string; readonly column: string }>;
 }
 
 /**
- * Codec metadata for database-specific type information.
- * Used for schema introspection and verification.
+ * Codec metadata for database-specific type information. Used for schema introspection and verification.
  */
 export interface CodecMeta {
   readonly db?: {
@@ -86,20 +58,11 @@ export interface CodecMeta {
 }
 
 /**
- * SQL codec — extends the framework codec base by narrowing the per-
- * call context to the SQL-family {@link SqlCodecCallContext} (adds
- * `column?: SqlColumnRef`). TypeScript treats method-syntax
- * declarations bivariantly, so the SQL narrowing is structurally
- * compatible with the framework {@link BaseCodec} super-interface.
+ * SQL codec — extends the framework codec base by narrowing the per-call context to the SQL-family {@link SqlCodecCallContext} (adds `column?: SqlColumnRef`). TypeScript treats method-syntax declarations bivariantly, so the SQL narrowing is structurally compatible with the framework {@link BaseCodec} super-interface.
  *
- * Codec-id-keyed static metadata (`traits`, `targetTypes`, `meta`,
- * `paramsSchema`, `renderOutputType`) lives on the unified
- * {@link import('@prisma-next/framework-components/codec').CodecDescriptor}
- * — the codec instance itself only carries `id` plus the four
- * conversion methods.
+ * Codec-id-keyed static metadata (`traits`, `targetTypes`, `meta`, `paramsSchema`, `renderOutputType`) lives on the unified {@link import('@prisma-next/framework-components/codec').CodecDescriptor} — the codec instance itself only carries `id` plus the four conversion methods.
  *
- * See `Codec` in `@prisma-next/framework-components/codec` for the codec
- * contract that this interface extends.
+ * See `Codec` in `@prisma-next/framework-components/codec` for the codec contract that this interface extends.
  */
 export interface Codec<
   Id extends string = string,
@@ -114,50 +77,27 @@ export interface Codec<
 /**
  * Contract-bound codec registry.
  *
- * The dispatch interface for encode/decode at runtime: built once at
- * `ExecutionContext` construction time by walking the contract's
- * `storage.tables[].columns[]` and resolving each column through its
- * descriptor's factory (per-instance for parameterized columns; the
- * cached shared codec for non-parameterized columns). The dispatch
- * path calls `forColumn(table, column).encode/decode(...)` and doesn't
- * know whether the codec is parameterized.
+ * The dispatch interface for encode/decode at runtime: built once at `ExecutionContext` construction time by walking the contract's `storage.tables[].columns[]` and resolving each column through its descriptor's factory (per-instance for parameterized columns; the cached shared codec for non-parameterized columns). The dispatch path calls `forColumn(table, column).encode/decode(...)` and doesn't know whether the codec
+ * is parameterized.
  *
- * `forCodecId(codecId)` is the refs-less fallback. Every column-bound
- * `ParamRef` carries `refs: { table; column }` and the builder-pipeline
- * `validateParamRefRefs` pass enforces refs on every parameterized
- * `ParamRef` before encode runs, so this fallback is only reached for
- * non-parameterized codec ids.
+ * `forCodecId(codecId)` is the refs-less fallback. Every column-bound `ParamRef` carries `refs: { table; column }` and the builder-pipeline `validateParamRefRefs` pass enforces refs on every parameterized `ParamRef` before encode runs, so this fallback is only reached for non-parameterized codec ids.
  */
 export interface ContractCodecRegistry {
   /**
-   * Resolve the codec for `(table, column)`. Returns the per-instance
-   * parameterized codec for parameterized columns, the shared codec for
-   * non-parameterized columns, or `undefined` if the column is unknown
-   * or the codec isn't registered.
+   * Resolve the codec for `(table, column)`. Returns the per-instance parameterized codec for parameterized columns, the shared codec for non-parameterized columns, or `undefined` if the column is unknown or the codec isn't registered.
    */
   forColumn(table: string, column: string): Codec | undefined;
 
   /**
-   * Resolve a codec by id. For non-parameterized codecs this returns
-   * the canonical shared instance materialized once at context
-   * construction; for parameterized codecs it returns the column-
-   * resolved instance when a single column declares the codec id, or
-   * the `factory(undefined)` representative when the descriptor's
-   * factory is parameter-tolerant. Used by refs-less call sites;
-   * the validator pass guarantees the call site's `codecId` is
-   * non-parameterized (or parameter-tolerant) at this boundary.
+   * Resolve a codec by id. For non-parameterized codecs this returns the canonical shared instance materialized once at context construction; for parameterized codecs it returns the column-resolved instance when a single column declares the codec id, or the `factory(undefined)` representative when the descriptor's factory is parameter-tolerant. Used by refs-less call sites; the validator pass guarantees the call site's
+   * `codecId` is non-parameterized (or parameter-tolerant) at this boundary.
    */
   forCodecId(codecId: string): Codec | undefined;
 }
 
 /**
- * Variance-erased descriptor type used for heterogeneous storage in
- * collection containers and on the unified contributor `codecs:` slot.
- * The descriptor's `factory` and `renderOutputType` are contravariant
- * in `P`, so descriptors with different params shapes are not in a
- * subtype relationship; collecting them into one container needs an
- * explicit variance erasure rather than `CodecDescriptor<unknown>`
- * (which is the narrowest, not the widest, of the family).
+ * Variance-erased descriptor type used for heterogeneous storage in collection containers and on the unified contributor `codecs:` slot. The descriptor's `factory` and `renderOutputType` are contravariant in `P`, so descriptors with different params shapes are not in a subtype relationship; collecting them into one container needs an explicit variance erasure rather than `CodecDescriptor<unknown>` (which is the
+ * narrowest, not the widest, of the family).
  */
 // biome-ignore lint/suspicious/noExplicitAny: descriptor variance erasure — `P` is contravariant on the factory and renderOutputType slots, so heterogeneous descriptor storage cannot use `unknown`.
 export type AnyCodecDescriptor = CodecDescriptor<any>;
@@ -175,15 +115,8 @@ export type DescriptorCodecInput<D> =
 /**
  * Resolve the trait union for a descriptor `D`.
  *
- * Reads `traits` directly off the descriptor — concrete descriptor classes
- * declare `override readonly traits = [...] as const`, which preserves the
- * literal trait tuple at the descriptor type. Reading from the resolved
- * codec instance (`CodecImpl<…, TTraits, …>`) would lose the literal
- * because `Codec` carries `TTraits` only on its optional phantom slot
- * (`readonly __codecTraits?: TTraits`); codecs
- * extending `CodecImpl` have no required structural site that pins
- * `TTraits`, so a descriptor-keyed extractor reading from the codec
- * instance would widen to the broad `CodecTrait` union.
+ * Reads `traits` directly off the descriptor — concrete descriptor classes declare `override readonly traits = [...] as const`, which preserves the literal trait tuple at the descriptor type. Reading from the resolved codec instance (`CodecImpl<…, TTraits, …>`) would lose the literal because `Codec` carries `TTraits` only on its optional phantom slot (`readonly __codecTraits?: TTraits`); codecs extending `CodecImpl`
+ * have no required structural site that pins `TTraits`, so a descriptor-keyed extractor reading from the codec instance would widen to the broad `CodecTrait` union.
  */
 export type DescriptorCodecTraits<D> = D extends {
   readonly traits: infer TTraits extends readonly CodecTrait[];
@@ -192,13 +125,9 @@ export type DescriptorCodecTraits<D> = D extends {
   : never;
 
 /**
- * Project a record of {@link AnyCodecDescriptor}s keyed by scalar name
- * onto the codec-id-keyed `CodecTypes` shape consumed by emit and no-
- * emit type pipelines (`{ readonly [codecId]: { input; output; traits } }`).
+ * Project a record of {@link AnyCodecDescriptor}s keyed by scalar name onto the codec-id-keyed `CodecTypes` shape consumed by emit and no-emit type pipelines (`{ readonly [codecId]: { input; output; traits } }`).
  *
- * Canonical extractor for the descriptor-keyed type pipeline; the
- * legacy instance-keyed extractor and its `mkCodec`-bound builder
- * retired alongside the carrier deletion.
+ * Canonical extractor for the descriptor-keyed type pipeline; the legacy instance-keyed extractor and its `mkCodec`-bound builder retired alongside the carrier deletion.
  */
 export type ExtractCodecTypes<
   ScalarNames extends {

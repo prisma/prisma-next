@@ -61,8 +61,7 @@ describe('createModelAccessor', () => {
             },
           },
           isParameterized: false,
-          // The trait-gating tests don't materialize codecs; the
-          // factory is shape-only and never invoked.
+          // The trait-gating tests don't materialize codecs; the factory is shape-only and never invoked.
           factory: () => () => {
             throw new Error('test descriptor factory not exercised');
           },
@@ -120,8 +119,7 @@ describe('createModelAccessor', () => {
       string,
       unknown
     >;
-    // Non-predicate return → ComparisonMethods wrapper; the underlying AST is
-    // behind the comparison methods. Invoke a comparison to observe it.
+    // Non-predicate return → ComparisonMethods wrapper; the underlying AST is behind the comparison methods. Invoke a comparison to observe it.
     const gt = (result['gt'] as (value: number) => BinaryExpr)(0.5);
     expect(gt).toBeInstanceOf(BinaryExpr);
     const opExpr = gt.left as OperationExpr;
@@ -134,10 +132,7 @@ describe('createModelAccessor', () => {
   });
 
   it('cosineDistance accepts another vector column and produces a ColumnRef on arg0 (cross-column composition)', () => {
-    // Cross-column composition: the second argument is another column handle
-    // (an Expression with buildAst → ColumnRef), not a raw JS value.
-    // The factory must detect it as an Expression and emit a ColumnRef, not a
-    // ParamRef wrapping the accessor object.
+    // Cross-column composition: the second argument is another column handle (an Expression with buildAst → ColumnRef), not a raw JS value. The factory must detect it as an Expression and emit a ColumnRef, not a ParamRef wrapping the accessor object.
     const post = createModelAccessor(context, 'Post');
     const otherPost = createModelAccessor(context, 'Post');
 
@@ -245,14 +240,12 @@ describe('createModelAccessor', () => {
     const user = createModelAccessor(context, 'User');
     expect((user as Record<PropertyKey, unknown>)[Symbol.iterator]).toBeUndefined();
 
-    // Unknown fields in a shorthand predicate are surfaced loudly — silent
-    // skip would drop user intent (a typo'd filter would match every row).
+    // Unknown fields in a shorthand predicate are surfaced loudly — silent skip would drop user intent (a typo'd filter would match every row).
     expect(() => user['posts']!.some({ unknown: 'value' })).toThrow(
       /Shorthand filter on "Post\.unknown": field is not defined on the model/,
     );
 
-    // Undefined values are skipped before the field lookup, so a shorthand
-    // with an unknown field and undefined value is a no-op.
+    // Undefined values are skipped before the field lookup, so a shorthand with an unknown field and undefined value is a no-op.
     const someUndefined = user['posts']!.some({ unknown: undefined }) as ExistsExpr;
     expect(someUndefined.subquery.where).toEqual(
       BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
@@ -395,11 +388,7 @@ describe('createModelAccessor', () => {
       },
     };
 
-    // Contract claims the User model lives in `users_storage`, but
-    // storage.tables has no entry for it. The Proxy returns undefined for
-    // fields whose column cannot be resolved, matching plain JS object
-    // semantics. Downstream consumers (or TypeScript at compile time) are
-    // responsible for noticing the missing column.
+    // Contract claims the User model lives in `users_storage`, but storage.tables has no entry for it. The Proxy returns undefined for fields whose column cannot be resolved, matching plain JS object semantics. Downstream consumers (or TypeScript at compile time) are responsible for noticing the missing column.
     const accessor = createModelAccessor(
       { ...context, contract: storageFallbackContract } as never,
       'User',

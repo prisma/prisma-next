@@ -4,14 +4,8 @@ import type { Scope, ScopeTable } from '../scope';
 import { ExpressionImpl } from './expression-impl';
 
 /**
- * For a top-level field name, find the namespace (table alias) that
- * contributed it. When exactly one namespace owns the field, the
- * top-level binding is unambiguously column-bound and we record that
- * `(table, column)` pair on the `ExpressionImpl` so encode-side dispatch
- * (`forColumn`) and the `validateParamRefRefs` pass can find it. The AST
- * stays as `IdentifierRef` to preserve SQL rendering — adapters render
- * top-level identifiers without an explicit table qualifier — so this
- * change is metadata-only and produces no SQL drift.
+ * For a top-level field name, find the namespace (table alias) that contributed it. When exactly one namespace owns the field, the top-level binding is unambiguously column-bound and we record that `(table, column)` pair on the `ExpressionImpl` so encode-side dispatch (`forColumn`) and the `validateParamRefRefs` pass can find it. The AST stays as `IdentifierRef` to preserve SQL rendering — adapters render top-level
+ * identifiers without an explicit table qualifier — so this change is metadata-only and produces no SQL drift.
  */
 function findUniqueNamespaceFor(scope: Scope, fieldName: string): string | undefined {
   let found: string | undefined;

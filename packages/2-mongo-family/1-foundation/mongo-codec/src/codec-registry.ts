@@ -9,9 +9,7 @@ export interface MongoCodecRegistry {
 }
 
 /**
- * Create a new Mongo codec registry. Inline object literal — no class
- * implementation; the registry is just a private `Map` with the
- * documented surface methods.
+ * Create a new Mongo codec registry. Inline object literal — no class implementation; the registry is just a private `Map` with the documented surface methods.
  */
 export function newMongoCodecRegistry(): MongoCodecRegistry {
   const byId = new Map<string, MongoCodec<string>>();

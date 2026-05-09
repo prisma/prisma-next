@@ -53,9 +53,7 @@ function createTestMutationDefaultGenerators() {
 }
 
 /**
- * Executes a plan and collects all results into an array.
- * This helper DRYs up the common pattern of executing plans in tests.
- * The return type is inferred from the plan's type parameter.
+ * Executes a plan and collects all results into an array. This helper DRYs up the common pattern of executing plans in tests. The return type is inferred from the plan's type parameter.
  */
 export async function executePlanAndCollect<
   P extends SqlExecutionPlan<ResultType<P>> | SqlQueryPlan<ResultType<P>>,
@@ -65,8 +63,7 @@ export async function executePlanAndCollect<
 }
 
 /**
- * Drains a plan execution, consuming all results without collecting them.
- * Useful for testing side effects without memory overhead.
+ * Drains a plan execution, consuming all results without collecting them. Useful for testing side effects without memory overhead.
  */
 export async function drainPlanExecution(
   runtime: ReturnType<typeof createRuntime>,
@@ -88,8 +85,7 @@ export async function executeStatement(client: Client, statement: SqlStatement):
 }
 
 /**
- * Sets up database schema and data, then writes the contract marker.
- * This helper DRYs up the common pattern of database setup in tests.
+ * Sets up database schema and data, then writes the contract marker. This helper DRYs up the common pattern of database setup in tests.
  */
 export async function setupTestDatabase(
   client: Client,
@@ -113,8 +109,7 @@ export async function setupTestDatabase(
 }
 
 /**
- * Writes a contract marker to the database.
- * This helper DRYs up the common pattern of writing contract markers in tests.
+ * Writes a contract marker to the database. This helper DRYs up the common pattern of writing contract markers in tests.
  */
 export async function writeTestContractMarker(
   client: Client,
@@ -130,17 +125,10 @@ export async function writeTestContractMarker(
 }
 
 /**
- * Creates a test adapter descriptor from a raw adapter.
- * Wraps the adapter in an SqlRuntimeAdapterDescriptor with static contributions
- * derived from the adapter's codec registry.
+ * Creates a test adapter descriptor from a raw adapter. Wraps the adapter in an SqlRuntimeAdapterDescriptor with static contributions derived from the adapter's codec registry.
  */
 /**
- * Build a {@link ContractCodecRegistry} from a codec array for tests
- * that exercise `encodeParam(s)` / `decodeRow` in isolation. The
- * production runtime builds `ContractCodecRegistry` from contract walk
- * + descriptor list and never goes through this helper; tests use it
- * to wire a hand-built codec set into the surface those functions
- * consume in production.
+ * Build a {@link ContractCodecRegistry} from a codec array for tests that exercise `encodeParam(s)` / `decodeRow` in isolation. The production runtime builds `ContractCodecRegistry` from contract walk + descriptor list and never goes through this helper; tests use it to wire a hand-built codec set into the surface those functions consume in production.
  */
 export function buildTestContractCodecs(
   codecs: ReadonlyArray<Codec<string>>,
@@ -156,14 +144,8 @@ export function buildTestContractCodecs(
 }
 
 /**
- * Synthesize `CodecDescriptor`s from a codec array of non-parameterized
- * codec instances. Test-only: the production synthesis bridge was
- * retired under TML-2357. Lets the existing `createTestAdapterDescriptor`
- * pattern keep wrapping a stub `Adapter` (whose `__codecs` slot still
- * exposes the codec set) into the descriptor-list shape that
- * `SqlStaticContributions.codecs:` now expects. The `Codec` instances
- * carry `traits`/`targetTypes`/`meta` via the SQL family extension; the
- * structural narrow reads those fields directly.
+ * Synthesize `CodecDescriptor`s from a codec array of non-parameterized codec instances. Test-only: the production synthesis bridge was retired under TML-2357. Lets the existing `createTestAdapterDescriptor` pattern keep wrapping a stub `Adapter` (whose `__codecs` slot still exposes the codec set) into the descriptor-list shape that `SqlStaticContributions.codecs:` now expects. The `Codec` instances carry
+ * `traits`/`targetTypes`/`meta` via the SQL family extension; the structural narrow reads those fields directly.
  */
 export function descriptorsFromCodecs(
   codecs: ReadonlyArray<Codec<string>>,
@@ -224,11 +206,9 @@ export function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgr
 }
 
 /**
- * Creates an ExecutionContext for testing.
- * This helper DRYs up the common pattern of context creation in tests.
+ * Creates an ExecutionContext for testing. This helper DRYs up the common pattern of context creation in tests.
  *
- * Accepts a raw adapter and optional extension descriptors, wrapping the
- * adapter in a descriptor internally for descriptor-first context creation.
+ * Accepts a raw adapter and optional extension descriptors, wrapping the adapter in a descriptor internally for descriptor-first context creation.
  */
 export function createTestContext<TContract extends Contract<SqlStorage>>(
   contract: TContract,
@@ -267,28 +247,19 @@ export function createTestStackInstance(options?: {
 }
 
 /**
- * Stub-adapter type augments the public {@link Adapter} surface with a
- * `__codecs` slot that exposes the test stub's runtime codec set to
- * descriptor-shaping helpers (`createTestAdapterDescriptor`). Production
- * adapters do not declare this slot — runtime codecs flow through the
- * descriptor list from `SqlRuntimeAdapterDescriptor.codecs()` — so the
- * augmentation is intentionally test-only.
+ * Stub-adapter type augments the public {@link Adapter} surface with a `__codecs` slot that exposes the test stub's runtime codec set to descriptor-shaping helpers (`createTestAdapterDescriptor`). Production adapters do not declare this slot — runtime codecs flow through the descriptor list from `SqlRuntimeAdapterDescriptor.codecs()` — so the augmentation is intentionally test-only.
  */
 export type StubAdapter = Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> & {
   readonly __codecs: ReadonlyArray<Codec<string>>;
 };
 
 /**
- * Creates a stub adapter for testing.
- * This helper DRYs up the common pattern of adapter creation in tests.
+ * Creates a stub adapter for testing. This helper DRYs up the common pattern of adapter creation in tests.
  *
- * The stub adapter includes simple codecs for common test types (pg/int4@1, pg/text@1, pg/timestamptz@1)
- * to enable type inference in tests without requiring the postgres adapter package.
+ * The stub adapter includes simple codecs for common test types (pg/int4@1, pg/text@1, pg/timestamptz@1) to enable type inference in tests without requiring the postgres adapter package.
  */
 export function createStubAdapter(): StubAdapter {
-  // Stub codecs for common test types — match the codec IDs used in
-  // test contracts (pg/int4@1, pg/text@1, pg/timestamptz@1) without
-  // importing from the postgres adapter package.
+  // Stub codecs for common test types — match the codec IDs used in test contracts (pg/int4@1, pg/text@1, pg/timestamptz@1) without importing from the postgres adapter package.
   const codecs: ReadonlyArray<Codec<string>> = [
     defineTestCodec({
       typeId: 'pg/int4@1',
@@ -307,8 +278,7 @@ export function createStubAdapter(): StubAdapter {
       targetTypes: ['timestamptz'],
       encode: (value: Date) => value,
       decode: (wire: Date) => wire,
-      // Date is not assignable to JsonValue, so the JSON round-trip pair
-      // must be supplied explicitly.
+      // Date is not assignable to JsonValue, so the JSON round-trip pair must be supplied explicitly.
       encodeJson: (value: Date) => value.toISOString(),
       decodeJson: (json) => {
         if (typeof json !== 'string') throw new Error('expected ISO date string');

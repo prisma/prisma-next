@@ -37,8 +37,7 @@ test('encode/decode call sites accept an explicit ctx (signal optional inside th
     c.encode(v, ctx);
   const decodeWithCtx = (c: StringCodec, w: string, ctx: CodecCallContext): Promise<string> =>
     c.decode(w, ctx);
-  // An empty ctx is legal — `signal` is the only field today and is optional
-  // inside the context shape.
+  // An empty ctx is legal — `signal` is the only field today and is optional inside the context shape.
   const encodeWithEmptyCtx = (c: StringCodec, v: string): Promise<string> => c.encode(v, {});
   const decodeWithEmptyCtx = (c: StringCodec, w: string): Promise<string> => c.decode(w, {});
   void encodeWithCtx;
@@ -47,9 +46,7 @@ test('encode/decode call sites accept an explicit ctx (signal optional inside th
   void decodeWithEmptyCtx;
 });
 
-// ADR 204 walk-back constraints — pinned here so future refactors cannot
-// reintroduce a `TRuntime` generic, a discriminator field, conditional
-// return types, or other shape complications on the public Codec.
+// ADR 204 walk-back constraints — pinned here so future refactors cannot reintroduce a `TRuntime` generic, a discriminator field, conditional return types, or other shape complications on the public Codec.
 
 test('Codec carries no `runtime` or `kind` discriminator field', () => {
   type CodecKeys = keyof Codec;
@@ -58,8 +55,7 @@ test('Codec carries no `runtime` or `kind` discriminator field', () => {
 });
 
 test('Codec has exactly four type parameters (Id, TTraits, TWire, TInput) — no TRuntime', () => {
-  // If a fifth `TRuntime` generic were added before TWire/TInput, this
-  // call shape would either fail or produce an unrelated codec type.
+  // If a fifth `TRuntime` generic were added before TWire/TInput, this call shape would either fail or produce an unrelated codec type.
   type FourGenericCodec = Codec<'demo/four@1', readonly [], number, string>;
   expectTypeOf<Parameters<FourGenericCodec['encode']>[0]>().toEqualTypeOf<string>();
   expectTypeOf<ReturnType<FourGenericCodec['encode']>>().toExtend<Promise<number>>();

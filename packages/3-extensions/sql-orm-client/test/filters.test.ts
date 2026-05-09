@@ -129,10 +129,7 @@ describe('filters', () => {
   });
 
   it('shorthandToWhereExpr() rejects equality-shorthand on a field without the equality trait', () => {
-    // Drop the descriptor's `traits` to model a codec that doesn't
-    // advertise equality (the descriptor-based trait gate replaces the
-    // legacy `codecs.traitsOf(codecId)` read; both branches — descriptor
-    // present without trait, descriptor missing entirely — must error).
+    // Drop the descriptor's `traits` to model a codec that doesn't advertise equality (the descriptor-based trait gate replaces the legacy `codecs.traitsOf(codecId)` read; both branches — descriptor present without trait, descriptor missing entirely — must error).
     const stubbedContext = {
       ...context,
       codecDescriptors: {
@@ -159,18 +156,14 @@ describe('filters', () => {
   });
 
   it('shorthandToWhereExpr() rejects equality-shorthand on a non-scalar field type', () => {
-    // When `fieldType?.kind !== 'scalar'` (e.g. the field doesn't have a
-    // codec id resolvable from a scalar type), the trait array is empty
-    // and the filter throws — this models a relation-shorthand attempt
-    // through the scalar code path.
+    // When `fieldType?.kind !== 'scalar'` (e.g. the field doesn't have a codec id resolvable from a scalar type), the trait array is empty and the filter throws — this models a relation-shorthand attempt through the scalar code path.
     expect(() => shorthandToWhereExpr(context, 'User', { posts: 'oops' } as never)).toThrow(
       /does not support equality comparisons/,
     );
   });
 
   it('shorthandToWhereExpr() rejects equality-shorthand when no descriptor is registered for the codec', () => {
-    // `descriptorFor` returns `undefined` — the trait array short-
-    // circuits to `[]` and `equality` is missing.
+    // `descriptorFor` returns `undefined` — the trait array short-circuits to `[]` and `equality` is missing.
     const stubbedContext = {
       ...context,
       codecDescriptors: {

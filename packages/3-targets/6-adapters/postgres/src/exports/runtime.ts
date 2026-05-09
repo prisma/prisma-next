@@ -36,13 +36,8 @@ const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', 
     queryOperations: () => postgresQueryOperations(),
     mutationDefaultGenerators: createPostgresMutationDefaultGenerators,
     create(stack): SqlRuntimeAdapter {
-      // The runtime `ExecutionStack` does not (yet) carry a pre-assembled
-      // `codecLookup` field the way the control `ControlStack` does, so we
-      // derive an equivalent lookup here from the stack's component metadata
-      // (target + adapter + extension packs) using the same assembly helper
-      // that `createControlStack` uses. This keeps the renderer fed with the
-      // same codec set on both planes — including extension-contributed
-      // codecs like `pg/vector@1` from `@prisma-next/extension-pgvector`.
+      // The runtime `ExecutionStack` does not (yet) carry a pre-assembled `codecLookup` field the way the control `ControlStack` does, so we derive an equivalent lookup here from the stack's component metadata (target + adapter + extension packs) using the same assembly helper that `createControlStack` uses. This keeps the renderer fed with the same codec set on both planes — including extension-contributed codecs like
+      // `pg/vector@1` from `@prisma-next/extension-pgvector`.
       const codecLookup = extractCodecLookup([
         stack.target,
         stack.adapter,

@@ -1,14 +1,7 @@
 /**
- * Test-only helper that constructs a SQL-family `Codec` instance from
- * author-side encode/decode functions. Replaces the legacy public
- * `mkCodec()` factory (deleted under TML-2357); tests that need a
- * stub codec for behavioural assertions instantiate one through this
- * helper rather than going through `descriptor.factory(...)`.
+ * Test-only helper that constructs a SQL-family `Codec` instance from author-side encode/decode functions. Replaces the legacy public `mkCodec()` factory (deleted under TML-2357); tests that need a stub codec for behavioural assertions instantiate one through this helper rather than going through `descriptor.factory(...)`.
  *
- * The body is identical in spirit to the retired `mkCodec`: promise-lift
- * sync author functions onto the framework-required `Promise<…>`
- * boundary, default `encodeJson`/`decodeJson` to identity when `TInput`
- * is JSON-safe, fail loudly otherwise.
+ * The body is identical in spirit to the retired `mkCodec`: promise-lift sync author functions onto the framework-required `Promise<…>` boundary, default `encodeJson`/`decodeJson` to identity when `TInput` is JSON-safe, fail loudly otherwise.
  */
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecTrait } from '@prisma-next/framework-components/codec';

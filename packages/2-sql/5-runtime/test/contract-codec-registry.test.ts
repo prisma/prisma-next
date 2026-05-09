@@ -16,17 +16,10 @@ import type {
 import { defineTestCodec } from './test-codec';
 import { createStubAdapter, createTestContext } from './utils';
 
-// Phase B of the codec-registry-unification project introduces two
-// runtime registries:
+// Phase B of the codec-registry-unification project introduces two runtime registries:
 //
-// - `ContractCodecRegistry` (`context.contractCodecs`): per-column
-//   resolved-codec dispatch with `forColumn(table, column)` and a codec-
-//   id-keyed fallback `forCodecId(codecId)` (the AC-5-deferred carve-out
-//   for sites without a column ref).
-// - `CodecDescriptorRegistry` (`context.codecDescriptors`): codec-id-
-//   keyed metadata read with `descriptorFor(codecId)` — non-branching for
-//   parameterized vs. non-parameterized codecs (every non-parameterized
-//   codec is auto-lifted into a synthesized `CodecDescriptor<void>`).
+// - `ContractCodecRegistry` (`context.contractCodecs`): per-column resolved-codec dispatch with `forColumn(table, column)` and a codec-id-keyed fallback `forCodecId(codecId)` (the AC-5-deferred carve-out for sites without a column ref).
+// - `CodecDescriptorRegistry` (`context.codecDescriptors`): codec-id-keyed metadata read with `descriptorFor(codecId)` — non-branching for parameterized vs. non-parameterized codecs (every non-parameterized codec is auto-lifted into a synthesized `CodecDescriptor<void>`).
 //
 // See spec § Decision and AC-3, AC-4.
 
@@ -37,15 +30,12 @@ function makeVectorCodec(meta?: Record<string, unknown>): Codec {
     decode: (w: number[]) => w,
   });
   if (!meta) return baseCodec;
-  // The narrow `Codec` shape is conversion-only (TML-2357);
-  // the `meta` sentinel here is test-side bookkeeping that downstream
-  // assertions read off the exact instance handed back by the factory.
+  // The narrow `Codec` shape is conversion-only (TML-2357); the `meta` sentinel here is test-side bookkeeping that downstream assertions read off the exact instance handed back by the factory.
   return { ...baseCodec, meta } as unknown as Codec;
 }
 
 function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgres'> {
-  // The factory returns a per-instance codec whose `meta.length` carries
-  // the parameter — so tests can observe per-instance differentiation.
+  // The factory returns a per-instance codec whose `meta.length` carries the parameter — so tests can observe per-instance differentiation.
   const factory: (params: { length: number }) => (ctx: CodecInstanceContext) => Codec =
     (params) => (_ctx) =>
       makeVectorCodec({ length: params.length });
@@ -83,8 +73,7 @@ function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postg
 }
 
 function createNonParameterizedExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgres'> {
-  // Custom codec id avoids colliding with the default test target
-  // descriptor's pre-registered codecs (`pg/text@1`, etc.).
+  // Custom codec id avoids colliding with the default test target descriptor's pre-registered codecs (`pg/text@1`, etc.).
   const scalarCodec = defineTestCodec({
     typeId: 'test/scalar@1',
     targetTypes: ['scalar'],
@@ -179,9 +168,7 @@ describe('ContractCodecRegistry', () => {
 
     const resolved = context.contractCodecs.forColumn('Doc', 'embedding');
     expect(resolved).toBeDefined();
-    // The per-instance codec carries the column's `length` on its meta —
-    // confirms the dispatch path resolves through `factory(typeParams)
-    // (ctx)`, not the codec-id-keyed fallback.
+    // The per-instance codec carries the column's `length` on its meta — confirms the dispatch path resolves through `factory(typeParams) (ctx)`, not the codec-id-keyed fallback.
     expect((resolved as Codec & { meta: { length: number } }).meta.length).toBe(768);
   });
 
@@ -245,8 +232,7 @@ describe('ContractCodecRegistry', () => {
 
     expect(primaryCodec).toBeDefined();
     expect(secondaryCodec).toBeDefined();
-    // Non-parameterized codec ids share one codec instance across every
-    // column with that id.
+    // Non-parameterized codec ids share one codec instance across every column with that id.
     expect(primaryCodec).toBe(secondaryCodec);
     expect(primaryCodec?.id).toBe('test/scalar@1');
   });
@@ -333,8 +319,7 @@ describe('CodecDescriptorRegistry', () => {
   });
 
   it('descriptorFor reads use the same call shape for parameterized and non-parameterized codec ids', () => {
-    // The defining property of the unified descriptor map: callers don't
-    // need to know whether a codec id is parameterized to read its traits.
+    // The defining property of the unified descriptor map: callers don't need to know whether a codec id is parameterized to read its traits.
     const contract = createTestContract({
       Doc: {
         embedding: {
@@ -360,8 +345,7 @@ describe('CodecDescriptorRegistry', () => {
       context.codecDescriptors.descriptorFor(codecId)?.traits ?? [];
 
     expect(traitsByCodecId('pg/vector@1')).toEqual(['equality']);
-    // Synthesized descriptors carry empty traits if the codec didn't
-    // declare any.
+    // Synthesized descriptors carry empty traits if the codec didn't declare any.
     expect(traitsByCodecId('test/scalar@1')).toEqual([]);
   });
 

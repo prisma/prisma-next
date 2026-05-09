@@ -395,8 +395,7 @@ describe('createRuntime', () => {
 
   it('rejects a Mongo middleware with a clear error', () => {
     const { stackInstance, context, driver } = createTestSetup();
-    // Simulate a caller bypassing the SqlMiddleware type constraint (e.g. dynamically-loaded
-    // middleware). Static typing already rejects familyId: 'mongo'; this tests the runtime guard.
+    // Simulate a caller bypassing the SqlMiddleware type constraint (e.g. dynamically-loaded middleware). Static typing already rejects familyId: 'mongo'; this tests the runtime guard.
     const mongoMiddleware = { name: 'mongo-mw', familyId: 'mongo' } as unknown as SqlMiddleware;
     expect(() =>
       createRuntime({
@@ -735,9 +734,7 @@ describe('withTransaction', () => {
 
     expect(driver.__spies.transactionCommit).toHaveBeenCalledOnce();
     expect(driver.__spies.transactionRollback).toHaveBeenCalledOnce();
-    // A successful rollback after a failed commit means the server is no
-    // longer in a transaction and the connection round-tripped cleanly, so
-    // it is safe to return to the pool rather than evict it.
+    // A successful rollback after a failed commit means the server is no longer in a transaction and the connection round-tripped cleanly, so it is safe to return to the pool rather than evict it.
     expect(driver.__spies.connectionRelease).toHaveBeenCalledOnce();
     expect(driver.__spies.connectionDestroy).not.toHaveBeenCalled();
   });

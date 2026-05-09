@@ -20,9 +20,7 @@ import {
   pgVarcharDescriptor,
 } from '../src/core/codecs';
 
-// `renderOutputType` is a `CodecDescriptor`-side concern after the SQL
-// `Codec` narrow (TML-2357). Tests read the renderer from
-// the descriptor directly.
+// `renderOutputType` is a `CodecDescriptor`-side concern after the SQL `Codec` narrow (TML-2357). Tests read the renderer from the descriptor directly.
 function rendererFor(
   descriptor: AnyCodecDescriptor,
 ): ((typeParams: Record<string, unknown>) => string | undefined) | undefined {
@@ -180,12 +178,7 @@ describe('codec renderOutputType', () => {
     });
   });
 
-  // Phase C: pg/json@1 and pg/jsonb@1 no longer carry renderOutputType.
-  // The schema-typed JSON column surface that drove typeParams.schemaJson
-  // / typeParams.type retired in favor of the per-library extension
-  // (`@prisma-next/extension-arktype-json`). Untyped raw json/jsonb
-  // columns have no typeParams; the framework emit path falls through to
-  // the generic CodecTypes accessor.
+  // Phase C: pg/json@1 and pg/jsonb@1 no longer carry renderOutputType. The schema-typed JSON column surface that drove typeParams.schemaJson / typeParams.type retired in favor of the per-library extension (`@prisma-next/extension-arktype-json`). Untyped raw json/jsonb columns have no typeParams; the framework emit path falls through to the generic CodecTypes accessor.
   describe('pg/jsonb@1', () => {
     it('has no renderOutputType (raw JSONB)', () => {
       expect(rendererFor(pgJsonbDescriptor)).toBeUndefined();

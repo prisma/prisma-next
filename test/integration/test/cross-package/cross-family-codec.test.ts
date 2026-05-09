@@ -6,13 +6,8 @@ import { defineTestCodec } from './test-codec';
 
 // T4.1 — cross-family codec parity proof
 //
-// A single codec instance (constructed via the test-only `defineTestCodec`
-// helper, which mirrors the shape of an author-side codec definition) is used
-// directly on the SQL side and registered in a Mongo `MongoCodecRegistry`.
-// Encoding the same input value through each path must produce identical wire
-// output. For the SQL fixture the same codec also round-trips via `decode`,
-// demonstrating that one codec definition can serve both directional
-// boundaries.
+// A single codec instance (constructed via the test-only `defineTestCodec` helper, which mirrors the shape of an author-side codec definition) is used directly on the SQL side and registered in a Mongo `MongoCodecRegistry`. Encoding the same input value through each path must produce identical wire output. For the SQL fixture the same codec also round-trips via `decode`, demonstrating that one codec definition can
+// serve both directional boundaries.
 
 describe('cross-family codec parity (T4.1)', () => {
   // A single codec instance — used on the SQL side directly and registered in the Mongo registry.

@@ -55,9 +55,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
         sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from _prisma_marker where id = ?',
         params: [1],
       }),
-      // SQLite stores arrays as JSON-encoded TEXT (no native array type),
-      // so the driver returns `invariants` as a string. Decode before
-      // delegating to the shared row schema, which expects `string[]`.
+      // SQLite stores arrays as JSON-encoded TEXT (no native array type), so the driver returns `invariants` as a string. Decode before delegating to the shared row schema, which expects `string[]`.
       parseMarkerRow: (row: unknown) => {
         const raw = row as Record<string, unknown>;
         const invariants =
@@ -77,9 +75,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
 /**
  * Lower a SQL query AST into a SQLite-flavored `{ sql, params }` payload.
  *
- * Shared between the runtime adapter (`SqliteAdapterImpl.lower`) and the
- * control adapter (`SqliteControlAdapter.lower`) so both produce
- * byte-identical SQL for the same AST and contract.
+ * Shared between the runtime adapter (`SqliteAdapterImpl.lower`) and the control adapter (`SqliteControlAdapter.lower`) so both produce byte-identical SQL for the same AST and contract.
  */
 export function renderLoweredSql(
   ast: AnyQueryAst,
@@ -233,8 +229,7 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
   }
 }
 
-// `excluded` is a pseudo-table in ON CONFLICT DO UPDATE that references the
-// row proposed for insertion. It is not quoted because it's a keyword.
+// `excluded` is a pseudo-table in ON CONFLICT DO UPDATE that references the row proposed for insertion. It is not quoted because it's a keyword.
 function renderColumn(ref: ColumnRef): string {
   if (ref.table === 'excluded') {
     return `excluded.${quoteIdentifier(ref.column)}`;

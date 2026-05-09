@@ -221,8 +221,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
       cause: reason,
     });
 
-    // Release the in-flight body so the test can clean up; cooperative
-    // cancellation lets it complete in the background without leaks.
+    // Release the in-flight body so the test can clean up; cooperative cancellation lets it complete in the background without leaks.
     release.resolve('done');
   });
 

@@ -303,11 +303,7 @@ describe('Postgres adapter', () => {
   });
 
   it('contributes parameterized codec descriptors through the unified codecs slot', async () => {
-    // The contributor protocol is unified: every codec descriptor
-    // (parameterized or not) flows through the runtime descriptor's
-    // `codecs:` slot. The adapter class itself no longer carries a
-    // dedicated parameterized-codec accessor — descriptor metadata
-    // lives on the runtime descriptor exported by the package.
+    // The contributor protocol is unified: every codec descriptor (parameterized or not) flows through the runtime descriptor's `codecs:` slot. The adapter class itself no longer carries a dedicated parameterized-codec accessor — descriptor metadata lives on the runtime descriptor exported by the package.
     const runtimeMod = await import('../src/exports/runtime');
     const descriptors = runtimeMod.default.codecs();
     expect(descriptors.length).toBeGreaterThan(0);
@@ -379,15 +375,10 @@ describe('Postgres adapter', () => {
   });
 
   it('renders multi-row DEFAULT VALUES inserts as `(DEFAULT, …), (DEFAULT, …)` over the contract column order', () => {
-    // Phase C deleted the schema-typed JSON tests that incidentally
-    // covered `renderInsert`'s multi-row default-values branch (lines
-    // walking `defaultColumns` and emitting `(DEFAULT, …)` per row).
-    // Pin the multi-row default-values shape here so the function-
-    // coverage % stays above the 95% threshold.
+    // Phase C deleted the schema-typed JSON tests that incidentally covered `renderInsert`'s multi-row default-values branch (lines walking `defaultColumns` and emitting `(DEFAULT, …)` per row). Pin the multi-row default-values shape here so the function-coverage % stays above the 95% threshold.
     const ast = InsertAst.into(TableSource.named('user')).withRows([{}, {}]);
     const sql = adapter.lower(ast, { contract, params: [] }).sql;
-    // Column order matches the contract storage column order; every
-    // value is `DEFAULT` per row.
+    // Column order matches the contract storage column order; every value is `DEFAULT` per row.
     expect(sql).toMatch(/^INSERT INTO "user" \("[^"]+"(, "[^"]+")*\) VALUES /);
     expect(sql).toContain(' VALUES (DEFAULT, ');
     // Two rows of defaults, separated by `, `.
@@ -395,10 +386,7 @@ describe('Postgres adapter', () => {
   });
 
   it('renders BinaryExpr.in over a non-empty ListExpression as `IN ($1, $2, …)`', () => {
-    // The empty-list branch of `renderListLiteral` is covered by the
-    // existing distinct/exists/null-check test. Pin the non-empty list
-    // shape so `.values.map(...)` (param-ref + literal arms) stays
-    // covered after the Phase C test deletions.
+    // The empty-list branch of `renderListLiteral` is covered by the existing distinct/exists/null-check test. Pin the non-empty list shape so `.values.map(...)` (param-ref + literal arms) stays covered after the Phase C test deletions.
     const ast = SelectAst.from(TableSource.named('user'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
       .withWhere(
@@ -416,12 +404,7 @@ describe('Postgres adapter', () => {
   });
 
   it("readMarkerStatement's parseMarkerRow round-trips a contract marker row payload", () => {
-    // `parseMarkerRow` (an arrow on `adapter.profile`) is invoked at
-    // contract-load time by the runtime's startup verify path. A focused
-    // unit test pins the function-coverage entry without needing an
-    // end-to-end Postgres driver — the parser itself lives in
-    // `@prisma-next/sql-runtime` and is fully covered there; we only
-    // need to verify the adapter-side wrapper forwards correctly.
+    // `parseMarkerRow` (an arrow on `adapter.profile`) is invoked at contract-load time by the runtime's startup verify path. A focused unit test pins the function-coverage entry without needing an end-to-end Postgres driver — the parser itself lives in `@prisma-next/sql-runtime` and is fully covered there; we only need to verify the adapter-side wrapper forwards correctly.
     const markerRow = {
       core_hash: 'sha256:test-core',
       profile_hash: 'sha256:test-profile',

@@ -157,9 +157,7 @@ describe('mongoDateCodec', () => {
 });
 
 describe('mongo vector descriptor renderOutputType', () => {
-  // The descriptor list is heterogeneous (`CodecDescriptor` with default
-  // `P = void`); the per-codec `P` for vector is `Record<string, unknown>`
-  // — narrow back here to invoke the renderer with concrete typeParams.
+  // The descriptor list is heterogeneous (`CodecDescriptor` with default `P = void`); the per-codec `P` for vector is `Record<string, unknown>` — narrow back here to invoke the renderer with concrete typeParams.
   const renderVector = mongoDescriptorById(mongoVectorCodec.id)?.renderOutputType as
     | ((typeParams: Record<string, unknown>) => string | undefined)
     | undefined;
@@ -202,8 +200,7 @@ describe('vector operation descriptors (production-defined)', () => {
   });
 
   it('mongoVectorNearOperation.impl returns undefined as a placeholder', () => {
-    // Mongo does not yet lower the vector `near` operation; the impl is a
-    // placeholder so the descriptor satisfies the shared shape.
+    // Mongo does not yet lower the vector `near` operation; the impl is a placeholder so the descriptor satisfies the shared shape.
     expect((mongoVectorNearOperation.impl as () => unknown)()).toBeUndefined();
   });
 

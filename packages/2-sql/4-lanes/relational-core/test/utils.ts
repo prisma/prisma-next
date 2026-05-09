@@ -5,8 +5,7 @@ import type { Adapter, LoweredStatement, SelectAst } from '../src/exports/ast';
 import type { ExecutionContext } from '../src/exports/query-lane-context';
 
 /**
- * Creates a stub adapter for testing.
- * This helper DRYs up the common pattern of adapter creation in tests.
+ * Creates a stub adapter for testing. This helper DRYs up the common pattern of adapter creation in tests.
  */
 export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> {
   return {
@@ -27,9 +26,7 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
 }
 
 /**
- * Creates an ExecutionContext for testing.
- * This helper DRYs up the common pattern of context creation in tests.
- * Note: This creates an ExecutionContext, so it doesn't include an adapter.
+ * Creates an ExecutionContext for testing. This helper DRYs up the common pattern of context creation in tests. Note: This creates an ExecutionContext, so it doesn't include an adapter.
  *
  * @param contract - The SQL contract
  */

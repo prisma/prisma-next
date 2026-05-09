@@ -1,21 +1,13 @@
 /**
  * Type tests for the SQL base codecs (TML-2357).
  *
- * Mirrors the framework-level pattern from
- * `packages/1-framework/1-core/framework-components/test/codec.types.test-d.ts`.
- * Verifies that:
+ * Mirrors the framework-level pattern from `packages/1-framework/1-core/framework-components/test/codec.types.test-d.ts`. Verifies that:
  *
- * - `SqlXDescriptor.factory(...)` preserves the typed return at the
- *   direct call site;
- * - the per-codec column helper threads that typed return through the
- *   `column()` packager into the `ColumnSpec` shape;
- * - `satisfies ColumnHelperFor<SqlXDescriptor>` (and the strict variant
- *   where applicable) ties the helper to its descriptor.
+ * - `SqlXDescriptor.factory(...)` preserves the typed return at the direct call site;
+ * - the per-codec column helper threads that typed return through the `column()` packager into the `ColumnSpec` shape;
+ * - `satisfies ColumnHelperFor<SqlXDescriptor>` (and the strict variant where applicable) ties the helper to its descriptor.
  *
- * Coverage selection: one void-param codec (`text`), one length-param
- * codec (`char`), one precision-param codec (`timestamp`). The framework
- * type tests already exercise the variance discipline at the abstract-
- * class level.
+ * Coverage selection: one void-param codec (`text`), one length-param codec (`char`), one precision-param codec (`timestamp`). The framework type tests already exercise the variance discipline at the abstract-class level.
  */
 
 import {
@@ -40,9 +32,7 @@ import {
   sqlTimestampDescriptor,
 } from '../../src/ast/sql-codecs';
 
-// ---------------------------------------------------------------------------
-// AC-CB-2: literal preservation through direct invocation
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------AC-CB-2: literal preservation through direct invocation ---------------------------------------------------------------------------
 
 test('sqlText: descriptor.factory() returns typed (ctx) => SqlTextCodec', () => {
   const factory = sqlTextDescriptor.factory();
@@ -83,9 +73,7 @@ test('sqlTimestamp: column helper preserves typed codecFactory + precision param
   expectTypeOf(col.typeParams).toEqualTypeOf<{ readonly precision?: number }>();
 });
 
-// ---------------------------------------------------------------------------
-// AC-CB-3: satisfies discipline catches wiring mistakes
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------AC-CB-3: satisfies discipline catches wiring mistakes ---------------------------------------------------------------------------
 
 sqlTextColumn satisfies ColumnHelperFor<SqlTextDescriptor>;
 sqlTextColumn satisfies ColumnHelperForStrict<SqlTextDescriptor>;
@@ -111,11 +99,7 @@ test('coarse satisfies catches wrong typeParams shape on sqlCharColumn', () => {
 });
 
 test('strict satisfies catches wrong codec wired in', () => {
-  // Wire the text descriptor's factory into the char descriptor's slot.
-  // Coarse satisfies passes (`undefined` is the typeParams shape mismatch
-  // — sqlText's params resolve to `undefined` while sqlChar expects
-  // `{ readonly length?: number }`), so this exercises both axes; we
-  // assert the strict failure for the codec mismatch.
+  // Wire the text descriptor's factory into the char descriptor's slot. Coarse satisfies passes (`undefined` is the typeParams shape mismatch — sqlText's params resolve to `undefined` while sqlChar expects `{ readonly length?: number }`), so this exercises both axes; we assert the strict failure for the codec mismatch.
   const wrongCodecHelper = (length: number) =>
     column(sqlTextDescriptor.factory(), sqlCharDescriptor.codecId, { length }, 'char');
   wrongCodecHelper satisfies ColumnHelperFor<SqlCharDescriptor>;

@@ -3,19 +3,14 @@
  *
  * Mirrors `packages/2-sql/4-lanes/relational-core/test/ast/sql-codecs.types.test-d.ts`.
  *
- * Coverage selection per the M0 brief: representative codecs only,
- * since the framework-level type discipline is exercised in Phase A
- * tests at framework-components/test/codec.types.test-d.ts. Per-target
- * coverage focuses on:
+ * Coverage selection per the M0 brief: representative codecs only, since the framework-level type discipline is exercised in Phase A tests at framework-components/test/codec.types.test-d.ts. Per-target coverage focuses on:
  *
  * - one void-param codec (`pgInt4`)
  * - one length-param codec (`pgBit`)
  * - one precision-param codec (`pgTimestamptz`)
  * - one composite-param codec (`pgNumeric` precision + scale)
- * - positive `satisfies ColumnHelperFor` and `ColumnHelperForStrict`
- *   on each
- * - one negative `// @ts-expect-error` for a wrong-shape malformed
- *   helper
+ * - positive `satisfies ColumnHelperFor` and `ColumnHelperForStrict` on each
+ * - one negative `// @ts-expect-error` for a wrong-shape malformed helper
  */
 
 import {
@@ -44,9 +39,7 @@ import {
   pgTimestamptzDescriptor,
 } from '../src/core/codecs';
 
-// ---------------------------------------------------------------------------
-// Literal preservation through direct invocation.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Literal preservation through direct invocation. ---------------------------------------------------------------------------
 
 test('pgInt4: descriptor.factory() returns typed (ctx) => PgInt4Codec', () => {
   const factory = pgInt4Descriptor.factory();
@@ -101,9 +94,7 @@ test('pgNumeric: column helper preserves typed codecFactory + composite params',
   }>();
 });
 
-// ---------------------------------------------------------------------------
-// satisfies discipline catches wiring mistakes.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------satisfies discipline catches wiring mistakes. ---------------------------------------------------------------------------
 
 pgInt4Column satisfies ColumnHelperFor<PgInt4Descriptor>;
 pgInt4Column satisfies ColumnHelperForStrict<PgInt4Descriptor>;

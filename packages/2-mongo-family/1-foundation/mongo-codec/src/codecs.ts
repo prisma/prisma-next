@@ -8,16 +8,9 @@ import type {
 export type MongoCodecTrait = CodecTrait;
 
 /**
- * A codec for the Mongo target. Translates between an application value
- * and the BSON-shaped wire form the Mongo driver exchanges, and between
- * an application value and the JSON form stored in contract artifacts.
+ * A codec for the Mongo target. Translates between an application value and the BSON-shaped wire form the Mongo driver exchanges, and between an application value and the JSON form stored in contract artifacts.
  *
- * Same shape as the framework codec base — see `Codec` in
- * `@prisma-next/framework-components/codec` for the contract. Codec-id-
- * keyed static metadata (`traits`, `targetTypes`, `renderOutputType`)
- * lives on the unified {@link import('@prisma-next/framework-components/codec').CodecDescriptor};
- * Mongo's full migration to descriptor-side registration is tracked
- * under TML-2324.
+ * Same shape as the framework codec base — see `Codec` in `@prisma-next/framework-components/codec` for the contract. Codec-id-keyed static metadata (`traits`, `targetTypes`, `renderOutputType`) lives on the unified {@link import('@prisma-next/framework-components/codec').CodecDescriptor}; Mongo's full migration to descriptor-side registration is tracked under TML-2324.
  */
 export interface MongoCodec<
   Id extends string = string,
@@ -27,11 +20,7 @@ export interface MongoCodec<
 > extends BaseCodec<Id, TTraits, TWire, TInput> {}
 
 /**
- * Conditional bundle for `encodeJson`/`decodeJson`: when `TInput` is
- * structurally assignable to `JsonValue` the identity defaults are
- * sound and both fields are optional; otherwise both fields are
- * required so an author cannot silently produce a non-JSON-safe
- * contract artifact.
+ * Conditional bundle for `encodeJson`/`decodeJson`: when `TInput` is structurally assignable to `JsonValue` the identity defaults are sound and both fields are optional; otherwise both fields are required so an author cannot silently produce a non-JSON-safe contract artifact.
  */
 type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
   ? {
@@ -46,21 +35,11 @@ type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
 /**
  * Construct a Mongo codec from author functions.
  *
- * Author `encode` and `decode` as sync or async functions; the factory
- * produces a {@link MongoCodec} whose query-time methods follow the
- * boundary contract documented on the framework {@link BaseCodec}.
- * Authors receive a second `ctx` options argument carrying the per-call
- * context; ignore it if you don't need it.
+ * Author `encode` and `decode` as sync or async functions; the factory produces a {@link MongoCodec} whose query-time methods follow the boundary contract documented on the framework {@link BaseCodec}. Authors receive a second `ctx` options argument carrying the per-call context; ignore it if you don't need it.
  *
- * Both `encode` and `decode` are required so `TInput` and `TWire` are
- * always covered by an explicit author function — the factory installs
- * no identity fallback. `encodeJson` and `decodeJson` default to identity
- * **only when `TInput` is assignable to `JsonValue`**; otherwise both are
- * required so the contract artifact stays JSON-safe.
+ * Both `encode` and `decode` are required so `TInput` and `TWire` are always covered by an explicit author function — the factory installs no identity fallback. `encodeJson` and `decodeJson` default to identity **only when `TInput` is assignable to `JsonValue`**; otherwise both are required so the contract artifact stays JSON-safe.
  *
- * Codec-id-keyed static metadata (`traits`, `targetTypes`,
- * `renderOutputType`) lives on the unified `CodecDescriptor` rather
- * than on the codec instance itself (TML-2357).
+ * Codec-id-keyed static metadata (`traits`, `targetTypes`, `renderOutputType`) lives on the unified `CodecDescriptor` rather than on the codec instance itself (TML-2357).
  */
 export function mongoCodec<
   Id extends string,
@@ -75,12 +54,7 @@ export function mongoCodec<
   } & JsonRoundTripConfig<TInput>,
 ): MongoCodec<Id, TTraits, TWire, TInput> {
   const identity = (v: unknown) => v;
-  // The runtime allocates one `CodecCallContext` per `runtime.execute()`
-  // call (no caller-supplied `signal` produces `{}` instead of `undefined`)
-  // and threads it as a non-optional reference to every codec call. The
-  // author surface keeps the second parameter optional so single-arg
-  // `(value) => …` authors continue to satisfy the signature via
-  // TypeScript's bivariance for trailing parameters.
+  // The runtime allocates one `CodecCallContext` per `runtime.execute()` call (no caller-supplied `signal` produces `{}` instead of `undefined`) and threads it as a non-optional reference to every codec call. The author surface keeps the second parameter optional so single-arg `(value) => …` authors continue to satisfy the signature via TypeScript's bivariance for trailing parameters.
   const userEncode = config.encode;
   const userDecode = config.decode;
   const widenedConfig = config as {

@@ -27,33 +27,14 @@ const NO_METADATA: ParamMetadata = Object.freeze({
 /**
  * Resolve the codec for an outgoing param.
  *
- * Column-aware dispatch (AC-5): when `metadata.refs` is populated by a
- * column-bound construction site, prefer
- * `contractCodecs.forColumn(refs.table, refs.column)` — that returns
- * the per-instance codec the contract walk materialized for the
- * `(table, column)` pair, encoding the column's typeParams (e.g.
- * `vector(1024)` vs. `vector(1536)`).
+ * Column-aware dispatch (AC-5): when `metadata.refs` is populated by a column-bound construction site, prefer `contractCodecs.forColumn(refs.table, refs.column)` — that returns the per-instance codec the contract walk materialized for the `(table, column)` pair, encoding the column's typeParams (e.g. `vector(1024)` vs. `vector(1536)`).
  *
- * On a column-lookup miss the resolver falls through to `forCodecId`.
- * The wrong-instance risk F22 originally flagged is closed off
- * structurally:
+ * On a column-lookup miss the resolver falls through to `forCodecId`. The wrong-instance risk F22 originally flagged is closed off structurally:
  *
- * 1. `buildContractCodecRegistry` pre-populates `byCodecId` with one
- *    canonical instance per non-parameterized descriptor; parameterized
- *    descriptors are intentionally absent from this pre-population.
- * 2. `forCodecId` rejects ambiguous parameterized fallbacks
- *    (`ambiguousCodecIds`) — if the contract walk resolved more than
- *    one distinct instance under a single parameterized id, the call
- *    throws rather than binding to whichever landed first.
- * 3. For the non-ambiguous parameterized case (a single column with
- *    that id), `byCodecId` stores the column-correct per-instance
- *    codec, so the fall-through still resolves to the right instance.
+ * 1. `buildContractCodecRegistry` pre-populates `byCodecId` with one canonical instance per non-parameterized descriptor; parameterized descriptors are intentionally absent from this pre-population. 2. `forCodecId` rejects ambiguous parameterized fallbacks (`ambiguousCodecIds`) — if the contract walk resolved more than one distinct instance under a single parameterized id, the call throws rather than binding to
+ * whichever landed first. 3. For the non-ambiguous parameterized case (a single column with that id), `byCodecId` stores the column-correct per-instance codec, so the fall-through still resolves to the right instance.
  *
- * Refs-less fallback: ParamRefs constructed outside a column-bound
- * site (literals, transient builder state) carry a non-parameterized
- * `codecId` whose dispatch is ambiguity-free. The validator pass
- * (`validateParamRefRefs`) already enforced refs on every parameterized
- * ParamRef before encode runs.
+ * Refs-less fallback: ParamRefs constructed outside a column-bound site (literals, transient builder state) carry a non-parameterized `codecId` whose dispatch is ambiguity-free. The validator pass (`validateParamRefRefs`) already enforced refs on every parameterized ParamRef before encode runs.
  */
 function resolveParamCodec(
   metadata: ParamMetadata,
@@ -89,18 +70,9 @@ function wrapEncodeFailure(
 }
 
 /**
- * Encodes a single parameter through its codec. Always awaits codec.encode so
- * a Promise can never leak into the driver, even if a sync-authored codec is
- * lifted to async by the codec factory. Failures are wrapped in
- * `RUNTIME.ENCODE_FAILED` with `{ label, codec, paramIndex }` and the original
- * error attached on `cause`.
+ * Encodes a single parameter through its codec. Always awaits codec.encode so a Promise can never leak into the driver, even if a sync-authored codec is lifted to async by the codec factory. Failures are wrapped in `RUNTIME.ENCODE_FAILED` with `{ label, codec, paramIndex }` and the original error attached on `cause`.
  *
- * `ctx` is forwarded verbatim to `codec.encode` so codec authors who opt
- * into the `(value, ctx)` arity see the same `SqlCodecCallContext` the
- * runtime built for the surrounding `runtime.execute()` call. The ctx is
- * always present; its `signal` field may be `undefined`. Encode call
- * sites do not populate `ctx.column` — encode-time column context is the
- * middleware's domain.
+ * `ctx` is forwarded verbatim to `codec.encode` so codec authors who opt into the `(value, ctx)` arity see the same `SqlCodecCallContext` the runtime built for the surrounding `runtime.execute()` call. The ctx is always present; its `signal` field may be `undefined`. Encode call sites do not populate `ctx.column` — encode-time column context is the middleware's domain.
  */
 export async function encodeParam(
   value: unknown,
@@ -146,23 +118,13 @@ async function encodeParamValue(
 }
 
 /**
- * Encodes all parameters concurrently via `Promise.all`. Per parameter, sync-
- * and async-authored codecs share the same path: `codec.encode → await →
- * return`. Param-level failures are wrapped in `RUNTIME.ENCODE_FAILED`.
+ * Encodes all parameters concurrently via `Promise.all`. Per parameter, sync-and async-authored codecs share the same path: `codec.encode → await → return`. Param-level failures are wrapped in `RUNTIME.ENCODE_FAILED`.
  *
  * When `ctx.signal` is provided:
  *
- * - **Already-aborted at entry** short-circuits with `RUNTIME.ABORTED`
- *   (`{ phase: 'encode' }`) before any `codec.encode` call is made — codecs
- *   can pin this with a per-call counter that stays at zero.
- * - **Mid-flight abort** races the per-param `Promise.all` against
- *   `abortable(ctx.signal)`. The runtime returns `RUNTIME.ABORTED` promptly
- *   even if codec bodies ignore the signal; the in-flight bodies are
- *   abandoned and run to completion in the background (cooperative
- *   cancellation, see ADR 204).
- * - Existing `RUNTIME.ENCODE_FAILED` envelopes that surface from a codec
- *   body before the runtime observes the abort pass through unchanged
- *   (no double wrap).
+ * - **Already-aborted at entry** short-circuits with `RUNTIME.ABORTED` (`{ phase: 'encode' }`) before any `codec.encode` call is made — codecs can pin this with a per-call counter that stays at zero.
+ * - **Mid-flight abort** races the per-param `Promise.all` against `abortable(ctx.signal)`. The runtime returns `RUNTIME.ABORTED` promptly even if codec bodies ignore the signal; the in-flight bodies are abandoned and run to completion in the background (cooperative cancellation, see ADR 204).
+ * - Existing `RUNTIME.ENCODE_FAILED` envelopes that surface from a codec body before the runtime observes the abort pass through unchanged (no double wrap).
  */
 export async function encodeParams(
   plan: SqlExecutionPlan,

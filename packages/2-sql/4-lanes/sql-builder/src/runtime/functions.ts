@@ -26,8 +26,7 @@ import type { QueryContext, ScopeField, Subquery } from '../scope';
 import { ExpressionImpl } from './expression-impl';
 
 type CodecTypes = Record<string, { readonly input: unknown }>;
-// Runtime-level ExprOrVal — accepts any codec, any nullability. Concrete codec
-// typing lives on the public BuiltinFunctions surface in `../expression`.
+// Runtime-level ExprOrVal — accepts any codec, any nullability. Concrete codec typing lives on the public BuiltinFunctions surface in `../expression`.
 type ExprOrVal<CodecId extends string = string, N extends boolean = boolean> = CodecExpression<
   CodecId,
   N,
@@ -39,17 +38,10 @@ const BOOL_FIELD: BooleanCodecType = { codecId: 'pg/bool@1', nullable: false };
 const resolve = toExpr;
 
 /**
- * Resolve a binary-comparison operand into an AST expression, threading
- * the column-bound side's `codecId` + `refs` to the raw-value side.
+ * Resolve a binary-comparison operand into an AST expression, threading the column-bound side's `codecId` + `refs` to the raw-value side.
  *
- * For `fns.eq(f.email, 'alice@example.com')`, `f.email` is the column-
- * bound expression carrying a `ColumnRef` AST and a `returnType.codecId`
- * (`pg/varchar@1`); the raw string operand has no codec context. By
- * deriving the codec context from the column-bound side and forwarding
- * it via `toExpr(value, codecId, refs)`, the resulting `ParamRef` carries
- * the column refs that encode-side `forColumn` dispatch needs (and that
- * the validator pass requires for parameterized codec ids like
- * `pg/varchar@1` with a length parameter).
+ * For `fns.eq(f.email, 'alice@example.com')`, `f.email` is the column-bound expression carrying a `ColumnRef` AST and a `returnType.codecId` (`pg/varchar@1`); the raw string operand has no codec context. By deriving the codec context from the column-bound side and forwarding it via `toExpr(value, codecId, refs)`, the resulting `ParamRef` carries the column refs that encode-side `forColumn` dispatch needs (and that the
+ * validator pass requires for parameterized codec ids like `pg/varchar@1` with a length parameter).
  */
 function resolveOperand(
   operand: ExprOrVal,
@@ -81,16 +73,9 @@ function operandRefs(operand: ExprOrVal): { table: string; column: string } | un
 }
 
 /**
- * Resolves an Expression via `buildAst()`, or wraps a raw value as a
- * `LiteralExpr` — an SQL literal inlined into the query text, not a bound
- * parameter.
+ * Resolves an Expression via `buildAst()`, or wraps a raw value as a `LiteralExpr` — an SQL literal inlined into the query text, not a bound parameter.
  *
- * Used for `and` / `or` operands. The usual operand is an `Expression<bool>`
- * (e.g. the result of `fns.eq`), which this function passes through by calling
- * `buildAst()`. The only time the raw-value branch fires is when the caller
- * writes `fns.and(true, x)` or similar — inlining `TRUE`/`FALSE` literals
- * lets the SQL planner statically simplify `TRUE AND x` to `x`, which it
- * cannot do for an opaque `ParamRef`.
+ * Used for `and` / `or` operands. The usual operand is an `Expression<bool>` (e.g. the result of `fns.eq`), which this function passes through by calling `buildAst()`. The only time the raw-value branch fires is when the caller writes `fns.and(true, x)` or similar — inlining `TRUE`/`FALSE` literals lets the SQL planner statically simplify `TRUE AND x` to `x`, which it cannot do for an opaque `ParamRef`.
  */
 function toLiteralExpr(value: unknown): AstExpression {
   if (

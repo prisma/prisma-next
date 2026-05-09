@@ -42,9 +42,7 @@ import {
 import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 import { pgEnumControlHooks } from './enum-control-hooks';
 
-// ============================================================================
-// Helper functions for reducing boilerplate
-// ============================================================================
+// ============================================================================ Helper functions for reducing boilerplate ============================================================================
 
 /** Creates a type import spec for codec types */
 const codecTypeImport = (named: string) =>
@@ -133,9 +131,7 @@ const precisionHooks: CodecControlHooks = { expandNativeType: expandPrecision };
 const numericHooks: CodecControlHooks = { expandNativeType: expandNumeric };
 const identityHooks: CodecControlHooks = { expandNativeType: ({ nativeType }) => nativeType };
 
-// ============================================================================
-// Descriptor metadata
-// ============================================================================
+// ============================================================================ Descriptor metadata ============================================================================
 
 type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
 

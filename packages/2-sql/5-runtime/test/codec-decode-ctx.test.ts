@@ -157,14 +157,11 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     ];
 
     const p = buildPlan([
-      // Aggregate (count) projections are not single-column refs, so the
-      // runtime cannot project a `{ table, name }` for them.
+      // Aggregate (count) projections are not single-column refs, so the runtime cannot project a `{ table, name }` for them.
       ProjectionItem.of('agg', AggregateExpr.count(), 'test/observe-undef@1'),
     ]);
 
-    // Seed the row ctx with a stale `column` to confirm unresolved cells
-    // explicitly clear inherited `column` rather than passing `rowCtx`
-    // through unchanged.
+    // Seed the row ctx with a stale `column` to confirm unresolved cells explicitly clear inherited `column` rather than passing `rowCtx` through unchanged.
     const rowCtx: SqlCodecCallContext = {
       signal: new AbortController().signal,
       column: { table: 'stale', name: 'stale' },
@@ -329,11 +326,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
   });
 
   it('reuses the existing per-cell ColumnRef resolution: the column passed to the codec matches the table/name used by RUNTIME.DECODE_FAILED for the same cell', async () => {
-    // The codec records the column it observes via ctx; the same plan
-    // exercises the failure path by throwing on a different cell. The
-    // observed `ctx.column` for the success cell must match the
-    // `{ table, column }` shape the runtime would have constructed for
-    // the error envelope (proving the resolution is shared, not duplicated).
+    // The codec records the column it observes via ctx; the same plan exercises the failure path by throwing on a different cell. The observed `ctx.column` for the success cell must match the `{ table, column }` shape the runtime would have constructed for the error envelope (proving the resolution is shared, not duplicated).
     const observedColumns: SqlCodecCallContext['column'][] = [];
     const registry = [
       defineTestCodec({
@@ -356,9 +349,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
       buildTestContractCodecs(registry),
     );
 
-    // SqlColumnRef shape `{ table, name }` projected from the ColumnRef
-    // shape `{ table, column }` the resolver returns — same source, one
-    // resolution per cell.
+    // SqlColumnRef shape `{ table, name }` projected from the ColumnRef shape `{ table, column }` the resolver returns — same source, one resolution per cell.
     expect(observedColumns).toEqual([{ table: 'users', name: 'email' }]);
   });
 });

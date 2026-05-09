@@ -306,9 +306,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
       targetTypes: ['text'],
       encode: (v: string) => v,
       decode: async (w: string, ctx?: SqlCodecCallContext) => {
-        // Mimic an SDK that registers an abort listener on the supplied
-        // signal. The runtime threads the same AbortSignal into every codec
-        // call; codec authors who forward it observe true cancellation.
+        // Mimic an SDK that registers an abort listener on the supplied signal. The runtime threads the same AbortSignal into every codec call; codec authors who forward it observe true cancellation.
         await new Promise<string>((_resolve, reject) => {
           if (ctx?.signal) {
             ctx.signal.addEventListener('abort', () => {
@@ -384,10 +382,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
     const reason = new Error('runtime aborted while codec body still running');
     const collector = runtime.execute(plan, { signal: controller.signal }).toArray();
 
-    // Wait until the decode body has actually started (we're now mid-decode);
-    // then abort. The race in raceAgainstAbort surfaces RUNTIME.ABORTED with
-    // phase: 'decode', even though the codec body is still running and does
-    // not honour the signal.
+    // Wait until the decode body has actually started (we're now mid-decode); then abort. The race in raceAgainstAbort surfaces RUNTIME.ABORTED with phase: 'decode', even though the codec body is still running and does not honour the signal.
     await decodeStarted.promise;
     controller.abort(reason);
 

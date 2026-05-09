@@ -1,24 +1,13 @@
 /**
  * Type tests for the arktype-json codec (TML-2357).
  *
- * Spec § Case 3: method-level generic over `S extends Type<unknown>`.
- * Coverage focuses on the literal-preservation property — `S['infer']`
- * flows from the column-author site through `arktypeJsonColumn` into
- * the resolved codec's `TInput` slot. Exercises that:
+ * Spec § Case 3: method-level generic over `S extends Type<unknown>`. Coverage focuses on the literal-preservation property — `S['infer']` flows from the column-author site through `arktypeJsonColumn` into the resolved codec's `TInput` slot. Exercises that:
  *
- * - the helper's return-type `codecFactory` slot carries
- *   `ArktypeJsonCodecClass<S['infer']>`, with the schema's TS-level
- *   inferred shape preserved.
- * - the column spec's `nativeType` is the bare `'jsonb'` literal (per
- *   F5 convention) and `codecId` is `'arktype/json@1'`.
+ * - the helper's return-type `codecFactory` slot carries `ArktypeJsonCodecClass<S['infer']>`, with the schema's TS-level inferred shape preserved.
+ * - the column spec's `nativeType` is the bare `'jsonb'` literal (per F5 convention) and `codecId` is `'arktype/json@1'`.
  * - `ColumnInputType` extraction recovers the schema's inferred shape.
- * - the descriptor's factory returns the erased `ArktypeJsonCodecClass<unknown>`
- *   form (since `S` is unavailable at descriptor-factory time; only the
- *   IR is).
- * - `satisfies ColumnHelperFor<ArktypeJsonDescriptor>` (coarse)
- *   succeeds; `ColumnHelperForStrict` is intentionally not applied
- *   because `Codec` is invariant in `TInput` (see codec-class.ts
- *   comment).
+ * - the descriptor's factory returns the erased `ArktypeJsonCodecClass<unknown>` form (since `S` is unavailable at descriptor-factory time; only the IR is).
+ * - `satisfies ColumnHelperFor<ArktypeJsonDescriptor>` (coarse) succeeds; `ColumnHelperForStrict` is intentionally not applied because `Codec` is invariant in `TInput` (see codec-class.ts comment).
  *
  * Negative tests cover the `ColumnHelperFor` typeParams-shape check.
  */
@@ -41,9 +30,7 @@ import {
   arktypeJsonDescriptor,
 } from '../src/core/arktype-json-codec';
 
-// ---------------------------------------------------------------------------
-// Method-level S generic flows from column-author site through helper.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Method-level S generic flows from column-author site through helper. ---------------------------------------------------------------------------
 
 test('arktypeJsonColumn: schema infer preserved through codecFactory return', () => {
   const ProductSchema = type({ name: 'string', price: 'number' });
@@ -82,11 +69,7 @@ test('ColumnInputType extracts the schema-inferred TS type', () => {
   >().toEqualTypeOf<{ name: string; price: number }>();
 });
 
-// ---------------------------------------------------------------------------
-// Descriptor.factory returns the erased ArktypeJsonCodecClass<unknown> —
-// `S` is only available at the column-author site, not at descriptor-
-// factory time (where only the serialized IR is in scope).
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------Descriptor.factory returns the erased ArktypeJsonCodecClass<unknown> — `S` is only available at the column-author site, not at descriptor-factory time (where only the serialized IR is in scope). ---------------------------------------------------------------------------
 
 test('arktypeJsonDescriptor: factory(params) returns erased ArktypeJsonCodecClass<unknown>', () => {
   const factory = arktypeJsonDescriptor.factory({ expression: 'string', jsonIr: {} });
@@ -95,9 +78,7 @@ test('arktypeJsonDescriptor: factory(params) returns erased ArktypeJsonCodecClas
   >();
 });
 
-// ---------------------------------------------------------------------------
-// satisfies discipline — coarse only (see codec-class.ts comment).
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------satisfies discipline — coarse only (see codec-class.ts comment). ---------------------------------------------------------------------------
 
 arktypeJsonColumn satisfies ColumnHelperFor<ArktypeJsonDescriptor>;
 
@@ -128,11 +109,7 @@ test('coarse satisfies catches wrong typeParams shape on arktypeJsonColumn', () 
   brokenHelper satisfies ColumnHelperFor<ArktypeJsonDescriptor>;
 });
 
-// ---------------------------------------------------------------------------
-// ColumnSpec shape passthrough — confirms the helper's return is a
-// proper ColumnSpec extending the framework's ColumnTypeDescriptor
-// shape.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------ColumnSpec shape passthrough — confirms the helper's return is a proper ColumnSpec extending the framework's ColumnTypeDescriptor shape. ---------------------------------------------------------------------------
 
 test('arktypeJsonColumn: result is ColumnSpec with typed codecFactory', () => {
   const ProductSchema = type({ name: 'string', price: 'number' });

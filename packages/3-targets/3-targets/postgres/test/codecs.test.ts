@@ -76,10 +76,7 @@ type ScalarName = keyof typeof descriptorByScalar;
 
 function codecForScalar(scalar: ScalarName): Codec {
   const descriptor = descriptorByScalar[scalar];
-  // Codec runtime is per-instance-stateless for every codec under test;
-  // pass `undefined as never` so parameterized descriptors (e.g. char,
-  // numeric) accept a missing params record without bypassing the
-  // descriptor's `factory(params)` contract at the type level.
+  // Codec runtime is per-instance-stateless for every codec under test; pass `undefined as never` so parameterized descriptors (e.g. char, numeric) accept a missing params record without bypassing the descriptor's `factory(params)` contract at the type level.
   return descriptor.factory(undefined as never)(SYNTH_CTX);
 }
 
@@ -401,17 +398,14 @@ describe('adapter-postgres codecs', () => {
     });
 
     it('throws on invalid base64 characters in decodeJson', () => {
-      // The bytea codec must reject malformed base64 rather than silently
-      // skipping invalid characters and producing arbitrary bytes — see
-      // https://github.com/prisma/prisma-next/pull/428.
+      // The bytea codec must reject malformed base64 rather than silently skipping invalid characters and producing arbitrary bytes — see https://github.com/prisma/prisma-next/pull/428.
       expect(() => byteaCodec.decodeJson('!!!not base64!!!')).toThrow(
         /Invalid base64 string for pg\/bytea@1/,
       );
     });
 
     it('throws on base64 with stray whitespace in decodeJson', () => {
-      // Whitespace decodes to valid bytes via Buffer.from, but the round-trip
-      // comparison rejects non-canonical input.
+      // Whitespace decodes to valid bytes via Buffer.from, but the round-trip comparison rejects non-canonical input.
       expect(() => byteaCodec.decodeJson('SGVs bG8=')).toThrow(
         /Invalid base64 string for pg\/bytea@1/,
       );
@@ -486,11 +480,7 @@ describe('adapter-postgres codecs', () => {
     it.each(paramsSchemaPresenceCases)('descriptor for $scalar carries a paramsSchema', ({
       scalar,
     }) => {
-      // Descriptors always carry `paramsSchema` (every codec
-      // has one, be it `voidParamsSchema` for non-parameterized codecs
-      // or a codec-specific schema). The parameterization split
-      // remains observable through the descriptor's typed paramsSchema
-      // shape; the runtime presence check below holds for every codec.
+      // Descriptors always carry `paramsSchema` (every codec has one, be it `voidParamsSchema` for non-parameterized codecs or a codec-specific schema). The parameterization split remains observable through the descriptor's typed paramsSchema shape; the runtime presence check below holds for every codec.
       expect(descriptorByScalar[scalar].paramsSchema).toBeDefined();
     });
   });

@@ -1,18 +1,12 @@
 /**
- * Runtime tests for the arktype-json codec (TML-2357).
- * Canonical test suite for arktype-json codec behavior after the
- * legacy `arktypeJson(schema)` form retired.
+ * Runtime tests for the arktype-json codec (TML-2357). Canonical test suite for arktype-json codec behavior after the legacy `arktypeJson(schema)` form retired.
  *
  * Coverage:
  *
- * - the column-author helper produces a working codec whose `id`
- *   proxies through the descriptor's `codecId`.
- * - the descriptor's factory rehydrates the schema and returns a
- *   working codec for runtime materialization paths.
- * - encode/decode round-trip including encodeJson/decodeJson agreement
- *   on the JSON-safe normalized payload.
- * - schema validation rejects malformed payloads at decode and
- *   non-JSON-safe runtime values at encode.
+ * - the column-author helper produces a working codec whose `id` proxies through the descriptor's `codecId`.
+ * - the descriptor's factory rehydrates the schema and returns a working codec for runtime materialization paths.
+ * - encode/decode round-trip including encodeJson/decodeJson agreement on the JSON-safe normalized payload.
+ * - schema validation rejects malformed payloads at decode and non-JSON-safe runtime values at encode.
  */
 
 import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
