@@ -8,15 +8,15 @@ disable-model-invocation: true
 
 A shared library of **personas** — named bias-frames that other skills load to shift the executor's default behaviour for the duration of a task.
 
-> **Status (v1, M1):** scaffold. Resolves the `architect` ID. The full persona library, the `developer`-as-default rule, and the heuristic for admitting v2+ personas land in M2 (see `projects/agent-personas/plan.md § Milestone 2`).
-
 ## What a persona is
 
 A persona is a *who* — the named representative of a coherent set of priorities, responsibilities, and vocabulary cues that frame how a task is executed. A persona is orthogonal to a skill: a **skill** is *what* (the action being performed); a **persona** is *who* is performing it. The same skill executed by two different personas should produce materially different output.
 
-Personas exist because the agent's default behaviour is *competent generic engineering* — unframed, it surfaces the concerns a generalist would surface. That misses lens-specific defects: an architect catches typology and naming defects a generalist sees through; a devrel catches fresh-reader friction a generalist normalises; a PM catches scope drift a generalist absorbs. Loading a persona shifts the default toward that lens for the duration of the task.
+Personas exist because the agent's default behaviour is *competent generic engineering* — unframed, it surfaces the concerns a generalist would surface. That misses lens-specific defects: an architect catches typology and naming defects a generalist sees through; a devrel catches fresh-reader friction a generalist normalises; a PM catches scope drift a generalist absorbs. Loading a persona shifts the executor's default toward that lens for the duration of the task.
 
 A persona is not a runtime contract. It is a *bias-frame* loaded into the executor's context — markdown prose that names an identity, its priorities, what it watches for, and the vocabulary it reaches for and avoids. The shift is whatever shift markdown-loaded-into-context can produce; this is convention, not enforcement (see `AGENTS.md` for the broader convention principle).
+
+**What a persona shifts (honest framing).** A persona shifts the executor's *priorities* and the *bar at which a class of concern is dismissed*. It does not turn the executor into the user during interactive review. The m1 architect-persona A/B test demonstrated a verdict shift (CONCERNS vs SATISFIED on identical evidence) and surfaced typology concerns the unframed run dismissed — but neither pass fully recovered the strongest form of the user's post-implementation finding (which surfaced through interactive iteration, not single-pass review). The library raises the floor of the agent's default scrutiny; it does not replace the human-in-the-loop pass.
 
 ## Resolution rule
 
@@ -28,28 +28,71 @@ The persona doc replaces your default frame:
 - Its **priorities** are what you watch for first.
 - Its **responsibilities** are what you produce or surface.
 - Its **vocabulary cues** are the framings you reach for and avoid.
-- Its **out of scope for this lens** section names what to surface to other personas rather than adjudicate yourself.
+- Its optional **probes**, when present, are concrete questions to fire when their triggers are hit.
+- Its optional **out of scope for this lens** section names what to surface to other personas rather than adjudicate yourself.
 
-Skills name personas **by ID only**, never by file path. The path lives inside this skill so the storage layout can change without rewriting every skill that names a persona.
+Skills name personas **by ID only**, never by file path. The path lives inside this skill so the storage layout can change without rewriting every skill that names a persona. The standard load instruction reads:
 
-## Available personas (v1, M1 scaffold)
+> *"Adopt the `<id>` persona (see the `drive-agent-personas` skill)."*
 
-| ID          | Persona     | Status                                 |
-| ----------- | ----------- | -------------------------------------- |
-| `architect` | Architect   | Available (`personas/architect.md`).   |
+## `developer`-as-default fallback
 
-The remaining six v1 personas (`pm`, `principal-engineer`, `tech-lead`, `developer`, `devrel`, `oss-specialist`) land in M2. Until then, a skill that names one of those IDs will fail to resolve — that is intentional; M1 is the kill-the-project gate that proves the persona-load mechanism shifts behaviour at all before the rest of the library is populated.
+A skill that **omits a persona instruction** executes as the **`developer`** persona. This is the explicit default — undeclared is not absent; undeclared is `developer`. Load `personas/developer.md` to see what that means in practice (competent implementer, fits the codebase, runs the validation gates, surfaces escapees honestly, defers substantive review to elevated personas).
+
+When you author a new skill and intend it to run with the developer baseline, you do not need to name `developer` explicitly — the convention covers you. Naming `developer` explicitly is fine and sometimes clarifying (e.g. in a composite skill that wants to be visibly explicit about which sub-skills run on the default), but never required.
+
+## Available personas (v1)
+
+The v1 library is exactly seven personas. Each one is anchored to a current production surface that needs the bias-shift; speculative personas are deferred (see *Heuristic for admitting v2+ personas* below).
+
+| ID                  | Persona               | When to use                                                                                                                                                                       |
+| ------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `architect`         | Architect             | Naming, typology, system shape, ubiquitous language, bounded contexts, conceptual integrity. Reach for when reviewing renames, type prefixes, layer placement, ADRs.              |
+| `principal-engineer`| Principal engineer    | Buildability, correctness, operability, blast radius, cost vs complexity. Reach for when reviewing designs, code, and runtime concerns.                                           |
+| `pm`                | PM                    | Named user, evidence, outcome over output, scope, sequencing, riskiest assumption, non-goals. Reach for when reviewing plans, specs, and product framings.                        |
+| `tech-lead`         | Tech lead             | Orchestration of multi-persona work; routing reviewers/implementers; surfacing conflicts to humans; packaging output for the right audience. Reach for in composite-skill design. |
+| `developer`         | Developer (default)   | Implementation. The persona that runs when no other is named. Reach for explicitly when authoring an implementer-class skill that wants the binding to be visible.                |
+| `devrel`            | Devrel                | Adopter learnability — docs, glossary, onboarding flow, fresh-reader experience, what the surface teaches. Reach for when reviewing READMEs, JSDoc, examples, public-API names.   |
+| `oss-specialist`    | OSS specialist        | Public-surface stewardship — breaking changes, license / provenance, contribution friction, governance, triage hygiene. Reach for when reviewing CONTRIBUTING, breaking-change PRs, dependency additions, RFCs. |
+
+The persona doc shape every file follows is documented at [`personas/_shape.md`](personas/_shape.md). Read that file before authoring a new persona.
+
+## Composite skills
+
+A **composite skill** is a skill that orchestrates other (atomic) skills. The convention:
+
+1. The composite skill names its **own** persona — typically `tech-lead`, since orchestration is the tech-lead lens. Other orchestrator personas are allowed if a composite genuinely needs one (e.g. a PM-orchestrated discovery composite); skill authors choose.
+2. The composite delegates to atomic single-persona sub-skills, in declared order, on declared artefacts.
+3. Each sub-skill names its **own** persona via its **own** load instruction in its body. Persona is **not** propagated by the orchestrator; every skill is independent on read.
+
+This keeps the persona-skill binding clean (each skill is independently legible), pushes "who runs what when" into composition where conflict-handling and result-merging will eventually live, and makes every skill self-describing on read.
+
+## Heuristic for admitting v2+ personas
+
+Per spec NFR3, the persona library is **pull-driven**: a new persona is authored when a concrete skill needs it. The bar for admission is:
+
+1. **Distinct execution-time priorities and responsibilities.** The candidate persona must have a coherent stance that the existing v1 set does not already cover. *"It would be like the architect but for X"* is not a distinct persona — it's a probe the architect persona should grow.
+2. **Materially different execution output.** Loading the candidate persona on a representative skill should produce output a reader can distinguish from the same skill executed under any v1 persona. If the output is indistinguishable from `developer` or from an existing review-class persona, the candidate isn't earning its keep.
+
+Both conditions must hold. Document a candidate's admission with: a one-paragraph stance preview, the skill that needs it (the *pull*), and (when feasible) a small A/B comparison demonstrating the materially-different-output condition.
+
+## Roles deferred from v1
+
+The following candidate personas were considered for v1 and **not authored**, with the rationale that admitting them speculatively would dilute the library before the heuristic above could be applied:
+
+- **Security.** Real concern, but cross-cuts every other persona's lens (architect cares about security implications of typology; principal-engineer cares about security as a failure mode; oss-specialist cares about license-risk-as-security; PM cares about security-as-user-value). Admit when a skill genuinely needs a security-only lens that the cross-cut can't deliver.
+- **Release manager.** Currently absorbed by `tech-lead` (orchestration of release-class workflows) and `oss-specialist` (release-notes, breaking-change discipline). Admit when a release-management-only skill exists.
+- **QA.** Currently absorbed by `principal-engineer` (test discipline as a buildability concern) and `developer` (running validation gates). Admit when a QA-only skill exists with a stance distinct from those.
+- **Engineering manager.** Absorbed by `tech-lead` for v1. Admit if a workflow surfaces that genuinely needs a people-and-process lens distinct from orchestration.
+
+These are not banned — they are *not yet earned*. When a skill author has a concrete need that the v1 set can't cover, they apply the heuristic and admit the persona.
 
 ## Persona doc shape
 
-Every persona doc under `personas/<id>.md` follows the shape contract documented at `personas/_shape.md`. Read that file before authoring or reviewing a persona.
+Every persona doc under `personas/<id>.md` follows the shape contract documented at [`personas/_shape.md`](personas/_shape.md): four mandatory sections (Stance, Priorities, Responsibilities, Vocabulary cues) plus two optional sections (Out of scope for this lens, Probes) admitted when the persona's role calls for them. Read `_shape.md` before authoring or reviewing a persona.
 
-## What lands in M2 (not yet here)
+## References
 
-The M2 work completes this scaffold:
-
-- The remaining six persona docs (`pm`, `principal-engineer`, `tech-lead`, `developer`, `devrel`, `oss-specialist`).
-- The `developer`-as-default rule for skills that omit a persona instruction.
-- The full convention: how a skill author writes the load instruction, how composite skills declare an orchestrator persona without propagating it to sub-skills, the heuristic for admitting v2+ personas, and which roles are deferred (security, release-manager, QA, EM-absorbed-by-tech-lead).
-
-Until M2 lands, treat this skill as load-bearing for one purpose only: resolving the `architect` ID for the M1 A/B test that gates the rest of the project.
+- [`AGENTS.md`](../../../AGENTS.md) — repo conventions referenced by personas.
+- [`personas/_shape.md`](personas/_shape.md) — the persona doc shape contract.
+- The seven persona docs themselves (`personas/<id>.md`).
