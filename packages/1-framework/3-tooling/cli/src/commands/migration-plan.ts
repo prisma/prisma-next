@@ -72,6 +72,19 @@ export interface MigrationPlanResult {
   readonly from: string | null;
   readonly to: string;
   readonly dir?: string;
+  /**
+   * Extension-space migration packages materialised onto disk during this
+   * `plan` run. Each entry names a `migrations/<spaceId>/<dirName>/`
+   * tree the framework wrote alongside the app-space migration directory.
+   * Empty when the project has no extension packs declaring a contract
+   * space, or when every extension-space package is already on disk.
+   *
+   * Surfacing these in the result (rather than only via `ui.step` log
+   * lines) makes the cross-space side effect explicit to JSON consumers
+   * and the success-summary renderer — the same multi-space side effect
+   * that `migration apply` will replay (M6 AC3).
+   */
+  readonly emittedExtensionDirs: readonly { readonly spaceId: string; readonly dirName: string }[];
   readonly operations: readonly {
     readonly id: string;
     readonly label: string;
@@ -272,6 +285,7 @@ async function executeMigrationPlanCommand(
       from: fromHash,
       to: toStorageHash,
       operations: [],
+      emittedExtensionDirs: extensionMigrationsResult.emitted,
       summary: 'No changes detected between contracts',
       timings: { total: Date.now() - startTime },
     };
@@ -407,6 +421,7 @@ async function executeMigrationPlanCommand(
         to: toStorageHash,
         dir: relative(process.cwd(), packageDir),
         operations: [],
+        emittedExtensionDirs: extensionMigrationsResult.emitted,
         pendingPlaceholders: true,
         summary:
           'Planned migration with placeholder(s) — edit migration.ts then run `node migration.ts` to self-emit',
@@ -429,8 +444,9 @@ async function executeMigrationPlanCommand(
         label: op.label,
         operationClass: op.operationClass,
       })),
+      emittedExtensionDirs: extensionMigrationsResult.emitted,
       ...(preview !== undefined ? { preview } : {}),
-      summary: `Planned ${plannedOps.length} operation(s)`,
+      summary: buildPlanSummary(plannedOps.length, extensionMigrationsResult.emitted.length),
       timings: { total: Date.now() - startTime },
     };
     return ok(result);
@@ -486,6 +502,28 @@ export function createMigrationPlanCommand(): Command {
     });
 
   return command;
+}
+
+/**
+ * Compose the success-line summary so the cross-space side effect
+ * (extension-space migration packages materialised on disk during
+ * this `plan` run) is visible in the top line — not just in the
+ * step log above it.
+ *
+ * Example outputs:
+ *   - `Planned 3 operation(s)` (app-space-only project)
+ *   - `Planned 3 operation(s); materialised 1 extension-space migration` (one extension)
+ *   - `Planned 3 operation(s); materialised 2 extension-space migrations` (two extensions)
+ *
+ * Locks AC3 at the summary-line level: a reader of the success line
+ * can tell that something happened beyond the app space.
+ */
+function buildPlanSummary(plannedOpsCount: number, emittedExtensionDirsCount: number): string {
+  const base = `Planned ${plannedOpsCount} operation(s)`;
+  if (emittedExtensionDirsCount === 0) return base;
+  const noun =
+    emittedExtensionDirsCount === 1 ? 'extension-space migration' : 'extension-space migrations';
+  return `${base}; materialised ${emittedExtensionDirsCount} ${noun}`;
 }
 
 function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFlags): string {
@@ -548,10 +586,22 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
   lines.push(dim_(`from:   ${result.from}`));
   lines.push(dim_(`to:     ${result.to}`));
   if (result.dir) {
-    lines.push(dim_(`dir:    ${result.dir}`));
+    lines.push(dim_(`App space → ${result.dir}`));
+  }
+  // Per-space block: surface the extension-space directories materialised
+  // alongside the app-space migration. Without this block the cross-space
+  // side effect is invisible in the success summary (e2e finding F1).
+  for (const entry of result.emittedExtensionDirs) {
+    lines.push(
+      dim_(`Extension space ${entry.spaceId} → migrations/${entry.spaceId}/${entry.dirName}`),
+    );
   }
 
   lines.push('');
+  // The "Next:" hint always points at the canonical apply path
+  // (`prisma-next migration apply`) regardless of how many spaces
+  // were materialised — `db update` is a dev-time convenience, not
+  // the canonical replay step.
   lines.push(
     `Next: review ${green_(result.dir ?? '<dir>')} if needed, then run ${green_('prisma-next migration apply')}.`,
   );
