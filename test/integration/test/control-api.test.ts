@@ -321,11 +321,8 @@ describe('control-api', () => {
               expect(result1.ok).toBe(true);
 
               // Apply second time - should be idempotent. The per-space
-              // flow achieves idempotency via planner returning an empty
-              // plan + runner being a no-op on empty plans (the legacy
-              // single-space path's marker-matches-destination short-
-              // circuit was deleted in the M2 orchestrator-consolidation
-              // slice).
+              // flow achieves idempotency by the planner returning an
+              // empty plan and the runner being a no-op on empty plans.
               const result2 = await client.dbInit({
                 contract: contractJson,
                 mode: 'apply',

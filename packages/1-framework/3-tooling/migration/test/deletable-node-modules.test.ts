@@ -1,5 +1,5 @@
 /**
- * "Deletable `node_modules`" fixture for AC-15 / TC-26.
+ * "Deletable `node_modules`" fixture (TML-2397).
  *
  * Locks in the property that the per-space verifier and runner **read
  * only the user's repo** — on-disk `contract.json` / `contract.d.ts` /
@@ -8,18 +8,15 @@
  * so the absence of `node_modules` (or any other path that resolves the
  * descriptor) does not affect verify / apply outcomes.
  *
- * Scoped to the framework helpers shipped in this round
+ * Scoped to the framework helpers
  * (`emitContractSpaceArtefacts` + `listContractSpaceDirectories` +
  * `verifyContractSpaces` + `concatenateSpaceApplyInputs`). The test
  * intentionally **does not import** the synthetic
  * `test-contract-space` fixture (today hosted under
  * `test/integration/test/contract-space-fixture/`) — that is the
  * point. The test invents a `'test-contract-space'` space id inline
- * and runs the helpers against on-disk artefacts on disk plus a fake set of
+ * and runs the helpers against on-disk artefacts plus a fake set of
  * marker rows.
- *
- * @see specs/framework-mechanism.spec.md § 4 — Verifier (T1.5).
- * @see projects/extension-contract-spaces/spec.md AC-15 / TC-26.
  */
 
 import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
@@ -179,14 +176,15 @@ describe('per-space verifier + runner against a project with deleted node_module
 });
 
 /**
- * AC15 (M2.5) lock for the loader → verifier path.
+ * Locks the loader → verifier path against the deleted-`node_modules`
+ * scenario (TML-2397).
  *
- * The aggregate refactor (M2.5) makes the loader the single
- * descriptor-import boundary for `db init` / `db update` / `db verify`:
- * once `loadContractSpaceAggregate` returns, the verifier operates
- * purely on the in-memory aggregate. This test exercises that property
- * end-to-end: with `node_modules` deleted, declared extension entries
- * supplied **inline** (the same shape
+ * The aggregate refactor makes the loader the single descriptor-import
+ * boundary for `db init` / `db update` / `db verify`: once
+ * `loadContractSpaceAggregate` returns, the verifier operates purely on
+ * the in-memory aggregate. This test exercises that property end-to-end:
+ * with `node_modules` deleted, declared extension entries supplied
+ * **inline** (the same shape
  * `cli/control-api/utils/contract-space-aggregate-loader` builds from
  * `Config.extensionPacks`), `loadContractSpaceAggregate` followed by
  * `verifyAggregate` succeeds. Planner coverage is owned by the

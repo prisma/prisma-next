@@ -8,16 +8,14 @@ import {
 import { runDbInit, setupDbInitFixture } from './utils/db-init-test-helpers';
 
 /**
- * Integration coverage for the marker-aware contract-space verifier
- * wired into `db init` (sub-spec § 4 / project § "Verifier wiring
- * contract"). Locks the `db init`-level half of:
+ * Integration coverage for the marker-aware contract-space verifier wired
+ * into `db init`. Locks two `db init`-level rejection cases:
  *
- * - **AC-13** — `db init` rejects when an orphan marker row exists in
- *   the database (a marker for a space that's not declared in
- *   `extensionPacks`).
- * - **AC-16** — `db init` rejects when an extension is declared in
- *   `extensionPacks` but no pinned `migrations/<space-id>/` directory
- *   exists on disk yet (`declaredButUnmigrated`).
+ * - `db init` rejects when an orphan marker row exists in the database
+ *   (a marker for a space that is not declared in `extensionPacks`).
+ * - `db init` rejects when an extension is declared in `extensionPacks`
+ *   but no pinned `migrations/<space-id>/` directory exists on disk yet
+ *   (`declaredButUnmigrated`).
  *
  * Mirrors the marker / pinned-dir setup patterns from
  * `packages/1-framework/3-tooling/cli/test/utils/contract-space-verifier-marker-check.test.ts`
