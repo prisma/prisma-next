@@ -3,7 +3,6 @@ import type {
   MigrationOperationPolicy,
   SqlMigrationPlanner,
   SqlMigrationPlannerPlanOptions,
-  SqlMigrationPlanOperation,
   SqlPlannerFailureResult,
 } from '@prisma-next/family-sql/control';
 import {
@@ -21,7 +20,6 @@ import type {
 import { parseSqliteDefault } from '../default-normalizer';
 import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
-import { RawSqlCall } from './op-factory-call';
 import {
   type SqliteMigrationDestinationInfo,
   TypeScriptRenderableSqliteMigration,
@@ -129,16 +127,10 @@ export class SqliteMigrationPlanner
       newContract: options.contract,
       codecHooks,
     });
-    // `extractCodecControlHooks` erases target-details to `unknown`; codec
-    // authors target a specific lane (here, sqlite) and produce ops whose
-    // target-details are `SqlitePlanTargetDetails`-shaped by construction.
-    // The cast re-specializes the type at this trust boundary.
-    const calls = [
-      ...result.value.calls,
-      ...fieldEventOps.map(
-        (op) => new RawSqlCall(op as SqlMigrationPlanOperation<SqlitePlanTargetDetails>),
-      ),
-    ];
+    // Codec-emitted calls already conform to `OpFactoryCall` — render +
+    // toOp + importRequirements ride directly through the same emit path
+    // as structural ops, no `RawSqlCall` wrap.
+    const calls = [...result.value.calls, ...fieldEventOps];
 
     const destination: SqliteMigrationDestinationInfo = {
       storageHash: options.contract.storage.storageHash,

@@ -4,9 +4,9 @@
  * specifier, same overall shape.
  */
 
+import type { OpFactoryCall } from '@prisma-next/framework-components/control';
 import { detectScaffoldRuntime, shebangLineFor } from '@prisma-next/migration-tools/migration-ts';
 import { type ImportRequirement, jsonToTsSource, renderImports } from '@prisma-next/ts-render';
-import type { SqliteOpFactoryCall } from './op-factory-call';
 
 export interface RenderMigrationMeta {
   readonly from: string | null;
@@ -33,7 +33,7 @@ const BASE_IMPORTS: readonly ImportRequirement[] = [
 ];
 
 export function renderCallsToTypeScript(
-  calls: ReadonlyArray<SqliteOpFactoryCall>,
+  calls: ReadonlyArray<OpFactoryCall>,
   meta: RenderMigrationMeta,
 ): string {
   const imports = buildImports(calls);
@@ -57,7 +57,7 @@ export function renderCallsToTypeScript(
   ].join('\n');
 }
 
-function buildImports(calls: ReadonlyArray<SqliteOpFactoryCall>): string {
+function buildImports(calls: ReadonlyArray<OpFactoryCall>): string {
   const requirements: ImportRequirement[] = [...BASE_IMPORTS];
   for (const call of calls) {
     for (const req of call.importRequirements()) {
