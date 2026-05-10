@@ -5,19 +5,23 @@
 
 ## Intent
 
-Packages are organised along three orthogonal axes:
+A SQL-family package tries to import a type from a Mongo-family package. `pnpm lint:deps` refuses: SQL and Mongo are sibling family domains; neither knows about the other; the import would tangle two contexts that the architecture deliberately keeps separate. The fix is either to lift the shared type to the framework domain (where both families can consume it) or to redesign the coupling.
 
-- **Domains:** Framework (target-agnostic) and per-target families (SQL, Document, Mongo, Targets, Extensions).
-- **Layers:** Core → Authoring → Tooling → Lanes → Runtime → Adapters / Drivers — responsibility tiers, expressing dependency direction.
-- **Planes:** Migration vs Runtime (vs Shared) — code in the migration plane must not import runtime-plane code; runtime may consume migration _artifacts_ (JSON manifests), never migration code.
+The pattern: every package lives at known coordinates in a three-axis grid — **Domain × Layer × Plane**. Imports flow downward and outward only, enforced mechanically by `pnpm lint:deps`. The grid encodes a dependency direction so cross-cutting concerns don't accumulate as ad-hoc imports.
 
-Imports flow **downward and outward only**. Cross-axis violations are caught by `pnpm lint:deps`. The catalogue records the structural shape; the canonical mapping and the full rules live in [`Package-Layering.md`](../Package-Layering.md).
+The three axes:
+
+- **Domains** — Framework (target-agnostic), per-family (SQL, Mongo, Document), Targets (Postgres, SQLite, …), Extensions.
+- **Layers** — Core → Authoring → Tooling → Lanes → Runtime → Adapters / Drivers. Lower layers are foundational; higher layers depend downward.
+- **Planes** — Migration vs Runtime (vs Shared). Migration-plane code may not import runtime-plane code; runtime may consume migration _artifacts_ (JSON manifests), never migration code.
+
+The full mapping and per-domain detail live in [`Package-Layering.md`](../Package-Layering.md); this entry pins the **shape** so a contributor can reach for the canonical doc when they need the rules.
 
 ## When to use
 
 - Whenever you create a new package — the directory hierarchy and naming convention pin where it goes.
 - Whenever you add an import — `lint:deps` checks the direction; this pattern is the rationale for what those checks enforce.
-- Whenever you reach for a "shared utilities" package — the layering rules say that shared code lives at a layer at-or-below every consumer; if there is no such layer, the shape is wrong.
+- Whenever you reach for a "shared utilities" package — the layering says shared code lives at a layer at-or-below every consumer; if no such layer exists, the shape is wrong.
 
 ## When NOT to use
 
@@ -50,7 +54,7 @@ The mapping is machine-readable in [`architecture.config.json`](../../../archite
 
 - `depcruise --config dependency-cruiser.config.mjs packages` — the core layering rules.
 - [`scripts/lint-framework-target-imports.mjs`](../../../scripts/lint-framework-target-imports.mjs) — guards the framework / target boundary specifically.
-- [`scripts/lint-app-space-id.mjs`](../../../scripts/lint-app-space-id.mjs) — guards the contract `appSpaceId` constant lives only where it should.
+- [`scripts/lint-app-space-id.mjs`](../../../scripts/lint-app-space-id.mjs) — guards that the contract `appSpaceId` constant lives only where it should.
 
 ## Reference implementations / sources of truth
 
