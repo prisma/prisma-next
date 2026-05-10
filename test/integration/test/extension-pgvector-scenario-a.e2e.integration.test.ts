@@ -22,7 +22,7 @@
  * inlined here with comments tying them to their source-of-truth
  * locations.
  *
- * Drives the CLI per-space `db init` flow (`executePerSpaceDbApply`,
+ * Drives the CLI aggregate `db init` flow (`executeDbInit`,
  * sub-spec § 6) against a real Postgres (PGlite via
  * `createDevDatabase`) with pgvector wired as an extension space and a
  * user `Doc` table that carries a `vector(N)` column. Three layers of
@@ -34,7 +34,7 @@
  *      `installVectorExtension.execute[0].sql` and is serialised
  *      byte-for-byte.
  *
- *   2. **Multi-space planning (real DDL).** `executePerSpaceDbApply`
+ *   2. **Multi-space planning (real DDL).** `executeDbInit`
  *      with `mode: 'plan'` against the real descriptor produces a plan
  *      that includes the pgvector baseline op AND the app-space
  *      `CREATE TABLE Doc` op, ordered first per
@@ -52,12 +52,11 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
-import { executePerSpaceDbApply } from '@prisma-next/cli/control-api';
+import { executeDbInit } from '@prisma-next/cli/control-api';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import pgvectorExtensionDescriptor from '@prisma-next/extension-pgvector/control';
 import sqlFamilyDescriptor, {
-  INIT_ADDITIVE_POLICY,
   type SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import {
@@ -322,7 +321,7 @@ describe.sequential(
     it('mode=plan against the real install op produces a multi-space plan', async () => {
       project = await setupTestProject({ migration: pgvectorBaselineMigration });
 
-      const result = await executePerSpaceDbApply({
+      const result = await executeDbInit({
         driver: driver!,
         familyInstance,
         contract: buildAppContract({ withLength: true }),
@@ -330,9 +329,8 @@ describe.sequential(
         migrations: postgresTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: project.migrationsDir,
-        extensionContractSpaces: [{ id: PGVECTOR_SPACE_ID }],
-        policy: INIT_ADDITIVE_POLICY,
-        action: 'dbInit',
+        targetId: 'postgres',
+        extensionPacks: [pgvectorExtensionDescriptor],
       });
 
       if (!result.ok) {
@@ -356,7 +354,7 @@ describe.sequential(
     it('synthetic vector stub: applies pgvector + app-space atomically; markers + round-trip OK', async () => {
       project = await setupTestProject({ migration: buildSyntheticBaselineMigration() });
 
-      const result = await executePerSpaceDbApply({
+      const result = await executeDbInit({
         driver: driver!,
         familyInstance,
         contract: buildAppContract({ withLength: false }),
@@ -364,9 +362,8 @@ describe.sequential(
         migrations: postgresTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: project.migrationsDir,
-        extensionContractSpaces: [{ id: PGVECTOR_SPACE_ID }],
-        policy: INIT_ADDITIVE_POLICY,
-        action: 'dbInit',
+        targetId: 'postgres',
+        extensionPacks: [pgvectorExtensionDescriptor],
       });
 
       if (!result.ok) {
