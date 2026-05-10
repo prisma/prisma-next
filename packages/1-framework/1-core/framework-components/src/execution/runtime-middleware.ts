@@ -115,7 +115,8 @@ export interface InterceptResult {
  * Extension authors target the family-specific mutator type, not this
  * marker.
  */
-export type ParamRefMutator = {};
+declare const PARAM_REF_MUTATOR_BRAND: unique symbol;
+export type ParamRefMutator = { readonly [PARAM_REF_MUTATOR_BRAND]?: never };
 
 /**
  * Family-agnostic middleware SPI parameterized over the plan marker.
