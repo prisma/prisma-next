@@ -170,6 +170,7 @@ async function executeDbInitCommand(
             },
           }
         : {}),
+      ...ifDefined('perSpace', result.value.perSpace),
       summary: result.value.summary,
       timings: { total: Date.now() - startTime },
     };

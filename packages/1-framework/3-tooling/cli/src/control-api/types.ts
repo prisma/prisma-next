@@ -309,6 +309,42 @@ export interface EmitOptions {
 // ============================================================================
 
 /**
+ * Per-space breakdown of an aggregate plan / apply.
+ *
+ * Surfaces the canonical schedule shape — extensions alphabetically,
+ * then app — together with the operations attributed to each space and,
+ * when the run was applied, the resulting per-space marker hash.
+ *
+ * M6 sub-spec § Output shape contract — every space involved in a run
+ * is observable in the success summary, including its post-apply
+ * marker, so the per-space invariant is visible to the user (closing
+ * F4 / F7 from `e2e-verification.md`).
+ */
+export interface AggregatePerSpaceExecutionEntry {
+  readonly spaceId: string;
+  /** `'app'` for the application's contract space; `'extension'` for any extension space. */
+  readonly kind: 'app' | 'extension';
+  /**
+   * Operations attributed to this space (display ops). In `mode: 'plan'`
+   * this is the planned set; in `mode: 'apply'` it is the same set
+   * (every op was executed in order, the runner does not skip).
+   */
+  readonly operations: ReadonlyArray<{
+    readonly id: string;
+    readonly label: string;
+    readonly operationClass: string;
+  }>;
+  /**
+   * Post-apply marker hash for this space. Present only when the run
+   * was applied (i.e. `mode: 'apply'` and the runner returned ok).
+   * Equals the per-space plan's `destination.storageHash`.
+   */
+  readonly marker?: {
+    readonly storageHash: string;
+  };
+}
+
+/**
  * Successful dbInit result.
  */
 export interface DbInitSuccess {
@@ -340,6 +376,14 @@ export interface DbInitSuccess {
     readonly storageHash: string;
     readonly profileHash?: string;
   };
+  /**
+   * Per-space breakdown in canonical schedule order (extensions
+   * alphabetically, then app). Present whenever the aggregate flow
+   * produced one — both `mode: 'plan'` and `mode: 'apply'`.
+   *
+   * See {@link AggregatePerSpaceExecutionEntry}.
+   */
+  readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
   readonly summary: string;
 }
 
@@ -405,6 +449,11 @@ export interface DbUpdateSuccess {
     readonly storageHash: string;
     readonly profileHash?: string;
   };
+  /**
+   * Per-space breakdown in canonical schedule order (extensions
+   * alphabetically, then app). See {@link AggregatePerSpaceExecutionEntry}.
+   */
+  readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
   readonly summary: string;
 }
 
