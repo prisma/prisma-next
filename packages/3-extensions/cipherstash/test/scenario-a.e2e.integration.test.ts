@@ -1,11 +1,11 @@
 /**
- * Scenario A: end-to-end against PGlite with cipherstash wired as an
- * extension space and the `cipherstash:string@1` codec hook attached to
- * a searchable `Encrypted<String>` column on the application contract.
+ * Scenario A end-to-end against PGlite.
  *
- * Drives the CLI `db init` flow (`executeDbInit`, which routes through
- * the aggregate loader → planner → runner pipeline) against a real
- * Postgres (PGlite via `createDevDatabase`).
+ * Drives the CLI per-space `db init` flow (`executePerSpaceDbApply`)
+ * against a real Postgres (PGlite via `createDevDatabase`) with
+ * cipherstash wired as an extension space and the
+ * `cipherstash:string@1` codec hook attached to a searchable
+ * `Encrypted<String>` column on the application contract.
  *
  * Three layers of coverage:
  *
@@ -14,68 +14,69 @@
  *      `EQL_BUNDLE_SQL` byte-for-byte (single-string `execute[0].sql`).
  *
  *   2. **Multi-space planning (real bundle).** Calling
- *      `executeDbInit` with `mode: 'plan'` on the real cipherstash
- *      descriptor (full vendored bundle) produces a plan that includes:
+ *      `executePerSpaceDbApply` with `mode: 'plan'` on the *real*
+ *      cipherstash descriptor (full vendored bundle) produces a plan
+ *      that includes:
  *
- *        - the cipherstash baseline ops (bundle + structural ops),
+ *        - the cipherstash baseline ops (bundle + structural ops), and
  *        - the app-space `CREATE TABLE User` op, and
  *        - the codec-hook-emitted `add_search_config@v1` op for
  *          `User.email`.
  *
- *      This validates codec hook wiring and that multi-space ordering is
+ *      This locks the codec-hook contract validated by the first real
+ *      consumer plus the planning half of multi-space ordering
  *      preserved through `concatenateSpaceApplyInputs`.
  *
  *   3. **Multi-space apply (synthetic bundle).** Same wiring as test
- *      (2), but with a synthetic cipherstash baseline whose
- *      `installEqlBundle` op SQL is a PGlite-compatible stub instead of
- *      the real vendored bundle. This exercises:
+ *      (2), but with a synthetic cipherstash baseline whose `installEql
+ *      Bundle` op SQL is a PGlite-compatible stub instead of the real
+ *      vendored bundle. This lets us exercise:
  *
  *        - the runner's `executeAcrossSpaces` single-tx path,
  *        - marker rows for both `app` and `cipherstash` spaces,
  *        - the codec-hook-emitted `add_search_config` SQL actually
- *          executing (the stub provides a minimal
+ *          executing (the stub provides a one-line
  *          `eql_v2.add_search_config` function), and
  *        - an insert + select round-trip through the bundle's
  *          `eql_v2_encrypted` composite type.
  *
- *      See {@link buildSyntheticEqlBundleSql} for what the stub includes
- *      and {@link SYNTHETIC_BUNDLE_RATIONALE} for why a stub is needed.
+ *      The synthetic bundle is the smallest stub that lets the codec
+ *      hook's emitted SQL run successfully — see
+ *      {@link buildSyntheticEqlBundleSql} for what it includes (and
+ *      {@link SYNTHETIC_BUNDLE_RATIONALE} for why).
  *
  * **Why split into two apply paths?** The real `EQL_BUNDLE_SQL`
  * includes `CREATE EXTENSION IF NOT EXISTS pgcrypto` which PGlite does
- * not ship (verified by enumerating the bundled contrib extensions).
+ * not ship (verified by enumerating
+ * `node_modules/.pnpm/@electric-sql+pglite@0.3.14/.../contrib/`).
  * Trying to apply the real bundle aborts PGlite at the WASM level
  * (`RuntimeError: unreachable`). The synthetic-bundle apply path here
  * verifies the framework + codec wiring against a real database; the
- * real-bundle apply against a real Postgres (with `pgcrypto`) requires
- * a full e2e environment and is out of scope for this test.
- *
- * Scenario B (drop searchable column → `remove_search_config` op) and
- * Scenario C (extension version bump) require the same full e2e
- * environment and are out of scope for this test.
+ * real-bundle apply against a real Postgres (with `pgcrypto`) is
+ * exercised by the example app's e2e setup.
  */
 
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
-import { executeDbInit } from '@prisma-next/cli/control-api';
+import { executePerSpaceDbApply } from '@prisma-next/cli/control-api';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor, {
+  INIT_ADDITIVE_POLICY,
   type SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
-import {
-  createControlStack,
-  type MigrationPackage,
-} from '@prisma-next/framework-components/control';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
-import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
+import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import cipherstashExtensionDescriptor from '../src/exports/control';
 import {
   CIPHERSTASH_INVARIANTS,
   CIPHERSTASH_SPACE_ID,
@@ -83,18 +84,21 @@ import {
   EQL_V2_CONFIGURATION_TABLE,
   EQL_V2_ENCRYPTED_TYPE,
   EQL_V2_SCHEMA,
-} from '../src/core/constants';
-import { CIPHERSTASH_STORAGE_HASH, cipherstashContract } from '../src/core/contract';
-import { EQL_BUNDLE_SQL } from '../src/core/eql-bundle';
-import { cipherstashBaselineMigration, cipherstashHeadRef } from '../src/core/migrations';
-import cipherstashExtensionDescriptor from '../src/exports/control';
+} from '../src/extension-metadata/constants';
+import { EQL_BUNDLE_SQL } from '../src/migration/eql-bundle';
+
+const cipherstashContractSpace = cipherstashExtensionDescriptor.contractSpace!;
+const cipherstashContract = cipherstashContractSpace.contractJson;
+const cipherstashBaselineMigration = cipherstashContractSpace.migrations[0]!;
+const cipherstashHeadRef = cipherstashContractSpace.headRef;
+const CIPHERSTASH_STORAGE_HASH = cipherstashContract.storage.storageHash;
 
 const APP_CONTRACT_HASH = coreHash('sha256:cipherstash-e2e-app-v1');
 const APP_PROFILE_HASH = profileHash('sha256:cipherstash-e2e-app-profile-v1');
 const APP_TABLE = 'User';
 const APP_FIELD = 'email';
 const ADD_SEARCH_CONFIG_INVARIANT_ID =
-  `cipherstash-codec:${APP_TABLE}.${APP_FIELD}:add-search-config@v1` as const;
+  `cipherstash-codec:${APP_TABLE}.${APP_FIELD}:add-search-config:match@v1` as const;
 
 const appContract: Contract<SqlStorage> = {
   target: 'postgres',
@@ -110,7 +114,7 @@ const appContract: Contract<SqlStorage> = {
             codecId: CIPHERSTASH_STRING_CODEC_ID,
             nativeType: EQL_V2_ENCRYPTED_TYPE,
             nullable: false,
-            typeParams: { searchable: true },
+            typeParams: { freeTextSearch: true },
           },
         },
         primaryKey: { columns: ['id'] },
@@ -150,22 +154,21 @@ const frameworkComponents = [
  * not ship — so an end-to-end apply through PGlite needs a stub that
  * creates only the typed objects + functions the codec hook touches.
  * This keeps the framework / hook wiring under test against a real
- * database while the *real* bundle's apply is exercised in integration
- * tests against a pgcrypto-equipped Postgres.
- *
- * The stub schema must match the contract IR so that applying the
- * synthetic bundle and then verifying against the contract does not
- * produce drift. The contract declares `eql_v2_configuration` as:
- * `id text PRIMARY KEY, state <state_type> NOT NULL, data jsonb NOT NULL`.
+ * database while the *real* bundle's apply is exercised in R4 against a
+ * pgcrypto-equipped Postgres.
  *
  * Includes:
  *   - `eql_v2` schema (for the function namespace)
  *   - `public.eql_v2_encrypted` composite type (so the app's `User.email`
  *     column type resolves)
- *   - `public.eql_v2_configuration` table using the contract-aligned schema
- *   - `eql_v2.add_search_config(table, field, index, cast_as)` — stores
- *     config as a jsonb `data` row so the test can assert the hook ran.
- *   - `eql_v2.remove_search_config(table, field)` — paired drop.
+ *   - `public.eql_v2_configuration` table (so the codec hook's
+ *     `add_search_config` SQL has a row to insert)
+ *   - `eql_v2.add_search_config(table, field, index, cast_as)` —
+ *     SQL-language stub that records the call in
+ *     `eql_v2_configuration` so the test can assert the hook's SQL
+ *     actually ran.
+ *   - `eql_v2.remove_search_config(table, field)` — paired drop, kept
+ *     for symmetry / future Scenario B.
  */
 const SYNTHETIC_BUNDLE_RATIONALE =
   'See block comment above buildSyntheticEqlBundleSql for the rationale.';
@@ -179,27 +182,23 @@ function buildSyntheticEqlBundleSql(): string {
       END IF;
     END $$;`,
     `CREATE TABLE IF NOT EXISTS public."${EQL_V2_CONFIGURATION_TABLE}" (
-      id text PRIMARY KEY,
-      state text NOT NULL,
-      data jsonb NOT NULL
+      id serial PRIMARY KEY,
+      "table" text NOT NULL,
+      "column" text NOT NULL,
+      index_name text NOT NULL,
+      cast_as text NOT NULL
     );`,
     `CREATE OR REPLACE FUNCTION "${EQL_V2_SCHEMA}".add_search_config(
       p_table text, p_column text, p_index text, p_cast_as text
     ) RETURNS void LANGUAGE sql AS $$
-      INSERT INTO public."${EQL_V2_CONFIGURATION_TABLE}" (id, state, data)
-      VALUES (
-        p_table || '.' || p_column,
-        'active',
-        jsonb_build_object('table', p_table, 'column', p_column, 'index_name', p_index, 'cast_as', p_cast_as)
-      )
-      ON CONFLICT (id) DO UPDATE
-        SET state = EXCLUDED.state, data = EXCLUDED.data;
+      INSERT INTO public."${EQL_V2_CONFIGURATION_TABLE}" ("table", "column", index_name, cast_as)
+      VALUES (p_table, p_column, p_index, p_cast_as);
     $$;`,
     `CREATE OR REPLACE FUNCTION "${EQL_V2_SCHEMA}".remove_search_config(
-      p_table text, p_column text
+      p_table text, p_column text, p_index text
     ) RETURNS void LANGUAGE sql AS $$
       DELETE FROM public."${EQL_V2_CONFIGURATION_TABLE}"
-      WHERE id = p_table || '.' || p_column;
+      WHERE "table" = p_table AND "column" = p_column AND index_name = p_index;
     $$;`,
   ].join('\n');
 }
@@ -243,6 +242,7 @@ function buildSyntheticBaselineMigration(): MigrationPackage {
 
   return {
     dirName: cipherstashBaselineMigration.dirName,
+    dirPath: cipherstashBaselineMigration.dirName,
     metadata: {
       ...baseMetadata,
       migrationHash: computeMigrationHash(baseMetadata, syntheticOps),
@@ -264,14 +264,14 @@ async function setupTestProject(args: {
   const migrationsDir = join(projectRoot, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
 
-  await emitContractSpaceArtefacts(migrationsDir, CIPHERSTASH_SPACE_ID, {
+  await emitPinnedSpaceArtefacts(migrationsDir, CIPHERSTASH_SPACE_ID, {
     contract: cipherstashContract,
     contractDts: '// rendered .d.ts for cipherstash contract space\nexport interface Contract {}\n',
     headRef: { hash: cipherstashHeadRef.hash, invariants: [...cipherstashHeadRef.invariants] },
   });
 
   const cipherstashSpaceDir = join(migrationsDir, CIPHERSTASH_SPACE_ID);
-  await materialiseMigrationPackage(cipherstashSpaceDir, args.migration);
+  await writeExtensionMigrationPackage(cipherstashSpaceDir, args.migration);
 
   return {
     projectRoot,
@@ -315,6 +315,11 @@ describe.sequential(
       }
     });
 
+    /**
+     * Byte-equivalence: the bundle SQL flowed through
+     * `installEqlBundleOp.execute[0].sql` and was serialised to the
+     * on-disk `ops.json` byte-for-byte.
+     */
     it('pinned ops.json carries the EQL bundle byte-for-byte', async () => {
       project = await setupTestProject({ migration: cipherstashBaselineMigration });
       const opsPath = join(project.cipherstashBaselineDir, 'ops.json');
@@ -331,18 +336,23 @@ describe.sequential(
     /**
      * Plan-only against the real cipherstash descriptor + bundle.
      *
-     * Runs the planner against the live (empty) database, including the
-     * codec-hook integration, but stops short of applying. Validates:
+     * `executePerSpaceDbApply` runs the planner against the live
+     * (empty) database, including the codec-hook integration through
+     * `extractCodecControlHooks` + `planFieldEventOperations`, but
+     * stops short of applying. This validates:
      *
      *   - the cipherstash codec hook fires for `User.email`, emitting
-     *     a `cipherstash-codec:User.email:add-search-config@v1` op;
+     *     a `cipherstash-codec:User.email:add-search-config:match@v1` op
+     *     (per-flag invariantId shape — see
+     *     {@link ADD_SEARCH_CONFIG_INVARIANT_ID});
      *   - both spaces are present in the plan output, with cipherstash
-     *     ops ordered before app-space ops.
+     *     ops ordered before app-space ops (per
+     *     `concatenateSpaceApplyInputs`).
      */
     it('mode=plan against the real bundle produces a multi-space plan with the codec-hook op', async () => {
       project = await setupTestProject({ migration: cipherstashBaselineMigration });
 
-      const result = await executeDbInit({
+      const result = await executePerSpaceDbApply({
         driver: driver!,
         familyInstance,
         contract: appContract,
@@ -350,8 +360,9 @@ describe.sequential(
         migrations: postgresTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: project.migrationsDir,
-        targetId: 'postgres',
-        extensionPacks: [cipherstashExtensionDescriptor],
+        extensionContractSpaces: [{ id: CIPHERSTASH_SPACE_ID }],
+        policy: INIT_ADDITIVE_POLICY,
+        action: 'dbInit',
       });
 
       if (!result.ok) {
@@ -400,7 +411,7 @@ describe.sequential(
     it('synthetic bundle: applies cipherstash + app-space atomically; markers, hook side-effect, and round-trip all OK', async () => {
       project = await setupTestProject({ migration: buildSyntheticBaselineMigration() });
 
-      const result = await executeDbInit({
+      const result = await executePerSpaceDbApply({
         driver: driver!,
         familyInstance,
         contract: appContract,
@@ -408,8 +419,9 @@ describe.sequential(
         migrations: postgresTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: project.migrationsDir,
-        targetId: 'postgres',
-        extensionPacks: [cipherstashExtensionDescriptor],
+        extensionContractSpaces: [{ id: CIPHERSTASH_SPACE_ID }],
+        policy: INIT_ADDITIVE_POLICY,
+        action: 'dbInit',
       });
 
       if (!result.ok) {
@@ -442,10 +454,9 @@ describe.sequential(
       expect(userTable.rows[0]?.exists).toBe(true);
 
       const configRows = await driver!.query<{ table: string; column: string; index_name: string }>(
-        `select data->>'table' as "table", data->>'column' as "column", data->>'index_name' as index_name
-         from public."${EQL_V2_CONFIGURATION_TABLE}"
-         where id = $1`,
-        [`${APP_TABLE}.${APP_FIELD}`],
+        `select "table", "column", index_name from public."${EQL_V2_CONFIGURATION_TABLE}"
+         where "table" = $1 and "column" = $2`,
+        [APP_TABLE, APP_FIELD],
       );
       expect(configRows.rows.length).toBe(1);
       expect(configRows.rows[0]?.index_name).toBe('match');
