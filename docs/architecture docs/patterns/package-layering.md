@@ -21,7 +21,6 @@ Imports flow **downward and outward only**. Cross-axis violations are caught by 
 
 ## When NOT to use
 
-- **Single-package projects** — the layering pattern is for cross-package boundaries; one package is its own bounded context.
 - **Examples and integration tests** — these are explicitly outside the layering rule (they consume from many layers); the pattern still informs how you reason about their consumption, but it doesn't constrain their imports.
 - **Tooling under `scripts/`** — repo-level scripts are not packages and have no layer; doc-tooling helpers like the catalogue link-checker are the canonical example.
 
