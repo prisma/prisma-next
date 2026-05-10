@@ -273,13 +273,13 @@ describe('formatMigrationApplyOutput', () => {
 
     it('surfaces every per-space marker on apply (AC4)', () => {
       const block = formatPerSpaceBlock(perSpace, 'apply', false).join('\n');
-      expect(block).toContain('marker → sha256:pgvector-head');
-      expect(block).toContain('marker → sha256:app-head');
+      expect(block).toContain('marker: sha256:pgvector-head');
+      expect(block).toContain('marker: sha256:app-head');
     });
 
     it('omits per-space markers in plan mode (no marker yet)', () => {
       const block = formatPerSpaceBlock(perSpace, 'plan', false).join('\n');
-      expect(block).not.toContain('marker →');
+      expect(block).not.toContain('marker:');
     });
 
     it('formatMigrationApplyOutput uses the per-space block in place of the legacy `Signature:` line when perSpace is present', () => {
@@ -295,8 +295,8 @@ describe('formatMigrationApplyOutput', () => {
       expect(stripped).toContain('Applied 2 operation(s) across 2 contract spaces');
       expect(stripped).toContain('Extension space: pgvector');
       expect(stripped).toContain('App space');
-      expect(stripped).toContain('marker → sha256:pgvector-head');
-      expect(stripped).toContain('marker → sha256:app-head');
+      expect(stripped).toContain('marker: sha256:pgvector-head');
+      expect(stripped).toContain('marker: sha256:app-head');
       // Legacy single-line signature must not reappear.
       expect(stripped).not.toContain('Signature:');
       // Next-step hint surfaces the canonical follow-up command (AC6).

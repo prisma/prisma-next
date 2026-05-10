@@ -95,11 +95,33 @@ export interface AggregatePlannerInput<TFamilyId extends string, TTargetId exten
  * - `strategy`: which strategy produced this plan (`'graph-walk'` or
  *   `'synth'`). Surfaced for diagnostics; not consumed by the runner.
  */
+/**
+ * Per-edge metadata for the chain assembled by the graph-walk
+ * strategy. Lets `migration apply` surface a per-migration `applied[]`
+ * entry (preserving the single-space `migrationsApplied` count
+ * semantics) without re-walking the graph.
+ *
+ * `synth`-produced plans leave this absent — synthesised plans don't
+ * have authored edges to surface.
+ */
+export interface AggregateMigrationEdgeRef {
+  readonly migrationHash: string;
+  readonly dirName: string;
+  readonly from: string;
+  readonly to: string;
+  readonly operationCount: number;
+}
+
 export interface AggregatePerSpacePlan {
   readonly plan: MigrationPlan;
   readonly displayOps: readonly MigrationPlanOperation[];
   readonly destinationContract: Contract;
   readonly strategy: 'graph-walk' | 'synth';
+  /**
+   * Per-edge breakdown of the chain. Populated by the graph-walk
+   * strategy; absent for synth-produced plans.
+   */
+  readonly migrationEdges?: readonly AggregateMigrationEdgeRef[];
 }
 
 export interface AggregatePlannerSuccess {

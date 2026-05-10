@@ -594,9 +594,19 @@ export interface MigrationApplyStep {
  * contract space that had pending migrations — empty `applied` means
  * every space was already at its head.
  */
+/**
+ * One entry per authored migration package applied. Preserves the
+ * single-space `migrationsApplied` count semantics (each entry is
+ * one migration directory) so `applied.length === migrationsApplied`.
+ *
+ * Per-space aggregate detail (markers, ops grouped by space) lives
+ * on `perSpace[]`; this list is the per-edge view.
+ */
 export interface MigrationApplyAppliedEntry {
   readonly spaceId: string;
-  readonly from: string | null;
+  readonly dirName: string;
+  readonly migrationHash: string;
+  readonly from: string;
   readonly to: string;
   readonly operationsExecuted: number;
 }

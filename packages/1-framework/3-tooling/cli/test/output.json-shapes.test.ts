@@ -10,8 +10,22 @@ describe('MigrationApplyResult JSON shape (aggregate-walking)', () => {
       migrationsTotal: 2,
       markerHash: 'sha256:app',
       applied: [
-        { spaceId: 'pgvector', from: null, to: 'sha256:ext', operationsExecuted: 1 },
-        { spaceId: 'app', from: null, to: 'sha256:app', operationsExecuted: 3 },
+        {
+          spaceId: 'pgvector',
+          dirName: '20250101000000_install_pgvector',
+          migrationHash: 'sha256:m-ext',
+          from: 'sha256:0000',
+          to: 'sha256:ext',
+          operationsExecuted: 1,
+        },
+        {
+          spaceId: 'app',
+          dirName: '20250101000001_init',
+          migrationHash: 'sha256:m-app',
+          from: 'sha256:0000',
+          to: 'sha256:app',
+          operationsExecuted: 3,
+        },
       ],
       summary: 'Applied 4 operation(s) across 2 contract space(s)',
       perSpace: [

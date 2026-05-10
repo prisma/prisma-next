@@ -128,7 +128,7 @@ export function formatPerSpaceBlock(
       }
     }
     if (mode === 'apply' && space.marker) {
-      lines.push(`  ${formatDimText(`marker → ${space.marker.storageHash}`)}`);
+      lines.push(`  ${formatDimText(`marker: ${space.marker.storageHash}`)}`);
     }
   }
   return lines;
@@ -243,6 +243,10 @@ export interface MigrationApplyCommandOutputResult {
   readonly markerHash: string;
   readonly applied: readonly {
     readonly spaceId: string;
+    readonly dirName?: string;
+    readonly migrationHash?: string;
+    readonly from?: string;
+    readonly to?: string;
     readonly operationsExecuted: number;
   }[];
   readonly summary: string;

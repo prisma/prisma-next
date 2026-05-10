@@ -66,7 +66,9 @@ export interface MigrationApplyResult {
   readonly markerHash: string;
   readonly applied: readonly {
     readonly spaceId: string;
-    readonly from: string | null;
+    readonly dirName: string;
+    readonly migrationHash: string;
+    readonly from: string;
     readonly to: string;
     readonly operationsExecuted: number;
   }[];

@@ -60,6 +60,13 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
 
   const pathOps: MigrationOps[number][] = [];
   const providedInvariantsSet = new Set<string>();
+  const edgeRefs: Array<{
+    migrationHash: string;
+    dirName: string;
+    from: string;
+    to: string;
+    operationCount: number;
+  }> = [];
   for (const edge of outcome.decision.selectedPath) {
     const pkg = packagesByMigrationHash.get(edge.migrationHash);
     if (!pkg) {
@@ -69,6 +76,13 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
     }
     for (const op of pkg.ops) pathOps.push(op);
     for (const invariant of pkg.metadata.providedInvariants) providedInvariantsSet.add(invariant);
+    edgeRefs.push({
+      migrationHash: edge.migrationHash,
+      dirName: edge.dirName,
+      from: edge.from,
+      to: edge.to,
+      operationCount: pkg.ops.length,
+    });
   }
 
   const plan: MigrationPlan = {
@@ -87,6 +101,7 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
       displayOps: pathOps,
       destinationContract: member.contract as Contract,
       strategy: 'graph-walk',
+      migrationEdges: edgeRefs,
     },
   };
 }

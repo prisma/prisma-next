@@ -216,7 +216,11 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     return notOk(failure);
   }
 
-  const summary = `Applied ${applied.value.totalOpsExecuted} operation(s) across ${applied.value.orderedResolutions.length} contract space(s)`;
+  const totalMigrationsApplied = applied.value.orderedResolutions.reduce(
+    (sum, r) => sum + (r.entry.migrationEdges?.length ?? 0),
+    0,
+  );
+  const summary = `Applied ${totalMigrationsApplied} migration(s) (${applied.value.totalOpsExecuted} operation(s)) across ${applied.value.orderedResolutions.length} contract space(s)`;
 
   return ok(
     buildSuccess({
@@ -265,21 +269,21 @@ function buildSuccess(args: BuildSuccessArgs): MigrationApplySuccess {
   const appMarkerHash =
     appResolution?.entry.plan.destination.storageHash ?? args.aggregate.app.headRef.hash;
 
+  // Per-migration entries (one per authored edge) preserve the
+  // single-space `migrationsApplied` count semantics for back-compat
+  // with existing JSON-shape consumers (e.g. `parsed.applied.length`
+  // in integration tests). The aggregate per-space breakdown lives on
+  // `perSpace[]`.
   const applied = args.orderedResolutions.flatMap((r) => {
-    const plan = r.entry.plan;
-    if (plan.operations.length === 0) return [];
-    // The graph-walk strategy reports the path's first edge `from`
-    // and last edge `to` via `plan.origin` / `plan.destination`. We
-    // surface the destination per space; the per-edge breakdown
-    // lives in the formatter via `perSpace[].operations`.
-    return [
-      {
-        spaceId: r.spaceId,
-        from: plan.origin?.storageHash ?? null,
-        to: plan.destination.storageHash,
-        operationsExecuted: plan.operations.length,
-      },
-    ];
+    const edges = r.entry.migrationEdges ?? [];
+    return edges.map((edge) => ({
+      spaceId: r.spaceId,
+      dirName: edge.dirName,
+      migrationHash: edge.migrationHash,
+      from: edge.from,
+      to: edge.to,
+      operationsExecuted: edge.operationCount,
+    }));
   });
 
   return {
