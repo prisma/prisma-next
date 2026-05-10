@@ -11,7 +11,14 @@ export interface DescriptorSelfConsistencyInputs {
   readonly extensionId: string;
   readonly target: string;
   readonly targetFamily: string;
-  readonly storage: Record<string, unknown>;
+  /**
+   * Family-specific storage object. Typed as `unknown` so callers can
+   * pass their own narrow storage shape (e.g. `SqlStorage`) without an
+   * inline cast — the helper canonicalises through `JSON.stringify`
+   * inside {@link computeStorageHash} and only requires a plain
+   * record-shaped value at runtime.
+   */
+  readonly storage: unknown;
   readonly headRefHash: string;
 }
 
@@ -42,7 +49,12 @@ export function assertDescriptorSelfConsistency(inputs: DescriptorSelfConsistenc
   // and produce a different digest. Strip `storageHash` before
   // recomputing so the helper sees the same canonical shape the
   // descriptor's authoring pipeline saw.
-  const { storageHash: _stripped, ...storageWithoutHash } = inputs.storage;
+  // The helper requires only a plain record-shaped storage value at
+  // runtime; a single cast here keeps the public input type
+  // family-agnostic (`unknown`) while still letting us strip the
+  // descriptor-published `storageHash` before re-canonicalising.
+  const storageRecord = inputs.storage as Record<string, unknown>;
+  const { storageHash: _stripped, ...storageWithoutHash } = storageRecord;
   const recomputed = computeStorageHash({
     target: inputs.target,
     targetFamily: inputs.targetFamily,

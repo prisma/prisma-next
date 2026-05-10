@@ -250,7 +250,9 @@ function isSqlControlAdapter<TTargetId extends string>(
     'introspect' in value &&
     typeof (value as { introspect: unknown }).introspect === 'function' &&
     'readMarker' in value &&
-    typeof (value as { readMarker: unknown }).readMarker === 'function'
+    typeof (value as { readMarker: unknown }).readMarker === 'function' &&
+    'readAllMarkers' in value &&
+    typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function'
   );
 }
 
@@ -335,14 +337,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         extensionId: extension.id,
         target: contractJson.target,
         targetFamily: contractJson.targetFamily,
-        // `SqlStorage` is structurally a record of named storage entries
-        // (tables, types, etc.) but TS cannot narrow the family-bound
-        // type to the framework helper's `Record<string, unknown>` shape
-        // without a cast. The helper canonicalises through `JSON.stringify`
-        // and only needs the structural-record shape — the cast scopes
-        // the loss-of-precision to this single argument rather than
-        // widening the descriptor type at the call site.
-        storage: contractJson.storage as unknown as Record<string, unknown>,
+        storage: contractJson.storage,
         headRefHash: headRef.hash,
       });
     }
@@ -364,7 +359,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     const controlAdapter = adapter.create(stack);
     if (!isSqlControlAdapter(controlAdapter)) {
       throw new Error(
-        'Adapter does not implement SqlControlAdapter (missing introspect or readMarker)',
+        'Adapter does not implement SqlControlAdapter (missing introspect, readMarker, or readAllMarkers)',
       );
     }
     return controlAdapter;
