@@ -32,14 +32,6 @@ export function validateInvariantId(invariantId: string): boolean {
  *
  * Throws `MIGRATION.INVALID_INVARIANT_ID` on a malformed id and
  * `MIGRATION.DUPLICATE_INVARIANT_IN_EDGE` on duplicates.
- *
- * @see projects/extension-contract-spaces/specs/framework-mechanism.spec.md
- *   § 7.5 — the test extension's baseline migration is shown carrying
- *   an `additive` op with an `invariantId` and a matching `headRef.
- *   invariants`.
- * @see projects/extension-contract-spaces/specs/cipherstash-migration.spec.md
- *   § 3 — cipherstash's `installEqlBundle` and structural `create-*`
- *   ops are additive-class but carry `cipherstash:*` invariantIds.
  */
 export function deriveProvidedInvariants(ops: MigrationOps): readonly string[] {
   const seen = new Set<string>();
