@@ -196,6 +196,7 @@ withTempDir(({ createTempDir }) => {
             | { counts?: { fail?: number; warn?: number } }
             | undefined;
           expect(schema?.counts?.fail ?? -1).toBe(0);
+          expect(schema?.counts?.warn ?? -1).toBe(0);
         });
       },
       timeouts.spinUpPpgDev,
