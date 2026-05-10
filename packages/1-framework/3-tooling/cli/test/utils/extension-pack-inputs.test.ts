@@ -1,5 +1,8 @@
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import type { MigrationOps } from '@prisma-next/migration-tools/package';
 import { describe, expect, it } from 'vitest';
 import {
+  type DescriptorMigrationPackage,
   type ExtensionPackInput,
   toDeclaredExtensions,
   toExtensionInputs,
@@ -15,10 +18,14 @@ const packWithoutSpace = {
   targetId: 'postgres',
 } as const;
 
-const migrationPkg = {
+// The pack helpers under test do not introspect the package contents — they
+// only pass references through. Use empty-cast stubs for the typed slots.
+const STUB_METADATA = {} as MigrationMetadata;
+const STUB_OPS = {} as MigrationOps;
+const migrationPkg: DescriptorMigrationPackage = {
   dirName: '0000000001-init',
-  metadata: { name: 'init', from: null, to: 'sha256:c1' },
-  ops: { kind: 'json', body: [] },
+  metadata: STUB_METADATA,
+  ops: STUB_OPS,
 };
 
 const packWithSpace = {

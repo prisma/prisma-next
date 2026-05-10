@@ -174,12 +174,12 @@ describe('formatContractSpaceDriftWarning', () => {
     expect(message).toContain('pgvector');
   });
 
-  it('renders <none> when priorHeadHash is undefined (first-run drift)', () => {
+  it('renders <none> when priorHeadHash is null (first-run drift)', () => {
     const message = formatContractSpaceDriftWarning({
       kind: 'drift',
       spaceId: 'cipherstash',
       descriptorHash: HASH_A,
-      priorHeadHash: undefined,
+      priorHeadHash: null,
     });
     expect(message).toContain('differs from on-disk head hash <none>');
   });
