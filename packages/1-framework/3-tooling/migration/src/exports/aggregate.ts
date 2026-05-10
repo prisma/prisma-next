@@ -19,6 +19,11 @@ export {
   planAggregate,
 } from '../aggregate/planner';
 export { projectSchemaToSpace } from '../aggregate/project-schema-to-space';
+export {
+  type GraphWalkOutcome,
+  type GraphWalkStrategyInputs,
+  graphWalkStrategy,
+} from '../aggregate/strategies/graph-walk';
 export type {
   ContractSpaceAggregate,
   ContractSpaceMember,

@@ -242,10 +242,16 @@ export interface MigrationApplyCommandOutputResult {
   readonly migrationsApplied: number;
   readonly markerHash: string;
   readonly applied: readonly {
-    readonly dirName: string;
+    readonly spaceId: string;
     readonly operationsExecuted: number;
   }[];
   readonly summary: string;
+  /**
+   * Per-space breakdown in canonical schedule order (extensions
+   * alphabetically, then app). Always present for the aggregate-walking
+   * `migration apply` command.
+   */
+  readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
   readonly timings?: {
     readonly total: number;
   };
@@ -264,26 +270,17 @@ export function formatMigrationApplyCommandOutput(
   const formatGreen = createColorFormatter(useColor, green);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  if (result.migrationsApplied === 0) {
-    lines.push(`${formatGreen('✔')} ${result.summary}`);
-    lines.push(formatDimText(`  marker: ${result.markerHash}`));
-    return lines.join('\n');
-  }
-
   lines.push(`${formatGreen('✔')} ${result.summary}`);
-  lines.push('');
 
-  for (let i = 0; i < result.applied.length; i++) {
-    const migration = result.applied[i]!;
-    const isLast = i === result.applied.length - 1;
-    const treeChar = isLast ? '└' : '├';
-    lines.push(
-      `${formatDimText(treeChar)}─ ${migration.dirName} ${formatDimText(`[${migration.operationsExecuted} op(s)]`)}`,
-    );
+  if (result.perSpace.length > 0) {
+    lines.push('');
+    for (const line of formatPerSpaceBlock(result.perSpace, 'apply', useColor)) {
+      lines.push(line);
+    }
   }
 
   lines.push('');
-  lines.push(formatDimText(`marker: ${result.markerHash}`));
+  lines.push(formatDimText('Next: prisma-next migration status'));
 
   if (isVerbose(flags, 1) && result.timings) {
     lines.push('');

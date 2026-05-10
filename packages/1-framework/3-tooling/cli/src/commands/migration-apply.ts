@@ -1,11 +1,6 @@
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import {
-  errorNoInvariantPath,
-  errorUnknownInvariant,
-  MigrationToolsError,
-} from '@prisma-next/migration-tools/errors';
-import { findPathWithDecision } from '@prisma-next/migration-tools/migration-graph';
-import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
+import { readFile } from 'node:fs/promises';
+import type { Contract } from '@prisma-next/contract/types';
+import { errorUnknownInvariant, MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -14,12 +9,14 @@ import { Command } from 'commander';
 
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
-import type { MigrationApplyFailure, MigrationApplyStep } from '../control-api/types';
+import type { AggregatePerSpaceExecutionEntry, MigrationApplyFailure } from '../control-api/types';
 import {
   CliStructuredError,
   type CliStructuredError as CliStructuredErrorType,
+  errorContractValidationFailed,
   errorDatabaseConnectionRequired,
   errorDriverRequired,
+  errorFileNotFound,
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
@@ -30,13 +27,11 @@ import {
   collectDeclaredInvariants,
   loadMigrationPackages,
   maskConnectionUrl,
-  readContractEnvelope,
+  resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
   targetSupportsMigrations,
-  toPathDecisionResult,
-  toStructuralEdge,
 } from '../utils/command-helpers';
 import { formatMigrationApplyCommandOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
@@ -51,34 +46,37 @@ interface MigrationApplyCommandOptions extends CommonCommandOptions {
   readonly ref?: string;
 }
 
+/**
+ * Per-space breakdown of an apply run. The CLI command surfaces these
+ * for both the JSON shape (`appliedSpaces[]`) and the human-readable
+ * formatter (per-space block — same shape `db init` / `db update`
+ * use, M6 sub-spec § Output shape contract).
+ */
 export interface MigrationApplyResult {
   readonly ok: boolean;
+  /** Number of contract spaces that had non-zero pending operations applied. */
   readonly migrationsApplied: number;
+  /** Total contract spaces visible in the aggregate (pending + already-up-to-date). */
   readonly migrationsTotal: number;
+  /**
+   * Marker hash for the **app member** post-apply. Surfaced for
+   * back-compat with single-space callers; per-space markers live on
+   * `perSpace[].marker.storageHash`.
+   */
   readonly markerHash: string;
   readonly applied: readonly {
-    readonly dirName: string;
+    readonly spaceId: string;
     readonly from: string | null;
     readonly to: string;
     readonly operationsExecuted: number;
   }[];
   readonly summary: string;
-  readonly pathDecision?: {
-    readonly fromHash: string;
-    readonly toHash: string;
-    readonly alternativeCount: number;
-    readonly tieBreakReasons: readonly string[];
-    readonly refName?: string;
-    readonly requiredInvariants: readonly string[];
-    readonly satisfiedInvariants: readonly string[];
-    readonly selectedPath: readonly {
-      readonly dirName: string;
-      readonly migrationHash: string;
-      readonly from: string;
-      readonly to: string;
-      readonly invariants: readonly string[];
-    }[];
-  };
+  /**
+   * Per-space breakdown in canonical schedule order (extensions
+   * alphabetically, then app). Always present for the aggregate-walking
+   * apply path.
+   */
+  readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
   readonly timings: {
     readonly total: number;
   };
@@ -92,17 +90,6 @@ function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType
   });
 }
 
-function packageToStep(pkg: OnDiskMigrationPackage): MigrationApplyStep {
-  return {
-    dirName: pkg.dirName,
-    from: pkg.metadata.from,
-    to: pkg.metadata.to,
-    toContract: pkg.metadata.toContract,
-    operations: pkg.ops,
-    providedInvariants: pkg.metadata.providedInvariants,
-  };
-}
-
 async function executeMigrationApplyCommand(
   options: MigrationApplyCommandOptions,
   flags: GlobalFlags,
@@ -110,10 +97,8 @@ async function executeMigrationApplyCommand(
   startTime: number,
 ): Promise<Result<MigrationApplyResult, CliStructuredErrorType>> {
   const config = await loadConfig(options.config);
-  const { configPath, appMigrationsDir, appMigrationsRelative, refsDir } = resolveMigrationPaths(
-    options.config,
-    config,
-  );
+  const { configPath, migrationsDir, appMigrationsDir, appMigrationsRelative, refsDir } =
+    resolveMigrationPaths(options.config, config);
 
   const dbConnection = options.db ?? config.db?.connection;
   if (!dbConnection) {
@@ -142,7 +127,6 @@ async function executeMigrationApplyCommand(
   }
 
   let refEntry: RefEntry | undefined;
-  let envelopeHash: string | undefined;
   const refName = options.ref;
 
   if (refName) {
@@ -155,20 +139,31 @@ async function executeMigrationApplyCommand(
       }
       throw error;
     }
-  } else {
-    try {
-      const envelope = await readContractEnvelope(config);
-      envelopeHash = envelope.storageHash;
-    } catch (error) {
+  }
+
+  // Resolve and parse the contract envelope. The aggregate-walking
+  // operation needs the validated app contract to load the aggregate.
+  const contractPathAbsolute = resolveContractPath(config);
+  let contractRaw: Contract;
+  try {
+    const contractContent = await readFile(contractPathAbsolute, 'utf-8');
+    contractRaw = JSON.parse(contractContent) as Contract;
+  } catch (error) {
+    if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
       return notOk(
-        errorRuntime('Current contract is unavailable', {
-          why: `Failed to read contract: ${error instanceof Error ? error.message : String(error)}`,
+        errorFileNotFound(contractPathAbsolute, {
+          why: `Contract file not found at ${contractPathAbsolute}`,
           fix: 'Run `prisma-next contract emit` to generate a valid contract.json, then retry apply.',
         }),
       );
     }
+    return notOk(
+      errorContractValidationFailed(
+        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        { where: { path: contractPathAbsolute } },
+      ),
+    );
   }
-  const destinationHash = refEntry?.hash ?? envelopeHash!;
 
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
@@ -194,10 +189,11 @@ async function executeMigrationApplyCommand(
     ui.stderr(header);
   }
 
-  // Read migrations and build migration chain model (offline — no DB needed)
-  let migrations: Awaited<ReturnType<typeof loadMigrationPackages>>;
+  // Load app-space migration packages — the aggregate operation
+  // needs them to hydrate the app member's graph for graph-walk.
+  let appPackages: Awaited<ReturnType<typeof loadMigrationPackages>>;
   try {
-    migrations = await loadMigrationPackages(appMigrationsDir);
+    appPackages = await loadMigrationPackages(appMigrationsDir);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
@@ -215,20 +211,20 @@ async function executeMigrationApplyCommand(
 
   try {
     await client.connect(dbConnection);
-    const marker = await client.readMarker();
 
-    // Pre-check unknown invariants against `(declared by graph) ∪
-    // (already on the marker)`. The union catches the edge case where the
-    // ref carries an invariant whose declaring migration was retired (e.g.
-    // history rewritten) but whose id is recorded on the marker —
-    // surfacing that as MIGRATION.UNKNOWN_INVARIANT would be misleading
-    // because the database has already satisfied the requirement, so the
-    // marker-subtraction below empties `effectiveRequired` and apply
-    // short-circuits to "Already up to date".
+    // Pre-check unknown invariants against `(declared by app graph) ∪
+    // (already on the app marker)`. The marker side of the union
+    // catches the case where the ref carries an invariant whose
+    // declaring migration was retired (history rewritten) but whose
+    // id is recorded on the marker — surfacing UNKNOWN_INVARIANT
+    // there would be misleading because the database has already
+    // satisfied the requirement.
     if (refEntry && refEntry.invariants.length > 0) {
-      const declared = collectDeclaredInvariants(migrations.graph);
+      const allMarkers = await client.readAllMarkers();
+      const appMarker = allMarkers.get('app') ?? null;
+      const declared = collectDeclaredInvariants(appPackages.graph);
       const known = new Set<string>(declared);
-      for (const id of marker?.invariants ?? []) known.add(id);
+      for (const id of appMarker?.invariants ?? []) known.add(id);
       const unknown = refEntry.invariants.filter((id) => !known.has(id));
       if (unknown.length > 0) {
         return notOk(
@@ -243,149 +239,15 @@ async function executeMigrationApplyCommand(
       }
     }
 
-    // --- No migrations on disk ---
-    if (migrations.bundles.length === 0) {
-      if (marker?.storageHash) {
-        return notOk(
-          errorRuntime('Database has state but no migrations exist', {
-            why: `The database marker hash "${marker.storageHash}" exists but no migrations were found in ${appMigrationsRelative}`,
-            fix: 'Ensure the migrations directory is correct. If the database was managed with `db init` or `db update`, run `prisma-next db sign` to update the marker.',
-            meta: { markerHash: marker.storageHash, migrationsDir: appMigrationsRelative },
-          }),
-        );
-      }
-      // Non-empty contract + no migrations = user needs to plan first.
-      if (destinationHash !== EMPTY_CONTRACT_HASH) {
-        return notOk(
-          errorRuntime('Current contract has no planned migrations', {
-            why: `No migrations were found in ${appMigrationsRelative}, but current contract hash is "${destinationHash}"`,
-            fix: 'Run `prisma-next migration plan` to create a migration for the current contract.',
-            meta: { destinationHash, migrationsDir: appMigrationsRelative },
-          }),
-        );
-      }
-      // Empty contract + no migrations = nothing to do.
-      return ok({
-        ok: true,
-        migrationsApplied: 0,
-        migrationsTotal: 0,
-        markerHash: EMPTY_CONTRACT_HASH,
-        applied: [],
-        summary: 'No migrations found',
-        timings: { total: Date.now() - startTime },
-      });
-    }
-
-    // --- Validate marker state ---
-
-    // The empty sentinel should never appear in a real marker row — if it does,
-    // the marker was corrupted and replaying all migrations would be dangerous.
-    if (marker?.storageHash === EMPTY_CONTRACT_HASH) {
-      return notOk(
-        errorRuntime('Database marker contains the empty sentinel hash', {
-          why: `The marker row exists but contains the empty sentinel value "${EMPTY_CONTRACT_HASH}". This should never happen — the marker should contain the hash of the last applied contract.`,
-          fix: 'The marker is corrupted. Run `prisma-next db sign` to overwrite it with the correct contract hash, or drop and recreate the database.',
-          meta: { markerHash: EMPTY_CONTRACT_HASH },
-        }),
-      );
-    }
-
-    const markerHash = marker?.storageHash;
-
-    if (markerHash !== undefined && !migrations.graph.nodes.has(markerHash)) {
-      return notOk(
-        errorRuntime('Database marker does not match any known migration', {
-          why: `The database marker hash "${markerHash}" is not found in the migration history at ${appMigrationsRelative}`,
-          fix: 'Ensure the migrations directory matches this database. If the database was managed with `db init` or `db update`, run `prisma-next db sign` to update the marker.',
-          meta: { markerHash, knownNodes: [...migrations.graph.nodes] },
-        }),
-      );
-    }
-
-    if (!migrations.graph.nodes.has(destinationHash)) {
-      return notOk(
-        errorRuntime('Current contract has no planned migration path', {
-          why: `Current contract hash "${destinationHash}" is not present in the migration history at ${appMigrationsRelative}`,
-          fix: 'Run `prisma-next migration plan` to create a migration for the current contract, then re-run apply.',
-          meta: { destinationHash, knownNodes: [...migrations.graph.nodes] },
-        }),
-      );
-    }
-
-    // "No marker" means the database is fresh — start from the empty contract hash.
-    const originHash = markerHash ?? EMPTY_CONTRACT_HASH;
-
-    const appliedInvariants = new Set(marker?.invariants ?? []);
-    const effectiveRequired = new Set(
-      (refEntry?.invariants ?? []).filter((id) => !appliedInvariants.has(id)),
-    );
-
-    const outcome = findPathWithDecision(migrations.graph, originHash, destinationHash, {
-      ...ifDefined('refName', refName),
-      required: effectiveRequired,
-    });
-    if (outcome.kind === 'unsatisfiable') {
-      return notOk(
-        mapMigrationToolsError(
-          errorNoInvariantPath({
-            ...ifDefined('refName', refName),
-            required: [...effectiveRequired].sort(),
-            missing: outcome.missing,
-            structuralPath: outcome.structuralPath.map(toStructuralEdge),
-          }),
-        ),
-      );
-    }
-    if (outcome.kind === 'unreachable') {
-      return notOk(
-        errorRuntime('No migration path from current state to target', {
-          why: `Cannot find a path from "${originHash}" to target "${destinationHash}"`,
-          fix: 'Check the migration history for gaps or inconsistencies.',
-          meta: { markerHash: originHash, destinationHash },
-        }),
-      );
-    }
-
-    const pathDecision = toPathDecisionResult(outcome.decision);
-
-    if (outcome.decision.selectedPath.length === 0) {
-      return ok({
-        ok: true,
-        migrationsApplied: 0,
-        migrationsTotal: 0,
-        markerHash: originHash,
-        applied: [],
-        summary: 'Already up to date',
-        pathDecision,
-        timings: { total: Date.now() - startTime },
-      });
-    }
-
-    const bundleByDir = new Map(migrations.bundles.map((b) => [b.dirName, b]));
-    const pendingMigrations: MigrationApplyStep[] = [];
-    for (const migration of outcome.decision.selectedPath) {
-      const pkg = bundleByDir.get(migration.dirName);
-      if (!pkg) {
-        return notOk(
-          errorRuntime(`Migration package not found: ${migration.dirName}`, {
-            why: `The migration directory for path segment ${migration.from} → ${migration.to} was not found`,
-            fix: 'Ensure all migration directories are present and intact.',
-          }),
-        );
-      }
-      pendingMigrations.push(packageToStep(pkg));
-    }
-
     if (!flags.quiet && !flags.json) {
-      for (const migration of pendingMigrations) {
-        ui.step(`Pending ${migration.dirName}`);
-      }
+      ui.step('Loading contract spaces…');
     }
 
     const applyResult = await client.migrationApply({
-      originHash,
-      destinationHash,
-      pendingMigrations,
+      contract: contractRaw,
+      migrationsDir,
+      appMigrationPackages: appPackages.bundles,
+      ...ifDefined('refHash', refEntry?.hash),
     });
 
     if (!applyResult.ok) {
@@ -397,11 +259,11 @@ async function executeMigrationApplyCommand(
     return ok({
       ok: true,
       migrationsApplied: value.migrationsApplied,
-      migrationsTotal: outcome.decision.selectedPath.length,
+      migrationsTotal: value.perSpace.length,
       markerHash: value.markerHash,
       applied: value.applied,
       summary: value.summary,
-      pathDecision,
+      perSpace: value.perSpace,
       timings: { total: Date.now() - startTime },
     });
   } catch (error) {
@@ -423,16 +285,17 @@ export function createMigrationApplyCommand(): Command {
   setCommandDescriptions(
     command,
     'Apply planned migrations to the database',
-    'Applies previously planned migrations (created by `migration plan`) to a live database.\n' +
-      'Compares the database marker against the migration history to determine which\n' +
-      'migrations are pending, then executes them sequentially. Each migration runs\n' +
-      'in its own transaction. Does not plan new migrations — run `migration plan` first.',
+    'Walks every contract space (app + extensions) and applies pending\n' +
+      'on-disk migrations in canonical order (extensions alphabetically,\n' +
+      'then app). Graph-walks the on-disk migration graph for every space —\n' +
+      "no introspection, no synth. Each space's marker advances inside its\n" +
+      "transaction; per-space failure rolls back every space's writes.",
   );
   setCommandExamples(command, ['prisma-next migration apply --db $DATABASE_URL']);
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--ref <name>', 'Target ref name from migrations/refs/')
+    .option('--ref <name>', 'App-space target ref name from migrations/app/refs/')
     .action(async (options: MigrationApplyCommandOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();

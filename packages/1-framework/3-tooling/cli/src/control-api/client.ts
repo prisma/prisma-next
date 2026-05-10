@@ -461,16 +461,26 @@ class ControlClientImpl implements ControlClient {
       throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
+    let contract: Contract;
+    try {
+      contract = familyInstance.validateContract(options.contract);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContractValidationError(message, error);
+    }
+
     return executeMigrationApply({
       driver,
       familyInstance,
-      originHash: options.originHash,
-      destinationHash: options.destinationHash,
-      pendingMigrations: options.pendingMigrations,
+      contract,
       migrations: this.options.target.migrations,
       frameworkComponents,
+      migrationsDir: options.migrationsDir,
+      extensionPacks: this.options.extensionPacks ?? [],
       targetId: this.options.target.targetId,
-      ...(onProgress ? { onProgress } : {}),
+      appMigrationPackages: options.appMigrationPackages,
+      ...ifDefined('refHash', options.refHash),
+      ...ifDefined('onProgress', onProgress),
     });
   }
 

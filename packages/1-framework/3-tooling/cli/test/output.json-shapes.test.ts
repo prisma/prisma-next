@@ -2,15 +2,36 @@ import { describe, expect, it } from 'vitest';
 import type { MigrationApplyResult } from '../src/commands/migration-apply';
 import type { MigrationStatusResult } from '../src/commands/migration-status';
 
-describe('MigrationApplyResult JSON shape', () => {
-  it('matches expected keys without pathDecision', () => {
+describe('MigrationApplyResult JSON shape (aggregate-walking)', () => {
+  it('pins keys for an apply that touched both an extension and the app space', () => {
     const result: MigrationApplyResult = {
       ok: true,
-      migrationsApplied: 1,
-      migrationsTotal: 1,
-      markerHash: 'sha256:abc',
-      applied: [{ dirName: 'm1', from: 'sha256:a', to: 'sha256:b', operationsExecuted: 2 }],
-      summary: 'Applied 1 migration(s)',
+      migrationsApplied: 2,
+      migrationsTotal: 2,
+      markerHash: 'sha256:app',
+      applied: [
+        { spaceId: 'pgvector', from: null, to: 'sha256:ext', operationsExecuted: 1 },
+        { spaceId: 'app', from: null, to: 'sha256:app', operationsExecuted: 3 },
+      ],
+      summary: 'Applied 4 operation(s) across 2 contract space(s)',
+      perSpace: [
+        {
+          spaceId: 'pgvector',
+          kind: 'extension',
+          operations: [{ id: 'op1', label: 'Install vector ext', operationClass: 'additive' }],
+          marker: { storageHash: 'sha256:ext' },
+        },
+        {
+          spaceId: 'app',
+          kind: 'app',
+          operations: [
+            { id: 'op2', label: 'Create user', operationClass: 'additive' },
+            { id: 'op3', label: 'Create post', operationClass: 'additive' },
+            { id: 'op4', label: 'Add fk', operationClass: 'additive' },
+          ],
+          marker: { storageHash: 'sha256:app' },
+        },
+      ],
       timings: { total: 42 },
     };
     expect(Object.keys(result).sort()).toMatchInlineSnapshot(`
@@ -20,120 +41,22 @@ describe('MigrationApplyResult JSON shape', () => {
         "migrationsApplied",
         "migrationsTotal",
         "ok",
+        "perSpace",
         "summary",
         "timings",
       ]
     `);
   });
 
-  it('matches expected keys with pathDecision', () => {
-    const result: MigrationApplyResult = {
-      ok: true,
-      migrationsApplied: 1,
-      migrationsTotal: 1,
-      markerHash: 'sha256:abc',
-      applied: [{ dirName: 'm1', from: 'sha256:a', to: 'sha256:b', operationsExecuted: 2 }],
-      summary: 'Applied 1 migration(s)',
-      pathDecision: {
-        fromHash: 'sha256:a',
-        toHash: 'sha256:b',
-        alternativeCount: 0,
-        tieBreakReasons: [],
-        requiredInvariants: [],
-        satisfiedInvariants: [],
-        selectedPath: [
-          {
-            dirName: 'm1',
-            migrationHash: 'sha256:mid',
-            from: 'sha256:a',
-            to: 'sha256:b',
-            invariants: [],
-          },
-        ],
-      },
-      timings: { total: 42 },
+  it('pins per-space entry shape so per-space markers and ordering survive future refactors', () => {
+    const entry: MigrationApplyResult['perSpace'][number] = {
+      spaceId: 'pgvector',
+      kind: 'extension',
+      operations: [{ id: 'op1', label: 'Install vector ext', operationClass: 'additive' }],
+      marker: { storageHash: 'sha256:ext' },
     };
-    expect(Object.keys(result).sort()).toMatchInlineSnapshot(`
-      [
-        "applied",
-        "markerHash",
-        "migrationsApplied",
-        "migrationsTotal",
-        "ok",
-        "pathDecision",
-        "summary",
-        "timings",
-      ]
-    `);
-    expect(Object.keys(result.pathDecision!).sort()).toMatchInlineSnapshot(`
-      [
-        "alternativeCount",
-        "fromHash",
-        "requiredInvariants",
-        "satisfiedInvariants",
-        "selectedPath",
-        "tieBreakReasons",
-        "toHash",
-      ]
-    `);
-    // Pin the selectedPath entry shape so a regression that drops
-    // `migrationHash` (or any other field) from the wire shape would fail.
-    expect(result.pathDecision!.selectedPath[0]).toEqual({
-      dirName: 'm1',
-      migrationHash: 'sha256:mid',
-      from: 'sha256:a',
-      to: 'sha256:b',
-      invariants: [],
-    });
-  });
-
-  it('pathDecision with ref includes refName', () => {
-    const result: MigrationApplyResult = {
-      ok: true,
-      migrationsApplied: 1,
-      migrationsTotal: 1,
-      markerHash: 'sha256:abc',
-      applied: [],
-      summary: 'Applied',
-      pathDecision: {
-        fromHash: 'sha256:a',
-        toHash: 'sha256:b',
-        alternativeCount: 1,
-        tieBreakReasons: ['at sha256:a: 2 candidates, selected by tie-break'],
-        refName: 'production',
-        requiredInvariants: ['backfill-user-phone'],
-        satisfiedInvariants: ['backfill-user-phone'],
-        selectedPath: [
-          {
-            dirName: 'm1',
-            migrationHash: 'sha256:mid',
-            from: 'sha256:a',
-            to: 'sha256:b',
-            invariants: ['backfill-user-phone'],
-          },
-        ],
-      },
-      timings: { total: 10 },
-    };
-    expect(result.pathDecision!.selectedPath[0]).toEqual({
-      dirName: 'm1',
-      migrationHash: 'sha256:mid',
-      from: 'sha256:a',
-      to: 'sha256:b',
-      invariants: ['backfill-user-phone'],
-    });
-    expect(Object.keys(result.pathDecision!).sort()).toMatchInlineSnapshot(`
-      [
-        "alternativeCount",
-        "fromHash",
-        "refName",
-        "requiredInvariants",
-        "satisfiedInvariants",
-        "selectedPath",
-        "tieBreakReasons",
-        "toHash",
-      ]
-    `);
+    expect(Object.keys(entry).sort()).toEqual(['kind', 'marker', 'operations', 'spaceId']);
+    expect(entry.marker).toEqual({ storageHash: 'sha256:ext' });
   });
 });
 

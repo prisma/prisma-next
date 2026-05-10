@@ -7,6 +7,7 @@ import type {
   LoadAggregateOutput,
 } from '@prisma-next/migration-tools/aggregate';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from './cli-errors';
 import { toDeclaredExtensions, toExtensionInputs } from './extension-pack-inputs';
@@ -138,6 +139,19 @@ export interface BuildAggregateInputs<TFamilyId extends string, TTargetId extend
   readonly appContract: Contract;
   readonly extensionPacks: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   readonly validateContract: (contractJson: unknown) => Contract;
+  /**
+   * App-space migration packages to hydrate the app member's
+   * migration graph with. Defaults to `[]` (matches the `db init` /
+   * `db update` daily-driver behaviour, where the app's authored
+   * `migrations/` graph is not walked — the planner uses the synth
+   * strategy for the app member instead).
+   *
+   * `migration apply` callers thread the user's authored app-space
+   * packages (loaded via `loadMigrationPackages(appMigrationsDir)`)
+   * through here so the graph-walk strategy can plot a path through
+   * them — the prod-time replay path explicitly forbids synth.
+   */
+  readonly appMigrationPackages?: ReadonlyArray<OnDiskMigrationPackage>;
 }
 
 /**
@@ -176,7 +190,7 @@ export async function buildContractSpaceAggregate<
       }
       return precomputed;
     },
-    appMigrationPackages: [],
+    appMigrationPackages: inputs.appMigrationPackages ?? [],
   };
 
   const result: LoadAggregateOutput = await loadContractSpaceAggregate(loadInput);

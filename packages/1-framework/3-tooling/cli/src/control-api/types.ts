@@ -18,6 +18,7 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import type { Result } from '@prisma-next/utils/result';
 import type { ExecuteDbVerifyResult } from './operations/db-verify';
 
@@ -526,44 +527,35 @@ export type EmitResult = Result<EmitSuccess, EmitFailure>;
 // ============================================================================
 
 /**
- * A pre-planned migration step ready for execution.
- * Contains the manifest metadata and the serialized operations from ops.json.
- */
-export interface MigrationApplyStep {
-  readonly dirName: string;
-  readonly from: string | null;
-  readonly to: string;
-  readonly toContract: Contract;
-  readonly operations: readonly MigrationPlanOperation[];
-  /**
-   * Sorted, deduplicated invariant ids from `migration.json.providedInvariants`.
-   * Verified at load time by `readMigrationPackage` (manifest copy must equal
-   * the value derived from `ops.json`). The control-api passes this through
-   * to the runner via `MigrationPlan.providedInvariants` so target runners
-   * read the canonical set instead of re-deriving from `operations`.
-   */
-  readonly providedInvariants: readonly string[];
-}
-
-/**
- * Options for the migrationApply operation.
+ * Options for the aggregate-walking `migrationApply` operation.
+ *
+ * The control-api operation is responsible for: loading the
+ * contract-space aggregate, reading per-space marker rows from the
+ * live database, plotting per-space paths via `graphWalkStrategy`
+ * (replay-only — no synth, no introspection), and dispatching
+ * through the shared `applyAggregate` primitive. The CLI command
+ * just resolves the descriptor surface (config, refs, contract
+ * envelope, app-space migration packages) and hands the inputs in.
+ *
+ * Sub-spec § `migration apply` semantics + § Required changes 1.
  */
 export interface MigrationApplyOptions {
+  /** Already-validated app contract (the canonical "where we are heading" hash). */
+  readonly contract: unknown;
+  /** Migrations root directory (`migrations/` under the project). */
+  readonly migrationsDir: string;
   /**
-   * Hash of the database state this apply path starts from.
-   * This is resolved by the caller (typically the CLI orchestration layer).
+   * Already-loaded app-space migration packages. The CLI loads these
+   * via `loadMigrationPackages(appMigrationsDir)` before invoking
+   * `migrationApply`.
    */
-  readonly originHash: string;
+  readonly appMigrationPackages: ReadonlyArray<OnDiskMigrationPackage>;
   /**
-   * Hash of the target contract this apply path must reach.
-   * This is resolved by the caller (typically the CLI orchestration layer).
+   * Optional app-space ref override. When provided, the app member's
+   * graph-walk targets this hash instead of `contract.storage.storageHash`.
+   * Extension members always walk to their own `headRef.hash`.
    */
-  readonly destinationHash: string;
-  /**
-   * Ordered list of migrations to execute from originHash to destinationHash.
-   * The execution layer does not choose defaults; it only executes this explicit path.
-   */
-  readonly pendingMigrations: readonly MigrationApplyStep[];
+  readonly refHash?: string;
   /**
    * Database connection. If provided, migrationApply will connect before executing.
    * If omitted, the client must already be connected.
@@ -574,23 +566,59 @@ export interface MigrationApplyOptions {
 }
 
 /**
- * Record of a successfully applied migration.
+ * A single on-disk migration package surfaced to the operation. The
+ * SQL family already produces this shape via `loadMigrationPackages`;
+ * the operation hands it through to the framework-neutral aggregate
+ * loader's `appMigrationPackages` slot.
+ *
+ * (Originally named `MigrationApplyStep` for the legacy single-space
+ * apply path; the name is kept for compatibility with existing CLI
+ * callers and tests.)
+ */
+export interface MigrationApplyStep {
+  readonly dirName: string;
+  readonly from: string | null;
+  readonly to: string;
+  readonly toContract: Contract;
+  readonly operations: readonly MigrationPlanOperation[];
+  /**
+   * Sorted, deduplicated invariant ids from `migration.json.providedInvariants`.
+   * Verified at load time by `readMigrationPackage` (manifest copy must equal
+   * the value derived from `ops.json`).
+   */
+  readonly providedInvariants: readonly string[];
+}
+
+/**
+ * Record of a successfully applied per-space migration. One entry per
+ * contract space that had pending migrations — empty `applied` means
+ * every space was already at its head.
  */
 export interface MigrationApplyAppliedEntry {
-  readonly dirName: string;
+  readonly spaceId: string;
   readonly from: string | null;
   readonly to: string;
   readonly operationsExecuted: number;
 }
 
 /**
- * Successful migrationApply result.
+ * Successful migrationApply result. Carries both the legacy
+ * single-space fields (`markerHash` is the **app member's** post-apply
+ * marker, surfaced for back-compat with single-space callers) and the
+ * per-space breakdown (`perSpace` — markers / operations / canonical
+ * order, per M6 sub-spec § Output shape).
  */
 export interface MigrationApplySuccess {
   readonly migrationsApplied: number;
   readonly markerHash: string;
   readonly applied: readonly MigrationApplyAppliedEntry[];
   readonly summary: string;
+  /**
+   * Per-space breakdown in canonical schedule order (extensions
+   * alphabetically, then app). See {@link AggregatePerSpaceExecutionEntry}.
+   * Always present for the aggregate-walking operation.
+   */
+  readonly perSpace: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
 }
 
 /**
