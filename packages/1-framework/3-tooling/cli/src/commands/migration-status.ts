@@ -1176,7 +1176,7 @@ export function formatStatusSummary(result: MigrationStatusResult, colorize: boo
   // the legacy single-space output already covers the app member.
   // When extensions exist, render every space (including the app)
   // for consistency, plus a cross-space pending total + apply hint.
-  if (result.spaces && result.spaces.some((s) => s.kind === 'extension')) {
+  if (result.spaces?.some((s) => s.kind === 'extension')) {
     const total = result.totalPendingAcrossSpaces ?? 0;
     lines.push('');
     lines.push(c(dim, 'spaces'));
