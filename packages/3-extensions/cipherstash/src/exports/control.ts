@@ -10,9 +10,8 @@
  * The descriptor wires those JSON artefacts via JSON-import declarations
  * so they flow through the consuming application's module resolver
  * without filesystem assumptions, and synthesises the canonical
- * {@link import('@prisma-next/migration-tools/package').MigrationPackage}
- * shape (gaining `dirPath` from `import.meta.url`) for the framework's
- * runner / verifier to consume.
+ * {@link import('@prisma-next/framework-components/control').MigrationPackage}
+ * shape for the framework's runner / verifier to consume.
  *
  * Wired surfaces:
  *
@@ -31,11 +30,14 @@
  *   (reference model).
  */
 
-import { fileURLToPath } from 'node:url';
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
-import type { ContractSpace } from '@prisma-next/framework-components/control';
-import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
+import type {
+  ContractSpace,
+  MigrationPackage,
+  MigrationPlanOperation,
+} from '@prisma-next/framework-components/control';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import baselineMetadata from '../../migrations/cipherstash/20260601T0000_install_eql_bundle/migration.json' with {
   type: 'json',
@@ -52,35 +54,22 @@ import {
 } from '../extension-metadata/constants';
 import { cipherstashPackMeta } from '../extension-metadata/descriptor-meta';
 import { cipherstashStringCodecHooks } from '../migration/cipherstash-codec';
-import {
-  asCipherstashContract,
-  asCipherstashMigrationMetadata,
-  asCipherstashMigrationOps,
-} from './contract-space-typing';
 
-/**
- * Resolve a migration package's on-disk path from this descriptor module's
- * URL. The framework's runner uses `dirPath` for diagnostic messages and
- * to locate sibling files (e.g. `start-contract.json` for non-baseline
- * migrations); pinning it from `import.meta.url` keeps the value correct
- * regardless of where the consuming application installs the package
- * (workspace, node_modules, bundled, etc.).
- */
-function resolveMigrationDirPath(dirName: string): string {
-  return fileURLToPath(
-    new URL(`../../migrations/${CIPHERSTASH_SPACE_ID}/${dirName}/`, import.meta.url),
-  );
-}
-
-const baselinePackage: OnDiskMigrationPackage = {
+// JSON-imported values lose the workspace's branded types
+// (e.g. `StorageHashBase<string>`, `MigrationPlanOperation` discriminants),
+// so we cast through `unknown` here. The values themselves are the same
+// canonical artefacts the application's contract / migration runners
+// produce and re-validate at runtime — the descriptor is just a
+// pass-through wiring layer between the on-disk JSON and the framework's
+// typed surface.
+const baselinePackage: MigrationPackage = {
   dirName: CIPHERSTASH_BASELINE_MIGRATION_NAME,
-  dirPath: resolveMigrationDirPath(CIPHERSTASH_BASELINE_MIGRATION_NAME),
-  metadata: asCipherstashMigrationMetadata(baselineMetadata),
-  ops: asCipherstashMigrationOps(baselineOps),
+  metadata: baselineMetadata as unknown as MigrationMetadata,
+  ops: baselineOps as unknown as readonly MigrationPlanOperation[],
 };
 
 const cipherstashContractSpace: ContractSpace<Contract<SqlStorage>> = {
-  contractJson: asCipherstashContract(contractJson),
+  contractJson: contractJson as unknown as Contract<SqlStorage>,
   migrations: [baselinePackage],
   headRef,
 };

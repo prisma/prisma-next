@@ -61,7 +61,10 @@ import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { executeDbInit } from '@prisma-next/cli/control-api';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import {
+  createControlStack,
+  type MigrationPackage,
+} from '@prisma-next/framework-components/control';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';

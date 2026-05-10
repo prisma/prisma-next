@@ -10,9 +10,11 @@
  * The descriptor wires those JSON artefacts via JSON-import declarations
  * so they flow through the consuming application's module resolver
  * without filesystem assumptions, and synthesises the canonical
- * {@link import('@prisma-next/migration-tools/package').MigrationPackage}
- * shape (gaining `dirPath` from `import.meta.url`) for the framework's
- * runner / verifier to consume.
+ * {@link import('@prisma-next/framework-components/control').MigrationPackage}
+ * shape for the framework's runner / verifier to consume. Readers in
+ * `@prisma-next/migration-tools` add `dirPath` when loading from disk
+ * (`OnDiskMigrationPackage`); descriptor-bundled packages do not need
+ * it because the framework reads them directly from the descriptor.
  *
  * Wired surfaces:
  *
@@ -30,7 +32,6 @@
  *   (R1 reference model).
  */
 
-import { fileURLToPath } from 'node:url';
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
@@ -38,10 +39,10 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type {
   ContractSpace,
+  MigrationPackage,
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import contractJson from '../../contract.json' with { type: 'json' };
 import baselineMetadata from '../../migrations/pgvector/20260601T0000_install_vector_extension/migration.json' with {
@@ -78,20 +79,6 @@ const vectorControlPlaneHooks: CodecControlHooks = {
   resolveIdentityValue: ({ typeParams }) => buildVectorIdentityValue(typeParams),
 };
 
-/**
- * Resolve a migration package's on-disk path from this descriptor module's
- * URL. The framework's runner uses `dirPath` for diagnostic messages and
- * to locate sibling files (e.g. `start-contract.json` for non-baseline
- * migrations); pinning it from `import.meta.url` keeps the value correct
- * regardless of where the consuming application installs the package
- * (workspace, node_modules, bundled, etc.).
- */
-function resolveMigrationDirPath(dirName: string): string {
-  return fileURLToPath(
-    new URL(`../../migrations/${PGVECTOR_SPACE_ID}/${dirName}/`, import.meta.url),
-  );
-}
-
 // JSON-imported values lose the workspace's branded types
 // (e.g. `StorageHashBase<string>`, `MigrationPlanOperation` discriminants),
 // so we cast through `unknown` here. The values themselves are the same
@@ -101,7 +88,6 @@ function resolveMigrationDirPath(dirName: string): string {
 // typed surface.
 const baselinePackage: MigrationPackage = {
   dirName: BASELINE_DIR_NAME,
-  dirPath: resolveMigrationDirPath(BASELINE_DIR_NAME),
   metadata: baselineMetadata as unknown as MigrationMetadata,
   ops: baselineOps as unknown as readonly MigrationPlanOperation[],
 };

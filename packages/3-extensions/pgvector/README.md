@@ -232,8 +232,7 @@ this package using the same pipeline application authors use:
   hash + `providedInvariants`.
 
 The descriptor at `src/exports/control.ts` then JSON-imports those
-artefacts and synthesises the framework's `MigrationPackage` shape
-(with `dirPath` resolved from `import.meta.url`).
+artefacts and synthesises the framework's `MigrationPackage` shape.
 
 See [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
 ("On-disk-in-package authoring convention") for the full rationale and

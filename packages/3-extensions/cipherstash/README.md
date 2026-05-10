@@ -110,7 +110,7 @@ The extension's contract + baseline migration are emitted on-disk inside this pa
 - `pnpm tsx migrations/cipherstash/<dirName>/migration.ts` (run from this package directory) — re-emits `ops.json` + `migration.json` from the hand-edited subclass. Use `tsx`, not bare `node`, because the Migration subclass imports relative TypeScript siblings (`../../../src/core/constants`, `../../../src/core/eql-bundle`) which Node's native loader can't resolve without a TS-aware loader.
 - `refs/head.json` is hand-pinned with the latest migration's `to` hash + `providedInvariants`.
 
-The descriptor at `src/exports/control.ts` then JSON-imports those artefacts and synthesises the framework's `MigrationPackage` shape (with `dirPath` resolved from `import.meta.url`).
+The descriptor at `src/exports/control.ts` then JSON-imports those artefacts and synthesises the framework's `MigrationPackage` shape.
 
 See [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md) ("On-disk-in-package authoring convention") for the full rationale and [`packages/3-extensions/test-contract-space`](../test-contract-space) for the reference model.
 
