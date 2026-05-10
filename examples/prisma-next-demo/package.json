@@ -48,6 +48,7 @@
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
