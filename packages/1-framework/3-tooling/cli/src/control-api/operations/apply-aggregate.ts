@@ -155,7 +155,6 @@ export async function applyAggregate<TFamilyId extends string, TTargetId extends
       driver,
       destinationContract: r.entry.destinationContract,
       policy,
-      executionChecks: { prechecks: false, postchecks: false, idempotencyChecks: false },
       frameworkComponents,
       // Per-space post-apply schema verification is non-strict: each
       // space's `destinationContract` describes only its own slice; a
