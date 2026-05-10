@@ -1,8 +1,7 @@
 /**
- * T3.7 / Scenario C — bump-cipherstash diff test (pure-fixture, no DB).
+ * Scenario C — bump-cipherstash diff test (pure-fixture, no DB).
  *
- * The cipherstash-migration sub-spec § 7 codifies a property of the
- * framework's `migrate`-time on-disk shape:
+ * Codifies a property of the framework's `migrate`-time on-disk shape:
  *
  *   when an extension version bump produces a new contract hash + a
  *   new migration package, re-running the materialisation passes
@@ -12,19 +11,15 @@
  *     (b) write the new migration directory under
  *         `migrations/<spaceId>/<newDirName>/`, and
  *     (c) leave the previously-emitted migration directory(s)
- *         byte-untouched (AC-7 / AM12 by-existence skip).
+ *         byte-untouched (by-existence skip).
  *
  * Pure fixture means: no live Postgres, no PGlite — the test computes
  * the on-disk shape and asserts on it. The two passes invoked here
- * (`emitContractSpaceArtefacts` + `materialiseExtensionMigrationPackageIfMissing`)
+ * (`emitPinnedSpaceArtefacts` + `materialiseExtensionMigrationPackageIfMissing`)
  * are the *exact* primitives the CLI's `runContractSpaceMigratePass`
  * + `runContractSpaceExtensionMigrationsPass` call. Calling them
  * directly keeps cipherstash's test cone independent of the CLI
  * package (cipherstash must not import the CLI).
- *
- * Locks AC-14 (cipherstash-migration spec) → project AC9 (extension
- * version bump → diff-able migrations + advancing head ref). Sub-spec
- * § 7 is the source of truth for the assertion list.
  */
 
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
@@ -32,18 +27,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type {
-  ContractSpaceHeadRef,
-  MigrationPackage,
-} from '@prisma-next/framework-components/control';
+  ExtensionContractRef,
+  SqlMigrationPlanOperation,
+} from '@prisma-next/family-sql/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   materialiseExtensionMigrationPackageIfMissing,
-  materialiseMigrationPackage,
+  writeExtensionMigrationPackage,
 } from '@prisma-next/migration-tools/io';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import {
-  emitContractSpaceArtefacts,
+  emitPinnedSpaceArtefacts,
   spaceMigrationDirectory,
 } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -52,12 +47,12 @@ import {
   CIPHERSTASH_SPACE_ID,
   EQL_V2_CONFIGURATION_STATE_TYPE,
   EQL_V2_CONFIGURATION_TABLE,
-} from '../src/core/constants';
+} from '../src/extension-metadata/constants';
 
 interface SyntheticVersion {
   readonly contract: Contract<SqlStorage>;
   readonly contractDts: string;
-  readonly headRef: ContractSpaceHeadRef;
+  readonly headRef: ExtensionContractRef;
   readonly migrations: readonly MigrationPackage[];
 }
 
@@ -65,9 +60,8 @@ const PROFILE = profileHash('cipherstash-extension-profile-v1');
 
 /**
  * Build a tiny cipherstash-shaped descriptor at version `v`. The
- * configuration table grows a new column at v2 (the audit_column from
- * sub-spec § 6 Scenario C); that's what advances the storage hash and
- * justifies the new migration package.
+ * configuration table grows a new audit column at v2; that's what
+ * advances the storage hash and justifies the new migration package.
  */
 function buildVersion(v: 1 | 2): SyntheticVersion {
   const baseColumns = {
@@ -141,6 +135,7 @@ function buildVersion(v: 1 | 2): SyntheticVersion {
   } as const;
   const baseline: MigrationPackage = {
     dirName: '20260601T0000_install_eql_bundle',
+    dirPath: '20260601T0000_install_eql_bundle',
     metadata: {
       ...baselineMetaNoHash,
       migrationHash: computeMigrationHash(baselineMetaNoHash, baselineOps),
@@ -194,6 +189,7 @@ function buildVersion(v: 1 | 2): SyntheticVersion {
   } as const;
   const auditPkg: MigrationPackage = {
     dirName: '20260615T0000_add_audit_column',
+    dirPath: '20260615T0000_add_audit_column',
     metadata: {
       ...auditMetaNoHash,
       migrationHash: computeMigrationHash(auditMetaNoHash, auditOps),
@@ -230,14 +226,14 @@ async function pinDescriptorVersion(
   version: SyntheticVersion,
   options: { readonly write: 'pinnedOnly' | 'pinnedAndMigrations' },
 ): Promise<void> {
-  await emitContractSpaceArtefacts(fixture.migrationsDir, CIPHERSTASH_SPACE_ID, {
+  await emitPinnedSpaceArtefacts(fixture.migrationsDir, CIPHERSTASH_SPACE_ID, {
     contract: version.contract,
     contractDts: version.contractDts,
     headRef: { hash: version.headRef.hash, invariants: [...version.headRef.invariants] },
   });
   if (options.write === 'pinnedAndMigrations') {
     for (const pkg of version.migrations) {
-      await materialiseMigrationPackage(fixture.cipherstashSpaceDir, pkg);
+      await writeExtensionMigrationPackage(fixture.cipherstashSpaceDir, pkg);
     }
   }
 }
