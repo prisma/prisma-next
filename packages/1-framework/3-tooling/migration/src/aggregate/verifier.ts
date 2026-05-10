@@ -1,4 +1,5 @@
-import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import type { Result } from '@prisma-next/utils/result';
+import { notOk, ok } from '@prisma-next/utils/result';
 import type { ContractMarkerRecordLike } from './marker-types';
 import { projectSchemaToSpace } from './project-schema-to-space';
 import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
