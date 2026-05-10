@@ -225,9 +225,6 @@ describe('emit command: additional fixtures', () => {
         try {
           process.chdir(testSetup.testDir);
           const exitCode = await executeCommand(command, [
-            'node',
-            'cli.js',
-            'emit',
             '--config',
             'prisma-next.config.ts',
             '--json',
