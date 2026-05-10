@@ -66,6 +66,7 @@ export interface ControlClientOptions {
 export type ControlActionName =
   | 'dbInit'
   | 'dbUpdate'
+  | 'dbVerify'
   | 'migrationApply'
   | 'verify'
   | 'schemaVerify'

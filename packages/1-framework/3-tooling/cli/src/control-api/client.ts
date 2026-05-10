@@ -412,7 +412,7 @@ class ControlClientImpl implements ControlClient {
 
   async dbVerify(options: DbVerifyOptions): Promise<ExecuteDbVerifyResult> {
     const { onProgress } = options;
-    await this.connectWithProgress(options.connection, 'schemaVerify', onProgress);
+    await this.connectWithProgress(options.connection, 'dbVerify', onProgress);
     const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
 
     let contract: Contract;

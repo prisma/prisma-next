@@ -131,7 +131,7 @@ async function runIntrospection<TFamilyId extends string, TTargetId extends stri
 }): Promise<unknown> {
   const { driver, familyInstance, onProgress } = args;
   onProgress?.({
-    action: 'schemaVerify',
+    action: 'dbVerify',
     kind: 'spanStart',
     spanId: SPAN_IDS.introspect,
     label: 'Introspecting database schema',
@@ -139,7 +139,7 @@ async function runIntrospection<TFamilyId extends string, TTargetId extends stri
   try {
     const result = await familyInstance.introspect({ driver });
     onProgress?.({
-      action: 'schemaVerify',
+      action: 'dbVerify',
       kind: 'spanEnd',
       spanId: SPAN_IDS.introspect,
       outcome: 'ok',
@@ -147,7 +147,7 @@ async function runIntrospection<TFamilyId extends string, TTargetId extends stri
     return result;
   } catch (error) {
     onProgress?.({
-      action: 'schemaVerify',
+      action: 'dbVerify',
       kind: 'spanEnd',
       spanId: SPAN_IDS.introspect,
       outcome: 'error',
@@ -190,7 +190,7 @@ function emitVerifySpan(
 ): void {
   if (kind === 'spanStart') {
     onProgress?.({
-      action: 'schemaVerify',
+      action: 'dbVerify',
       kind: 'spanStart',
       spanId: SPAN_IDS.verify,
       label: 'Verifying contract spaces',
@@ -198,7 +198,7 @@ function emitVerifySpan(
     return;
   }
   onProgress?.({
-    action: 'schemaVerify',
+    action: 'dbVerify',
     kind: 'spanEnd',
     spanId: SPAN_IDS.verify,
     outcome: kind === 'spanEndOk' ? 'ok' : 'error',
