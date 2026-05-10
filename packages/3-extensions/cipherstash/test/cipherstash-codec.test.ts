@@ -150,6 +150,33 @@ describe('cipherstashStringCodecHooks.onFieldEvent', () => {
     });
   });
 
+  describe('operation labels (AC7 — first-time-user-readable)', () => {
+    it('add op label is action-first / column-first and free of extension jargon', () => {
+      const [op] = onFieldEvent('added', ctx({ next: { typeParams: { searchable: true } } }));
+      expect(op!.label).toBe(`Enable cipherstash search on ${TABLE}.${FIELD}`);
+      // The pre-M6 wording must not reappear (regression bar).
+      expect(op!.label).not.toContain('Register cipherstash search config');
+    });
+
+    it('remove op label is action-first / column-first', () => {
+      const [op] = onFieldEvent('dropped', ctx({ prior: { typeParams: { searchable: true } } }));
+      expect(op!.label).toBe(`Disable cipherstash search on ${TABLE}.${FIELD}`);
+      expect(op!.label).not.toContain('Remove cipherstash search config');
+    });
+
+    it('rotate op label is action-first / column-first', () => {
+      const [op] = onFieldEvent(
+        'altered',
+        ctx({
+          prior: { typeParams: { searchable: true, indexes: ['match'] } },
+          next: { typeParams: { searchable: true, indexes: ['match', 'unique'] } },
+        }),
+      );
+      expect(op!.label).toBe(`Rotate cipherstash search on ${TABLE}.${FIELD}`);
+      expect(op!.label).not.toContain('Rotate cipherstash search config');
+    });
+  });
+
   describe('invariantId + SQL conventions', () => {
     it('namespaces every emitted op under cipherstash-codec:*', () => {
       const allOps = [
