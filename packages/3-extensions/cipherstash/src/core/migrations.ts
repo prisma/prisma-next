@@ -1,25 +1,22 @@
 /**
  * CipherStash contract space — baseline migration package.
  *
- * Per project spec FR1 and the M3 sub-spec § 3, an extension's
- * `contractSpace.migrations` is a list of in-memory
+ * An extension's `contractSpace.migrations` is a list of in-memory
  * `MigrationPackage` values whose `ops` carry framework-level
  * `MigrationPlanOperation`s. The SQL family runner reads the additional
  * runtime fields (`target`, `precheck`, `execute`, `postcheck`) at
- * apply time; the manifest schema on disk (`ops.json`) intentionally
- * stays light at the framework level.
+ * apply time.
  *
- * R1 ships a single baseline migration whose ops mirror the M3 sub-spec
- * § 3 table: one `installEqlBundle` op carrying the vendored EQL bundle
- * SQL byte-for-byte (placeholder content for now — see
- * `./eql-bundle.ts`), one structural op per typed object in CipherStash's
- * contract IR, plus structural ops for the typed objects deferred to
- * IR-vocabulary expansion (composite types / enum / domains — kept here
- * so the database state remains consistent with the
- * `meta.cipherstashFutureIR` documentation in `./contract.ts`).
+ * This module exports a single baseline migration with:
+ *   - one `installEqlBundle` op carrying the vendored EQL bundle SQL
+ *     byte-for-byte (see `./eql-bundle.ts`);
+ *   - one structural op per typed object in CipherStash's contract IR;
+ *   - structural ops for the typed objects deferred from the contract IR
+ *     (composite types, enum, domains — kept here so the database state
+ *     remains consistent with `meta.cipherstashFutureIR` in `./contract.ts`).
  *
  * Each op carries a stable `cipherstash:*` invariantId — once published
- * these ids are immutable (project spec FR11).
+ * these ids are immutable.
  */
 
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
