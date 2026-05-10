@@ -21,7 +21,7 @@ The eight v1 patterns land in milestone M2. Until each entry exists, its row is 
 | Interface + factory function (stateful services) | [`interface-plus-factory.md`](./interface-plus-factory.md) | Stateful services are exposed as an exported `interface` plus a `createXxx()` factory; the implementing class is private. | Stable |
 | Adapter SPI for target-specific behaviour | [`adapter-spi.md`](./adapter-spi.md) | Target-specific behaviour is encapsulated behind an adapter interface the framework consumes uniformly; the framework never branches on `target === 'postgres'`. | Stable |
 | Capability gating | [`capability-gating.md`](./capability-gating.md) | Optional or target-varying features are declared as capabilities, verified against the database at runtime, and gated at every consumption site. | Stable |
-| Package layering: domains × layers × planes | `package-layering.md` | Packages are organised along three orthogonal axes (domains × layers × planes); imports flow downward and outward only, enforced by `pnpm lint:deps`. | Pending |
+| Package layering: domains × layers × planes | [`package-layering.md`](./package-layering.md) | Packages are organised along three orthogonal axes (domains × layers × planes); imports flow downward and outward only, enforced by `pnpm lint:deps`. | Stable |
 
 The status column reads **Stable** once an entry has at least two reference implementations in the codebase, and **Emerging** when a pattern has one shipped adopter plus a credible second adopter committed. _Three-layer polymorphic IR_ is the only Emerging entry in v1 — migration ops follow it today, and Contract IR / Schema IR adoption is in flight.
 
