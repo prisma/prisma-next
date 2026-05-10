@@ -6,24 +6,18 @@ import type {
   ControlFamilyInstance,
   MigrationOperationPolicy,
   MigrationPlanOperation,
-  MultiSpaceCapableRunner,
-  MultiSpaceRunnerPerSpaceOptions,
   OperationPreview,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
+import { hasOperationPreview } from '@prisma-next/framework-components/control';
 import {
-  hasMultiSpaceRunner,
-  hasOperationPreview,
-} from '@prisma-next/framework-components/control';
-import {
-  type AggregatePerSpacePlan,
   type AggregatePlannerError,
   type ContractSpaceAggregate,
   planAggregate,
 } from '@prisma-next/migration-tools/aggregate';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { CliStructuredError, errorRunnerFailed } from '../../utils/cli-errors';
+import { CliStructuredError } from '../../utils/cli-errors';
 import {
   type BuildAggregateInputs,
   buildContractSpaceAggregate,
@@ -38,17 +32,19 @@ import type {
   DbUpdateSuccess,
   OnControlProgress,
 } from '../types';
+import { applyAggregate, buildPerSpaceBreakdown, collectOrdered } from './apply-aggregate';
 import { stripOperations } from './migration-helpers';
 
 /**
  * Span IDs emitted via `onProgress` during the aggregate apply flow.
  * Stable identifiers consumed by the structured-output renderer and by
- * tests asserting on span ids.
+ * tests asserting on span ids. The `apply` span itself is owned by
+ * the {@link applyAggregate} primitive — only the introspect / plan
+ * spans are emitted directly here.
  */
 const SPAN_IDS = {
   introspect: 'introspect',
   plan: 'plan',
-  apply: 'apply',
 } as const;
 
 /**
@@ -207,123 +203,46 @@ export async function executeAggregateApply<TFamilyId extends string, TTargetId 
     });
   }
 
-  // 5. Apply mode: dispatch into the multi-space runner.
-  const runner = migrations.createRunner(familyInstance);
-  if (!hasMultiSpaceRunner(runner)) {
-    throw errorRunnerFailed(
-      `Runner for target "${aggregate.targetId}" does not implement \`executeAcrossSpaces\``,
-      {
-        why: `${action === 'dbInit' ? 'db init' : 'db update'} requires multi-space-capable runners (today: every SQL family runner).`,
-      },
-    );
-  }
-
-  onProgress?.({
+  // 5. Apply mode: hand off to the shared `applyAggregate` primitive.
+  // The runner-driving tail is identical for `db init` / `db update` /
+  // `migration apply` — only how each caller produces `perSpacePlans`
+  // differs (synth + graph-walk via planAggregate here; graph-walk
+  // only for migration apply). See M6 sub-spec § Required changes 1.
+  const applied = await applyAggregate({
+    aggregate,
+    perSpacePlans: planResult.value.perSpace,
+    applyOrder: planResult.value.applyOrder,
+    driver,
+    familyInstance,
+    migrations,
+    frameworkComponents,
+    policy,
     action,
-    kind: 'spanStart',
-    spanId: SPAN_IDS.apply,
-    label: 'Applying migration plan across spaces',
+    ...ifDefined('onProgress', onProgress),
   });
-
-  const perSpaceOptions: MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>[] =
-    orderedResolutions.map((r) => ({
-      space: r.spaceId,
-      plan: r.entry.plan,
-      driver,
-      destinationContract: r.entry.destinationContract,
-      policy,
-      executionChecks: { prechecks: false, postchecks: false, idempotencyChecks: false },
-      frameworkComponents,
-      // Per-space post-apply schema verification is non-strict: each
-      // space's `destinationContract` describes only its own slice; a
-      // strict verifier would treat every other space's tables as
-      // `extras`. Tolerant mode still catches missing tables / columns.
-      // SQL family runners read `strictVerification` via structural
-      // typing.
-      strictVerification: false,
-    })) as MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>[];
-
-  const runnerResult = await (
-    runner as MultiSpaceCapableRunner<TFamilyId, TTargetId>
-  ).executeAcrossSpaces({ driver, perSpaceOptions });
-
-  if (!runnerResult.ok) {
-    onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.apply, outcome: 'error' });
+  if (!applied.ok) {
     return buildRunnerFailure({
-      summary: runnerResult.failure.summary,
-      ...ifDefined('why', runnerResult.failure.why),
-      meta: {
-        ...(runnerResult.failure.meta ?? {}),
-        failingSpace: runnerResult.failure.failingSpace,
-      },
+      summary: applied.failure.summary,
+      ...ifDefined('why', applied.failure.why),
+      meta: applied.failure.meta,
     });
   }
-  onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.apply, outcome: 'ok' });
 
-  const totalOpsPlanned = runnerResult.value.perSpaceResults.reduce(
-    (sum, r) => sum + r.value.operationsPlanned,
-    0,
-  );
-  const totalOpsExecuted = runnerResult.value.perSpaceResults.reduce(
-    (sum, r) => sum + r.value.operationsExecuted,
-    0,
-  );
-
-  const aggregateOps = orderedResolutions.flatMap((r) => r.entry.displayOps);
-  const perSpace = buildPerSpaceBreakdown(orderedResolutions, aggregate.app.spaceId, {
-    includeMarkers: true,
-  });
+  const aggregateOps = applied.value.orderedResolutions.flatMap((r) => r.entry.displayOps);
   const summary =
     action === 'dbInit'
-      ? `Applied ${totalOpsExecuted} operation(s) across ${orderedResolutions.length} space(s), database signed`
-      : totalOpsExecuted === 0
-        ? `Database already matches contract across ${orderedResolutions.length} space(s), signature updated`
-        : `Applied ${totalOpsExecuted} operation(s) across ${orderedResolutions.length} space(s), signature updated`;
+      ? `Applied ${applied.value.totalOpsExecuted} operation(s) across ${applied.value.orderedResolutions.length} space(s), database signed`
+      : applied.value.totalOpsExecuted === 0
+        ? `Database already matches contract across ${applied.value.orderedResolutions.length} space(s), signature updated`
+        : `Applied ${applied.value.totalOpsExecuted} operation(s) across ${applied.value.orderedResolutions.length} space(s), signature updated`;
 
   return wrapApplyResult({
     operations: aggregateOps,
     destination: appPlan.destination,
-    operationsPlanned: totalOpsPlanned,
-    operationsExecuted: totalOpsExecuted,
-    perSpace,
+    operationsPlanned: applied.value.totalOpsPlanned,
+    operationsExecuted: applied.value.totalOpsExecuted,
+    perSpace: applied.value.perSpace,
     summary,
-  });
-}
-
-/**
- * Project the aggregate planner's per-space resolutions into the
- * `AggregatePerSpaceExecutionEntry[]` shape the CLI surfaces.
- *
- * Order is preserved (the input is already in canonical schedule order
- * — extensions alphabetically, then app — per
- * `concatenateSpaceApplyInputs`).
- *
- * `includeMarkers` is `true` for apply-mode (each space's marker is the
- * `destination.storageHash` of its plan, which the runner advances as
- * the last step of each space's transaction) and `false` for plan-mode
- * (no marker has been written yet).
- */
-function buildPerSpaceBreakdown(
-  orderedResolutions: readonly OrderedResolution[],
-  appSpaceId: string,
-  options: { readonly includeMarkers: boolean },
-): readonly AggregatePerSpaceExecutionEntry[] {
-  return orderedResolutions.map((r) => {
-    const operations = r.entry.displayOps.map((op) => ({
-      id: op.id,
-      label: op.label,
-      operationClass: op.operationClass,
-    }));
-    const base: AggregatePerSpaceExecutionEntry = {
-      spaceId: r.spaceId,
-      kind: r.spaceId === appSpaceId ? 'app' : 'extension',
-      operations,
-    };
-    if (!options.includeMarkers) return base;
-    return {
-      ...base,
-      marker: { storageHash: r.entry.plan.destination.storageHash },
-    };
   });
 }
 
@@ -373,24 +292,6 @@ function detectOrphanMarkers(
     meta: {
       violations: orphans.map((spaceId) => ({ kind: 'orphanMarker', spaceId })),
     },
-  });
-}
-
-interface OrderedResolution {
-  readonly spaceId: string;
-  readonly entry: AggregatePerSpacePlan;
-}
-
-function collectOrdered(
-  applyOrder: readonly string[],
-  perSpace: ReadonlyMap<string, AggregatePerSpacePlan>,
-): readonly OrderedResolution[] {
-  return applyOrder.map((spaceId) => {
-    const entry = perSpace.get(spaceId);
-    if (!entry) {
-      throw new Error(`Aggregate planner output missing per-space plan for "${spaceId}"`);
-    }
-    return { spaceId, entry };
   });
 }
 
