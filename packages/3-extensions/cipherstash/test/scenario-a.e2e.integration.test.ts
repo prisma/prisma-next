@@ -68,11 +68,13 @@ import { executePerSpaceDbApply } from '@prisma-next/cli/control-api';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor, {
-  type ExtensionMigrationPackage,
   INIT_ADDITIVE_POLICY,
   type SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import {
+  createControlStack,
+  type MigrationPackage,
+} from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
@@ -211,7 +213,7 @@ function buildSyntheticEqlBundleSql(): string {
  * {@link buildSyntheticEqlBundleSql}. The migrationHash is recomputed
  * because the on-disk representation differs.
  */
-function buildSyntheticBaselineMigration(): ExtensionMigrationPackage {
+function buildSyntheticBaselineMigration(): MigrationPackage {
   const realOps = cipherstashBaselineMigration.ops;
   const syntheticOps = realOps.map((op) => {
     const sqlOp = op as unknown as SqlMigrationPlanOperation<unknown>;
@@ -257,7 +259,7 @@ interface TestProject {
 }
 
 async function setupTestProject(args: {
-  readonly migration: ExtensionMigrationPackage;
+  readonly migration: MigrationPackage;
 }): Promise<TestProject> {
   const projectRoot = await mkdtemp(join(tmpdir(), 'cipherstash-scenario-a-'));
   const migrationsDir = join(projectRoot, 'migrations');

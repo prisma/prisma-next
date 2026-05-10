@@ -3,7 +3,7 @@
  *
  * Per project spec FR1 and the M3 sub-spec § 3, an extension's
  * `contractSpace.migrations` is a list of in-memory
- * `ExtensionMigrationPackage` values whose `ops` carry framework-level
+ * `MigrationPackage` values whose `ops` carry framework-level
  * `MigrationPlanOperation`s. The SQL family runner reads the additional
  * runtime fields (`target`, `precheck`, `execute`, `postcheck`) at
  * apply time; the manifest schema on disk (`ops.json`) intentionally
@@ -22,12 +22,12 @@
  * these ids are immutable (project spec FR11).
  */
 
+import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type {
-  ExtensionContractRef,
-  ExtensionMigrationPackage,
-  SqlMigrationPlanOperation,
-} from '@prisma-next/family-sql/control';
-import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+  ContractSpaceHeadRef,
+  MigrationPackage,
+  MigrationPlanOperation,
+} from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   CIPHERSTASH_BASELINE_MIGRATION_NAME,
@@ -61,7 +61,7 @@ type PostgresTargetDetails = {
  * shape checked by the type system), then narrow the
  * `target.details` to {@link PostgresTargetDetails} via a single
  * scoped cast on `target.details`. The wider `MigrationOps` type that
- * `ExtensionMigrationPackage.ops` declares is `readonly
+ * `MigrationPackage.ops` declares is `readonly
  * MigrationPlanOperation[]` (sub-spec § 1, AM3) — the SQL runner reads
  * the runtime fields off the same object at execution time.
  *
@@ -184,7 +184,7 @@ const createOreCompositeOps = EQL_V2_ORE_COMPOSITE_TYPES.map((name) =>
  * marker — see the {@link STRUCTURAL_OP_NOOP_SQL} block above for the
  * conflict-resolution rationale.
  *
- * The framework's `ExtensionMigrationPackage.ops` type is
+ * The framework's `MigrationPackage.ops` type is
  * `readonly MigrationPlanOperation[]` — wider than the SQL-family
  * runtime op shape. The list is typed as the framework alias here and
  * the runner narrows back to the SQL shape at apply time.
@@ -206,7 +206,7 @@ export const CIPHERSTASH_BASELINE_INVARIANTS: readonly string[] = (() => {
   return [...new Set(ids)].sort();
 })();
 
-const baselineMetadataWithoutHash: Omit<ExtensionMigrationPackage['metadata'], 'migrationHash'> = {
+const baselineMetadataWithoutHash: Omit<MigrationPackage['metadata'], 'migrationHash'> = {
   from: null,
   to: CIPHERSTASH_STORAGE_HASH,
   fromContract: null,
@@ -223,7 +223,7 @@ const baselineMetadataWithoutHash: Omit<ExtensionMigrationPackage['metadata'], '
  * this to `migrations/cipherstash/<dirName>/{manifest,ops,contract}.json`
  * in the user's repo at `migrate` time.
  */
-export const cipherstashBaselineMigration: ExtensionMigrationPackage = {
+export const cipherstashBaselineMigration: MigrationPackage = {
   dirName: CIPHERSTASH_BASELINE_MIGRATION_NAME,
   metadata: {
     ...baselineMetadataWithoutHash,
@@ -239,7 +239,7 @@ export const cipherstashBaselineMigration: ExtensionMigrationPackage = {
  * `findPathWithDecision` step (T2.3 / T2.4) consults `head.json` to
  * decide which migrations need to apply.
  */
-export const cipherstashHeadRef: ExtensionContractRef = {
+export const cipherstashHeadRef: ContractSpaceHeadRef = {
   hash: CIPHERSTASH_STORAGE_HASH,
   invariants: CIPHERSTASH_BASELINE_INVARIANTS,
 };
