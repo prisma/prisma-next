@@ -5,9 +5,9 @@
 
 ## Intent
 
-The canonical persistent artifact is **JSON**; the canonical in-memory form is a **class hierarchy** whose plain readonly fields serialize through `JSON.stringify` without a custom `toJSON()`. Hydration validates JSON shape (with arktype) then constructs class instances from the `kind` discriminant. Identity, attestation, replay, and audit key off the JSON; in-memory consumers walk class instances polymorphically.
+A migration emits `ops.json`; some time later, a runner in a different process reads that file and applies the ops. In between, you want to `cat` the file in PR review, `git diff` it across versions, `grep` it during an incident, and hash it for attestation — none of which work if the canonical form is "a tree of TypeScript class instances". So `ops.json` is the contract: the bytes the runner re-reads, the bytes the hash is computed over, the bytes a human can review. In memory the runner walks classes (so it gets polymorphic dispatch via [Frozen-class AST + visitor](./frozen-class-ast.md)), but the JSON is what's authoritative.
 
-Adopting this pattern commits you to: a single source-of-truth shape per node (no parallel "JSON DTO" / "in-memory class" pair drifting apart), JSON-clean fields on every class (no `Map`, `Set`, `Date`, or methods on properties), and validation at the JSON boundary (the boundary is where untrusted shape becomes trusted instances).
+The pattern: keep the persisted shape and the in-memory shape **the same shape** — every class field is a plain readonly value with a stable JSON encoding, so `JSON.stringify(node)` round-trips without a custom `toJSON()`. Validate at the boundary (with arktype) when reading; trust the instances inside. Identity (hashes, attestation) keys off the JSON, never off the in-memory representation.
 
 ## When to use
 
@@ -41,7 +41,7 @@ Adopting this pattern commits you to: a single source-of-truth shape per node (n
        dispatch                      across processes
 ```
 
-The classes have **plain readonly fields only** — no methods on properties, no JS types that don't have a stable JSON form. Hydration walks the JSON, switches on `kind`, and calls the matching constructor; the constructor calls `Object.freeze(this)` (per [Frozen-class AST + visitor](./frozen-class-ast.md)). Identity (hashes, attestation) is computed over the canonical JSON, never over the in-memory representation.
+The classes have plain readonly fields only — no methods on properties, no JS types that don't have a stable JSON form. Hydration walks the JSON, switches on `kind`, and calls the matching constructor; the constructor calls `Object.freeze(this)` (per [Frozen-class AST + visitor](./frozen-class-ast.md)). Identity is computed over the canonical JSON, never over the in-memory representation.
 
 ## Reference implementations
 
@@ -50,8 +50,6 @@ The classes have **plain readonly fields only** — no methods on properties, no
 | Migration `ops.json` (Mongo) | [`packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts`](../../../packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts) | `OpFactoryCall` classes serialise via `JSON.stringify` to `ops.json`; the runner rehydrates and walks the same class hierarchy at apply time. |
 | Migration `ops.json` (Postgres) | [`packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts`](../../../packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts) | Same shape on the SQL side; demonstrates the pattern is target-agnostic. |
 | Mongo wire commands | [`packages/2-mongo-family/6-transport/mongo-wire/src/wire-commands.ts`](../../../packages/2-mongo-family/6-transport/mongo-wire/src/wire-commands.ts) | Wire commands round-trip natively because MongoDB commands _are_ JSON; the canonical example of the pattern's "JSON is the contract" property. |
-
-Forthcoming reference implementations (in flight): Contract IR and Schema IR are being moved onto this pattern by the in-flight target-extensible IR work. The pattern entry will gain those references when they ship.
 
 ## Related ADRs
 
@@ -67,7 +65,7 @@ Forthcoming reference implementations (in flight): Contract IR and Schema IR are
 
 ## Cautions / common mistakes
 
-- **Non-JSON-clean fields.** A `Map`, `Set`, `Date`, or method-on-property field will silently round-trip wrong (a `Date` becomes a string; a `Map` becomes `{}`). Architect-persona check: every class field is a plain readonly value of a type with a stable JSON encoding.
+- **Non-JSON-clean fields.** A `Map`, `Set`, `Date`, or method-on-property field will silently round-trip wrong (a `Date` becomes a string; a `Map` becomes `{}`). Every class field should be a plain readonly value of a type with a stable JSON encoding.
 - **Custom `toJSON()`.** Once a class needs a custom `toJSON()` to serialise correctly, the in-memory shape and the JSON shape have diverged — the round-trip is no longer canonical. Surface the divergence rather than papering over it with `toJSON()`.
 - **Hashing the in-memory form.** Identity must key off the JSON, not the class instances; in-memory representations can vary by Node version, by frozen-state, by V8 internals. The JSON is the only stable byte stream.
 - **Skipping arktype validation at the boundary.** A consumer that constructs class instances from an unverified JSON shape inherits every drift, every renamed field, every off-by-one-version mismatch. Validate at the boundary; trust inside it.
