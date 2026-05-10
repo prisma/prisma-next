@@ -77,11 +77,11 @@ updates:
       timezone: Etc/UTC
     target-branch: main
     open-pull-requests-limit: 3
+    # GitHub Actions tags are not SemVer-typed by Dependabot, so the
+    # semver-*-days fields are rejected for this ecosystem. We use the
+    # single default soak window instead.
     cooldown:
       default-days: 10
-      semver-major-days: 28
-      semver-minor-days: 10
-      semver-patch-days: 6
       include: ["*"]
     commit-message:
       prefix: "chore(actions)"
