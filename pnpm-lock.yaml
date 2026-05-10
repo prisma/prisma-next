@@ -15,9 +15,6 @@ catalogs:
     '@types/pg':
       specifier: 8.20.0
       version: 8.20.0
-    arktype:
-      specifier: ^2.2.0
-      version: 2.2.0
     gray-matter:
       specifier: ^4.0.3
       version: 4.0.3
@@ -44,6 +41,7 @@ catalogs:
       version: 4.1.5
 
 overrides:
+  arktype: 2.1.29
   hono: 4.11.4
   js-yaml: 3.14.2
   lodash: 4.17.23
@@ -280,8 +278,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/3-targets/3-targets/postgres
       arktype:
-        specifier: 'catalog:'
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       pg:
         specifier: 'catalog:'
         version: 8.20.0
@@ -380,8 +378,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/3-targets/3-targets/postgres
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -504,8 +502,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/3-targets/3-targets/sqlite
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -791,8 +789,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
       arktype:
-        specifier: 'catalog:'
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -843,8 +841,8 @@ importers:
         specifier: workspace:*
         version: link:../../0-foundation/utils
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
@@ -1089,8 +1087,8 @@ importers:
         specifier: workspace:*
         version: link:../../0-foundation/utils
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       c12:
         specifier: ^3.3.4
         version: 3.3.4(magicast@0.5.1)
@@ -1180,8 +1178,8 @@ importers:
         specifier: workspace:*
         version: link:../../0-foundation/utils
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       prettier:
         specifier: ^3.8.3
         version: 3.8.3
@@ -1220,8 +1218,8 @@ importers:
         specifier: workspace:*
         version: link:../../0-foundation/utils
       arktype:
-        specifier: 'catalog:'
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
@@ -1278,8 +1276,8 @@ importers:
         specifier: workspace:*
         version: link:../../0-foundation/utils
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       c12:
         specifier: ^3.3.4
         version: 3.3.4(magicast@0.5.1)
@@ -1392,8 +1390,8 @@ importers:
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/contract
       arktype:
-        specifier: 'catalog:'
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -1905,8 +1903,8 @@ importers:
         specifier: workspace:*
         version: link:../../../1-framework/1-core/framework-components
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -1957,8 +1955,8 @@ importers:
         specifier: workspace:*
         version: link:../contract
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/emitter':
         specifier: workspace:*
@@ -2077,8 +2075,8 @@ importers:
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/utils
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
@@ -2196,8 +2194,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
       arktype:
-        specifier: 'catalog:'
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       ts-toolbelt:
         specifier: ^9.6.0
         version: 9.6.0
@@ -2306,8 +2304,8 @@ importers:
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/utils
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -2376,8 +2374,8 @@ importers:
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/utils
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
@@ -2434,8 +2432,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/sql-contract':
         specifier: workspace:*
@@ -2609,8 +2607,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/operations':
         specifier: workspace:*
@@ -2883,8 +2881,8 @@ importers:
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/utils
       arktype:
-        specifier: 'catalog:'
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0
@@ -2956,8 +2954,8 @@ importers:
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/utils
       arktype:
-        specifier: 'catalog:'
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0
@@ -3081,8 +3079,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
@@ -3215,8 +3213,8 @@ importers:
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/utils
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/cli':
         specifier: workspace:*
@@ -3300,8 +3298,8 @@ importers:
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/utils
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/driver-sqlite':
         specifier: workspace:*
@@ -3355,8 +3353,8 @@ importers:
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/utils
       arktype:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
       pg:
         specifier: 'catalog:'
         version: 8.20.0
@@ -3513,8 +3511,8 @@ importers:
         specifier: workspace:*
         version: link:../../utils
       arktype:
-        specifier: 'catalog:'
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
@@ -3652,8 +3650,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/vite-plugin-contract-emit
       arktype:
-        specifier: 'catalog:'
-        version: 2.2.0
+        specifier: 2.1.29
+        version: 2.1.29
     devDependencies:
       '@prisma-next/framework-components':
         specifier: workspace:*
@@ -6540,8 +6538,8 @@ packages:
   arkregex@0.0.5:
     resolution: {integrity: sha512-ncYjBdLlh5/QnVsAA8De16Tc9EqmYM7y/WU9j+236KcyYNUXogpz3sC4ATIZYzzLxwI+0sEOaQLEmLmRleaEXw==}
 
-  arktype@2.2.0:
-    resolution: {integrity: sha512-t54MZ7ti5BhOEvzEkgKnWvqj+UbDfWig+DHr5I34xatymPusKLS0lQpNJd8M6DzmIto2QGszHfNKoFIT8tMCZQ==}
+  arktype@2.1.29:
+    resolution: {integrity: sha512-jyfKk4xIOzvYNayqnD8ZJQqOwcrTOUbIU4293yrzAjA3O1dWh61j71ArMQ6tS/u4pD7vabSPe7nG3RCyoXW6RQ==}
 
   array-flatten@1.1.1:
     resolution: {integrity: sha512-PCVAQswWemu6UdxsDFFX/+gVeYqKAod3D3UVm91jHwynguOwAvYPhx8nNlM++NqRcK6CxxpUafjmhIdKiHibqg==}
@@ -10897,7 +10895,7 @@ snapshots:
     dependencies:
       '@ark/util': 0.56.0
 
-  arktype@2.2.0:
+  arktype@2.1.29:
     dependencies:
       '@ark/schema': 0.56.0
       '@ark/util': 0.56.0
