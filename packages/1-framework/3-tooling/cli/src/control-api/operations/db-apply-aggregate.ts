@@ -29,6 +29,7 @@ import {
   buildContractSpaceAggregate,
 } from '../../utils/contract-space-aggregate-loader';
 import type {
+  AggregatePerSpaceExecutionEntry,
   DbInitFailure,
   DbInitResult,
   DbInitSuccess,
@@ -193,11 +194,15 @@ export async function executeAggregateApply<TFamilyId extends string, TTargetId 
     const preview = hasOperationPreview(familyInstance)
       ? familyInstance.toOperationPreview(aggregateOps)
       : undefined;
+    const perSpace = buildPerSpaceBreakdown(orderedResolutions, aggregate.app.spaceId, {
+      includeMarkers: false,
+    });
     const summary = `Planned ${aggregateOps.length} operation(s) across ${orderedResolutions.length} space(s)`;
     return wrapPlanResult({
       operations: aggregateOps,
       destination: appPlan.destination,
       preview,
+      perSpace,
       summary,
     });
   }
@@ -265,6 +270,9 @@ export async function executeAggregateApply<TFamilyId extends string, TTargetId 
   );
 
   const aggregateOps = orderedResolutions.flatMap((r) => r.entry.displayOps);
+  const perSpace = buildPerSpaceBreakdown(orderedResolutions, aggregate.app.spaceId, {
+    includeMarkers: true,
+  });
   const summary =
     action === 'dbInit'
       ? `Applied ${totalOpsExecuted} operation(s) across ${orderedResolutions.length} space(s), database signed`
@@ -277,7 +285,45 @@ export async function executeAggregateApply<TFamilyId extends string, TTargetId 
     destination: appPlan.destination,
     operationsPlanned: totalOpsPlanned,
     operationsExecuted: totalOpsExecuted,
+    perSpace,
     summary,
+  });
+}
+
+/**
+ * Project the aggregate planner's per-space resolutions into the
+ * `AggregatePerSpaceExecutionEntry[]` shape the CLI surfaces.
+ *
+ * Order is preserved (the input is already in canonical schedule order
+ * — extensions alphabetically, then app — per
+ * `concatenateSpaceApplyInputs`).
+ *
+ * `includeMarkers` is `true` for apply-mode (each space's marker is the
+ * `destination.storageHash` of its plan, which the runner advances as
+ * the last step of each space's transaction) and `false` for plan-mode
+ * (no marker has been written yet).
+ */
+function buildPerSpaceBreakdown(
+  orderedResolutions: readonly OrderedResolution[],
+  appSpaceId: string,
+  options: { readonly includeMarkers: boolean },
+): readonly AggregatePerSpaceExecutionEntry[] {
+  return orderedResolutions.map((r) => {
+    const operations = r.entry.displayOps.map((op) => ({
+      id: op.id,
+      label: op.label,
+      operationClass: op.operationClass,
+    }));
+    const base: AggregatePerSpaceExecutionEntry = {
+      spaceId: r.spaceId,
+      kind: r.spaceId === appSpaceId ? 'app' : 'extension',
+      operations,
+    };
+    if (!options.includeMarkers) return base;
+    return {
+      ...base,
+      marker: { storageHash: r.entry.plan.destination.storageHash },
+    };
   });
 }
 
@@ -387,6 +433,7 @@ function wrapPlanResult(args: {
   readonly operations: readonly MigrationPlanOperation[];
   readonly destination: { readonly storageHash: string; readonly profileHash?: string };
   readonly preview: OperationPreview | undefined;
+  readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
   readonly summary: string;
 }): DbInitResult | DbUpdateResult {
   const success: DbInitSuccess | DbUpdateSuccess = {
@@ -399,6 +446,7 @@ function wrapPlanResult(args: {
       storageHash: args.destination.storageHash,
       ...ifDefined('profileHash', args.destination.profileHash),
     },
+    perSpace: args.perSpace,
     summary: args.summary,
   };
   return ok(success);
@@ -409,6 +457,7 @@ function wrapApplyResult(args: {
   readonly destination: { readonly storageHash: string; readonly profileHash?: string };
   readonly operationsPlanned: number;
   readonly operationsExecuted: number;
+  readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
   readonly summary: string;
 }): DbInitResult | DbUpdateResult {
   const success: DbInitSuccess | DbUpdateSuccess = {
@@ -425,6 +474,7 @@ function wrapApplyResult(args: {
     marker: args.destination.profileHash
       ? { storageHash: args.destination.storageHash, profileHash: args.destination.profileHash }
       : { storageHash: args.destination.storageHash },
+    perSpace: args.perSpace,
     summary: args.summary,
   };
   return ok(success);

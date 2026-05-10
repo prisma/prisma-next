@@ -1,9 +1,11 @@
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
+import type { AggregatePerSpaceExecutionEntry } from '../src/control-api/types';
 import {
   formatMigrationApplyOutput,
   formatMigrationJson,
   formatMigrationPlanOutput,
+  formatPerSpaceBlock,
   type MigrationCommandResult,
 } from '../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../src/utils/global-flags';
@@ -193,7 +195,12 @@ describe('formatMigrationApplyOutput', () => {
     const output = formatMigrationApplyOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('Signature: sha256:dest-hash');
+    // M6 (T6.5 / AC4): single-line `Signature:` is replaced. When the
+    // result carries no per-space breakdown we fall back to a labelled
+    // `App-space marker:` line that names what the hash covers; the
+    // multi-space block lives in the per-space output (see other tests).
+    expect(stripped).toContain('App-space marker: sha256:dest-hash');
+    expect(stripped).not.toContain('Signature: sha256:dest-hash');
   });
 
   it('shows profile hash when present', () => {
@@ -225,6 +232,76 @@ describe('formatMigrationApplyOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain('Total time: 100ms');
+  });
+
+  describe('per-space breakdown (M6 AC4 / AC5)', () => {
+    const perSpace: ReadonlyArray<AggregatePerSpaceExecutionEntry> = [
+      {
+        spaceId: 'pgvector',
+        kind: 'extension',
+        operations: [
+          {
+            id: 'pgvector.install-vector-extension',
+            label: 'Install vector extension',
+            operationClass: 'additive',
+          },
+        ],
+        marker: { storageHash: 'sha256:pgvector-head' },
+      },
+      {
+        spaceId: 'app',
+        kind: 'app',
+        operations: [
+          {
+            id: 'table.embeddings',
+            label: 'Create table embeddings',
+            operationClass: 'additive',
+          },
+        ],
+        marker: { storageHash: 'sha256:app-head' },
+      },
+    ];
+
+    it('renders the extension space first then the app space (canonical order)', () => {
+      const lines = formatPerSpaceBlock(perSpace, 'apply', false);
+      const block = lines.join('\n');
+      const extensionIdx = block.indexOf('Extension space: pgvector');
+      const appIdx = block.indexOf('App space');
+      expect(extensionIdx).toBeGreaterThanOrEqual(0);
+      expect(appIdx).toBeGreaterThan(extensionIdx);
+    });
+
+    it('surfaces every per-space marker on apply (AC4)', () => {
+      const block = formatPerSpaceBlock(perSpace, 'apply', false).join('\n');
+      expect(block).toContain('marker → sha256:pgvector-head');
+      expect(block).toContain('marker → sha256:app-head');
+    });
+
+    it('omits per-space markers in plan mode (no marker yet)', () => {
+      const block = formatPerSpaceBlock(perSpace, 'plan', false).join('\n');
+      expect(block).not.toContain('marker →');
+    });
+
+    it('formatMigrationApplyOutput uses the per-space block in place of the legacy `Signature:` line when perSpace is present', () => {
+      const result = createApplyResult({
+        execution: { operationsPlanned: 2, operationsExecuted: 2 },
+        marker: { storageHash: 'sha256:app-head' },
+        perSpace,
+        summary: 'Applied 2 operation(s) across 2 space(s), database signed',
+      });
+      const flags = parseGlobalFlags({ 'no-color': true });
+      const stripped = stripAnsi(formatMigrationApplyOutput(result, flags));
+
+      expect(stripped).toContain('Applied 2 operation(s) across 2 contract spaces');
+      expect(stripped).toContain('Extension space: pgvector');
+      expect(stripped).toContain('App space');
+      expect(stripped).toContain('marker → sha256:pgvector-head');
+      expect(stripped).toContain('marker → sha256:app-head');
+      // Legacy single-line signature must not reappear.
+      expect(stripped).not.toContain('Signature:');
+      // Next-step hint surfaces the canonical follow-up command (AC6).
+      expect(stripped).toContain("Run 'prisma-next migration status'");
+    });
   });
 
   it('shows no-op message when zero operations executed', () => {
