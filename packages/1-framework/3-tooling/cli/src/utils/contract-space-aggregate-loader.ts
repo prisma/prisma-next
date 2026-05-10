@@ -2,7 +2,6 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
 import type {
   ContractSpaceAggregate,
-  DeclaredExtensionEntry,
   LoadAggregateError,
   LoadAggregateInput,
   LoadAggregateOutput,
@@ -10,55 +9,7 @@ import type {
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from './cli-errors';
-
-/**
- * Structural shape the aggregate loader needs from each declared
- * `Config.extensionPacks` entry. Mirrors the SQL family's
- * `SqlControlExtensionDescriptor.contractSpace` shape but kept
- * structural so the loader doesn't depend on the SQL family.
- */
-type ExtensionPackForAggregate = {
-  readonly id: string;
-  readonly targetId: string;
-  readonly contractSpace?: {
-    readonly contractJson: unknown;
-    readonly headRef: { readonly hash: string; readonly invariants: readonly string[] };
-  };
-};
-
-/**
- * Convert the CLI's `Config.extensionPacks` array into the loader's
- * `DeclaredExtensionEntry[]` shape.
- *
- * The loader hashes `contractSpace.contractJson` to compare against the
- * on-disk `refs/head.json.hash` (drift detection). Rather than re-running
- * the canonical-JSON + SHA-256 pipeline at the CLI surface, we look up
- * the descriptor's pre-computed `headRef.hash` via reference identity
- * on the contract JSON value — the loader passes the same
- * `entry.contractSpace.contractJson` reference through to the hasher,
- * so identity-keyed lookup is safe.
- */
-function toDeclaredExtensions(extensionPacks: ReadonlyArray<ExtensionPackForAggregate>): {
-  readonly entries: ReadonlyArray<DeclaredExtensionEntry>;
-  readonly hashByContractJson: Map<unknown, string>;
-} {
-  const entries: DeclaredExtensionEntry[] = [];
-  const hashByContractJson = new Map<unknown, string>();
-  for (const pack of extensionPacks) {
-    const entry: DeclaredExtensionEntry = pack.contractSpace
-      ? {
-          id: pack.id,
-          targetId: pack.targetId,
-          contractSpace: { contractJson: pack.contractSpace.contractJson },
-        }
-      : { id: pack.id, targetId: pack.targetId };
-    entries.push(entry);
-    if (pack.contractSpace) {
-      hashByContractJson.set(pack.contractSpace.contractJson, pack.contractSpace.headRef.hash);
-    }
-  }
-  return { entries, hashByContractJson };
-}
+import { toDeclaredExtensions, toExtensionInputs } from './extension-pack-inputs';
 
 /**
  * Render a {@link LoadAggregateError} into a CLI structured-error
@@ -207,7 +158,7 @@ export async function buildContractSpaceAggregate<
   inputs: BuildAggregateInputs<TFamilyId, TTargetId>,
 ): Promise<Result<ContractSpaceAggregate, CliStructuredError>> {
   const { entries, hashByContractJson } = toDeclaredExtensions(
-    inputs.extensionPacks as ReadonlyArray<ExtensionPackForAggregate>,
+    toExtensionInputs(inputs.extensionPacks),
   );
 
   const loadInput: LoadAggregateInput = {
