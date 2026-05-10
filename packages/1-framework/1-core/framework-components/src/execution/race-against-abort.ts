@@ -1,14 +1,18 @@
-import type { CodecCallContext } from '../shared/codec-types';
 import type { RuntimeAbortedPhase } from './runtime-error';
 import { runtimeAborted } from './runtime-error';
 
 /**
  * Throw a phase-tagged `RUNTIME.ABORTED` envelope if the supplied
- * codec-call context is already aborted at the precheck site. Centralises
- * the `if (ctx.signal?.aborted) throw runtimeAborted(...)` pattern that
- * every codec dispatch site repeats.
+ * context is already aborted at the precheck site. Centralises the
+ * `if (ctx.signal?.aborted) throw runtimeAborted(...)` pattern that
+ * every codec dispatch site (and the `beforeExecute` middleware phase)
+ * repeats. Accepts both the framework `CodecCallContext` and the
+ * `RuntimeMiddlewareContext`; both expose `signal?: AbortSignal`.
  */
-export function checkAborted(ctx: CodecCallContext, phase: RuntimeAbortedPhase): void {
+export function checkAborted(
+  ctx: { readonly signal?: AbortSignal },
+  phase: RuntimeAbortedPhase,
+): void {
   if (ctx.signal?.aborted) {
     throw runtimeAborted(phase, ctx.signal.reason);
   }
@@ -31,9 +35,9 @@ export function checkAborted(ctx: CodecCallContext, phase: RuntimeAbortedPhase):
  * before installing the listener. The rejection is still attributed to the
  * abort path via the sentinel-identity check.
  *
- * Distinguishing the rejection source is load-bearing for AC-ERR4
- * (`RUNTIME.ENCODE_FAILED` / `RUNTIME.DECODE_FAILED` pass through unchanged).
- * The semantically equivalent `abortable(signal)` helper in
+ * Distinguishing the rejection source is load-bearing so codec-thrown
+ * errors (`RUNTIME.ENCODE_FAILED` / `RUNTIME.DECODE_FAILED`) pass
+ * through unchanged. The semantically equivalent `abortable(signal)` helper in
  * `@prisma-next/utils` rejects with `signal.reason ?? new DOMException(...)`,
  * which is not stably distinguishable from a codec-thrown error by identity
  * alone (a fresh fallback DOMException is allocated per call). We instead
@@ -41,10 +45,10 @@ export function checkAborted(ctx: CodecCallContext, phase: RuntimeAbortedPhase):
  * installed here ever rejects with the sentinel, so an `error === sentinel`
  * identity check after the race is unambiguous.
  *
- * Lives in `framework-components` (rather than the SQL family, where it
- * originated in m2) so every family runtime that needs cooperative
- * cancellation around a codec-dispatch `Promise.all` (SQL encode + decode
- * today, Mongo encode in m3) shares the same attribution logic.
+ * Lives in `framework-components` (rather than a single family) so every
+ * family runtime that needs cooperative cancellation around a codec-dispatch
+ * `Promise.all` (SQL encode + decode, Mongo encode) shares the same
+ * attribution logic.
  */
 export async function raceAgainstAbort<T>(
   work: Promise<T>,

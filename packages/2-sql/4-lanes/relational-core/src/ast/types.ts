@@ -156,7 +156,7 @@ function rewriteProjectionItem(item: ProjectionItem, rewriter: AstRewriter): Pro
         ? rewriter.literal(item.expr)
         : item.expr
       : item.expr.rewrite(rewriter);
-  return new ProjectionItem(item.alias, rewrittenExpr, item.codecId, item.refs);
+  return new ProjectionItem(item.alias, rewrittenExpr, item.codecId);
 }
 
 function rewriteInsertValue(value: InsertValue, rewriter: AstRewriter): InsertValue {
@@ -320,7 +320,9 @@ export class DerivedTableSource extends FromSource {
     return new DerivedTableSource(alias, query);
   }
 
-  // Intentionally does not call rewriter.tableSource — derived tables are rewritten via their inner query, not intercepted at the FromSource level. A future fromSource?(source: AnyFromSource) callback would be needed for that.
+  // Intentionally does not call rewriter.tableSource — derived tables are rewritten
+  // via their inner query, not intercepted at the FromSource level. A future
+  // fromSource?(source: AnyFromSource) callback would be needed for that.
   override rewrite(rewriter: AstRewriter): AnyFromSource {
     return new DerivedTableSource(this.alias, this.query.rewrite(rewriter));
   }
@@ -390,37 +392,23 @@ export class IdentifierRef extends Expression {
   }
 }
 
-/**
- * Column ref carried by a {@link ParamRef} that was constructed at a column-bound site (e.g. an INSERT/UPDATE column assignment, a `WHERE column = $param` comparison). The encode-side dispatch path uses `refs` to call `contractCodecs.forColumn(refs.table, refs.column)`, which selects the per-instance parameterized codec for the column — required when a parameterized codec id is shared by multiple columns with distinct
- * typeParams (e.g. `vector(1024)` vs. `vector(1536)`).
- *
- * `refs` may legitimately be `undefined` for `ParamRef`s constructed without a column context — the validator pass (`validateParamRefRefs`) treats refs-less ParamRefs as a hard error only when their codec id is parameterized.
- */
-export interface ParamRefBindingRefs {
-  readonly table: string;
-  readonly column: string;
-}
-
 export class ParamRef extends Expression {
   readonly kind = 'param-ref' as const;
   readonly value: unknown;
   readonly name: string | undefined;
   readonly codecId: string | undefined;
-  readonly refs: ParamRefBindingRefs | undefined;
 
   constructor(
     value: unknown,
     options?: {
       name?: string;
       codecId?: string;
-      refs?: ParamRefBindingRefs;
     },
   ) {
     super();
     this.value = value;
     this.name = options?.name;
     this.codecId = options?.codecId;
-    this.refs = options?.refs ? Object.freeze({ ...options.refs }) : undefined;
     this.freeze();
   }
 
@@ -429,7 +417,6 @@ export class ParamRef extends Expression {
     options?: {
       name?: string;
       codecId?: string;
-      refs?: ParamRefBindingRefs;
     },
   ): ParamRef {
     return new ParamRef(value, options);
@@ -1082,32 +1069,21 @@ export class ProjectionItem extends AstNode {
   readonly alias: string;
   readonly expr: ProjectionExpr;
   readonly codecId: string | undefined;
-  /**
-   * Column-bound metadata for the projection. Populated by builder paths that promote a top-level field shortcut (`select('email', ...)`) into a bare `IdentifierRef` AST while still knowing the originating `(table, column)`. Decode-side dispatch consults `refs` to call `forColumn(table, column)` so parameterized codec ids resolve to the per-instance codec — required when multiple columns share a codec id with distinct
-   * typeParams (e.g. `varchar(36)` vs. `varchar(255)`). Stays `undefined` for `column-ref` projections (the AST already carries the binding) and for non-column-bound projections (computed expressions, subqueries, raw aliases).
-   */
-  readonly refs: ParamRefBindingRefs | undefined;
 
-  constructor(alias: string, expr: ProjectionExpr, codecId?: string, refs?: ParamRefBindingRefs) {
+  constructor(alias: string, expr: ProjectionExpr, codecId?: string) {
     super();
     this.alias = alias;
     this.expr = expr;
     this.codecId = codecId;
-    this.refs = refs ? Object.freeze({ ...refs }) : undefined;
     this.freeze();
   }
 
-  static of(
-    alias: string,
-    expr: ProjectionExpr,
-    codecId?: string,
-    refs?: ParamRefBindingRefs,
-  ): ProjectionItem {
-    return new ProjectionItem(alias, expr, codecId, refs);
+  static of(alias: string, expr: ProjectionExpr, codecId?: string): ProjectionItem {
+    return new ProjectionItem(alias, expr, codecId);
   }
 
   withCodecId(codecId: string | undefined): ProjectionItem {
-    return new ProjectionItem(this.alias, this.expr, codecId, this.refs);
+    return new ProjectionItem(this.alias, this.expr, codecId);
   }
 }
 
@@ -1265,7 +1241,6 @@ export class SelectAst extends QueryAst {
                 : projection.expr
               : projection.expr.rewrite(rewriter),
             projection.codecId,
-            projection.refs,
           ),
       ),
       where: this.where?.rewrite(rewriter),
@@ -1651,7 +1626,60 @@ export class DeleteAst extends QueryAst {
   }
 }
 
-export type AnyQueryAst = SelectAst | InsertAst | UpdateAst | DeleteAst;
+/**
+ * Raw-SQL query AST node carrying interpolated parameter / expression nodes
+ * embedded inside literal SQL fragments.
+ *
+ * `fragments` and `args` are interleaved during lowering:
+ * `fragments[0] + lower(args[0]) + fragments[1] + ... + fragments[n]`.
+ * Construction enforces `fragments.length === args.length + 1`.
+ *
+ * Extends {@link QueryAst} (whole-query AST, not a sub-expression).
+ * Construction does not validate that each arg is a `ParamRef` /
+ * `AnyExpression`: the type system already rejects bare values because
+ * `args` is typed `readonly AnyExpression[]`. The user-facing `raw\`...\``
+ * factory (separate `sql-raw-factory` component) layers stricter
+ * type-level rejection on top of this AST node.
+ */
+export class RawSqlExpr extends QueryAst {
+  readonly kind = 'raw-sql' as const;
+  readonly fragments: readonly string[];
+  readonly args: readonly AnyExpression[];
+
+  constructor(fragments: readonly string[], args: readonly AnyExpression[]) {
+    super();
+    if (fragments.length !== args.length + 1) {
+      throw new Error(
+        `RawSqlExpr: fragments.length must equal args.length + 1 (got fragments=${fragments.length}, args=${args.length})`,
+      );
+    }
+    this.fragments = Object.freeze([...fragments]);
+    this.args = Object.freeze([...args]);
+    this.freeze();
+  }
+
+  static of(fragments: readonly string[], args: readonly AnyExpression[]): RawSqlExpr {
+    return new RawSqlExpr(fragments, args);
+  }
+
+  override collectParamRefs(): ParamRef[] {
+    const refs: ParamRef[] = [];
+    for (const arg of this.args) {
+      if (arg.kind === 'param-ref') {
+        refs.push(arg);
+      } else {
+        refs.push(...arg.collectParamRefs());
+      }
+    }
+    return refs;
+  }
+
+  override toQueryAst(): AnyQueryAst {
+    return this;
+  }
+}
+
+export type AnyQueryAst = SelectAst | InsertAst | UpdateAst | DeleteAst | RawSqlExpr;
 export type AnyFromSource = TableSource | DerivedTableSource;
 export type AnyExpression =
   | ColumnRef
@@ -1679,6 +1707,7 @@ export const queryAstKinds: ReadonlySet<string> = new Set<AnyQueryAst['kind']>([
   'insert',
   'update',
   'delete',
+  'raw-sql',
 ]);
 export const whereExprKinds: ReadonlySet<string> = new Set<AnyExpression['kind']>([
   'binary',

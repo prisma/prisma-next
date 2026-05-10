@@ -1,7 +1,6 @@
 {
   "name": "@prisma-next/sql-relational-core",
   "version": "0.0.1",
-  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "AST types, query lane context, and type utilities for Prisma Next SQL lanes",
@@ -22,7 +21,6 @@
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/utils": "workspace:*",
-    "@standard-schema/spec": "^1.1.0",
     "arktype": "catalog:",
     "ts-toolbelt": "^9.6.0"
   },
@@ -42,9 +40,9 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./ast": "./dist/exports/ast.mjs",
-    "./codec-descriptor-registry": "./dist/exports/codec-descriptor-registry.mjs",
     "./errors": "./dist/exports/errors.mjs",
     "./expression": "./dist/exports/expression.mjs",
+    "./middleware": "./dist/exports/middleware.mjs",
     "./plan": "./dist/exports/plan.mjs",
     "./query-lane-context": "./dist/exports/query-lane-context.mjs",
     "./types": "./dist/exports/types.mjs",

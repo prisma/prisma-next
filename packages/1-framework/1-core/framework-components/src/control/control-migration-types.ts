@@ -10,64 +10,10 @@
  */
 
 import type { Contract } from '@prisma-next/contract/types';
+import type { ImportRequirement } from '@prisma-next/ts-render';
 import type { Result } from '@prisma-next/utils/result';
 import type { TargetBoundComponentDescriptor } from '../shared/framework-components';
 import type { ControlDriverInstance, ControlFamilyInstance } from './control-instances';
-
-// ============================================================================
-// Migration Package Metadata
-// ============================================================================
-
-/**
- * Planner provenance recorded inside {@link MigrationMetadata}.
- *
- * `used` / `applied` track which migration hints the planner consulted
- * vs. which it actually applied during emission; `plannerVersion`
- * pins the planner build that produced the migration so future
- * verification passes can recognise plans authored against an older
- * planner.
- */
-export interface MigrationHints {
-  readonly used: readonly string[];
-  readonly applied: readonly string[];
-  readonly plannerVersion: string;
-}
-
-/**
- * In-memory migration metadata envelope. Every migration is
- * content-addressed: the `migrationHash` is a hash over the metadata
- * envelope plus the operations list, computed at write time. There is no
- * draft state — a migration directory either exists with fully attested
- * metadata or it does not.
- *
- * When the planner cannot lower an operation because of an unfilled
- * `placeholder(...)` slot, the migration is still written with
- * `migrationHash` hashed over `ops: []`. Re-running self-emit after the
- * user fills the placeholder produces a *different* `migrationHash`
- * (committed to the real ops); this is intentional.
- *
- * The on-disk JSON shape in `migration.json` matches this type
- * field-for-field — `JSON.stringify(metadata, null, 2)` is the canonical
- * writer output (defined in `@prisma-next/migration-tools/io`).
- */
-export interface MigrationMetadata {
-  readonly migrationHash: string;
-  readonly from: string | null;
-  readonly to: string;
-  readonly fromContract: Contract | null;
-  readonly toContract: Contract;
-  readonly hints: MigrationHints;
-  readonly labels: readonly string[];
-  /**
-   * Sorted, deduplicated list of `invariantId`s declared by the
-   * migration's data-transform ops. Always present; an empty array
-   * means the migration has no routing-visible data transforms.
-   */
-  readonly providedInvariants: readonly string[];
-  readonly authorship?: { readonly author?: string; readonly email?: string };
-  readonly signature?: { readonly keyId: string; readonly value: string } | null;
-  readonly createdAt: string;
-}
 
 // ============================================================================
 // Operation Classes and Policy
@@ -140,9 +86,33 @@ export interface MigrationPlanOperation {
 // ============================================================================
 
 /**
- * Framework-level contract for a single factory call in a target's planner IR.
+ * Framework-level contract for a single factory call in a target's planner
+ * IR — the canonical shape for any node participating in the two-renderer
+ * pattern (source-text rendering for `migration.ts` + runtime-op derivation
+ * for `ops.json`).
  *
- * @see ADR 195
+ * Implementations declare:
+ *
+ *   - **Identity / display metadata** (`factoryName`, `operationClass`,
+ *     `label`) used by CLI summaries and the issue planner.
+ *   - **`renderTypeScript()`** — emit the call as a TypeScript expression
+ *     suitable for inclusion in a generated `migration.ts`. Polymorphic
+ *     across postgres / mongo / sqlite / extension-owned calls.
+ *   - **`importRequirements()`** — the symbols this rendered expression
+ *     pulls in. Aggregated and deduplicated by the top-level renderer
+ *     into a single import block per file.
+ *   - **`toOp()`** — lower the call to a runtime
+ *     `MigrationPlanOperation`. Returns the framework base; concrete
+ *     implementations narrow via covariant return (e.g. SQL targets
+ *     return `SqlMigrationPlanOperation<TTargetDetails>`).
+ *
+ * Each domain (target, extension) defines its own set of concrete `*Call`
+ * classes that implement this interface — typically by extending
+ * {@link import('@prisma-next/ts-render').TsExpression} and adding the
+ * concrete `toOp()` body. Extensions can implement the interface
+ * directly without depending on a target's package-private base.
+ *
+ * @see ADR 195 — Planner IR with two renderers.
  */
 export interface OpFactoryCall {
   /** The name of the factory that would produce this call's runtime op. */
@@ -151,6 +121,26 @@ export interface OpFactoryCall {
   readonly operationClass: MigrationOperationClass;
   /** Human-readable label for CLI output and diagnostics. */
   readonly label: string;
+  /**
+   * Render this call as a TypeScript expression suitable for inclusion in
+   * a generated `migration.ts`. The output is composed alongside other
+   * calls' rendered expressions inside the migration's `operations`
+   * array.
+   */
+  renderTypeScript(): string;
+  /**
+   * Import requirements pulled in by the rendered TypeScript expression.
+   * Aggregated and deduplicated across all calls into a single import
+   * block per file.
+   */
+  importRequirements(): readonly ImportRequirement[];
+  /**
+   * Lower this call to a runtime migration plan operation suitable for
+   * execution / inclusion in `ops.json`. Concrete implementations narrow
+   * the return type via covariant return (e.g. SQL targets return
+   * `SqlMigrationPlanOperation<TTargetDetails>`).
+   */
+  toOp(): MigrationPlanOperation;
 }
 
 // ============================================================================
@@ -164,16 +154,6 @@ export interface OpFactoryCall {
 export interface MigrationPlan {
   /** The target ID this plan is for (e.g., 'postgres'). */
   readonly targetId: string;
-  /**
-   * Contract space this plan applies to. Runners cross-check
-   * `options.space` against `plan.spaceId` so the marker row gets keyed
-   * by the right space when applying via `executeAcrossSpaces`.
-   *
-   * Optional for backward compatibility with single-space callers that
-   * pre-date the contract-space aggregate; when present, runners
-   * enforce that it matches `options.space`.
-   */
-  readonly spaceId?: string;
   /**
    * Origin contract identity that the plan expects the database to currently be at.
    * If omitted or null, the runner skips origin validation entirely.
@@ -363,13 +343,6 @@ export interface MigrationPlanner<
     readonly frameworkComponents: ReadonlyArray<
       TargetBoundComponentDescriptor<TFamilyId, TTargetId>
     >;
-    /**
-     * Contract space this plan applies to. Stamped onto the produced
-     * plan so the runner keys the marker row by the right space when
-     * executing. App-plan callers pass `APP_SPACE_ID` (`'app'`);
-     * per-extension callers pass the extension's space id.
-     */
-    readonly spaceId: string;
   }): MigrationPlannerResult;
 
   /**
@@ -378,15 +351,8 @@ export interface MigrationPlanner<
    * Used by `migration new` to scaffold a fresh `migration.ts`. The
    * returned plan has no operations; its `renderTypeScript()` yields a
    * stub the user can edit.
-   *
-   * `spaceId` is stamped onto the produced plan; reconciliation flows
-   * (`db init`, `db update`) and authoring flows (`migration new`) all
-   * pass it explicitly.
    */
-  emptyMigration(
-    context: MigrationScaffoldContext,
-    spaceId: string,
-  ): MigrationPlanWithAuthoringSurface;
+  emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface;
 }
 
 /**
@@ -483,12 +449,12 @@ export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiS
 /**
  * Optional capability for runners that can apply a list of per-space plans
  * inside a single outer transaction. A failure on any space rolls back every
- * space's writes.
+ * space's writes — the cross-space rollback guarantee.
  *
  * Today's only implementer is the SQL family (`SqlMigrationRunner`); Mongo
- * per-space is a non-goal per the project spec. The capability is declared
- * at the framework layer so CLI utilities can route through it without
- * importing the SQL family directly.
+ * per-space is a non-goal. The capability is declared at the framework
+ * layer so CLI utilities can route through it without importing the SQL
+ * family directly.
  */
 export interface MultiSpaceCapableRunner<
   TFamilyId extends string = string,

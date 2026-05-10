@@ -1,7 +1,6 @@
 {
   "name": "@prisma-next/framework-components",
   "version": "0.0.1",
-  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "Framework component types, assembly logic, and stack creation for Prisma Next",
@@ -15,6 +14,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/operations": "workspace:*",
+    "@prisma-next/ts-render": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "@standard-schema/spec": "^1.1.0"
   },

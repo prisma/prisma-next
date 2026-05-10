@@ -4,6 +4,7 @@ import type {
   RuntimeMiddlewareContext,
 } from '@prisma-next/framework-components/runtime';
 import type { MongoExecutionPlan } from './mongo-execution-plan';
+import type { MongoParamRefMutator } from './mongo-param-ref-mutator';
 
 export interface MongoMiddlewareContext extends RuntimeMiddlewareContext {}
 
@@ -17,10 +18,22 @@ export interface MongoMiddlewareContext extends RuntimeMiddlewareContext {}
  * telemetry) — which carry no `familyId` — remain assignable. When
  * present, it must be `'mongo'`; the runtime rejects mismatches at
  * construction time via `checkMiddlewareCompatibility`.
+ *
+ * `beforeExecute` accepts an additive third {@link MongoParamRefMutator}
+ * argument matching the SQL family's seam. Existing 2-arg
+ * middleware bodies remain valid — TypeScript permits assigning a
+ * function with fewer parameters to a function-typed slot that declares
+ * more.
  */
-export interface MongoMiddleware extends RuntimeMiddleware<MongoExecutionPlan> {
+export interface MongoMiddleware<
+  TCodecMap extends Record<string, unknown> = Record<string, unknown>,
+> extends RuntimeMiddleware<MongoExecutionPlan, MongoParamRefMutator<TCodecMap>> {
   readonly familyId?: 'mongo';
-  beforeExecute?(plan: MongoExecutionPlan, ctx: MongoMiddlewareContext): Promise<void>;
+  beforeExecute?(
+    plan: MongoExecutionPlan,
+    ctx: MongoMiddlewareContext,
+    params?: MongoParamRefMutator<TCodecMap>,
+  ): void | Promise<void>;
   onRow?(
     row: Record<string, unknown>,
     plan: MongoExecutionPlan,

@@ -1,24 +1,29 @@
 /**
- * Regression tests for verify / apply / re-materialise behavior when
- * the cipherstash descriptor is not on disk (simulating
- * `rm -rf node_modules/@prisma-next/extension-cipherstash`).
+ * Regression — verify / apply / re-materialise without the cipherstash
+ * descriptor on disk.
  *
- *   - Verify-time helpers succeed against pinned `migrations/cipherstash/`
- *     files alone — they never resolve the descriptor module. The
- *     migrate-time helper, by contrast, does import descriptors and must
- *     fail informatively when the descriptor is missing; we assert that
- *     path refuses to operate on a missing descriptor input.
+ * Pinned properties:
+ *
+ *   - With the cipherstash extension's installed package directory
+ *     removed (a stand-in for `rm -rf node_modules/@prisma-next/
+ *     extension-cipherstash`), the per-space verifier helpers succeed
+ *     against pinned `migrations/cipherstash/` files alone — they
+ *     never resolve the descriptor module. The companion `migrate`
+ *     path, by contrast, *does* import descriptors and is expected to
+ *     fail informatively without them; we cover that direction by
+ *     asserting the helper that *would* be used at `migrate`-time
+ *     refuses to operate on a missing descriptor input.
  *
  *   - Re-running the materialisation pass against an already emitted
- *     `migrations/cipherstash/<dirName>/` is idempotent: the directory's
- *     contents are left byte-untouched (existence check, not overwrite).
+ *     `migrations/cipherstash/<dirName>/` leaves its contents
+ *     byte-untouched (existence check, not write-and-compare).
  *
  * Mirrors `packages/1-framework/3-tooling/migration/test/deletable-
  * node-modules.test.ts` (which exercises the same property for an
  * abstract synthetic space). This file pins the property against the
- * real cipherstash descriptor so a future refactor that accidentally
- * introduces a descriptor import inside the verify-time code path
- * will regress here.
+ * *real* cipherstash descriptor so a future refactor that, for
+ * example, accidentally introduced a descriptor import inside the
+ * verify-time code path would regress here.
  */
 
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -26,21 +31,25 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   materialiseExtensionMigrationPackageIfMissing,
-  materialiseMigrationPackage,
+  writeExtensionMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import {
-  type ContractSpaceHeadRecord,
-  emitContractSpaceArtefacts,
-  listContractSpaceDirectories,
-  readContractSpaceHeadRef,
+  emitPinnedSpaceArtefacts,
+  listPinnedSpaceDirectories,
+  readPinnedHeadRef,
   type SpaceMarkerRecord,
+  type SpacePinnedHashRecord,
   spaceMigrationDirectory,
   verifyContractSpaces,
 } from '@prisma-next/migration-tools/spaces';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { CIPHERSTASH_SPACE_ID } from '../src/core/constants';
-import { cipherstashContract } from '../src/core/contract';
-import { cipherstashBaselineMigration, cipherstashHeadRef } from '../src/core/migrations';
+import cipherstashExtensionDescriptor from '../src/exports/control';
+import { CIPHERSTASH_SPACE_ID } from '../src/extension-metadata/constants';
+
+const cipherstashContractSpace = cipherstashExtensionDescriptor.contractSpace!;
+const cipherstashContract = cipherstashContractSpace.contractJson;
+const cipherstashBaselineMigration = cipherstashContractSpace.migrations[0]!;
+const cipherstashHeadRef = cipherstashContractSpace.headRef;
 
 interface ProjectFixture {
   readonly projectRoot: string;
@@ -73,13 +82,13 @@ async function setupProject(): Promise<ProjectFixture> {
     JSON.stringify({ name: '@prisma-next/extension-cipherstash', version: '0.0.1' }),
   );
 
-  await emitContractSpaceArtefacts(migrationsDir, CIPHERSTASH_SPACE_ID, {
+  await emitPinnedSpaceArtefacts(migrationsDir, CIPHERSTASH_SPACE_ID, {
     contract: cipherstashContract,
     contractDts: '// rendered .d.ts for cipherstash contract space\nexport interface Contract {}\n',
     headRef: { hash: cipherstashHeadRef.hash, invariants: [...cipherstashHeadRef.invariants] },
   });
 
-  await materialiseMigrationPackage(cipherstashSpaceDir, cipherstashBaselineMigration);
+  await writeExtensionMigrationPackage(cipherstashSpaceDir, cipherstashBaselineMigration);
 
   return {
     projectRoot,
@@ -112,13 +121,13 @@ describe('cipherstash — verify / re-materialise without descriptor on disk', (
       expect(remaining.includes('extension-cipherstash')).toBe(false);
     });
 
-    it('listContractSpaceDirectories discovers cipherstash from disk', async () => {
-      const dirs = await listContractSpaceDirectories(fixture.migrationsDir);
+    it('listPinnedSpaceDirectories discovers cipherstash from disk', async () => {
+      const dirs = await listPinnedSpaceDirectories(fixture.migrationsDir);
       expect(dirs).toContain(CIPHERSTASH_SPACE_ID);
     });
 
-    it('readContractSpaceHeadRef returns the cipherstash head ref from disk', async () => {
-      const headRef = await readContractSpaceHeadRef(fixture.migrationsDir, CIPHERSTASH_SPACE_ID);
+    it('readPinnedHeadRef returns the cipherstash head ref from disk', async () => {
+      const headRef = await readPinnedHeadRef(fixture.migrationsDir, CIPHERSTASH_SPACE_ID);
       expect(headRef).not.toBeNull();
       expect(headRef?.hash).toBe(cipherstashHeadRef.hash);
       expect([...(headRef?.invariants ?? [])].sort()).toEqual(
@@ -126,9 +135,9 @@ describe('cipherstash — verify / re-materialise without descriptor on disk', (
       );
     });
 
-    it('verifyContractSpaces returns ok when head-ref files + marker rows match', async () => {
-      const dirs = await listContractSpaceDirectories(fixture.migrationsDir);
-      const headRef: ContractSpaceHeadRecord = {
+    it('verifyContractSpaces returns ok when pinned files + marker rows match', async () => {
+      const dirs = await listPinnedSpaceDirectories(fixture.migrationsDir);
+      const pinnedHash: SpacePinnedHashRecord = {
         hash: cipherstashHeadRef.hash,
         invariants: [...cipherstashHeadRef.invariants],
       };
@@ -139,8 +148,8 @@ describe('cipherstash — verify / re-materialise without descriptor on disk', (
 
       const result = verifyContractSpaces({
         loadedSpaces: new Set(['app', CIPHERSTASH_SPACE_ID]),
-        spaceDirsOnDisk: dirs,
-        headRefsBySpace: new Map([[CIPHERSTASH_SPACE_ID, headRef]]),
+        pinnedDirsOnDisk: dirs,
+        pinnedHashesBySpace: new Map([[CIPHERSTASH_SPACE_ID, pinnedHash]]),
         markerRowsBySpace: new Map([[CIPHERSTASH_SPACE_ID, marker]]),
       });
 
@@ -148,7 +157,7 @@ describe('cipherstash — verify / re-materialise without descriptor on disk', (
     });
 
     it('verifyContractSpaces flags hash drift on cipherstash without descriptor access', async () => {
-      const dirs = await listContractSpaceDirectories(fixture.migrationsDir);
+      const dirs = await listPinnedSpaceDirectories(fixture.migrationsDir);
       const driftedMarker: SpaceMarkerRecord = {
         hash: 'sha256:00000000000000000000000000000000000000000000000000000000deadbeef',
         invariants: [...cipherstashHeadRef.invariants],
@@ -156,14 +165,14 @@ describe('cipherstash — verify / re-materialise without descriptor on disk', (
 
       const result = verifyContractSpaces({
         loadedSpaces: new Set(['app', CIPHERSTASH_SPACE_ID]),
-        spaceDirsOnDisk: dirs,
-        headRefsBySpace: new Map([
+        pinnedDirsOnDisk: dirs,
+        pinnedHashesBySpace: new Map([
           [
             CIPHERSTASH_SPACE_ID,
             {
               hash: cipherstashHeadRef.hash,
               invariants: [...cipherstashHeadRef.invariants],
-            } satisfies ContractSpaceHeadRecord,
+            } satisfies SpacePinnedHashRecord,
           ],
         ]),
         markerRowsBySpace: new Map([[CIPHERSTASH_SPACE_ID, driftedMarker]]),

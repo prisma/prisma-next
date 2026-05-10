@@ -118,12 +118,19 @@ export abstract class RuntimeCore<
 
       const compiled = await self.runBeforeCompile(plan);
       const exec = await self.lower(compiled, codecCtx);
+      // Merge the per-execute signal onto the persistent middleware ctx
+      // for the duration of this execute() call. The ctx object itself is
+      // freshly allocated per-execute so middleware sees the signal that
+      // belongs to *its* invocation, not a shared one. Identity matches
+      // codecCtx.signal so middleware authors who compare `ctx.signal`
+      // across the codec/middleware boundary observe the same reference.
+      const execMiddlewareCtx = signal === undefined ? self.ctx : { ...self.ctx, signal };
       // The driver yields raw `Record<string, unknown>`; we cast to `Row` here.
       // The Row contract is enforced by the caller via `plan._row`.
       yield* runWithMiddleware<TExec, Row>(
         exec,
         self.middleware,
-        self.ctx,
+        execMiddlewareCtx,
         () => self.runDriver(exec) as AsyncIterable<Row>,
       );
     }

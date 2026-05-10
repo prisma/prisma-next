@@ -1,5 +1,10 @@
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { profileHash } from '@prisma-next/contract/types';
+import type {
+  ImportRequirement,
+  MigrationOperationClass,
+  OpFactoryCall,
+} from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { planFieldEventOperations } from '../src/core/migrations/field-event-planner';
@@ -59,6 +64,37 @@ function makeOp(id: string, label = id): Op {
   };
 }
 
+/**
+ * Test-only `OpFactoryCall` stub. Wraps a stub op (`makeOp`) so the
+ * existing assertion shape (`calls.map((c) => c.toOp().id)`) keeps
+ * working after the planner started returning Calls instead of raw ops.
+ */
+class StubCall implements OpFactoryCall {
+  readonly factoryName = 'stub' as const;
+  readonly operationClass: MigrationOperationClass = 'additive';
+  readonly label: string;
+
+  constructor(private readonly op: Op) {
+    this.label = op.label;
+  }
+
+  toOp(): Op {
+    return this.op;
+  }
+
+  renderTypeScript(): string {
+    return `stub(${JSON.stringify(this.op.id)})`;
+  }
+
+  importRequirements(): readonly ImportRequirement[] {
+    return [];
+  }
+}
+
+function makeCall(id: string, label = id): StubCall {
+  return new StubCall(makeOp(id, label));
+}
+
 interface RecordedCall {
   readonly event: 'added' | 'dropped' | 'altered';
   readonly tableName: string;
@@ -69,7 +105,9 @@ interface RecordedCall {
   readonly newTablePresent: boolean;
 }
 
-function recordingHook(opsPerCall: readonly Op[] | ((call: RecordedCall) => readonly Op[])): {
+function recordingHook(
+  callsPerEvent: readonly OpFactoryCall[] | ((call: RecordedCall) => readonly OpFactoryCall[]),
+): {
   readonly hook: CodecControlHooks;
   readonly calls: readonly RecordedCall[];
 } {
@@ -86,7 +124,7 @@ function recordingHook(opsPerCall: readonly Op[] | ((call: RecordedCall) => read
         newTablePresent: ctx.newTable !== undefined,
       };
       calls.push(recorded);
-      return typeof opsPerCall === 'function' ? opsPerCall(recorded) : opsPerCall;
+      return typeof callsPerEvent === 'function' ? callsPerEvent(recorded) : callsPerEvent;
     },
   };
   return { hook, calls };
@@ -104,7 +142,7 @@ describe('planFieldEventOperations', () => {
       }),
     });
 
-    const cs = recordingHook([makeOp('add-search-config-User-email')]);
+    const cs = recordingHook([makeCall('add-search-config-User-email')]);
     const codecHooks = new Map<string, CodecControlHooks>([['cs/string@1', cs.hook]]);
 
     const ops = planFieldEventOperations({
@@ -124,7 +162,7 @@ describe('planFieldEventOperations', () => {
         newTablePresent: true,
       },
     ]);
-    expect(ops.map((o) => o.id)).toEqual(['add-search-config-User-email']);
+    expect(ops.map((c) => c.toOp().id)).toEqual(['add-search-config-User-email']);
   });
 
   it("fires 'dropped' once per dropped field on the prior field's codec", () => {
@@ -138,7 +176,7 @@ describe('planFieldEventOperations', () => {
       User: table({ id: col({ codecId: 'pg/text@1' }) }),
     });
 
-    const cs = recordingHook([makeOp('remove-search-config-User-email')]);
+    const cs = recordingHook([makeCall('remove-search-config-User-email')]);
     const codecHooks = new Map<string, CodecControlHooks>([['cs/string@1', cs.hook]]);
 
     const ops = planFieldEventOperations({
@@ -158,7 +196,7 @@ describe('planFieldEventOperations', () => {
         newTablePresent: false,
       },
     ]);
-    expect(ops.map((o) => o.id)).toEqual(['remove-search-config-User-email']);
+    expect(ops.map((c) => c.toOp().id)).toEqual(['remove-search-config-User-email']);
   });
 
   it("fires 'altered' when nullable changes", () => {
@@ -169,7 +207,7 @@ describe('planFieldEventOperations', () => {
       User: table({ email: col({ codecId: 'cs/string@1', nullable: false }) }),
     });
 
-    const cs = recordingHook([makeOp('rotate')]);
+    const cs = recordingHook([makeCall('rotate')]);
     const codecHooks = new Map<string, CodecControlHooks>([['cs/string@1', cs.hook]]);
 
     const ops = planFieldEventOperations({
@@ -197,7 +235,7 @@ describe('planFieldEventOperations', () => {
       }),
     });
 
-    const cs = recordingHook([makeOp('rotate')]);
+    const cs = recordingHook([makeCall('rotate')]);
     const codecHooks = new Map<string, CodecControlHooks>([['cs/string@1', cs.hook]]);
 
     const ops = planFieldEventOperations({
@@ -222,7 +260,7 @@ describe('planFieldEventOperations', () => {
       }),
     });
 
-    const cs = recordingHook([makeOp('rotate')]);
+    const cs = recordingHook([makeCall('rotate')]);
     const codecHooks = new Map<string, CodecControlHooks>([['cs/string@1', cs.hook]]);
 
     const ops = planFieldEventOperations({
@@ -243,8 +281,8 @@ describe('planFieldEventOperations', () => {
       User: table({ email: col({ codecId: 'pg/varchar@1' }) }),
     });
 
-    const text = recordingHook([makeOp('text')]);
-    const varchar = recordingHook([makeOp('varchar')]);
+    const text = recordingHook([makeCall('text')]);
+    const varchar = recordingHook([makeCall('varchar')]);
     const codecHooks = new Map<string, CodecControlHooks>([
       ['pg/text@1', text.hook],
       ['pg/varchar@1', varchar.hook],
@@ -266,7 +304,7 @@ describe('planFieldEventOperations', () => {
       User: table({ email: col({ codecId: 'cs/string@1', nullable: false }) }),
     });
 
-    const cs = recordingHook([makeOp('rotate')]);
+    const cs = recordingHook([makeCall('rotate')]);
     const codecHooks = new Map<string, CodecControlHooks>([['cs/string@1', cs.hook]]);
 
     const ops = planFieldEventOperations({
@@ -287,7 +325,7 @@ describe('planFieldEventOperations', () => {
       }),
     });
 
-    const cs = recordingHook([makeOp('add-search-config')]);
+    const cs = recordingHook([makeCall('add-search-config')]);
     const codecHooks = new Map<string, CodecControlHooks>([['cs/string@1', cs.hook]]);
 
     const ops = planFieldEventOperations({
@@ -344,7 +382,7 @@ describe('planFieldEventOperations', () => {
       User: table({ email: col({ codecId: 'cs/string@1' }) }),
     });
 
-    const cs = recordingHook([makeOp('first'), makeOp('second'), makeOp('third')]);
+    const cs = recordingHook([makeCall('first'), makeCall('second'), makeCall('third')]);
     const codecHooks = new Map<string, CodecControlHooks>([['cs/string@1', cs.hook]]);
 
     const ops = planFieldEventOperations({
@@ -353,7 +391,7 @@ describe('planFieldEventOperations', () => {
       codecHooks,
     });
 
-    expect(ops.map((o) => o.id)).toEqual(['first', 'second', 'third']);
+    expect(ops.map((c) => c.toOp().id)).toEqual(['first', 'second', 'third']);
   });
 
   it('returns an empty list when the hook returns an empty array', () => {
@@ -389,7 +427,7 @@ describe('planFieldEventOperations', () => {
       }),
     });
 
-    const cs = recordingHook((call) => [makeOp(`${call.event}:${call.fieldName}`)]);
+    const cs = recordingHook((call) => [makeCall(`${call.event}:${call.fieldName}`)]);
     const codecHooks = new Map<string, CodecControlHooks>([['cs/string@1', cs.hook]]);
 
     const ops = planFieldEventOperations({
@@ -399,7 +437,11 @@ describe('planFieldEventOperations', () => {
     });
 
     expect(cs.calls.map((c) => c.event)).toEqual(['added', 'dropped', 'altered']);
-    expect(ops.map((o) => o.id)).toEqual(['added:toAdd', 'dropped:toDrop', 'altered:toAlter']);
+    expect(ops.map((c) => c.toOp().id)).toEqual([
+      'added:toAdd',
+      'dropped:toDrop',
+      'altered:toAlter',
+    ]);
   });
 
   it('orders events within a group alphabetically by (tableName, fieldName)', () => {
@@ -441,8 +483,8 @@ describe('planFieldEventOperations', () => {
       }),
     });
 
-    const cs = recordingHook([makeOp('cs-add')]);
-    const pg = recordingHook([makeOp('pg-add')]);
+    const cs = recordingHook([makeCall('cs-add')]);
+    const pg = recordingHook([makeCall('pg-add')]);
     const codecHooks = new Map<string, CodecControlHooks>([
       ['cs/string@1', cs.hook],
       ['pg/text@1', pg.hook],
@@ -477,7 +519,7 @@ describe('planFieldEventOperations', () => {
       [
         'cs/string@1',
         {
-          onFieldEvent: (event, ctx) => [makeOp(`op-${event}-${ctx.tableName}-${ctx.fieldName}`)],
+          onFieldEvent: (event, ctx) => [makeCall(`op-${event}-${ctx.tableName}-${ctx.fieldName}`)],
         },
       ],
     ]);
@@ -503,7 +545,7 @@ describe('planFieldEventOperations', () => {
     });
 
     const cs = recordingHook((call) => [
-      makeOp(`${call.event}:${call.tableName}.${call.fieldName}`),
+      makeCall(`${call.event}:${call.tableName}.${call.fieldName}`),
     ]);
     const codecHooks = new Map<string, CodecControlHooks>([['cs/string@1', cs.hook]]);
 
@@ -513,7 +555,7 @@ describe('planFieldEventOperations', () => {
       codecHooks,
     });
 
-    expect(ops.map((o) => o.id)).toEqual([
+    expect(ops.map((c) => c.toOp().id)).toEqual([
       'added:Add.x',
       'added:Add.y',
       'dropped:Drop.a',
