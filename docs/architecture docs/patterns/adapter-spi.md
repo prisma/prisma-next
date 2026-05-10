@@ -5,21 +5,21 @@
 
 ## Intent
 
-Target-specific behaviour (dialect emission, capability discovery, type expansion, default rendering, error mapping, marker reading) is encapsulated behind a single **adapter interface** that the framework consumes uniformly. The framework never branches on `target === 'postgres'`; targets register adapters and the framework dispatches through the adapter's methods. The adapter is the framework's only window onto target specificity.
+Suppose Postgres needs to emit a `RETURNING` clause and MySQL doesn't, and the framework code that builds an `INSERT` plan needs to know which to do. That code can't ask `if (target === 'postgres')` — the framework is target-agnostic by design. The decision has to live somewhere target-specific, and the **adapter** is where it lives: each target ships an object the framework calls into for anything dialect-shaped — lowering, capability discovery, error mapping, marker reading.
 
-Adopting this pattern commits you to: a stable adapter interface (every method the framework needs from a target lives on this surface), one adapter implementation per target (no per-feature ad-hoc `if-target` checks), and a registration / lookup mechanism that lets the framework find the adapter for the contract it is consuming.
+The pattern: declare an `Adapter` interface that the framework consumes uniformly, ship one implementation per target, and route every target-specific call through that interface. The framework never asks which target it is talking to.
 
 ## When to use
 
 - Framework code needs target-specific behaviour at runtime — lowering an AST, rendering a dialect, mapping an error, checking a capability, reading the contract marker.
-- The set of targets is open (more targets land over time) and the framework cannot enumerate them at compile time.
-- The behaviour is **per-target**, not per-IR-kind. (Per-IR-kind variation is [Three-layer polymorphic IR](./three-layer-polymorphic-ir.md); per-layer dispatch is [SPI at the lowest consuming layer](./spi-at-lowest-consuming-layer.md).)
+- The set of targets is open: more targets land over time and the framework cannot enumerate them at compile time.
+- The variation is _per target_, not per IR kind. (Per-IR-kind variation belongs in [Three-layer polymorphic IR](./three-layer-polymorphic-ir.md); per-layer dispatch is [SPI at the lowest consuming layer](./spi-at-lowest-consuming-layer.md).)
 
 ## When NOT to use
 
-- **Code that is genuinely target-agnostic** — don't introduce an adapter call that always returns the same answer regardless of target. The adapter exists to capture variation; flat code paths should stay flat.
-- **Variation expressible as abstract methods on a class hierarchy** the framework already owns — use [Three-layer polymorphic IR](./three-layer-polymorphic-ir.md). The adapter interface is for behaviour the framework does not (and should not) know how to model itself.
-- **One-off branches inside a single subsystem** with no plausible second adopter — gate the branch and surface as debt; an adapter SPI for one target is a misnamed concrete type.
+- **Code that is genuinely target-agnostic.** Don't introduce an adapter call that always returns the same answer regardless of target; the adapter exists to capture variation, and flat code paths should stay flat.
+- **Variation expressible as abstract methods on a class hierarchy** the framework already owns — use [Three-layer polymorphic IR](./three-layer-polymorphic-ir.md). The adapter is for behaviour the framework cannot model itself; if it can model it, it should.
+- **One-off branches inside a single subsystem** with no plausible second adopter. An adapter SPI for a single permanent target is a misnamed concrete type.
 
 ## Structure
 
@@ -48,7 +48,7 @@ export function createPostgresAdapter(options?: PostgresAdapterOptions) {
 }
 ```
 
-The framework code that needs target-specific behaviour calls a method on the `Adapter` (`adapter.lower(ast, ctx)`, `adapter.profile.readMarkerStatement()`, `adapter.profile.capabilities[…]`); it never asks "is this Postgres?". The adapter is exposed via [Interface + factory function](./interface-plus-factory.md), so the implementation class is private.
+Framework code that needs target-specific behaviour calls a method on the `Adapter` (`adapter.lower(ast, ctx)`, `adapter.profile.readMarkerStatement()`, `adapter.profile.capabilities[…]`). It never asks "is this Postgres?". The adapter is exposed via [Interface + factory function](./interface-plus-factory.md), so the implementation class stays private.
 
 ## Reference implementations
 
@@ -78,7 +78,7 @@ The framework code that needs target-specific behaviour calls a method on the `A
 
 ## Cautions / common mistakes
 
-- **Smuggling a target check past the adapter.** Code that does `adapter.profile.target === 'postgres'` defeats the pattern — it is `if-target` with an extra hop. Architect-persona check: the framework consumes adapter methods, not adapter identity.
+- **Smuggling a target check past the adapter.** Code that does `adapter.profile.target === 'postgres'` defeats the pattern — it is `if-target` with an extra hop. The framework consumes adapter methods, not adapter identity.
 - **Adapter interface that grows by accretion.** Every new framework caller adds a method, the interface bloats, and adapters become hard to implement. Surface as debt and decompose; consider whether the new caller is really framework code or really subsystem code.
 - **One-target adapter SPIs.** An adapter interface with a single permanent implementer is over-abstracted; collapse to a concrete type until the second target exists.
-- **Branching inside the adapter on target the adapter is for.** A `PostgresAdapter` does not need to ask "is this Postgres?" — it _is_ Postgres. If it asks, the wrong abstraction is in play.
+- **Branching inside the adapter on the target the adapter is for.** A `PostgresAdapter` does not need to ask "is this Postgres?" — it _is_ Postgres. If it asks, the wrong abstraction is in play.
