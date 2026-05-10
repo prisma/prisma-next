@@ -131,9 +131,9 @@ describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor
       );
     });
 
-    it('verifyContractSpaces returns ok when pinned files + marker rows match', async () => {
+    it('verifyContractSpaces returns ok when head-ref files + marker rows match', async () => {
       const dirs = await listContractSpaceDirectories(fixture.migrationsDir);
-      const pinnedHash: ContractSpaceHeadRecord = {
+      const headRef: ContractSpaceHeadRecord = {
         hash: cipherstashHeadRef.hash,
         invariants: [...cipherstashHeadRef.invariants],
       };
@@ -145,7 +145,7 @@ describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor
       const result = verifyContractSpaces({
         loadedSpaces: new Set(['app', CIPHERSTASH_SPACE_ID]),
         spaceDirsOnDisk: dirs,
-        pinnedHashesBySpace: new Map([[CIPHERSTASH_SPACE_ID, pinnedHash]]),
+        headRefsBySpace: new Map([[CIPHERSTASH_SPACE_ID, headRef]]),
         markerRowsBySpace: new Map([[CIPHERSTASH_SPACE_ID, marker]]),
       });
 
@@ -162,7 +162,7 @@ describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor
       const result = verifyContractSpaces({
         loadedSpaces: new Set(['app', CIPHERSTASH_SPACE_ID]),
         spaceDirsOnDisk: dirs,
-        pinnedHashesBySpace: new Map([
+        headRefsBySpace: new Map([
           [
             CIPHERSTASH_SPACE_ID,
             {

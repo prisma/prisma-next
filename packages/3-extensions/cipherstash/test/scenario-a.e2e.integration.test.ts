@@ -1,8 +1,9 @@
 /**
  * Scenario A end-to-end against PGlite — cipherstash sub-spec § 6 / T3.6.
  *
- * Drives the CLI per-space `db init` flow (`executePerSpaceDbApply`,
- * sub-spec § 6) against a real Postgres (PGlite via `createDevDatabase`)
+ * Drives the CLI `db init` flow (`executeDbInit`, sub-spec § 6 — routes
+ * through the M2.5 aggregate loader → planner → runner pipeline) against
+ * a real Postgres (PGlite via `createDevDatabase`)
  * with cipherstash wired as an extension space and the
  * `cipherstash:string@1` codec hook attached to a searchable
  * `Encrypted<String>` column on the application contract.
@@ -14,7 +15,7 @@
  *      `EQL_BUNDLE_SQL` byte-for-byte (single-string `execute[0].sql`).
  *
  *   2. **Multi-space planning (real bundle).** Calling
- *      `executePerSpaceDbApply` with `mode: 'plan'` on the *real*
+ *      `executeDbInit` with `mode: 'plan'` on the *real*
  *      cipherstash descriptor (full vendored bundle) produces a plan
  *      that includes:
  *
@@ -64,11 +65,10 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
-import { executePerSpaceDbApply } from '@prisma-next/cli/control-api';
+import { executeDbInit } from '@prisma-next/cli/control-api';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor, {
-  INIT_ADDITIVE_POLICY,
   type SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import {
@@ -352,7 +352,7 @@ describe.sequential(
     it('mode=plan against the real bundle produces a multi-space plan with the codec-hook op', async () => {
       project = await setupTestProject({ migration: cipherstashBaselineMigration });
 
-      const result = await executePerSpaceDbApply({
+      const result = await executeDbInit({
         driver: driver!,
         familyInstance,
         contract: appContract,
@@ -360,9 +360,8 @@ describe.sequential(
         migrations: postgresTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: project.migrationsDir,
-        extensionContractSpaces: [{ id: CIPHERSTASH_SPACE_ID }],
-        policy: INIT_ADDITIVE_POLICY,
-        action: 'dbInit',
+        targetId: 'postgres',
+        extensionPacks: [cipherstashExtensionDescriptor],
       });
 
       if (!result.ok) {
@@ -411,7 +410,7 @@ describe.sequential(
     it('synthetic bundle: applies cipherstash + app-space atomically; markers, hook side-effect, and round-trip all OK', async () => {
       project = await setupTestProject({ migration: buildSyntheticBaselineMigration() });
 
-      const result = await executePerSpaceDbApply({
+      const result = await executeDbInit({
         driver: driver!,
         familyInstance,
         contract: appContract,
@@ -419,9 +418,8 @@ describe.sequential(
         migrations: postgresTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: project.migrationsDir,
-        extensionContractSpaces: [{ id: CIPHERSTASH_SPACE_ID }],
-        policy: INIT_ADDITIVE_POLICY,
-        action: 'dbInit',
+        targetId: 'postgres',
+        extensionPacks: [cipherstashExtensionDescriptor],
       });
 
       if (!result.ok) {
