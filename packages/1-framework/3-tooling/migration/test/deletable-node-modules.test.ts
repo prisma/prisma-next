@@ -199,7 +199,6 @@ describe('per-space verifier + runner against a project with deleted node_module
  */
 describe('aggregate pipeline (loader → planner → verifier) against deleted node_modules', () => {
   const HEAD_HASH = 'sha256:abc123';
-  const APP_HEAD_HASH = 'sha256:appHead';
   let projectRoot: string;
   let migrationsDir: string;
 
@@ -299,10 +298,5 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
     expect(verifyResult.value.markerCheck.perSpace.get('app')).toEqual({ kind: 'absent' });
     expect(verifyResult.value.markerCheck.perSpace.get(TEST_SPACE_ID)).toEqual({ kind: 'absent' });
     expect(verifyResult.value.schemaCheck.orphanElements).toEqual([]);
-    // Use APP_HEAD_HASH to keep the test variable referenced — the
-    // expectation is that the loader synthesises the app member's
-    // headRef.hash from the user's contract, not from this constant
-    // directly. This assertion locks the loader's behaviour at the API.
-    expect(typeof APP_HEAD_HASH).toBe('string');
   });
 });
