@@ -1172,7 +1172,53 @@ export function formatStatusSummary(result: MigrationStatusResult, colorize: boo
     }
   }
 
+  // Per-space section. Suppressed when there's no extension space —
+  // the legacy single-space output already covers the app member.
+  // When extensions exist, render every space (including the app)
+  // for consistency, plus a cross-space pending total + apply hint.
+  if (result.spaces && result.spaces.some((s) => s.kind === 'extension')) {
+    const total = result.totalPendingAcrossSpaces ?? 0;
+    lines.push('');
+    lines.push(c(dim, 'spaces'));
+    for (const space of result.spaces) {
+      lines.push(formatSpaceLine(space, c));
+    }
+    if (total > 0) {
+      lines.push('');
+      lines.push(
+        `${c(yellow, '⧗')} ${total} pending migration(s) across ${result.spaces.length} space(s) — run 'prisma-next migration apply' to apply`,
+      );
+    }
+  }
+
   return lines.join('\n');
+}
+
+function formatSpaceLine(
+  space: MigrationStatusSpaceEntry,
+  c: (fn: (s: string) => string, s: string) => string,
+): string {
+  const glyph = (() => {
+    if (space.status === 'up-to-date' || space.status === 'no-marker') return c(cyan, '✓');
+    if (space.status === 'pending') return c(yellow, '⧗');
+    if (space.status === 'unreachable' || space.status === 'never-planned') return c(magenta, '✗');
+    return ' ';
+  })();
+  const tag = space.kind === 'app' ? '[app]' : '[ext]';
+  const head = space.headHash.slice(0, 8);
+  const marker =
+    space.markerHash === undefined
+      ? '(unknown)'
+      : space.markerHash === null
+        ? '(no marker)'
+        : space.markerHash.slice(0, 8);
+  const pending =
+    space.pendingCount === undefined
+      ? ''
+      : space.pendingCount === 0
+        ? c(dim, ' (up to date)')
+        : c(yellow, ` (${space.pendingCount} pending)`);
+  return `  ${glyph} ${c(dim, tag)} ${space.spaceId} → head ${c(dim, head)}, marker ${c(dim, marker)}${pending}`;
 }
 
 function formatInvariantList(ids: readonly string[]): string {
