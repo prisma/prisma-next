@@ -376,10 +376,11 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
   readonly plan: SqlMigrationPlan<TTargetDetails>;
   readonly driver: ControlDriverInstance<'sql', string>;
   /**
-   * Logical contract space this plan applies to. Defaults to
-   * `'app'` so existing single-space callers keep working without
-   * modification. Multi-space callers supply each space's id
-   * explicitly so the marker write goes against the right row.
+   * Logical contract space this plan applies to. When omitted the
+   * runner derives the space from {@link SqlMigrationPlan.spaceId};
+   * when supplied, the runner asserts it matches `plan.spaceId` so a
+   * caller cannot accidentally write the marker row for a different
+   * space than the plan was produced for.
    */
   readonly space?: string;
   /**

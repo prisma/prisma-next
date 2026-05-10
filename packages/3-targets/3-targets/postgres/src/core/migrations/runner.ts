@@ -128,7 +128,12 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   ): Promise<SqlMigrationRunnerResult> {
     const schema = options.schemaName ?? this.config.defaultSchema;
     const driver = options.driver;
-    const space = options.space ?? options.plan.spaceId;
+    if (options.space !== undefined && options.space !== options.plan.spaceId) {
+      throw new Error(
+        `SqlMigrationRunner: options.space (${options.space}) does not match plan.spaceId (${options.plan.spaceId})`,
+      );
+    }
+    const space = options.plan.spaceId;
     const lockKey = `${LOCK_DOMAIN}:${schema}:${space}`;
 
     // Static checks (idempotent — safe to run again when the caller is
