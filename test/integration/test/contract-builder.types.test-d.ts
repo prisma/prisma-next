@@ -4,6 +4,7 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
+import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
@@ -391,10 +392,15 @@ test('contract structure type matches Contract', () => {
   expectTypeOf(contract).toHaveProperty('storage');
 });
 
-test('jsonb columns currently resolve to never in no-emit type path (known gap)', () => {
+test('arktypeJson and jsonbColumn currently resolve to never in no-emit type path (known gap)', () => {
   // Phase C: schema-typed JSON ships from per-library extension packages
   // now (`@prisma-next/extension-arktype-json` for arktype). The
   // adapter's `jsonbColumn` is the untyped fallback.
+  const payloadSchema = arktype({
+    action: 'string',
+    actorId: 'number',
+  });
+
   const contract = defineContract({
     family: sqlFamilyPack,
     target: postgresPack,
@@ -402,7 +408,7 @@ test('jsonb columns currently resolve to never in no-emit type path (known gap)'
       Event: model('Event', {
         fields: {
           id: field.column(int4Column).id(),
-          payload: field.column(jsonbColumn),
+          payload: field.column(arktypeJson(payloadSchema)),
           meta: field.column(jsonbColumn),
         },
       }).sql({ table: 'event' }),
