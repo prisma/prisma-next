@@ -29,9 +29,9 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_DIR_TARGETS = ['docs/architecture docs/patterns'];
 
 // Catalogue-touching files outside the patterns/ directory. Append entries
-// here as later milestones land (M2: docs/reference/typescript-patterns.md
-// stub; M3: architect persona, .cursor/rules/adr-writing.mdc).
-const EXTRA_TARGETS = [];
+// here as later milestones land (M3: architect persona,
+// .cursor/rules/adr-writing.mdc).
+const EXTRA_TARGETS = ['docs/reference/typescript-patterns.md'];
 
 const INLINE_LINK_RE = /(!?)\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g;
 

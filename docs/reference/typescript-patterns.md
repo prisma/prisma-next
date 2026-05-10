@@ -77,79 +77,9 @@ interface ColumnBuilderState<
 
 ## Interface-Based Design with Factory Functions
 
-**Pattern**: Export interfaces and factory functions, keep classes as private implementation details.
+This architectural pattern is now documented in the architecture pattern catalogue under [`interface-plus-factory.md`](../architecture%20docs/patterns/interface-plus-factory.md). The catalogue is the source of truth for the pattern's intent, structure, when-to-use boundaries, and reference implementations.
 
-### Why?
-
-This aligns with the "Types-Only Emission" principle and allows for better abstraction. Consumers work with interfaces, not concrete classes, which enables:
-- Better encapsulation
-- Easier testing with mocks
-- Future flexibility to change implementations
-- Cleaner API surface
-
-### Implementation
-
-**✅ CORRECT: Export interface and factory function**
-
-```typescript
-export interface ColumnRegistry {
-  register(column: Column): void;
-  get(id: string): Column | undefined;
-  has(id: string): boolean;
-  // ... other methods
-}
-
-export function createColumnRegistry(): ColumnRegistry {
-  const columns = new Map<string, Column>();
-  return {
-    register(column) {
-      columns.set(column.id, column);
-    },
-    get(id) {
-      return columns.get(id);
-    },
-    has(id) {
-      return columns.has(id);
-    },
-  };
-}
-```
-
-**❌ WRONG: Don't export classes directly**
-
-```typescript
-// Don't do this - exposes implementation details
-export class ColumnRegistry {
-  private columns = new Map<string, Column>();
-  // ...
-}
-```
-
-### Examples in Codebase
-
-- `Runtime` → `createRuntime()`
-- `PostgresDriver` → `postgresRuntimeDriverDescriptor.create()` + `connect(binding)`
-- `PostgresAdapter` → `createPostgresAdapter()`
-
-### Internal Use
-
-If you need the interface or type for internal use (e.g., in tests), you can export it from an internal module or use it within the same package:
-
-```typescript
-// ✅ CORRECT: Export interface for internal use
-export interface ColumnBuilder {
-  // ...
-}
-
-// Internal implementation - not exported
-class ColumnBuilderImpl implements ColumnBuilder {
-  // ...
-}
-
-export function createColumnBuilder(): ColumnBuilder {
-  return new ColumnBuilderImpl();
-}
-```
+This reference doc retains only the TypeScript-mechanical guidance below — the language-level caveat about classes with private properties in exported types — because that is a TypeScript trap rather than a structural pattern.
 
 ### Exception: Classes with Private Properties in Exported Types
 
