@@ -118,4 +118,60 @@ describe('combineSchemaResults', () => {
     expect(combined.schema.root.message).toBe('Aggregate schema mismatch');
     expect(combined.meta?.strict).toBe(true);
   });
+
+  it('throws a wiring-bug error when the per-space map is empty', () => {
+    const empty = new Map<string, VerifyDatabaseSchemaResult>();
+    expect(() => combineSchemaResults(empty, 'app', false)).toThrow(/wiring bug/);
+  });
+
+  it('falls back to the first iterator value when the app id is absent from the per-space map', () => {
+    const perSpace = new Map<string, VerifyDatabaseSchemaResult>([
+      ['cipher', makeResult({ spaceId: 'cipher', ok: true, summary: 'Schema matches contract' })],
+    ]);
+
+    const combined = combineSchemaResults(perSpace, 'app', false);
+
+    expect(combined.ok).toBe(true);
+    expect(combined.summary).toBe('Schema matches contract');
+    expect(combined.contract.storageHash).toBe('sha256:cipher-storage');
+  });
+
+  it('keeps the first failure summary when multiple members fail', () => {
+    const perSpace = new Map<string, VerifyDatabaseSchemaResult>([
+      [
+        'app',
+        makeResult({ spaceId: 'app', ok: true, summary: 'Database schema satisfies contract' }),
+      ],
+      ['cipher', makeResult({ spaceId: 'cipher', ok: false, summary: 'cipher failure', fail: 1 })],
+      [
+        'pgvector',
+        makeResult({ spaceId: 'pgvector', ok: false, summary: 'pgvector failure', fail: 1 }),
+      ],
+    ]);
+
+    const combined = combineSchemaResults(perSpace, 'app', false);
+
+    expect(combined.ok).toBe(false);
+    expect(combined.summary).toBe('cipher failure');
+    expect(combined.schema.counts.fail).toBe(2);
+  });
+
+  it('uses the default `PN-RUN-3010` code when a failing app result carries no code', () => {
+    const failingWithoutCode: VerifyDatabaseSchemaResult = {
+      ...makeResult({
+        spaceId: 'app',
+        ok: false,
+        summary: 'Database schema does not satisfy contract (1 failure)',
+        fail: 1,
+      }),
+    };
+    const stripped = { ...failingWithoutCode };
+    delete stripped.code;
+    const perSpace = new Map<string, VerifyDatabaseSchemaResult>([['app', stripped]]);
+
+    const combined = combineSchemaResults(perSpace, 'app', false);
+
+    expect(combined.ok).toBe(false);
+    expect(combined.code).toBe('PN-RUN-3010');
+  });
 });

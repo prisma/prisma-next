@@ -45,8 +45,17 @@ export function combineSchemaResults(
     childRoots.push(result.schema.root);
   }
 
+  // When `okAll !== appResult.ok`, exactly one shape is reachable: app passes
+  // (`appResult.ok === true`) and at least one other member failed
+  // (`okAll === false`). In that shape the failure was assigned to
+  // `firstFailure` during iteration, so non-null assertion is safe. The mirror
+  // shape (app fails while every member passes) is impossible because
+  // `appResult` either *is* a member of `perSpace` or is the first iterator
+  // value; either way its `ok` flag participates in `okAll`.
   const summary =
-    okAll === appResult.ok ? appResult.summary : (firstFailure?.summary ?? appResult.summary);
+    okAll === appResult.ok
+      ? appResult.summary
+      : (firstFailure as VerifyDatabaseSchemaResult).summary;
 
   return {
     ok: okAll,
