@@ -77,13 +77,14 @@ export function hasOperationPreview<TFamilyId extends string, TSchemaIR>(
 
 /**
  * Capability declaring that a runner can apply per-space plans inside a
- * single outer transaction. Today's only implementer is the SQL family
- * (`SqlMigrationRunner`); Mongo per-space is a non-goal per the project
- * spec for extension contract spaces (TML-2397).
+ * single outer transaction. The SQL family (`SqlMigrationRunner`) implements
+ * this with a true outer transaction. The Mongo family implements a
+ * degenerate single-space shim (Mongo per-space is a non-goal per the
+ * extension-contract-spaces project spec — TML-2397).
  *
- * The CLI uses this guard to route `db init` / `db update` through a
- * per-space wiring when extensions expose a `contractSpace`, falling back
- * to the single-space path when no multi-space capability is present.
+ * The CLI's shared `applyAggregate` primitive uses this guard so that
+ * `db init` / `db update` / `migration apply` route uniformly through one
+ * dispatch path regardless of family.
  */
 export function hasMultiSpaceRunner<TFamilyId extends string, TTargetId extends string>(
   runner: MigrationRunner<TFamilyId, TTargetId>,
