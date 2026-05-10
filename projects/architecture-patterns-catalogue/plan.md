@@ -58,6 +58,8 @@ Write the eight v1 entries listed in the spec. Recommended order: write _Frozen-
 - [ ] Verify all links in the catalogue resolve (NFR2).
 - [ ] Self-check AC9 (a fresh contributor can articulate any v1 entry's intent and find a reference implementation in five minutes).
 - [ ] Confirm AC1–AC8.
+- [ ] **Re-test the scaffold-commit pattern's per-commit-gate-green claim** by running `node scripts/check-catalogue-links.mjs` at the architect-persona commit and at the `adr-writing.mdc` commit (cheap insurance against M3 introducing a new coupling miss). Per [M2 R1 reviewer's plan-amendment candidate](./reviews/code-review.md#round-notes).
+- [ ] **Note the spec-vs-on-disk drift in any close-out artifacts:** four discrepancies caught during M2 (`EmissionSpi` location, `ColumnRegistry` non-existence, ADR 117 title, multi-file ADR numbers) were corrected directly in the catalogue rather than amended in the spec. The catalogue is authoritative for these claims; the spec deletes at close-out per [`drive-project-workflow`](../../.cursor/rules/drive-project-workflow.mdc). See [`wip/unattended-decisions.md`](../../wip/unattended-decisions.md) § Decision 4 for the list.
 
 ## Close-out (required)
 
