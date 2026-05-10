@@ -1,22 +1,21 @@
 # Pattern: Three-layer polymorphic IR (framework → family → target)
 
-**Status:** Emerging
-**Maintainer:** architect
+**Status:** Emerging — adopted by migration ops on every target. The framework-level commitment exists in code, and second and third adopters (Contract IR, Schema IR) are committed but not yet shipped. Promotes to **Stable** once those land.
 
-> **Status note.** This pattern is currently the convention for migration ops and is being extended to Contract IR and Schema IR by in-flight work. v1 catalogue ships it as **Emerging** because the second-and-third adopters are committed but not yet shipped; promote to **Stable** once Contract IR / Schema IR land.
+**Maintainer:** architect
 
 ## Intent
 
-IRs that cross the framework/target boundary are layered as **framework interfaces and abstract bases → family abstract bases → target concrete classes**. The framework declares the minimum every target must satisfy; the family refines for SQL-shaped or document-shaped persistence; the target ships concrete classes _and_ target-only kinds with no family parent. Consumers above the framework layer dispatch through the framework interface; consumers inside a family dispatch through the family abstract base; the target is the only place that knows its own kind set.
+Postgres needs `CreateExtensionCall` to model `CREATE EXTENSION`. Mongo doesn't, and shouldn't have to invent a stub `CreateExtensionCall` just because Postgres has one. But the framework still has to walk every target's migration ops generically — for hashing, for display, for "what factory produced this?" — without knowing the per-target kind set ahead of time.
 
-Adopting this pattern commits you to: a clear minimum contract at the framework layer (no leaking target-specific concepts upward), a family layer that names the shape's domain (`SqlMigrationOp`, `DocumentMigrationOp`), and a target layer that is free to introduce kinds the framework cannot anticipate (Postgres extensions, MySQL databases, Mongo aggregation stages) without forcing every other target to model them.
+The pattern layers the IR three ways: the **framework** declares an interface that every kind on every target must satisfy (e.g. `OpFactoryCall` with `factoryName`, `operationClass`, `label`); the **family** layer (SQL-shaped, document-shaped) extends that with persistence-shaped abstractions (`SqlMigrationOpNode`, `DocumentMigrationOpNode`); the **target** layer ships concrete classes for the kinds it cares about — including target-only kinds with no family parent. Consumers above the framework dispatch through the framework interface; consumers inside a family dispatch through the family base; the target is the only layer that knows its full kind set.
 
 ## When to use
 
 - The IR is consumed at multiple layers (framework tooling, family-level lowering, target-specific rendering).
-- Targets must extend the framework's set of kinds with target-only kinds (e.g. Postgres `CREATE EXTENSION`, Mongo collection options) — the framework cannot enumerate them ahead of time.
+- Targets must extend the framework's set of kinds with target-only kinds — the framework cannot enumerate them ahead of time.
 - The framework needs a stable contract to walk the IR (validation, hashing, display) without knowing the target's full kind set.
-- The IR is already a [Frozen-class AST + visitor](./frozen-class-ast.md) (this pattern is the layering rule for that one when it crosses the framework/target boundary).
+- The IR is already a [Frozen-class AST + visitor](./frozen-class-ast.md). This pattern is the layering rule for that one when it crosses the framework/target boundary.
 
 ## When NOT to use
 
@@ -62,8 +61,6 @@ The framework layer's contract is intentionally minimal — `factoryName`, `oper
 | Postgres target concrete classes | [`packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts`](../../../packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts) | `PostgresOpFactoryCallNode` abstract base implementing the framework interface; concrete `CreateTableCall`, `AddColumnCall`, etc.; **plus** target-only kinds like `CreateExtensionCall` with no family analog. |
 | Mongo target concrete classes | [`packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts`](../../../packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts) | The same layering on the document side; demonstrates the pattern is family-shaped, not Postgres-shaped. |
 
-Forthcoming reference implementations (in flight): Contract IR and Schema IR are being layered onto this pattern by the in-flight target-extensible IR work. The pattern entry will be promoted to **Stable** and gain those references when they ship.
-
 ## Related ADRs
 
 - [ADR 195 — Planner IR with two renderers](../adrs/ADR%20195%20-%20Planner%20IR%20with%20two%20renderers.md) — establishes the IR shape this pattern layers.
@@ -79,5 +76,5 @@ Forthcoming reference implementations (in flight): Contract IR and Schema IR are
 ## Cautions / common mistakes
 
 - **Lifting target concepts to the framework layer to "share code".** If the framework interface gains a field that only one target uses, the layering is leaking; either move the field to the family layer or accept that the framework's contract is wider than it should be.
-- **Family layer as dead weight.** A family layer that adds nothing beyond `extends` is a noise. If the family doesn't refine the contract, drop the layer for that IR.
-- **Target-only kinds with no framework parent.** This is **expected**, not a violation — Postgres `CreateExtensionCall` is intentionally a target-only kind. Architect-persona check: target-only kinds should still satisfy the framework interface (`factoryName`, `label`, etc.) so framework-level walks don't have to special-case them.
+- **Family layer as dead weight.** A family layer that adds nothing beyond `extends` is noise. If the family doesn't refine the contract, drop the layer for that IR.
+- **Target-only kinds with no framework parent.** This is **expected**, not a violation — Postgres `CreateExtensionCall` is intentionally a target-only kind. Target-only kinds should still satisfy the framework interface (`factoryName`, `label`, etc.) so framework-level walks don't have to special-case them.
