@@ -179,15 +179,19 @@ describe('per-space verifier + runner against a project with deleted node_module
 });
 
 /**
- * AC15 (M2.5) lock for the loader → planner → verifier pipeline.
+ * AC15 (M2.5) lock for the loader → verifier path.
  *
  * The aggregate refactor (M2.5) makes the loader the single
  * descriptor-import boundary for `db init` / `db update` / `db verify`:
- * once `loadContractSpaceAggregate` returns, the planner and verifier
- * operate purely on the in-memory aggregate. This test exercises that
- * property end-to-end: with `node_modules` deleted, declared extension
- * entries supplied **inline** (the same shape `cli/control-api/utils/contract-space-aggregate-loader`
- * builds from `Config.extensionPacks`), the full pipeline succeeds.
+ * once `loadContractSpaceAggregate` returns, the verifier operates
+ * purely on the in-memory aggregate. This test exercises that property
+ * end-to-end: with `node_modules` deleted, declared extension entries
+ * supplied **inline** (the same shape
+ * `cli/control-api/utils/contract-space-aggregate-loader` builds from
+ * `Config.extensionPacks`), `loadContractSpaceAggregate` followed by
+ * `verifyAggregate` succeeds. Planner coverage is owned by the
+ * dedicated planner tests; this test intentionally does not exercise
+ * `planContractSpaceAggregate`.
  *
  * The test deliberately constructs `DeclaredExtensionEntry` values
  * directly — no descriptor module is imported. If the post-load
@@ -197,7 +201,7 @@ describe('per-space verifier + runner against a project with deleted node_module
  * loader is the only place that calls `validateContract` / `hashContract`,
  * the property is locked at the API surface.
  */
-describe('aggregate pipeline (loader → planner → verifier) against deleted node_modules', () => {
+describe('aggregate loader → verifier against deleted node_modules', () => {
   const HEAD_HASH = 'sha256:abc123';
   let projectRoot: string;
   let migrationsDir: string;
@@ -246,7 +250,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
     await rm(projectRoot, { recursive: true, force: true });
   });
 
-  it('loader → verifier walk to completion with node_modules removed', async () => {
+  it('loader → verifier walks to completion with node_modules removed', async () => {
     // Reconstruct the same on-disk contract value the writer used (the
     // emitter rounds it through the canonical-JSON pipeline; the test
     // hands the validator back an identity value structurally identical
