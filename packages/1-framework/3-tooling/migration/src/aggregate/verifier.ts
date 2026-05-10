@@ -105,7 +105,8 @@ export type AggregateVerifierOutput<TSchemaResult> = Result<
  *   the member claims via {@link projectSchemaToSpace}, then delegate
  *   to the caller-supplied `verifySchemaForMember`. The pre-projection
  *   means the family's single-contract verifier no longer sees other
- *   members' tables as `extras` — closes F23.
+ *   members' tables as `extras`, so a multi-member deployment never
+ *   surfaces cross-member tables as orphaned schema elements.
  *
  * `markerCheck.orphanMarkers` lists every marker row whose `space` is
  * not a member of the aggregate. `db verify` callers reject orphans;

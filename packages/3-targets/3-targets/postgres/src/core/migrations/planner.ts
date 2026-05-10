@@ -165,12 +165,11 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return plannerFailure(result.failure);
     }
 
-    // Codec lifecycle hook (T2.2): inline `onFieldEvent`-emitted ops after
-    // structural DDL. Sub-spec § 5 fixes the ordering as
-    // `structural → added → dropped → altered`, with within-group sorting by
-    // `(tableName, fieldName)` deterministic for byte-stable re-emits.
-    // Hook fires only at the application emitter — extension-space planning
-    // (M2 R2) never reaches this helper.
+    // Inline `onFieldEvent`-emitted ops after structural DDL. The fixed
+    // ordering is `structural → added → dropped → altered`, with
+    // within-group sorting by `(tableName, fieldName)` so re-emits are
+    // byte-stable. The hook fires only at the application emitter —
+    // extension-space planning never reaches this helper.
     const fieldEventOps = planFieldEventOperations({
       priorContract: options.fromContract,
       newContract: options.contract,

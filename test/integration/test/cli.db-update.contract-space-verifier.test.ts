@@ -9,16 +9,14 @@ import {
 import { runDbUpdateAllowFailure, setupDbUpdateFixture } from './utils/db-update-test-helpers';
 
 /**
- * Integration coverage for the marker-aware contract-space verifier
- * wired into `db update` (sub-spec § 4 / project § "Verifier wiring
- * contract"). Locks the `db update`-level half of:
+ * Integration coverage for the marker-aware contract-space verifier wired
+ * into `db update`. Locks two `db update`-level rejection cases:
  *
- * - **AC-13** — `db update` rejects when an orphan marker row exists in
- *   the database (a marker for a space that's not declared in
- *   `extensionPacks`).
- * - **AC-16** — `db update` rejects when an extension is declared in
- *   `extensionPacks` but no pinned `migrations/<space-id>/` directory
- *   exists on disk yet (`declaredButUnmigrated`).
+ * - `db update` rejects when an orphan marker row exists in the database
+ *   (a marker for a space that is not declared in `extensionPacks`).
+ * - `db update` rejects when an extension is declared in `extensionPacks`
+ *   but no pinned `migrations/<space-id>/` directory exists on disk yet
+ *   (`declaredButUnmigrated`).
  *
  * Pre-amendment, `db update` ran neither verifier — both kinds of
  * violation slipped through. Post-amendment, both checks fire as
