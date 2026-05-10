@@ -21,6 +21,9 @@ function buildAliasMap(ast: AnyQueryAst): ReadonlyMap<string, string> {
     for (const join of ast.joins ?? []) {
       recordSource(join.source);
     }
+  } else if (ast.kind === 'raw-sql') {
+    // Raw-SQL ASTs do not bind a single primary table — alias resolution
+    // is driven by inline `IdentifierRef`s the caller embedded directly.
   } else {
     recordSource(ast.table);
   }

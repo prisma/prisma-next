@@ -94,6 +94,12 @@ function evaluateAstLints(ast: AnyQueryAst): LintFinding[] {
     case 'insert':
       break;
 
+    case 'raw-sql':
+      // Raw-SQL ASTs opt out of structural lints (LIMIT / WHERE etc.) —
+      // the embedded SQL fragments are caller-authored and the lint's
+      // shape-based heuristics don't apply.
+      break;
+
     // v8 ignore next 2
     default:
       throw new Error(`Unsupported AST kind: ${(ast satisfies never as { kind: string }).kind}`);

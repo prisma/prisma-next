@@ -36,6 +36,9 @@ function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> 
   if (ast.kind === 'select') {
     return ast.projection;
   }
+  if (ast.kind === 'raw-sql') {
+    return undefined;
+  }
   return ast.returning;
 }
 
