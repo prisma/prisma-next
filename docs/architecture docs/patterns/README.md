@@ -15,7 +15,7 @@ The eight v1 patterns land in milestone M2. Until each entry exists, its row is 
 | Pattern | Slug | Intent (one-line) | Status |
 |---|---|---|---|
 | Frozen-class AST + visitor | [`frozen-class-ast.md`](./frozen-class-ast.md) | Discriminated AST as an abstract base + concrete classes per kind, frozen at construction, with `accept(visitor)` for narrow exhaustive dispatch. | Stable |
-| JSON-canonical / class-in-memory round-trip | `json-canonical-class-in-memory.md` | The canonical persistent artifact is JSON; the canonical in-memory form is a class hierarchy whose plain readonly fields serialize without a custom `toJSON()`. | Pending |
+| JSON-canonical / class-in-memory round-trip | [`json-canonical-class-in-memory.md`](./json-canonical-class-in-memory.md) | The canonical persistent artifact is JSON; the canonical in-memory form is a class hierarchy whose plain readonly fields serialize without a custom `toJSON()`. | Stable |
 | Three-layer polymorphic IR (framework → family → target) | `three-layer-polymorphic-ir.md` | IRs that cross the framework/target boundary layer as framework interfaces → family abstract bases → target concrete classes. | Pending (Emerging) |
 | SPI at the lowest consuming layer | `spi-at-lowest-consuming-layer.md` | When a lower layer needs to call a higher layer, the SPI interface is declared at the lowest layer whose types it depends on; both sides depend on the abstraction. | Pending |
 | Interface + factory function (stateful services) | `interface-plus-factory.md` | Stateful services are exposed as an exported `interface` plus a `createXxx()` factory; the implementing class is private. | Pending |
