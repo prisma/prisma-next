@@ -1,6 +1,11 @@
 import { AsyncIterableResult } from './async-iterable-result';
 import type { ExecutionPlan } from './query-plan';
-import type { RuntimeMiddleware, RuntimeMiddlewareContext } from './runtime-middleware';
+import { checkAborted, raceAgainstAbort } from './race-against-abort';
+import type {
+  ParamRefMutator,
+  RuntimeMiddleware,
+  RuntimeMiddlewareContext,
+} from './runtime-middleware';
 
 /**
  * Drives a single execution of `runDriver()` through the middleware lifecycle.
@@ -37,11 +42,16 @@ import type { RuntimeMiddleware, RuntimeMiddlewareContext } from './runtime-midd
  * This helper is the single canonical implementation of the middleware
  * orchestration loop; family runtimes should not reimplement it.
  */
-export function runWithMiddleware<TExec extends ExecutionPlan, Row>(
+export function runWithMiddleware<
+  TExec extends ExecutionPlan,
+  Row,
+  TMutator extends ParamRefMutator = ParamRefMutator,
+>(
   exec: TExec,
-  middleware: ReadonlyArray<RuntimeMiddleware<TExec>>,
+  middleware: ReadonlyArray<RuntimeMiddleware<TExec, TMutator>>,
   ctx: RuntimeMiddlewareContext,
   runDriver: () => AsyncIterable<Row>,
+  paramsMutator?: TMutator,
 ): AsyncIterableResult<Row> {
   const iterator = async function* (): AsyncGenerator<Row, void, unknown> {
     const startedAt = Date.now();
@@ -83,7 +93,18 @@ export function runWithMiddleware<TExec extends ExecutionPlan, Row>(
       if (source === 'driver') {
         for (const mw of middleware) {
           if (mw.beforeExecute) {
-            await mw.beforeExecute(exec, ctx);
+            checkAborted(ctx, 'beforeExecute');
+            // The framework only forwards the mutator the caller supplied; a
+            // pass-through `undefined` for non-mutating families is safe — the
+            // base `RuntimeMiddleware` declares the third parameter, and
+            // existing `(plan, ctx)` bodies that ignore it stay unchanged.
+            // The cast below is the single point at which the framework's
+            // generic mutator slot meets the (possibly absent) caller value;
+            // `runWithMiddleware` cannot synthesize a TMutator instance.
+            const work = mw.beforeExecute(exec, ctx, paramsMutator as TMutator);
+            if (work !== undefined) {
+              await raceAgainstAbort(Promise.resolve(work), ctx.signal, 'beforeExecute');
+            }
           }
         }
         rowSource = runDriver();
