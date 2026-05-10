@@ -1,241 +1,225 @@
-# Project 1 — Searchable-encryption MVP — Plan
+# Project 1 — CR follow-ups — Plan
 
-> Plan for [Project 1](spec.md) of the [cipherstash-integration umbrella](../spec.md). The umbrella plan ([../plan.md](../plan.md)) sequences the three components; this document sequences the work *inside* Project 1.
->
-> **Independent of in-flight framework PRs.** [#404](https://github.com/prisma/prisma-next/pull/404) (invariant-aware ref routing) and [#409](https://github.com/prisma/prisma-next/pull/409) (middleware `intercept` hook + `contentHash`) are both open and both touch surfaces Project 1 also touches, but Project 1 does not consume either. See the *External PRs — non-dependency* section below.
+Two milestones, sequential: m1 (CR-1 — migration-op factories + renderable IR) followed by m2 (CR-5 — operator type-visibility). Each milestone has its own validation gate; both gates run as a full sweep (workspace-wide test:packages + example typecheck + lint:deps + targeted package builds).
 
-# Strategy
+Locked-in design — file paths, code snippets, exact signatures — lives in [`../project-1-rebase-followups.md`](../project-1-rebase-followups.md). The implementer reads that doc as the source of truth for *what* to build; this plan describes *how* to sequence and validate it.
 
-Five **value-slice milestones** — each milestone produces a concrete, testable end-to-end slice. The cuts are by *user-visible function*, not by task spec, so the framework SPI work (`raw-sql-ast-node`, `middleware-param-transform`) lands in milestones that consume it rather than in a separate "framework prerequisites" phase. The trade-off: milestones span multiple task specs, but each is independently demoable.
+# m1 — CR-1: Public migration-op factories + renderable IR via the codec hook
 
+**Scope:** Promote the framework `OpFactoryCall` interface; widen the codec hook contract; drop the postgres planner's `RawSqlCall` wrap; cipherstash gets its own `*Call` classes implementing the framework interface, with public factory functions exported from a new `/migration` subpath; codec hook returns the renderable IR; ADR 195 + 212 amendments.
+
+**Acceptance criteria covered:** AC-1, AC-3 (ADR 195 + 212).
+
+## Tasks
+
+Ordered. Each task lands in its own commit (or a tight group) per the repo's commit-as-you-go rule.
+
+### T1.1 — Promote framework `OpFactoryCall` interface
+
+[`packages/1-framework/1-core/framework-components/src/control/control-migration-types.ts:92-99`](../../../packages/1-framework/1-core/framework-components/src/control/control-migration-types.ts:92-99). Add `renderTypeScript(): string`, `importRequirements(): readonly ImportRequirement[]`, `toOp(): MigrationPlanOperation` to the interface. Pull `ImportRequirement` from `@prisma-next/ts-render`. Update the doc comment to reflect that this interface is the framework-level contract for any factory call participating in the planner IR / two-renderer pattern (ADR 195).
+
+This is structurally a breaking change to a framework-public type. Postgres + mongo already satisfy the promoted shape (verify each builds + tests).
+
+**Validates with:** `pnpm --filter @prisma-next/framework-components build`, `pnpm --filter @prisma-next/family-sql build`, `pnpm --filter @prisma-next/target-postgres build`, `pnpm --filter @prisma-next/target-mongo build`.
+
+### T1.2 — Widen `CodecControlHooks.onFieldEvent` return type
+
+[`packages/2-sql/9-family/src/core/migrations/types.ts`](../../../packages/2-sql/9-family/src/core/migrations/types.ts) — change `onFieldEvent` return type from `readonly SqlMigrationPlanOperation<TTargetDetails>[]` to `readonly OpFactoryCall[]`.
+
+[`packages/2-sql/9-family/src/core/migrations/field-event-planner.ts:65-67`](../../../packages/2-sql/9-family/src/core/migrations/field-event-planner.ts:65-67) — change `planFieldEventOperations` return type from `readonly SqlMigrationPlanOperation<unknown>[]` to `readonly OpFactoryCall[]`. Update internal accumulator + tests' fixture stubs in lockstep.
+
+Hard-cut, no `OpFactoryCall | SqlMigrationPlanOperation` widening. Cipherstash is the only production implementer; tests update in this same task.
+
+**Validates with:** `pnpm --filter @prisma-next/family-sql test`, plus T1.1 validation gates (still green).
+
+### T1.3 — Drop the postgres planner's `RawSqlCall` wrap
+
+[`packages/3-targets/3-targets/postgres/src/core/migrations/planner.ts:170-175`](../../../packages/3-targets/3-targets/postgres/src/core/migrations/planner.ts:170-175) — replace the `.map((op) => new RawSqlCall(op as SqlMigrationPlanOperation<PostgresPlanTargetDetails>))` call with a plain spread of `fieldEventOps`.
+
+[`packages/3-targets/3-targets/postgres/src/core/migrations/render-typescript.ts:46`](../../../packages/3-targets/3-targets/postgres/src/core/migrations/render-typescript.ts:46) — widen `renderCallsToTypeScript` parameter type from `ReadonlyArray<PostgresOpFactoryCall>` to `ReadonlyArray<OpFactoryCall>`. The body is already polymorphic over `call.renderTypeScript()` + `call.importRequirements()`; no body change required.
+
+`TypeScriptRenderablePostgresMigration`'s constructor signature widens to match.
+
+**Validates with:** `pnpm --filter @prisma-next/target-postgres test`.
+
+### T1.4 — Cipherstash `*Call` classes
+
+New file [`packages/3-extensions/cipherstash/src/core/migration-call-classes.ts`](../../../packages/3-extensions/cipherstash/src/core/migration-call-classes.ts) — package-internal:
+
+- `abstract class CipherstashOpFactoryCallNode extends TsExpression implements OpFactoryCall` with `factoryName`, `operationClass`, `label`, `toOp()` abstract; `importRequirements()` provided.
+- `CipherstashAddSearchConfigCall` — concrete, `factoryName: 'cipherstashAddSearchConfig'`, `operationClass: 'additive'`. Constructor stamps `(table, column, index, castAs)`. `toOp()` produces the same `SqlMigrationPlanOperation<unknown>` today's `buildAddOp` produces. `renderTypeScript()` emits `cipherstashAddSearchConfig({ table, column, index, castAs? })` via `jsonToTsSource`.
+- `CipherstashRemoveSearchConfigCall` — mirror, `operationClass: 'destructive'`.
+- Frozen at construction.
+
+Plus the public types: `CipherstashSearchIndex` (`'unique' | 'match'`), `CipherstashSearchConfigArgs` (`{ table, column, index, castAs? }`).
+
+**Validates with:** `pnpm --filter @prisma-next/extension-cipherstash test` (existing 167 tests still green; new unit tests for the Call classes added in this task).
+
+### T1.5 — Public factory functions + new `/migration` subpath
+
+New file [`packages/3-extensions/cipherstash/src/exports/migration.ts`](../../../packages/3-extensions/cipherstash/src/exports/migration.ts):
+
+```typescript
+export {
+  cipherstashAddSearchConfig,
+  cipherstashRemoveSearchConfig,
+} from '../core/migration-call-classes';
+export type {
+  CipherstashSearchIndex,
+  CipherstashSearchConfigArgs,
+} from '../core/migration-call-classes';
 ```
-M1: framework SPI (raw-sql-ast-node + middleware-param-transform)  ─┐
-M2: store-only round-trip (psl + envelope-codec storage path)       ├─ M5: close-out
-M3: eq operator + addSearchConfig manual migration                  │
-M4: ilike + activatePending + decryptAll                            ─┘
+
+The factory functions construct the corresponding `*Call` classes; they live in `migration-call-classes.ts` alongside the class definitions.
+
+[`packages/3-extensions/cipherstash/package.json`](../../../packages/3-extensions/cipherstash/package.json) — add a `./migration` entry to `exports`. Mirror the existing `./control` / `./runtime` shape.
+
+[`packages/3-extensions/cipherstash/tsdown.config.ts`](../../../packages/3-extensions/cipherstash/tsdown.config.ts) (or equivalent — verify the package's bundler config) — register the new entry.
+
+**Validates with:** `pnpm --filter @prisma-next/extension-cipherstash build` (new subpath emits), `pnpm --filter cipherstash-integration-example typecheck` (downstream resolves).
+
+### T1.6 — Cipherstash codec hook returns Calls
+
+[`packages/3-extensions/cipherstash/src/core/cipherstash-codec.ts`](../../../packages/3-extensions/cipherstash/src/core/cipherstash-codec.ts) — change `onFieldEvent` return type to `readonly OpFactoryCall[]`. Replace `buildAddOp` / `buildRemoveOp` plain-object construction with calls to `cipherstashAddSearchConfig({...})` / `cipherstashRemoveSearchConfig({...})`. The flag-to-index walk (`equality → 'unique'`, `freeTextSearch → 'match'`) stays inside this file; the public factory args expose `index` directly.
+
+Delete `buildAddOp` / `buildRemoveOp` and any now-dead helpers. (No back-compat shims — the only caller is this codec.)
+
+**Validates with:** `pnpm --filter @prisma-next/extension-cipherstash test`.
+
+### T1.7 — Regenerate the example app's baseline migration; verify round-trip invariants
+
+[`examples/cipherstash-integration/migrations/20260508T1721_migration/migration.ts`](../../../examples/cipherstash-integration/migrations/20260508T1721_migration/migration.ts) regenerates as part of `pnpm --filter cipherstash-integration-example build:contract-space` (or the equivalent migration-plan command — confirm against the example's package.json scripts).
+
+Verify:
+
+1. Codec-emitted ops render as `cipherstashAddSearchConfig({...})` / `cipherstashRemoveSearchConfig({...})` calls. **Zero** `rawSql({ id: 'cipherstash-codec.*', ... })` blocks remain (grep the regenerated file).
+2. Auto-import: `import { cipherstashAddSearchConfig, ... } from '@prisma-next/extension-cipherstash/migration';` is at the top of the regenerated file, deduped alongside postgres imports.
+3. Re-run `pnpm tsx migrations/20260508T1721_migration/migration.ts` and verify `ops.json` is byte-identical to the pre-CR-1 baseline (capture the baseline before the regen; compare after).
+4. `migration.json` `migrationHash` is unchanged.
+
+**Validates with:** the round-trip checks above (scripted as part of this task), plus `pnpm --filter cipherstash-integration-example typecheck`.
+
+### T1.8 — ADR 195 + ADR 212 amendments
+
+ADR 195 ([`docs/architecture docs/adrs/ADR 195 - Planner IR with two renderers.md`](../../../docs/architecture%20docs/adrs/ADR%20195%20-%20Planner%20IR%20with%20two%20renderers.md)):
+
+- Record that the framework-level `OpFactoryCall` interface (in `framework-components/control`) is now the canonical contract for the IR; postgres + mongo + cipherstash all implement it directly.
+- Note that the visitor-pattern section is illustrative-only; production implementations use inheritance-with-abstract-methods (`renderTypeScript`, `importRequirements`, `toOp`). The visitor / `accept` form is not what the postgres or mongo `OpFactoryCallNode` actually look like.
+- Note that extensions can implement the framework `OpFactoryCall` directly without depending on a target's package-private base.
+
+ADR 212 ([`docs/architecture docs/adrs/ADR 212 - Codec lifecycle hooks.md`](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Codec%20lifecycle%20hooks.md)):
+
+- Update the hook contract code block: return type `readonly OpFactoryCall[]` (was `readonly SqlMigrationPlanOperation<TTargetDetails>[]`).
+- Update the mermaid diagram to reflect that codec-emitted output flows through the planner's call list (rendered to `migration.ts`) AND through `toOp()` derivation (rendered to `ops.json`). The two-fan-out shape from ADR 195 applies here.
+- Cross-link to ADR 195 explicitly.
+
+**Validates with:** doc-build / link-check whatever this repo runs (likely none specifically for ADRs; rely on review).
+
+## m1 validation gate
+
+All of these must pass green before the milestone is `SATISFIED`:
+
+```bash
+pnpm --filter @prisma-next/framework-components build
+pnpm --filter @prisma-next/family-sql build
+pnpm --filter @prisma-next/target-postgres build
+pnpm --filter @prisma-next/target-mongo build
+pnpm --filter @prisma-next/extension-cipherstash build
+pnpm --filter cipherstash-integration-example typecheck
+pnpm test:packages
+pnpm lint:deps
 ```
 
-**Critical path.** M1 → M2 → M3 → M4 → M5. M1 is pure framework work and can be parallelized internally (the two task specs touch disjoint files). M2 depends on M1's middleware seam. M3 and M4 each extend M2's working extension with more user-facing surface.
+Plus the round-trip invariants from T1.7 (scripted check; result captured in the implementer's report).
 
-Two task specs, both pure framework SPI work, can be **executed in parallel inside M1** by two different drivers — the `raw-sql-ast-node` task touches `packages/2-sql/4-lanes/relational-core/src/ast/types.ts` and the Postgres lowerer; `middleware-param-transform` touches `packages/1-framework/1-core/framework-components/` and the SQL/Mongo runtimes. They do not collide.
+# m2 — CR-5: Operator type-visibility
 
-# Tests-first guidance
+**Scope:** Mirror pgvector's `QueryOperationTypes` pattern for `cipherstashEq` / `cipherstashIlike` on `cipherstash/string@1`; new `/operation-types` subpath; positive + negative type tests in the example app; ADR 211 amendment; cancel TML-2435 Linear ticket.
 
-Per the repo rule "always write tests before creating or modifying implementation," each milestone leads with a failing-test step before its implementation step. The task specs already enumerate per-feature acceptance criteria (`AC-AST*`, `AC-LOW*`, `AC-MUT*`, `AC-CODEC*`, etc.); each milestone's tests are drawn from the corresponding ACs. The plan does not duplicate AC inventories; it points at them.
+**Acceptance criteria covered:** AC-2, AC-3 (ADR 211).
 
-# External PRs — non-dependency
+## Tasks
 
-Two PRs are open against `main` that touch surfaces this project also touches. Project 1 is independent of both:
+### T2.1 — `QueryOperationTypes` declaration
 
-## #409 — middleware `intercept` hook + `contentHash`
+New file [`packages/3-extensions/cipherstash/src/types/operation-types.ts`](../../../packages/3-extensions/cipherstash/src/types/operation-types.ts):
 
-**What it adds:** `intercept?(plan, ctx)` hook on `RuntimeMiddleware`; `source: 'driver' | 'middleware'` on `AfterExecuteResult`; **required** `contentHash(exec)` method on `RuntimeMiddlewareContext`.
+```typescript
+export type QueryOperationTypes<CT extends CodecTypesBase> = SqlQueryOperationTypes<
+  CT,
+  {
+    readonly cipherstashEq: { readonly self: { readonly codecId: 'cipherstash/string@1' }; readonly impl: ... };
+    readonly cipherstashIlike: { readonly self: { readonly codecId: 'cipherstash/string@1' }; readonly impl: ... };
+  }
+>;
+```
 
-**What we consume from it:** Nothing. Our `bulkEncryptMiddleware` only uses `beforeExecute(plan, ctx, params)` — none of `intercept`, `contentHash`, or `source` is referenced anywhere in our task specs.
+Reference: [`packages/3-extensions/pgvector/src/types/operation-types.ts`](../../../packages/3-extensions/pgvector/src/types/operation-types.ts).
 
-**Coordination:** Both PRs edit `RuntimeMiddleware` / `RuntimeMiddlewareContext` and their construction sites. Whichever lands on `main` first, the other rebases — small, mechanical: add your fields next to the other PR's already-merged fields; update construction sites to populate both sets.
+Verify the return-codec type matches what `cipherstashQueryOperations()` actually lowers to at runtime ([`packages/3-extensions/cipherstash/src/core/operators.ts`](../../../packages/3-extensions/cipherstash/src/core/operators.ts)). The boolean codec ID may be `pg/bool@1` (matching pgvector) or something else; pin to the runtime's truth.
 
-**Rebase plan:** if #409 lands first, our `middleware-param-transform` task adds its `signal` and `params` fields to a `RuntimeMiddlewareContext` shape that already has `contentHash`. If our PR lands first, #409 adds its fields to a shape that already has ours. Either order is fine.
+**Validates with:** `pnpm --filter @prisma-next/extension-cipherstash build` (types compile).
 
-## #404 — invariant-aware ref routing (M4) + self-edge support
+### T2.2 — `/operation-types` subpath export
 
-**What it adds:** Routes downstream migration operations across `DataTransformOperation`s by `invariantId`. Reads `invariantId` from `operationClass: 'data'` ops via `deriveProvidedInvariants`.
+New file [`packages/3-extensions/cipherstash/src/exports/operation-types.ts`](../../../packages/3-extensions/cipherstash/src/exports/operation-types.ts):
 
-**What we consume from it:** Nothing at execute time. Our migration-factories produce `DataTransformOperation`s carrying `invariantId` fields (per the [migration-factories task spec](specs/migration-factories.spec.md)). The `invariantId` is data the operation carries; nothing reads it until #404 lands. Project 1's own integration tests don't exercise cross-migration ref routing, so the field-being-set-but-unread behavior is invisible at the AC level.
+```typescript
+export type { QueryOperationTypes } from '../types/operation-types';
+```
 
-**Coordination:** None. Project 1 ships with `invariantId`-carrying ops; the routing benefit becomes effective when #404 lands on `main`, retroactively.
+[`packages/3-extensions/cipherstash/package.json`](../../../packages/3-extensions/cipherstash/package.json) — add `./operation-types` exports entry.
 
-# Milestones
+Bundler config (tsdown or equivalent) — register the new entry.
 
-## M1 — Framework SPI
+**Validates with:** `pnpm --filter @prisma-next/extension-cipherstash build` (new subpath emits cleanly).
 
-**Goal.** Land the two framework-side prerequisites (`RawSqlExpr` AST node + lowerer arm; `beforeExecute` mutator + `MiddlewareContext.signal`) on `main`. No cipherstash surface yet.
+### T2.3 — Positive + negative type tests in the example app
 
-**Visible value.** Other extensions immediately benefit from the seams. After M1, any extension author can write a bulk-pattern middleware following the [middleware-param-transform task spec](specs/middleware-param-transform.spec.md)'s grounding example, and any caller can construct a `RawSqlExpr`-bearing `SqlQueryPlan` for `dataTransform` consumption.
+[`examples/cipherstash-integration`](../../../examples/cipherstash-integration) — wire the cipherstash extension's `QueryOperationTypes` through the example's contract / type composition. Mirror however the example currently composes pgvector's operations if pgvector is set up there; otherwise follow the framework's contract-emit composition pattern.
 
-**Task specs.** [`raw-sql-ast-node`](specs/raw-sql-ast-node.spec.md), [`middleware-param-transform`](specs/middleware-param-transform.spec.md). Both can land in either order; can also land as separate PRs.
+Add type tests (preferably as part of an existing typecheck-only file in the example, or a new `*.types.ts` sibling):
 
-**Tests-first.**
+- **Positive:** `db.user.findMany({ where: { email: { cipherstashEq: 'x' } } })` type-checks. `sql(t).where(t => t.email.cipherstashEq('x'))` type-checks.
+- **Negative (`@ts-expect-error`):** `db.user.findMany({ where: { name: { cipherstashEq: 'x' } } })` — `name` is `pg/text@1`, should error.
 
-- `raw-sql-ast-node`: AC-AST1–AC-AST5, AC-LOW1–AC-LOW5, AC-PLAN1–AC-PLAN3 all enumerated in the task spec; write the failing tests first.
-- `middleware-param-transform`: AC-MUT1–AC-MUT5, AC-ABT1–AC-ABT4, AC-FAM1–AC-FAM2 from the task spec.
+**Validates with:** `pnpm --filter cipherstash-integration-example typecheck`.
 
-**Implementation sketch.**
+### T2.4 — ADR 211 amendment
 
-- `raw-sql-ast-node`:
-  - Add `RawSqlExpr` class in `packages/2-sql/4-lanes/relational-core/src/ast/types.ts`; extend `AnyQueryAst` union and `queryAstKinds`.
-  - Add lowerer arm in the Postgres SQL renderer.
-  - Add `planFromAst` helper in `relational-core/plan.ts` (open question 2 of the task spec — confirm location during implementation).
-- `middleware-param-transform`:
-  - Add `MiddlewareContext.signal` to `packages/1-framework/1-core/framework-components/`.
-  - Add `SqlParamRefMutator` interface in `packages/2-sql/4-lanes/relational-core/`; analogous `MongoParamRefMutator` in the Mongo family.
-  - Update `RuntimeMiddleware.beforeExecute` to accept the third `params` argument; preserve trailing-arg bivariance for back-compat.
-  - Wire the lazy mutator construction in the `runWithMiddleware` orchestrator (no allocation when no middleware mutates).
+[`docs/architecture docs/adrs/ADR 211 - Extension operator surface namespaced replacement operators.md`](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Extension%20operator%20surface%20namespaced%20replacement%20operators.md):
 
-**Validation gate.**
+- Add a section noting that namespaced replacement operators must also project type-visibility through `QueryOperationTypes` for the operator to be discoverable on model accessors and the SQL query builder.
+- Reference the `/operation-types` subpath convention.
+- Cipherstash + pgvector are the canonical examples.
 
-- All ACs above pass.
-- `pnpm typecheck`, `pnpm test:packages`, `pnpm lint:deps` clean.
-- No regression in `packages/2-sql/5-runtime/test/sql-runtime.test.ts` or `packages/1-framework/1-core/framework-components/test/run-with-middleware.test.ts`.
+**Validates with:** none specifically; rely on review.
 
-**Done when.** Both task specs' ACs are green and merged on `main` (or on the project branch). M2 unblocks.
+### T2.5 — Cancel TML-2435
 
-**Commits.** Two PRs (one per task spec) is cleanest. Single PR is acceptable if scheduling makes that easier — they don't share files.
+Cancel the Linear ticket TML-2435 (separate ticket previously tracking this work). The change log entry in the ticket should reference the project-1 PR.
 
----
+**Validates with:** ticket is cancelled (verify via Linear MCP).
 
-## M2 — Store-only round-trip
+## m2 validation gate
 
-**Goal.** `EncryptedString` works as a column type for *storage* — encrypt on write, decode-into-envelope on read, retrieve plaintext via `await envelope.decrypt()`. No search operators yet (queries are key-lookup or full-table scan only). No migration factories yet (the test suite uses hand-written DDL fixtures).
-
-**Visible value.** End-to-end-demoable encrypted column. A test inserts plaintext, the SDK is hit once via bulk-encrypt middleware, the row lands in Postgres as encrypted JSONB, a `findUnique` decodes it back to an envelope, `await envelope.decrypt()` returns the plaintext.
-
-**Task specs touched.** [`envelope-codec-extension`](specs/envelope-codec-extension.spec.md) (storage portion), [`psl-encrypted-string-constructor`](specs/psl-encrypted-string-constructor.spec.md). Operator lowering and migration factories are explicitly deferred to M3/M4.
-
-**Tests-first.**
-
-- Envelope: AC-ENV1, AC-ENV2, AC-ENV4.
-- Codec: AC-CODEC1–AC-CODEC5.
-- Bulk-encrypt middleware: AC-MW1, AC-MW2, AC-MW3, AC-MW4, AC-MW5.
-- EQL bundle install: AC-INSTALL1, AC-INSTALL2, AC-INSTALL3.
-- PSL constructor: enumerate from the task spec — full constructor registration, inline + named-type-alias usage, all three argument shapes (`EncryptedString({})`, `({ equality })`, `({ equality, freeTextSearch })`), nullable + non-nullable variants, the parity test against the TS contract factory.
-- One umbrella-level integration test (subset of [AC-UMB1](spec.md)) covering only the storage round-trip — no `findMany({ where: { email: { equals: ... } } })` yet.
-
-**Implementation sketch.**
-
-- Bootstrap `packages/3-extensions/cipherstash/` mirroring `packages/3-extensions/pgvector/`. Subpath exports per the spec's "Subpath exports" layout.
-- `EncryptedString` envelope + handle in `core/envelope.ts`. Handle as `WeakMap<EncryptedString, Handle>` or `#`-prefixed field — implementation choice; pin in the eventual implementation PR's design comment.
-- `cipherstashStringCodec` in `core/codecs.ts`. `RuntimeParameterizedCodecDescriptor<P>` registration following pgvector's post-#402 shape.
-- `bulkEncryptMiddleware` factory in `middleware/bulk-encrypt.ts`. Consumes M1's mutator + signal.
-- PSL constructor registration in `core/authoring.ts` mirroring `packages/3-extensions/pgvector/src/core/authoring.ts`. Both inline and `types {}` alias paths supported.
-- TS contract factory `encryptedString({ ... })` in `exports/column-types.ts`.
-- EQL bundle vendor: copy `eql-bundle.ts` from `reference/cipherstash/stack/packages/stack/src/prisma/core/eql-bundle.ts`. Wire `databaseDependencies.init` per the spec's example.
-- Parity test under `test/integration/test/authoring/parity/cipherstash-encrypted-string/` (mirrors pgvector's parity test).
-
-**Validation gate.**
-
-- All M2-scoped ACs pass.
-- Integration test against live Postgres + EQL: insert encrypted value via `db.insert(User, { email: EncryptedString.from('alice@example.com') })`; verify the wire row is `eql_v2_encrypted` JSONB; `findUnique` returns an envelope; `await envelope.decrypt()` returns the plaintext.
-- Bulk-call counter: inserting 10 rows × 1 column issues exactly **one** `bulkEncrypt` call.
-- `pnpm lint:deps` passes for `packages/3-extensions/cipherstash/`.
-
-**Done when.** Storage round-trip works end-to-end; bulk amortization on the write side verified.
-
-**Commit.** One or two PRs depending on review size. The PSL constructor (and its parity test) and the runtime/codec/middleware/install can naturally split.
-
----
-
-## M3 — `eq` operator + manual `addSearchConfig` migration
-
-**Goal.** A `findMany({ where: { email: { equals: 'alice@example.com' } } })` against a cipherstash column works against live Postgres + EQL. The user authors a hand-written migration calling `cipherstash.addSearchConfig({ table, column, equality: true })`; the migration installs the EQL search-config row; the query works.
-
-**Visible value.** Searchable encryption is real. Equality search on encrypted columns — the headline cipherstash feature — works end-to-end on the framework.
-
-**Task specs touched.** [`envelope-codec-extension`](specs/envelope-codec-extension.spec.md) (operator lowering portion); [`migration-factories`](specs/migration-factories.spec.md) (`addSearchConfig` for `equality`). `activatePendingSearches` is included if the EQL protocol requires it for `equality` mode (open question 1 of the migration-factories task spec — confirm against EQL).
-
-**Tests-first.**
-
-- Operator lowering: AC-OP1, AC-OP2 (snapshot tests verifying SQL shape).
-- Nullable handling: AC-OP3, AC-OP4 — `WHERE email IS NULL` short-circuits, doesn't hit `eql_v2.eq`.
-- Migration factories: AC-FACT1–AC-FACT4 (factory shape), AC-SQL1–AC-SQL4 (SQL shapes, parameterization correctness — adversarial table/column names flow through unchanged), AC-MIG1–AC-MIG6 (migration plan integration), AC-E2E1, AC-E2E2 (end-to-end with `dataTransform`).
-
-**Implementation sketch.**
-
-- Operator lowering: implement `queryOperations` handlers for `eq` against `cipherstash/string@1` columns. Lowering produces `eql_v2.eq("col", eql_v2.encrypt($1, ...))` (or the EQL canonical form — confirm against `reference/cipherstash/stack/packages/stack/src/prisma/core/operation-templates.ts`, the spec's open question 1).
-- `addSearchConfig({ ... })` factory in `exports/migration.ts`. Constructs `RawSqlExpr` instances directly via the package-internal API delivered by M1's `raw-sql-ast-node`. Each entry produces a `SqlQueryPlan` via `planFromAst(ast, contract)` and is wrapped by the user via `this.dataTransform(...)` in their `migration.ts`.
-- The `equality` mapping → EQL `'unique'` index (the spec's table). For M3 only the `equality` flag is exercised; `freeTextSearch` defers to M4.
-- Hand-author the integration test's `migration.ts` — the M3 test fixture is a real migration file under `test/integration/`.
-
-**Validation gate.**
-
-- All M3-scoped ACs pass.
-- Integration test against live Postgres + EQL: M2's storage round-trip continues to work; `findMany({ where: { email: { equals: 'alice@example.com' } } })` returns the inserted row; SQL snapshot matches the EQL operator form.
-- `cs_configuration_v2` ends with one row for `(user, email)` with `'unique'` index in the post-migration state.
-- Re-applying the migration is a no-op (idempotency test).
-
-**Done when.** `eq` search round-trips end-to-end against live EQL.
-
-**Commit.** One PR likely covers M3 cleanly — operator lowering and the factory are tightly coupled.
-
----
-
-## M4 — `ilike` + `activatePendingSearches` + `decryptAll`
-
-**Goal.** Complete the Project 1 user-facing surface: `findMany({ where: { email: { contains: 'alice' } } })` works (free-text search via EQL `ilike`); `decryptAll(rows)` materializes plaintext for batches of envelopes; the migration factories cover both `equality` and `freeTextSearch` modes plus the `activatePendingSearches` final step.
-
-**Visible value.** All Project 1 acceptance criteria (UMB1–UMB7) green. The umbrella's "ship a coherent searchable-encryption slice" promise is met.
-
-**Task specs touched.** Remaining portions of [`envelope-codec-extension`](specs/envelope-codec-extension.spec.md) (`ilike` operator, `decryptAll`); remaining portions of [`migration-factories`](specs/migration-factories.spec.md) (`freeTextSearch` mode, `activatePendingSearches`).
-
-**Tests-first.**
-
-- `ilike` operator: AC-OP2, AC-OP3, AC-OP4 (already enumerated under M3 — overlap; the `ilike`-specific cases land here).
-- `decryptAll`: AC-DEC1–AC-DEC4.
-- Migration factories: AC-FACT1 + AC-SQL2 for the `freeTextSearch` path; AC-MIG1 / AC-E2E1 expanded to exercise both modes; `activatePendingSearches` covered by AC-FACT4 / AC-SQL3.
-
-**Implementation sketch.**
-
-- Add the `ilike` arm to the operator lowering implemented in M3.
-- Implement `decryptAll(rows, opts?)` walker in `exports/decrypt-all.ts`. Bulk amortization — one `bulkDecrypt` per routing key.
-- Extend `addSearchConfig` to emit the `freeTextSearch` → EQL `'match'` index entry alongside `equality`.
-- Implement `activatePendingSearches()` as a single-entry factory.
-- Update the integration migration `migration.ts` fixture from M3 to call `addSearchConfig({ ..., freeTextSearch: true })` and `activatePendingSearches()`.
-
-**Validation gate.**
-
-- Every umbrella AC (UMB1–UMB7) passes:
-  - UMB1: full PSL round-trip with both `equality` and `freeTextSearch`; `findMany` for both `equals` and `contains` returns rows; `decryptAll(rows)` materializes plaintext.
-  - UMB2: parity test (PSL vs TS contract produces byte-identical `contract.json`).
-  - UMB3: bulk amortization on both write and read sides verified by counters (1 × `bulkEncrypt` for 10 inserts; 1 × `bulkDecrypt` for `decryptAll` over 10 rows).
-  - UMB4: nullable variant + `where: { email: null }` short-circuits.
-  - UMB5: cancellation surfaces `RUNTIME.ABORTED` at every phase.
-  - UMB6: `pnpm lint:deps` passes.
-  - UMB7: `examples/` app exercises the pattern.
-
-**Done when.** All UMB ACs green; Project 1 functionally complete.
-
-**Commit.** One PR covers M4 cleanly — `ilike` lowering, `decryptAll`, `freeTextSearch` migration mode all reuse the patterns established in M3.
-
----
-
-## M5 — Close-out
-
-**Scope.** Project lifecycle close-out per `projects/README.md`.
-
-**Tasks.**
-
-- **T5.1** Verify all umbrella ACs (UMB1–UMB7) and per-task-spec ACs are green.
-- **T5.2** Migrate long-lived docs to `docs/`. Candidates: the envelope-codec extension pattern as an architecture-doc note (does not need a full ADR; documented in the package README is acceptable for the first KMS-backed extension); the `RawSqlExpr` AST node behavior as an addition to the existing SQL family architecture doc if relevant.
-- **T5.3** Strip repo-wide references to `projects/cipherstash-integration/project-1/**`. Where references are needed, replace with canonical `docs/` links (or with package READMEs).
-- **T5.4** Close [TML-2373](https://linear.app/prisma-company/issue/TML-2373) ("Project 1: Searchable-encryption MVP"). [TML-2374](https://linear.app/prisma-company/issue/TML-2374) (`sql-raw-factory`) and [TML-2375](https://linear.app/prisma-company/issue/TML-2375) (Project 2) continue under the umbrella.
-- **T5.5** Final sanity: `pnpm build`, `pnpm typecheck`, `pnpm test:packages`, `pnpm lint:deps` all green.
-- **T5.6** Delete `projects/cipherstash-integration/project-1/`. The umbrella's `spec.md` and `plan.md` continue to track the remaining components (Project 2, `sql-raw-factory`).
-
-**Validation gate.** All checks green; no references to `project-1/**` remain in the tree (modulo umbrella-level cross-references that should be updated to point at `docs/` or removed).
-
-**Done when.** `project-1/` directory deleted; umbrella plan's status table updated to "shipped."
-
-**Commit.** Single close-out PR.
-
----
-
-# Status
-
-| Milestone | Scope | Status |
-|---|---|---|
-| M1 — Framework SPI | `raw-sql-ast-node` + `middleware-param-transform` | not started |
-| M2 — Store-only round-trip | `psl-encrypted-string-constructor` + `envelope-codec` storage path | blocked on M1 |
-| M3 — `eq` operator + manual `addSearchConfig` | Operator lowering + migration factories (`equality` mode) | blocked on M2 |
-| M4 — `ilike` + `activatePending` + `decryptAll` | Remaining surface from `envelope-codec` + `migration-factories` | blocked on M3 |
-| M5 — Close-out | Lifecycle close-out per `projects/README.md` | blocked on M4 |
+```bash
+pnpm --filter @prisma-next/extension-cipherstash build
+pnpm --filter @prisma-next/extension-cipherstash test
+pnpm --filter cipherstash-integration-example typecheck
+pnpm test:packages
+pnpm lint:deps
+```
 
 # Open items
 
-1. **PSL parity test location.** The umbrella spec defers to "same convention as pgvector" by default. Confirm during M2 implementation whether `test/integration/test/authoring/parity/cipherstash-encrypted-string/` (the pgvector-mirrored shape) or `test/integration/test/authoring/cipherstash/` (a cipherstash-grouped subdir) is preferred.
-2. **Operator lowering source of truth.** [Open question 1 of the envelope-codec task spec](specs/envelope-codec-extension.spec.md#open-questions) — confirm against `reference/cipherstash/stack/packages/stack/src/prisma/core/operation-templates.ts` whether the lowering matches that file's templates byte-for-byte or has minor differences (e.g. `eql_v2.encrypt` wrapping vs an EQL operator-class override). Resolve in M3.
-3. **Migration factory naming — single vs split.** [Open question 2 of the migration-factories task spec](specs/migration-factories.spec.md#open-questions) — confirm whether `addSearchConfig` returns an array (current default) or a grouped op. Resolve in M3 implementation.
-4. **EQL `activate_pending_searches` exact function name.** [Open question 1 of the migration-factories task spec](specs/migration-factories.spec.md#open-questions) — defer to first-attempt repo's name; confirm against the bundled EQL version. Resolve in M4.
-5. **Routing-key derivation.** [Open question 4 of the umbrella spec / Project 1 spec](spec.md#open-questions) — does `encryptedString({ ... })` need an explicit per-column key id slot? Default is "always derived from `(table, column)`." Resolve at the start of M2; confirm with CipherStash team.
-6. **Plaintext-zeroing default.** [Open question 5 of the envelope-codec task spec](specs/envelope-codec-extension.spec.md#open-questions) — does the bulk-encrypt middleware overwrite the handle's plaintext slot with `undefined` post-encrypt? Default yes (memory hygiene). Resolve in M2.
+- The orchestration uses Cursor's `Task` tool with `resume` for subagent continuity. The implementer + reviewer subagent IDs land in `reviews/code-review.md § Subagent IDs` after R1 spawns them.
+- ADR amendments (T1.8, T2.4) ride with their implementing milestone's PR rather than landing in a separate doc-only PR.
+- TML-2435 cancellation (T2.5) waits for the PR to be in-flight (post-`SATISFIED`) so the ticket reference points at a real PR.
 
-Each open item is targeted to the milestone where the answer is needed; none block the start of M1.
+## Pre-existing items surfaced during execution (out of scope for this PR)
+
+The following surfaced during m1 R1 implementation/review and were verified pre-existing on the rebased branch (i.e. they pre-date m1 and are not introduced by CR-1 work). They are out-of-scope for this PR; the implementer is **not** to address them in subsequent rounds.
+
+- **E1 — `ExtensionMigrationPackage` TS2614 in three cipherstash e2e integration tests.** `storage-roundtrip.e2e.integration.test.ts`, `umbrella.e2e.integration.test.ts`, `umbrella-nullable.e2e.integration.test.ts` carry a type-only import `ExtensionMigrationPackage` from `@prisma-next/family-sql/control` that errors `TS2614: Module ... has no exported member ...`. Verified missing from the family-sql barrel at `7f651eb62` and at HEAD; tests run + pass at runtime; the import is type-only. Pre-existing post-rebase artefact; track separately. **Action:** file as a follow-up Linear ticket (test infra hardening) referencing the failing test paths; out-of-scope for Project 1 CR follow-ups.
+- **E2 — `pnpm test:packages` cold-run flakes.** Cold-cache runs reproduce 2-3 transient failures across `target-mongo`, `extension-cipherstash`, occasionally `cli` / `adapter-postgres`. Failures are timing-bound (100ms `beforeEach` hooks + temp-dir races; 8s render-typescript test timeout). Each failing package, run individually, passes 100% of tests. After per-package warm-up runs, full sweep reports 113/113. None of the failing tests touch CR-1 surfaces. **Action:** file as a follow-up Linear ticket (test infra hardening — hook timeouts + temp-dir handling); out-of-scope for Project 1 CR follow-ups.
