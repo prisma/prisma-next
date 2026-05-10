@@ -10,6 +10,16 @@ This project is **doc-only** — no production code is modified. The work is sma
 
 You are picking up a project with **no prior conversation context**. The spec is written assuming you have not read any prior transcript. If something in the spec does not match what you find on disk, prefer the codebase and surface the discrepancy.
 
+## Validation gates
+
+The full validation-gate definition lives in [`projects/architecture-patterns-catalogue/reviews/code-review.md`](./reviews/code-review.md) § Validation gates (orchestrator-maintained, project-wide gates with per-milestone refinements). Confirmed with the user at orchestration setup. Summary:
+
+- Markdown link check across the catalogue + touched files (covers AC7 / NFR2).
+- Doc-only diff check (covers AC8) — only `docs/`, `projects/`, `.agents/skills/drive-agent-personas/personas/architect.md`, and `.cursor/rules/adr-writing.mdc` may change.
+- Template-conformance check on every v1 entry (covers AC2).
+- `pnpm lint:deps` sanity (no code paths touched).
+- Markdown line-wrap rule per [`markdown-no-artificial-line-wraps`](../../.claude/skills/markdown-no-artificial-line-wraps/SKILL.md).
+
 ## Recommended milestones
 
 The implementer may follow these or refine them via `drive-create-plan`. Each milestone produces commits the team can review independently (small, intent-driven slices — the `commit-as-you-go` user rule).
@@ -39,7 +49,7 @@ After each entry, update the catalogue index's status from Pending to Stable / E
 ### M3 — Architect persona + close-out
 
 - [ ] Update [`.agents/skills/drive-agent-personas/personas/architect.md`](../../.agents/skills/drive-agent-personas/personas/architect.md) with the "Patterns to know" section (FR10).
-- [ ] (Spec Open Question 3) Optionally update [`.cursor/rules/adr-writing.mdc`](../../.cursor/rules/adr-writing.mdc) to expect new ADRs to link forward to catalogue patterns when applicable.
+- [ ] Update [`.cursor/rules/adr-writing.mdc`](../../.cursor/rules/adr-writing.mdc) so new ADRs that instantiate a catalogue pattern link forward to it (Spec Open Question 3 — confirmed in scope by the user during orchestration setup; the spec's default-assumption applies). Flag if the rule's existing wording resists the addition cleanly.
 - [ ] Verify all links in the catalogue resolve (NFR2).
 - [ ] Self-check AC9 (a fresh contributor can articulate any v1 entry's intent and find a reference implementation in five minutes).
 - [ ] Confirm AC1–AC8.
