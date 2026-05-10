@@ -156,21 +156,22 @@ const frameworkComponents = [
  * not ship — so an end-to-end apply through PGlite needs a stub that
  * creates only the typed objects + functions the codec hook touches.
  * This keeps the framework / hook wiring under test against a real
- * database while the *real* bundle's apply is exercised in R4 against a
- * pgcrypto-equipped Postgres.
+ * database while the *real* bundle's apply is exercised in integration
+ * tests against a pgcrypto-equipped Postgres.
+ *
+ * The stub schema must match the contract IR so that applying the
+ * synthetic bundle and then verifying against the contract does not
+ * produce drift. The contract declares `eql_v2_configuration` as:
+ * `id text PRIMARY KEY, state <state_type> NOT NULL, data jsonb NOT NULL`.
  *
  * Includes:
  *   - `eql_v2` schema (for the function namespace)
  *   - `public.eql_v2_encrypted` composite type (so the app's `User.email`
  *     column type resolves)
- *   - `public.eql_v2_configuration` table (so the codec hook's
- *     `add_search_config` SQL has a row to insert)
- *   - `eql_v2.add_search_config(table, field, index, cast_as)` —
- *     SQL-language stub that records the call in
- *     `eql_v2_configuration` so the test can assert the hook's SQL
- *     actually ran.
- *   - `eql_v2.remove_search_config(table, field)` — paired drop, kept
- *     for symmetry / future Scenario B.
+ *   - `public.eql_v2_configuration` table using the contract-aligned schema
+ *   - `eql_v2.add_search_config(table, field, index, cast_as)` — stores
+ *     config as a jsonb `data` row so the test can assert the hook ran.
+ *   - `eql_v2.remove_search_config(table, field)` — paired drop.
  */
 const SYNTHETIC_BUNDLE_RATIONALE =
   'See block comment above buildSyntheticEqlBundleSql for the rationale.';
@@ -184,23 +185,27 @@ function buildSyntheticEqlBundleSql(): string {
       END IF;
     END $$;`,
     `CREATE TABLE IF NOT EXISTS public."${EQL_V2_CONFIGURATION_TABLE}" (
-      id serial PRIMARY KEY,
-      "table" text NOT NULL,
-      "column" text NOT NULL,
-      index_name text NOT NULL,
-      cast_as text NOT NULL
+      id text PRIMARY KEY,
+      state text NOT NULL,
+      data jsonb NOT NULL
     );`,
     `CREATE OR REPLACE FUNCTION "${EQL_V2_SCHEMA}".add_search_config(
       p_table text, p_column text, p_index text, p_cast_as text
     ) RETURNS void LANGUAGE sql AS $$
-      INSERT INTO public."${EQL_V2_CONFIGURATION_TABLE}" ("table", "column", index_name, cast_as)
-      VALUES (p_table, p_column, p_index, p_cast_as);
+      INSERT INTO public."${EQL_V2_CONFIGURATION_TABLE}" (id, state, data)
+      VALUES (
+        p_table || '.' || p_column,
+        'active',
+        jsonb_build_object('table', p_table, 'column', p_column, 'index_name', p_index, 'cast_as', p_cast_as)
+      )
+      ON CONFLICT (id) DO UPDATE
+        SET state = EXCLUDED.state, data = EXCLUDED.data;
     $$;`,
     `CREATE OR REPLACE FUNCTION "${EQL_V2_SCHEMA}".remove_search_config(
       p_table text, p_column text
     ) RETURNS void LANGUAGE sql AS $$
       DELETE FROM public."${EQL_V2_CONFIGURATION_TABLE}"
-      WHERE "table" = p_table AND "column" = p_column;
+      WHERE id = p_table || '.' || p_column;
     $$;`,
   ].join('\n');
 }
@@ -282,7 +287,7 @@ async function setupTestProject(args: {
 }
 
 describe.sequential(
-  'cipherstash Scenario A end-to-end (PGlite, T3.6)',
+  'cipherstash Scenario A end-to-end (PGlite)',
   { timeout: timeouts.spinUpPpgDev },
   () => {
     let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -316,13 +321,7 @@ describe.sequential(
       }
     });
 
-    /**
-     * AC-7 byte-equivalence (sub-spec § 3): the bundle SQL flowed
-     * through `installEqlBundleOp.execute[0].sql` and was serialised to
-     * the on-disk `ops.json` byte-for-byte. This closes the half of
-     * AC-7 that R2 left gated behind "the test reads the on-disk file".
-     */
-    it('pinned ops.json carries the EQL bundle byte-for-byte (AC-7)', async () => {
+    it('pinned ops.json carries the EQL bundle byte-for-byte', async () => {
       project = await setupTestProject({ migration: cipherstashBaselineMigration });
       const opsPath = join(project.cipherstashBaselineDir, 'ops.json');
       const opsRaw = await readFile(opsPath, 'utf-8');
@@ -338,16 +337,13 @@ describe.sequential(
     /**
      * Plan-only against the real cipherstash descriptor + bundle.
      *
-     * `executePerSpaceDbApply` runs the planner against the live
-     * (empty) database, including the codec-hook integration through
-     * `extractCodecControlHooks` + `planFieldEventOperations`, but
-     * stops short of applying. This validates:
+     * Runs the planner against the live (empty) database, including the
+     * codec-hook integration, but stops short of applying. Validates:
      *
      *   - the cipherstash codec hook fires for `User.email`, emitting
      *     a `cipherstash-codec:User.email:add-search-config@v1` op;
      *   - both spaces are present in the plan output, with cipherstash
-     *     ops ordered before app-space ops (per
-     *     `concatenateSpaceApplyInputs`).
+     *     ops ordered before app-space ops.
      */
     it('mode=plan against the real bundle produces a multi-space plan with the codec-hook op', async () => {
       project = await setupTestProject({ migration: cipherstashBaselineMigration });
@@ -452,9 +448,10 @@ describe.sequential(
       expect(userTable.rows[0]?.exists).toBe(true);
 
       const configRows = await driver!.query<{ table: string; column: string; index_name: string }>(
-        `select "table", "column", index_name from public."${EQL_V2_CONFIGURATION_TABLE}"
-         where "table" = $1 and "column" = $2`,
-        [APP_TABLE, APP_FIELD],
+        `select data->>'table' as "table", data->>'column' as "column", data->>'index_name' as index_name
+         from public."${EQL_V2_CONFIGURATION_TABLE}"
+         where id = $1`,
+        [`${APP_TABLE}.${APP_FIELD}`],
       );
       expect(configRows.rows.length).toBe(1);
       expect(configRows.rows[0]?.index_name).toBe('match');
