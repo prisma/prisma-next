@@ -20,11 +20,13 @@
  * "Shipping Strategy"). M5 removes the field at the framework level.
  */
 
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import type { ContractSpace } from '@prisma-next/framework-components/control';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { pgvectorContract } from '../core/contract';
 import { PGVECTOR_SPACE_ID } from '../core/contract-space-constants';
 import { pgvectorPackMeta, pgvectorQueryOperations } from '../core/descriptor-meta';
@@ -53,7 +55,7 @@ const vectorControlPlaneHooks: CodecControlHooks = {
   resolveIdentityValue: ({ typeParams }) => buildVectorIdentityValue(typeParams),
 };
 
-const pgvectorContractSpace: ContractSpace = {
+const pgvectorContractSpace: ContractSpace<Contract<SqlStorage>> = {
   contractJson: pgvectorContract,
   migrations: [pgvectorBaselineMigration],
   headRef: pgvectorHeadRef,

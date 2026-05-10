@@ -5,13 +5,15 @@
  * uniformly.
  */
 
+import type { Contract } from '@prisma-next/contract/types';
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
 import type { ContractSpace } from '@prisma-next/framework-components/control';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { FEATURE_FLAGS_SPACE_ID } from './constants';
 import { featureFlagsContract } from './contract';
 import { featureFlagsBaselineMigration, featureFlagsHeadRef } from './migrations';
 
-const featureFlagsContractSpace: ContractSpace = {
+const featureFlagsContractSpace: ContractSpace<Contract<SqlStorage>> = {
   contractJson: featureFlagsContract,
   migrations: [featureFlagsBaselineMigration],
   headRef: featureFlagsHeadRef,
