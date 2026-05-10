@@ -1,30 +1,27 @@
 /**
- * Multi-extension monorepo end-to-end against PGlite — project:
- * extension-contract-spaces, M4 / T4.4 / TC-8 / spec AC4.
+ * Multi-extension monorepo end-to-end against PGlite.
  *
- * Drives the CLI aggregate `db init` flow (`executeDbInit`)
- * against a real Postgres (PGlite via `createDevDatabase`) with **two**
- * internal extension packages (`audit`, `feature-flags`) plus the
- * application's own contract. Mirrors the cipherstash + pgvector
- * Scenario A pattern; the structurally novel property under test here
- * is **plurality**: the framework treats N>1 contract-space
- * contributors uniformly, regardless of whether they ship as
- * out-of-tree extensions, in-tree extension packages, or internal
- * monorepo packages.
+ * Drives the CLI aggregate `db init` flow (`executeDbInit`) against
+ * PGlite (via `createDevDatabase`) with **two** internal extension
+ * packages (`audit`, `feature-flags`) plus the application's own
+ * contract. The structurally novel property under test here is
+ * **plurality**: the framework treats N>1 contract-space contributors
+ * uniformly, regardless of whether they ship as out-of-tree
+ * extensions, in-tree extension packages, or internal monorepo
+ * packages.
  *
- * Three layers of coverage:
+ * Layers of coverage:
  *
  *   1. **Pinned per-space artefacts on disk.** After
  *      `emitContractSpaceArtefacts` runs for both extension spaces, the
  *      user's repo carries `migrations/audit/{contract.json,
  *      contract.d.ts, refs/head.json}` and the same triple under
- *      `migrations/feature-flags/`. Closes spec AC4 / TC-8 at the
- *      on-disk shape level.
+ *      `migrations/feature-flags/`.
  *
  *   2. **Multi-space planning across three spaces.** Calling
- *      `executeDbInit` with `mode: 'plan'` produces a plan
- *      whose ops are ordered alphabetically by space id (extensions
- *      first, app last) per `concatenateSpaceApplyInputs`. The audit
+ *      `executeDbInit` with `mode: 'plan'` produces a plan whose ops
+ *      are ordered alphabetically by space id (extensions first, app
+ *      last) per `concatenateSpaceApplyInputs`. The audit
  *      `CREATE TABLE audit_event` op precedes the feature-flags
  *      `CREATE TABLE feature_flag` op (both are extension-space and
  *      sort by space id), and both precede the app-space User-table
@@ -36,18 +33,17 @@
  *        - all three tables (`audit_event`, `feature_flag`, the app
  *          `User`-equivalent) exist in `public`;
  *        - the marker table has rows for `app`, `audit`, and
- *          `feature-flags` (project AC4 / AC5 / TC-8);
+ *          `feature-flags`;
  *        - each marker row carries the expected `core_hash` and the
  *          expected `applied_invariants`;
  *        - insert + select round-trip works against each table
  *          (proving the apply path actually ran the DDL, not just
  *          updated the marker).
  *
- *   4. **Order-independent across `extensionPacks` declaration order
- *      (NFR6).** Re-running the apply path with the extensions
- *      declared in reverse order produces the same marker hashes —
- *      cross-space ordering is determined by space id, not by
- *      declaration order.
+ *   4. **Order-independent across `extensionPacks` declaration order.**
+ *      Re-running the apply path with the extensions declared in
+ *      reverse order produces the same marker hashes — cross-space
+ *      ordering is determined by space id, not by declaration order.
  */
 
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';

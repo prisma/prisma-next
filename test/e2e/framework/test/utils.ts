@@ -149,27 +149,27 @@ export async function runDbInit(options: {
   const controlClient = createControlClientForTests(connectionString);
 
   const invoke = async (migrationsDir: string): Promise<void> => {
-    try {
-      const result = await controlClient.dbInit({
-        contract: contractJson,
-        mode: 'apply',
-        migrationsDir,
-      });
-      if (!result.ok) {
-        throw new Error(
-          `dbInit failed: ${result.failure.summary}\n${JSON.stringify(result.failure, null, 2)}`,
-        );
-      }
-    } finally {
-      await controlClient.close();
+    const result = await controlClient.dbInit({
+      contract: contractJson,
+      mode: 'apply',
+      migrationsDir,
+    });
+    if (!result.ok) {
+      throw new Error(
+        `dbInit failed: ${result.failure.summary}\n${JSON.stringify(result.failure, null, 2)}`,
+      );
     }
   };
 
-  if (options.migrationsDir !== undefined) {
-    await invoke(options.migrationsDir);
-    return;
+  try {
+    if (options.migrationsDir !== undefined) {
+      await invoke(options.migrationsDir);
+      return;
+    }
+    await withE2eMigrationsDir(invoke);
+  } finally {
+    await controlClient.close();
   }
-  await withE2eMigrationsDir(invoke);
 }
 
 async function getPlannedDdlSql(options: {
@@ -181,31 +181,31 @@ async function getPlannedDdlSql(options: {
   const controlClient = createControlClientForTests(connectionString);
 
   const invoke = async (migrationsDir: string): Promise<string> => {
-    try {
-      const result = await controlClient.dbInit({
-        contract,
-        mode: 'plan',
-        connection: connectionString,
-        migrationsDir,
-      });
-      if (!result.ok) {
-        throw new Error(`dbInit plan failed: ${result.failure.summary}`);
-      }
-
-      const sqlStatements =
-        result.value.plan.preview?.statements
-          .filter((s) => s.language === 'sql')
-          .map((s) => s.text) ?? [];
-      return sqlStatements.join(';\n\n');
-    } finally {
-      await controlClient.close();
+    const result = await controlClient.dbInit({
+      contract,
+      mode: 'plan',
+      connection: connectionString,
+      migrationsDir,
+    });
+    if (!result.ok) {
+      throw new Error(`dbInit plan failed: ${result.failure.summary}`);
     }
+
+    const sqlStatements =
+      result.value.plan.preview?.statements
+        .filter((s) => s.language === 'sql')
+        .map((s) => s.text) ?? [];
+    return sqlStatements.join(';\n\n');
   };
 
-  if (options.migrationsDir !== undefined) {
-    return invoke(options.migrationsDir);
+  try {
+    if (options.migrationsDir !== undefined) {
+      return await invoke(options.migrationsDir);
+    }
+    return await withE2eMigrationsDir(invoke);
+  } finally {
+    await controlClient.close();
   }
-  return withE2eMigrationsDir(invoke);
 }
 
 /**

@@ -1,7 +1,6 @@
 /**
  * pgvector contract space — declares the parameterised native type
- * `vector(N)` that user columns can name as `nativeType` (project spec
- * § "IR vocabulary boundary", FR9 / TC-15).
+ * `vector(N)` that user columns can name as `nativeType`.
  *
  * Unlike CipherStash's typed objects (composite types / domains / enums
  * — deferred behind `meta.cipherstashFutureIR` until the IR vocabulary

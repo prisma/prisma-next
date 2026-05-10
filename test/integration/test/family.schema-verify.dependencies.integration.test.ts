@@ -53,9 +53,9 @@ describe('family instance schemaVerify', () => {
 
         // Build contract with extension pack declared. We use a synthetic
         // legacy `databaseDependencies` extension here because pgvector itself
-        // moved to the contract-space mechanism in M4 of TML-2397; the
-        // databaseDependencies dependency_missing path still exists until M5
-        // and this test exercises that path with a stand-in extension.
+        // moved to the contract-space mechanism (see TML-2397); the
+        // databaseDependencies dependency_missing path still exists and this
+        // test exercises that path with a stand-in extension.
         const contract = defineContract({
           family: sqlFamily,
           target: postgresPack,

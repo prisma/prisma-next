@@ -3,8 +3,7 @@
 Worked example: a Prisma Next application that depends on **two** internal
 contract-space packages — `audit` and `feature-flags` — plus its own
 application schema. Exercises the framework's per-space planner / runner /
-verifier with multiple extensions composed into a single application
-(project: `extension-contract-spaces`, **M4 / TC-8** / spec **AC4**).
+verifier with multiple extensions composed into a single application.
 
 ## What this demonstrates
 
@@ -16,8 +15,9 @@ descriptor at authoring time, emits pinned per-space artefacts into the
 user's repo, and applies migrations from each space in cross-space order
 (extensions first, app last) inside a single transaction.
 
-This example exercises that property end-to-end against a real Postgres
-(via PGlite). Two trivial "internal extensions" each declare:
+This example exercises that property end-to-end against PGlite (the
+embedded Postgres-compatible engine the framework uses for tests). Two
+trivial "internal extensions" each declare:
 
 - a one-table contract,
 - a single baseline migration that creates the table,

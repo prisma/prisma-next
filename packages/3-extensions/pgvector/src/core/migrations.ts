@@ -1,8 +1,7 @@
 /**
  * pgvector contract space — baseline migration package.
  *
- * Per project spec FR1 and the M3 sub-spec § 3, an extension's
- * `contractSpace.migrations` is a list of in-memory
+ * An extension's `contractSpace.migrations` is a list of in-memory
  * `MigrationPackage` values whose `ops` carry framework-level
  * `MigrationPlanOperation`s. The SQL family runner reads the additional
  * runtime fields (`target`, `precheck`, `execute`, `postcheck`) at
@@ -11,14 +10,14 @@
  * Ships a single baseline migration whose only op is
  * {@link installVectorExtensionOp} — it carries the
  * `CREATE EXTENSION IF NOT EXISTS vector` DDL plus a postcondition that
- * confirms the extension landed. Mirrors the legacy
- * legacy `databaseDependencies.init[0]` shape (precheck / execute /
- * postcheck) but as an `MigrationPackage` op so the framework's
- * per-space runner / verifier (M1+M2) can manage it the same way it
- * manages an application's own migrations.
+ * confirms the extension landed. Mirrors the prior
+ * `databaseDependencies.init[0]` shape (precheck / execute / postcheck)
+ * but as a `MigrationPackage` op so the framework's per-space runner /
+ * verifier can manage it the same way it manages an application's own
+ * migrations.
  *
  * The op carries the stable `pgvector:install-vector-v1` invariantId —
- * once published it is immutable (project spec FR11).
+ * once published it is immutable.
  */
 
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
