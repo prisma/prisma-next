@@ -6,8 +6,8 @@ import { emit } from '@prisma-next/emitter';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
+import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import postgres from '@prisma-next/target-postgres/control';
@@ -37,12 +37,12 @@ async function materialisePgvectorPinnedArtefacts(projectRoot: string): Promise<
   if (!baseline) {
     throw new Error('pgvector contract-space must ship at least one baseline migration');
   }
-  await emitPinnedSpaceArtefacts(migrationsDir, 'pgvector', {
+  await emitContractSpaceArtefacts(migrationsDir, 'pgvector', {
     contract: space.contractJson,
     contractDts: '// rendered .d.ts for pgvector contract space\nexport interface Contract {}\n',
     headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
   });
-  await writeExtensionMigrationPackage(join(migrationsDir, 'pgvector'), baseline);
+  await materialiseMigrationPackage(join(migrationsDir, 'pgvector'), baseline);
   return migrationsDir;
 }
 

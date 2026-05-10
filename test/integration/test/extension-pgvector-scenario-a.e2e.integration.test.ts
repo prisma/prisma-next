@@ -57,14 +57,16 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import pgvectorExtensionDescriptor from '@prisma-next/extension-pgvector/control';
 import sqlFamilyDescriptor, {
-  type ExtensionMigrationPackage,
   INIT_ADDITIVE_POLICY,
   type SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import {
+  createControlStack,
+  type MigrationPackage,
+} from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
-import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
+import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
@@ -92,7 +94,7 @@ function getPgvectorContractSpace(): NonNullable<typeof pgvectorExtensionDescrip
   return space;
 }
 
-function getPgvectorBaselineMigration(): ExtensionMigrationPackage {
+function getPgvectorBaselineMigration(): MigrationPackage {
   const migrations = getPgvectorContractSpace().migrations;
   const baseline = migrations[0];
   if (!baseline) {
@@ -200,7 +202,7 @@ function buildSyntheticVectorInstallSql(): string {
  * {@link buildSyntheticVectorInstallSql}. The migrationHash is
  * recomputed because the on-disk representation differs.
  */
-function buildSyntheticBaselineMigration(): ExtensionMigrationPackage {
+function buildSyntheticBaselineMigration(): MigrationPackage {
   const realOps = pgvectorBaselineMigration.ops;
   const syntheticOps = realOps.map((op) => {
     const sqlOp = op as unknown as SqlMigrationPlanOperation<unknown>;
@@ -248,20 +250,20 @@ interface TestProject {
 }
 
 async function setupTestProject(args: {
-  readonly migration: ExtensionMigrationPackage;
+  readonly migration: MigrationPackage;
 }): Promise<TestProject> {
   const projectRoot = await mkdtemp(join(tmpdir(), 'pgvector-scenario-a-'));
   const migrationsDir = join(projectRoot, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
 
-  await emitPinnedSpaceArtefacts(migrationsDir, PGVECTOR_SPACE_ID, {
+  await emitContractSpaceArtefacts(migrationsDir, PGVECTOR_SPACE_ID, {
     contract: pgvectorContract,
     contractDts: '// rendered .d.ts for pgvector contract space\nexport interface Contract {}\n',
     headRef: { hash: pgvectorHeadRef.hash, invariants: [...pgvectorHeadRef.invariants] },
   });
 
   const pgvectorSpaceDir = join(migrationsDir, PGVECTOR_SPACE_ID);
-  await writeExtensionMigrationPackage(pgvectorSpaceDir, args.migration);
+  await materialiseMigrationPackage(pgvectorSpaceDir, args.migration);
 
   return {
     projectRoot,

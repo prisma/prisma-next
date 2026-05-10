@@ -5,15 +5,13 @@
  * alongside the application's own schema.
  */
 
-import type {
-  ExtensionContractSpace,
-  SqlControlExtensionDescriptor,
-} from '@prisma-next/family-sql/control';
+import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
+import type { ContractSpace } from '@prisma-next/framework-components/control';
 import { AUDIT_SPACE_ID } from './constants';
 import { auditContract } from './contract';
 import { auditBaselineMigration, auditHeadRef } from './migrations';
 
-const auditContractSpace: ExtensionContractSpace = {
+const auditContractSpace: ContractSpace = {
   contractJson: auditContract,
   migrations: [auditBaselineMigration],
   headRef: auditHeadRef,

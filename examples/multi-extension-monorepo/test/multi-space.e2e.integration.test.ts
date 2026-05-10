@@ -15,7 +15,7 @@
  * Three layers of coverage:
  *
  *   1. **Pinned per-space artefacts on disk.** After
- *      `emitPinnedSpaceArtefacts` runs for both extension spaces, the
+ *      `emitContractSpaceArtefacts` runs for both extension spaces, the
  *      user's repo carries `migrations/audit/{contract.json,
  *      contract.d.ts, refs/head.json}` and the same triple under
  *      `migrations/feature-flags/`. Closes spec AC4 / TC-8 at the
@@ -58,8 +58,8 @@ import { executePerSpaceDbApply } from '@prisma-next/cli/control-api';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitPinnedSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
+import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -121,15 +121,15 @@ async function setupTestProject(): Promise<TestProject> {
   const migrationsDir = join(projectRoot, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
 
-  await emitPinnedSpaceArtefacts(migrationsDir, AUDIT_SPACE_ID, {
+  await emitContractSpaceArtefacts(migrationsDir, AUDIT_SPACE_ID, {
     contract: auditContract,
     contractDts: '// rendered .d.ts for audit contract space\nexport interface Contract {}\n',
     headRef: { hash: auditHeadRef.hash, invariants: [...auditHeadRef.invariants] },
   });
   const auditSpaceDir = join(migrationsDir, AUDIT_SPACE_ID);
-  await writeExtensionMigrationPackage(auditSpaceDir, auditBaselineMigration);
+  await materialiseMigrationPackage(auditSpaceDir, auditBaselineMigration);
 
-  await emitPinnedSpaceArtefacts(migrationsDir, FEATURE_FLAGS_SPACE_ID, {
+  await emitContractSpaceArtefacts(migrationsDir, FEATURE_FLAGS_SPACE_ID, {
     contract: featureFlagsContract,
     contractDts:
       '// rendered .d.ts for feature-flags contract space\nexport interface Contract {}\n',
@@ -139,7 +139,7 @@ async function setupTestProject(): Promise<TestProject> {
     },
   });
   const featureFlagsSpaceDir = join(migrationsDir, FEATURE_FLAGS_SPACE_ID);
-  await writeExtensionMigrationPackage(featureFlagsSpaceDir, featureFlagsBaselineMigration);
+  await materialiseMigrationPackage(featureFlagsSpaceDir, featureFlagsBaselineMigration);
 
   return { projectRoot, migrationsDir };
 }

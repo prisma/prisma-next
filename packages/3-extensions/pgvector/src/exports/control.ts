@@ -22,9 +22,9 @@
 
 import type {
   CodecControlHooks,
-  ExtensionContractSpace,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
+import type { ContractSpace } from '@prisma-next/framework-components/control';
 import { pgvectorContract } from '../core/contract';
 import { PGVECTOR_SPACE_ID } from '../core/contract-space-constants';
 import { pgvectorPackMeta, pgvectorQueryOperations } from '../core/descriptor-meta';
@@ -53,7 +53,7 @@ const vectorControlPlaneHooks: CodecControlHooks = {
   resolveIdentityValue: ({ typeParams }) => buildVectorIdentityValue(typeParams),
 };
 
-const pgvectorContractSpace: ExtensionContractSpace = {
+const pgvectorContractSpace: ContractSpace = {
   contractJson: pgvectorContract,
   migrations: [pgvectorBaselineMigration],
   headRef: pgvectorHeadRef,
