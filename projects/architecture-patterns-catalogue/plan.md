@@ -39,17 +39,22 @@ Write the eight v1 entries listed in the spec. Recommended order: write _Frozen-
 - [ ] `json-canonical-class-in-memory.md`
 - [ ] `three-layer-polymorphic-ir.md` (status: Emerging — see spec Open Question 2)
 - [ ] `spi-at-lowest-consuming-layer.md`
-- [ ] `interface-plus-factory.md` (also: condense [`docs/reference/typescript-patterns.md`](../../docs/reference/typescript-patterns.md) § "Interface-Based Design with Factory Functions" to a stub linking here — FR11)
+- [ ] `interface-plus-factory.md` (also: condense [`docs/reference/typescript-patterns.md`](../../docs/reference/typescript-patterns.md) § "Interface-Based Design with Factory Functions" to a stub linking here — FR11; **append `docs/reference/typescript-patterns.md` to `EXTRA_TARGETS` in [`scripts/check-catalogue-links.mjs`](../../scripts/check-catalogue-links.mjs)** so the link-check gate covers it).
 - [ ] `adapter-spi.md`
 - [ ] `capability-gating.md`
-- [ ] `package-layering.md` (short — points at `Package-Layering.md`)
+- [ ] `package-layering.md` (short — points at `Package-Layering.md`. Note: cite the actual layering linter scripts (`scripts/lint-framework-target-imports.mjs`, `scripts/lint-app-space-id.mjs`) rather than the stale `scripts/check-imports.mjs` reference in the spec — see [`wip/unattended-decisions.md`](../../wip/unattended-decisions.md) § Decision 2).
 
-After each entry, update the catalogue index's status from Pending to Stable / Emerging.
+**For each entry**, the implementer must do all of the following before moving on:
+
+1. Write the file under `docs/architecture docs/patterns/<slug>.md` from `_template.md`.
+2. **In [`docs/architecture docs/patterns/README.md`](../../docs/architecture%20docs/patterns/README.md):** flip the row's slug from a code span to a markdown link to the new file, and flip the Status column from `Pending` to `Stable` (or `Emerging` for `three-layer-polymorphic-ir.md`).
+3. Run `node scripts/check-catalogue-links.mjs` and confirm exit 0 before committing.
 
 ### M3 — Architect persona + close-out
 
 - [ ] Update [`.agents/skills/drive-agent-personas/personas/architect.md`](../../.agents/skills/drive-agent-personas/personas/architect.md) with the "Patterns to know" section (FR10).
 - [ ] Update [`.cursor/rules/adr-writing.mdc`](../../.cursor/rules/adr-writing.mdc) so new ADRs that instantiate a catalogue pattern link forward to it (Spec Open Question 3 — confirmed in scope by the user during orchestration setup; the spec's default-assumption applies). Flag if the rule's existing wording resists the addition cleanly.
+- [ ] **Append both new files to `EXTRA_TARGETS` in [`scripts/check-catalogue-links.mjs`](../../scripts/check-catalogue-links.mjs)** (`.agents/skills/drive-agent-personas/personas/architect.md`, `.cursor/rules/adr-writing.mdc`) so the link-check gate covers them.
 - [ ] Verify all links in the catalogue resolve (NFR2).
 - [ ] Self-check AC9 (a fresh contributor can articulate any v1 entry's intent and find a reference implementation in five minutes).
 - [ ] Confirm AC1–AC8.
