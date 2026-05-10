@@ -10,6 +10,7 @@
  */
 
 import type { Contract } from '@prisma-next/contract/types';
+import type { ImportRequirement } from '@prisma-next/ts-render';
 import type { Result } from '@prisma-next/utils/result';
 import type { TargetBoundComponentDescriptor } from '../shared/framework-components';
 import type { ControlDriverInstance, ControlFamilyInstance } from './control-instances';
@@ -140,9 +141,33 @@ export interface MigrationPlanOperation {
 // ============================================================================
 
 /**
- * Framework-level contract for a single factory call in a target's planner IR.
+ * Framework-level contract for a single factory call in a target's planner
+ * IR — the canonical shape for any node participating in the two-renderer
+ * pattern (source-text rendering for `migration.ts` + runtime-op derivation
+ * for `ops.json`).
  *
- * @see ADR 195
+ * Implementations declare:
+ *
+ *   - **Identity / display metadata** (`factoryName`, `operationClass`,
+ *     `label`) used by CLI summaries and the issue planner.
+ *   - **`renderTypeScript()`** — emit the call as a TypeScript expression
+ *     suitable for inclusion in a generated `migration.ts`. Polymorphic
+ *     across postgres / mongo / sqlite / extension-owned calls.
+ *   - **`importRequirements()`** — the symbols this rendered expression
+ *     pulls in. Aggregated and deduplicated by the top-level renderer
+ *     into a single import block per file.
+ *   - **`toOp()`** — lower the call to a runtime
+ *     `MigrationPlanOperation`. Returns the framework base; concrete
+ *     implementations narrow via covariant return (e.g. SQL targets
+ *     return `SqlMigrationPlanOperation<TTargetDetails>`).
+ *
+ * Each domain (target, extension) defines its own set of concrete `*Call`
+ * classes that implement this interface — typically by extending
+ * {@link import('@prisma-next/ts-render').TsExpression} and adding the
+ * concrete `toOp()` body. Extensions can implement the interface
+ * directly without depending on a target's package-private base.
+ *
+ * @see ADR 195 — Planner IR with two renderers.
  */
 export interface OpFactoryCall {
   /** The name of the factory that would produce this call's runtime op. */
@@ -151,6 +176,26 @@ export interface OpFactoryCall {
   readonly operationClass: MigrationOperationClass;
   /** Human-readable label for CLI output and diagnostics. */
   readonly label: string;
+  /**
+   * Render this call as a TypeScript expression suitable for inclusion in
+   * a generated `migration.ts`. The output is composed alongside other
+   * calls' rendered expressions inside the migration's `operations`
+   * array.
+   */
+  renderTypeScript(): string;
+  /**
+   * Import requirements pulled in by the rendered TypeScript expression.
+   * Aggregated and deduplicated across all calls into a single import
+   * block per file.
+   */
+  importRequirements(): readonly ImportRequirement[];
+  /**
+   * Lower this call to a runtime migration plan operation suitable for
+   * execution / inclusion in `ops.json`. Concrete implementations narrow
+   * the return type via covariant return (e.g. SQL targets return
+   * `SqlMigrationPlanOperation<TTargetDetails>`).
+   */
+  toOp(): MigrationPlanOperation;
 }
 
 // ============================================================================

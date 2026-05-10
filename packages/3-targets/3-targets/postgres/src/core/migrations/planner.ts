@@ -2,7 +2,6 @@ import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
   SqlMigrationPlannerPlanOptions,
-  SqlMigrationPlanOperation,
   SqlPlannerFailureResult,
 } from '@prisma-next/family-sql/control';
 import {
@@ -21,10 +20,8 @@ import type {
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
-import { RawSqlCall } from './op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
-import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -175,16 +172,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       newContract: options.contract,
       codecHooks,
     });
-    // `extractCodecControlHooks` erases target-details to `unknown`; codec
-    // authors target a specific lane (here, postgres) and produce ops whose
-    // target-details are `PostgresPlanTargetDetails`-shaped by construction.
-    // The cast re-specializes the type at this trust boundary.
-    const calls = [
-      ...result.value.calls,
-      ...fieldEventOps.map(
-        (op) => new RawSqlCall(op as SqlMigrationPlanOperation<PostgresPlanTargetDetails>),
-      ),
-    ];
+    // Codec-emitted calls already conform to `OpFactoryCall` — render +
+    // toOp + importRequirements ride directly through the same emit path
+    // as structural ops, no `RawSqlCall` wrap.
+    const calls = [...result.value.calls, ...fieldEventOps];
 
     return Object.freeze({
       kind: 'success' as const,

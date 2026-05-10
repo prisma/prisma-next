@@ -21,13 +21,9 @@
  */
 
 import type { Contract } from '@prisma-next/contract/types';
+import type { OpFactoryCall } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
-import type {
-  CodecControlHooks,
-  FieldEvent,
-  FieldEventContext,
-  SqlMigrationPlanOperation,
-} from './types';
+import type { CodecControlHooks, FieldEvent, FieldEventContext } from './types';
 
 export interface PlanFieldEventOperationsOptions {
   /**
@@ -62,7 +58,7 @@ interface FieldEntry {
 
 export function planFieldEventOperations(
   options: PlanFieldEventOperationsOptions,
-): readonly SqlMigrationPlanOperation<unknown>[] {
+): readonly OpFactoryCall[] {
   const priorTables = options.priorContract?.storage.tables ?? {};
   const newTables = options.newContract.storage.tables;
 
@@ -99,18 +95,18 @@ export function planFieldEventOperations(
     }
   }
 
-  const ops: SqlMigrationPlanOperation<unknown>[] = [];
-  appendOps('added', added, options.codecHooks, ops, (e) => e.newField?.codecId);
-  appendOps('dropped', dropped, options.codecHooks, ops, (e) => e.priorField?.codecId);
-  appendOps('altered', altered, options.codecHooks, ops, (e) => e.newField?.codecId);
-  return ops;
+  const calls: OpFactoryCall[] = [];
+  appendCalls('added', added, options.codecHooks, calls, (e) => e.newField?.codecId);
+  appendCalls('dropped', dropped, options.codecHooks, calls, (e) => e.priorField?.codecId);
+  appendCalls('altered', altered, options.codecHooks, calls, (e) => e.newField?.codecId);
+  return calls;
 }
 
-function appendOps(
+function appendCalls(
   event: FieldEvent,
   entries: readonly FieldEntry[],
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
-  ops: SqlMigrationPlanOperation<unknown>[],
+  calls: OpFactoryCall[],
   pickCodecId: (entry: FieldEntry) => string | undefined,
 ): void {
   for (const entry of entries) {
@@ -120,7 +116,7 @@ function appendOps(
     if (!hook?.onFieldEvent) continue;
     const ctx = buildContext(event, entry);
     const emitted = hook.onFieldEvent(event, ctx);
-    for (const op of emitted) ops.push(op);
+    for (const call of emitted) calls.push(call);
   }
 }
 

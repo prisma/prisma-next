@@ -1,8 +1,10 @@
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import type { MigrationPlanWithAuthoringSurface } from '@prisma-next/framework-components/control';
+import type {
+  MigrationPlanWithAuthoringSurface,
+  OpFactoryCall,
+} from '@prisma-next/framework-components/control';
 import type { MigrationMeta } from '@prisma-next/migration-tools/migration';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { SqliteOpFactoryCall } from './op-factory-call';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 import { renderOps } from './render-ops';
 import { renderCallsToTypeScript } from './render-typescript';
@@ -19,13 +21,13 @@ export class TypeScriptRenderableSqliteMigration
   extends SqliteMigration
   implements MigrationPlanWithAuthoringSurface
 {
-  readonly #calls: readonly SqliteOpFactoryCall[];
+  readonly #calls: readonly OpFactoryCall[];
   readonly #meta: MigrationMeta;
   readonly #destination: SqliteMigrationDestinationInfo;
   readonly #spaceId: string;
 
   constructor(
-    calls: readonly SqliteOpFactoryCall[],
+    calls: readonly OpFactoryCall[],
     meta: MigrationMeta,
     spaceId: string,
     destination?: SqliteMigrationDestinationInfo,
