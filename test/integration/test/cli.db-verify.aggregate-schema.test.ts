@@ -27,16 +27,17 @@ import {
 } from './utils/cli-test-helpers';
 
 /**
- * `db verify` against a multi-member aggregate (app + extension, both
- * claiming live tables) returns zero schema issues.
+ * F23 lock — `db verify` against a multi-member aggregate (app +
+ * extension, both claiming live tables) returns zero schema issues.
  *
- * The aggregate verifier pre-projects the live schema per member
- * before running the family's schema-verify, so each member only sees
- * the elements it owns. Without the pre-projection, tables claimed by
- * extensions would surface in the app's diff as `extras` and trip
- * lenient/strict schema verification.
+ * Pre-aggregate (M2 R6 R1), `db verify` projected the live schema only
+ * through the app contract. Tables claimed by extensions surfaced as
+ * `extras` and tripped lenient/strict schema diffs, polluting the
+ * verify output. The aggregate verifier (M2.5) pre-projects the live
+ * schema per member before running the family's schema-verify, so each
+ * member only sees the elements it owns.
  *
- * Setup:
+ * Setup mirrors the spec's intent (sub-spec § "Commit 6"):
  * - app contract claims `user`
  * - extension `test-contract-space` claims `test_box`
  * - both tables exist in the live DB and both markers match the
@@ -55,26 +56,27 @@ async function writePinnedExtensionDir(testDir: string): Promise<string> {
   const migrationsDir = join(testDir, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
 
-  // The on-disk head ref's invariants must be derivable from the
-  // on-disk ops (`deriveProvidedInvariants`) — that derivation only
-  // counts data-class ops. The test extension's baseline op is
-  // additive, so its declared invariants live in memory only and do
-  // not survive a disk round-trip. We drop the pinned invariants here
-  // because the schema verifier doesn't consult them.
+  // The on-disk head ref's `invariants` and the migration package's
+  // `providedInvariants` must both round-trip through
+  // `deriveProvidedInvariants` (M2.5b loader integrity gate, error
+  // PN-MIG-5002). The test extension's baseline op carries an
+  // `invariantId`, so the derivation produces `[TEST_BASELINE_INVARIANT_ID]`
+  // — match that on disk for both the head ref and migration metadata.
   await emitContractSpaceArtefacts(migrationsDir, EXT_SPACE_ID, {
     contract: extContractJson,
     contractDts: '// placeholder for test\nexport {};\n',
-    headRef: { hash: extHeadRef.hash, invariants: [] },
+    headRef: { hash: extHeadRef.hash, invariants: [...extHeadRef.invariants] },
   });
 
   const spaceDir = join(migrationsDir, EXT_SPACE_ID);
   for (const pkg of extMigrations) {
     const ops = [...pkg.ops];
-    const baseMeta = { ...pkg.metadata, providedInvariants: [] };
-    const migrationHash = computeMigrationHash(baseMeta, ops);
+    // Recompute the hash because the synthetic placeholder hash on the
+    // in-memory fixture's metadata won't satisfy the loader's hash gate.
+    const migrationHash = computeMigrationHash(pkg.metadata, ops);
     await materialiseMigrationPackage(spaceDir, {
       dirName: pkg.dirName,
-      metadata: { ...baseMeta, migrationHash },
+      metadata: { ...pkg.metadata, migrationHash },
       ops,
     });
   }
@@ -83,7 +85,7 @@ async function writePinnedExtensionDir(testDir: string): Promise<string> {
 }
 
 withTempDir(({ createTempDir }) => {
-  describe('db verify command - aggregate schema verification', () => {
+  describe('db verify command - aggregate schema verification (F23)', () => {
     let consoleOutput: string[] = [];
     let cleanupMocks: () => void;
 
