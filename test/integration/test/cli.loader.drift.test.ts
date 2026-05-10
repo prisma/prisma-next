@@ -19,9 +19,10 @@ import { runDbInit } from './utils/db-init-test-helpers';
  * error envelope (`PN-MIG-5002`, `meta.violations[0].kind === 'drift'`)
  * naming the spaceId and suggesting the user run `prisma-next migrate`.
  *
- * This is the integration-level lock for sub-spec § "Loader" step 5
- * and AC11 of the M2.5 spec. The unit-level lock lives in
- * `migration-tools/test/aggregate/loader.drift.test.ts`.
+ * The unit-level lock for the same drift detection lives in
+ * `migration-tools/test/aggregate/loader.drift.test.ts`; this file is
+ * the integration-level lock that exercises the same path through the
+ * CLI surface.
  */
 
 const EXT = testContractSpaceExtension;

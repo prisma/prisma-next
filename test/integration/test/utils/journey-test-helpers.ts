@@ -532,7 +532,7 @@ export function parseJsonOutput<T = Record<string, unknown>>(result: CommandResu
 
 /**
  * Path of the app subspace's migrations directory under the journey
- * test root (M2.5b layout: `migrations/app/`).
+ * test root (`migrations/app/`).
  */
 function appMigrationsDir(ctx: JourneyContext): string {
   return join(ctx.testDir, 'migrations', 'app');

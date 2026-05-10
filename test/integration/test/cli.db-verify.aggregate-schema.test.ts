@@ -27,17 +27,16 @@ import {
 } from './utils/cli-test-helpers';
 
 /**
- * F23 lock — `db verify` against a multi-member aggregate (app +
- * extension, both claiming live tables) returns zero schema issues.
+ * `db verify` against a multi-member aggregate (app + extension, both
+ * claiming live tables) returns zero schema issues.
  *
- * Pre-aggregate (M2 R6 R1), `db verify` projected the live schema only
- * through the app contract. Tables claimed by extensions surfaced as
- * `extras` and tripped lenient/strict schema diffs, polluting the
- * verify output. The aggregate verifier (M2.5) pre-projects the live
- * schema per member before running the family's schema-verify, so each
- * member only sees the elements it owns.
+ * The aggregate verifier pre-projects the live schema per member
+ * before running the family's schema-verify, so each member only sees
+ * the elements it owns. Without the pre-projection, tables claimed by
+ * extensions would surface in the app's diff as `extras` and trip
+ * lenient/strict schema verification.
  *
- * Setup mirrors the spec's intent (sub-spec § "Commit 6"):
+ * Setup:
  * - app contract claims `user`
  * - extension `test-contract-space` claims `test_box`
  * - both tables exist in the live DB and both markers match the
@@ -60,8 +59,8 @@ async function writePinnedExtensionDir(testDir: string): Promise<string> {
   // on-disk ops (`deriveProvidedInvariants`) — that derivation only
   // counts data-class ops. The test extension's baseline op is
   // additive, so its declared invariants live in memory only and do
-  // not survive a disk round-trip. For the F23 verify test we drop
-  // the pinned invariants (the schema verifier doesn't consult them).
+  // not survive a disk round-trip. We drop the pinned invariants here
+  // because the schema verifier doesn't consult them.
   await emitContractSpaceArtefacts(migrationsDir, EXT_SPACE_ID, {
     contract: extContractJson,
     contractDts: '// placeholder for test\nexport {};\n',
@@ -84,7 +83,7 @@ async function writePinnedExtensionDir(testDir: string): Promise<string> {
 }
 
 withTempDir(({ createTempDir }) => {
-  describe('db verify command - aggregate schema verification (F23)', () => {
+  describe('db verify command - aggregate schema verification', () => {
     let consoleOutput: string[] = [];
     let cleanupMocks: () => void;
 

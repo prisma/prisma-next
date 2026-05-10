@@ -64,7 +64,9 @@ describe('assertValidSpaceId', () => {
 
 describe('spaceMigrationDirectory', () => {
   it('appends the app space id as a subdirectory (uniform with extensions)', () => {
-    // M2.5b: the app no longer has a special-case layout. AC1.
+    // The app no longer has a special-case layout — its migrations
+    // live under the same `migrations/<spaceId>/` subtree as any
+    // extension space.
     expect(spaceMigrationDirectory('/p/migrations', APP_SPACE_ID)).toBe('/p/migrations/app');
   });
 

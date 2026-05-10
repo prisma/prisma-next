@@ -145,8 +145,8 @@ describe('loadContractSpaceAggregate', () => {
       const failure = result.assertNotOk();
       expect(failure.kind).toBe('layoutViolation');
       if (failure.kind !== 'layoutViolation') return;
-      // Both offences are surfaced in one error rather than fixed one
-      // commit at a time (preserves the M2 R6 R3 verifier behaviour).
+      // Both offences are surfaced in one error so the operator can
+      // resolve them together rather than discovering one at a time.
       expect([...failure.violations].sort((a, b) => a.spaceId.localeCompare(b.spaceId))).toEqual([
         { kind: 'orphanSpaceDir', spaceId: 'orphan_ext' },
         { kind: 'declaredButUnmigrated', spaceId: 'unmigrated_ext' },
