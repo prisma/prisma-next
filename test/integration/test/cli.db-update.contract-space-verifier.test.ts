@@ -1,6 +1,7 @@
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  parseJsonObjectFromCliCapture,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
@@ -80,8 +81,7 @@ withTempDir(({ createTempDir }) => {
           ]);
           expect(exitCode).not.toBe(0);
 
-          const errorText = consoleOutput.join('\n').trim();
-          const errorJson = JSON.parse(errorText) as Record<string, unknown>;
+          const errorJson = parseJsonObjectFromCliCapture(consoleOutput) as Record<string, unknown>;
 
           expect(errorJson).toMatchObject({
             code: 'PN-MIG-5002',
@@ -134,8 +134,7 @@ withTempDir(({ createTempDir }) => {
           ]);
           expect(exitCode).not.toBe(0);
 
-          const errorText = consoleOutput.join('\n').trim();
-          const errorJson = JSON.parse(errorText) as Record<string, unknown>;
+          const errorJson = parseJsonObjectFromCliCapture(consoleOutput) as Record<string, unknown>;
 
           expect(String(errorJson['code'])).toMatch(/^PN-MIG-50/);
           expect(errorJson['domain']).toBe('MIG');
