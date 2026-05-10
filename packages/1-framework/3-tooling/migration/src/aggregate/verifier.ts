@@ -1,4 +1,4 @@
-import { ok, type Result } from '@prisma-next/utils/result';
+import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import type { ContractMarkerRecordLike } from './marker-types';
 import { projectSchemaToSpace } from './project-schema-to-space';
 import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
@@ -115,6 +115,19 @@ export type AggregateVerifierOutput<TSchemaResult> = Result<
  * `markersBySpaceId` and `schemaIntrospection` ahead of the call.
  */
 export function verifyAggregate<TSchemaResult>(
+  input: AggregateVerifierInput<TSchemaResult>,
+): AggregateVerifierOutput<TSchemaResult> {
+  try {
+    return runVerifyAggregate(input);
+  } catch (error) {
+    return notOk({
+      kind: 'introspectionFailure',
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+function runVerifyAggregate<TSchemaResult>(
   input: AggregateVerifierInput<TSchemaResult>,
 ): AggregateVerifierOutput<TSchemaResult> {
   const { aggregate, markersBySpaceId, schemaIntrospection, mode, verifySchemaForMember } = input;

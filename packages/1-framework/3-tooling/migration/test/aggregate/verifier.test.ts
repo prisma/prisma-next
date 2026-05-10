@@ -272,6 +272,51 @@ describe('verifyAggregate', () => {
       expect(result.assertOk().schemaCheck.orphanElements).toEqual([]);
     });
 
+    it('returns notOk(introspectionFailure) when verifySchemaForMember throws', () => {
+      const aggregate = makeAggregate({
+        app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+      });
+
+      const result = verifyAggregate({
+        aggregate,
+        markersBySpaceId: new Map(),
+        schemaIntrospection: { tables: { user: { columns: {} } } },
+        mode: 'strict',
+        verifySchemaForMember: () => {
+          throw new Error('introspection broke');
+        },
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.assertNotOk()).toEqual({
+        kind: 'introspectionFailure',
+        detail: 'introspection broke',
+      });
+    });
+
+    it('returns notOk(introspectionFailure) when projectSchemaToSpace throws via a malformed schema', () => {
+      const aggregate = makeAggregate({
+        app: makeMember({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+      });
+
+      const exploding = {
+        get tables() {
+          throw new Error('schema access blew up');
+        },
+      };
+
+      const result = verifyAggregate({
+        aggregate,
+        markersBySpaceId: new Map(),
+        schemaIntrospection: exploding,
+        mode: 'strict',
+        verifySchemaForMember: STUB_VERIFY,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.assertNotOk().kind).toBe('introspectionFailure');
+    });
+
     it('threads the verifier mode (strict / lenient) to the per-member callback verbatim', () => {
       let observedMode: 'strict' | 'lenient' | undefined;
       const aggregate = makeAggregate({
