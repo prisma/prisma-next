@@ -5,9 +5,7 @@ application-layer encryption for Postgres via the EQL bundle.
 
 ## Status
 
-Work in progress under
-[`projects/extension-contract-spaces`](../../../projects/extension-contract-spaces/)
-(Linear: [TML-2397](https://linear.app/prisma/issue/TML-2397)).
+Work in progress. This package documents the current supported behavior only.
 
 This package authors CipherStash's database scaffolding (the
 `eql_v2_configuration` table, the `eql_v2_encrypted` / `ore_*` composite
@@ -18,16 +16,15 @@ schema.
 
 The codec runtime (encoding/decoding `Encrypted<string>` payloads) and the
 `searchable: true` codec lifecycle hook for `add_search_config` /
-`remove_search_config` ops are intentionally **not** in this round
-(M3 R2+ — see plan).
+`remove_search_config` ops are intentionally **not** in this round.
 
 ## What this package contributes
 
 - `contractSpace.contractJson` — the typed objects EQL exposes that user
-  columns can name as `nativeType`. Per the IR vocabulary boundary in
-  the project spec, this carries tables / enums / composite types /
-  domains only; functions / operators / casts / op classes live below
-  the boundary as opaque DDL inside the `installEqlBundle` migration op.
+  columns can name as `nativeType`. Per the IR vocabulary boundary,
+  this carries tables / enums / composite types / domains only; functions /
+  operators / casts / op classes live below the boundary as opaque DDL inside
+  the `installEqlBundle` migration op.
 - `contractSpace.migrations` — the baseline migration that installs the
   vendored EQL bundle SQL (one `cipherstash:install-eql-bundle-v1` op
   carrying the bundle byte-for-byte) plus the structural ops that create
@@ -59,11 +56,5 @@ transaction as any application-space migration emitted in the same
 
 ## See also
 
-- Project spec:
-  [`projects/extension-contract-spaces/spec.md`](../../../projects/extension-contract-spaces/spec.md)
-- M3 sub-spec:
-  [`projects/extension-contract-spaces/specs/cipherstash-migration.spec.md`](../../../projects/extension-contract-spaces/specs/cipherstash-migration.spec.md)
-- Framework mechanism sub-spec:
-  [`projects/extension-contract-spaces/specs/framework-mechanism.spec.md`](../../../projects/extension-contract-spaces/specs/framework-mechanism.spec.md)
 - Reference fixture: [`packages/3-extensions/test-contract-space`](../test-contract-space)
 - Reference shape: [`packages/3-extensions/pgvector`](../pgvector)
