@@ -77,8 +77,11 @@ describe('formatMigrationPlanOutput', () => {
     expect(stripped).toContain('Planned 2 operation(s)');
     expect(stripped).toContain('Add column nickname on user');
     expect(stripped).toContain('Drop column legacy on post');
-    expect(stripped).toContain('[additive]');
-    expect(stripped).toContain('[destructive]');
+    // M6 (T6.6 / AC8): inline operationClass tags removed; destructive
+    // ops keep a "(destructive)" marker on the same line.
+    expect(stripped).not.toContain('[additive]');
+    expect(stripped).not.toContain('[destructive]');
+    expect(stripped).toContain('(destructive)');
   });
 
   it('shows destination hash', () => {
