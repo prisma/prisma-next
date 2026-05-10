@@ -5,9 +5,9 @@
 
 ## Intent
 
-A discriminated AST is implemented as an abstract base class plus a concrete class per node kind. Each concrete class is **frozen at construction** (`Object.freeze(this)` in the constructor), exposes a literal `kind` discriminator, and dispatches through an `accept(visitor)` method (and, when consumers transform trees, a sibling `rewrite(rewriter)` method). The class instances **are** the AST; the visitor interface **is** the consumption contract for kind-narrow operations.
+Migration ops are a tree of kinds: `CreateTableCall`, `AddColumnCall`, `DropIndexCall`, and a Postgres-only `CreateExtensionCall`. Several walks consume that tree — the renderer that prints TypeScript, the runner that applies ops, the differ that compares two op sets. When a new kind lands (say a Postgres `CreateMaterializedViewCall`), every walk needs to know about it; quietly forgetting one is a bug that won't surface until production.
 
-Adopting this pattern commits you to: classes as the canonical in-memory shape (no plain-object IR alongside), exhaustive `kind`-narrowed dispatch through the visitor (no `if-else` chains scattered across consumers), and immutability after construction (rewrites return new instances).
+The pattern: every kind is a small concrete class extending an abstract base; the base declares an `accept(visitor)` method; consumers dispatch through the visitor instead of through `switch (node.kind)`. Adding a new kind is a compile error in every walk that hasn't handled it. Each instance is `Object.freeze`'d in its constructor so the tree is immutable once built.
 
 ## When to use
 
@@ -18,7 +18,7 @@ Adopting this pattern commits you to: classes as the canonical in-memory shape (
 
 ## When NOT to use
 
-- **Stateful services** (registries, runtimes, adapters, drivers) — use [Interface + factory function](./interface-plus-factory.md). Services have lifecycle and behaviour, not polymorphic data.
+- **Stateful services** (registries, runtimes, adapters, drivers) — use [Interface + factory function](./interface-plus-factory.md). Services have lifecycle and behaviour, not polymorphic data. The catalogue's deliberate split: services hide their classes; AST nodes _are_ their classes.
 - **Single-instance value objects** that nobody dispatches over polymorphically — a plain `interface` plus a frozen literal is enough.
 - **Trees that never need polymorphic dispatch** — if the only consumer is a single switch, a discriminated union of plain objects is cheaper to read.
 - **Hot-path data structures where allocation dominates** — class instances per node have measurable overhead vs. plain objects; profile before adopting in tight loops.
@@ -75,7 +75,7 @@ The base is package-private; consumers see only the framework-level interface (e
 
 - [JSON-canonical / class-in-memory round-trip](./json-canonical-class-in-memory.md) — almost always paired with this pattern when the AST persists.
 - [Three-layer polymorphic IR](./three-layer-polymorphic-ir.md) — the framework/family/target layering this pattern adopts when targets need to extend the kind set.
-- [Interface + factory function](./interface-plus-factory.md) — the **alternative** when the thing being modelled is a stateful service rather than a polymorphic data tree. See its "When NOT to use" for the inverse boundary.
+- [Interface + factory function](./interface-plus-factory.md) — the alternative when the thing being modelled is a stateful service rather than a polymorphic data tree. See its "When NOT to use" for the inverse boundary.
 
 ## Cautions / common mistakes
 
