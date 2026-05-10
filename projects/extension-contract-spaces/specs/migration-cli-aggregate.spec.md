@@ -174,6 +174,23 @@ A single formatter (`utils/formatters/migrations.ts` or a new file under `utils/
 
 Adds `db:init` and `db:update` scripts matching `examples/prisma-next-demo/package.json`. The example app today wires `migration:apply` only — once M6 lands, `migration apply` is the canonical path and `db init` / `db update` are dev conveniences; both should be available.
 
+### 7. Centralise the descriptor-import boundary
+
+Today, every CLI utility that consumes `extensionPacks` re-implements the same `(pack) => cs ? { id, contractSpace } : { id }` projection with its own structural cast and its own narrowed result shape:
+
+- `packages/1-framework/3-tooling/cli/src/utils/contract-space-aggregate-loader.ts` — `DeclaredExtensionEntry` (id + targetId + contractSpace { contractJson, headRef }).
+- `packages/1-framework/3-tooling/cli/src/utils/contract-space-migrate-pass.ts` — `MigratePassExtensionInput` (id + contractSpace { contractJson, headRef }).
+- `packages/1-framework/3-tooling/cli/src/utils/contract-space-extension-migrations-pass.ts` — `ExtensionMigrationsExtensionInput` (id + contractSpace { contractJson, migrations, headRef }).
+- `packages/1-framework/3-tooling/cli/src/commands/migration-plan.ts` — re-implements the same projection inline at lines ~237 and ~263.
+
+This is the framework's single descriptor-import boundary, scattered. Every M6 command (and `db init` / `db update` after M2.5) re-derives it. Centralise it:
+
+- One canonical helper, e.g. `cli/src/utils/extension-pack-inputs.ts → toExtensionInputs(extensionPacks)`, returning the **most general** shape: `{ id, targetId, contractSpace?: { contractJson, headRef, migrations? } }`.
+- Per-consumer adapters (`toDeclaredExtensions`, `toMigratePassInputs`, `toExtensionMigrationsInputs`) take the canonical shape and project to what their downstream primitive needs.
+- The `pack as { contractSpace?: ... }` structural cast lives **only** inside the canonical helper — no other CLI code re-implements it.
+
+This is M6 surface work because M6 reshapes every consumer of this boundary (`migration apply` / `migration status` / `migration plan` join `db init` / `db update` as aggregate-by-default callers). Doing the centralisation outside M6 would land code M6 would immediately rework.
+
 ## Acceptance criteria
 
 - **AC1** — `migration apply` walks the aggregate. Running `prisma-next migration apply` against an app schema using a pgvector `vector(N)` column with both an app-space migration and the pgvector extension space pending applies both, in canonical order (pgvector first, app second). The single-space-only behaviour (e2e finding F3 against cipherstash) does not reproduce against either extension.
@@ -186,7 +203,8 @@ Adds `db:init` and `db:update` scripts matching `examples/prisma-next-demo/packa
 - **AC8** — `[additive]` is no longer on the default human-readable line. Whether the implementer drops it entirely or moves it behind `--verbose`, the default plan/apply/status output does not carry operationClass tags inline with operation labels.
 - **AC9** — `examples/cipherstash-integration/package.json` exposes `db:init` and `db:update` scripts that run against `process.env.DATABASE_URL`. Parity with `examples/prisma-next-demo/package.json`.
 - **AC10** — Output shape is locked by snapshot test. A single end-to-end snapshot test against a pgvector-using app walks `emit → plan → status → apply → status` and locks the output of every step. Future formatter drift fails the test loudly.
-- **AC11** — Validation gates pass: `pnpm typecheck`, `pnpm lint:deps`, `pnpm test:packages`, `pnpm test:integration`, `pnpm test:e2e`, `pnpm build`.
+- **AC11** — Single descriptor-import boundary helper. Exactly one helper module performs the `extensionPacks → { id, targetId, contractSpace? }` projection (carrying the only `pack as { contractSpace?: ... }` structural cast in the CLI). Every CLI utility / command that consumes extension descriptors goes through this helper (directly or via a per-consumer adapter). `rg "as \{[^}]*contractSpace\?" packages/1-framework/3-tooling/cli/src/` returns matches in the canonical helper only.
+- **AC12** — Validation gates pass: `pnpm typecheck`, `pnpm lint:deps`, `pnpm test:packages`, `pnpm test:integration`, `pnpm test:e2e`, `pnpm build`.
 
 ## Test plan
 
@@ -208,7 +226,7 @@ Adds `db:init` and `db:update` scripts matching `examples/prisma-next-demo/packa
 
 Approximate, for sizing only:
 
-- **CLI commands**: 3 files updated (`migration-apply.ts`, `migration-status.ts`, `migration-plan.ts`); 1 control-api operation rewritten (`operations/migration-apply.ts`); possibly 1 shared formatter file added or extended (`utils/formatters/migrations.ts`).
+- **CLI commands**: 3 files updated (`migration-apply.ts`, `migration-status.ts`, `migration-plan.ts`); 1 control-api operation rewritten (`operations/migration-apply.ts`); possibly 1 shared formatter file added or extended (`utils/formatters/migrations.ts`); 1 new helper added (`utils/extension-pack-inputs.ts`) plus 3 existing utilities (`contract-space-aggregate-loader.ts`, `contract-space-migrate-pass.ts`, `contract-space-extension-migrations-pass.ts`) refactored to consume it.
 - **Cipherstash extension**: 1 file touched (`migration/call-classes.ts`) — a label string change.
 - **Examples**: 1 file touched (`examples/cipherstash-integration/package.json`) — script additions.
 - **Tests**: 1 e2e snapshot test added; per-command unit tests under each touched command's `__tests__/` (paths may vary).
@@ -234,14 +252,15 @@ The branch name follows the project convention: `tml-2397-migration-cli-aggregat
 
 Within the M6 branch, commit-by-commit slice (illustrative — implementer may reorganise as long as each commit passes its scoped validation):
 
-1. Extract `applyAggregate` primitive (if needed; see Risk note above).
-2. Rewire `migration apply` onto the aggregate; verify AC1.
-3. Add per-space output formatter; rewire `db init` / `db update` / `migration apply` summaries onto it; verify AC4 / AC5.
-4. Rewire `migration status` onto the aggregate; verify AC2.
-5. Update `migration plan` summary rendering; verify AC3 / AC6.
-6. Cipherstash label rewording; CLI `[additive]` rendering change; verify AC7 / AC8.
-7. Example `package.json` script parity; verify AC9.
-8. E2E snapshot test against a pgvector-using app (PGlite-native); verify AC10.
+1. Add the canonical `toExtensionInputs(extensionPacks)` helper + per-consumer adapters; refactor existing utilities (`contract-space-aggregate-loader.ts`, `contract-space-migrate-pass.ts`, `contract-space-extension-migrations-pass.ts`) and the inline projections in `migration-plan.ts` onto it; verify AC11.
+2. Extract `applyAggregate` primitive (if needed; see Risk note above).
+3. Rewire `migration apply` onto the aggregate; verify AC1.
+4. Add per-space output formatter; rewire `db init` / `db update` / `migration apply` summaries onto it; verify AC4 / AC5.
+5. Rewire `migration status` onto the aggregate; verify AC2.
+6. Update `migration plan` summary rendering; verify AC3 / AC6.
+7. Cipherstash label rewording; CLI `[additive]` rendering change; verify AC7 / AC8.
+8. Example `package.json` script parity; verify AC9.
+9. E2E snapshot test against a pgvector-using app (PGlite-native); verify AC10.
 
 ## Open questions
 
