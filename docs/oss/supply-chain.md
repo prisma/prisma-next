@@ -12,7 +12,7 @@ The check exists because npm tooling (and downstream consumers running license-a
 
 Apache-2.0 §4(d) requires distributors of derivative works to propagate any `NOTICE` file from upstream Apache-2.0 dependencies into their own distribution. To check whether we are subject to that obligation, [`scripts/audit-notice.mjs`](../../scripts/audit-notice.mjs) walks the resolved dependency graph of every publishable package and looks for `NOTICE` files in upstream packages.
 
-The audit's most recent result is recorded in [`projects/oss-setup/assets/notice-audit.md`](../../projects/oss-setup/assets/notice-audit.md): no runtime-redistributed dependency carries a NOTICE file at this time, so we do not need a root `NOTICE` file in this repository. The audit should be re-run when significant runtime dependencies are added or upgraded; if a NOTICE is found in a runtime dep, we add or extend a root `NOTICE` file.
+As of the most recent audit, no runtime-redistributed dependency carries a `NOTICE` file, so we do not need a root `NOTICE` file in this repository. The audit should be re-run when significant runtime dependencies are added or upgraded; if a `NOTICE` is found in a runtime dep, add or extend a root `NOTICE` file and update the statement above to reflect the new audit result.
 
 ## npm provenance attestations
 
