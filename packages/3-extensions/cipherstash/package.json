@@ -47,8 +47,5 @@
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/3-extensions/cipherstash"
-  },
-  "main": "./dist/control.mjs",
-  "module": "./dist/control.mjs",
-  "types": "./dist/control.d.mts"
+  }
 }
