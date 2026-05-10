@@ -28,10 +28,14 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const DEFAULT_DIR_TARGETS = ['docs/architecture docs/patterns'];
 
-// Catalogue-touching files outside the patterns/ directory. Append entries
-// here as later milestones land (M3: architect persona,
-// .cursor/rules/adr-writing.mdc).
-const EXTRA_TARGETS = ['docs/reference/typescript-patterns.md'];
+// Catalogue-touching files outside the patterns/ directory.
+const EXTRA_TARGETS = [
+  'docs/reference/typescript-patterns.md',
+  '.agents/skills/drive-agent-personas/personas/architect.md',
+  '.cursor/rules/adr-writing.mdc',
+];
+
+const MARKDOWN_EXTENSIONS = ['.md', '.mdc'];
 
 const INLINE_LINK_RE = /(!?)\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g;
 
@@ -40,7 +44,9 @@ function collectMarkdownFiles(targetPath) {
   const abs = isAbsolute(targetPath) ? targetPath : join(REPO_ROOT, targetPath);
   if (!existsSync(abs)) return [];
   const stat = statSync(abs);
-  if (stat.isFile()) return abs.endsWith('.md') ? [abs] : [];
+  if (stat.isFile()) {
+    return MARKDOWN_EXTENSIONS.some((ext) => abs.endsWith(ext)) ? [abs] : [];
+  }
   if (!stat.isDirectory()) return [];
   const out = [];
   for (const entry of readdirSync(abs)) {
