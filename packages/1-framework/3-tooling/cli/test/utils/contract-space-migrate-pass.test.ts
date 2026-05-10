@@ -162,4 +162,25 @@ describe('formatContractSpaceDriftWarning', () => {
       }),
     ).toThrow();
   });
+
+  it('renders priorHeadHash when present', () => {
+    const message = formatContractSpaceDriftWarning({
+      kind: 'drift',
+      spaceId: 'pgvector',
+      descriptorHash: HASH_A,
+      priorHeadHash: HASH_B,
+    });
+    expect(message).toContain(`differs from on-disk head hash ${HASH_B}`);
+    expect(message).toContain('pgvector');
+  });
+
+  it('renders <none> when priorHeadHash is undefined (first-run drift)', () => {
+    const message = formatContractSpaceDriftWarning({
+      kind: 'drift',
+      spaceId: 'cipherstash',
+      descriptorHash: HASH_A,
+      priorHeadHash: undefined,
+    });
+    expect(message).toContain('differs from on-disk head hash <none>');
+  });
 });
