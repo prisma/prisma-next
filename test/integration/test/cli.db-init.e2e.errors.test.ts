@@ -2,6 +2,7 @@ import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  parseJsonObjectFromCliCapture,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
@@ -77,8 +78,10 @@ withTempDir(({ createTempDir }) => {
               runDbInit(testSetup, ['--config', configPath, '--json', '--no-color']),
             ).rejects.toThrow();
 
-            const errorText = consoleOutput.join('\n').trim();
-            const errorJson = JSON.parse(errorText) as Record<string, unknown>;
+            const errorJson = parseJsonObjectFromCliCapture(consoleOutput) as Record<
+              string,
+              unknown
+            >;
             expect(errorJson).toMatchObject({
               code: 'PN-CLI-4004',
               domain: 'CLI',
@@ -140,8 +143,10 @@ withTempDir(({ createTempDir }) => {
               ]),
             ).rejects.toThrow();
 
-            const errorText = consoleOutput.join('\n').trim();
-            const errorJson = JSON.parse(errorText) as Record<string, unknown>;
+            const errorJson = parseJsonObjectFromCliCapture(consoleOutput) as Record<
+              string,
+              unknown
+            >;
 
             expect(errorJson).toMatchObject({
               code: 'PN-RUN-3000',
@@ -199,8 +204,10 @@ withTempDir(({ createTempDir }) => {
               runDbInit(testSetup, ['--config', configPath, '--json', '--no-color']),
             ).rejects.toThrow();
 
-            const errorText = consoleOutput.join('\n').trim();
-            const errorJson = JSON.parse(errorText) as Record<string, unknown>;
+            const errorJson = parseJsonObjectFromCliCapture(consoleOutput) as Record<
+              string,
+              unknown
+            >;
 
             expect(errorJson).toMatchObject({
               code: 'PN-RUN-3000',
