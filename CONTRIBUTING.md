@@ -77,7 +77,7 @@ If your change touches the SQL or Mongo runtime, also run `pnpm test:integration
 
 ## Developer Certificate of Origin (DCO)
 
-Every commit on a PR must be signed off under the [Developer Certificate of Origin 1.1](https://developercertificate.org/). The DCO is a lightweight statement that you have the right to submit the contribution under the project's license (Apache-2.0); it is *not* a Contributor License Agreement and does not transfer copyright.
+Every commit on a PR must be signed off under the [Developer Certificate of Origin 1.1](https://developercertificate.org/). The DCO is a lightweight statement that you have the right to submit the contribution under the project's license (Apache-2.0); it is *not* a Contributor License Agreement and does not transfer copyright. (For the reasoning behind choosing DCO over CLA, see [`docs/oss/governance.md`](./docs/oss/governance.md#contributor-provenance).)
 
 To sign off a commit, append a `Signed-off-by:` trailer with `git commit -s`:
 

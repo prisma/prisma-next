@@ -31,3 +31,9 @@ This directory contains the primary documentation for the repository.
 
 - [Cursor Cloud Agents](./onboarding/Cursor-Cloud-Agents.md) — how cloud agents run against this repo, where config lives, how to change it, how to debug a failed run
 
+## OSS posture
+
+- [OSS posture overview](./oss/README.md) — index of governance, supply-chain, and contribution policies
+- [Governance](./oss/governance.md) — maintainer team, decision-making, DCO basis
+- [Supply chain](./oss/supply-chain.md) — license validation, NOTICE audit, npm provenance, Dependabot cooldown
+
