@@ -5,38 +5,27 @@
  * emit time — they never call `encode`/`decode`.
  *
  * The SDK-bound runtime codec for actual `encode`/`decode` lives in
- * `./codec-runtime` (see `createCipherstashStringCodec(sdk)`); it is
- * resolved through `RuntimeParameterizedCodecDescriptor.factory` at
- * runtime instead of through pack-meta's `codecInstances`.
+ * `../execution/codec-runtime`; it is resolved through
+ * `RuntimeParameterizedCodecDescriptor.factory` at runtime instead of
+ * through pack-meta's `codecInstances`.
  *
- * Keeping the SDK-free metadata in its own module preserves the control
- * vs runtime split: control-plane consumers (`exports/control.ts`,
+ * Keeping the SDK-free metadata in its own module — and *not* importing
+ * the runtime `CipherstashStringCodec` class — preserves the control
+ * vs runtime split. Control-plane consumers (`exports/control.ts`,
  * `exports/pack.ts`) pull this file but never touch the envelope, the
- * SDK interface, or the bulk-encrypt middleware.
+ * SDK interface, or the bulk-encrypt middleware. The bundling-isolation
+ * test pins this property by snapshotting that the control entry's
+ * chunk graph does not transitively load `envelope-*.mjs`.
  *
  * `encode`/`decode` throw with a clear hint in the misuse case so
  * accidental wiring of the metadata codec into a real runtime path
  * surfaces immediately instead of silently no-op'ing.
  */
 
-import type { AnyCodecDescriptor } from '@prisma-next/framework-components/codec';
-import { CipherstashStringCodec } from '../execution/codec-runtime';
+import type { JsonValue } from '@prisma-next/contract/types';
+import { type AnyCodecDescriptor, CodecImpl } from '@prisma-next/framework-components/codec';
 import { CIPHERSTASH_STRING_CODEC_ID, EQL_V2_ENCRYPTED_TYPE } from './constants';
 
-// Empty traits — cipherstash columns expose equality search via the
-// cipherstash-namespaced operator surface (`cipherstashEq` /
-// `cipherstashIlike` in `./operators.ts`), not via the framework`s
-// trait-gated built-in `eq`. See `./codec-runtime.ts` for the full
-// rationale; the metadata codec mirrors the runtime codec`s trait
-// declaration so contract emit (which reads pack-meta) and runtime
-// (which reads the parameterized descriptor) agree.
-/**
- * SDK-free metadata codec for pack consumers. The `CipherstashStringCodec`
- * class is the same shape used at runtime; passing `undefined` for the SDK
- * causes `decode` to throw with a clear "metadata-only" diagnostic, while
- * `id` / `targetTypes` / `traits` / `meta` (read off the descriptor passed
- * to the constructor) remain available for emit-time inspection.
- */
 const METADATA_DESCRIPTOR: AnyCodecDescriptor = {
   codecId: CIPHERSTASH_STRING_CODEC_ID,
   traits: [],
@@ -56,7 +45,37 @@ const METADATA_DESCRIPTOR: AnyCodecDescriptor = {
   },
 };
 
-export const cipherstashStringCodecMetadata = new CipherstashStringCodec(
+class CipherstashStringCodecMetadata extends CodecImpl<
+  typeof CIPHERSTASH_STRING_CODEC_ID,
+  readonly [],
+  unknown,
+  unknown
+> {
+  async encode(): Promise<unknown> {
+    throw new Error(
+      'cipherstash codec: encode called on the pack-meta metadata codec. ' +
+        'Construct a runtime descriptor via `createCipherstashRuntimeDescriptor({ sdk })` and use that instead.',
+    );
+  }
+
+  async decode(): Promise<unknown> {
+    throw new Error(
+      'cipherstash codec: decode called on the pack-meta metadata codec. ' +
+        'Construct a runtime descriptor via `createCipherstashRuntimeDescriptor({ sdk })` and use that instead.',
+    );
+  }
+
+  encodeJson(): JsonValue {
+    return { $encryptedString: '<opaque>' };
+  }
+
+  decodeJson(): unknown {
+    throw new Error(
+      'cipherstash codec: decodeJson is not supported; envelopes do not round-trip through JSON.',
+    );
+  }
+}
+
+export const cipherstashStringCodecMetadata = new CipherstashStringCodecMetadata(
   METADATA_DESCRIPTOR,
-  undefined,
 );

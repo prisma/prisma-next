@@ -24,6 +24,7 @@
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { describe, expect, it } from 'vitest';
 import cipherstashExtensionDescriptor from '../src/exports/control';
@@ -61,7 +62,10 @@ describe('cipherstash extension descriptor (on-disk-in-package authoring)', () =
   });
 
   it("synthesises the migration package's `dirPath` from the descriptor's URL", () => {
-    const baseline = cipherstashExtensionDescriptor.contractSpace!.migrations[0]!;
+    // The framework `MigrationPackage` is the structural shape; this
+    // descriptor materialises the on-disk variant carrying `dirPath`.
+    const baseline = cipherstashExtensionDescriptor.contractSpace!
+      .migrations[0]! as OnDiskMigrationPackage;
     expect(existsSync(baseline.dirPath)).toBe(true);
     expect(existsSync(join(baseline.dirPath, 'migration.json'))).toBe(true);
     expect(existsSync(join(baseline.dirPath, 'ops.json'))).toBe(true);

@@ -48,8 +48,8 @@ function emptySdk(): CipherstashSdk {
 describe('cipherstash codec: no `equality` trait', () => {
   it('runtime codec declares an empty traits list', () => {
     const codec = createCipherstashStringCodec(emptySdk());
-    expect(codec.traits).toEqual([]);
-    expect(codec.traits ?? []).not.toContain('equality');
+    expect(codec.descriptor.traits).toEqual([]);
+    expect(codec.descriptor.traits ?? []).not.toContain('equality');
   });
 
   it('parameterized codec descriptor (the one the runtime consumes for dispatch) declares an empty traits list', () => {
@@ -61,8 +61,8 @@ describe('cipherstash codec: no `equality` trait', () => {
   });
 
   it('SDK-free pack-meta codec metadata declares an empty traits list', () => {
-    expect(cipherstashStringCodecMetadata.traits).toEqual([]);
-    expect(cipherstashStringCodecMetadata.traits ?? []).not.toContain('equality');
+    expect(cipherstashStringCodecMetadata.descriptor.traits).toEqual([]);
+    expect(cipherstashStringCodecMetadata.descriptor.traits ?? []).not.toContain('equality');
   });
 
   it('the three trait declarations agree (runtime / parameterized / pack-meta)', () => {
@@ -70,9 +70,9 @@ describe('cipherstash codec: no `equality` trait', () => {
     // the runtime (which reads the parameterized descriptor) will
     // disagree about which built-in operations are reachable on
     // cipherstash columns. They must always be identical.
-    const runtime = createCipherstashStringCodec(emptySdk()).traits ?? [];
+    const runtime = createCipherstashStringCodec(emptySdk()).descriptor.traits ?? [];
     const parameterized = createParameterizedCodecDescriptors(emptySdk())[0]?.traits ?? [];
-    const packMeta = cipherstashStringCodecMetadata.traits ?? [];
+    const packMeta = cipherstashStringCodecMetadata.descriptor.traits ?? [];
     expect([...runtime].sort()).toEqual([...parameterized].sort());
     expect([...runtime].sort()).toEqual([...packMeta].sort());
   });
@@ -104,7 +104,8 @@ describe('cipherstash columns: framework built-in `eq` is not reachable', () => 
     // well-typed even when TS narrows the codec`s `traits` to
     // `readonly never[]` (which is itself a strong static signal that
     // the trait can`t be present).
-    const traits: ReadonlyArray<string> = createCipherstashStringCodec(emptySdk()).traits ?? [];
+    const traits: ReadonlyArray<string> =
+      createCipherstashStringCodec(emptySdk()).descriptor.traits ?? [];
     expect(traits.includes('equality')).toBe(false);
   });
 });

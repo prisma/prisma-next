@@ -44,8 +44,11 @@ describe('createCipherstashStringCodec — registration shape', () => {
 
   it('targets the eql_v2_encrypted Postgres native type', () => {
     const codec = createCipherstashStringCodec(emptySdk());
-    expect(codec.targetTypes).toEqual(['eql_v2_encrypted']);
-    expect(codec.meta?.db?.sql?.postgres?.nativeType).toBe('eql_v2_encrypted');
+    expect(codec.descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
+    const dbMeta = codec.descriptor.meta?.['db'] as
+      | { sql?: { postgres?: { nativeType?: string } } }
+      | undefined;
+    expect(dbMeta?.sql?.postgres?.nativeType).toBe('eql_v2_encrypted');
   });
 
   it('declares no codec traits — equality search routes through cipherstashEq', () => {
@@ -59,7 +62,7 @@ describe('createCipherstashStringCodec — registration shape', () => {
     // a trait here without re-routing through the namespaced operator
     // would silently re-introduce the wrong-SQL footgun.
     const codec = createCipherstashStringCodec(emptySdk());
-    expect(codec.traits).toEqual([]);
+    expect(codec.descriptor.traits).toEqual([]);
   });
 });
 
@@ -103,10 +106,10 @@ describe('codec.encode(envelope, ctx)', () => {
   });
 });
 
-describe('codec.renderOutputType', () => {
+describe('codec.descriptor.renderOutputType', () => {
   it('returns "EncryptedString"', () => {
     const codec = createCipherstashStringCodec(emptySdk());
-    expect(codec.renderOutputType?.({})).toBe('EncryptedString');
+    expect(codec.descriptor.renderOutputType?.({})).toBe('EncryptedString');
   });
 });
 

@@ -56,6 +56,12 @@ export function createParameterizedCodecDescriptors(
       // `eq`. See `./codec-runtime.ts` for the full rationale.
       traits: [] as const,
       targetTypes: ['eql_v2_encrypted'] as const,
+      // Postgres native-type metadata. The SQL renderer reads this off
+      // the descriptor via `codecLookup.metaFor(codecId)` to insert the
+      // `$N::eql_v2_encrypted` cast on bound params (the EQL composite
+      // type isn`t inferrable from a `text` literal, so the cast is
+      // load-bearing).
+      meta: { db: { sql: { postgres: { nativeType: 'eql_v2_encrypted' } } } },
       paramsSchema: encryptedStringParamsSchema,
       isParameterized: true as const,
       renderOutputType: renderEncryptedStringOutputType,

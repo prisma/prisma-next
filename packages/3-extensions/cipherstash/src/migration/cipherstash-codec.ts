@@ -39,11 +39,8 @@
  * Stable across regenerations because every input is deterministic.
  */
 
-import type {
-  CodecControlHooks,
-  FieldEventContext,
-  SqlMigrationPlanOperation,
-} from '@prisma-next/family-sql/control';
+import type { CodecControlHooks, FieldEventContext } from '@prisma-next/family-sql/control';
+import type { OpFactoryCall } from '@prisma-next/framework-components/control';
 import { CIPHERSTASH_STRING_CODEC_ID } from '../extension-metadata/constants';
 import {
   type CipherstashSearchIndex,
@@ -75,12 +72,12 @@ function isEnabled(
 function onFieldEvent(
   event: 'added' | 'dropped' | 'altered',
   ctx: FieldEventContext,
-): readonly SqlMigrationPlanOperation<unknown>[] {
+): readonly OpFactoryCall[] {
   const { tableName, fieldName, priorField, newField } = ctx;
 
   if (event === 'added') {
     if (newField === undefined) return [];
-    const calls: SqlMigrationPlanOperation<unknown>[] = [];
+    const calls: OpFactoryCall[] = [];
     for (const flag of ALL_FLAGS) {
       if (isEnabled(newField.typeParams, flag)) {
         calls.push(
@@ -97,7 +94,7 @@ function onFieldEvent(
 
   if (event === 'dropped') {
     if (priorField === undefined) return [];
-    const calls: SqlMigrationPlanOperation<unknown>[] = [];
+    const calls: OpFactoryCall[] = [];
     for (const flag of ALL_FLAGS) {
       if (isEnabled(priorField.typeParams, flag)) {
         calls.push(
@@ -113,7 +110,7 @@ function onFieldEvent(
   }
 
   if (priorField === undefined || newField === undefined) return [];
-  const calls: SqlMigrationPlanOperation<unknown>[] = [];
+  const calls: OpFactoryCall[] = [];
   for (const flag of ALL_FLAGS) {
     const before = isEnabled(priorField.typeParams, flag);
     const after = isEnabled(newField.typeParams, flag);
