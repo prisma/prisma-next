@@ -8,6 +8,10 @@ This directory contains the primary documentation for the repository.
 - [Getting Started](./onboarding/Getting-Started.md) — build, test, and run the demo
 - [Testing Guide](./Testing%20Guide.md) — testing philosophy and commands
 
+## Guides
+
+- [Cross-Family Middleware](./guides/Cross-Family%20Middleware.md) — composing middleware that works against both SQL and Mongo runtimes (SPI guarantees, patterns, worked examples, anti-patterns)
+
 ## Deploying
 
 - [Serverless Deployment Guide](./Serverless%20Deployment%20Guide.md) — deploying to per-request runtimes (Cloudflare Workers + Hyperdrive worked example, with pointers for AWS Lambda, Vercel, Deno, Bun)
