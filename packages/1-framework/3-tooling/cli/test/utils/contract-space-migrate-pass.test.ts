@@ -12,19 +12,28 @@ const HASH_A = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 const HASH_B = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
 describe('runContractSpaceMigratePass', () => {
-  let migrationsDir: string;
+  let migrationsDir: string | undefined;
+  const requireDir = (): string => {
+    if (migrationsDir === undefined) {
+      throw new Error('migrationsDir was not initialised by beforeEach');
+    }
+    return migrationsDir;
+  };
 
   beforeEach(async () => {
     migrationsDir = await mkdtemp(join(tmpdir(), 'cli-cs-migrate-'));
   });
 
   afterEach(async () => {
-    await rm(migrationsDir, { recursive: true, force: true });
+    if (migrationsDir !== undefined) {
+      await rm(migrationsDir, { recursive: true, force: true });
+      migrationsDir = undefined;
+    }
   });
 
   it('emits on-disk artefacts on first emit and reports kind=firstEmit', async () => {
     const out = await runContractSpaceMigratePass({
-      migrationsDir,
+      migrationsDir: requireDir(),
       extensionPacks: [
         {
           id: 'cipherstash',
@@ -40,22 +49,22 @@ describe('runContractSpaceMigratePass', () => {
     expect(out.drifts.map((d) => d.kind)).toEqual(['firstEmit']);
 
     const headJson = JSON.parse(
-      await readFile(join(migrationsDir, 'cipherstash', 'refs', 'head.json'), 'utf-8'),
+      await readFile(join(requireDir(), 'cipherstash', 'refs', 'head.json'), 'utf-8'),
     );
     expect(headJson.hash).toBe(HASH_A);
-    const dts = await readFile(join(migrationsDir, 'cipherstash', 'contract.d.ts'), 'utf-8');
+    const dts = await readFile(join(requireDir(), 'cipherstash', 'contract.d.ts'), 'utf-8');
     expect(dts).toContain('@ts-nocheck');
   });
 
   it('reports kind=noDrift when descriptor matches the on-disk head (idempotent re-pin)', async () => {
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
+    await emitContractSpaceArtefacts(requireDir(), 'cipherstash', {
       contract: { v: 1 },
       contractDts: '\n',
       headRef: { hash: HASH_A, invariants: [] },
     });
 
     const out = await runContractSpaceMigratePass({
-      migrationsDir,
+      migrationsDir: requireDir(),
       extensionPacks: [
         {
           id: 'cipherstash',
@@ -70,15 +79,15 @@ describe('runContractSpaceMigratePass', () => {
     expect(out.drifts.map((d) => d.kind)).toEqual(['noDrift']);
   });
 
-  it('reports kind=drift when descriptor hash diverges from the on-disk head (locks AM7)', async () => {
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
+  it('reports kind=drift when descriptor hash diverges from the on-disk head', async () => {
+    await emitContractSpaceArtefacts(requireDir(), 'cipherstash', {
       contract: { v: 1 },
       contractDts: '\n',
       headRef: { hash: HASH_A, invariants: [] },
     });
 
     const out = await runContractSpaceMigratePass({
-      migrationsDir,
+      migrationsDir: requireDir(),
       extensionPacks: [
         {
           id: 'cipherstash',
@@ -92,23 +101,24 @@ describe('runContractSpaceMigratePass', () => {
 
     expect(out.drifts.map((d) => d.kind)).toEqual(['drift']);
     const drift = out.drifts[0];
-    if (drift && drift.kind === 'drift') {
-      const warning = formatContractSpaceDriftWarning(drift);
-      expect(warning).toContain('cipherstash');
-      expect(warning).toContain(HASH_A);
-      expect(warning).toContain(HASH_B);
+    if (drift?.kind !== 'drift') {
+      throw new Error(`expected drift result, got ${drift?.kind ?? 'undefined'}`);
     }
+    const warning = formatContractSpaceDriftWarning(drift);
+    expect(warning).toContain('cipherstash');
+    expect(warning).toContain(HASH_A);
+    expect(warning).toContain(HASH_B);
 
     // Head hash on disk is refreshed to descriptor hash.
     const headJson = JSON.parse(
-      await readFile(join(migrationsDir, 'cipherstash', 'refs', 'head.json'), 'utf-8'),
+      await readFile(join(requireDir(), 'cipherstash', 'refs', 'head.json'), 'utf-8'),
     );
     expect(headJson.hash).toBe(HASH_B);
   });
 
   it('skips extensions without contractSpace (codec-only extensions)', async () => {
     const out = await runContractSpaceMigratePass({
-      migrationsDir,
+      migrationsDir: requireDir(),
       extensionPacks: [{ id: 'codec-only' }],
     });
     expect(out.emittedSpaceIds).toEqual([]);
@@ -117,7 +127,7 @@ describe('runContractSpaceMigratePass', () => {
 
   it('processes multiple extension spaces in a single pass', async () => {
     const out = await runContractSpaceMigratePass({
-      migrationsDir,
+      migrationsDir: requireDir(),
       extensionPacks: [
         {
           id: 'cipherstash',
