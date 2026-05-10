@@ -5,43 +5,39 @@
 # Components and their relationships
 
 ```
-                                  In-flight framework PRs
-                                  ──────────────────────
-              ┌──────────────────── #400 (merged) ──────────────┐
-              │                     #402 (merged)               │
-              │                     #404 (open)                 │
-              │                     #409 (open)                 │
-              ▼                                                 ▼
-        ┌──────────┐                                       ┌────────┐
-        │Project 1 │                                       │Project │
-        │  (MVP)   │                                       │   2    │
-        └─────┬────┘                                       └────────┘
-              │                                                 ▲
-              │ ships RawSqlExpr AST node                       │
-              │                                                 │ inherits patterns,
-              │                                                 │ surfaces, factories
-              ▼                                                 │ from Project 1
-        ┌──────────────┐                                        │
-        │sql-raw-      │                                        │
-        │  factory     │ ◄── consumes AST node ─────────────────┘
-        └──────────────┘
+                  Foundation                            Foundation
+              TML-2397 (contract spaces, satisfied)   #400, #402, #404, #409 (merged)
+                          │                                    │
+                          ▼                                    ▼
+                    ┌──────────┐                          ┌────────┐
+                    │Project 1 │                          │Project │
+                    │  (MVP)   │                          │   2    │
+                    └─────┬────┘                          └────────┘
+                          │                                   ▲
+                          │ ships RawSqlExpr AST node         │ inherits patterns
+                          │                                   │ (envelope, codec,
+                          │                                   │  PSL/TS, operator
+                          ▼                                   │  lowering) from P1
+                    ┌──────────────┐                          │
+                    │sql-raw-      │                          │
+                    │  factory     │ ◄── consumes AST node ───┘
+                    └──────────────┘
 ```
 
 The dependency edges:
 
 | Edge | Direction | Hard / Soft |
 |---|---|---|
-| Project 1 → Project 2 | Project 2 *expands* Project 1's surface (more types, more operators, planner-driven DDL) | **Hard** — Project 2 lifts Project 1's codec/factory/operator patterns into the planner |
+| Project 1 → Project 2 | Project 2 *expands* Project 1's surface (more types, more operators) | **Hard** — Project 2 instantiates Project 1's codec/PSL/TS/operator pattern per type. |
 | Project 1 → `sql-raw-factory` | Project 1 ships the `RawSqlExpr` AST node `sql-raw-factory` consumes | **Soft on ordering, hard on substance** — `sql-raw-factory` could ship before Project 1 if it owns the AST node, but the agreed cleavage has Project 1 ship it |
-| Framework PRs (#400, #402) → Project 1 | Project 1's codec consumes the merged context + descriptor APIs | **Hard, satisfied** — both merged 2026-05-01 |
-| Framework PRs (#404, #409) → Project 1 | Same SPI surfaces edited; no consumption | **Coordinate-only** — Project 1 ships independently of both. See [Project 1 plan](project-1/plan.md#external-prs--non-dependency) for the rebase posture |
-| Framework prerequisites → Project 2 | Planner needs `(table, column)` input to `planTypeOperations` and prior-state contract for destructive DDL — both unstarted, no longer separately Linear-tracked | **Hard, not started** |
+| TML-2397 (contract spaces) → all components | Codec lifecycle hook, per-space verifier, EQL bundle install in cipherstash space's baseline migration | **Hard, satisfied** — all components rebase onto `tml-2397-cipherstash-contract-space` |
+| Framework PRs (#400, #402, #404, #409) → Project 1 | Codec call context, unified `CodecDescriptor<P>`, invariant-aware ref routing, middleware `intercept` + `contentHash` | **Hard, satisfied** — already on the contract-spaces base |
 
 # Sequencing
 
 ## Component order
 
-The natural order is **Project 1 first, `sql-raw-factory` and Project 2 in parallel afterwards** — modulo Project 2 being further blocked on its own framework prerequisites (per-column `planTypeOperations` input + prior-state contract).
+The natural order is **Project 1 first, `sql-raw-factory` and Project 2 in parallel afterwards.**
 
 ```
 phase A:    Project 1 [shape] ──► [execute] ──► [ship]
@@ -51,36 +47,36 @@ phase A:    Project 1 [shape] ──► [execute] ──► [ship]
 phase B:                          ┌───────────────┴───────────────┐
                                   ▼                               ▼
                           sql-raw-factory                  Project 2
-                          [shape ──► ship]                 (blocked on
-                          (parallelizable                  framework prereqs;
-                          with Project 1's                 shape once
-                          execution once                   unblocked)
+                          [shape ──► ship]                 [shape ──► ship]
+                          (parallelizable                  (per-type sub-specs
+                          with Project 1's                  in customer-demand
+                          execution once                    order)
                           AST node lands)
 ```
 
 A few things to note about this picture:
 
 - **`sql-raw-factory` shaping can start anytime** — its design is largely independent of Project 1's execution detail. It can be shaped (spec already exists) and even partially executed in parallel with Project 1, with a hard merge-block on the AST node landing.
-- **Project 2 shaping should not start yet.** It depends on framework decisions (per-column `planTypeOperations` input shape; prior-state contract for destructive DDL) that haven't been designed; shaping Project 2 against guesses risks rework. The current Project 2 spec is a deliberate stub.
-- **Project 1 is the critical path.** Both other components depend on it directly or indirectly. Project 1's own dependencies (#404 and #409) are the only things gating start of Project 1 *execution*.
+- **Project 2 shaping waits for Project 1 to ship.** Each new type rides on the patterns Project 1 establishes (envelope, codec, PSL constructor, TS factory, parity test, operator lowering); shaping Project 2 against patterns that may still shift during Project 1 execution risks rework. The current Project 2 spec is a deliberate stub.
+- **Project 1 is the critical path.** Both other components depend on it directly or indirectly. With TML-2397 satisfied as foundation and the four framework PRs (#400, #402, #404, #409) all merged, no external work gates Project 1 execution.
 
 ## Phase A — Project 1 (Searchable-encryption MVP)
 
-**Goal.** Ship `@prisma-next/extension-cipherstash` with `EncryptedString`, `eq` + `ilike`, hand-authored migration factories, end-to-end integration tested.
+**Goal.** Ship `@prisma-next/extension-cipherstash` with `EncryptedString`, `eq` + `ilike`, end-to-end integration tested. Per-column DDL emitted automatically by the codec lifecycle hook (TML-2397).
 
-**Status.** Spec drafted (5 task specs); [plan drafted](project-1/plan.md) with five value-slice milestones (M1 framework SPI → M2 store-only round-trip → M3 `eq` operator + manual migration → M4 `ilike` + activatePending + decryptAll → M5 close-out).
+**Status.** Rebased onto `tml-2397-cipherstash-contract-space`. M0 (rebase + cherry-pick of M1 framework SPIs from PR #416) and M1 (framework SPI) are SATISFIED; M2 (cipherstash runtime layer), M3 (operators + decryptAll + full e2e), M4 (close-out) are remaining. See [project-1/plan.md](project-1/plan.md) for the milestone-by-milestone breakdown.
 
-**External gating.** None. Project 1 is independent of [PR #404](https://github.com/prisma/prisma-next/pull/404) (invariant-aware ref routing) and [PR #409](https://github.com/prisma/prisma-next/pull/409) (middleware `intercept` hook). #404's `invariantId` field is populated on emitted ops regardless of #404's status; the routing benefit becomes effective when #404 lands, retroactively. #409 edits the same `RuntimeMiddleware` types Project 1's middleware-param-transform task edits but adds non-overlapping fields; whichever lands first, the other rebases mechanically. See [Project 1 plan — External PRs](project-1/plan.md#external-prs--non-dependency).
+**External gating.** None. TML-2397 satisfied; PRs #400 / #402 / #404 / #409 all merged onto the contract-spaces base.
 
 **Internal sequencing.** Drafted in [project-1/plan.md](project-1/plan.md). Summary:
 
-1. **M1 — Framework SPI.** `middleware-param-transform` and `raw-sql-ast-node` in parallel (no file overlap).
-2. **M2 — Store-only round-trip.** `psl-encrypted-string-constructor` + `envelope-codec-extension` storage path. Encrypted column type works for storage; no operators yet.
-3. **M3 — `eq` operator + manual `addSearchConfig` migration.** First searchable round-trip end-to-end against live EQL.
-4. **M4 — `ilike` + `activatePendingSearches` + `decryptAll`.** Completes Project 1's user-facing surface. All UMB ACs green.
-5. **M5 — Close-out.** Project lifecycle close-out per `projects/README.md`.
+1. **M0 — Rebase onto contract spaces.** ✅ DONE. Branch off TML-2397; cherry-pick framework SPIs + skill update; rewrite spec/plan against contract-spaces foundation.
+2. **M1 — Framework SPI.** ✅ DONE. `RawSqlExpr` AST + lowerer; `planFromAst`; `SqlParamRefMutator` + Mongo mirror; per-execute `signal`; boolean `AuthoringArgumentDescriptor` kind.
+3. **M2 — Cipherstash runtime layer.** Envelope + SDK + codec encode/decode + bulk-encrypt middleware + PSL/TS authoring + parity + storage e2e + codec-hook flag-name alignment.
+4. **M3 — Operators + decryptAll + full e2e.** `eq` + `ilike` operator lowering; `decryptAll` walker; all `AC-UMB1..9`; example app.
+5. **M4 — Close-out.** Project lifecycle close-out per `projects/README.md`.
 
-**Done when.** Project 1's acceptance criteria (UMB1–UMB7) all green; long-lived docs migrated to `docs/`; Project 1 directory deletable per the project lifecycle.
+**Done when.** Project 1's acceptance criteria (`AC-UMB1..9`) all green; long-lived docs migrated to `docs/`; Project 1 directory deletable per the project lifecycle.
 
 ## Phase B (parallelizable) — `sql-raw-factory`
 
@@ -96,29 +92,32 @@ A few things to note about this picture:
 
 ## Phase B (parallelizable) — Project 2
 
-**Goal.** Planner-driven per-column DDL via `planTypeOperations`; expanded type/operator surface (`EncryptedNumber`, `EncryptedDate`, `EncryptedBoolean`, `EncryptedJson`; `orderAndRange`, `searchableJson`).
+**Goal.** Expanded type/operator surface (`EncryptedNumber`, `EncryptedDate`, `EncryptedBoolean`, `EncryptedJson`; `orderAndRange`, `searchableJson`).
 
 **Status.** Stub spec only. Not yet shaped.
 
 **Gating.**
 
-- Hard dep on Project 1 shipping (codec + factory shape + invariant-routing pattern).
-- Hard dep on framework prerequisites: `planTypeOperations` accepting `(table, column)` and a prior-state contract for destructive DDL. Neither has started; shaping either requires framework-design work that hasn't begun. (These were previously tracked as TML-2338 / TML-2339 — both cancelled in the Linear redesign; the *work* is real and described in [`project-2/spec.md`](project-2/spec.md), it is simply no longer separately tracked at the ticket level.)
+- Hard dep on Project 1 shipping (codec + PSL/TS authoring + operator-lowering pattern). Each new type/operator family in Project 2 instantiates the same pattern.
 
-**Recommended cadence.** Wait until Project 1 ships before shaping Project 2 in detail. The shape of Project 2's planner integration is sensitive to those framework decisions; shaping against guesses produces rework. Stub remains a placeholder and a forward-reference target until then.
+The original gating on framework prerequisites (`planTypeOperations` accepting `(table, column)`; prior-state contract for destructive DDL) is dissolved: TML-2397's codec lifecycle hook is the framework-wide planner-integration mechanism, and each new type wires its own `onFieldEvent` arm. No framework work blocks Project 2.
+
+**Recommended cadence.** Wait until Project 1 ships before shaping Project 2 in detail, since each new type rides on patterns Project 1 establishes (envelope, codec, PSL constructor, TS factory, operator lowering, parity test). Stub remains a placeholder and a forward-reference target until then.
+
+Within Project 2, types ship in customer-demand order. Suggested default: `EncryptedNumber` first (simplest after string; exercises `orderAndRange`), `EncryptedDate` (similar shape), `EncryptedBoolean` (smallest), `EncryptedJson` last (carries the biggest design open question on `searchableJson`). Reorder freely as customer signals dictate.
 
 # Status
 
 | Component | Linear | Spec | Plan | Execution | Notes |
 |---|---|---|---|---|---|
-| Umbrella | — | [drafted](spec.md) | [drafted](plan.md) (this doc) | — | — |
-| Project 1 | [TML-2373](https://linear.app/prisma-company/issue/TML-2373) | [drafted](project-1/spec.md) (5 task specs all drafted) | [drafted](project-1/plan.md) | not started | Independent of #404 + #409; #400 + #402 already merged |
-| `sql-raw-factory` | [TML-2374](https://linear.app/prisma-company/issue/TML-2374) | [drafted](sql-raw-factory/spec.md) | [drafted](sql-raw-factory/plan.md) | not started | Mergeable after Project 1's M1 lands (`raw-sql-ast-node`); three milestones (factory + param() → identifier(...) → integration + close-out) |
-| Project 2 | [TML-2375](https://linear.app/prisma-company/issue/TML-2375) | [stub](project-2/spec.md) | not started | not started | Gated on Project 1 + framework prerequisites (`planTypeOperations` input + prior-state contract) |
+| Umbrella | — | [drafted](spec.md) | [drafted](plan.md) (this doc) | — | Rebased onto `tml-2397-cipherstash-contract-space` |
+| Project 1 | [TML-2373](https://linear.app/prisma-company/issue/TML-2373) | [drafted](project-1/spec.md) (4 active task specs; migration-factories obsoleted by TML-2397) | [drafted](project-1/plan.md) | M0 + M1 done; M2 next | All framework PRs merged; TML-2397 satisfied as foundation |
+| `sql-raw-factory` | [TML-2374](https://linear.app/prisma-company/issue/TML-2374) | [drafted](sql-raw-factory/spec.md) | [drafted](sql-raw-factory/plan.md) | not started | Mergeable after Project 1's M1 lands (`raw-sql-ast-node` already cherry-picked onto Project 1's branch); three milestones (factory + param() → identifier(...) → integration + close-out) |
+| Project 2 | [TML-2375](https://linear.app/prisma-company/issue/TML-2375) | [stub](project-2/spec.md) | not started | not started | Gated on Project 1 only; framework prerequisites dissolved by TML-2397 |
 
 # Open questions at the umbrella level
 
-1. **Project 2 shaping trigger.** Confirm: shape Project 2 only after Project 1 ships? Or earlier (in parallel with Project 1's execution) at the cost of likely rework when the framework prerequisites land?
+1. **Project 2 shaping trigger.** Confirmed: shape Project 2 after Project 1 ships, since each new type rides on patterns Project 1 establishes.
 
 # References
 
