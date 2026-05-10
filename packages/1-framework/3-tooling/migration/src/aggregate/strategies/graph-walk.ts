@@ -73,6 +73,7 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
 
   const plan: MigrationPlan = {
     targetId: aggregateTargetId,
+    spaceId: member.spaceId,
     origin: currentMarker === null ? null : { storageHash: currentMarker.storageHash },
     destination: { storageHash: member.headRef.hash },
     operations: pathOps,

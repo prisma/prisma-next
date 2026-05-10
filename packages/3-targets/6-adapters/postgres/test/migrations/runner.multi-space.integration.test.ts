@@ -63,7 +63,7 @@ function buildSuccessfulExtensionPlan() {
 function buildFailingAppPlan() {
   return createMigrationPlan<PostgresPlanTargetDetails>({
     targetId: 'postgres',
-    spaceId: 'ext',
+    spaceId: 'app',
     origin: null,
     destination: toPlanContractInfo(extensionContract),
     operations: [
