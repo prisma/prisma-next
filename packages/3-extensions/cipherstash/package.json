@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/extension-cipherstash",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "CipherStash EQL extension for Prisma Next: contract-space authoring of the encrypted-column scaffolding (eql_v2_configuration table, eql_v2_encrypted/ore_* composite types, eql_v2 domains) plus a baseline migration that installs the vendored EQL bundle SQL byte-for-byte.",
