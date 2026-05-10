@@ -445,6 +445,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/emitter
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/3-tooling/migration
       '@prisma-next/sql-contract-emitter':
         specifier: workspace:*
         version: link:../../packages/2-sql/3-tooling/emitter
@@ -3581,6 +3584,9 @@ importers:
       '@prisma-next/integration-tests':
         specifier: workspace:*
         version: link:../../integration
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../../../packages/1-framework/3-tooling/migration
       '@prisma-next/postgres':
         specifier: workspace:*
         version: link:../../../packages/3-extensions/postgres

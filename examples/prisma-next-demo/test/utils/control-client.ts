@@ -4,11 +4,16 @@
  * This demonstrates how to use `createControlClient` for test database setup
  * and the runtime for data operations, instead of manual SQL and stampMarker.
  */
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import sql from '@prisma-next/family-sql/control';
+import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
+import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import postgres from '@prisma-next/target-postgres/control';
 
 export interface TestControlClientOptions {
@@ -46,24 +51,53 @@ export function createPrismaNextControlClient(options: TestControlClientOptions)
  * });
  * ```
  */
+/**
+ * Materialise pgvector's pinned contract-space artefacts under
+ * `<migrationsDir>/pgvector/...`. The demo's contract uses pgvector,
+ * so the per-space `db init` flow requires its head ref + baseline
+ * migration to be present on disk.
+ */
+async function materialisePgvectorPinnedArtefacts(migrationsDir: string): Promise<void> {
+  const space = pgvector.contractSpace;
+  if (!space) {
+    throw new Error('pgvector descriptor must declare a contractSpace');
+  }
+  const baseline = space.migrations[0];
+  if (!baseline) {
+    throw new Error('pgvector contract-space must ship at least one baseline migration');
+  }
+  await emitContractSpaceArtefacts(migrationsDir, 'pgvector', {
+    contract: space.contractJson,
+    contractDts: '// rendered .d.ts for pgvector contract space\nexport interface Contract {}\n',
+    headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
+  });
+  await materialiseMigrationPackage(join(migrationsDir, 'pgvector'), baseline);
+}
+
 export async function initTestDatabase(options: {
   readonly connection: string;
   readonly contract: unknown;
   /**
-   * On-disk migrations directory. The demo app does not declare any
-   * extension contract spaces, so the per-space `db init` flow runs
-   * with the n=1 (app-only) resolver list and does not actually read
-   * from this path — but `migrationsDir` is required by the API.
+   * On-disk migrations directory. When omitted, a temporary directory is
+   * created (and cleaned up) and pgvector's pinned contract-space
+   * artefacts are materialised inside it.
    */
   readonly migrationsDir?: string;
 }): Promise<void> {
   const client = createPrismaNextControlClient({ connection: options.connection });
 
+  const ownsMigrationsDir = options.migrationsDir === undefined;
+  const migrationsDir =
+    options.migrationsDir ?? mkdtempSync(join(tmpdir(), 'prisma-next-demo-migrations-'));
   try {
+    if (ownsMigrationsDir) {
+      mkdirSync(migrationsDir, { recursive: true });
+      await materialisePgvectorPinnedArtefacts(migrationsDir);
+    }
     const initResult = await client.dbInit({
       contract: options.contract,
       mode: 'apply',
-      migrationsDir: options.migrationsDir ?? '/tmp/__prisma-next-test-migrations',
+      migrationsDir,
     });
     if (!initResult.ok) {
       throw new Error(
@@ -72,5 +106,8 @@ export async function initTestDatabase(options: {
     }
   } finally {
     await client.close();
+    if (ownsMigrationsDir) {
+      rmSync(migrationsDir, { recursive: true, force: true });
+    }
   }
 }
