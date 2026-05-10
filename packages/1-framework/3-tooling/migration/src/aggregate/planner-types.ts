@@ -9,6 +9,7 @@ import type {
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import type { Result } from '@prisma-next/utils/result';
+import type { PathDecision } from '../migration-graph';
 import type { ContractMarkerRecordLike } from './marker-types';
 import type { ContractSpaceAggregate } from './types';
 
@@ -122,6 +123,17 @@ export interface AggregatePerSpacePlan {
    * strategy; absent for synth-produced plans.
    */
   readonly migrationEdges?: readonly AggregateMigrationEdgeRef[];
+  /**
+   * Path decision data the strategy used to select the chain
+   * (alternative count, tie-break reasons, required/satisfied
+   * invariants, per-edge invariants). Populated by the graph-walk
+   * strategy; absent for synth-produced plans.
+   *
+   * `migration apply` surfaces this for the app member as
+   * `MigrationApplySuccess.pathDecision` (back-compat with single-
+   * space callers).
+   */
+  readonly pathDecision?: PathDecision;
 }
 
 export interface AggregatePlannerSuccess {

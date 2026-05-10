@@ -9,7 +9,11 @@ import { Command } from 'commander';
 
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
-import type { AggregatePerSpaceExecutionEntry, MigrationApplyFailure } from '../control-api/types';
+import type {
+  AggregatePerSpaceExecutionEntry,
+  MigrationApplyFailure,
+  MigrationApplyPathDecision,
+} from '../control-api/types';
 import {
   CliStructuredError,
   type CliStructuredError as CliStructuredErrorType,
@@ -79,6 +83,12 @@ export interface MigrationApplyResult {
    * apply path.
    */
   readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
+  /**
+   * Path-decision data for the app member. Surfaced for back-compat
+   * with single-space callers (cli-journeys invariant tests).
+   * Absent for no-op applies where the app had nothing to do.
+   */
+  readonly pathDecision?: MigrationApplyPathDecision;
   readonly timings: {
     readonly total: number;
   };
@@ -250,6 +260,7 @@ async function executeMigrationApplyCommand(
       migrationsDir,
       appMigrationPackages: appPackages.bundles,
       ...ifDefined('refHash', refEntry?.hash),
+      ...(refEntry?.invariants ? { refInvariants: refEntry.invariants } : {}),
     });
 
     if (!applyResult.ok) {
@@ -266,11 +277,15 @@ async function executeMigrationApplyCommand(
       applied: value.applied,
       summary: value.summary,
       perSpace: value.perSpace,
+      ...ifDefined('pathDecision', value.pathDecision),
       timings: { total: Date.now() - startTime },
     });
   } catch (error) {
     if (CliStructuredError.is(error)) {
       return notOk(error);
+    }
+    if (MigrationToolsError.is(error)) {
+      return notOk(mapMigrationToolsError(error));
     }
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {

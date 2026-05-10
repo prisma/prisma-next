@@ -557,6 +557,12 @@ export interface MigrationApplyOptions {
    */
   readonly refHash?: string;
   /**
+   * Required invariants on the user-supplied app-space ref. Threaded
+   * into the graph-walk's `required` calculation so the planner picks
+   * an invariant-bearing path. Ignored when `refHash` is absent.
+   */
+  readonly refInvariants?: readonly string[];
+  /**
    * Database connection. If provided, migrationApply will connect before executing.
    * If omitted, the client must already be connected.
    */
@@ -618,6 +624,32 @@ export interface MigrationApplyAppliedEntry {
  * per-space breakdown (`perSpace` — markers / operations / canonical
  * order, per M6 sub-spec § Output shape).
  */
+/**
+ * Path-decision summary for the **app member** post-apply. Surfaced
+ * for back-compat with single-space callers (and the cli-journeys
+ * suite, which inspects `requiredInvariants`/`satisfiedInvariants`/
+ * `selectedPath` to validate invariant routing).
+ *
+ * Per-space path decisions for extension members are not surfaced —
+ * extensions own their own ref/invariant control.
+ */
+export interface MigrationApplyPathDecision {
+  readonly fromHash: string;
+  readonly toHash: string;
+  readonly alternativeCount: number;
+  readonly tieBreakReasons: readonly string[];
+  readonly refName?: string;
+  readonly requiredInvariants: readonly string[];
+  readonly satisfiedInvariants: readonly string[];
+  readonly selectedPath: readonly {
+    readonly dirName: string;
+    readonly migrationHash: string;
+    readonly from: string;
+    readonly to: string;
+    readonly invariants: readonly string[];
+  }[];
+}
+
 export interface MigrationApplySuccess {
   readonly migrationsApplied: number;
   readonly markerHash: string;
@@ -629,6 +661,13 @@ export interface MigrationApplySuccess {
    * Always present for the aggregate-walking operation.
    */
   readonly perSpace: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  /**
+   * Path-decision data for the app member. Present whenever the
+   * graph-walk strategy ran for the app (i.e. always for the
+   * aggregate-walking apply path). Absent only for the no-op
+   * "Already up to date" early return when the app has no plan.
+   */
+  readonly pathDecision?: MigrationApplyPathDecision;
 }
 
 /**

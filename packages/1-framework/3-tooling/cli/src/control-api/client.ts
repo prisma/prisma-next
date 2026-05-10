@@ -480,6 +480,7 @@ class ControlClientImpl implements ControlClient {
       targetId: this.options.target.targetId,
       appMigrationPackages: options.appMigrationPackages,
       ...ifDefined('refHash', options.refHash),
+      ...ifDefined('refInvariants', options.refInvariants),
       ...ifDefined('onProgress', onProgress),
     });
   }

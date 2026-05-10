@@ -13,6 +13,8 @@ import {
   type ContractSpaceMember,
   graphWalkStrategy,
 } from '@prisma-next/migration-tools/aggregate';
+import { errorNoInvariantPath } from '@prisma-next/migration-tools/errors';
+import { findPathWithDecision } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -23,6 +25,7 @@ import {
 import type {
   AggregatePerSpaceExecutionEntry,
   MigrationApplyFailure,
+  MigrationApplyPathDecision,
   MigrationApplyResult,
   MigrationApplySuccess,
   OnControlProgress,
@@ -69,6 +72,14 @@ export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetI
    * Sub-spec § `--ref <hash>` semantics under multi-space.
    */
   readonly refHash?: string;
+  /**
+   * Required invariants attached to the user-supplied app-space ref.
+   * Threaded into the graph-walk's `required` calculation so the
+   * planner picks an invariant-bearing path and surfaces the
+   * required/satisfied set on the success envelope. When `refHash`
+   * is absent the file's `member.headRef.invariants` are used.
+   */
+  readonly refInvariants?: readonly string[];
   readonly onProgress?: OnControlProgress;
 }
 
@@ -106,6 +117,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     targetId,
     appMigrationPackages,
     refHash,
+    refInvariants,
     onProgress,
   } = options;
 
@@ -148,10 +160,14 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
       return notOk(buildNeverPlannedFailure(member.spaceId, targetHash));
     }
 
+    const targetInvariants =
+      isAppMember && refHash !== undefined && refInvariants !== undefined
+        ? refInvariants
+        : member.headRef.invariants;
     const targetMember: ContractSpaceMember =
-      targetHash === member.headRef.hash
+      targetHash === member.headRef.hash && targetInvariants === member.headRef.invariants
         ? member
-        : { ...member, headRef: { hash: targetHash, invariants: member.headRef.invariants } };
+        : { ...member, headRef: { hash: targetHash, invariants: targetInvariants } };
 
     const walked = graphWalkStrategy({
       aggregateTargetId: aggregate.targetId,
@@ -162,7 +178,30 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
       return notOk(buildPathNotFoundFailure(member.spaceId, liveMarker, targetHash));
     }
     if (walked.kind === 'unsatisfiable') {
-      return notOk(buildInvariantUnsatisfiableFailure(member.spaceId, walked.missing));
+      // Surface the canonical MIGRATION.NO_INVARIANT_PATH envelope
+      // (the error rendering pipeline maps it to meta.code +
+      // meta.required + meta.missing + meta.structuralPath that the
+      // cli-journeys invariant suite asserts on).
+      const fromHash = liveMarker?.storageHash ?? '';
+      const structural = findPathWithDecision(targetMember.migrations.graph, fromHash, targetHash, {
+        required: new Set<string>(),
+      });
+      const structuralPath =
+        structural.kind === 'ok'
+          ? structural.decision.selectedPath.map((edge) => ({
+              dirName: edge.dirName,
+              migrationHash: edge.migrationHash,
+              from: edge.from,
+              to: edge.to,
+              invariants: edge.invariants,
+            }))
+          : [];
+      throw errorNoInvariantPath({
+        ...(refHash !== undefined ? { refName: 'app-ref' } : {}),
+        required: targetInvariants,
+        missing: walked.missing,
+        structuralPath,
+      });
     }
 
     perSpacePlans.set(member.spaceId, walked.result);
@@ -188,7 +227,9 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
         summary:
           applyOrder.length === 0
             ? 'Already up to date — no contract spaces are loaded'
-            : `Already up to date across ${applyOrder.length} space(s)`,
+            : applyOrder.length === 1
+              ? 'Already up to date'
+              : `Already up to date across ${applyOrder.length} space(s)`,
       }),
     );
   }
@@ -286,12 +327,35 @@ function buildSuccess(args: BuildSuccessArgs): MigrationApplySuccess {
     }));
   });
 
+  const appPlan = appResolution?.entry;
+  const pathDecision: MigrationApplyPathDecision | undefined = appPlan?.pathDecision
+    ? {
+        fromHash: appPlan.pathDecision.fromHash,
+        toHash: appPlan.pathDecision.toHash,
+        alternativeCount: appPlan.pathDecision.alternativeCount,
+        tieBreakReasons: appPlan.pathDecision.tieBreakReasons,
+        ...(appPlan.pathDecision.refName !== undefined
+          ? { refName: appPlan.pathDecision.refName }
+          : {}),
+        requiredInvariants: appPlan.pathDecision.requiredInvariants ?? [],
+        satisfiedInvariants: appPlan.pathDecision.satisfiedInvariants ?? [],
+        selectedPath: appPlan.pathDecision.selectedPath.map((entry) => ({
+          dirName: entry.dirName,
+          migrationHash: entry.migrationHash,
+          from: entry.from,
+          to: entry.to,
+          invariants: entry.invariants,
+        })),
+      }
+    : undefined;
+
   return {
     migrationsApplied: applied.length,
     markerHash: appMarkerHash,
     applied,
     summary: args.summary,
     perSpace: args.perSpace,
+    ...(pathDecision !== undefined ? { pathDecision } : {}),
   };
 }
 
@@ -310,22 +374,19 @@ function buildPathNotFoundFailure(
   targetHash: string,
 ): MigrationApplyFailure {
   const fromHash = marker?.storageHash ?? '<empty>';
+  // The single-space-degenerate phrasing names the user-visible
+  // condition (a contract has been emitted that no on-disk
+  // migration reaches) so the error reads naturally for the
+  // single-space app case. Multi-space callers see the same
+  // condition expressed against the offending space.
+  const summary =
+    spaceId === 'app'
+      ? 'Current contract has no planned migration path'
+      : `Current contract has no planned migration path for contract space "${spaceId}"`;
   return {
     code: 'MIGRATION_PATH_NOT_FOUND',
-    summary: `No migration path for contract space "${spaceId}"`,
-    why: `Cannot reach target "${targetHash}" from current marker "${fromHash}" in space "${spaceId}". The on-disk migration graph for this space does not connect the two states.`,
+    summary,
+    why: `Cannot reach target "${targetHash}" from current marker "${fromHash}" in space "${spaceId}". The on-disk migration graph for this space does not connect the two states. Run \`prisma-next migration plan\` to materialise the path.`,
     meta: { spaceId, fromHash, targetHash, kind: 'pathUnreachable' },
-  };
-}
-
-function buildInvariantUnsatisfiableFailure(
-  spaceId: string,
-  missing: readonly string[],
-): MigrationApplyFailure {
-  return {
-    code: 'MIGRATION_PATH_NOT_FOUND',
-    summary: `No invariant-satisfying migration path for contract space "${spaceId}"`,
-    why: `On-disk migration graph for space "${spaceId}" reaches the target but does not cover required invariants: ${missing.join(', ')}.`,
-    meta: { spaceId, missingInvariants: missing, kind: 'invariantsUnsatisfiable' },
   };
 }

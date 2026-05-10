@@ -102,6 +102,7 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
       destinationContract: member.contract as Contract,
       strategy: 'graph-walk',
       migrationEdges: edgeRefs,
+      pathDecision: outcome.decision,
     },
   };
 }
