@@ -10,8 +10,6 @@ The catalogue is distinct from its neighbours:
 
 ## v1 entries
 
-The eight v1 patterns land in milestone M2. Until each entry exists, its row is **Pending** — the slug column shows the file the entry will live at.
-
 | Pattern | Slug | Intent (one-line) | Status |
 |---|---|---|---|
 | Frozen-class AST + visitor | [`frozen-class-ast.md`](./frozen-class-ast.md) | Discriminated AST as an abstract base + concrete classes per kind, frozen at construction, with `accept(visitor)` for narrow exhaustive dispatch. | Stable |
