@@ -49,8 +49,10 @@ describe('combineSchemaResults', () => {
 
     const combined = combineSchemaResults(perSpace, 'app', false);
 
-    expect(combined.ok).toBe(true);
-    expect(combined.summary).toBe('Database schema satisfies contract');
+    expect(combined).toMatchObject({
+      ok: true,
+      summary: 'Database schema satisfies contract',
+    });
   });
 
   it('preserves the per-family failure summary when every member fails', () => {
@@ -67,8 +69,10 @@ describe('combineSchemaResults', () => {
 
     const combined = combineSchemaResults(perSpace, 'app', false);
 
-    expect(combined.ok).toBe(false);
-    expect(combined.summary).toBe('Database schema does not satisfy contract (1 failure)');
+    expect(combined).toMatchObject({
+      ok: false,
+      summary: 'Database schema does not satisfy contract (1 failure)',
+    });
   });
 
   it('falls back to the failing member summary when the app passes but an extension fails', () => {
@@ -90,10 +94,12 @@ describe('combineSchemaResults', () => {
 
     const combined = combineSchemaResults(perSpace, 'app', false);
 
-    expect(combined.ok).toBe(false);
-    expect(combined.summary).toBe('Database schema does not satisfy contract (1 failure)');
-    expect(combined.schema.counts.fail).toBe(1);
-    expect(combined.code).toBe('PN-RUN-3010');
+    expect(combined).toMatchObject({
+      ok: false,
+      summary: 'Database schema does not satisfy contract (1 failure)',
+      schema: { counts: { fail: 1 } },
+      code: 'PN-RUN-3010',
+    });
   });
 
   it('returns a non-`ok` envelope when any member fails, even when the app passes', () => {
@@ -131,9 +137,11 @@ describe('combineSchemaResults', () => {
 
     const combined = combineSchemaResults(perSpace, 'app', false);
 
-    expect(combined.ok).toBe(true);
-    expect(combined.summary).toBe('Schema matches contract');
-    expect(combined.contract.storageHash).toBe('sha256:cipher-storage');
+    expect(combined).toMatchObject({
+      ok: true,
+      summary: 'Schema matches contract',
+      contract: { storageHash: 'sha256:cipher-storage' },
+    });
   });
 
   it('keeps the first failure summary when multiple members fail', () => {
@@ -151,9 +159,11 @@ describe('combineSchemaResults', () => {
 
     const combined = combineSchemaResults(perSpace, 'app', false);
 
-    expect(combined.ok).toBe(false);
-    expect(combined.summary).toBe('cipher failure');
-    expect(combined.schema.counts.fail).toBe(2);
+    expect(combined).toMatchObject({
+      ok: false,
+      summary: 'cipher failure',
+      schema: { counts: { fail: 2 } },
+    });
   });
 
   it('uses the default `PN-RUN-3010` code when a failing app result carries no code', () => {
@@ -171,7 +181,9 @@ describe('combineSchemaResults', () => {
 
     const combined = combineSchemaResults(perSpace, 'app', false);
 
-    expect(combined.ok).toBe(false);
-    expect(combined.code).toBe('PN-RUN-3010');
+    expect(combined).toMatchObject({
+      ok: false,
+      code: 'PN-RUN-3010',
+    });
   });
 });
