@@ -46,6 +46,8 @@ Prisma Next is **pre-1.0**. While we are pre-1.0:
 
 When Prisma Next reaches 1.0 this section will be revised; the supported-versions story will be more conservative.
 
+For the supply-chain practices that protect published `@prisma-next/*` packages — license declarations, npm provenance attestations, the Dependabot cooldown window, and the `NOTICE`-propagation audit — see [`docs/oss/supply-chain.md`](./docs/oss/supply-chain.md).
+
 ## What this document does *not* commit to
 
 - A fixed time-to-patch SLO. We have not committed to one publicly because we cannot guarantee one yet. The 5-business-day acknowledgement is the only firm commitment.
