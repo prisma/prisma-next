@@ -1,6 +1,14 @@
 <!--
 Copy this file to a new kebab-case slug under `docs/architecture docs/patterns/` and fill it in.
 Replace every `<...>` placeholder. Delete optional sections you do not use.
+
+Writing guidance — read this before drafting:
+
+- **Lead with a grounding example.** The Intent section should open with a concrete situation in the codebase a fresh reader can hold in their head. Avoid abstract definition until after the reader has a picture.
+- **State the decision in plain language second.** What does the pattern tell a contributor to do? One or two sentences, no jargon-stacking.
+- **Cut "Adopting this pattern commits you to..." style paragraphs.** Constraints belong in "When NOT to use" and "Cautions" where the reader can act on them.
+- **Don't address one audience inside the prose** ("Architect-persona check:", "we used to ...", "v1 catalogue ships ..."). Pattern docs are long-lived; if a sentence only makes sense to a specific reader at a specific moment, cut or rephrase it.
+- **Single-line prose paragraphs.** No fixed-column hard wraps; let editors and viewers reflow.
 -->
 
 # Pattern: `<Title>`
@@ -10,11 +18,11 @@ Replace every `<...>` placeholder. Delete optional sections you do not use.
 
 ## Intent
 
-`<1–3 sentences. What problem does this pattern solve? What does adopting it commit you to?>`
+`<Open with a grounding example: a real situation in the codebase a fresh reader can pin understanding to. Then state in 1–2 plain sentences what the pattern tells a contributor to do. No abstract framing before the example.>`
 
 ## When to use
 
-- `<The conditions under which this pattern is the right fit. State them concretely enough that a reader can verify their case matches.>`
+- `<Concrete conditions a reader can verify against their own case. Avoid placeholder words like "consumers" or "the framework" without anchoring.>`
 
 ## When NOT to use
 
@@ -22,7 +30,7 @@ Replace every `<...>` placeholder. Delete optional sections you do not use.
 
 ## Structure
 
-`<The shape. Types, layers, interfaces, contracts — whichever language fits. Keep it abstract; concrete code goes in "Reference implementations". Diagrams welcome but optional.>`
+`<The shape. Types, layers, interfaces, contracts — whichever language fits. Lift concrete code from a real reference implementation when it grounds the abstraction faster than prose. Diagrams welcome but only when they earn the space.>`
 
 ## Reference implementations
 
@@ -46,6 +54,6 @@ Replace every `<...>` placeholder. Delete optional sections you do not use.
 
 ## Cautions / common mistakes
 
-<!-- Optional but recommended. Mistakes the architect persona has seen this pattern attract. Surface them so reviewers can check. Delete this section if there are none. -->
+<!-- Optional but recommended. Mistakes the codebase has seen this pattern attract. State the mistake plainly; do not address a specific reviewer audience. Delete this section if there are none. -->
 
 - `<caution>`
