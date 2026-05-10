@@ -85,10 +85,6 @@ async function executeDbUpdateCommand(
     ctxResult.value;
   const { migrationsDir } = resolveMigrationPaths(options.config, config);
 
-  // The aggregate loader (loader → planner → runner pipeline) folds in
-  // the legacy precheck and marker-check helpers; no extra gating is
-  // needed at this surface.
-
   try {
     await client.connect(dbConnection);
 
