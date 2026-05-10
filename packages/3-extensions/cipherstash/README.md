@@ -14,9 +14,10 @@ EQL bundle SQL) as a **contract space** so the Prisma Next framework can
 plan, apply, and verify it the same way it manages an application's own
 schema.
 
-The codec runtime (encoding/decoding `Encrypted<string>` payloads) and the
-`searchable: true` codec lifecycle hook for `add_search_config` /
-`remove_search_config` ops are intentionally **not** in this round.
+The `searchable: true` codec lifecycle hook (`add_search_config` /
+`remove_search_config` ops) is wired up — see `src/exports/control.ts`. The
+codec runtime (encoding/decoding `Encrypted<string>` payloads at query time)
+is not yet implemented.
 
 ## What this package contributes
 
