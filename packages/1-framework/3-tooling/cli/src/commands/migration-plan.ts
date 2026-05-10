@@ -43,15 +43,16 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
-import {
-  type ExtensionMigrationsExtensionInput,
-  runContractSpaceExtensionMigrationsPass,
-} from '../utils/contract-space-extension-migrations-pass';
+import { runContractSpaceExtensionMigrationsPass } from '../utils/contract-space-extension-migrations-pass';
 import {
   formatContractSpaceDriftWarning,
-  type MigrateExtensionInput,
   runContractSpaceMigratePass,
 } from '../utils/contract-space-migrate-pass';
+import {
+  toExtensionInputs,
+  toExtensionMigrationsInputs,
+  toMigratePassInputs,
+} from '../utils/extension-pack-inputs';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -233,16 +234,12 @@ async function executeMigrationPlanCommand(
   // structural app-space change) still re-pins extension artefacts on
   // disk. Drift warnings are non-fatal — the on-disk artefacts are refreshed
   // and the user is notified that the bump is being captured.
-  const extensionInputs: readonly MigrateExtensionInput[] = (config.extensionPacks ?? []).map(
-    (pack) => {
-      const cs = (pack as { readonly contractSpace?: MigrateExtensionInput['contractSpace'] })
-        .contractSpace;
-      return cs !== undefined ? { id: pack.id, contractSpace: cs } : { id: pack.id };
-    },
-  );
+  // Single descriptor-import boundary: every consumer of `extensionPacks`
+  // goes through `toExtensionInputs` + a per-consumer adapter. AC11.
+  const canonicalExtensionInputs = toExtensionInputs(config.extensionPacks ?? []);
   const migratePass = await runContractSpaceMigratePass({
     migrationsDir,
-    extensionPacks: extensionInputs,
+    extensionPacks: toMigratePassInputs(canonicalExtensionInputs),
   });
   if (!flags.json && !flags.quiet) {
     for (const drift of migratePass.drifts) {
@@ -257,19 +254,9 @@ async function executeMigrationPlanCommand(
   // Idempotent (existing dirs are left untouched).
   // Uses `planAllSpaces` for deterministic ordering + duplicate-spaceId
   // detection.
-  const extensionMigrationsInputs: readonly ExtensionMigrationsExtensionInput[] = (
-    config.extensionPacks ?? []
-  ).map((pack) => {
-    const cs = (
-      pack as {
-        readonly contractSpace?: ExtensionMigrationsExtensionInput['contractSpace'];
-      }
-    ).contractSpace;
-    return cs !== undefined ? { id: pack.id, contractSpace: cs } : { id: pack.id };
-  });
   const extensionMigrationsResult = await runContractSpaceExtensionMigrationsPass({
     migrationsDir,
-    extensionPacks: extensionMigrationsInputs,
+    extensionPacks: toExtensionMigrationsInputs(canonicalExtensionInputs),
   });
   if (!flags.json && !flags.quiet) {
     for (const entry of extensionMigrationsResult.emitted) {
