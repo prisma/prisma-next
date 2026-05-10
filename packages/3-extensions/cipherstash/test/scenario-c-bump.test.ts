@@ -16,7 +16,7 @@
  *
  * Pure fixture means: no live Postgres, no PGlite — the test computes
  * the on-disk shape and asserts on it. The two passes invoked here
- * (`emitContractSpaceArtefacts` + `materialiseExtensionMigrationPackageIfMissing`)
+ * (`emitContractSpaceArtefacts` + `materialiseMigrationPackageIfMissing`)
  * are the *exact* primitives the CLI's `runContractSpaceMigratePass`
  * + `runContractSpaceExtensionMigrationsPass` call. Calling them
  * directly keeps cipherstash's test cone independent of the CLI
@@ -32,15 +32,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type {
-  ExtensionContractRef,
-  ExtensionMigrationPackage,
-  SqlMigrationPlanOperation,
-} from '@prisma-next/family-sql/control';
+  ContractSpaceHeadRef,
+  MigrationPackage,
+} from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
-  materialiseExtensionMigrationPackageIfMissing,
   materialiseMigrationPackage,
+  materialiseMigrationPackageIfMissing,
 } from '@prisma-next/migration-tools/io';
 import {
   emitContractSpaceArtefacts,
@@ -57,8 +57,8 @@ import {
 interface SyntheticVersion {
   readonly contract: Contract<SqlStorage>;
   readonly contractDts: string;
-  readonly headRef: ExtensionContractRef;
-  readonly migrations: readonly ExtensionMigrationPackage[];
+  readonly headRef: ContractSpaceHeadRef;
+  readonly migrations: readonly MigrationPackage[];
 }
 
 const PROFILE = profileHash('cipherstash-extension-profile-v1');
@@ -139,7 +139,7 @@ function buildVersion(v: 1 | 2): SyntheticVersion {
     providedInvariants: baselineProvided,
     createdAt: '2026-06-01T00:00:00.000Z',
   } as const;
-  const baseline: ExtensionMigrationPackage = {
+  const baseline: MigrationPackage = {
     dirName: '20260601T0000_install_eql_bundle',
     metadata: {
       ...baselineMetaNoHash,
@@ -192,7 +192,7 @@ function buildVersion(v: 1 | 2): SyntheticVersion {
     providedInvariants: auditProvided,
     createdAt: '2026-06-15T00:00:00.000Z',
   } as const;
-  const auditPkg: ExtensionMigrationPackage = {
+  const auditPkg: MigrationPackage = {
     dirName: '20260615T0000_add_audit_column',
     metadata: {
       ...auditMetaNoHash,
@@ -249,10 +249,7 @@ async function rematerialiseAll(
   const written: string[] = [];
   const skipped: string[] = [];
   for (const pkg of version.migrations) {
-    const result = await materialiseExtensionMigrationPackageIfMissing(
-      fixture.cipherstashSpaceDir,
-      pkg,
-    );
+    const result = await materialiseMigrationPackageIfMissing(fixture.cipherstashSpaceDir, pkg);
     (result.written ? written : skipped).push(pkg.dirName);
   }
   return { written, skipped };

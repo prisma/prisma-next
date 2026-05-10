@@ -26,16 +26,14 @@
  * regression test `test/descriptor.test.ts` pins this absence.
  */
 
-import type {
-  ExtensionContractSpace,
-  SqlControlExtensionDescriptor,
-} from '@prisma-next/family-sql/control';
+import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
+import type { ContractSpace } from '@prisma-next/framework-components/control';
 import { cipherstashStringCodecHooks } from '../core/cipherstash-codec';
 import { CIPHERSTASH_SPACE_ID, CIPHERSTASH_STRING_CODEC_ID } from '../core/constants';
 import { cipherstashContract } from '../core/contract';
 import { cipherstashBaselineMigration, cipherstashHeadRef } from '../core/migrations';
 
-const cipherstashContractSpace: ExtensionContractSpace = {
+const cipherstashContractSpace: ContractSpace = {
   contractJson: cipherstashContract,
   migrations: [cipherstashBaselineMigration],
   headRef: cipherstashHeadRef,
