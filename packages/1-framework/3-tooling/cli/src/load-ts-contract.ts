@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import type { Contract } from '@prisma-next/contract/types';
 import type { Plugin } from 'esbuild';
 import { build } from 'esbuild';
-import { join } from 'pathe';
+import { join, resolve as resolvePath } from 'pathe';
 
 export interface LoadTsContractOptions {
   readonly allowlist?: ReadonlyArray<string>;
@@ -78,7 +78,21 @@ function validatePurity(value: unknown): void {
   }
 }
 
-function createImportAllowlistPlugin(allowlist: ReadonlyArray<string>, entryPath: string): Plugin {
+function createImportAllowlistPlugin(
+  allowlist: ReadonlyArray<string>,
+  entryPath: string,
+  collected: Set<string>,
+): Plugin {
+  // Match against several path forms that esbuild may use as the importer:
+  // the absolute resolved entry, the value the caller passed (which may be
+  // relative), and the conventional `<stdin>` placeholder. This is more
+  // forgiving than `===` against a single form, which broke when esbuild
+  // resolved the entry to an absolute path while the caller passed a
+  // relative one (or vice versa).
+  const entryAbs = resolvePath(entryPath);
+  function isFromEntry(importer: string): boolean {
+    return importer === entryAbs || importer === entryPath || importer === '<stdin>';
+  }
   return {
     name: 'import-allowlist',
     setup(build) {
@@ -89,8 +103,8 @@ function createImportAllowlistPlugin(allowlist: ReadonlyArray<string>, entryPath
         if (args.path.startsWith('.') || args.path.startsWith('/')) {
           return undefined;
         }
-        const isFromEntryPoint = args.importer === entryPath || args.importer === '<stdin>';
-        if (isFromEntryPoint && !isAllowedImport(args.path, allowlist)) {
+        if (isFromEntry(args.importer) && !isAllowedImport(args.path, allowlist)) {
+          collected.add(args.path);
           return {
             path: args.path,
             external: true,
@@ -132,6 +146,13 @@ export async function loadContractFromTs(
     `prisma-next-contract-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`,
   );
 
+  // Disallowed imports are collected by the allowlist resolver plugin itself,
+  // which has the `importer` context to distinguish entry-direct imports from
+  // transitive imports made inside allowlisted (`@prisma-next/*`) dependencies.
+  // The metafile is intentionally not re-walked: it would surface internal
+  // `node:*` imports inside framework code as false positives.
+  const disallowedFromEntry = new Set<string>();
+
   try {
     const result = await build({
       entryPoints: [entryPath],
@@ -142,7 +163,7 @@ export async function loadContractFromTs(
       outfile: tempFile,
       write: false,
       metafile: true,
-      plugins: [createImportAllowlistPlugin(allowlist, entryPath)],
+      plugins: [createImportAllowlistPlugin(allowlist, entryPath, disallowedFromEntry)],
       logLevel: 'error',
     });
 
@@ -155,28 +176,9 @@ export async function loadContractFromTs(
       throw new Error('No output files generated from bundling');
     }
 
-    const disallowedImports: string[] = [];
-    if (result.metafile) {
-      const inputs = result.metafile.inputs;
-      for (const [, inputData] of Object.entries(inputs)) {
-        const imports =
-          (inputData as { imports?: Array<{ path: string; external?: boolean }> }).imports || [];
-        for (const imp of imports) {
-          if (
-            imp.external &&
-            !imp.path.startsWith('.') &&
-            !imp.path.startsWith('/') &&
-            !isAllowedImport(imp.path, allowlist)
-          ) {
-            disallowedImports.push(imp.path);
-          }
-        }
-      }
-    }
-
-    if (disallowedImports.length > 0) {
+    if (disallowedFromEntry.size > 0) {
       throw new Error(
-        `Disallowed imports detected. Only imports matching the allowlist are permitted:\n  Allowlist: ${allowlist.join(', ')}\n  Disallowed imports: ${disallowedImports.join(', ')}\n\nOnly @prisma-next/* packages are allowed in contract files.`,
+        `Disallowed imports detected. Only imports matching the allowlist are permitted:\n  Allowlist: ${allowlist.join(', ')}\n  Disallowed imports: ${[...disallowedFromEntry].join(', ')}\n\nOnly @prisma-next/* packages are allowed in contract files.`,
       );
     }
 
