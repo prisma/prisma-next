@@ -36,7 +36,7 @@ The cooldown is shaped by the change risk:
 - **Minors** get a moderate soak.
 - **Patches** get the shortest soak — just long enough to dodge "shipped broken, fixed within 24 hours" cases.
 
-Current values live in [`.github/dependabot.yml`](../../.github/dependabot.yml) and may be tuned over time as we learn from specific upstream behaviour.
+Current values live in [`.github/dependabot.yml`](../../.github/dependabot.yml) and may be tuned over time as we learn from specific upstream behaviour. The per-tier shape applies to `npm`, where Dependabot understands SemVer; the `github-actions` ecosystem isn't SemVer-typed by Dependabot, so it uses a single default soak window instead.
 
 **Security updates bypass the cooldown entirely.** Dependabot's CVE-driven security-updates path opens a PR within hours of a published advisory regardless of soak settings. The cooldown trades nothing on CVE response time; it only delays version-update PRs.
 
