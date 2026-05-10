@@ -8,7 +8,6 @@
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/driver-mongo": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/extension-test-contract-space": "workspace:*",
     "@prisma-next/family-mongo": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",

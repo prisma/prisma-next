@@ -26,7 +26,6 @@
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/extension-arktype-json": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
-    "@prisma-next/extension-test-contract-space": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/ids": "workspace:*",
     "@prisma-next/migration-tools": "workspace:*",
