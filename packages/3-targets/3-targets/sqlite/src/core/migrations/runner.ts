@@ -104,7 +104,12 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     options: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>,
   ): Promise<SqlMigrationRunnerResult> {
     const driver = options.driver;
-    const space = options.space ?? options.plan.spaceId;
+    if (options.space !== undefined && options.space !== options.plan.spaceId) {
+      throw new Error(
+        `SqlMigrationRunner: options.space (${options.space}) does not match plan.spaceId (${options.plan.spaceId})`,
+      );
+    }
+    const space = options.plan.spaceId;
 
     const destinationCheck = this.ensurePlanMatchesDestinationContract(
       options.plan.destination,
@@ -209,6 +214,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
           space: string;
           value: SqlMigrationRunnerSuccessValue;
         }> = [];
+        let lastProcessedSpace: string | undefined;
         for (const spaceOptions of perSpaceOptions) {
           const space = spaceOptions.space ?? spaceOptions.plan.spaceId;
           const result = await this.executeOnConnection({ ...spaceOptions, driver, space });
@@ -216,12 +222,22 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
             return notOk({ ...result.failure, failingSpace: space });
           }
           perSpaceResults.push({ space, value: result.value });
+          lastProcessedSpace = space;
         }
 
         if (fkWasEnabled) {
           const fkIntegrityCheck = await this.verifyForeignKeyIntegrity(driver);
           if (!fkIntegrityCheck.ok) {
-            return notOk({ ...fkIntegrityCheck.failure, failingSpace: APP_SPACE_ID });
+            // Post-loop integrity violations cannot be attributed to a
+            // single per-space step (the cumulative effect of all
+            // applied plans was needed to reveal the broken
+            // reference). Surface the last successfully-applied space
+            // so operators can investigate from the most recent
+            // migration first.
+            return notOk({
+              ...fkIntegrityCheck.failure,
+              failingSpace: lastProcessedSpace ?? APP_SPACE_ID,
+            });
           }
         }
 
