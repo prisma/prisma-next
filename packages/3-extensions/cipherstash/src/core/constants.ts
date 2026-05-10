@@ -3,10 +3,11 @@
  *
  * Centralising the strings here so:
  *   - the contract IR (`./contract`), the migration ops (`./migrations`),
- *     the head ref (`./head-ref`), and the descriptor (`../exports/control`)
- *     all reference the same values without typos;
- *   - the `cipherstash:*` invariantId namespace is locked in one place
- *     (project spec FR11 — once published, an invariantId cannot be renamed).
+ *     and the descriptor (`../exports/control`) all reference the same
+ *     values without typos;
+ *   - the `cipherstash:*` invariantId namespace is locked in one place:
+ *     once a `cipherstash:*` invariantId is published it cannot be renamed
+ *     without breaking downstream consumers that reference it by string.
  *
  * The space identifier `'cipherstash'` is what the framework writes to
  * `migrations/cipherstash/` in the user's repo and what the marker table's
@@ -17,11 +18,9 @@ export const CIPHERSTASH_SPACE_ID = 'cipherstash';
 
 /**
  * Codec id the application-side `Encrypted<string>` lowering targets.
- * Lives here so the M3 R2 codec lifecycle hook (T3.4 — emit
+ * Lives here so the codec lifecycle hook (which emits
  * `add_search_config` / `remove_search_config` ops on field events) and
  * the descriptor's `controlPlaneHooks` wiring share the same constant.
- *
- * Not consumed by R1 (no codec hook in this round).
  */
 export const CIPHERSTASH_STRING_CODEC_ID = 'cipherstash/string@1';
 
@@ -50,9 +49,8 @@ export const EQL_V2_DOMAIN_TYPES = ['bloom_filter', 'hmac_256', 'blake3'] as con
  *   - `ore_cllw_u64_8` — fixed-width Comparable Linear Wide.
  *   - `ore_cllw_var_8` — variable-width Comparable Linear Wide.
  *
- * Synced with the bundle in M3 R4 (item 22, FR11 cleanup). Subsequent
- * bundle bumps that add ORE shapes must extend this list and mint a new
- * `cipherstash:create-eql_v2_<name>-v1` invariantId via
+ * Subsequent bundle bumps that add ORE shapes must extend this list and
+ * mint a new `cipherstash:create-eql_v2_<name>-v1` invariantId via
  * {@link CIPHERSTASH_INVARIANTS.createOreComposite}.
  */
 export const EQL_V2_ORE_COMPOSITE_TYPES = [
@@ -65,23 +63,23 @@ export const EQL_V2_ORE_COMPOSITE_TYPES = [
 /**
  * Migration directory name for the baseline.
  *
- * Per the framework's per-space layout convention (sub-spec § 3 layout
- * table γ), this name is preserved verbatim when the framework writes
- * the package to `migrations/cipherstash/<this-name>/` in the user's repo.
+ * Preserved verbatim when the framework writes the package to
+ * `migrations/cipherstash/<this-name>/` in the user's repo.
  */
 export const CIPHERSTASH_BASELINE_MIGRATION_NAME = '20260601T0000_install_eql_bundle';
 
 /**
  * `cipherstash:*` invariantIds emitted by the baseline migration. Each
- * `cipherstash:*` id, once published, is immutable (project spec FR11):
- * downstream consumers (other extensions, the marker table) reference
- * them by literal string match.
+ * id, once published, is immutable: downstream consumers (other extensions,
+ * the marker table) reference them by literal string match.
  */
 export const CIPHERSTASH_INVARIANTS = {
   installBundle: 'cipherstash:install-eql-bundle-v1',
   createConfiguration: 'cipherstash:create-eql_v2_configuration-v1',
   createConfigurationState: 'cipherstash:create-eql_v2_configuration_state-v1',
   createEncrypted: 'cipherstash:create-eql_v2_encrypted-v1',
-  createDomain: (name: string) => `cipherstash:create-eql_v2_${name}-v1`,
-  createOreComposite: (name: string) => `cipherstash:create-eql_v2_${name}-v1`,
+  createDomain: (name: (typeof EQL_V2_DOMAIN_TYPES)[number]) =>
+    `cipherstash:create-eql_v2_${name}-v1`,
+  createOreComposite: (name: (typeof EQL_V2_ORE_COMPOSITE_TYPES)[number]) =>
+    `cipherstash:create-eql_v2_${name}-v1`,
 } as const;
