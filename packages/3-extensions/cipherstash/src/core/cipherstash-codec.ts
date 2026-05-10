@@ -156,20 +156,26 @@ function onFieldEvent(
 
   if (event === 'added') {
     if (newField === undefined) {
-      throw new Error(`cipherstash:string@1 'added' event missing newField for ${tableName}.${fieldName}`);
+      throw new Error(
+        `cipherstash:string@1 'added' event missing newField for ${tableName}.${fieldName}`,
+      );
     }
     return isSearchable(newField.typeParams) ? [buildAddOp(tableName, fieldName)] : [];
   }
 
   if (event === 'dropped') {
     if (priorField === undefined) {
-      throw new Error(`cipherstash:string@1 'dropped' event missing priorField for ${tableName}.${fieldName}`);
+      throw new Error(
+        `cipherstash:string@1 'dropped' event missing priorField for ${tableName}.${fieldName}`,
+      );
     }
     return isSearchable(priorField.typeParams) ? [buildRemoveOp(tableName, fieldName)] : [];
   }
 
   if (priorField === undefined || newField === undefined) {
-    throw new Error(`cipherstash:string@1 'altered' event missing field payload for ${tableName}.${fieldName}`);
+    throw new Error(
+      `cipherstash:string@1 'altered' event missing field payload for ${tableName}.${fieldName}`,
+    );
   }
   const priorSearchable = isSearchable(priorField.typeParams);
   const newSearchable = isSearchable(newField.typeParams);
