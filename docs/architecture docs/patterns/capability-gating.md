@@ -5,15 +5,15 @@
 
 ## Intent
 
-Optional or target-varying features are declared as **capabilities** in the contract (or on the adapter profile), verified against the live database (or adapter) at runtime, and **gated at every consumption site**. The framework never assumes a feature is available; it asks the capability profile and degrades gracefully if not. Capability checks are explicit, namespaced, and machine-readable.
+Postgres supports `RETURNING` on `INSERT`. MySQL doesn't. SQLite supports it from a particular version. The framework can't pretend the feature is universal, but it also can't write `if (target === 'postgres')` everywhere `RETURNING` might apply. Instead, the framework asks `capabilities.sql.returning` at the consumption site: if true, build the `RETURNING` clause; if false, fall back to a separate `SELECT`.
 
-Adopting this pattern commits you to: a capability vocabulary that names features (not adapters or targets), a profile that records which capabilities the current contract / adapter / live database supports, gating at every consumer that depends on the feature, and an honest answer (degrade, fall back, or refuse) when the capability is absent.
+The pattern: declare optional or target-varying features as **namespaced capabilities** in the contract or on the adapter profile. Verify them against the live database when relevant. Gate at every consumption site — the gate names a capability, never a target. When a capability is absent, the framework degrades, falls back, or refuses honestly; it never silently assumes.
 
 ## When to use
 
-- A feature is target-optional (some targets implement it, others do not — `RETURNING`, `lateral`, `jsonAgg`).
+- A feature is target-optional (some targets implement it, others do not — `RETURNING`, `LATERAL`, `jsonAgg`).
 - A feature is target-varying (the same target supports it differently across versions — prepared statements, JSON ops, partial indexes).
-- A feature depends on the live database state that the contract alone cannot tell you (extension installed, server version, configuration flag).
+- A feature depends on live database state that the contract alone cannot tell you (extension installed, server version, configuration flag).
 - A pack or extension surfaces a feature the framework should consume only when the pack is present (pgvector operators, PostGIS types).
 
 ## When NOT to use
@@ -43,7 +43,7 @@ if (adapter.profile.capabilities.postgres.lateral) {
 return lowerWithCorrelatedSubquery(ast);
 ```
 
-The capability is **a key, not a code path** — gates are explicit, namespaced (`postgres.lateral`, not `lateral`), and live next to the consumption site, not buried in a target check. Family-instance views ([ADR 207](../adrs/ADR%20207%20-%20Family-instance%20capability%20views%20for%20the%20framework%20CLI.md)) project the cross-cutting capability profile onto family-shaped surfaces so consumers see only the capabilities relevant to them.
+The capability is **a key, not a code path** — gates are explicit, namespaced (`postgres.lateral`, not `lateral`), and live next to the consumption site, not buried in a target check. Family-instance views project the cross-cutting capability profile onto family-shaped surfaces so consumers see only the capabilities relevant to them — see [ADR 207](../adrs/ADR%20207%20-%20Family-instance%20capability%20views%20for%20the%20framework%20CLI.md).
 
 ## Reference implementations
 
@@ -73,7 +73,7 @@ The capability is **a key, not a code path** — gates are explicit, namespaced 
 
 ## Cautions / common mistakes
 
-- **Branching on target instead of consulting the capability.** `if (target === 'postgres')` and `if (capabilities.postgres.lateral)` look similar but are deeply different — the latter is honest about what the code depends on, the former is a target check. Architect-persona check: every feature gate names a capability, never a target.
+- **Branching on target instead of consulting the capability.** `if (target === 'postgres')` and `if (capabilities.postgres.lateral)` look similar but are deeply different — the latter is honest about what the code depends on, the former is a target check. Every feature gate should name a capability, never a target.
 - **Capabilities that name implementations rather than features.** `useCursor: true` is a configuration; `cursorBatching: true` is a capability. The first belongs on the adapter as an option; the second belongs in the capability profile.
 - **Silent degradation without surfacing.** A capability gate that silently falls back without telling the caller is a footgun — operators discover the degradation only when results diverge. Surface degradation through a structured warning or guardrail.
 - **Capability keys without namespace.** `lateral` could mean a SQL feature or a Mongo aggregation stage. Namespacing (`postgres.lateral`, `mongo.lookup`) prevents collisions and makes the gate's scope explicit.
