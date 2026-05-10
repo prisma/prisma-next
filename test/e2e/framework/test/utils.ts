@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
@@ -100,56 +102,84 @@ export async function emitAndVerifyContract(
   return validateContract<Contract<SqlStorage>>(emittedContract, emptyCodecLookup);
 }
 
+async function withE2eMigrationsDir<T>(
+  callback: (migrationsDir: string) => Promise<T>,
+): Promise<T> {
+  const migrationsDir = await mkdtemp(join(tmpdir(), 'prisma-next-e2e-migrations-'));
+  try {
+    return await callback(migrationsDir);
+  } finally {
+    await rm(migrationsDir, { recursive: true, force: true });
+  }
+}
+
 export async function runDbInit(options: {
   readonly connectionString: string;
   readonly contractJsonPath: string;
+  readonly migrationsDir?: string;
 }): Promise<void> {
   const { connectionString, contractJsonPath } = options;
   const contractJson = await loadRawContractFromDisk(contractJsonPath);
   const controlClient = createControlClientForTests(connectionString);
 
-  try {
-    const result = await controlClient.dbInit({
-      contract: contractJson,
-      mode: 'apply',
-      migrationsDir: '/tmp/__e2e-test-migrations',
-    });
-    if (!result.ok) {
-      throw new Error(
-        `dbInit failed: ${result.failure.summary}\n${JSON.stringify(result.failure, null, 2)}`,
-      );
+  const invoke = async (migrationsDir: string): Promise<void> => {
+    try {
+      const result = await controlClient.dbInit({
+        contract: contractJson,
+        mode: 'apply',
+        migrationsDir,
+      });
+      if (!result.ok) {
+        throw new Error(
+          `dbInit failed: ${result.failure.summary}\n${JSON.stringify(result.failure, null, 2)}`,
+        );
+      }
+    } finally {
+      await controlClient.close();
     }
-  } finally {
-    await controlClient.close();
+  };
+
+  if (options.migrationsDir !== undefined) {
+    await invoke(options.migrationsDir);
+    return;
   }
+  await withE2eMigrationsDir(invoke);
 }
 
 async function getPlannedDdlSql(options: {
   readonly connectionString: string;
   readonly contract: Record<string, unknown>;
+  readonly migrationsDir?: string;
 }): Promise<string> {
   const { connectionString, contract } = options;
   const controlClient = createControlClientForTests(connectionString);
 
-  try {
-    const result = await controlClient.dbInit({
-      contract,
-      mode: 'plan',
-      connection: connectionString,
-      migrationsDir: '/tmp/__e2e-test-migrations',
-    });
-    if (!result.ok) {
-      throw new Error(`dbInit plan failed: ${result.failure.summary}`);
-    }
+  const invoke = async (migrationsDir: string): Promise<string> => {
+    try {
+      const result = await controlClient.dbInit({
+        contract,
+        mode: 'plan',
+        connection: connectionString,
+        migrationsDir,
+      });
+      if (!result.ok) {
+        throw new Error(`dbInit plan failed: ${result.failure.summary}`);
+      }
 
-    const sqlStatements =
-      result.value.plan.preview?.statements
-        .filter((s) => s.language === 'sql')
-        .map((s) => s.text) ?? [];
-    return sqlStatements.join(';\n\n');
-  } finally {
-    await controlClient.close();
+      const sqlStatements =
+        result.value.plan.preview?.statements
+          .filter((s) => s.language === 'sql')
+          .map((s) => s.text) ?? [];
+      return sqlStatements.join(';\n\n');
+    } finally {
+      await controlClient.close();
+    }
+  };
+
+  if (options.migrationsDir !== undefined) {
+    return invoke(options.migrationsDir);
   }
+  return withE2eMigrationsDir(invoke);
 }
 
 /**
@@ -199,24 +229,30 @@ export async function withTestRuntime<TContract extends Contract<SqlStorage>>(
   const contract = validateContract<TContract>(contractJson, emptyCodecLookup);
 
   await withDevDatabase(async ({ connectionString }) => {
-    const sql = await getPlannedDdlSql({ connectionString, contract: contractJson });
-    await runDbInit({ connectionString, contractJsonPath });
-
-    await withClient(connectionString, async (client: Client) => {
-      const adapter = createStubAdapter();
-      const context = createTestContext(contract, adapter, {
-        extensionPacks: [pgvectorRuntime, arktypeJsonRuntime],
+    await withE2eMigrationsDir(async (migrationsDir) => {
+      const sql = await getPlannedDdlSql({
+        connectionString,
+        contract: contractJson,
+        migrationsDir,
       });
-      const runtime = await createTestRuntimeFromClient(contract, client, {
-        extensionPacks: [pgvectorRuntime, arktypeJsonRuntime],
-      });
+      await runDbInit({ connectionString, contractJsonPath, migrationsDir });
 
-      try {
-        const db = sqlBuilder<TContract>({ context });
-        await callback({ contract, context, runtime, db, client, sql });
-      } finally {
-        await runtime.close();
-      }
+      await withClient(connectionString, async (client: Client) => {
+        const adapter = createStubAdapter();
+        const context = createTestContext(contract, adapter, {
+          extensionPacks: [pgvectorRuntime, arktypeJsonRuntime],
+        });
+        const runtime = await createTestRuntimeFromClient(contract, client, {
+          extensionPacks: [pgvectorRuntime, arktypeJsonRuntime],
+        });
+
+        try {
+          const db = sqlBuilder<TContract>({ context });
+          await callback({ contract, context, runtime, db, client, sql });
+        } finally {
+          await runtime.close();
+        }
+      });
     });
   });
 }
