@@ -58,6 +58,7 @@ export function deriveProvidedInvariants(ops: MigrationOps): readonly string[] {
 }
 
 function readInvariantId(op: MigrationPlanOperation): string | undefined {
+  if (!Object.hasOwn(op, 'invariantId')) return undefined;
   const candidate = (op as { invariantId?: unknown }).invariantId;
   return typeof candidate === 'string' ? candidate : undefined;
 }
