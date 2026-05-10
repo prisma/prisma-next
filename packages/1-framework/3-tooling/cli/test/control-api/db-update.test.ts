@@ -560,7 +560,7 @@ describe('executeDbUpdate', () => {
     });
   });
 
-  it('passes disabled execution checks to runner in apply mode', async () => {
+  it('does not disable runner execution checks in apply mode (ADR 038 idempotent replay)', async () => {
     const executeAcrossSpaces = vi.fn().mockResolvedValue(
       ok({
         perSpaceResults: [{ space: 'app', value: { operationsPlanned: 1, operationsExecuted: 1 } }],
@@ -606,19 +606,17 @@ describe('executeDbUpdate', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(executeAcrossSpaces).toHaveBeenCalledWith(
-      expect.objectContaining({
-        perSpaceOptions: expect.arrayContaining([
-          expect.objectContaining({
-            executionChecks: {
-              prechecks: false,
-              postchecks: false,
-              idempotencyChecks: false,
-            },
-          }),
-        ]),
-      }),
-    );
+    expect(executeAcrossSpaces).toHaveBeenCalledTimes(1);
+    const callArg = executeAcrossSpaces.mock.calls[0]?.[0] as
+      | { perSpaceOptions: ReadonlyArray<{ executionChecks?: unknown }> }
+      | undefined;
+    expect(callArg).toBeDefined();
+    for (const opts of callArg?.perSpaceOptions ?? []) {
+      // Runner default = all checks enabled (ADR 038). The aggregate apply
+      // primitive must not opt out — letting it do so would silently re-execute
+      // operations whose postconditions are already satisfied on re-apply.
+      expect(opts.executionChecks).toBeUndefined();
+    }
   });
 
   describe('progress events', () => {
