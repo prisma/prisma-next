@@ -1,64 +1,58 @@
 /**
- * Scenario A end-to-end against PGlite — cipherstash sub-spec § 6 / T3.6.
+ * Scenario A: end-to-end against PGlite with cipherstash wired as an
+ * extension space and the `cipherstash:string@1` codec hook attached to
+ * a searchable `Encrypted<String>` column on the application contract.
  *
- * Drives the CLI `db init` flow (`executeDbInit`, sub-spec § 6 — routes
- * through the M2.5 aggregate loader → planner → runner pipeline) against
- * a real Postgres (PGlite via `createDevDatabase`)
- * with cipherstash wired as an extension space and the
- * `cipherstash:string@1` codec hook attached to a searchable
- * `Encrypted<String>` column on the application contract.
+ * Drives the CLI `db init` flow (`executeDbInit`, which routes through
+ * the aggregate loader → planner → runner pipeline) against a real
+ * Postgres (PGlite via `createDevDatabase`).
  *
  * Three layers of coverage:
  *
- *   1. **AC-7 byte-equivalence (disk).** The pinned
+ *   1. **Byte-equivalence (disk).** The pinned
  *      `migrations/cipherstash/<dirName>/ops.json` carries the vendored
  *      `EQL_BUNDLE_SQL` byte-for-byte (single-string `execute[0].sql`).
  *
  *   2. **Multi-space planning (real bundle).** Calling
- *      `executeDbInit` with `mode: 'plan'` on the *real*
- *      cipherstash descriptor (full vendored bundle) produces a plan
- *      that includes:
+ *      `executeDbInit` with `mode: 'plan'` on the real cipherstash
+ *      descriptor (full vendored bundle) produces a plan that includes:
  *
- *        - the cipherstash baseline ops (bundle + structural ops), and
+ *        - the cipherstash baseline ops (bundle + structural ops),
  *        - the app-space `CREATE TABLE User` op, and
  *        - the codec-hook-emitted `add_search_config@v1` op for
  *          `User.email`.
  *
- *      This locks TC-14 (codec hook validated by the first real
- *      consumer) plus the planning half of AM4 (multi-space ordering
- *      preserved through `concatenateSpaceApplyInputs`).
+ *      This validates codec hook wiring and that multi-space ordering is
+ *      preserved through `concatenateSpaceApplyInputs`.
  *
  *   3. **Multi-space apply (synthetic bundle).** Same wiring as test
- *      (2), but with a synthetic cipherstash baseline whose `installEql
- *      Bundle` op SQL is a PGlite-compatible stub instead of the real
- *      vendored bundle. This lets us exercise:
+ *      (2), but with a synthetic cipherstash baseline whose
+ *      `installEqlBundle` op SQL is a PGlite-compatible stub instead of
+ *      the real vendored bundle. This exercises:
  *
  *        - the runner's `executeAcrossSpaces` single-tx path,
  *        - marker rows for both `app` and `cipherstash` spaces,
  *        - the codec-hook-emitted `add_search_config` SQL actually
- *          executing (the stub provides a one-line
+ *          executing (the stub provides a minimal
  *          `eql_v2.add_search_config` function), and
  *        - an insert + select round-trip through the bundle's
  *          `eql_v2_encrypted` composite type.
  *
- *      The synthetic bundle is the smallest stub that lets the codec
- *      hook's emitted SQL run successfully — see
- *      {@link buildSyntheticEqlBundleSql} for what it includes (and
- *      {@link SYNTHETIC_BUNDLE_RATIONALE} for why).
+ *      See {@link buildSyntheticEqlBundleSql} for what the stub includes
+ *      and {@link SYNTHETIC_BUNDLE_RATIONALE} for why a stub is needed.
  *
  * **Why split into two apply paths?** The real `EQL_BUNDLE_SQL`
  * includes `CREATE EXTENSION IF NOT EXISTS pgcrypto` which PGlite does
- * not ship (verified by enumerating
- * `node_modules/.pnpm/@electric-sql+pglite@0.3.14/.../contrib/`).
+ * not ship (verified by enumerating the bundled contrib extensions).
  * Trying to apply the real bundle aborts PGlite at the WASM level
  * (`RuntimeError: unreachable`). The synthetic-bundle apply path here
  * verifies the framework + codec wiring against a real database; the
- * real-bundle apply against a real Postgres (with `pgcrypto`) is
- * deferred to M3 R4 / TML-2373 e2e infra.
+ * real-bundle apply against a real Postgres (with `pgcrypto`) requires
+ * a full e2e environment and is out of scope for this test.
  *
  * Scenario B (drop searchable column → `remove_search_config` op) and
- * Scenario C (extension version bump) are deferred to R4 per the
- * orchestrator's R3-only scope.
+ * Scenario C (extension version bump) require the same full e2e
+ * environment and are out of scope for this test.
  */
 
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
