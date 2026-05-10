@@ -541,11 +541,11 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
       const op = result.operations[i]!;
       const isLast = i === result.operations.length - 1;
       const treeChar = isLast ? '└' : '├';
-      const opClassLabel =
-        op.operationClass === 'destructive'
-          ? yellow_(`[${op.operationClass}]`)
-          : dim_(`[${op.operationClass}]`);
-      lines.push(`${dim_(treeChar)}─ ${op.label} ${opClassLabel}`);
+      // operationClass tag is intentionally NOT inlined per spec:
+      // a destructive footer warning still surfaces below this list.
+      const destructiveMarker =
+        op.operationClass === 'destructive' ? ` ${yellow_('(destructive)')}` : '';
+      lines.push(`${dim_(treeChar)}─ ${op.label}${destructiveMarker}`);
     }
 
     const hasDestructive = result.operations.some((op) => op.operationClass === 'destructive');

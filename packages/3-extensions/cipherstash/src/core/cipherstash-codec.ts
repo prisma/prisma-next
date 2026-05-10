@@ -81,7 +81,7 @@ function invariantId(tableName: string, fieldName: string, action: string): stri
 function buildAddOp(tableName: string, fieldName: string): Op {
   return {
     id: `cipherstash-codec.${tableName}.${fieldName}.add-search-config`,
-    label: `Register cipherstash search config for ${tableName}.${fieldName}`,
+    label: `Enable cipherstash search on ${tableName}.${fieldName}`,
     operationClass: 'additive',
     invariantId: invariantId(tableName, fieldName, 'add-search-config'),
     target: { id: 'postgres' },
@@ -99,7 +99,7 @@ function buildAddOp(tableName: string, fieldName: string): Op {
 function buildRemoveOp(tableName: string, fieldName: string): Op {
   return {
     id: `cipherstash-codec.${tableName}.${fieldName}.remove-search-config`,
-    label: `Remove cipherstash search config for ${tableName}.${fieldName}`,
+    label: `Disable cipherstash search on ${tableName}.${fieldName}`,
     operationClass: 'destructive',
     invariantId: invariantId(tableName, fieldName, 'remove-search-config'),
     target: { id: 'postgres' },
@@ -117,7 +117,7 @@ function buildRemoveOp(tableName: string, fieldName: string): Op {
 function buildRotateOp(tableName: string, fieldName: string): Op {
   return {
     id: `cipherstash-codec.${tableName}.${fieldName}.rotate-search-config`,
-    label: `Rotate cipherstash search config for ${tableName}.${fieldName}`,
+    label: `Rotate cipherstash search on ${tableName}.${fieldName}`,
     operationClass: 'widening',
     invariantId: invariantId(tableName, fieldName, 'rotate-search-config'),
     target: { id: 'postgres' },

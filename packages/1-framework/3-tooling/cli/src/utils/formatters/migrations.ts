@@ -108,11 +108,9 @@ export function formatMigrationPlanOutput(
       if (!op) continue;
       const isLast = i === result.plan.operations.length - 1;
       const treeChar = isLast ? '└' : '├';
-      const opClassLabel =
-        op.operationClass === 'destructive'
-          ? formatYellow(`[${op.operationClass}]`)
-          : formatDimText(`[${op.operationClass}]`);
-      lines.push(`${formatDimText(treeChar)}─ ${op.label} ${opClassLabel}`);
+      const destructiveMarker =
+        op.operationClass === 'destructive' ? ` ${formatYellow('(destructive)')}` : '';
+      lines.push(`${formatDimText(treeChar)}─ ${op.label}${destructiveMarker}`);
     }
 
     const hasDestructive = result.plan.operations.some((op) => op.operationClass === 'destructive');
@@ -259,11 +257,9 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
       const op = result.operations[i]!;
       const isLast = i === result.operations.length - 1;
       const treeChar = isLast ? '└' : '├';
-      const opClassLabel =
-        op.operationClass === 'destructive'
-          ? formatYellow(`[${op.operationClass}]`)
-          : formatDimText(`[${op.operationClass}]`);
-      lines.push(`${formatDimText(treeChar)}─ ${op.label} ${opClassLabel}`);
+      const destructiveMarker =
+        op.operationClass === 'destructive' ? ` ${formatYellow('(destructive)')}` : '';
+      lines.push(`${formatDimText(treeChar)}─ ${op.label}${destructiveMarker}`);
     }
 
     const hasDestructive = result.operations.some((op) => op.operationClass === 'destructive');
