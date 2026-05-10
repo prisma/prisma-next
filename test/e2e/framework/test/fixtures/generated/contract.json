@@ -108,8 +108,24 @@
         "profile": {
           "nullable": false,
           "type": {
-            "codecId": "pg/jsonb@1",
-            "kind": "scalar"
+            "codecId": "arktype/json@1",
+            "kind": "scalar",
+            "typeParams": {
+              "expression": "{ age: number, name: string }",
+              "jsonIr": {
+                "domain": "object",
+                "required": [
+                  {
+                    "key": "age",
+                    "value": "number"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  }
+                ]
+              }
+            }
           }
         }
       },
@@ -593,7 +609,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:2e72bb4249046b5293d54aae3c84fa9049e05ca205e2ff10410e71c2c7b28260",
+    "storageHash": "sha256:46a85cfb733bccaef4e3fc232d9d4bbdff9f106e0d409293a38da165658c1105",
     "tables": {
       "comment": {
         "columns": {
@@ -660,9 +676,25 @@
             "nullable": false
           },
           "profile": {
-            "codecId": "pg/jsonb@1",
+            "codecId": "arktype/json@1",
             "nativeType": "jsonb",
-            "nullable": false
+            "nullable": false,
+            "typeParams": {
+              "expression": "{ age: number, name: string }",
+              "jsonIr": {
+                "domain": "object",
+                "required": [
+                  {
+                    "key": "age",
+                    "value": "number"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  }
+                ]
+              }
+            }
           }
         },
         "foreignKeys": [],
