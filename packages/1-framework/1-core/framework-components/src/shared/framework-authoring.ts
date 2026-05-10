@@ -33,6 +33,7 @@ interface AuthoringArgumentDescriptorCommon {
 export type AuthoringArgumentDescriptor = AuthoringArgumentDescriptorCommon &
   (
     | { readonly kind: 'string' }
+    | { readonly kind: 'boolean' }
     | {
         readonly kind: 'number';
         readonly integer?: boolean;
@@ -340,6 +341,13 @@ function validateAuthoringArgument(
   if (descriptor.kind === 'string') {
     if (typeof value !== 'string') {
       throw new Error(`Authoring helper argument at ${path} must be a string`);
+    }
+    return;
+  }
+
+  if (descriptor.kind === 'boolean') {
+    if (typeof value !== 'boolean') {
+      throw new Error(`Authoring helper argument at ${path} must be a boolean`);
     }
     return;
   }
