@@ -5,9 +5,13 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type {
   CodecControlHooks,
   SqlControlExtensionDescriptor,
+  SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import type {
+  MigrationPlanOperation,
+  OpFactoryCall,
+} from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
@@ -412,23 +416,30 @@ describe(
       const hooks: CodecControlHooks = {
         onFieldEvent: (event, ctx) => {
           hookFiredFor.push(`${event}:${ctx.tableName}.${ctx.fieldName}`);
-          return [
-            {
-              id: `codec.${event}.${ctx.tableName}.${ctx.fieldName}`,
-              label: `${event} hook on ${ctx.tableName}.${ctx.fieldName}`,
-              operationClass: 'additive',
-              invariantId: `cs:${ctx.tableName}.${ctx.fieldName}@${event}`,
-              target: { id: 'sqlite' },
-              precheck: [],
-              execute: [
-                {
-                  description: 'codec side-effect (no-op for test)',
-                  sql: 'SELECT 1',
-                },
-              ],
-              postcheck: [],
-            },
-          ];
+          const op: SqlMigrationPlanOperation<unknown> = {
+            id: `codec.${event}.${ctx.tableName}.${ctx.fieldName}`,
+            label: `${event} hook on ${ctx.tableName}.${ctx.fieldName}`,
+            operationClass: 'additive',
+            invariantId: `cs:${ctx.tableName}.${ctx.fieldName}@${event}`,
+            target: { id: 'sqlite' },
+            precheck: [],
+            execute: [
+              {
+                description: 'codec side-effect (no-op for test)',
+                sql: 'SELECT 1',
+              },
+            ],
+            postcheck: [],
+          };
+          const call: OpFactoryCall = {
+            factoryName: op.id,
+            operationClass: op.operationClass,
+            label: op.label,
+            renderTypeScript: () => `${op.id}()`,
+            importRequirements: () => [],
+            toOp: () => op,
+          };
+          return [call];
         },
       };
 

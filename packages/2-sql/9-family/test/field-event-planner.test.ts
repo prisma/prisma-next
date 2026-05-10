@@ -1,5 +1,6 @@
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { profileHash } from '@prisma-next/contract/types';
+import type { OpFactoryCall } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { planFieldEventOperations } from '../src/core/migrations/field-event-planner';
@@ -46,8 +47,8 @@ function contract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
   };
 }
 
-function makeOp(id: string, label = id): Op {
-  return {
+function makeOp(id: string, label = id): OpFactoryCall {
+  const op: Op = {
     id,
     label,
     operationClass: 'additive',
@@ -56,6 +57,14 @@ function makeOp(id: string, label = id): Op {
     precheck: [],
     execute: [{ description: label, sql: `-- ${id}` }],
     postcheck: [],
+  };
+  return {
+    factoryName: id,
+    operationClass: 'additive',
+    label,
+    renderTypeScript: () => `${id}()`,
+    importRequirements: () => [],
+    toOp: () => op,
   };
 }
 
@@ -69,7 +78,9 @@ interface RecordedCall {
   readonly newTablePresent: boolean;
 }
 
-function recordingHook(opsPerCall: readonly Op[] | ((call: RecordedCall) => readonly Op[])): {
+function recordingHook(
+  opsPerCall: readonly OpFactoryCall[] | ((call: RecordedCall) => readonly OpFactoryCall[]),
+): {
   readonly hook: CodecControlHooks;
   readonly calls: readonly RecordedCall[];
 } {
@@ -124,7 +135,7 @@ describe('planFieldEventOperations', () => {
         newTablePresent: true,
       },
     ]);
-    expect(ops.map((o) => o.id)).toEqual(['add-search-config-User-email']);
+    expect(ops.map((o) => o.toOp().id)).toEqual(['add-search-config-User-email']);
   });
 
   it("fires 'dropped' once per dropped field on the prior field's codec", () => {
@@ -158,7 +169,7 @@ describe('planFieldEventOperations', () => {
         newTablePresent: false,
       },
     ]);
-    expect(ops.map((o) => o.id)).toEqual(['remove-search-config-User-email']);
+    expect(ops.map((o) => o.toOp().id)).toEqual(['remove-search-config-User-email']);
   });
 
   it("fires 'altered' when nullable changes", () => {
@@ -353,7 +364,7 @@ describe('planFieldEventOperations', () => {
       codecHooks,
     });
 
-    expect(ops.map((o) => o.id)).toEqual(['first', 'second', 'third']);
+    expect(ops.map((o) => o.toOp().id)).toEqual(['first', 'second', 'third']);
   });
 
   it('returns an empty list when the hook returns an empty array', () => {
@@ -399,7 +410,11 @@ describe('planFieldEventOperations', () => {
     });
 
     expect(cs.calls.map((c) => c.event)).toEqual(['added', 'dropped', 'altered']);
-    expect(ops.map((o) => o.id)).toEqual(['added:toAdd', 'dropped:toDrop', 'altered:toAlter']);
+    expect(ops.map((o) => o.toOp().id)).toEqual([
+      'added:toAdd',
+      'dropped:toDrop',
+      'altered:toAlter',
+    ]);
   });
 
   it('orders events within a group alphabetically by (tableName, fieldName)', () => {
@@ -513,7 +528,7 @@ describe('planFieldEventOperations', () => {
       codecHooks,
     });
 
-    expect(ops.map((o) => o.id)).toEqual([
+    expect(ops.map((o) => o.toOp().id)).toEqual([
       'added:Add.x',
       'added:Add.y',
       'dropped:Drop.a',
