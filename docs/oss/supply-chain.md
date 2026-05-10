@@ -49,5 +49,3 @@ GitHub's secret scanning and push protection are enabled at the repository level
 Workflows triggered by `pull_request` from forks run with a read-only `GITHUB_TOKEN` and zero access to repository secrets — this is GitHub's default and we rely on it. We do not use `pull_request_target` anywhere in [`.github/workflows/`](../../.github/workflows/); that trigger is the standard pitfall that defeats fork-PR isolation, and we deliberately avoid it.
 
 The publish workflow is additionally gated by `if: github.ref == 'refs/heads/main'` so it cannot run from any PR, fork or otherwise.
-
-The detailed fork-PR approval policy (which categories of contributors require maintainer approval before CI runs) will be written down in `reviews.md` in this directory once the policy stabilises.

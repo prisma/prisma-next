@@ -18,7 +18,7 @@ Architectural decisions — anything that changes the system's design, public su
 
 Prisma Next uses the [Developer Certificate of Origin (DCO) 1.1](https://developercertificate.org/), not a Contributor License Agreement. Every commit on a PR must include a `Signed-off-by:` trailer matching the commit author. The full mechanics are in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#developer-certificate-of-origin-dco).
 
-DCO was chosen over CLA because it is the lightweight standard used by Linux, Kubernetes, and a large fraction of the modern OSS ecosystem; it lowers contribution friction without giving up the legal grounding we need. The choice carries one practical implication: **the project is not currently optioned to relicense away from Apache-2.0** within a 3-year horizon. If that changes, the DCO basis would need to be revisited (a CLA would likely be required to preserve relicensing optionality).
+DCO was chosen over CLA because it is the lightweight standard used by Linux, Kubernetes, and a large fraction of the modern OSS ecosystem; it lowers contribution friction without giving up the legal grounding we need.
 
 ## License
 
@@ -26,7 +26,7 @@ Prisma Next is licensed under [Apache-2.0](../../LICENSE). All publishable works
 
 ## Pre-1.0 status
 
-Prisma Next is pre-1.0. The practical implications for contributors and consumers are described in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#status--please-read-first) and [`SECURITY.md`](../../SECURITY.md). Post-1.0 cadence and support windows will follow [Prisma's established practice in `prisma/prisma`](https://github.com/prisma/prisma) and will be written down in a `release-policy.md` page in this directory closer to 1.0.
+Prisma Next is pre-1.0. The practical implications for contributors and consumers are described in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#status--please-read-first) and [`SECURITY.md`](../../SECURITY.md).
 
 ## Code of Conduct
 
