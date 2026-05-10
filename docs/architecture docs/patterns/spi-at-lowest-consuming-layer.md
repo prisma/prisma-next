@@ -5,21 +5,21 @@
 
 ## Intent
 
-When a lower layer needs to call a higher-layer implementation (dependency inversion), the SPI **interface** is declared at the **lowest layer whose types it depends on**; the implementer lives higher up in the dependency graph; both the caller and the implementer depend on the abstraction, never on each other. The interface is an *S*ervice *P*rovider *I*nterface — defined once, consumed by the layer that orchestrates, implemented by the layer that customises.
+The framework's emitter needs to call into family-specific behaviour — a SQL emitter does one thing, a Mongo emitter does another. Naively, the framework would import from the family packages. But families are layered _above_ the framework (the framework knows about both; neither family knows the other), so a framework-imports-family edge would invert the layering and `pnpm lint:deps` would refuse to compile it.
 
-Adopting this pattern commits you to: a one-way dependency from caller-and-implementer onto the SPI module, an SPI module that imports nothing higher in the layer graph than its own layer, and a clean answer to "where does the contract live?" — at the lowest layer that can host it without leaking upward concerns.
+The pattern: the framework declares an `EmissionSpi` interface in its own layer; both families implement it; the framework calls into the SPI without ever importing the implementer. Imports flow downward (the family imports the SPI it implements; the framework imports nothing from the family). The SPI is the meeting point — not at the top, not at the bottom, but at the **lowest layer whose types it can name**. (SPI = Service Provider Interface, but you rarely need to expand it; everyone who works with one knows what it is.)
 
 ## When to use
 
 - A lower-layer component needs to call into a higher-layer implementation (the framework needs target-specific behaviour; the runner needs driver-specific behaviour; the emitter needs family-specific behaviour).
-- The variation point cannot be expressed as a method on a class hierarchy the framework already owns (otherwise, prefer extending the hierarchy — see [Three-layer polymorphic IR](./three-layer-polymorphic-ir.md)).
+- The variation point cannot be expressed as a method on a class hierarchy the framework already owns. (If it can, prefer extending the hierarchy — see [Three-layer polymorphic IR](./three-layer-polymorphic-ir.md).)
 - The same SPI is implemented by more than one layer above (one per family, or one per target).
-- The package layering rule (`pnpm lint:deps`) would otherwise force a circular import; the SPI breaks the cycle by inverting the dependency.
+- Without the SPI, `pnpm lint:deps` would force a circular import; the SPI breaks the cycle by inverting the dependency.
 
 ## When NOT to use
 
 - **The framework can model the variation directly** via abstract methods on a class hierarchy — then use [Three-layer polymorphic IR](./three-layer-polymorphic-ir.md). An SPI declared just to avoid extending a class is over-abstraction.
-- **The variation is target-specific behaviour** (dialect emission, capability discovery, error mapping) — those are [Adapter SPI](./adapter-spi.md), a specialised application of this pattern with a stronger naming convention.
+- **The variation is target-specific behaviour** (dialect emission, capability discovery, error mapping) — that's [Adapter SPI](./adapter-spi.md), a specialised application of this pattern with a stronger naming convention.
 - **There is exactly one implementer and no plausible second one.** An SPI with a single permanent implementer is a misnamed concrete type.
 
 ## Structure
@@ -71,7 +71,7 @@ The SPI module imports only types that exist at its layer or below. The caller i
 
 ## Cautions / common mistakes
 
-- **Hosting the SPI too high.** If the SPI lives at the same layer as the implementer (or higher), the caller has to depend upward — the inversion is broken. Architect-persona check: the SPI's layer should be the lowest layer whose types appear in the SPI's signature.
+- **Hosting the SPI too high.** If the SPI lives at the same layer as the implementer (or higher), the caller has to depend upward — the inversion is broken. The SPI's layer should be the lowest layer whose types appear in the SPI's signature.
 - **Hosting the SPI too low.** If the SPI lives in foundation (or another layer below where its types resolve), it has to import upward to bind to the types it references. That's the symptom of "too low" — the SPI module's imports should be a subset of the layer's allowed imports.
-- **Sneaking implementer-only types into the SPI.** Any type the SPI exports forces every implementer to know about it. Architect-persona check: every type referenced from the SPI is something the caller actually consumes.
+- **Sneaking implementer-only types into the SPI.** Any type the SPI exports forces every implementer to know about it. Every type referenced from the SPI should be something the caller actually consumes.
 - **Single-implementer SPIs.** An SPI with one permanent implementer is a misnamed concrete type — surface as a typology defect and rename to the concrete shape.
