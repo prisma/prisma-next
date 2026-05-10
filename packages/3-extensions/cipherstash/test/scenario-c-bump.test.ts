@@ -16,7 +16,7 @@
  *
  * Pure fixture means: no live Postgres, no PGlite — the test computes
  * the on-disk shape and asserts on it. The two passes invoked here
- * (`emitContractSpaceArtefacts` + `materialiseMigrationPackageIfMissing`)
+ * (`emitContractSpaceArtefacts` + `materialiseExtensionMigrationPackageIfMissing`)
  * are the *exact* primitives the CLI's `runContractSpaceMigratePass`
  * + `runContractSpaceExtensionMigrationsPass` call. Calling them
  * directly keeps cipherstash's test cone independent of the CLI
@@ -39,8 +39,8 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
+  materialiseExtensionMigrationPackageIfMissing,
   materialiseMigrationPackage,
-  materialiseMigrationPackageIfMissing,
 } from '@prisma-next/migration-tools/io';
 import {
   emitContractSpaceArtefacts,
@@ -249,7 +249,10 @@ async function rematerialiseAll(
   const written: string[] = [];
   const skipped: string[] = [];
   for (const pkg of version.migrations) {
-    const result = await materialiseMigrationPackageIfMissing(fixture.cipherstashSpaceDir, pkg);
+    const result = await materialiseExtensionMigrationPackageIfMissing(
+      fixture.cipherstashSpaceDir,
+      pkg,
+    );
     (result.written ? written : skipped).push(pkg.dirName);
   }
   return { written, skipped };
