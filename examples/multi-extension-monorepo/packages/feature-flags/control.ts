@@ -8,15 +8,14 @@
  * pattern applied to the feature-flags package.
  */
 
-import { fileURLToPath } from 'node:url';
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
 import type {
   ContractSpace,
+  MigrationPackage,
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { FEATURE_FLAGS_BASELINE_MIGRATION_NAME, FEATURE_FLAGS_SPACE_ID } from './constants';
 import contractJson from './contract.json' with { type: 'json' };
@@ -28,15 +27,8 @@ import baselineOps from './migrations/feature-flags/20260601T0000_create_feature
 };
 import headRef from './refs/head.json' with { type: 'json' };
 
-function resolveMigrationDirPath(dirName: string): string {
-  return fileURLToPath(
-    new URL(`./migrations/${FEATURE_FLAGS_SPACE_ID}/${dirName}/`, import.meta.url),
-  );
-}
-
 const baselinePackage: MigrationPackage = {
   dirName: FEATURE_FLAGS_BASELINE_MIGRATION_NAME,
-  dirPath: resolveMigrationDirPath(FEATURE_FLAGS_BASELINE_MIGRATION_NAME),
   metadata: baselineMetadata as unknown as MigrationMetadata,
   ops: baselineOps as unknown as readonly MigrationPlanOperation[],
 };
