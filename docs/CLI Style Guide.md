@@ -2,6 +2,8 @@
 
 This guide defines how Prisma Next's CLI behaves and looks. It exists to keep our developer experience consistent across commands and packages while aligning with our architecture: contract‑first, deterministic, agent‑friendly.
 
+For the architectural view of the CLI (distribution, command surface, init pipeline, programmatic API, layering), see the [CLI subsystem doc](architecture%20docs/subsystems/11.%20CLI.md).
+
 ## Principles
 - Human‑first TTY output; CI/agents get deterministic, parseable output.
 - Deterministic behavior: stable exit codes, PN error codes, and JSON schemas.

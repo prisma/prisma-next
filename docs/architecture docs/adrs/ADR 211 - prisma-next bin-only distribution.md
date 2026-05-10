@@ -50,6 +50,7 @@ The CLI's `init` command installs `prisma-next` (not `@prisma-next/cli`) as the 
 
 ## References
 
+- [CLI subsystem](../subsystems/11.%20CLI.md)
 - [Package Naming Conventions](../../reference/Package%20Naming%20Conventions.md)
 - One-package-install user journey (settled): emitted `package.json` carries `prisma-next` as devDep, target facade as dep, every other `@prisma-next/*` arrives transitively
 - Linear: [TML-2265 — Publish `@prisma-next/cli` as `prisma-next`](https://linear.app/prisma-company/issue/TML-2265/publish-prisma-nextcli-as-prisma-next)
