@@ -485,10 +485,12 @@ export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiS
  * inside a single outer transaction. A failure on any space rolls back every
  * space's writes.
  *
- * Today's only implementer is the SQL family (`SqlMigrationRunner`); Mongo
- * per-space is a non-goal per the project spec. The capability is declared
- * at the framework layer so CLI utilities can route through it without
- * importing the SQL family directly.
+ * The SQL family (`SqlMigrationRunner`) implements this with a true outer
+ * transaction across every space. The Mongo family implements a degenerate
+ * single-space shim (per-space is a non-goal per the extension-contract-spaces
+ * project spec — Mongo aggregates are always single-member). The capability
+ * is declared at the framework layer so CLI utilities can route through it
+ * without importing any specific family directly.
  */
 export interface MultiSpaceCapableRunner<
   TFamilyId extends string = string,
