@@ -71,12 +71,17 @@ This collapses the bifurcation that produced the e2e gaps. The implementation ru
 Concretely:
 
 1. Load every on-disk contract space via the aggregate loader (already exists from M2.5 — same primitive `db init` / `db update` use).
-2. For each space, enumerate pending migration directories (those past the current marker).
-3. Schedule across spaces using `concatenate-space-apply-inputs` (extensions alphabetically, then app).
-4. Apply in scheduled order. After each space's last applied directory, advance that space's marker.
-5. Emit the per-space success summary (see § Output shape).
+2. Read marker rows per space (`familyInstance.readAllMarkers` — the only DB read on this path).
+3. For each space, run `graphWalkStrategy({ member, currentMarker })` (`packages/1-framework/3-tooling/migration/src/aggregate/strategies/graph-walk.ts`) to plot the path through the on-disk graph from `currentMarker` to `member.headRef.hash`. Pure path-plotting against on-disk artefacts; no introspection. Empty-graph members fail loudly — "never planned" is a user-error condition for the prod replay path.
+4. Schedule the per-space plans across spaces in canonical order (extensions alphabetically, then app — same `concatenate-space-apply-inputs` ordering).
+5. Apply via the multi-space runner's `executeAcrossSpaces`. After each space's last applied directory, advance that space's marker.
+6. Emit the per-space success summary (see § Output shape).
 
-This is exactly the apply phase of `db init` / `db update`, minus the introspect+plan preamble. The implementation will share the apply primitive.
+**Apply primitive sharing.** The runner-driving tail of `db-apply-aggregate.ts:executeAggregateApply` (steps 5–6 above) is factored out into a shared `applyAggregate(aggregate, perSpacePlans, …)` primitive. `migration apply` builds `perSpacePlans` via `graphWalkStrategy` directly (no introspection, no synth) and calls `applyAggregate`. `db init` / `db update` keep their introspect → `planAggregate` (synth or graph-walk per member) → `applyAggregate` pipeline. One apply primitive, two callers.
+
+**Why `migration apply` does not call `planAggregate`.** `planAggregate` is the unified planner that picks `synthStrategy` vs `graphWalkStrategy` per member; the synth path is what brings in the live-DB introspection (it diffs introspected schema against contract IR to generate ops). `migration apply` semantically forbids both synth and introspection — the user has already planned and committed directories; this is replay. So `migration apply` calls `graphWalkStrategy` directly per member. This also keeps the planner-vs-replay boundary visibly clean in the call graph.
+
+**`--ref <hash>` semantics under multi-space.** `--ref` always names a hash in the **app-space** graph; extensions advance to their own `member.headRef.hash`. Extensions have their own ref control (their `refs/head.json` — authored by the extension owner). When `--ref` is provided, the app-space graph-walk targets the named hash; every extension space targets its head as usual.
 
 ### `migration status` semantics
 
@@ -149,9 +154,13 @@ The general rule going forward: **any user-facing migration command operates on 
 
 ### 1. `migration apply` rewires onto the aggregate
 
-`packages/1-framework/3-tooling/cli/src/control-api/operations/migration-apply.ts` is rewritten to load the aggregate, schedule via `concatenate-space-apply-inputs`, and apply in canonical order. It either delegates to `db-apply-aggregate.ts`'s apply primitive (preferred, factor it out cleanly) or absorbs the same logic. The existing app-space-only `loadMigrationPackages` call is replaced by the aggregate loader.
+`packages/1-framework/3-tooling/cli/src/control-api/operations/migration-apply.ts` is rewritten to: (1) load the aggregate from disk, (2) read marker rows, (3) run `graphWalkStrategy` per member to plot paths, (4) call the new shared `applyAggregate` primitive. The existing app-space-only `loadMigrationPackages` call is replaced by the aggregate loader. No `planAggregate` call on this path (no synth, no introspection — see § `migration apply` semantics).
 
-Marker advancement happens per-space (the same primitive `db init` / `db update` already use); the aggregate `markerCheck` from M2.5 is reused for preflight and post-apply verification.
+**Factor-out (the shared primitive):** the runner-driving tail of `db-apply-aggregate.ts:executeAggregateApply` is extracted into `applyAggregate(aggregate, perSpacePlans, runner, …)`. `migration apply` and the existing `db init` / `db update` flows both call it; the only difference is how each caller produces `perSpacePlans` (graph-walk-only for `migration apply`; full `planAggregate` for the `db` family). The factor-out commit lands first; all three callers refactor to consume it in the same slice.
+
+`--ref <hash>` (app-space-only — extensions always walk to head): when present, the app member's graph-walk targets the named hash instead of `member.headRef.hash`. Extension members are unaffected.
+
+Marker advancement happens per-space inside `applyAggregate` (same as today's `executeAggregateApply`); the aggregate `markerCheck` from M2.5 is reused for preflight and post-apply verification.
 
 ### 2. `migration status` rewires onto the aggregate
 
