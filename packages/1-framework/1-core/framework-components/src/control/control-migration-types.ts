@@ -165,6 +165,16 @@ export interface MigrationPlan {
   /** The target ID this plan is for (e.g., 'postgres'). */
   readonly targetId: string;
   /**
+   * Contract space this plan applies to. Runners cross-check
+   * `options.space` against `plan.spaceId` so the marker row gets keyed
+   * by the right space when applying via `executeAcrossSpaces`.
+   *
+   * Optional for backward compatibility with single-space callers that
+   * pre-date the contract-space aggregate; when present, runners
+   * enforce that it matches `options.space`.
+   */
+  readonly spaceId?: string;
+  /**
    * Origin contract identity that the plan expects the database to currently be at.
    * If omitted or null, the runner skips origin validation entirely.
    */

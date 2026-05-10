@@ -63,7 +63,7 @@ function buildSuccessfulExtensionPlan() {
 function buildFailingExtensionPlan() {
   return createMigrationPlan<SqlitePlanTargetDetails>({
     targetId: 'sqlite',
-    spaceId: 'ext',
+    spaceId: 'app',
     origin: null,
     destination: toPlanContractInfo(extensionContract),
     operations: [
