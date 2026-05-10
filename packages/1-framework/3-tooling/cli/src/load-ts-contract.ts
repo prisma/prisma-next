@@ -178,7 +178,7 @@ export async function loadContractFromTs(
 
     if (disallowedFromEntry.size > 0) {
       throw new Error(
-        `Disallowed imports detected. Only imports matching the allowlist are permitted:\n  Allowlist: ${allowlist.join(', ')}\n  Disallowed imports: ${[...disallowedFromEntry].join(', ')}\n\nOnly @prisma-next/* packages are allowed in contract files.`,
+        `Disallowed imports detected. Only imports matching the allowlist are permitted:\n  Allowlist: ${allowlist.join(', ')}\n  Disallowed imports: ${[...disallowedFromEntry].join(', ')}`,
       );
     }
 
