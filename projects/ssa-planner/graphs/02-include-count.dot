@@ -1,0 +1,31 @@
+// db.users.include('posts', p => p.count()).all()
+digraph {
+  label="db.users.include('posts', p => p.count()).all()"
+  labelloc=t
+  fontsize=16
+  fontname="Helvetica-Bold"
+  rankdir=BT
+  node [fontname="Helvetica" fontsize=11 style=filled]
+  edge [fontname="Helvetica" fontsize=9]
+
+  // Nodes
+  start [label="Start" shape=circle fillcolor=white]
+  cs_users_0 [label="CollectionState\n(users, 0)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  cs_posts_0 [label="CollectionState\n(posts, 0)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  read_users [label="Read\n(users, [*])" shape=box fillcolor="#dae8fc" color="#6c8ebf"]
+  agg_posts [label="Aggregate\n(posts, fn=count\ngroupBy=[userId])" shape=box fillcolor="#e0f2f1" color="#4db6ac"]
+  nest [label="Nest\nleftKeys=[id]\nrightKeys=[userId]\nfield=posts" shape=box fillcolor="#d5e8d4" color="#82b366"]
+  ret [label="Return" shape=doublecircle fillcolor=black fontcolor=white]
+
+  // Edges
+  cs_users_0 -> start [color=gray60]
+  cs_posts_0 -> start [color=gray60]
+  read_users -> cs_users_0 [color=gray60]
+  agg_posts -> read_users [label="FilterData\n(users.id -> posts.userId)" color="#2196F3" fontcolor="#2196F3"]
+  agg_posts -> cs_posts_0 [color=gray60]
+  nest -> read_users [label="left" color=gray60]
+  nest -> agg_posts [label="right" color=gray60]
+  ret -> nest [color=gray60]
+  ret -> cs_users_0 [color=gray60 style=dashed]
+  ret -> cs_posts_0 [color=gray60 style=dashed]
+}

@@ -1,0 +1,38 @@
+// db.posts.create({ id: 10, title: 'Post 1', author: a => a.create({ id: 1, name: 'Alice', email: 'a@b.com' }) })
+digraph {
+  label="db.posts.create({\n  id: 10, title: 'Post 1',\n  author: a => a.create({ id: 1, name: 'Alice', email: 'a@b.com' })\n})"
+  labelloc=t
+  fontsize=14
+  fontname="Helvetica-Bold"
+  rankdir=BT
+  node [fontname="Helvetica" fontsize=11 style=filled]
+  edge [fontname="Helvetica" fontsize=9]
+
+  // Nodes
+  start [label="Start" shape=circle fillcolor=white]
+  cs_users_0 [label="CollectionState\n(users, 0)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  cs_posts_0 [label="CollectionState\n(posts, 0)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  create_users [label="Create\n(users)\ndata={id:1, name:'Alice',\nemail:'a@b.com'}" shape=box fillcolor="#ffccbc" color="#e64a19"]
+  cs_users_1 [label="CollectionState\n(users, 1)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  read_users [label="Read\n(users, [id])" shape=box fillcolor="#dae8fc" color="#6c8ebf"]
+  create_posts [label="Create\n(posts)\ndata={id:10, title:'Post 1'}" shape=box fillcolor="#ffccbc" color="#e64a19"]
+  cs_posts_1 [label="CollectionState\n(posts, 1)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  read_posts [label="Read\n(posts, [*])" shape=box fillcolor="#dae8fc" color="#6c8ebf"]
+  ret [label="Return" shape=doublecircle fillcolor=black fontcolor=white]
+
+  // Edges
+  cs_users_0 -> start [color=gray60]
+  cs_posts_0 -> start [color=gray60]
+  create_users -> cs_users_0 [color=gray60]
+  cs_users_1 -> create_users [color=gray60]
+  read_users -> create_users [label="FilterData\n(users.id -> users.id)" color="#2196F3" fontcolor="#2196F3"]
+  read_users -> cs_users_1 [color=gray60]
+  create_posts -> read_users [label="PayloadData\n(users.id -> posts.userId)" color="#FF9800" fontcolor="#FF9800"]
+  create_posts -> cs_posts_0 [color=gray60]
+  cs_posts_1 -> create_posts [color=gray60]
+  read_posts -> create_posts [label="FilterData\n(posts.id -> posts.id)" color="#2196F3" fontcolor="#2196F3"]
+  read_posts -> cs_posts_1 [color=gray60]
+  ret -> read_posts [color=gray60]
+  ret -> cs_users_1 [color=gray60 style=dashed]
+  ret -> cs_posts_1 [color=gray60 style=dashed]
+}
