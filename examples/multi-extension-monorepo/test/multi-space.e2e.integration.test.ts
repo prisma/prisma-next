@@ -2,7 +2,7 @@
  * Multi-extension monorepo end-to-end against PGlite — project:
  * extension-contract-spaces, M4 / T4.4 / TC-8 / spec AC4.
  *
- * Drives the CLI per-space `db init` flow (`executePerSpaceDbApply`)
+ * Drives the CLI aggregate `db init` flow (`executeDbInit`)
  * against a real Postgres (PGlite via `createDevDatabase`) with **two**
  * internal extension packages (`audit`, `feature-flags`) plus the
  * application's own contract. Mirrors the cipherstash + pgvector
@@ -22,7 +22,7 @@
  *      on-disk shape level.
  *
  *   2. **Multi-space planning across three spaces.** Calling
- *      `executePerSpaceDbApply` with `mode: 'plan'` produces a plan
+ *      `executeDbInit` with `mode: 'plan'` produces a plan
  *      whose ops are ordered alphabetically by space id (extensions
  *      first, app last) per `concatenateSpaceApplyInputs`. The audit
  *      `CREATE TABLE audit_event` op precedes the feature-flags
@@ -54,9 +54,9 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
-import { executePerSpaceDbApply } from '@prisma-next/cli/control-api';
+import { executeDbInit } from '@prisma-next/cli/control-api';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
-import sqlFamilyDescriptor, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
@@ -223,7 +223,7 @@ describe.sequential(
     it('mode=plan produces a multi-space plan ordered alphabetically (extensions first, app last)', async () => {
       project = await setupTestProject();
 
-      const result = await executePerSpaceDbApply({
+      const result = await executeDbInit({
         driver: driver!,
         familyInstance: buildFamilyInstance('natural'),
         contract: appContract,
@@ -231,9 +231,8 @@ describe.sequential(
         migrations: postgresTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: project.migrationsDir,
-        extensionContractSpaces: [{ id: AUDIT_SPACE_ID }, { id: FEATURE_FLAGS_SPACE_ID }],
-        policy: INIT_ADDITIVE_POLICY,
-        action: 'dbInit',
+        targetId: 'postgres',
+        extensionPacks: [auditExtensionDescriptor, featureFlagsExtensionDescriptor],
       });
 
       if (!result.ok) {
@@ -259,7 +258,7 @@ describe.sequential(
     it('mode=apply: three spaces apply atomically; markers + round-trips OK (TC-8 / AC5)', async () => {
       project = await setupTestProject();
 
-      const result = await executePerSpaceDbApply({
+      const result = await executeDbInit({
         driver: driver!,
         familyInstance: buildFamilyInstance('natural'),
         contract: appContract,
@@ -267,9 +266,8 @@ describe.sequential(
         migrations: postgresTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: project.migrationsDir,
-        extensionContractSpaces: [{ id: AUDIT_SPACE_ID }, { id: FEATURE_FLAGS_SPACE_ID }],
-        policy: INIT_ADDITIVE_POLICY,
-        action: 'dbInit',
+        targetId: 'postgres',
+        extensionPacks: [auditExtensionDescriptor, featureFlagsExtensionDescriptor],
       });
 
       if (!result.ok) {
@@ -349,7 +347,7 @@ describe.sequential(
     it('marker hashes are independent of `extensionPacks` declaration order (NFR6)', async () => {
       project = await setupTestProject();
 
-      const result = await executePerSpaceDbApply({
+      const result = await executeDbInit({
         driver: driver!,
         familyInstance: buildFamilyInstance('reverse'),
         contract: appContract,
@@ -357,9 +355,8 @@ describe.sequential(
         migrations: postgresTargetDescriptor.migrations,
         frameworkComponents: [...frameworkComponents],
         migrationsDir: project.migrationsDir,
-        extensionContractSpaces: [{ id: FEATURE_FLAGS_SPACE_ID }, { id: AUDIT_SPACE_ID }],
-        policy: INIT_ADDITIVE_POLICY,
-        action: 'dbInit',
+        targetId: 'postgres',
+        extensionPacks: [featureFlagsExtensionDescriptor, auditExtensionDescriptor],
       });
 
       if (!result.ok) {
