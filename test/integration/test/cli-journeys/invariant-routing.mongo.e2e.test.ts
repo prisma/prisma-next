@@ -158,7 +158,11 @@ async function migrationEmit(ctx: JourneyCtx, args: readonly string[] = []): Pro
 
 function getLatestMigrationDir(ctx: JourneyCtx): string {
   const migrationsDir = join(ctx.testDir, 'migrations', 'app');
-  const dirs = readdirSync(migrationsDir).filter((d) => !d.startsWith('.'));
+  const dirs = readdirSync(migrationsDir).filter((d) => {
+    if (d.startsWith('.')) return false;
+    if (d === 'refs') return false;
+    return statSync(join(migrationsDir, d)).isDirectory();
+  });
   if (dirs.length === 0) throw new Error('No migration directory found');
   let newest = dirs[0]!;
   let newestMtime = statSync(join(migrationsDir, newest)).mtimeMs;
