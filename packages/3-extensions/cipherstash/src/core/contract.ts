@@ -1,28 +1,25 @@
 /**
  * CipherStash contract space — the typed objects EQL exposes that user
- * columns can name as `nativeType` (project spec § "IR vocabulary
- * boundary").
+ * columns can name as `nativeType`.
  *
- * ## R1 IR coverage and explicit deferral
+ * ## IR coverage and explicit deferral
  *
- * The project spec lists four kinds of typed objects CipherStash should
- * declare in its contract IR: tables, enums, composite types, and
- * domains (project spec FR9 / AC8; M3 sub-spec § 2). Of these, today's
- * `SqlStorage` IR (`@prisma-next/sql-contract/types`) only models tables
- * (`StorageTable`) and parameterised type instances (`StorageTypeInstance`,
- * which is `{ codecId, nativeType, typeParams }` — a fit for things like
- * pgvector's `vector(N)`, but not for codec-less composite types,
- * standalone enums, or domains).
+ * CipherStash installs four kinds of typed objects: tables, enums,
+ * composite types, and domains. The current `SqlStorage` IR
+ * (`@prisma-next/sql-contract/types`) only models tables (`StorageTable`)
+ * and parameterised type instances (`StorageTypeInstance`, which is
+ * `{ codecId, nativeType, typeParams }` — a fit for things like pgvector's
+ * `vector(N)`, but not for codec-less composite types, standalone enums,
+ * or domains).
  *
- * R1 declares the only IR-representable object today —
+ * This module declares the only IR-representable object today —
  * `eql_v2_configuration` — and records the remaining typed objects under
- * `meta.cipherstashFutureIR` as a documentary placeholder. The objects
- * still get **created in the database** by the `installEqlBundle`
+ * `meta.cipherstashFutureIR` as a documentary placeholder. Those objects
+ * are still **created in the database** by the `installEqlBundle`
  * migration op (which carries the vendored bundle SQL byte-for-byte —
  * see `./eql-bundle`), so the runtime contract holds; the gap is purely
  * the verifier's structural visibility of those typed objects until IR
- * vocabulary expansion lands. See M3 R1 return report for the full
- * deferral rationale.
+ * vocabulary expansion lands.
  */
 
 import { computeStorageHash } from '@prisma-next/contract/hashing';

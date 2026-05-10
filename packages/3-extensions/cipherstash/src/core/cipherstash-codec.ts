@@ -1,20 +1,17 @@
 /**
  * Control hooks for the `cipherstash:string@1` codec.
  *
- * Implements `CodecControlHooks.onFieldEvent` per the framework-
- * mechanism sub-spec § 5 and the cipherstash sub-spec § 4. Reacts to
- * per-field added / dropped / altered events as the *application*
- * emitter diffs the prior contract against the new contract; the
- * returned ops are inlined into the application's migration alongside
- * the user's structural ops by the SQL planner
- * (`planFieldEventOperations` in `@prisma-next/family-sql/control`).
+ * Reacts to per-field added / dropped / altered events as the application
+ * emitter diffs the prior contract against the new contract; the returned
+ * ops are inlined into the application's migration alongside the user's
+ * structural ops by the SQL planner.
  *
  * Trigger condition: a field uses the `cipherstash:string@1` codec.
- * The planner already dispatches per `(table, field)` based on the
- * field's `codecId` (new field for `'added'` / `'altered'`, prior
- * field for `'dropped'`), so this hook only fires when a cipherstash
- * field is involved. Whether the field also carries `searchable: true`
- * in `typeParams` decides whether any DDL is needed:
+ * The planner dispatches per `(table, field)` based on the field's
+ * `codecId` (new field for `'added'` / `'altered'`, prior field for
+ * `'dropped'`), so this hook only fires when a cipherstash field is
+ * involved. Whether the field carries `searchable: true` in `typeParams`
+ * decides whether any DDL is needed:
  *
  * - `'added'`, `searchable: true`        → emit `add_search_config`.
  * - `'added'`, `searchable !== true`     → no-op (column-type change
@@ -44,11 +41,11 @@ import { CIPHERSTASH_STRING_CODEC_ID } from './constants';
 type Op = SqlMigrationPlanOperation<unknown>;
 
 /**
- * Default index name. Cipherstash's EQL bundle ships several index
- * shapes (`match`, `unique`, `ore`, …); R2 wires a single conservative
- * default that gives every searchable column a usable index. Callers
- * needing finer control can author per-column ops manually until the
- * codec accepts a per-field index-mode parameter.
+ * Default index name. CipherStash's EQL bundle ships several index
+ * shapes (`match`, `unique`, `ore`, …); this codec wires a single
+ * conservative default that gives every searchable column a usable index.
+ * Callers needing finer control can author per-column ops manually until
+ * the codec accepts a per-field index-mode parameter.
  */
 const DEFAULT_INDEX_NAME = 'match';
 
@@ -158,16 +155,22 @@ function onFieldEvent(
   const { tableName, fieldName, priorField, newField } = ctx;
 
   if (event === 'added') {
-    if (newField === undefined) return [];
+    if (newField === undefined) {
+      throw new Error(`cipherstash:string@1 'added' event missing newField for ${tableName}.${fieldName}`);
+    }
     return isSearchable(newField.typeParams) ? [buildAddOp(tableName, fieldName)] : [];
   }
 
   if (event === 'dropped') {
-    if (priorField === undefined) return [];
+    if (priorField === undefined) {
+      throw new Error(`cipherstash:string@1 'dropped' event missing priorField for ${tableName}.${fieldName}`);
+    }
     return isSearchable(priorField.typeParams) ? [buildRemoveOp(tableName, fieldName)] : [];
   }
 
-  if (priorField === undefined || newField === undefined) return [];
+  if (priorField === undefined || newField === undefined) {
+    throw new Error(`cipherstash:string@1 'altered' event missing field payload for ${tableName}.${fieldName}`);
+  }
   const priorSearchable = isSearchable(priorField.typeParams);
   const newSearchable = isSearchable(newField.typeParams);
 
@@ -187,12 +190,9 @@ function onFieldEvent(
  * search-config wiring is delivered by the codec hook's
  * `add_search_config` op (a separate row in `eql_v2_configuration`),
  * not by the column type itself. Returning `nativeType` unchanged
- * tells the planner "no expansion required" — see
- * `expandParameterizedTypeSql` in
- * `packages/3-targets/3-targets/postgres/src/core/migrations/planner-ddl-builders.ts`,
- * which only requires this hook to *exist* for any column carrying
- * `typeParams`. Without it, the planner refuses to render the column
- * (the existing arktype-json extension wires the same identity hook).
+ * tells the planner "no expansion required". The planner requires this
+ * hook to exist for any column carrying `typeParams`; without it, the
+ * planner refuses to render the column.
  */
 const expandNativeType: NonNullable<CodecControlHooks['expandNativeType']> = ({ nativeType }) =>
   nativeType;
