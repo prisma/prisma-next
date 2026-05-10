@@ -29,11 +29,11 @@ The pattern: keep the persisted shape and the in-memory shape **the same shape**
             authoring                      apply / consume
                 │                                 ▲
                 ▼                                 │
-   ┌─────────────────────┐         ┌──────────────────────────┐
-   │  class instances    │── JSON.stringify ───►│  ops.json    │
-   │  (frozen AST nodes) │                      │  contract.json│
-   │  with `kind` field  │◄── arktype validate ──│              │
-   └─────────────────────┘         └──────────────────────────┘
+   ┌─────────────────────┐         ┌─────────────────────────────┐
+   │  class instances    │── JSON.stringify ───► │  ops.json     │
+   │  (frozen AST nodes) │                       │  contract.json│
+   │  with `kind` field  │◄── arktype validate ──│               │
+   └─────────────────────┘         └─────────────────────────────┘
             ▲                                 │
             │                                 ▼
        in-memory                     content-addressed,
@@ -45,11 +45,13 @@ The classes have plain readonly fields only — no methods on properties, no JS 
 
 ## Reference implementations
 
-| Implementation | Path | Demonstrates |
-|---|---|---|
-| Migration `ops.json` (Mongo) | [`packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts`](../../../packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts) | `OpFactoryCall` classes serialise via `JSON.stringify` to `ops.json`; the runner rehydrates and walks the same class hierarchy at apply time. |
-| Migration `ops.json` (Postgres) | [`packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts`](../../../packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts) | Same shape on the SQL side; demonstrates the pattern is target-agnostic. |
-| Mongo wire commands | [`packages/2-mongo-family/6-transport/mongo-wire/src/wire-commands.ts`](../../../packages/2-mongo-family/6-transport/mongo-wire/src/wire-commands.ts) | Wire commands round-trip natively because MongoDB commands _are_ JSON; the canonical example of the pattern's "JSON is the contract" property. |
+
+| Implementation                  | Path                                                                                                                                                                    | Demonstrates                                                                                                                                   |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration `ops.json` (Mongo)    | `[packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts](../../../packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts)`                     | `OpFactoryCall` classes serialise via `JSON.stringify` to `ops.json`; the runner rehydrates and walks the same class hierarchy at apply time.  |
+| Migration `ops.json` (Postgres) | `[packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts](../../../packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts)` | Same shape on the SQL side; demonstrates the pattern is target-agnostic.                                                                       |
+| Mongo wire commands             | `[packages/2-mongo-family/6-transport/mongo-wire/src/wire-commands.ts](../../../packages/2-mongo-family/6-transport/mongo-wire/src/wire-commands.ts)`                   | Wire commands round-trip natively because MongoDB commands *are* JSON; the canonical example of the pattern's "JSON is the contract" property. |
+
 
 ## Related ADRs
 
@@ -69,3 +71,4 @@ The classes have plain readonly fields only — no methods on properties, no JS 
 - **Custom `toJSON()`.** Once a class needs a custom `toJSON()` to serialise correctly, the in-memory shape and the JSON shape have diverged — the round-trip is no longer canonical. Surface the divergence rather than papering over it with `toJSON()`.
 - **Hashing the in-memory form.** Identity must key off the JSON, not the class instances; in-memory representations can vary by Node version, by frozen-state, by V8 internals. The JSON is the only stable byte stream.
 - **Skipping arktype validation at the boundary.** A consumer that constructs class instances from an unverified JSON shape inherits every drift, every renamed field, every off-by-one-version mismatch. Validate at the boundary; trust inside it.
+

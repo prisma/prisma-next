@@ -4,24 +4,26 @@ This catalogue is the single place to learn **which structural shapes the Prisma
 
 The catalogue is distinct from its neighbours:
 
-- **ADRs** ([`../adrs/`](../adrs/)) record one-time decisions. The catalogue records recurring shapes those decisions instantiate.
+- **ADRs** ([`../adrs/`](../adrs/)) record one-time decisions. The catalogue records the recurring shapes those decisions instantiate.
 - **Cursor rules** ([`../../../.cursor/rules/`](../../../.cursor/rules/)) are tactical do/don'ts. The catalogue records the structural rationale a rule enforces.
 - **Reference docs** ([`../../reference/`](../../reference/)) are subsystem how-to guides. The catalogue records cross-subsystem shapes; subsystem-specific shapes stay in the reference docs.
 
 ## v1 entries
 
-| Pattern | Slug | Intent (one-line) | Status |
-|---|---|---|---|
-| Frozen-class AST + visitor | [`frozen-class-ast.md`](./frozen-class-ast.md) | Discriminated AST as an abstract base + concrete classes per kind, frozen at construction, with `accept(visitor)` for narrow exhaustive dispatch. | Stable |
-| JSON-canonical / class-in-memory round-trip | [`json-canonical-class-in-memory.md`](./json-canonical-class-in-memory.md) | The canonical persistent artifact is JSON; the canonical in-memory form is a class hierarchy whose plain readonly fields serialize without a custom `toJSON()`. | Stable |
-| Three-layer polymorphic IR (framework → family → target) | [`three-layer-polymorphic-ir.md`](./three-layer-polymorphic-ir.md) | IRs that cross the framework/target boundary layer as framework interfaces → family abstract bases → target concrete classes. | Emerging |
-| SPI at the lowest consuming layer | [`spi-at-lowest-consuming-layer.md`](./spi-at-lowest-consuming-layer.md) | When a lower layer needs to call a higher layer, the SPI interface is declared at the lowest layer whose types it depends on; both sides depend on the abstraction. | Stable |
-| Interface + factory function (stateful services) | [`interface-plus-factory.md`](./interface-plus-factory.md) | Stateful services are exposed as an exported `interface` plus a `createXxx()` factory; the implementing class is private. | Stable |
-| Adapter SPI for target-specific behaviour | [`adapter-spi.md`](./adapter-spi.md) | Target-specific behaviour is encapsulated behind an adapter interface the framework consumes uniformly; the framework never branches on `target === 'postgres'`. | Stable |
-| Capability gating | [`capability-gating.md`](./capability-gating.md) | Optional or target-varying features are declared as capabilities, verified against the database at runtime, and gated at every consumption site. | Stable |
-| Package layering: domains × layers × planes | [`package-layering.md`](./package-layering.md) | Packages are organised along three orthogonal axes (domains × layers × planes); imports flow downward and outward only, enforced by `pnpm lint:deps`. | Stable |
+The "Reach for it when..." column is the fastest way to scan: read it for the situation you're in, then open the entry that matches.
 
-The status column reads **Stable** once an entry has at least two reference implementations in the codebase, and **Emerging** when a pattern has one shipped adopter plus a credible second adopter committed. _Three-layer polymorphic IR_ is the only Emerging entry in v1 — migration ops follow it today, and Contract IR / Schema IR adoption is in flight.
+| Pattern | Slug | Reach for it when... | Status |
+|---|---|---|---|
+| Frozen-class AST + visitor | [`frozen-class-ast.md`](./frozen-class-ast.md) | You have a tree with many kinds and many consumers, and you want every consumer to break loudly when a new kind is added. | Stable |
+| JSON-canonical / class-in-memory round-trip | [`json-canonical-class-in-memory.md`](./json-canonical-class-in-memory.md) | You're writing data to disk that another process will read back, and you want the on-disk form to be diffable, greppable, and hashable. | Stable |
+| Three-layer polymorphic IR | [`three-layer-polymorphic-ir.md`](./three-layer-polymorphic-ir.md) | An IR crosses the framework/target boundary and targets need to add kinds the framework cannot anticipate (Postgres-only, Mongo-only). | Emerging |
+| SPI at the lowest consuming layer | [`spi-at-lowest-consuming-layer.md`](./spi-at-lowest-consuming-layer.md) | A lower layer needs to call into a higher-layer implementation, and `pnpm lint:deps` would otherwise force a circular import. | Stable |
+| Interface + factory function (stateful services) | [`interface-plus-factory.md`](./interface-plus-factory.md) | You're building a stateful service (registry, runtime, adapter, driver) and consumers should never see the implementation class. | Stable |
+| Adapter SPI for target-specific behaviour | [`adapter-spi.md`](./adapter-spi.md) | The framework needs target-specific behaviour (dialect, capabilities, error mapping) and you can't write `if (target === 'postgres')`. | Stable |
+| Capability gating | [`capability-gating.md`](./capability-gating.md) | A feature is target-optional or target-varying (`RETURNING`, `LATERAL`, prepared statements), and the framework needs to check before relying on it. | Stable |
+| Package layering: domains × layers × planes | [`package-layering.md`](./package-layering.md) | You're creating a new package, adding an import, or reaching for "shared utilities" — and you need to know where it goes. | Stable |
+
+The status column reads **Stable** once an entry has at least two reference implementations in the codebase, and **Emerging** when a pattern has one shipped adopter plus a credible second adopter committed. Three-layer polymorphic IR is the only Emerging entry — migration ops follow it today; Contract IR and Schema IR are committed to follow.
 
 ## How to add a new pattern
 
@@ -35,7 +37,7 @@ A new entry joins the catalogue when it earns its keep against four criteria:
 The process:
 
 1. Copy [`_template.md`](./_template.md) to a new kebab-case slug.
-2. Fill in every section — every claim must cite a reference implementation, an ADR, or a rule.
+2. Fill in every section — every claim must cite a reference implementation, an ADR, or a rule. **Lead with a grounding example**; the template's own guidance has the writing rules.
 3. Add a row to the table above and link the slug.
 4. Cross-link from any related ADRs, rules, or reference docs.
 5. Open a PR. The **architect persona** ([`.agents/skills/drive-agent-personas/personas/architect.md`](../../../.agents/skills/drive-agent-personas/personas/architect.md)) owns the bar; tech-lead arbitrates if there is disagreement on whether the entry is ready.
