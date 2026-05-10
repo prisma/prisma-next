@@ -144,7 +144,7 @@ describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor
 
       const result = verifyContractSpaces({
         loadedSpaces: new Set(['app', CIPHERSTASH_SPACE_ID]),
-        pinnedDirsOnDisk: dirs,
+        spaceDirsOnDisk: dirs,
         pinnedHashesBySpace: new Map([[CIPHERSTASH_SPACE_ID, pinnedHash]]),
         markerRowsBySpace: new Map([[CIPHERSTASH_SPACE_ID, marker]]),
       });
@@ -161,7 +161,7 @@ describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor
 
       const result = verifyContractSpaces({
         loadedSpaces: new Set(['app', CIPHERSTASH_SPACE_ID]),
-        pinnedDirsOnDisk: dirs,
+        spaceDirsOnDisk: dirs,
         pinnedHashesBySpace: new Map([
           [
             CIPHERSTASH_SPACE_ID,
