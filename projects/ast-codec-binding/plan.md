@@ -47,11 +47,10 @@ Instead: **the AST shape change and the heuristic deletion land together at M3**
 
 **Files changed.**
 
-- `packages/2-sql/5-runtime/src/sql-context.ts` — `buildContractCodecRegistry` rewritten:
-  - One pass over `storage.tables[].columns[]`: for each column, derive `CodecRef` (resolving `typeRef` to `storage.types[ref].typeParams`); call `resolver.forCodecRef(ref)` to populate cache.
-  - `byColumn` Map keeps existing `${table}.${column}` keying for the `forColumn(table, column)` API but stores `CodecRef`, not `Codec`. `forColumn` wrapper: `forCodecRef(byColumn.get(...))`.
-  - `byCodecId` and `parameterizedRepresentatives` deleted.
-  - `ambiguousCodecIds` deleted.
+- `packages/2-sql/5-runtime/src/sql-context.ts` — `buildContractCodecRegistry` augmented (additive on the runtime side; M3c does the collapse):
+  - One pass over `storage.tables[].columns[]`: for each column, derive `CodecRef` (resolving `typeRef` to `storage.types[ref].typeParams`); call `resolver.forCodecRef(ref)` to populate the `byCodecRef` cache.
+  - `byColumn` (Codec-valued, per-column ctx) **stays unchanged in M2** — collapsing it onto `forCodecRef(byColumn.get(...))` would change per-column ctx semantics that existing tests still assert; M3c does that flip together with deleting the legacy heuristics.
+  - `byCodecId`, `parameterizedRepresentatives`, `ambiguousCodecIds`, `forCodecId`, and the codec-id consistency check **all stay in M2** and delete in M3c. M2 is the parallel-surface setup; M3c is the swap.
 - `packages/2-sql/4-lanes/relational-core/src/codec-descriptor-registry.ts` — add `codecRefForColumn(table, column): CodecRef | undefined` to `CodecDescriptorRegistry` interface. Implementation walks `contract.storage.tables[].columns[].typeRef`/`typeParams`.
 - `packages/2-sql/5-runtime/src/codecs/encoding.ts` — `resolveParamCodec` rewritten to consult resolver. Path narrows to: `if (paramRef.refs) → forColumn(refs.table, refs.column)` (legacy path, M3 deletes). The codec-id consistency check stays in M2 (still needed because legacy AST shape still in play); deletes in M3.
 - `packages/2-sql/5-runtime/test/sql-context.codec-context.test.ts` — augment existing tests with `byCodecRef` cache assertions; preserve all current `byColumn`/`forCodecId` assertions (some delete in M3).
