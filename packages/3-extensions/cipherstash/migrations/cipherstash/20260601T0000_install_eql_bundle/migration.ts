@@ -17,7 +17,7 @@
  * getter.
  *
  * Authoring loop: this file is hand-edited (see
- * `docs/architecture docs/adrs/ADR 211 - Contract spaces.md`'s
+ * `docs/architecture docs/adrs/ADR 212 - Contract spaces.md`'s
  * on-disk-in-package authoring section). Re-emit `ops.json` /
  * `migration.json` after edits via `node migration.ts`.
  */

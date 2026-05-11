@@ -19,7 +19,7 @@
  * the assertions stay honest under re-emission. Mirrors the synthetic
  * extension's `test/descriptor.test.ts` reference model.
  *
- * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
+ * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
 
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';

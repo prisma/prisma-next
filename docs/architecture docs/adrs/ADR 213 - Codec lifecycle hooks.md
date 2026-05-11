@@ -1,12 +1,12 @@
-# ADR 212 — Codec lifecycle hooks
+# ADR 213 — Codec lifecycle hooks
 
 ## Status
 
-Accepted (TML-2397). Companion mechanism to [ADR 211 — Contract spaces](./ADR%20211%20-%20Contract%20spaces.md).
+Accepted (TML-2397). Companion mechanism to [ADR 212 — Contract spaces](./ADR%20212%20-%20Contract%20spaces.md).
 
 ## At a glance
 
-Some schema-driven extension behaviour is *not* a function of the extension version but of the consuming application's schema. Cipherstash is the canonical example: when a user adds an `Encrypted<String>` column with `searchable: true`, the database needs `INSERT INTO eql_v2_configuration (...) VALUES (...)` (registering the column for search). That work is per-`(table, column)`, not per-cipherstash-version, and ADR 211's contract-space mechanism on its own can't express it — cipherstash's contract space is a pure function of the cipherstash *package*, not of the consuming app's schema.
+Some schema-driven extension behaviour is *not* a function of the extension version but of the consuming application's schema. Cipherstash is the canonical example: when a user adds an `Encrypted<String>` column with `searchable: true`, the database needs `INSERT INTO eql_v2_configuration (...) VALUES (...)` (registering the column for search). That work is per-`(table, column)`, not per-cipherstash-version, and ADR 212's contract-space mechanism on its own can't express it — cipherstash's contract space is a pure function of the cipherstash *package*, not of the consuming app's schema.
 
 Codecs already exist as first-class objects: every column in the contract names its codec via `codecId`. This ADR promotes codecs to also carry a **plan-time lifecycle hook**, fired on field-added / field-dropped / field-altered events, that emits app-space migration ops scoped to the columns where the codec applies.
 
@@ -20,7 +20,7 @@ flowchart LR
 
 ## Context
 
-[ADR 211](./ADR%20211%20-%20Contract%20spaces.md) gives extensions a uniform planner / runner / verifier surface for schema they ship as a pure function of their package version. That covers most of cipherstash's footprint — the EQL bundle, the `eql_v2_configuration` table, the typed objects `Encrypted<String>` columns reference. But it doesn't cover the per-column work: registering each searchable column with EQL via `INSERT INTO eql_v2_configuration (...)` (or a similarly per-column DDL/DML for other future codecs).
+[ADR 212](./ADR%20212%20-%20Contract%20spaces.md) gives extensions a uniform planner / runner / verifier surface for schema they ship as a pure function of their package version. That covers most of cipherstash's footprint — the EQL bundle, the `eql_v2_configuration` table, the typed objects `Encrypted<String>` columns reference. But it doesn't cover the per-column work: registering each searchable column with EQL via `INSERT INTO eql_v2_configuration (...)` (or a similarly per-column DDL/DML for other future codecs).
 
 Two failed approaches surfaced before settling on codec hooks:
 
@@ -161,7 +161,7 @@ const cipherstashStringCodecHooks: CodecControlHooks = {
 };
 ```
 
-The hook reads `typeParams.searchable` off the field, decides whether work is needed, and emits ops. It never reads the live database, never reads cipherstash's contract-space contract or marker — those advance independently via ADR 211's per-space mechanism. It is a pure function over IR.
+The hook reads `typeParams.searchable` off the field, decides whether work is needed, and emits ops. It never reads the live database, never reads cipherstash's contract-space contract or marker — those advance independently via ADR 212's per-space mechanism. It is a pure function over IR.
 
 ## Consequences
 
@@ -173,13 +173,13 @@ The hook reads `typeParams.searchable` off the field, decides whether work is ne
 
 ### Trade-offs
 
-- **Hooks are synchronous-by-design.** They can't read DB state at plan time; if a codec needs DB-state-aware planning, it must take a different approach (probably an extension-owned migration of its own under ADR 211, or a deferred mechanism not yet designed).
+- **Hooks are synchronous-by-design.** They can't read DB state at plan time; if a codec needs DB-state-aware planning, it must take a different approach (probably an extension-owned migration of its own under ADR 212, or a deferred mechanism not yet designed).
 - **App-space-bound by API shape.** Cross-space codec hooks are out of scope; if a real consumer surfaces the need, the API can grow a new context shape rather than retrofitting cross-space behaviour into `onFieldEvent`.
 - **Helper boundary types `unknown`.** `planFieldEventOperations` returns `SqlMigrationPlanOperation<unknown>[]`; the integration site casts back to its target-details specialisation. Documented as a structural divergence from the spec's first-cut generic vision; aligns with the existing `extractCodecControlHooks` surface.
 
 ## Related
 
-- [ADR 211 — Contract spaces](./ADR%20211%20-%20Contract%20spaces.md) — the contract-space mechanism this hook complements; together they cover both static extension scaffolding and schema-driven per-column behaviour.
+- [ADR 212 — Contract spaces](./ADR%20212%20-%20Contract%20spaces.md) — the contract-space mechanism this hook complements; together they cover both static extension scaffolding and schema-driven per-column behaviour.
 - [ADR 184 — Codec-owned value serialization](./ADR%20184%20-%20Codec-owned%20value%20serialization.md) — codecs as first-class objects in the contract.
 - [ADR 207 — Codec call context per-query AbortSignal and column metadata](./ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md) — runtime-side codec context (companion to this ADR's plan-time hook).
 - [ADR 195 — Planner IR with two renderers](./ADR%20195%20-%20Planner%20IR%20with%20two%20renderers.md) — the planner pipeline `onFieldEvent` participates in.

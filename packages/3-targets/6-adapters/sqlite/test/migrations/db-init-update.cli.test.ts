@@ -45,7 +45,7 @@ import {
  * the planner / runner. The runner-level multi-space coverage lives in
  * `runner.multi-space.test.ts`.
  *
- * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
+ * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
 
 const EXT_SPACE_ID = 'test_contract_space_sqlite';

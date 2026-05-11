@@ -34,7 +34,7 @@ create table if not exists prisma_contract.marker (
 
 ### Schema evolution (TML-2397)
 
-The marker was originally a singleton — one row keyed by `id smallint primary key default 1`. [ADR 211 — Contract spaces](./ADR%20211%20-%20Contract%20spaces.md) made each contract space (the application plus every loaded schema-contributing extension) own its own marker row, so the schema gained a `space text not null` column and re-keyed by `(space)`:
+The marker was originally a singleton — one row keyed by `id smallint primary key default 1`. [ADR 212 — Contract spaces](./ADR%20212%20-%20Contract%20spaces.md) made each contract space (the application plus every loaded schema-contributing extension) own its own marker row, so the schema gained a `space text not null` column and re-keyed by `(space)`:
 
 - The application's row uses `space = 'app'`.
 - Each extension's row uses its declared space identifier (e.g. `'cipherstash'`, `'pgvector'`).
@@ -63,7 +63,7 @@ Note that ADR 029's shadow-DB preflight is user-DDL-scoped and does not cover `e
 ### Other targets
 - **MySQL**: same table in prisma_contract database or current schema
 - **SQLite**: `prisma_contract_marker` table with the same columns (including the `space` PK); the runner merges the `invariants` set inside `BEGIN EXCLUSIVE` (no native text-array merge in SQL). Same three-state idempotent migration as Postgres.
-- **Mongo**: `prisma_contract.marker` collection — per-space contract spaces are out of scope for the Mongo family today (see [ADR 211](./ADR%20211%20-%20Contract%20spaces.md)). The Mongo bridge surfaces the legacy single-row marker as the `'app'` space's row when read through cross-family interfaces. `invariants` is read as `doc.invariants ?? []` so older docs without the field transparently report the empty set (natural schemaless behaviour, not a compat shim).
+- **Mongo**: `prisma_contract.marker` collection — per-space contract spaces are out of scope for the Mongo family today (see [ADR 212](./ADR%20212%20-%20Contract%20spaces.md)). The Mongo bridge surfaces the legacy single-row marker as the `'app'` space's row when read through cross-family interfaces. `invariants` is read as `doc.invariants ?? []` so older docs without the field transparently report the empty set (natural schemaless behaviour, not a compat shim).
 - Adapters must provide DDL for creating and reading the marker consistently
 
 ## Ownership and lifecycle
@@ -203,5 +203,5 @@ createRunner({
 
 ## Related
 
-- [ADR 211 — Contract spaces](./ADR%20211%20-%20Contract%20spaces.md) — promotes the marker from singleton to one-row-per-loaded-space.
+- [ADR 212 — Contract spaces](./ADR%20212%20-%20Contract%20spaces.md) — promotes the marker from singleton to one-row-per-loaded-space.
 - [ADR 208 — Invariant-aware migration routing](./ADR%20208%20-%20Invariant-aware%20migration%20routing.md) — `invariants` semantics on the marker.

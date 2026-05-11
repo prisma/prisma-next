@@ -112,7 +112,7 @@ The extension's contract + baseline migration are emitted on-disk inside this pa
 
 The descriptor at `src/exports/control.ts` then JSON-imports those artefacts and synthesises the framework's `MigrationPackage` shape.
 
-See [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md) ("On-disk-in-package authoring convention") for the full rationale and [`packages/3-extensions/test-contract-space`](../test-contract-space) for the reference model.
+See [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md) ("On-disk-in-package authoring convention") for the full rationale and [`packages/3-extensions/test-contract-space`](../test-contract-space) for the reference model.
 
 ## Runtime usage
 
@@ -164,7 +164,7 @@ See [`DEVELOPING.md`](./DEVELOPING.md) for source layout, design choices, and th
 - [CipherStash](https://cipherstash.com) — managed application-layer encryption for Postgres.
 - [Prisma Next Architecture Overview](../../../docs/Architecture%20Overview.md).
 - [Extension Packs Naming and Layout](../../../docs/reference/Extension-Packs-Naming-and-Layout.md).
-- [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
-- [ADR 212 — Codec lifecycle hooks](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Codec%20lifecycle%20hooks.md)
+- [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md)
+- [ADR 213 — Codec lifecycle hooks](../../../docs/architecture%20docs/adrs/ADR%20213%20-%20Codec%20lifecycle%20hooks.md)
 - [Subsystem doc — Ecosystem Extensions & Packs](../../../docs/architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20%26%20Packs.md)
 - Reference fixture: [`packages/3-extensions/test-contract-space`](../test-contract-space)

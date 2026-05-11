@@ -1,4 +1,4 @@
-# ADR 211 — Contract spaces
+# ADR 212 — Contract spaces
 
 ## Status
 
@@ -281,7 +281,7 @@ Pgvector's `vector` type is in its IR; `CREATE EXTENSION vector` is the body of 
 
 A single `migrate` invocation produces one migration directory per space whose contract changed in this emit, plus refreshed pinned per-space files for every loaded extension. Each migration's `ops.json` is space-scoped — it contains only ops belonging to that space.
 
-**Codec-emitted ops belong to app-space** and are inlined into the relevant app-space migration's `ops.json` alongside the user's own structural ops. See [ADR 212 — Codec lifecycle hooks](./ADR%20212%20-%20Codec%20lifecycle%20hooks.md) for the hook contract and rationale.
+**Codec-emitted ops belong to app-space** and are inlined into the relevant app-space migration's `ops.json` alongside the user's own structural ops. See [ADR 213 — Codec lifecycle hooks](./ADR%20213%20-%20Codec%20lifecycle%20hooks.md) for the hook contract and rationale.
 
 ```jsonc
 // app-space migration: 20260508T0942_user_init/ops.json
@@ -352,7 +352,7 @@ The asymmetry between `migrate` (authoring) and the apply/verify path is what ma
 - **Extension removal semantics.** Removing an extension from `extensionPacks` while user schema still depends on extension-installed types (e.g. `Encrypted<String>` columns referencing `eql_v2_encrypted`). Until addressed, removal is unsupported and the verifier reports orphan marker rows as errors.
 - **Codec-id-changed lifecycle event.** When a user upgrades an extension in a way that changes a codec ID (`cipherstash:string@1` → `@2`), the codec needs a way to emit a "rotate" migration op. Cleanly extends the existing event vocabulary; deferred until needed.
 - **Cross-space dependencies as a first-class concept.** Convention-based ordering (extensions first, app-space second) is sufficient for v1 given the single-transaction property.
-- **Cross-space codec hooks.** Codec-emitted ops are app-space-bound by API shape — the hook signature has no parameter for cross-space context. See [ADR 212](./ADR%20212%20-%20Codec%20lifecycle%20hooks.md).
+- **Cross-space codec hooks.** Codec-emitted ops are app-space-bound by API shape — the hook signature has no parameter for cross-space context. See [ADR 213](./ADR%20213%20-%20Codec%20lifecycle%20hooks.md).
 - **`refs/head.json` ergonomics.** Today the extension author hand-pins `refs/head.json` after running `migration plan` (copy `to` from the latest migration's metadata; copy `providedInvariants` from the same). Adding a `prisma-next refs update` (or equivalent) command that emits/refreshes head pins from the latest migration is a small follow-up; until it ships, the `test-contract-space` reference model documents the manual step.
 - **Relocate `adapter-postgres`'s pgvector test fixtures.** M3.5 R3 broke an `adapter-postgres ↔ extension-pgvector` workspace cycle by demoting `@prisma-next/adapter-postgres` to an optional `peerDependencies` entry on `@prisma-next/extension-pgvector` (the cycle exists because `adapter-postgres`'s tests import pgvector fixtures — planner-test, sql-renderer cast policy, control-adapter parity — and pgvector's new `prisma-next.config.ts` flow needs `adapter-postgres`). The peerDeps workaround is correct in install/runtime semantics but papers over a real layering issue. Proper resolution: relocate `adapter-postgres`'s pgvector-specific test fixtures into either pgvector's own test suite or a separate `extension-pgvector-fixtures` test package, then revert the peerDeps entry to a regular `devDependencies` line. Out of scope for the M3.5 alignment work; tracked here so the workaround's rationale is discoverable.
 
@@ -363,4 +363,4 @@ The asymmetry between `migrate` (authoring) and the apply/verify path is what ma
 - [ADR 197 — Migration packages snapshot their own contract](./ADR%20197%20-%20Migration%20packages%20snapshot%20their%20own%20contract.md) — per-package metadata shape used by `MigrationPackage`.
 - [ADR 208 — Invariant-aware migration routing](./ADR%20208%20-%20Invariant-aware%20migration%20routing.md) — `findPathWithDecision` primitive that `db init` / `db update` use per space.
 - [ADR 169 — On-disk migration persistence](./ADR%20169%20-%20On-disk%20migration%20persistence.md) — the migration directory shape extended per-space.
-- [ADR 212 — Codec lifecycle hooks](./ADR%20212%20-%20Codec%20lifecycle%20hooks.md) — schema-driven companion mechanism that emits app-space ops in response to per-field events.
+- [ADR 213 — Codec lifecycle hooks](./ADR%20213%20-%20Codec%20lifecycle%20hooks.md) — schema-driven companion mechanism that emits app-space ops in response to per-field events.

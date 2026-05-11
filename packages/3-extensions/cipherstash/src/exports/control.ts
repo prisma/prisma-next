@@ -24,7 +24,7 @@
  *     `add_search_config` / `remove_search_config` / rotate behaviour
  *     for `searchable: true` `Encrypted<string>` columns.
  *
- * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
+ * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  *   (on-disk-in-package authoring convention).
  * @see packages/3-extensions/test-contract-space/src/exports/control.ts
  *   (reference model).
