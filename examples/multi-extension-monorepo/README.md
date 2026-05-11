@@ -69,7 +69,7 @@ Each internal "package" under `packages/` follows the **on-disk-in-package autho
    pnpm exec prisma-next migration plan --name <slug>
    ```
 
-   Then hand-edit the generated `migrations/<pkg>/<dir>/migration.ts`'s `operations` getter so each op carries the package's stable `<pkg>:<change>-vN` invariantId (invariantIds cannot be renamed once published). Re-emit `ops.json` + `migration.json`:
+   Then hand-edit the generated `migrations/<pkg>/<dir>/migration.ts`'s `operations` getter so each op carries the package's stable `<pkg>:<change>-vN` `invariantId` (invariant IDs cannot be renamed once published). Re-emit `ops.json` + `migration.json`:
 
    ```sh
    node migrations/<pkg>/<dir>/migration.ts

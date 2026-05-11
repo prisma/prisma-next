@@ -154,7 +154,7 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
 
 export interface SqlControlExtensionDescriptor<TTargetId extends string>
   extends ControlExtensionDescriptor<'sql', TTargetId> {
-  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
+  readonly queryOperations?: () => SqlOperationDescriptors;
   /**
    * Schema-contributing extensions opt into the per-space planner / runner /
    * verifier by setting this field. Extensions without it are codec-only or
@@ -165,8 +165,6 @@ export interface SqlControlExtensionDescriptor<TTargetId extends string>
    * not a SQL-specific one. The SQL family specialises the generic to
    * `Contract<SqlStorage>` so descriptor authors continue to see a
    * typed contract value.
-   *
-   * @see specs/framework-mechanism.spec.md § 1.
    */
   readonly contractSpace?: ContractSpace<Contract<SqlStorage>>;
 }
