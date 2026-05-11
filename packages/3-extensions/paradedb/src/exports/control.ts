@@ -4,7 +4,7 @@
  * **On-disk-in-package authoring.** The extension's contract
  * + migrations are emitted by the same pipeline application authors use:
  *
- *   `prisma-next contract emit` → `<package>/contract.{json,d.ts}`
+ *   `prisma-next contract emit` → `<package>/src/contract/contract.{json,d.ts}`
  *   `prisma-next migration plan` → `<package>/migrations/paradedb/<dir>/...`
  *
  * The descriptor wires those JSON artefacts via JSON-import declarations
@@ -38,14 +38,14 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import contractJson from '../../contract.json' with { type: 'json' };
 import baselineMetadata from '../../migrations/paradedb/20260601T0000_install_pg_search_extension/migration.json' with {
   type: 'json',
 };
 import baselineOps from '../../migrations/paradedb/20260601T0000_install_pg_search_extension/ops.json' with {
   type: 'json',
 };
-import headRef from '../../refs/head.json' with { type: 'json' };
+import headRef from '../../migrations/paradedb/refs/head.json' with { type: 'json' };
+import contractJson from '../contract/contract.json' with { type: 'json' };
 import { PARADEDB_SPACE_ID } from '../core/constants';
 import { paradedbPackMeta, paradedbQueryOperations } from '../core/descriptor-meta';
 
