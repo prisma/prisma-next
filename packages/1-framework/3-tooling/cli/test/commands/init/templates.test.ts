@@ -61,18 +61,38 @@ describe('templates', () => {
       expect(schema).toContain('@@map("posts")');
     });
 
-    it('uses defineContract for postgres TypeScript', () => {
+    it('uses defineContract for postgres TypeScript imported from facade', () => {
       const schema = starterSchema('postgres', 'typescript');
 
       expect(schema).toContain('defineContract');
-      expect(schema).toContain("from '@prisma-next/sql-contract-ts/contract-builder'");
+      expect(schema).toContain("from '@prisma-next/postgres/contract-builder'");
     });
 
-    it('uses defineContract for mongo TypeScript', () => {
+    it('uses defineContract for mongo TypeScript imported from facade', () => {
       const schema = starterSchema('mongo', 'typescript');
 
       expect(schema).toContain('defineContract');
-      expect(schema).toContain("from '@prisma-next/mongo-contract-ts/contract-builder'");
+      expect(schema).toContain("from '@prisma-next/mongo/contract-builder'");
+    });
+
+    it('only imports from the facade package for postgres TypeScript', () => {
+      const schema = starterSchema('postgres', 'typescript');
+
+      const imports = schema.match(/from '@prisma-next\/[^']+'/g) ?? [];
+      expect(imports.length).toBeGreaterThan(0);
+      for (const importLine of imports) {
+        expect(importLine).toMatch(/from '@prisma-next\/postgres(\/[^']+)?'/);
+      }
+    });
+
+    it('only imports from the facade package for mongo TypeScript', () => {
+      const schema = starterSchema('mongo', 'typescript');
+
+      const imports = schema.match(/from '@prisma-next\/[^']+'/g) ?? [];
+      expect(imports.length).toBeGreaterThan(0);
+      for (const importLine of imports) {
+        expect(importLine).toMatch(/from '@prisma-next\/mongo(\/[^']+)?'/);
+      }
     });
 
     // FR5.3: TS schema templates for Postgres and Mongo share a single
@@ -313,7 +333,7 @@ describe('templates', () => {
 
         expect(md).toContain('```typescript');
         expect(md).toContain('defineContract');
-        expect(md).toContain("from '@prisma-next/sql-contract-ts/contract-builder'");
+        expect(md).toContain("from '@prisma-next/postgres/contract-builder'");
         expect(md).not.toContain('```prisma');
         expect(md).not.toMatch(/^model User \{/m);
       });
@@ -337,7 +357,7 @@ describe('templates', () => {
 
         expect(md).toContain('```typescript');
         expect(md).toContain('defineContract');
-        expect(md).toContain("from '@prisma-next/mongo-contract-ts/contract-builder'");
+        expect(md).toContain("from '@prisma-next/mongo/contract-builder'");
         expect(md).not.toContain('```prisma');
         expect(md).not.toMatch(/^model User \{/m);
       });
