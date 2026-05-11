@@ -34,7 +34,6 @@ export type ProfileHash =
   ProfileHashBase<'sha256:4afac8f9fa43b8aa78ee7fb8b1b3e079e92b64ef745e9f115be11e201eb08ef1'>;
 
 export type CodecTypes = PgTypes;
-export type OperationTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
   ParadeDbQueryOperationTypes<CodecTypes>;
@@ -60,7 +59,6 @@ export type FieldInputTypes = {
 };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
-  OperationTypes,
   QueryOperationTypes,
   FieldOutputTypes,
   FieldInputTypes

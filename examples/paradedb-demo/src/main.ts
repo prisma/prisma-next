@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { loadAppConfig } from './app-config';
+import { ormClientBm25TopMatches } from './orm-client/bm25-top-matches';
 import { db } from './prisma/db';
 import { bm25CastDemo } from './queries/bm25-cast-demo';
 import { bm25ChainDemo } from './queries/bm25-chain-demo';
@@ -102,9 +103,18 @@ async function main() {
     } else if (cmd === 'cast-demo') {
       const rows = await bm25CastDemo();
       console.log(JSON.stringify(rows, null, 2));
+    } else if (cmd === 'orm-top') {
+      const [query, limitStr] = args;
+      if (!query) {
+        console.error('Usage: pnpm start -- orm-top <query> [limit]');
+        process.exit(1);
+      }
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const rows = await ormClientBm25TopMatches(query, limit, runtime);
+      console.log(JSON.stringify(rows, null, 2));
     } else {
       console.log(
-        'Usage: pnpm start -- [match <query> [limit] | top <query> [limit] | fuzzy <term> <distance> [limit] | proximity <term1> <term2> <distance> [limit] | proximity-chain <t0> <d1> <t1> [<d2> <t2> ...] | chain-demo | mode-tour | cast-demo]',
+        'Usage: pnpm start -- [match <query> [limit] | top <query> [limit] | fuzzy <term> <distance> [limit] | proximity <term1> <term2> <distance> [limit] | proximity-chain <t0> <d1> <t1> [<d2> <t2> ...] | chain-demo | mode-tour | cast-demo | orm-top <query> [limit]]',
       );
       process.exit(1);
     }
