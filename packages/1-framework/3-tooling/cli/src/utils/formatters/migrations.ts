@@ -294,7 +294,8 @@ export function formatMigrationApplyCommandOutput(
   return lines.join('\n');
 }
 
-interface MigrationShowResult {
+interface MigrationShowSpaceResult {
+  readonly spaceId: string;
   readonly dirName: string;
   readonly dirPath: string;
   readonly from: string | null;
@@ -310,39 +311,40 @@ interface MigrationShowResult {
   readonly summary: string;
 }
 
-export function formatMigrationShowOutput(result: MigrationShowResult, flags: GlobalFlags): string {
-  if (flags.quiet) {
-    return '';
-  }
+interface MigrationShowResult {
+  readonly spaces: readonly MigrationShowSpaceResult[];
+}
 
-  const lines: string[] = [];
-
-  const useColor = flags.color !== false;
+function formatSpaceShowBlock(
+  space: MigrationShowSpaceResult,
+  useColor: boolean,
+): readonly string[] {
   const formatGreen = createColorFormatter(useColor, green);
   const formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  lines.push(`${formatGreen('✔')} ${result.dirName}`);
-  lines.push(`${formatDimText(`  from: ${result.from ?? '(baseline)'}`)}`);
-  lines.push(`${formatDimText(`  to:   ${result.to}`)}`);
-  lines.push(`${formatDimText(`  migrationHash: ${result.migrationHash}`)}`);
-  lines.push(`${formatDimText(`  created: ${result.createdAt}`)}`);
+  const lines: string[] = [];
+  lines.push(`${formatGreen('✔')} ${space.dirName}`);
+  lines.push(`${formatDimText(`  from: ${space.from ?? '(baseline)'}`)}`);
+  lines.push(`${formatDimText(`  to:   ${space.to}`)}`);
+  lines.push(`${formatDimText(`  migrationHash: ${space.migrationHash}`)}`);
+  lines.push(`${formatDimText(`  created: ${space.createdAt}`)}`);
 
   lines.push('');
-  lines.push(`${result.operations.length} operation(s)`);
+  lines.push(`${space.operations.length} operation(s)`);
 
-  if (result.operations.length > 0) {
+  if (space.operations.length > 0) {
     lines.push(`${formatDimText('│')}`);
-    for (let i = 0; i < result.operations.length; i++) {
-      const op = result.operations[i]!;
-      const isLast = i === result.operations.length - 1;
+    for (let i = 0; i < space.operations.length; i++) {
+      const op = space.operations[i]!;
+      const isLast = i === space.operations.length - 1;
       const treeChar = isLast ? '└' : '├';
       const destructiveMarker =
         op.operationClass === 'destructive' ? ` ${formatYellow('(destructive)')}` : '';
       lines.push(`${formatDimText(treeChar)}─ ${op.label}${destructiveMarker}`);
     }
 
-    const hasDestructive = result.operations.some((op) => op.operationClass === 'destructive');
+    const hasDestructive = space.operations.some((op) => op.operationClass === 'destructive');
     if (hasDestructive) {
       lines.push('');
       lines.push(
@@ -351,15 +353,41 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
     }
   }
 
-  if (result.preview.statements.length > 0) {
+  if (space.preview.statements.length > 0) {
     lines.push('');
-    lines.push(`${formatDimText(previewBlockHeader(result.preview))}`);
+    lines.push(`${formatDimText(previewBlockHeader(space.preview))}`);
     lines.push('');
-    for (const statement of result.preview.statements) {
+    for (const statement of space.preview.statements) {
       const rendered = renderPreviewStatement(statement.text, statement.language);
       if (rendered) {
         lines.push(rendered);
       }
+    }
+  }
+
+  return lines;
+}
+
+export function formatMigrationShowOutput(result: MigrationShowResult, flags: GlobalFlags): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const useColor = flags.color !== false;
+  const formatDimText = (text: string) => formatDim(useColor, text);
+  const multipleSpaces = result.spaces.length > 1;
+  const lines: string[] = [];
+
+  for (let i = 0; i < result.spaces.length; i++) {
+    const space = result.spaces[i]!;
+    if (multipleSpaces) {
+      lines.push(formatDimText(`── ${space.spaceId} ──`));
+    }
+    for (const line of formatSpaceShowBlock(space, useColor)) {
+      lines.push(line);
+    }
+    if (i < result.spaces.length - 1) {
+      lines.push('');
     }
   }
 

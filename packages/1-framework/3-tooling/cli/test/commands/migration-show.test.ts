@@ -15,6 +15,7 @@ import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
+import type { MigrationShowSpaceResult } from '../../src/commands/migration-show';
 import { resolveByHashPrefix } from '../../src/commands/migration-show';
 import { formatMigrationShowOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
@@ -275,11 +276,18 @@ describe('resolveByHashPrefix', () => {
   });
 });
 
+function singleSpace(space: MigrationShowSpaceResult): {
+  spaces: readonly MigrationShowSpaceResult[];
+} {
+  return { spaces: [space] };
+}
+
 describe('formatMigrationShowOutput', () => {
   it('shows migration metadata', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
-      {
+      singleSpace({
+        spaceId: 'app',
         dirName: '20260101_100000_add_user',
         dirPath: 'migrations/20260101_100000_add_user',
         from: null,
@@ -293,7 +301,7 @@ describe('formatMigrationShowOutput', () => {
           statements: [{ text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' }],
         },
         summary: '1 operation(s)',
-      },
+      }),
       flags,
     );
     const stripped = stripAnsi(output);
@@ -308,7 +316,8 @@ describe('formatMigrationShowOutput', () => {
   it('shows operations tree with class labels', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
-      {
+      singleSpace({
+        spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
         from: null,
@@ -325,7 +334,7 @@ describe('formatMigrationShowOutput', () => {
         ],
         preview: { statements: [] },
         summary: '2 operation(s)',
-      },
+      }),
       flags,
     );
     const stripped = stripAnsi(output);
@@ -344,7 +353,8 @@ describe('formatMigrationShowOutput', () => {
   it('shows destructive warning when operations include destructive', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
-      {
+      singleSpace({
+        spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
         from: null,
@@ -362,7 +372,7 @@ describe('formatMigrationShowOutput', () => {
           statements: [{ text: 'ALTER TABLE "post" DROP COLUMN "legacy"', language: 'sql' }],
         },
         summary: '1 operation(s)',
-      },
+      }),
       flags,
     );
     const stripped = stripAnsi(output);
@@ -375,7 +385,8 @@ describe('formatMigrationShowOutput', () => {
   it('omits destructive warning when all additive', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
-      {
+      singleSpace({
+        spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
         from: null,
@@ -389,7 +400,7 @@ describe('formatMigrationShowOutput', () => {
           statements: [{ text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' }],
         },
         summary: '1 operation(s)',
-      },
+      }),
       flags,
     );
     const stripped = stripAnsi(output);
@@ -401,7 +412,8 @@ describe('formatMigrationShowOutput', () => {
   it('shows DDL preview', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
-      {
+      singleSpace({
+        spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
         from: null,
@@ -415,7 +427,7 @@ describe('formatMigrationShowOutput', () => {
           statements: [{ text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' }],
         },
         summary: '1 operation(s)',
-      },
+      }),
       flags,
     );
     const stripped = stripAnsi(output);
@@ -427,7 +439,8 @@ describe('formatMigrationShowOutput', () => {
   it('returns empty string in quiet mode', () => {
     const flags = parseGlobalFlags({ quiet: true });
     const output = formatMigrationShowOutput(
-      {
+      singleSpace({
+        spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
         from: null,
@@ -437,10 +450,51 @@ describe('formatMigrationShowOutput', () => {
         operations: [],
         preview: { statements: [] },
         summary: '0 operation(s)',
-      },
+      }),
       flags,
     );
 
     expect(output).toBe('');
+  });
+
+  it('renders per-space section headings when multiple spaces are present', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationShowOutput(
+      {
+        spaces: [
+          {
+            spaceId: 'app',
+            dirName: '20260101_100000_app_init',
+            dirPath: 'migrations/app/20260101_100000_app_init',
+            from: null,
+            to: 'sha256:hash-app',
+            migrationHash: 'sha256:mhash-app',
+            createdAt: '2026-01-01T10:00:00.000Z',
+            operations: [],
+            preview: { statements: [] },
+            summary: '0 operation(s)',
+          },
+          {
+            spaceId: 'cipherstash',
+            dirName: '0000000001-init',
+            dirPath: 'migrations/cipherstash/0000000001-init',
+            from: null,
+            to: 'sha256:hash-cs',
+            migrationHash: 'sha256:mhash-cs',
+            createdAt: '2026-01-01T10:00:00.000Z',
+            operations: [],
+            preview: { statements: [] },
+            summary: '0 operation(s)',
+          },
+        ],
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('── app ──');
+    expect(stripped).toContain('── cipherstash ──');
+    expect(stripped).toContain('20260101_100000_app_init');
+    expect(stripped).toContain('0000000001-init');
   });
 });

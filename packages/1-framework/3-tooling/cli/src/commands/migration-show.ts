@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationPlanOperation,
   OperationPreview,
@@ -9,7 +11,7 @@ import {
   reconstructGraph,
 } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
-import { APP_SPACE_ID, spaceMigrationDirectory } from '@prisma-next/migration-tools/spaces';
+import { spaceMigrationDirectory } from '@prisma-next/migration-tools/spaces';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -17,15 +19,20 @@ import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
   type CliStructuredError,
+  errorContractValidationFailed,
+  errorFileNotFound,
   errorRuntime,
   errorUnexpected,
   mapMigrationToolsError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
+  resolveContractPath,
+  resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import { buildContractSpaceAggregate } from '../utils/contract-space-aggregate-loader';
 import { formatMigrationShowOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -37,8 +44,11 @@ interface MigrationShowOptions extends CommonCommandOptions {
   readonly config?: string;
 }
 
-export interface MigrationShowResult {
-  readonly ok: true;
+/**
+ * Details of one space's latest (or targeted) migration package.
+ */
+export interface MigrationShowSpaceResult {
+  readonly spaceId: string;
   readonly dirName: string;
   readonly dirPath: string;
   readonly from: string | null;
@@ -51,13 +61,21 @@ export interface MigrationShowResult {
     readonly operationClass: string;
   }[];
   /**
-   * Family-agnostic textual preview of the migration's operations. Replaces
-   * the previous string-array DDL field. Always defined; statements is empty
-   * for a no-op migration or a family that does not implement the
-   * `OperationPreviewCapable` capability.
+   * Family-agnostic textual preview of the migration's operations. Always
+   * defined; statements is empty for a no-op migration or a family that does
+   * not implement the `OperationPreviewCapable` capability.
    */
   readonly preview: OperationPreview;
   readonly summary: string;
+}
+
+export interface MigrationShowResult {
+  readonly ok: true;
+  /**
+   * Per-space results, ordered: app first, then extensions alphabetically
+   * (matching the aggregate's canonical ordering).
+   */
+  readonly spaces: readonly MigrationShowSpaceResult[];
 }
 
 function looksLikePath(target: string): boolean {
@@ -93,6 +111,58 @@ export function resolveByHashPrefix(
   );
 }
 
+/**
+ * Resolve the latest migration from a space directory. Returns `null` if the
+ * directory is empty or does not exist (ENOENT is absorbed by `readMigrationsDir`).
+ */
+async function resolveLatestFromDir(
+  spaceDir: string,
+): Promise<Result<OnDiskMigrationPackage | null, CliStructuredError>> {
+  try {
+    const allPackages = await readMigrationsDir(spaceDir);
+    if (allPackages.length === 0) return ok(null);
+    const graph = reconstructGraph(allPackages);
+    const latestMigration = findLatestMigration(graph);
+    if (!latestMigration) return ok(null);
+    const leafPkg = allPackages.find(
+      (p) => p.metadata.migrationHash === latestMigration.migrationHash,
+    );
+    return ok(leafPkg ?? null);
+  } catch (error) {
+    if (MigrationToolsError.is(error)) return notOk(mapMigrationToolsError(error));
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: `Failed to read migrations: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    );
+  }
+}
+
+function pkgToSpaceResult(
+  spaceId: string,
+  pkg: OnDiskMigrationPackage,
+  client: ReturnType<typeof createControlClient>,
+): MigrationShowSpaceResult {
+  const ops = pkg.ops as readonly MigrationPlanOperation[];
+  const preview: OperationPreview = client.toOperationPreview(ops) ?? { statements: [] };
+  return {
+    spaceId,
+    dirName: pkg.dirName,
+    dirPath: relative(process.cwd(), pkg.dirPath),
+    from: pkg.metadata.from,
+    to: pkg.metadata.to,
+    migrationHash: pkg.metadata.migrationHash,
+    createdAt: pkg.metadata.createdAt,
+    operations: ops.map((op) => ({
+      id: op.id,
+      label: op.label,
+      operationClass: op.operationClass,
+    })),
+    preview,
+    summary: `${ops.length} operation(s)`,
+  };
+}
+
 async function executeMigrationShowCommand(
   target: string | undefined,
   options: MigrationShowOptions,
@@ -100,20 +170,16 @@ async function executeMigrationShowCommand(
   ui: TerminalUI,
 ): Promise<Result<MigrationShowResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const configPath = options.config
-    ? relative(process.cwd(), resolve(options.config))
-    : 'prisma-next.config.ts';
+  const { configPath, migrationsDir, appMigrationsDir, appMigrationsRelative } =
+    resolveMigrationPaths(options.config, config);
 
-  const migrationsDirRoot = resolve(
-    options.config ? resolve(options.config, '..') : process.cwd(),
-    config.migrations?.dir ?? 'migrations',
-  );
-  const appMigrationsDir = spaceMigrationDirectory(migrationsDirRoot, APP_SPACE_ID);
-  const appMigrationsRelative = relative(process.cwd(), appMigrationsDir);
+  const contractPathAbsolute = resolveContractPath(config);
+  const contractPath = relative(process.cwd(), contractPathAbsolute);
 
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
+      { label: 'contract', value: contractPath },
       { label: 'migrations', value: appMigrationsRelative },
     ];
     if (target) {
@@ -128,11 +194,73 @@ async function executeMigrationShowCommand(
     ui.stderr(header);
   }
 
-  let pkg: OnDiskMigrationPackage;
-
+  // Load the app contract so the aggregate loader can validate it.
+  let contractJsonContent: string;
   try {
+    contractJsonContent = await readFile(contractPathAbsolute, 'utf-8');
+  } catch (error) {
+    if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+      return notOk(
+        errorFileNotFound(contractPathAbsolute, {
+          why: `Contract file not found at ${contractPathAbsolute}`,
+          fix: `Run \`prisma-next contract emit\` to generate ${contractPath}`,
+        }),
+      );
+    }
+    return notOk(
+      errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: 'Failed to read contract file',
+      }),
+    );
+  }
+
+  let appContract: Contract;
+  try {
+    appContract = JSON.parse(contractJsonContent) as Contract;
+  } catch (error) {
+    return notOk(
+      errorContractValidationFailed(
+        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        { where: { path: contractPathAbsolute } },
+      ),
+    );
+  }
+
+  // Build the aggregate against current disk state to enumerate all spaces.
+  // biome-ignore lint/suspicious/noExplicitAny: factory accepts a stack-shaped object
+  const familyInstanceForValidate = config.family.create({} as any);
+  const aggregateResult = await buildContractSpaceAggregate({
+    targetId: config.target.targetId,
+    migrationsDir,
+    appContract,
+    // biome-ignore lint/suspicious/noExplicitAny: extension descriptors carry family-bound generics
+    extensionPacks: (config.extensionPacks ?? []) as ReadonlyArray<any>,
+    // biome-ignore lint/suspicious/noExplicitAny: stand-in for typed Contract
+    validateContract: (json: unknown) => familyInstanceForValidate.validateContract(json) as any,
+  });
+  if (!aggregateResult.ok) {
+    return notOk(aggregateResult.failure);
+  }
+  const aggregate = aggregateResult.value;
+
+  // `migration show` is an offline command; the control client is constructed
+  // purely to dispatch the family-specific `toOperationPreview` capability and
+  // is not connected to a database.
+  const client = createControlClient({
+    family: config.family,
+    target: config.target,
+    adapter: config.adapter,
+    ...(config.driver ? { driver: config.driver } : {}),
+    extensionPacks: config.extensionPacks ?? [],
+  });
+
+  const spaces: MigrationShowSpaceResult[] = [];
+
+  // App space: honour the `target` argument (path or hash prefix) when provided.
+  try {
+    let appPkg: OnDiskMigrationPackage;
     if (target && looksLikePath(target)) {
-      pkg = await readMigrationPackage(resolve(target));
+      appPkg = await readMigrationPackage(resolve(target));
     } else {
       const allPackages = await readMigrationsDir(appMigrationsDir);
       if (allPackages.length === 0) {
@@ -143,11 +271,10 @@ async function executeMigrationShowCommand(
           }),
         );
       }
-
       if (target) {
         const resolved = resolveByHashPrefix(allPackages, target);
         if (!resolved.ok) return resolved;
-        pkg = resolved.value;
+        appPkg = resolved.value;
       } else {
         const graph = reconstructGraph(allPackages);
         const latestMigration = findLatestMigration(graph);
@@ -170,51 +297,32 @@ async function executeMigrationShowCommand(
             }),
           );
         }
-        pkg = leafPkg;
+        appPkg = leafPkg;
       }
     }
+    spaces.push(pkgToSpaceResult(aggregate.app.spaceId, appPkg, client));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
     }
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Failed to read migration: ${error instanceof Error ? error.message : String(error)}`,
+        why: `Failed to read app-space migration: ${error instanceof Error ? error.message : String(error)}`,
       }),
     );
   }
 
-  const ops = pkg.ops as readonly MigrationPlanOperation[];
+  // Extension spaces: always show the latest migration from each space.
+  for (const ext of aggregate.extensions) {
+    const extSpaceDir = spaceMigrationDirectory(migrationsDir, ext.spaceId);
+    const extPkgResult = await resolveLatestFromDir(extSpaceDir);
+    if (!extPkgResult.ok) return extPkgResult;
+    if (extPkgResult.value !== null) {
+      spaces.push(pkgToSpaceResult(ext.spaceId, extPkgResult.value, client));
+    }
+  }
 
-  // `migration show` is an offline command; the control client is constructed
-  // purely to dispatch the family-specific `toOperationPreview` capability and
-  // is not connected to a database.
-  const client = createControlClient({
-    family: config.family,
-    target: config.target,
-    adapter: config.adapter,
-    ...(config.driver ? { driver: config.driver } : {}),
-    extensionPacks: config.extensionPacks ?? [],
-  });
-  const preview: OperationPreview = client.toOperationPreview(ops) ?? { statements: [] };
-
-  const result: MigrationShowResult = {
-    ok: true,
-    dirName: pkg.dirName,
-    dirPath: relative(process.cwd(), pkg.dirPath),
-    from: pkg.metadata.from,
-    to: pkg.metadata.to,
-    migrationHash: pkg.metadata.migrationHash,
-    createdAt: pkg.metadata.createdAt,
-    operations: ops.map((op) => ({
-      id: op.id,
-      label: op.label,
-      operationClass: op.operationClass,
-    })),
-    preview,
-    summary: `${ops.length} operation(s)`,
-  };
-  return ok(result);
+  return ok({ ok: true, spaces });
 }
 
 export function createMigrationShowCommand(): Command {
@@ -222,16 +330,16 @@ export function createMigrationShowCommand(): Command {
   setCommandDescriptions(
     command,
     'Display migration package contents',
-    'Shows the operations, statement preview, and metadata for a migration package.\n' +
-      'Accepts a directory path, a hash prefix (git-style), or defaults to the\n' +
-      'latest migration.',
+    'Shows the operations, statement preview, and metadata for every loaded contract\n' +
+      'space (app + extensions). Accepts a directory path or hash prefix to target a\n' +
+      'specific app-space migration; defaults to the latest per space.',
   );
   setCommandExamples(command, [
     'prisma-next migration show',
     'prisma-next migration show sha256:a1b2c3',
   ]);
   addGlobalOptions(command)
-    .argument('[target]', 'Migration directory path or migrationHash prefix (defaults to latest)')
+    .argument('[target]', 'App-space migration path or migrationHash prefix (defaults to latest)')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (target: string | undefined, options: MigrationShowOptions) => {
       const flags = parseGlobalFlags(options);
