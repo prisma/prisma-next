@@ -70,7 +70,10 @@ import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces'
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { APP_CONTRACT_HASH_VALUE, APP_USER_TABLE, appContract } from '../app/contract';
+import { APP_USER_TABLE, contract as appContract } from '../app/contract-source';
+
+const APP_CONTRACT_HASH_VALUE = appContract.storage.storageHash;
+
 import {
   AUDIT_BASELINE_INVARIANT_ID,
   AUDIT_EVENT_TABLE,
@@ -174,7 +177,7 @@ async function setupTestProject(): Promise<TestProject> {
 }
 
 describe.sequential(
-  'multi-extension-monorepo end-to-end (PGlite, T4.4)',
+  'multi-extension-monorepo end-to-end (PGlite)',
   { timeout: timeouts.spinUpPpgDev },
   () => {
     let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -207,7 +210,7 @@ describe.sequential(
       }
     });
 
-    it('pinned per-space artefacts land for both extension spaces (TC-8)', async () => {
+    it('pinned per-space artefacts land for both extension spaces', async () => {
       project = await setupTestProject();
 
       const auditHeadJson = JSON.parse(
@@ -284,7 +287,7 @@ describe.sequential(
       expect(appIdx).toBeGreaterThan(featureFlagsIdx);
     });
 
-    it('mode=apply: three spaces apply atomically; markers + round-trips OK (TC-8 / AC5)', async () => {
+    it('mode=apply: three spaces apply atomically; markers + round-trips OK', async () => {
       project = await setupTestProject();
 
       const result = await executeDbInit({

@@ -12,7 +12,7 @@ This example exercises that property end-to-end against PGlite (the embedded Pos
 - a single baseline migration that creates the table,
 - a stable `<package>:create-<table>-v1` invariantId.
 
-The aggregator (the example application itself) declares its own `User` table and lists both internal extensions in its `prisma-next.config.ts`-equivalent. After `migrate` + `apply`:
+The aggregator (`app/`) declares its own `User` table and lists both internal extensions in its `prisma-next.config.ts`. After `migrate` + `apply`:
 
 - pinned artefacts land at `migrations/audit/{contract.json,contract.d.ts,refs/head.json}` and `migrations/feature-flags/...`;
 - migration directories at `migrations/audit/<dirName>/` and `migrations/feature-flags/<dirName>/`;
@@ -20,26 +20,29 @@ The aggregator (the example application itself) declares its own `User` table an
 
 ## Layout
 
-This example is shipped as a single workspace package for ergonomic reasons (the framework's package layering treats `examples/*` as the top-level glob — see `pnpm-workspace.yaml`). The internal `packages/*` subdirectories play the role of separately-published packages in a real monorepo: each has its own descriptor module exporting an `SqlControlExtensionDescriptor` exactly as a published extension would. The application code under `app/` consumes them via relative imports where it would consume them via `workspace:*` dependencies in a real monorepo. The framework code path is identical either way — the descriptor module is the only seam.
-
 ```text
 examples/multi-extension-monorepo/
+├── app/                                 ← aggregate root (the "application")
+│   ├── prisma-next.config.ts            ← composes extensionPacks: [audit, featureFlags]
+│   └── contract-source.ts               ← application contract (declares `User`)
 ├── packages/
-│   ├── audit/                         ← internal "package" #1
+│   ├── audit/                           ← internal "package" #1
 │   │   ├── constants.ts
-│   │   ├── contract-source.ts         ← TS authoring entry-point
-│   │   ├── prisma-next.config.ts      ← `prisma-next contract emit` driver
-│   │   ├── contract.json              ← emitted (do not edit)
-│   │   ├── contract.d.ts              ← emitted (do not edit)
-│   │   ├── refs/head.json             ← hand-pinned head ref
-│   │   ├── migrations/audit/<dir>/    ← emitted migration package
-│   │   └── control.ts                 ← `auditExtensionDescriptor` (JSON-import wiring)
-│   └── feature-flags/                 ← internal "package" #2 (same shape)
-├── app/
-│   └── contract.ts                    ← application contract (declares `User`)
+│   │   ├── contract-source.ts           ← TS authoring entry-point
+│   │   ├── prisma-next.config.ts        ← `prisma-next contract emit` driver
+│   │   ├── contract.json                ← emitted (do not edit)
+│   │   ├── contract.d.ts               ← emitted (do not edit)
+│   │   ├── refs/head.json               ← hand-pinned head ref
+│   │   ├── migrations/audit/<dir>/      ← emitted migration package
+│   │   └── control.ts                   ← `auditExtensionDescriptor` (JSON-import wiring)
+│   └── feature-flags/                   ← internal "package" #2 (same shape)
 └── test/
     └── multi-space.e2e.integration.test.ts
 ```
+
+The aggregate root at `app/prisma-next.config.ts` is the config an application author writes — the CLI reads it for `contract emit`, `migration plan`, `db init`, and `db update`. It imports the extension descriptors from `packages/*/control.ts` and lists them in `extensionPacks`, exactly as a real application would import published extensions from npm.
+
+This example is shipped as a single workspace package for ergonomic reasons (the framework's package layering treats `examples/*` as the top-level glob — see `pnpm-workspace.yaml`). The internal `packages/*` subdirectories play the role of separately-published packages in a real monorepo: each has its own descriptor module exporting an `SqlControlExtensionDescriptor` exactly as a published extension would. The framework code path is identical either way — the descriptor module is the only seam.
 
 ## Running
 
