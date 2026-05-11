@@ -42,6 +42,32 @@ function lookup(routingKey: CipherstashRoutingKey) {
   return { table: entry.table, column };
 }
 
+function isEncryptedEnvelope(value: unknown): value is Encrypted {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!Object.hasOwn(value, 'i') || !Object.hasOwn(value, 'v')) return false;
+  const candidate = value as { i: unknown; v: unknown; c?: unknown };
+  if (typeof candidate.v !== 'number') return false;
+  if (typeof candidate.i !== 'object' || candidate.i === null) return false;
+  if (!Object.hasOwn(candidate.i, 't') || !Object.hasOwn(candidate.i, 'c')) return false;
+  if (Object.hasOwn(candidate, 'c') && typeof candidate.c !== 'string') return false;
+  return true;
+}
+
+function ensureEncryptedEnvelope(
+  value: unknown,
+  kind: 'decrypt' | 'bulkDecrypt',
+  index?: number,
+): Encrypted {
+  if (!isEncryptedEnvelope(value)) {
+    const where = index === undefined ? '' : ` at index ${index}`;
+    throw new Error(
+      `cipherstash ${kind}: ciphertext${where} is not a valid EQL v2 envelope ` +
+        '(expected an object with `i: { t, c }`, numeric `v`, and optional string `c`).',
+    );
+  }
+  return value;
+}
+
 function ensureString(value: unknown, kind: 'decrypt' | 'bulkDecrypt'): string {
   if (typeof value !== 'string') {
     throw new Error(
@@ -69,9 +95,11 @@ export function createCipherstashSdk(): CipherstashSdk {
     async bulkDecrypt({ ciphertexts }) {
       // Framework-side ciphertexts are typed `unknown` to keep the SDK
       // contract opaque (see `CipherstashSingleDecryptArgs`); on the wire
-      // they're stack-shaped EQL v2 envelopes, so reinterpret them at the
-      // SDK boundary.
-      const payload = ciphertexts.map((data) => ({ data: data as Encrypted }));
+      // they're stack-shaped EQL v2 envelopes, so validate each one at
+      // the SDK boundary before handing it to the encryption client.
+      const payload = ciphertexts.map((data, index) => ({
+        data: ensureEncryptedEnvelope(data, 'bulkDecrypt', index),
+      }));
       const result = await encryptionClient.bulkDecrypt(payload);
       if (result.failure) {
         throw new Error(`cipherstash bulkDecrypt failed: ${result.failure.message}`);
@@ -85,7 +113,7 @@ export function createCipherstashSdk(): CipherstashSdk {
     },
 
     async decrypt({ ciphertext }) {
-      const result = await encryptionClient.decrypt(ciphertext as Encrypted);
+      const result = await encryptionClient.decrypt(ensureEncryptedEnvelope(ciphertext, 'decrypt'));
       if (result.failure) {
         throw new Error(`cipherstash decrypt failed: ${result.failure.message}`);
       }
