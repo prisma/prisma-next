@@ -1,7 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { type } from 'arktype';
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { validateIndexTypes } from '../src/index-type-validation';
+import { createIndexTypeRegistry } from '../src/index-types';
 import type { SqlStorage } from '../src/types';
 import { validateContract } from '../src/validate';
 
@@ -890,6 +893,94 @@ describe('validateContract', () => {
       expectTypeOf<ReturnType<typeof validateContract<Contract<SqlStorage>>>>().not.toEqualTypeOf<
         Promise<Contract<SqlStorage>>
       >();
+    });
+  });
+
+  describe('validateIndexTypes', () => {
+    function makeContractWithIndex(index: Record<string, unknown>) {
+      return makeContract({
+        User: {
+          columns: {
+            id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            body: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [index],
+          foreignKeys: [],
+        },
+      }) as Contract<SqlStorage>;
+    }
+
+    it('accepts a contract whose index references a registered type with valid options', () => {
+      const registry = createIndexTypeRegistry();
+      registry.register({
+        type: 'demo',
+        options: type({ fillfactor: 'number' }),
+      });
+      const contract = makeContractWithIndex({
+        columns: ['body'],
+        type: 'demo',
+        options: { fillfactor: 70 },
+      });
+      expect(() => validateIndexTypes(contract, registry)).not.toThrow();
+    });
+
+    it('rejects an index whose type is not registered', () => {
+      const registry = createIndexTypeRegistry();
+      const contract = makeContractWithIndex({ columns: ['body'], type: 'made-up' });
+      expect(() => validateIndexTypes(contract, registry)).toThrow(/made-up/);
+    });
+
+    it('rejects an index whose options fail the registered validator', () => {
+      const registry = createIndexTypeRegistry();
+      registry.register({
+        type: 'demo',
+        options: type({ fillfactor: 'number' }),
+      });
+      const contract = makeContractWithIndex({
+        columns: ['body'],
+        type: 'demo',
+        options: { fillfactor: 'not-a-number' },
+      });
+      expect(() => validateIndexTypes(contract, registry)).toThrow(/fillfactor/);
+    });
+
+    it('rejects extra option keys in strict mode', () => {
+      const registry = createIndexTypeRegistry();
+      registry.register({
+        type: 'demo',
+        options: type({ '+': 'reject', fillfactor: 'number' }),
+      });
+      const contract = makeContractWithIndex({
+        columns: ['body'],
+        type: 'demo',
+        options: { fillfactor: 70, unknown: 1 },
+      });
+      expect(() => validateIndexTypes(contract, registry)).toThrow(/unknown/);
+    });
+
+    it('rejects an index that has options without a type', () => {
+      const registry = createIndexTypeRegistry();
+      const contract = makeContractWithIndex({
+        columns: ['body'],
+        options: { fillfactor: 70 },
+      });
+      expect(() => validateIndexTypes(contract, registry)).toThrow(/options/);
+    });
+
+    it('accepts an index without type or options', () => {
+      const registry = createIndexTypeRegistry();
+      const contract = makeContractWithIndex({ columns: ['body'] });
+      expect(() => validateIndexTypes(contract, registry)).not.toThrow();
+    });
+
+    it('rejects a typed index against an empty registry', () => {
+      const registry = createIndexTypeRegistry();
+      const contract = makeContractWithIndex({ columns: ['body'], type: 'made-up' });
+      expect(() => validateIndexTypes(contract, registry)).toThrow(
+        /unregistered index type "made-up"/,
+      );
     });
   });
 });

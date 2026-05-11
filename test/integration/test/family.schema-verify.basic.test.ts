@@ -66,7 +66,7 @@ describe('family instance schemaVerify - basic', () => {
           },
         }).sql(({ cols, constraints }) => ({
           table: 'post',
-          indexes: [constraints.index(cols.userId)],
+          indexes: [constraints.index([cols.userId])],
         }));
 
         const contract = defineContract({

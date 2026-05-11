@@ -465,7 +465,7 @@ export type RelationState =
   | ManyToManyRelation;
 
 type AnyRelationState = RelationState;
-type AnyRelationBuilder = RelationBuilder<AnyRelationState>;
+export type AnyRelationBuilder = RelationBuilder<AnyRelationState>;
 
 type ApplyBelongsToRelationSqlSpec<
   State extends RelationState,
@@ -537,11 +537,21 @@ type ConstraintOptions<Name extends string | undefined = string | undefined> = {
   readonly name?: Name;
 };
 
-type IndexOptions<Name extends string | undefined = string | undefined> =
-  ConstraintOptions<Name> & {
-    readonly using?: string;
-    readonly config?: Record<string, unknown>;
-  };
+export type IndexTypeMap = Record<string, { readonly options: unknown }>;
+
+type IndexInput<
+  Name extends string | undefined,
+  IndexTypes extends IndexTypeMap,
+> = keyof IndexTypes extends never
+  ? ConstraintOptions<Name>
+  :
+      | (ConstraintOptions<Name> & { readonly type?: never; readonly options?: never })
+      | {
+          readonly [K in keyof IndexTypes & string]: ConstraintOptions<Name> & {
+            readonly type: K;
+            readonly options: IndexTypes[K]['options'];
+          };
+        }[keyof IndexTypes & string];
 
 type ForeignKeyOptions<Name extends string | undefined = string | undefined> =
   ConstraintOptions<Name> & {
@@ -577,8 +587,8 @@ export type IndexConstraint<
   readonly kind: 'index';
   readonly fields: FieldNames;
   readonly name?: Name;
-  readonly using?: string;
-  readonly config?: Record<string, unknown>;
+  readonly type?: string;
+  readonly options?: Record<string, unknown>;
 };
 
 export type ForeignKeyConstraint<
@@ -623,7 +633,7 @@ function normalizeTargetFieldRefInput(input: TargetFieldRef | readonly TargetFie
   };
 }
 
-function createConstraintsDsl() {
+function createConstraintsDsl<IndexTypes extends IndexTypeMap = Record<never, never>>() {
   function ref<ModelName extends string, FieldName extends string>(
     modelName: ModelName,
     fieldName: FieldName,
@@ -674,24 +684,26 @@ function createConstraintsDsl() {
     };
   }
 
-  function index<FieldName extends string, Name extends string | undefined = undefined>(
-    field: ColumnRef<FieldName>,
-    options?: IndexOptions<Name>,
-  ): IndexConstraint<readonly [FieldName], Name>;
   function index<FieldNames extends readonly string[], Name extends string | undefined = undefined>(
     fields: { readonly [K in keyof FieldNames]: ColumnRef<FieldNames[K] & string> },
-    options?: IndexOptions<Name>,
+    options?: IndexInput<Name, IndexTypes>,
   ): IndexConstraint<FieldNames, Name>;
   function index(
-    fieldOrFields: ColumnRef | readonly ColumnRef[],
-    options?: IndexOptions,
+    fields: readonly ColumnRef[],
+    options?: {
+      readonly name?: string;
+      readonly type?: string;
+      readonly options?: unknown;
+    },
   ): IndexConstraint {
     return {
       kind: 'index',
-      fields: normalizeFieldRefInput(fieldOrFields),
-      ...(options?.name ? { name: options.name } : {}),
-      ...(options?.using ? { using: options.using } : {}),
-      ...(options?.config ? { config: options.config } : {}),
+      fields: normalizeFieldRefInput(fields),
+      ...(options?.name !== undefined ? { name: options.name } : {}),
+      ...(options?.type !== undefined ? { type: options.type } : {}),
+      ...(options?.options !== undefined
+        ? { options: options.options as Record<string, unknown> }
+        : {}),
     };
   }
 
@@ -776,9 +788,26 @@ type AttributeContext<Fields extends Record<string, ScalarFieldBuilder>> = {
   readonly constraints: Pick<ConstraintsDsl, 'id' | 'unique'>;
 };
 
-type SqlContext<Fields extends Record<string, ScalarFieldBuilder>> = {
+type PackAwareIndex<IndexTypes extends IndexTypeMap> = <
+  FieldNames extends readonly string[],
+  Name extends string | undefined = undefined,
+>(
+  fields: { readonly [K in keyof FieldNames]: ColumnRef<FieldNames[K] & string> },
+  options?: IndexInput<Name, IndexTypes>,
+) => IndexConstraint<FieldNames, Name>;
+
+type PackAwareSqlConstraints<IndexTypes extends IndexTypeMap> = {
+  readonly foreignKey: ConstraintsDsl['foreignKey'];
+  readonly ref: ConstraintsDsl['ref'];
+  readonly index: PackAwareIndex<IndexTypes>;
+};
+
+export type SqlContext<
+  Fields extends Record<string, ScalarFieldBuilder>,
+  IndexTypes extends IndexTypeMap = Record<never, never>,
+> = {
   readonly cols: FieldRefs<Fields>;
-  readonly constraints: Pick<ConstraintsDsl, 'index' | 'foreignKey' | 'ref'>;
+  readonly constraints: PackAwareSqlConstraints<IndexTypes>;
 };
 
 function createFieldRefs<Fields extends Record<string, ScalarFieldBuilder>>(
@@ -829,8 +858,10 @@ function createAttributeConstraintsDsl(): AttributeContext<
   };
 }
 
-function createSqlConstraintsDsl(): SqlContext<Record<string, ScalarFieldBuilder>>['constraints'] {
-  const constraints = createConstraintsDsl();
+function createSqlConstraintsDsl<
+  IndexTypes extends IndexTypeMap = Record<never, never>,
+>(): SqlContext<Record<string, ScalarFieldBuilder>, IndexTypes>['constraints'] {
+  const constraints = createConstraintsDsl<IndexTypes>();
   return {
     index: constraints.index,
     foreignKey: constraints.foreignKey,
@@ -946,12 +977,14 @@ export class ContractModelBuilder<
   Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
   AttributesSpec extends ModelAttributesSpec | undefined = undefined,
   SqlSpec extends SqlStageSpec | undefined = undefined,
+  IndexTypes extends IndexTypeMap = Record<never, never>,
 > {
   declare readonly __name: ModelName;
   declare readonly __fields: Fields;
   declare readonly __relations: Relations;
   declare readonly __attributes: AttributesSpec;
   declare readonly __sql: SqlSpec;
+  declare readonly __indexTypes: IndexTypes;
   readonly refs: ModelName extends string ? ModelTokenRefs<ModelName, Fields> : never;
 
   constructor(
@@ -961,7 +994,7 @@ export class ContractModelBuilder<
       readonly relations: Relations;
     },
     readonly attributesFactory?: StageInput<AttributeContext<Fields>, AttributesSpec>,
-    readonly sqlFactory?: StageInput<SqlContext<Fields>, SqlSpec>,
+    readonly sqlFactory?: StageInput<SqlContext<Fields, IndexTypes>, SqlSpec>,
   ) {
     this.refs = (
       stageOne.modelName ? createModelTokenRefs(stageOne.modelName, stageOne.fields) : undefined
@@ -970,7 +1003,7 @@ export class ContractModelBuilder<
 
   ref<FieldName extends keyof Fields & string>(
     this: ModelName extends string
-      ? ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, SqlSpec>
+      ? ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, SqlSpec, IndexTypes>
       : never,
     fieldName: FieldName,
   ): TargetFieldRef<ModelName & string, FieldName> {
@@ -989,7 +1022,14 @@ export class ContractModelBuilder<
 
   relations<const NextRelations extends Record<string, AnyRelationBuilder>>(
     relations: NextRelations,
-  ): ContractModelBuilder<ModelName, Fields, Relations & NextRelations, AttributesSpec, SqlSpec> {
+  ): ContractModelBuilder<
+    ModelName,
+    Fields,
+    Relations & NextRelations,
+    AttributesSpec,
+    SqlSpec,
+    IndexTypes
+  > {
     const duplicateRelationName = findDuplicateRelationName(this.stageOne.relations, relations);
     if (duplicateRelationName) {
       throw new Error(
@@ -1015,15 +1055,15 @@ export class ContractModelBuilder<
       AttributeContext<Fields>,
       ValidateAttributesStageSpec<Fields, SqlSpec, NextAttributesSpec>
     >,
-  ): ContractModelBuilder<ModelName, Fields, Relations, NextAttributesSpec, SqlSpec> {
+  ): ContractModelBuilder<ModelName, Fields, Relations, NextAttributesSpec, SqlSpec, IndexTypes> {
     return new ContractModelBuilder(this.stageOne, specOrFactory, this.sqlFactory);
   }
 
   sql<const NextSqlSpec extends SqlStageSpec>(
-    specOrFactory: StageInput<SqlContext<Fields>, NextSqlSpec>,
+    specOrFactory: StageInput<SqlContext<Fields, IndexTypes>, NextSqlSpec>,
   ): [ValidateSqlStageSpec<Fields, AttributesSpec, NextSqlSpec>] extends [never]
-    ? ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, never>
-    : ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, NextSqlSpec> {
+    ? ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, never, IndexTypes>
+    : ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, NextSqlSpec, IndexTypes> {
     // Conditional return type cannot be verified by the implementation; the runtime value is always a valid ContractModelBuilder regardless of the validation outcome (validation is type-level only).
     return new ContractModelBuilder(this.stageOne, this.attributesFactory, specOrFactory) as never;
   }
@@ -1045,7 +1085,7 @@ export class ContractModelBuilder<
     }
     return buildStageSpec(this.sqlFactory, {
       cols: createColumnRefs(this.stageOne.fields),
-      constraints: createSqlConstraintsDsl() as SqlContext<Fields>['constraints'],
+      constraints: createSqlConstraintsDsl<IndexTypes>(),
     });
   }
 }

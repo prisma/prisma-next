@@ -26,7 +26,14 @@ import type {
   TupleFromArgumentDescriptors,
   UnionToIntersection,
 } from './authoring-type-utils';
+import type {
+  AnyRelationBuilder,
+  ContractModelBuilder,
+  IndexTypeMap,
+  ScalarFieldBuilder,
+} from './contract-dsl';
 import { buildFieldPreset, field, model, rel } from './contract-dsl';
+import type { MergeExtensionIndexTypes } from './contract-types';
 
 type ExtractTypeNamespaceFromPack<Pack> = Pack extends {
   readonly authoring?: { readonly type?: infer Namespace extends AuthoringTypeNamespace };
@@ -93,6 +100,33 @@ type TypeHelpersFromNamespace<Namespace> = {
 
 type CoreFieldHelpers = Pick<typeof field, 'column' | 'generated' | 'namedType'>;
 
+type MergeAllPackIndexTypes<Family, Target, ExtensionPacks> = MergeExtensionIndexTypes<
+  { readonly __family: Family; readonly __target: Target } & (ExtensionPacks extends Record<
+    string,
+    unknown
+  >
+    ? ExtensionPacks
+    : Record<never, never>)
+>;
+
+type PackAwareModel<IndexTypes extends IndexTypeMap> = {
+  <
+    const ModelName extends string,
+    Fields extends Record<string, ScalarFieldBuilder>,
+    Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
+  >(
+    modelName: ModelName,
+    input: { readonly fields: Fields; readonly relations?: Relations },
+  ): ContractModelBuilder<ModelName, Fields, Relations, undefined, undefined, IndexTypes>;
+  <
+    Fields extends Record<string, ScalarFieldBuilder>,
+    Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
+  >(input: {
+    readonly fields: Fields;
+    readonly relations?: Relations;
+  }): ContractModelBuilder<undefined, Fields, Relations, undefined, undefined, IndexTypes>;
+};
+
 export type ComposedAuthoringHelpers<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
@@ -104,7 +138,7 @@ export type ComposedAuthoringHelpers<
         ExtractFieldNamespaceFromPack<Target> &
         MergeExtensionFieldNamespaces<ExtensionPacks>
     >;
-  readonly model: typeof model;
+  readonly model: PackAwareModel<MergeAllPackIndexTypes<Family, Target, ExtensionPacks>>;
   readonly rel: typeof rel;
   readonly type: TypeHelpersFromNamespace<
     ExtractTypeNamespaceFromPack<Family> &

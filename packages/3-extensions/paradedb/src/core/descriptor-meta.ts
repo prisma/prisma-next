@@ -1,3 +1,4 @@
+import { paradedbIndexTypes } from '../types/index-types';
 import { PARADEDB_EXTENSION_ID } from './constants';
 
 export const paradedbPackMeta = {
@@ -11,4 +12,5 @@ export const paradedbPackMeta = {
       'paradedb/bm25': true,
     },
   },
+  indexTypes: paradedbIndexTypes,
 } as const;

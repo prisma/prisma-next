@@ -1,6 +1,7 @@
+import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { paradedbPackMeta } from '../src/core/descriptor-meta';
-import { bm25, bm25Index } from '../src/types/index-types';
+import { paradedbIndexTypes } from '../src/types/index-types';
 
 describe('ParadeDB extension', () => {
   describe('paradedbPackMeta', () => {
@@ -16,163 +17,44 @@ describe('ParadeDB extension', () => {
         postgres: { 'paradedb/bm25': true },
       });
     });
-  });
 
-  describe('bm25 field builders', () => {
-    describe('bm25.text', () => {
-      it('creates a text field with defaults', () => {
-        expect(bm25.text('description')).toEqual({ column: 'description' });
-      });
-
-      it('creates a text field with tokenizer', () => {
-        expect(bm25.text('description', { tokenizer: 'simple' })).toEqual({
-          column: 'description',
-          tokenizer: 'simple',
-        });
-      });
-
-      it('creates a text field with stemmer', () => {
-        expect(bm25.text('description', { tokenizer: 'simple', stemmer: 'english' })).toEqual({
-          column: 'description',
-          tokenizer: 'simple',
-          tokenizerParams: { stemmer: 'english' },
-        });
-      });
-
-      it('creates a text field with remove_emojis', () => {
-        expect(
-          bm25.text('description', { tokenizer: 'unicode_words', remove_emojis: true }),
-        ).toEqual({
-          column: 'description',
-          tokenizer: 'unicode_words',
-          tokenizerParams: { remove_emojis: true },
-        });
-      });
-
-      it('creates a text field with alias for multi-tokenizer', () => {
-        expect(
-          bm25.text('description', { tokenizer: 'simple', alias: 'description_simple' }),
-        ).toEqual({
-          column: 'description',
-          tokenizer: 'simple',
-          alias: 'description_simple',
-        });
-      });
-    });
-
-    describe('bm25.numeric', () => {
-      it('creates a numeric field', () => {
-        expect(bm25.numeric('rating')).toEqual({ column: 'rating' });
-      });
-    });
-
-    describe('bm25.boolean', () => {
-      it('creates a boolean field', () => {
-        expect(bm25.boolean('active')).toEqual({ column: 'active' });
-      });
-    });
-
-    describe('bm25.json', () => {
-      it('creates a json field with defaults', () => {
-        expect(bm25.json('metadata')).toEqual({ column: 'metadata' });
-      });
-
-      it('creates a json field with ngram tokenizer', () => {
-        expect(bm25.json('metadata', { tokenizer: 'ngram', min: 2, max: 3 })).toEqual({
-          column: 'metadata',
-          tokenizer: 'ngram',
-          tokenizerParams: { min: 2, max: 3 },
-        });
-      });
-    });
-
-    describe('bm25.datetime', () => {
-      it('creates a datetime field', () => {
-        expect(bm25.datetime('created_at')).toEqual({ column: 'created_at' });
-      });
-    });
-
-    describe('bm25.range', () => {
-      it('creates a range field', () => {
-        expect(bm25.range('price_range')).toEqual({ column: 'price_range' });
-      });
-    });
-
-    describe('bm25.expression', () => {
-      it('creates an expression field with alias', () => {
-        expect(
-          bm25.expression("description || ' ' || category", {
-            alias: 'concat',
-            tokenizer: 'simple',
-          }),
-        ).toEqual({
-          expression: "description || ' ' || category",
-          alias: 'concat',
-          tokenizer: 'simple',
-        });
-      });
-
-      it('creates expression field with tokenizer params', () => {
-        expect(
-          bm25.expression("(metadata->>'color')", {
-            alias: 'meta_color',
-            tokenizer: 'ngram',
-            min: 2,
-            max: 3,
-          }),
-        ).toEqual({
-          expression: "(metadata->>'color')",
-          alias: 'meta_color',
-          tokenizer: 'ngram',
-          tokenizerParams: { min: 2, max: 3 },
-        });
-      });
-
-      it('creates expression field without tokenizer', () => {
-        expect(bm25.expression('rating + 1', { alias: 'rating_plus' })).toEqual({
-          expression: 'rating + 1',
-          alias: 'rating_plus',
-        });
-      });
+    it('exposes the bm25 entry in indexTypes', () => {
+      expect(paradedbPackMeta.indexTypes.entries).toHaveLength(1);
+      expect(paradedbPackMeta.indexTypes.entries[0]?.type).toBe('bm25');
     });
   });
 
-  describe('bm25Index', () => {
-    it('creates index definition with extension config payload', () => {
-      const indexDef = bm25Index({
-        keyField: 'id',
-        name: 'search_idx',
-        fields: [bm25.text('description', { tokenizer: 'simple' })],
-      });
-
-      expect(indexDef).toEqual({
-        columns: ['description'],
-        name: 'search_idx',
-        using: 'bm25',
-        config: {
-          keyField: 'id',
-          fields: [{ column: 'description', tokenizer: 'simple' }],
-        },
-      });
+  describe('paradedbIndexTypes', () => {
+    it('declares a single bm25 entry', () => {
+      expect(paradedbIndexTypes.entries.map((e) => e.type)).toEqual(['bm25']);
     });
 
-    it('keeps expression fields in config while preserving core-safe columns', () => {
-      const indexDef = bm25Index({
-        keyField: 'id',
-        fields: [
-          bm25.text('description'),
-          bm25.expression("description || ' ' || category", { alias: 'concat' }),
-        ],
-      });
+    it('validates bm25 options with a key_field string', () => {
+      const entry = paradedbIndexTypes.entries[0];
+      if (!entry) throw new Error('expected bm25 entry');
+      const result = entry.options({ key_field: 'id' });
+      expect(result instanceof type.errors).toBe(false);
+    });
 
-      expect(indexDef.columns).toEqual(['description']);
-      expect(indexDef.config).toEqual({
-        keyField: 'id',
-        fields: [
-          { column: 'description' },
-          { expression: "description || ' ' || category", alias: 'concat' },
-        ],
-      });
+    it('rejects bm25 options without key_field', () => {
+      const entry = paradedbIndexTypes.entries[0];
+      if (!entry) throw new Error('expected bm25 entry');
+      const result = entry.options({});
+      expect(result instanceof type.errors).toBe(true);
+    });
+
+    it('rejects bm25 options with extra unknown keys', () => {
+      const entry = paradedbIndexTypes.entries[0];
+      if (!entry) throw new Error('expected bm25 entry');
+      const result = entry.options({ key_field: 'id', extra: 'nope' });
+      expect(result instanceof type.errors).toBe(true);
+    });
+
+    it('rejects bm25 options where key_field is not a string', () => {
+      const entry = paradedbIndexTypes.entries[0];
+      if (!entry) throw new Error('expected bm25 entry');
+      const result = entry.options({ key_field: 42 });
+      expect(result instanceof type.errors).toBe(true);
     });
   });
 });

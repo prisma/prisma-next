@@ -18,15 +18,15 @@ describe('descriptor exports', () => {
     const index: IndexDef = {
       columns: ['email'],
       name: 'user_email_idx',
-      using: 'btree',
-      config: { fillfactor: 90 },
+      type: 'btree',
+      options: { fillfactor: 90 },
     };
 
     expect(index).toEqual({
       columns: ['email'],
       name: 'user_email_idx',
-      using: 'btree',
-      config: { fillfactor: 90 },
+      type: 'btree',
+      options: { fillfactor: 90 },
     });
   });
 });

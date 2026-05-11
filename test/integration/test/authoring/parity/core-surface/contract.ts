@@ -49,7 +49,7 @@ const Post = model('Post', {
   }))
   .sql(({ cols, constraints }) => ({
     table: 'post',
-    indexes: [constraints.index(cols.userId)],
+    indexes: [constraints.index([cols.userId])],
   }));
 
 export const contract = defineContract({

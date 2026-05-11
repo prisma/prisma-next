@@ -29,7 +29,7 @@ const Member = model('Member', {
   }))
   .sql(({ cols, constraints }) => ({
     table: 'team_member',
-    indexes: [constraints.index(cols.teamId)],
+    indexes: [constraints.index([cols.teamId])],
   }));
 
 export const contract = defineContract({

@@ -1,16 +1,24 @@
-import type { TargetPackRef } from '@prisma-next/framework-components/components';
+import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
+import { createComposedAuthoringHelpers } from '../src/composed-authoring-helpers';
 import {
   applyNaming,
   field,
   isContractInput,
-  model,
   normalizeRelationFieldNames,
   rel,
   resolveRelationModelName,
   type TargetFieldRef,
 } from '../src/contract-dsl';
 import { columnDescriptor } from './helpers/column-descriptor';
+import { testIndexPack } from './helpers/test-index-pack';
+
+const bareFamilyPack: FamilyPackRef<'sql'> = {
+  kind: 'family',
+  id: 'sql',
+  familyId: 'sql',
+  version: '0.0.1',
+};
 
 const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   kind: 'target',
@@ -19,6 +27,12 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   targetId: 'postgres',
   version: '0.0.1',
 };
+
+const { model } = createComposedAuthoringHelpers({
+  family: bareFamilyPack,
+  target: postgresTargetPack,
+  extensionPacks: { testIndexes: testIndexPack },
+});
 
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
@@ -123,10 +137,10 @@ describe('contract DSL runtime helpers', () => {
       },
     }).sql(({ cols, constraints }) => ({
       indexes: [
-        constraints.index(cols.teamId, {
+        constraints.index([cols.teamId], {
           name: 'audit_log_team_id_idx',
-          using: 'hash',
-          config: { fillfactor: 70 },
+          type: 'hash',
+          options: { fillfactor: 70 },
         }),
       ],
       foreignKeys: [
@@ -146,8 +160,8 @@ describe('contract DSL runtime helpers', () => {
           kind: 'index',
           fields: ['teamId'],
           name: 'audit_log_team_id_idx',
-          using: 'hash',
-          config: { fillfactor: 70 },
+          type: 'hash',
+          options: { fillfactor: 70 },
         },
       ],
       foreignKeys: [
