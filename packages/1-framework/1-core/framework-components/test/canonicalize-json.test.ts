@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalizeJson } from '../src/canonicalize-json';
+import { canonicalizeJson } from '../src/exports/utils';
 
 describe('canonicalizeJson', () => {
   it('sorts object keys lexicographically', () => {

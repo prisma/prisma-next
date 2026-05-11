@@ -26,11 +26,11 @@ import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
+import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type DeclaredExtensionEntry, loadContractSpaceAggregate } from '../src/aggregate/loader';
 import { verifyAggregate } from '../src/aggregate/verifier';
-import { canonicalizeJson } from '../src/canonicalize-json';
 import { concatenateSpaceApplyInputs } from '../src/concatenate-space-apply-inputs';
 import {
   type ContractSpaceHeadRecord,

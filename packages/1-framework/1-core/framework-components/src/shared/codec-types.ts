@@ -1,18 +1,8 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Codec } from './codec';
 
 export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
-
-/**
- * JSON-safe value space. The set of values that survive `JSON.stringify` / `JSON.parse` round-trips structurally identical (modulo object key ordering). Constrains the value space {@link CodecRef.typeParams} accepts so any `CodecRef` carried on an AST node serializes losslessly.
- */
-export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | readonly JsonValue[]
-  | { readonly [key: string]: JsonValue };
 
 /**
  * Serializable codec identity carried by every codec-bearing AST node.

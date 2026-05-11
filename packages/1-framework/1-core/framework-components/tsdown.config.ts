@@ -10,5 +10,6 @@ export default defineConfig({
     'src/exports/execution.ts',
     'src/exports/psl-ast.ts',
     'src/exports/runtime.ts',
+    'src/exports/utils.ts',
   ],
 });

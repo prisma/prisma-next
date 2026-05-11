@@ -50,7 +50,7 @@ graph TD
     IO --> META["metadata.ts<br/>MigrationMetadata, MigrationHints"]
     IO --> PKG["package.ts<br/>MigrationPackage, MigrationOps"]
     HASH --> IO
-    HASH --> CAN["canonicalize-json.ts"]
+    HASH --> CAN["@prisma-next/framework-components/utils<br/>canonicalizeJson"]
     HASH --> CP["@prisma-next/emitter<br/>canonicalizeContract"]
     GRAPH --> GR["graph.ts<br/>MigrationGraph, MigrationEdge"]
     GRAPH --> ABS["@prisma-next/migration-tools/constants<br/>EMPTY_CONTRACT_HASH"]

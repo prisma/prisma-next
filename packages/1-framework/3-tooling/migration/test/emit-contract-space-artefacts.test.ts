@@ -1,8 +1,8 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { canonicalizeJson } from '../src/canonicalize-json';
 import { emitContractSpaceArtefacts } from '../src/emit-contract-space-artefacts';
 import { MigrationToolsError } from '../src/errors';
 import { APP_SPACE_ID } from '../src/space-layout';
