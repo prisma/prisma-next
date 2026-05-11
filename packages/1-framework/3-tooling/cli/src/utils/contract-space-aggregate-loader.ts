@@ -158,10 +158,13 @@ export interface BuildAggregateInputs<TFamilyId extends string, TTargetId extend
  * Run the aggregate loader at the CLI surface, mapping any
  * {@link LoadAggregateError} into a {@link CliStructuredError} envelope.
  *
- * App-side migration packages are intentionally not threaded through:
- * `db init` / `db update` go through the planner's `synth` strategy for
- * the app member (driven by `callerPolicy.ignoreGraphFor`), so the
- * app's authored `migrations/` graph is not walked.
+ * App-side migration packages flow through `inputs.appMigrationPackages`
+ * (defaulting to `[]`). `db init` / `db update` leave it empty: the
+ * planner's `synth` strategy is used for the app member (driven by
+ * `callerPolicy.ignoreGraphFor`), so the app's authored `migrations/`
+ * graph does not need to be walked. `migration apply` threads the
+ * already-loaded app-space packages through so the graph-walk strategy
+ * can plot a path through them — replay forbids synth.
  *
  * @see specs/contract-space-aggregate-spec.md § Loader.
  */
