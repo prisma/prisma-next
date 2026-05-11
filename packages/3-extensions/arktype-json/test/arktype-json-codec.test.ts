@@ -159,10 +159,17 @@ describe('arktypeJsonColumn encode/encodeJson agreement', () => {
     }
   });
 
-  it('decode parses raw JSON text for string-schema columns', async () => {
+  it('decode preserves quote-bounded strings byte-exact (jsonb pre-parsed)', async () => {
+    // Regression: the previous `isJsonStringText` heuristic unwrapped any
+    // `"…"`-shaped wire as JSON-encoded text. Under `pg` + `jsonb` the
+    // wire is already pre-parsed, so `"bob"` (5 chars with literal quote
+    // characters) IS the value — unwrapping silently truncated it to
+    // `bob` (3 chars). The decoder must return the literal wire here.
     const stringSchema = type('string');
     const codec = arktypeJsonColumn(stringSchema).codecFactory(SYNTH_CTX);
-    expect(await codec.decode('"bob"', CALL_CTX)).toBe('bob');
+    expect(await codec.decode('"bob"', CALL_CTX)).toBe('"bob"');
+    expect(await codec.decode('"hello"', CALL_CTX)).toBe('"hello"');
+    expect(await codec.decode('""', CALL_CTX)).toBe('""');
   });
 
   it('decode rejects pre-parsed primitives that violate the schema', async () => {

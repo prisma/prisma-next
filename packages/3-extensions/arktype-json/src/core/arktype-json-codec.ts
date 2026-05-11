@@ -87,21 +87,24 @@ function parseJsonText(wire: string): JsonValue | undefined {
   }
 }
 
-function isJsonStringText(wire: string): boolean {
-  return wire.length >= 2 && wire[0] === '"' && wire[wire.length - 1] === '"';
-}
-
 function decodeWireValue<TInferred>(
   schema: ArktypeSchemaLike,
   wire: string | JsonValue,
 ): TInferred {
   if (typeof wire !== 'string') return validateSchema<TInferred>(schema, wire);
 
-  const parsedStringText = isJsonStringText(wire) ? parseJsonText(wire) : undefined;
-  if (parsedStringText !== undefined) {
-    return validateSchema<TInferred>(schema, parsedStringText);
-  }
-
+  // Try the wire as the literal value first. Under `pg` + `jsonb` (the
+  // documented native type), wire arrives already-parsed: a JSON object
+  // surfaces as a JS object, a JSON string surfaces as a JS string. For
+  // string columns that means the wire IS the user's value — including
+  // strings whose literal characters happen to start and end with `"`.
+  // A `"…"`-shape unwrap heuristic would silently truncate them (the
+  // 7-char `"hello"` would decode to the 5-char `hello`).
+  //
+  // Fall back to JSON.parse only when schema validation rejects the raw
+  // wire: that path covers object/array shapes received as raw JSON
+  // text (legacy `json` text-OID adapters, or any code path that hands
+  // us un-pre-parsed JSON).
   try {
     return validateSchema<TInferred>(schema, wire);
   } catch (error) {
