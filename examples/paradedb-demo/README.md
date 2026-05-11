@@ -8,7 +8,7 @@ Exercises:
 - `paradeDbScore(keyCol)` — BM25 relevance score (`pdb.score`).
 - `paradeDbFuzzy` / `paradeDbBoost` / `paradeDbConst` / `paradeDbSlop` — typmod casts (`'q'::pdb.fuzzy(N)` etc.); compose into match operators.
 - `paradeDbProximity(start).within(distance, term, { ordered? })…` — chained proximity (`##` / `##>`); composes through `paradeDbMatch`.
-- Automatic `CREATE EXTENSION pg_search` via `databaseDependencies`.
+- Automatic `CREATE EXTENSION pg_search` via the extension's contract-space baseline migration.
 - Automatic `CREATE INDEX ... USING bm25 (...) WITH (key_field='...')` via upstream's index-type registry.
 
 ## Run it
