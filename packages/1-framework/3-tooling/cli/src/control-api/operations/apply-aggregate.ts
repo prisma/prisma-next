@@ -266,7 +266,7 @@ export function collectOrdered(
  * and `migration apply`; the span label tracks the user-visible action
  * so structured-progress output reads naturally for each surface.
  */
-function progressLabelForAction(action: AggregateApplyAction): string {
+export function progressLabelForAction(action: AggregateApplyAction): string {
   switch (action) {
     case 'dbInit':
       return 'Initialising database across spaces';
