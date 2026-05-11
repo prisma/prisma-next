@@ -3,6 +3,7 @@ import {
   buildOperation,
   type CodecExpression,
   type Expression,
+  refsOf,
   toExpr,
 } from '@prisma-next/sql-relational-core/expression';
 import type { CodecTypes } from '../types/codec-types';
@@ -34,42 +35,47 @@ export function postgisQueryOperations<
     {
       method: 'distance',
       self: { codecId: postgisTypeId },
-      impl: (self: GeoExpr, other: GeoExpr): Float =>
-        buildOperation({
+      impl: (self: GeoExpr, other: GeoExpr): Float => {
+        const selfRefs = refsOf(self);
+        return buildOperation({
           method: 'distance',
-          args: [toExpr(self, postgisTypeId), toExpr(other, postgisTypeId)],
+          args: [toExpr(self, postgisTypeId, selfRefs), toExpr(other, postgisTypeId, selfRefs)],
           returns: { codecId: 'pg/float8@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
             strategy: 'function',
             template: 'ST_Distance({{self}}, {{arg0}})',
           },
-        }),
+        });
+      },
     },
     {
       method: 'distanceSphere',
       self: { codecId: postgisTypeId },
-      impl: (self: GeoExpr, other: GeoExpr): Float =>
-        buildOperation({
+      impl: (self: GeoExpr, other: GeoExpr): Float => {
+        const selfRefs = refsOf(self);
+        return buildOperation({
           method: 'distanceSphere',
-          args: [toExpr(self, postgisTypeId), toExpr(other, postgisTypeId)],
+          args: [toExpr(self, postgisTypeId, selfRefs), toExpr(other, postgisTypeId, selfRefs)],
           returns: { codecId: 'pg/float8@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
             strategy: 'function',
             template: 'ST_DistanceSphere({{self}}, {{arg0}})',
           },
-        }),
+        });
+      },
     },
     {
       method: 'dwithin',
       self: { codecId: postgisTypeId },
-      impl: (self: GeoExpr, other: GeoExpr, distance: FloatExpr): Bool =>
-        buildOperation({
+      impl: (self: GeoExpr, other: GeoExpr, distance: FloatExpr): Bool => {
+        const selfRefs = refsOf(self);
+        return buildOperation({
           method: 'dwithin',
           args: [
-            toExpr(self, postgisTypeId),
-            toExpr(other, postgisTypeId),
+            toExpr(self, postgisTypeId, selfRefs),
+            toExpr(other, postgisTypeId, selfRefs),
             toExpr(distance, 'pg/float8@1'),
           ],
           returns: { codecId: 'pg/bool@1', nullable: false },
@@ -78,67 +84,76 @@ export function postgisQueryOperations<
             strategy: 'function',
             template: 'ST_DWithin({{self}}, {{arg0}}, {{arg1}})',
           },
-        }),
+        });
+      },
     },
     {
       method: 'contains',
       self: { codecId: postgisTypeId },
-      impl: (self: GeoExpr, other: GeoExpr): Bool =>
-        buildOperation({
+      impl: (self: GeoExpr, other: GeoExpr): Bool => {
+        const selfRefs = refsOf(self);
+        return buildOperation({
           method: 'contains',
-          args: [toExpr(self, postgisTypeId), toExpr(other, postgisTypeId)],
+          args: [toExpr(self, postgisTypeId, selfRefs), toExpr(other, postgisTypeId, selfRefs)],
           returns: { codecId: 'pg/bool@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
             strategy: 'function',
             template: 'ST_Contains({{self}}, {{arg0}})',
           },
-        }),
+        });
+      },
     },
     {
       method: 'within',
       self: { codecId: postgisTypeId },
-      impl: (self: GeoExpr, other: GeoExpr): Bool =>
-        buildOperation({
+      impl: (self: GeoExpr, other: GeoExpr): Bool => {
+        const selfRefs = refsOf(self);
+        return buildOperation({
           method: 'within',
-          args: [toExpr(self, postgisTypeId), toExpr(other, postgisTypeId)],
+          args: [toExpr(self, postgisTypeId, selfRefs), toExpr(other, postgisTypeId, selfRefs)],
           returns: { codecId: 'pg/bool@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
             strategy: 'function',
             template: 'ST_Within({{self}}, {{arg0}})',
           },
-        }),
+        });
+      },
     },
     {
       method: 'intersects',
       self: { codecId: postgisTypeId },
-      impl: (self: GeoExpr, other: GeoExpr): Bool =>
-        buildOperation({
+      impl: (self: GeoExpr, other: GeoExpr): Bool => {
+        const selfRefs = refsOf(self);
+        return buildOperation({
           method: 'intersects',
-          args: [toExpr(self, postgisTypeId), toExpr(other, postgisTypeId)],
+          args: [toExpr(self, postgisTypeId, selfRefs), toExpr(other, postgisTypeId, selfRefs)],
           returns: { codecId: 'pg/bool@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
             strategy: 'function',
             template: 'ST_Intersects({{self}}, {{arg0}})',
           },
-        }),
+        });
+      },
     },
     {
       method: 'intersectsBbox',
       self: { codecId: postgisTypeId },
-      impl: (self: GeoExpr, other: GeoExpr): Bool =>
-        buildOperation({
+      impl: (self: GeoExpr, other: GeoExpr): Bool => {
+        const selfRefs = refsOf(self);
+        return buildOperation({
           method: 'intersectsBbox',
-          args: [toExpr(self, postgisTypeId), toExpr(other, postgisTypeId)],
+          args: [toExpr(self, postgisTypeId, selfRefs), toExpr(other, postgisTypeId, selfRefs)],
           returns: { codecId: 'pg/bool@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
             strategy: 'function',
             template: '({{self}} && {{arg0}})',
           },
-        }),
+        });
+      },
     },
   ];
 }
