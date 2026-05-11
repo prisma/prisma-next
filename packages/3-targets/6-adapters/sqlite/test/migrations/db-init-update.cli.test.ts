@@ -1,5 +1,4 @@
 import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
 import { executeDbInit, executeDbUpdate } from '@prisma-next/cli/control-api';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
@@ -17,6 +16,7 @@ import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { timeouts } from '@prisma-next/test-utils';
+import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   contract as appContract,
