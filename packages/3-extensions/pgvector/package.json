@@ -6,7 +6,7 @@
   "sideEffects": false,
   "scripts": {
     "build:contract-space": "prisma-next contract emit",
-    "build": "pnpm build:contract-space && tsdown",
+    "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit",
