@@ -1,4 +1,4 @@
-import { model } from '@prisma-next/sql-contract-ts/contract-builder';
+import { field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import { expect, it } from 'vitest';
 import { describeSqlMigration } from '../../migration-targets/sql-fanout';
 
@@ -10,19 +10,36 @@ const expectedIntNativeType = { sqlite: 'integer', postgres: 'int4' } as const;
 
 describeSqlMigration(
   'Migration E2E - Destructive operations',
-  ({ int, text, defineContract, runMigration }) => {
+  ({ cols, defineContract, runMigration }) => {
     const DESTRUCTIVE = { allowedOperationClasses: ['additive', 'destructive'] } as const;
 
     it('drops a table removed from the contract', async () => {
       await runMigration({
         origin: defineContract({
           models: {
-            User: model('User', { fields: { id: int.id(), name: text } }),
-            Legacy: model('Legacy', { fields: { id: int.id(), data: text } }),
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+              },
+            }),
+            Legacy: model('Legacy', {
+              fields: {
+                id: field.column(cols.int).id(),
+                data: field.column(cols.text),
+              },
+            }),
           },
         }),
         destination: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), name: text } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+              },
+            }),
+          },
         }),
         policy: DESTRUCTIVE,
         after: async ({ schema }) => {
@@ -36,13 +53,25 @@ describeSqlMigration(
       await runMigration({
         origin: defineContract({
           models: {
-            User: model('User', { fields: { id: int.id(), email: text } }).sql((ctx) => ({
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                email: field.column(cols.text),
+              },
+            }).sql((ctx) => ({
               indexes: [ctx.constraints.index(ctx.cols.email, { name: 'idx_users_email' })],
             })),
           },
         }),
         destination: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), email: text } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                email: field.column(cols.text),
+              },
+            }),
+          },
         }),
         policy: DESTRUCTIVE,
         after: async ({ schema }) => {
@@ -55,27 +84,35 @@ describeSqlMigration(
       await runMigration({
         origin: defineContract({
           models: {
-            User: model('User', { fields: { id: int.id(), email: text, name: text } }).sql(
-              (ctx) => ({
-                indexes: [ctx.constraints.index(ctx.cols.email, { name: 'idx_email' })],
-              }),
-            ),
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                email: field.column(cols.text),
+                name: field.column(cols.text),
+              },
+            }).sql((ctx) => ({
+              indexes: [ctx.constraints.index(ctx.cols.email, { name: 'idx_email' })],
+            })),
           },
         }),
         destination: defineContract({
           models: {
-            User: model('User', { fields: { id: int.id(), email: text, name: text } }).sql(
-              (ctx) => ({
-                indexes: [ctx.constraints.index(ctx.cols.name, { name: 'idx_name' })],
-              }),
-            ),
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                email: field.column(cols.text),
+                name: field.column(cols.text),
+              },
+            }).sql((ctx) => ({
+              indexes: [ctx.constraints.index(ctx.cols.name, { name: 'idx_name' })],
+            })),
           },
         }),
         policy: DESTRUCTIVE,
         after: async ({ schema }) => {
-          const cols = schema.tables['User']!.indexes.map((i) => [...i.columns]);
-          expect(cols).toContainEqual(['name']);
-          expect(cols).not.toContainEqual(['email']);
+          const idxCols = schema.tables['User']!.indexes.map((i) => [...i.columns]);
+          expect(idxCols).toContainEqual(['name']);
+          expect(idxCols).not.toContainEqual(['email']);
         },
       });
     });
@@ -88,7 +125,7 @@ describeSqlMigration(
 
 describeSqlMigration(
   'Migration E2E - Destructive column changes',
-  ({ name, int, text, defineContract, runMigration }) => {
+  ({ name, cols, defineContract, runMigration }) => {
     const ALL = { allowedOperationClasses: ['additive', 'widening', 'destructive'] } as const;
 
     it('drops a column', async () => {
@@ -97,15 +134,22 @@ describeSqlMigration(
           models: {
             User: model('User', {
               fields: {
-                id: int.id(),
-                name: text,
-                legacyField: text.optional().column('legacy_field'),
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+                legacyField: field.column(cols.text).optional().column('legacy_field'),
               },
             }),
           },
         }),
         destination: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), name: text } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+              },
+            }),
+          },
         }),
         policy: ALL,
         after: async ({ schema }) => {
@@ -118,10 +162,24 @@ describeSqlMigration(
     it('changes a column type', async () => {
       await runMigration({
         origin: defineContract({
-          models: { Item: model('Item', { fields: { id: int.id(), value: text } }) },
+          models: {
+            Item: model('Item', {
+              fields: {
+                id: field.column(cols.int).id(),
+                value: field.column(cols.text),
+              },
+            }),
+          },
         }),
         destination: defineContract({
-          models: { Item: model('Item', { fields: { id: int.id(), value: int.optional() } }) },
+          models: {
+            Item: model('Item', {
+              fields: {
+                id: field.column(cols.int).id(),
+                value: field.column(cols.int).optional(),
+              },
+            }),
+          },
         }),
         policy: ALL,
         after: async ({ schema }) => {
@@ -135,10 +193,24 @@ describeSqlMigration(
     it('tightens nullability (nullable to NOT NULL)', async () => {
       await runMigration({
         origin: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), name: text.optional() } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text).optional(),
+              },
+            }),
+          },
         }),
         destination: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), name: text } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+              },
+            }),
+          },
         }),
         policy: ALL,
         after: async ({ schema }) => {
@@ -159,11 +231,24 @@ describeSqlMigration(
       await runMigration({
         origin: defineContract({
           models: {
-            User: model('User', { fields: { id: int.id(), name: text, temp: text.optional() } }),
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+                temp: field.column(cols.text).optional(),
+              },
+            }),
           },
         }),
         destination: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), name: text } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+              },
+            }),
+          },
         }),
         policy: ALL,
         before: async ({ db, runtime }) => {
@@ -187,10 +272,24 @@ describeSqlMigration(
     it('changes a column type and preserves data', async () => {
       await runMigration({
         origin: defineContract({
-          models: { Item: model('Item', { fields: { id: int.id(), value: text } }) },
+          models: {
+            Item: model('Item', {
+              fields: {
+                id: field.column(cols.int).id(),
+                value: field.column(cols.text),
+              },
+            }),
+          },
         }),
         destination: defineContract({
-          models: { Item: model('Item', { fields: { id: int.id(), value: int.optional() } }) },
+          models: {
+            Item: model('Item', {
+              fields: {
+                id: field.column(cols.int).id(),
+                value: field.column(cols.int).optional(),
+              },
+            }),
+          },
         }),
         policy: ALL,
         before: async ({ db, runtime }) => {
@@ -215,15 +314,22 @@ describeSqlMigration(
           models: {
             Record: model('Record', {
               fields: {
-                id: int.id(),
-                value: text.optional(),
-                oldField: text.optional().column('old_field'),
+                id: field.column(cols.int).id(),
+                value: field.column(cols.text).optional(),
+                oldField: field.column(cols.text).optional().column('old_field'),
               },
             }),
           },
         }),
         destination: defineContract({
-          models: { Record: model('Record', { fields: { id: int.id(), value: int } }) },
+          models: {
+            Record: model('Record', {
+              fields: {
+                id: field.column(cols.int).id(),
+                value: field.column(cols.int),
+              },
+            }),
+          },
         }),
         policy: ALL,
         after: async ({ schema }) => {

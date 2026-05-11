@@ -10,17 +10,31 @@ import { applyMigration, int, pack, text } from './harness';
 
 describeSqlMigration(
   'Migration E2E - Widening operations',
-  ({ int, text, defineContract, runMigration }) => {
+  ({ cols, defineContract, runMigration }) => {
     const WIDENING = { allowedOperationClasses: ['additive', 'widening'] } as const;
 
     it('relaxes NOT NULL to nullable', async () => {
       await runMigration({
         origin: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), name: text, bio: text } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+                bio: field.column(cols.text),
+              },
+            }),
+          },
         }),
         destination: defineContract({
           models: {
-            User: model('User', { fields: { id: int.id(), name: text, bio: text.optional() } }),
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+                bio: field.column(cols.text).optional(),
+              },
+            }),
           },
         }),
         policy: WIDENING,
@@ -44,14 +58,20 @@ describeSqlMigration(
         origin: defineContract({
           models: {
             Setting: model('Setting', {
-              fields: { id: int.id(), status: text.default('draft') },
+              fields: {
+                id: field.column(cols.int).id(),
+                status: field.column(cols.text).default('draft'),
+              },
             }),
           },
         }),
         destination: defineContract({
           models: {
             Setting: model('Setting', {
-              fields: { id: int.id(), status: text.default('active') },
+              fields: {
+                id: field.column(cols.int).id(),
+                status: field.column(cols.text).default('active'),
+              },
             }),
           },
         }),
@@ -75,14 +95,20 @@ describeSqlMigration(
         origin: defineContract({
           models: {
             User: model('User', {
-              fields: { id: int.id(), nickname: text.default('old') },
+              fields: {
+                id: field.column(cols.int).id(),
+                nickname: field.column(cols.text).default('old'),
+              },
             }),
           },
         }),
         destination: defineContract({
           models: {
             User: model('User', {
-              fields: { id: int.id(), nickname: text.default("It's") },
+              fields: {
+                id: field.column(cols.int).id(),
+                nickname: field.column(cols.text).default("It's"),
+              },
             }),
           },
         }),
@@ -105,12 +131,24 @@ describeSqlMigration(
     it('preserves existing data through column-set widening', async () => {
       await runMigration({
         origin: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), name: text, email: text } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+                email: field.column(cols.text),
+              },
+            }),
+          },
         }),
         destination: defineContract({
           models: {
             User: model('User', {
-              fields: { id: int.id(), name: text, email: text.optional() },
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+                email: field.column(cols.text).optional(),
+              },
             }),
           },
         }),

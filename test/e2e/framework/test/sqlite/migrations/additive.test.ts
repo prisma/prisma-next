@@ -13,11 +13,18 @@ import { applyMigration, int, pack, text } from './harness';
 
 describeSqlMigration(
   'Migration E2E - From empty schema',
-  ({ int, text, integerColumn, defineContract, runMigration }) => {
+  ({ cols, defineContract, runMigration }) => {
     it('creates a single table with PK and NOT NULL', async () => {
       await runMigration({
         destination: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), name: text } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+              },
+            }),
+          },
         }),
         after: async ({ schema }) => {
           expect(schema.tables['User']).toBeDefined();
@@ -31,11 +38,11 @@ describeSqlMigration(
           models: {
             Setting: model('Setting', {
               fields: {
-                id: int.id(),
-                label: text.default('untitled'),
-                priority: field.column(integerColumn).default('0'),
-                isActive: field.column(integerColumn).default('1').column('is_active'),
-                createdAt: text.defaultSql('now()').column('created_at'),
+                id: field.column(cols.int).id(),
+                label: field.column(cols.text).default('untitled'),
+                priority: field.column(cols.int).default('0'),
+                isActive: field.column(cols.int).default('1').column('is_active'),
+                createdAt: field.column(cols.text).defaultSql('now()').column('created_at'),
               },
             }),
           },
@@ -61,22 +68,35 @@ describeSqlMigration(
         destination: defineContract({
           models: {
             Account: model('Account', {
-              fields: { id: int.id(), email: text.unique(), username: text.unique() },
+              fields: {
+                id: field.column(cols.int).id(),
+                email: field.column(cols.text).unique(),
+                username: field.column(cols.text).unique(),
+              },
             }),
           },
         }),
         after: async ({ schema }) => {
-          const cols = schema.tables['Account']!.uniques.map((u) => [...u.columns]);
-          expect(cols).toContainEqual(['email']);
-          expect(cols).toContainEqual(['username']);
+          const uniques = schema.tables['Account']!.uniques.map((u) => [...u.columns]);
+          expect(uniques).toContainEqual(['email']);
+          expect(uniques).toContainEqual(['username']);
         },
       });
     });
 
     it('creates tables with FK ON DELETE CASCADE', async () => {
-      const Author = model('Author', { fields: { id: int.id(), name: text } });
+      const Author = model('Author', {
+        fields: {
+          id: field.column(cols.int).id(),
+          name: field.column(cols.text),
+        },
+      });
       const Post = model('Post', {
-        fields: { id: int.id(), title: text, authorId: int.column('author_id') },
+        fields: {
+          id: field.column(cols.int).id(),
+          title: field.column(cols.text),
+          authorId: field.column(cols.int).column('author_id'),
+        },
       }).sql((ctx) => ({
         foreignKeys: [
           ctx.constraints.foreignKey(ctx.cols.authorId, ctx.constraints.ref('Author', 'id'), {
@@ -102,9 +122,18 @@ describeSqlMigration(
     });
 
     it('creates tables with FK ON DELETE SET NULL', async () => {
-      const Category = model('Category', { fields: { id: int.id(), name: text } });
+      const Category = model('Category', {
+        fields: {
+          id: field.column(cols.int).id(),
+          name: field.column(cols.text),
+        },
+      });
       const Post = model('Post', {
-        fields: { id: int.id(), title: text, categoryId: int.optional().column('category_id') },
+        fields: {
+          id: field.column(cols.int).id(),
+          title: field.column(cols.text),
+          categoryId: field.column(cols.int).optional().column('category_id'),
+        },
       }).sql((ctx) => ({
         foreignKeys: [
           ctx.constraints.foreignKey(ctx.cols.categoryId, ctx.constraints.ref('Category', 'id'), {
@@ -138,7 +167,12 @@ describeSqlMigration(
         destination: defineContract({
           models: {
             Event: model('Event', {
-              fields: { id: int.id(), name: text, date: text, location: text.optional() },
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+                date: field.column(cols.text),
+                location: field.column(cols.text).optional(),
+              },
             }).sql((ctx) => ({
               indexes: [
                 ctx.constraints.index(ctx.cols.date, { name: 'idx_events_date' }),
@@ -150,9 +184,9 @@ describeSqlMigration(
           },
         }),
         after: async ({ schema }) => {
-          const cols = schema.tables['Event']!.indexes.map((i) => [...i.columns]);
-          expect(cols).toContainEqual(['date']);
-          expect(cols).toContainEqual(['name', 'date']);
+          const idxCols = schema.tables['Event']!.indexes.map((i) => [...i.columns]);
+          expect(idxCols).toContainEqual(['date']);
+          expect(idxCols).toContainEqual(['name', 'date']);
         },
       });
     });
@@ -165,15 +199,28 @@ describeSqlMigration(
 
 describeSqlMigration(
   'Migration E2E - Schema evolution',
-  ({ int, text, defineContract, runMigration }) => {
+  ({ cols, defineContract, runMigration }) => {
     it('adds a new nullable column', async () => {
       await runMigration({
         origin: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), name: text } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+              },
+            }),
+          },
         }),
         destination: defineContract({
           models: {
-            User: model('User', { fields: { id: int.id(), name: text, bio: text.optional() } }),
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+                bio: field.column(cols.text).optional(),
+              },
+            }),
           },
         }),
         after: async ({ schema }) => {
@@ -185,12 +232,23 @@ describeSqlMigration(
     it('adds a new column with a default value', async () => {
       await runMigration({
         origin: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), name: text } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+              },
+            }),
+          },
         }),
         destination: defineContract({
           models: {
             User: model('User', {
-              fields: { id: int.id(), name: text, status: text.default('active') },
+              fields: {
+                id: field.column(cols.int).id(),
+                name: field.column(cols.text),
+                status: field.column(cols.text).default('active'),
+              },
             }),
           },
         }),
@@ -205,9 +263,18 @@ describeSqlMigration(
     });
 
     it('adds a new table alongside existing tables', async () => {
-      const UserModel = model('User', { fields: { id: int.id(), name: text } });
+      const UserModel = model('User', {
+        fields: {
+          id: field.column(cols.int).id(),
+          name: field.column(cols.text),
+        },
+      });
       const PostModel = model('Post', {
-        fields: { id: int.id(), title: text, userId: int.column('user_id') },
+        fields: {
+          id: field.column(cols.int).id(),
+          title: field.column(cols.text),
+          userId: field.column(cols.int).column('user_id'),
+        },
       }).sql((ctx) => ({
         foreignKeys: [
           ctx.constraints.foreignKey(ctx.cols.userId, ctx.constraints.ref('User', 'id')),
@@ -227,11 +294,23 @@ describeSqlMigration(
     it('adds an index to an existing table', async () => {
       await runMigration({
         origin: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), email: text } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                email: field.column(cols.text),
+              },
+            }),
+          },
         }),
         destination: defineContract({
           models: {
-            User: model('User', { fields: { id: int.id(), email: text } }).sql((ctx) => ({
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                email: field.column(cols.text),
+              },
+            }).sql((ctx) => ({
               indexes: [ctx.constraints.index(ctx.cols.email, { name: 'idx_users_email' })],
             })),
           },
@@ -247,22 +326,33 @@ describeSqlMigration(
     it('applies a multi-step migration: new columns, indexes, and table', async () => {
       await runMigration({
         origin: defineContract({
-          models: { User: model('User', { fields: { id: int.id(), email: text } }) },
+          models: {
+            User: model('User', {
+              fields: {
+                id: field.column(cols.int).id(),
+                email: field.column(cols.text),
+              },
+            }),
+          },
         }),
         destination: defineContract({
           models: {
             User: model('User', {
               fields: {
-                id: int.id(),
-                email: text,
-                bio: text.optional(),
-                status: text.default('active'),
+                id: field.column(cols.int).id(),
+                email: field.column(cols.text),
+                bio: field.column(cols.text).optional(),
+                status: field.column(cols.text).default('active'),
               },
             }).sql((ctx) => ({
               indexes: [ctx.constraints.index(ctx.cols.email, { name: 'idx_users_email' })],
             })),
             Post: model('Post', {
-              fields: { id: int.id(), title: text, userId: int.column('user_id') },
+              fields: {
+                id: field.column(cols.int).id(),
+                title: field.column(cols.text),
+                userId: field.column(cols.int).column('user_id'),
+              },
             }).sql((ctx) => ({
               foreignKeys: [
                 ctx.constraints.foreignKey(ctx.cols.userId, ctx.constraints.ref('User', 'id')),

@@ -15,15 +15,15 @@ import { describeSqlMigration } from '../../migration-targets/sql-fanout';
  */
 describeSqlMigration(
   'Migration E2E - integer default drift',
-  ({ int, integerColumn, defineContract, runMigration }) => {
+  ({ cols, defineContract, runMigration }) => {
     it('verifies an integer `@default(42)` without drift', async () => {
       await runMigration({
         destination: defineContract({
           models: {
             Setting: model('Setting', {
               fields: {
-                id: int.id(),
-                priority: field.column(integerColumn).default(42),
+                id: field.column(cols.int).id(),
+                priority: field.column(cols.int).default(42),
               },
             }),
           },

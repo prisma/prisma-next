@@ -1,3 +1,35 @@
+/**
+ * SQL fan-out helper.
+ *
+ * Two design choices that test authors care about:
+ *
+ * 1. `sqlTargetRegistry` is the source of truth for every per-target
+ *    config (pack, test target adapter, runtime builder). Adding a new
+ *    SQL target = one entry. `SqlTargetName` is derived from
+ *    `keyof typeof sqlTargetRegistry`, so adding a target propagates
+ *    to every caller-supplied column map via the type checker.
+ *
+ * 2. Columns are NOT hardcoded into `SqlFanoutContext`. A module-level
+ *    `commonSqlCols` carries the shared baseline (int, text, …); tests
+ *    that need more columns pass them as an `extras` arg. Adding a new
+ *    column type either extends the module constant (one place,
+ *    shared by all tests) or is passed inline by the test that needs
+ *    it — no changes to the harness file required.
+ *
+ * `describeSqlMigration` has two overloads:
+ *   describeSqlMigration(name, body)                  // common cols only
+ *   describeSqlMigration(name, extras, body)          // common ∪ extras
+ *
+ * In both, the body receives a per-target context with a
+ * contract-typed `db` and `runtime` (for the SQL DSL), plus `cols`
+ * mapping the caller's column names to per-target descriptors. Tests
+ * write `field.column(cols.int).id()` etc.
+ *
+ * Sqlite-specific tests (rowid auto-increment, recreate-table internals,
+ * datetime() canonicalization) shouldn't use this — keep them as plain
+ * `describe` blocks importing from `./sqlite`.
+ */
+
 import { int4Column, textColumn as pgTextColumn } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import {
@@ -6,14 +38,12 @@ import {
 } from '@prisma-next/adapter-sqlite/column-types';
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import type { Contract } from '@prisma-next/contract/types';
+import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import type {
-  MigrationOperationPolicy,
-  VerifyDatabaseSchemaResult,
-} from '@prisma-next/framework-components/control';
+import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
@@ -22,7 +52,6 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   defineContract as baseDefineContract,
   type ContractModelBuilder,
-  field,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
   createExecutionContext,
@@ -35,38 +64,23 @@ import postgresPack from '@prisma-next/target-postgres/pack';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import sqlitePack from '@prisma-next/target-sqlite/pack';
 import sqliteTarget from '@prisma-next/target-sqlite/runtime';
+import type { VerifyDatabaseSchemaResultLike } from '@prisma-next/test-utils/migration-harness';
 import type { Client } from 'pg';
 import { describe } from 'vitest';
 import { getPostgresBinding, type PostgresTestDriver, postgresTestTarget } from './postgres';
 import { getSqlitePath, type SqliteTestDriver, sqliteTestTarget } from './sqlite';
 
-/**
- * Helper for fanning out SQL migration tests across SQLite and Postgres.
- *
- * Each test body runs once per target inside a `describe` block named
- * `${groupName} — sqlite` / `${groupName} — postgres`. The body receives a
- * per-target context: column-type builders (`int`, `text`, raw column
- * descriptors), a `defineContract` pre-bound to the current target's
- * family/target pack, and `runMigration({ origin?, destination, before?,
- * after })` — the harness orchestrates origin apply → optional `before`
- * with a runtime typed against `origin` → destination apply → `after`
- * with a runtime typed against `destination`.
- *
- * `before` and `after` each receive `{ db, runtime, driver }` where `db`
- * is the contract-typed SQL DSL surface (`Db<TOrigin>` / `Db<TDestination>`).
- * `driver` stays available as a raw escape hatch but should be a last
- * resort — the DSL covers the common cases and is target-portable.
- *
- * Sqlite-specific tests (rowid auto-increment, recreate-table internals,
- * datetime() canonicalization) should not use this — keep them as plain
- * `describe` blocks importing from `./sqlite`.
- */
+// ---------------------------------------------------------------------------
+// 1. Target registry — the source of truth
+// ---------------------------------------------------------------------------
+
+// biome-ignore lint/suspicious/noExplicitAny: ContractModelBuilder is generic; we accept any concrete instance
+export type AnyContractModelBuilder = ContractModelBuilder<any, any, any, any, any>;
 
 /**
  * Structural common shape over `SqliteTestDriver` and `PostgresTestDriver`.
- * Both targets' test drivers accept `?`-style placeholders in test SQL
- * (postgres translates internally) and expose the standard control-driver
- * query API.
+ * Both targets' test drivers accept `?`-style placeholders (postgres
+ * translates internally to `$N`).
  */
 export interface SqlTestDriver {
   readonly familyId: 'sql';
@@ -78,135 +92,41 @@ export interface SqlTestDriver {
   close(): Promise<void>;
 }
 
-export type SqlTargetName = 'sqlite' | 'postgres';
-
 /**
- * Any concrete `ContractModelBuilder` instance — what `model('Name', {...})`
- * returns. Used as the constraint on `Models` for the per-target
- * `defineContract` wrappers, so TypeScript can satisfy baseDefineContract's
- * private `Record<string, ModelLike>` constraint without us having to
- * approximate the private type. `ContractModelBuilder` is exported and is
- * structurally a `ModelLike`.
+ * Shape of one target's config. `pack` is the family + target pack used
+ * to build contracts. `testTarget` is the migration TestTargetAdapter.
+ * `buildRuntime` constructs a contract-typed runtime against the case's
+ * live database, for the SQL DSL.
  */
-// biome-ignore lint/suspicious/noExplicitAny: ContractModelBuilder is generic over name/fields/relations/attrs/sql — we accept any concrete instance
-export type AnyContractModelBuilder = ContractModelBuilder<any, any, any, any, any>;
-
-// ---------------------------------------------------------------------------
-// Target-neutral typing via unions
-// ---------------------------------------------------------------------------
-//
-// `SqlFanoutContext` exposes `defineContract`, `int`/`text` (field
-// builders), and `integerColumn`/`textColumn` (raw column descriptors)
-// with target-NEUTRAL types — unions over every supported SQL target's
-// pack/column types. No target is privileged; adding a new SQL target
-// means extending these unions (and adding a case below).
-//
-// Each case's runtime values use ITS OWN concrete pack and column
-// descriptors. The union types are upper bounds for the static
-// interface; runtime values are subtypes of the unions. Codec lookups
-// inside `Db<TContract>` operate over whichever pack the contract was
-// built with (per case) — every concrete pack supplies the codecs its
-// own column descriptors reference, so the JS scalar types resolve
-// correctly per case without any cross-pack synthesis.
-
-type SupportedSqlPack = typeof sqlitePack | typeof postgresPack;
-type SupportedIntColumn = typeof sqliteIntegerColumn | typeof int4Column;
-type SupportedTextColumn = typeof sqliteTextColumn | typeof pgTextColumn;
-
-/**
- * Typing-only signature for `defineContract`. The Target generic is the
- * union of supported SQL packs; each case's actual implementation calls
- * `baseDefineContract` with its own concrete pack value. The `const
- * Models` generic preserves the inferred model/column literal types
- * end-to-end (table keys, column keys, scalar JS types).
- */
-function defineSqlContractTyping<
-  const Models extends Record<string, AnyContractModelBuilder>,
->(args: {
-  models: Models;
-}): ReturnType<
-  typeof baseDefineContract<typeof sqlFamilyPack, SupportedSqlPack, Record<never, never>, Models>
-> {
-  // Unreachable: each case provides its own concrete impl.
-  void args;
-  throw new Error('typing-only stub — use a per-case `defineContract` implementation');
-}
-export type DefineSqlContract = typeof defineSqlContractTyping;
-
-/**
- * Context passed to `before` (typed against the origin contract).
- */
-export interface SqlBeforeContext<TOrigin extends Contract<SqlStorage>> {
-  readonly db: Db<TOrigin>;
-  readonly runtime: Runtime;
-  readonly driver: SqlTestDriver;
+interface SqlTargetConfig {
+  readonly pack: { readonly family: typeof sqlFamilyPack; readonly target: unknown };
+  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous targets are dispatched per iteration
+  readonly testTarget: any;
+  readonly buildRuntime: <TContract extends Contract<SqlStorage>>(
+    driver: SqlTestDriver,
+    contract: TContract,
+  ) => Promise<{ db: Db<TContract>; runtime: Runtime; dispose: () => Promise<void> }>;
 }
 
 /**
- * Context passed to `after` (typed against the destination contract).
+ * Wrap a pg.Client so its `end()` is a no-op. The test target owns the
+ * real lifecycle of the client; the postgres runtime driver's close()
+ * would otherwise tear down the shared connection mid-test.
  */
-export interface SqlAfterContext<TDestination extends Contract<SqlStorage>> {
-  readonly db: Db<TDestination>;
-  readonly runtime: Runtime;
-  readonly driver: SqlTestDriver;
-  readonly schema: SqlSchemaIR;
-  readonly operationsExecuted: number;
-  readonly plannedOperationIds: readonly string[];
+function makeBorrowedPgClient(real: Client): Client {
+  return new Proxy(real, {
+    get(target, prop, receiver) {
+      if (prop === 'end') {
+        return async () => {
+          /* borrowed: lifecycle owned by the test target */
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
 }
 
-export interface RunMigrationOptions<
-  TOrigin extends Contract<SqlStorage>,
-  TDestination extends Contract<SqlStorage>,
-> {
-  origin?: TOrigin;
-  destination: TDestination;
-  policy?: MigrationOperationPolicy;
-  /** Optional: runs after origin is applied, typed against origin. */
-  before?: (ctx: SqlBeforeContext<TOrigin>) => Promise<void>;
-  /** Required: runs after destination is applied + verified, typed against destination. */
-  after: (ctx: SqlAfterContext<TDestination>) => Promise<void>;
-}
-
-export interface SqlFanoutContext {
-  readonly name: SqlTargetName;
-  // Field builders + raw column descriptors with a literal codecId
-  // (`ReturnType<typeof field.column>` with no generic arg defaults
-  // codecId to `string`, the codec lookup produces `never`, and
-  // `db.<Model>.insert({...})` typing collapses to `never` for every
-  // column). The canonical type is shared across cases — see
-  // CanonicalSqlPack above for the rationale.
-  readonly int: ReturnType<typeof field.column<SupportedIntColumn>>;
-  readonly text: ReturnType<typeof field.column<SupportedTextColumn>>;
-  readonly integerColumn: SupportedIntColumn;
-  readonly textColumn: SupportedTextColumn;
-  // Declared as a method (not a property) so the `const Models` generic
-  // is preserved through call-site inference. As a property, TS would
-  // widen Models when reading the property value at the call site.
-  defineContract<const Models extends Record<string, AnyContractModelBuilder>>(args: {
-    models: Models;
-  }): ReturnType<typeof defineSqlContractTyping<Models>>;
-  runMigration<
-    const TOrigin extends Contract<SqlStorage>,
-    const TDestination extends Contract<SqlStorage>,
-  >(options: RunMigrationOptions<TOrigin, TDestination>): Promise<void>;
-}
-
-// ---------------------------------------------------------------------------
-// Per-target runtime construction
-// ---------------------------------------------------------------------------
-
-interface RuntimeBundle<TContract extends Contract<SqlStorage>> {
-  readonly db: Db<TContract>;
-  readonly runtime: Runtime;
-  readonly dispose: () => Promise<void>;
-}
-
-type BuildRuntime = <TContract extends Contract<SqlStorage>>(
-  driver: SqlTestDriver,
-  contract: TContract,
-) => Promise<RuntimeBundle<TContract>>;
-
-const buildSqliteRuntime: BuildRuntime = async (driver, contract) => {
+const buildSqliteRuntime: SqlTargetConfig['buildRuntime'] = async (driver, contract) => {
   const path = getSqlitePath(driver as SqliteTestDriver);
   const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
   const stack = createSqlExecutionStack({
@@ -232,27 +152,7 @@ const buildSqliteRuntime: BuildRuntime = async (driver, contract) => {
   };
 };
 
-/**
- * Wrap a pg.Client so `end()` is a no-op. The test target owns the real
- * lifecycle of the client (it's shared between the control driver and
- * one or more runtimes); the postgres runtime driver's `close()` calls
- * `client.end()` on its bound client, which would otherwise tear down
- * the shared connection mid-test.
- */
-function makeBorrowedPgClient(real: Client): Client {
-  return new Proxy(real, {
-    get(target, prop, receiver) {
-      if (prop === 'end') {
-        return async () => {
-          /* borrowed: lifecycle owned by the test target */
-        };
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
-}
-
-const buildPostgresRuntime: BuildRuntime = async (driver, contract) => {
+const buildPostgresRuntime: SqlTargetConfig['buildRuntime'] = async (driver, contract) => {
   const { client } = getPostgresBinding(driver as PostgresTestDriver);
   const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
   const stack = createSqlExecutionStack({
@@ -283,31 +183,43 @@ const buildPostgresRuntime: BuildRuntime = async (driver, contract) => {
   };
 };
 
+/**
+ * The registry. Adding `mysql` = one new entry; every column map in
+ * the project then must update or the type checker complains.
+ */
+export const sqlTargetRegistry = {
+  sqlite: {
+    pack: { family: sqlFamilyPack, target: sqlitePack },
+    testTarget: sqliteTestTarget,
+    buildRuntime: buildSqliteRuntime,
+  },
+  postgres: {
+    pack: { family: sqlFamilyPack, target: postgresPack },
+    testTarget: postgresTestTarget,
+    buildRuntime: buildPostgresRuntime,
+  },
+} as const satisfies Record<string, SqlTargetConfig>;
+
+export type SqlTargetName = keyof typeof sqlTargetRegistry;
+
 // ---------------------------------------------------------------------------
-// Fan-out cases (one per supported SQL target)
+// 2. defineContract — typed against the union of supported target packs
 // ---------------------------------------------------------------------------
 
-interface CaseSpec {
-  readonly name: SqlTargetName;
-  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous targets dispatched per iteration; helper hides the union
-  readonly target: any;
-  // Each case provides its own concrete column descriptors at runtime;
-  // they're typed against the canonical shape (see CanonicalSqlPack
-  // above) so they fit a single CaseSpec interface and SqlFanoutContext
-  // can expose them with a single literal codecId.
-  readonly intCol: SupportedIntColumn;
-  readonly textCol: SupportedTextColumn;
-  readonly defineContract: DefineSqlContract;
-  readonly buildRuntime: BuildRuntime;
+type SupportedSqlPack = (typeof sqlTargetRegistry)[SqlTargetName]['pack']['target'];
+
+function defineSqlContractTyping<
+  const Models extends Record<string, AnyContractModelBuilder>,
+>(args: {
+  models: Models;
+}): ReturnType<
+  typeof baseDefineContract<typeof sqlFamilyPack, SupportedSqlPack, Record<never, never>, Models>
+> {
+  void args;
+  throw new Error('typing-only stub — use a per-case `defineContract` implementation');
 }
+export type DefineSqlContract = typeof defineSqlContractTyping;
 
-// Per-case `defineContract` implementations. Each uses its OWN target
-// pack at runtime; both share the `DefineSqlContract` typing
-// (SupportedSqlPack union). Both impls cast via `as unknown as`
-// because each returns a contract with a SPECIFIC Target (its own
-// pack), which TypeScript treats as nominally distinct from the union
-// Target the interface advertises — even though the specific is a
-// subtype of the union structurally for our DSL purposes.
 const sqliteDefineContract: DefineSqlContract = (<
   const Models extends Record<string, AnyContractModelBuilder>,
 >(args: {
@@ -330,31 +242,88 @@ const postgresDefineContract: DefineSqlContract = (<
     models: args.models,
   })) as unknown as DefineSqlContract;
 
-const cases: readonly CaseSpec[] = [
-  {
-    name: 'sqlite',
-    target: sqliteTestTarget,
-    intCol: sqliteIntegerColumn,
-    textCol: sqliteTextColumn,
-    defineContract: sqliteDefineContract,
-    buildRuntime: buildSqliteRuntime,
-  },
-  {
-    name: 'postgres',
-    target: postgresTestTarget,
-    intCol: int4Column,
-    textCol: pgTextColumn,
-    defineContract: postgresDefineContract,
-    buildRuntime: buildPostgresRuntime,
-  },
-];
+const defineContractByTarget: Record<SqlTargetName, DefineSqlContract> = {
+  sqlite: sqliteDefineContract,
+  postgres: postgresDefineContract,
+};
 
 // ---------------------------------------------------------------------------
-// Manual orchestration (so we can interleave runtime setup with apply steps)
+// 3. Columns — common baseline + per-test extras
+// ---------------------------------------------------------------------------
+
+/**
+ * Caller-supplied column declarations: per name, per target.
+ * Type-checked against `SqlTargetName` — adding a target to the
+ * registry forces every column map (common and per-test) to update.
+ */
+export type SqlColumnsByTarget = Record<string, Record<SqlTargetName, ColumnTypeDescriptor>>;
+
+/**
+ * Shared baseline columns. To add a column for use across many tests,
+ * extend this constant. Tests can also pass per-test extras (see the
+ * three-arg overload of `describeSqlMigration`).
+ */
+export const commonSqlCols = {
+  int: { sqlite: sqliteIntegerColumn, postgres: int4Column },
+  text: { sqlite: sqliteTextColumn, postgres: pgTextColumn },
+} as const satisfies SqlColumnsByTarget;
+
+/** Per-target resolution: each named column becomes a union over targets. */
+type ResolvedCols<TCols extends SqlColumnsByTarget> = {
+  [K in keyof TCols]: TCols[K][SqlTargetName];
+};
+
+// ---------------------------------------------------------------------------
+// 4. Run-migration shape
+// ---------------------------------------------------------------------------
+
+export interface SqlBeforeContext<TOrigin extends Contract<SqlStorage>> {
+  readonly db: Db<TOrigin>;
+  readonly runtime: Runtime;
+  readonly driver: SqlTestDriver;
+}
+
+export interface SqlAfterContext<TDestination extends Contract<SqlStorage>> {
+  readonly db: Db<TDestination>;
+  readonly runtime: Runtime;
+  readonly driver: SqlTestDriver;
+  readonly schema: SqlSchemaIR;
+  readonly operationsExecuted: number;
+  readonly plannedOperationIds: readonly string[];
+}
+
+export interface RunMigrationOptions<
+  TOrigin extends Contract<SqlStorage>,
+  TDestination extends Contract<SqlStorage>,
+> {
+  origin?: TOrigin;
+  destination: TDestination;
+  policy?: MigrationOperationPolicy;
+  before?: (ctx: SqlBeforeContext<TOrigin>) => Promise<void>;
+  after: (ctx: SqlAfterContext<TDestination>) => Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// 5. SqlFanoutContext — parameterized over the resolved column set
+// ---------------------------------------------------------------------------
+
+export interface SqlFanoutContext<TCols extends SqlColumnsByTarget> {
+  readonly name: SqlTargetName;
+  readonly cols: ResolvedCols<TCols>;
+  defineContract<const Models extends Record<string, AnyContractModelBuilder>>(args: {
+    models: Models;
+  }): ReturnType<typeof defineSqlContractTyping<Models>>;
+  runMigration<
+    const TOrigin extends Contract<SqlStorage>,
+    const TDestination extends Contract<SqlStorage>,
+  >(options: RunMigrationOptions<TOrigin, TDestination>): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// 6. Manual orchestration
 // ---------------------------------------------------------------------------
 
 const CONTROL_TABLES = new Set(['_prisma_marker', '_prisma_ledger']);
-const emptySqlSchema: SqlSchemaIR = { tables: {}, dependencies: [] };
 
 function stripControlTables(schema: SqlSchemaIR): SqlSchemaIR {
   const userTables: Record<string, SqlSchemaIR['tables'][string]> = {};
@@ -364,7 +333,7 @@ function stripControlTables(schema: SqlSchemaIR): SqlSchemaIR {
   return { ...schema, tables: userTables };
 }
 
-function throwIfVerifyFailed(verify: VerifyDatabaseSchemaResult): void {
+function throwIfVerifyFailed(verify: VerifyDatabaseSchemaResultLike): void {
   if (!verify.ok) {
     const issues = verify.schema.issues.map((i) => `  - [${i.kind}] ${i.message}`).join('\n');
     throw new Error(`Schema verification failed:\n${issues}`);
@@ -374,14 +343,21 @@ function throwIfVerifyFailed(verify: VerifyDatabaseSchemaResult): void {
 async function runOneMigration<
   const TOrigin extends Contract<SqlStorage>,
   const TDestination extends Contract<SqlStorage>,
->(caseSpec: CaseSpec, options: RunMigrationOptions<TOrigin, TDestination>): Promise<void> {
-  const { target, buildRuntime } = caseSpec;
-  const { driver, cleanup } = await target.setup();
+>(targetName: SqlTargetName, options: RunMigrationOptions<TOrigin, TDestination>): Promise<void> {
+  const config = sqlTargetRegistry[targetName];
+  // testTarget at this point has the union of sqlite/postgres TestTargetAdapter
+  // instantiations (because targetName is the SqlTargetName union); methods
+  // on the union narrow incompatible parameter types to `never`. Cast at the
+  // boundary — the runtime dispatch by targetName ensures the correct one runs.
+  // biome-ignore lint/suspicious/noExplicitAny: see comment above
+  const testTarget = config.testTarget as any;
+  const { buildRuntime } = config;
+  const { driver, cleanup } = await testTarget.setup();
   try {
-    let currentSchema = target.emptySchema as SqlSchemaIR;
+    let currentSchema = testTarget.emptySchema as SqlSchemaIR;
 
     if (options.origin !== undefined) {
-      await target.applyContract({
+      await testTarget.applyContract({
         driver,
         currentSchema,
         contract: options.origin,
@@ -389,7 +365,7 @@ async function runOneMigration<
         policy: undefined,
         isInitial: true,
       });
-      currentSchema = (await target.introspect(driver)) as SqlSchemaIR;
+      currentSchema = (await testTarget.introspect(driver)) as SqlSchemaIR;
 
       if (options.before !== undefined) {
         const bundle = await buildRuntime(driver, options.origin);
@@ -405,7 +381,7 @@ async function runOneMigration<
       }
     }
 
-    const applyResult = await target.applyContract({
+    const applyResult = await testTarget.applyContract({
       driver,
       currentSchema,
       contract: options.destination,
@@ -414,8 +390,8 @@ async function runOneMigration<
       isInitial: false,
     });
 
-    const fresh = (await target.introspect(driver)) as SqlSchemaIR;
-    throwIfVerifyFailed(target.verify({ contract: options.destination, schema: fresh }));
+    const fresh = (await testTarget.introspect(driver)) as SqlSchemaIR;
+    throwIfVerifyFailed(testTarget.verify({ contract: options.destination, schema: fresh }));
 
     const bundle = await buildRuntime(driver, options.destination);
     try {
@@ -436,52 +412,48 @@ async function runOneMigration<
 }
 
 // ---------------------------------------------------------------------------
-// Public API
+// 7. Public API — describeSqlMigration with two overloads
 // ---------------------------------------------------------------------------
 
-/**
- * Fan out a SQL migration scenario across SQLite and Postgres. Generates
- * one `describe` block per target. The body is invoked twice with a
- * per-target context.
- */
 export function describeSqlMigration(
   groupName: string,
-  body: (ctx: SqlFanoutContext) => void,
+  body: (ctx: SqlFanoutContext<typeof commonSqlCols>) => void,
+): void;
+export function describeSqlMigration<const TExtra extends SqlColumnsByTarget>(
+  groupName: string,
+  extras: TExtra,
+  body: (ctx: SqlFanoutContext<typeof commonSqlCols & TExtra>) => void,
+): void;
+export function describeSqlMigration(
+  groupName: string,
+  // biome-ignore lint/suspicious/noExplicitAny: implementation signature — the public overloads above are the type-safe surface
+  bodyOrExtras: any,
+  // biome-ignore lint/suspicious/noExplicitAny: implementation signature — the public overloads above are the type-safe surface
+  maybeBody?: any,
 ): void {
-  // Suppress unused-import warning for emptySqlSchema (referenced lazily via
-  // target.emptySchema, kept here as a stable fallback if a target ever
-  // omits it).
-  void emptySqlSchema;
-  for (const caseSpec of cases) {
-    describe(`${groupName} — ${caseSpec.name}`, () => {
-      // Method shorthand (`defineContract(args) { ... }` / `runMigration(opts) { ... }`)
-      // is important: the SqlFanoutContext interface declares both as
-      // generic methods. If we assigned arrow-function values here
-      // instead, TypeScript would erase the `const` generic and the
-      // caller would see widened types (Models → Record<string, never>,
-      // column JS types → never).
-      // Why a generic function expression rather than an arrow or method
-      // shorthand: the SqlFanoutContext interface declares `runMigration`
-      // with `const TOrigin, const TDestination` generics so the call
-      // site preserves inferred contract types (so `db.User.insert(...)`
-      // sees real column JS types instead of `never`). An arrow function
-      // value assigned to that slot would erase the const generics; a
-      // named generic function expression assigned to the slot keeps
-      // them.
-      const runMigrationForCase = function runMigration<
-        const TOrigin extends Contract<SqlStorage>,
-        const TDestination extends Contract<SqlStorage>,
-      >(options: RunMigrationOptions<TOrigin, TDestination>): Promise<void> {
-        return runOneMigration(caseSpec, options);
-      };
-      const ctx: SqlFanoutContext = {
-        name: caseSpec.name,
-        int: field.column(caseSpec.intCol),
-        text: field.column(caseSpec.textCol),
-        integerColumn: caseSpec.intCol,
-        textColumn: caseSpec.textCol,
-        defineContract: caseSpec.defineContract,
-        runMigration: runMigrationForCase,
+  const [extras, body] =
+    typeof bodyOrExtras === 'function' ? [{}, bodyOrExtras] : [bodyOrExtras, maybeBody!];
+
+  const cols: SqlColumnsByTarget = { ...commonSqlCols, ...extras };
+
+  for (const targetName of Object.keys(sqlTargetRegistry) as SqlTargetName[]) {
+    describe(`${groupName} — ${targetName}`, () => {
+      const resolvedCols: Record<string, ColumnTypeDescriptor> = {};
+      for (const [colName, byTarget] of Object.entries(cols)) {
+        resolvedCols[colName] = byTarget[targetName];
+      }
+      const ctx: SqlFanoutContext<SqlColumnsByTarget> = {
+        name: targetName,
+        cols: resolvedCols as ResolvedCols<SqlColumnsByTarget>,
+        defineContract: defineContractByTarget[
+          targetName
+        ] as SqlFanoutContext<SqlColumnsByTarget>['defineContract'],
+        runMigration: function runMigration<
+          const TOrigin extends Contract<SqlStorage>,
+          const TDestination extends Contract<SqlStorage>,
+        >(options: RunMigrationOptions<TOrigin, TDestination>): Promise<void> {
+          return runOneMigration(targetName, options);
+        },
       };
       body(ctx);
     });
