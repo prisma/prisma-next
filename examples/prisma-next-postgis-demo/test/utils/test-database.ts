@@ -4,6 +4,9 @@
  * server isn't reachable so a clean clone of the repo doesn't fail
  * unexpectedly; you opt in by running `pnpm db:up`.
  */
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
@@ -13,9 +16,6 @@ import { instantiateExecutionStack } from '@prisma-next/framework-components/exe
 import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
 import { type CreateRuntimeOptions, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import pg from 'pg';
 
 export const TEST_DATABASE_URL =
