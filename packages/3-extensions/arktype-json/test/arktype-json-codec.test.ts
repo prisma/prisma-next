@@ -145,6 +145,23 @@ describe('arktypeJsonColumn encode/encodeJson agreement', () => {
     await expect(codec.decode(wire, CALL_CTX)).rejects.toThrow(/price/);
   });
 
+  it('decode preserves the original validation error when fallback JSON parsing fails', async () => {
+    const codec = arktypeJsonColumn(productSchema).codecFactory(SYNTH_CTX);
+    await expect(codec.decode('{not json', CALL_CTX)).rejects.toThrow(/schema validation failed/);
+  });
+
+  it('decode rethrows non-runtime schema errors from the raw string pass', async () => {
+    const throwingSchema = Object.assign(
+      (_value: unknown): unknown => {
+        throw new Error('schema exploded');
+      },
+      { expression: 'unknown', json: {} },
+    );
+    const codec = arktypeJsonColumn(throwingSchema as never).codecFactory(SYNTH_CTX);
+
+    await expect(codec.decode('raw wire', CALL_CTX)).rejects.toThrow('schema exploded');
+  });
+
   it('decode accepts pre-parsed JSON string primitives for string-schema columns', async () => {
     const stringSchema = type('string');
     const codec = arktypeJsonColumn(stringSchema).codecFactory(SYNTH_CTX);
