@@ -70,6 +70,7 @@ describe('createModelAccessor', () => {
     );
     return {
       descriptorFor: (id) => map.get(id),
+      codecRefForColumn: () => undefined,
       values: function* () {
         yield* map.values();
       },

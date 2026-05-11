@@ -22,6 +22,7 @@ const stubDescriptor = (codecId: string): CodecDescriptor<unknown> =>
 
 const registry: CodecDescriptorRegistry = {
   descriptorFor: (codecId) => stubDescriptor(codecId),
+  codecRefForColumn: () => undefined,
   *values() {
     for (const id of PARAMETERIZED_IDS) yield stubDescriptor(id);
   },
@@ -91,6 +92,7 @@ describe('validateParamRefRefs', () => {
   it('passes when codecId is unknown to the registry (descriptorFor returns undefined)', () => {
     const sparseRegistry: CodecDescriptorRegistry = {
       descriptorFor: () => undefined,
+      codecRefForColumn: () => undefined,
       *values() {},
       byTargetType: () => Object.freeze([]),
     };

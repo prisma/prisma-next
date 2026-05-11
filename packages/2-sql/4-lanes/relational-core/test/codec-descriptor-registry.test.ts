@@ -1,4 +1,5 @@
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import type { AnyCodecDescriptor } from '../src/ast/codec-types';
 import { buildCodecDescriptorRegistry } from '../src/codec-descriptor-registry';
@@ -59,5 +60,155 @@ describe('buildCodecDescriptorRegistry', () => {
     expect(() => buildCodecDescriptorRegistry([a, a2])).toThrowError(
       /Duplicate codec descriptor id: 'lib\/dup@1'/,
     );
+  });
+});
+
+describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
+  function storageWith(parts: {
+    tables: SqlStorage['tables'];
+    types?: SqlStorage['types'];
+  }): SqlStorage {
+    return {
+      storageHash: 'sha256:test' as SqlStorage['storageHash'],
+      tables: parts.tables,
+      ...(parts.types ? { types: parts.types } : {}),
+    };
+  }
+
+  const descriptors = [stub('pg/vector@1', ['vector']), stub('pg/text@1', ['text'])];
+
+  it('returns undefined when the registry was built without storage', () => {
+    const registry = buildCodecDescriptorRegistry(descriptors);
+    expect(registry.codecRefForColumn('Doc', 'embedding')).toBeUndefined();
+  });
+
+  it('derives `{codecId, typeParams}` from `storage.types` for a typeRef column', () => {
+    const storage = storageWith({
+      tables: {
+        Doc: {
+          columns: {
+            embedding: {
+              nativeType: 'vector',
+              codecId: 'pg/vector@1',
+              nullable: false,
+              typeRef: 'Vector1536',
+            },
+          },
+          primaryKey: { columns: ['embedding'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+      types: {
+        Vector1536: {
+          codecId: 'pg/vector@1',
+          nativeType: 'vector',
+          typeParams: { length: 1536 },
+        },
+      },
+    });
+
+    const registry = buildCodecDescriptorRegistry(descriptors, storage);
+    expect(registry.codecRefForColumn('Doc', 'embedding')).toEqual({
+      codecId: 'pg/vector@1',
+      typeParams: { length: 1536 },
+    });
+  });
+
+  it('derives `{codecId, typeParams}` from inline `column.typeParams` when no typeRef is set', () => {
+    const storage = storageWith({
+      tables: {
+        Doc: {
+          columns: {
+            embedding: {
+              nativeType: 'vector',
+              codecId: 'pg/vector@1',
+              nullable: false,
+              typeParams: { length: 768 },
+            },
+          },
+          primaryKey: { columns: ['embedding'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    });
+
+    const registry = buildCodecDescriptorRegistry(descriptors, storage);
+    expect(registry.codecRefForColumn('Doc', 'embedding')).toEqual({
+      codecId: 'pg/vector@1',
+      typeParams: { length: 768 },
+    });
+  });
+
+  it('emits `{codecId}` (typeParams undefined) for a non-parameterized column', () => {
+    const storage = storageWith({
+      tables: {
+        User: {
+          columns: {
+            email: {
+              nativeType: 'text',
+              codecId: 'pg/text@1',
+              nullable: false,
+            },
+          },
+          primaryKey: { columns: ['email'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    });
+
+    const registry = buildCodecDescriptorRegistry(descriptors, storage);
+    const ref = registry.codecRefForColumn('User', 'email');
+    expect(ref).toEqual({ codecId: 'pg/text@1' });
+    expect(ref?.typeParams).toBeUndefined();
+  });
+
+  it('returns undefined for an unknown table or column', () => {
+    const storage = storageWith({
+      tables: {
+        User: {
+          columns: {
+            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          },
+          primaryKey: { columns: ['email'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    });
+
+    const registry = buildCodecDescriptorRegistry(descriptors, storage);
+    expect(registry.codecRefForColumn('User', 'nope')).toBeUndefined();
+    expect(registry.codecRefForColumn('NoSuchTable', 'whatever')).toBeUndefined();
+  });
+
+  it('returns undefined when the typeRef points at an undefined storage type', () => {
+    const storage = storageWith({
+      tables: {
+        Doc: {
+          columns: {
+            embedding: {
+              nativeType: 'vector',
+              codecId: 'pg/vector@1',
+              nullable: false,
+              typeRef: 'Missing',
+            },
+          },
+          primaryKey: { columns: ['embedding'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    });
+
+    const registry = buildCodecDescriptorRegistry(descriptors, storage);
+    expect(registry.codecRefForColumn('Doc', 'embedding')).toBeUndefined();
   });
 });

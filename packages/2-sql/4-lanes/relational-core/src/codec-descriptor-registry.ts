@@ -1,4 +1,6 @@
-import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
+import type { JsonValue } from '@prisma-next/contract/types';
+import type { CodecDescriptor, CodecRef } from '@prisma-next/framework-components/codec';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AnyCodecDescriptor } from './ast/codec-types';
 import type { CodecDescriptorRegistry } from './query-lane-context';
 
@@ -14,6 +16,7 @@ import type { CodecDescriptorRegistry } from './query-lane-context';
  */
 export function buildCodecDescriptorRegistry(
   allDescriptors: ReadonlyArray<AnyCodecDescriptor>,
+  storage?: SqlStorage,
 ): CodecDescriptorRegistry {
   type AnyDescriptor = CodecDescriptor<unknown>;
   const byId = new Map<string, AnyDescriptor>();
@@ -41,6 +44,23 @@ export function buildCodecDescriptorRegistry(
   return {
     descriptorFor(codecId: string): AnyDescriptor | undefined {
       return byId.get(codecId);
+    },
+    codecRefForColumn(table: string, column: string): CodecRef | undefined {
+      if (!storage) return undefined;
+      const tableDef = storage.tables[table];
+      if (!tableDef) return undefined;
+      const columnDef = tableDef.columns[column];
+      if (!columnDef) return undefined;
+      if (columnDef.typeRef !== undefined) {
+        const instance = storage.types?.[columnDef.typeRef];
+        if (!instance) return undefined;
+        // Contract storage carries `typeParams: Record<string, unknown>` but every value must be JSON-shaped to survive serialization to `contract.json`; descriptors validate the value via `paramsSchema` at JSON load time. The narrow is safe by that invariant.
+        return { codecId: instance.codecId, typeParams: instance.typeParams as JsonValue };
+      }
+      if (columnDef.typeParams !== undefined) {
+        return { codecId: columnDef.codecId, typeParams: columnDef.typeParams as JsonValue };
+      }
+      return { codecId: columnDef.codecId };
     },
     *values(): IterableIterator<AnyDescriptor> {
       yield* byId.values();

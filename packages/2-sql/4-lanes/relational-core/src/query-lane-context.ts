@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
+import type { CodecDescriptor, CodecRef } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { ContractCodecRegistry } from './ast/codec-types';
@@ -12,6 +12,18 @@ export interface CodecDescriptorRegistry {
    * Descriptors carry distinct param shapes per codec id; the registry is heterogeneous and the consumer narrows per codec.
    */
   descriptorFor(codecId: string): CodecDescriptor<unknown> | undefined;
+  /**
+   * Derive the canonical {@link CodecRef} for a contract `(table, column)`. The builder side calls this at AST construction time to stamp `codec` onto every column-bound `ParamRef` / `ProjectionItem`; the runtime side uses the result as the cache key into the content-keyed codec resolver.
+   *
+   * Resolution rules over `storage.tables[table].columns[column]`:
+   *
+   * - `typeRef` column → emit `{codecId, typeParams}` from `storage.types[typeRef]` (multiple columns sharing the typeRef produce the same ref → same memoised codec).
+   * - inline `typeParams` column → emit `{codecId, typeParams}` from the column itself.
+   * - non-parameterized column → emit `{codecId}` with `typeParams` undefined (keys as `${codecId}:undefined` → one shared codec).
+   *
+   * Returns `undefined` when the registry was built without contract storage (package-scoped registries used purely as descriptor lookups), when the table or column is unknown, or when the column declares a `typeRef` that the storage doesn't define.
+   */
+  codecRefForColumn(table: string, column: string): CodecRef | undefined;
   /**
    * All registered descriptors. Used by `validateCodecRegistryCompleteness` and other startup-time consumers that enumerate descriptors.
    */
