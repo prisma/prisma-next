@@ -105,9 +105,6 @@ export interface MigrationStatusEntry {
  *
  * Online-only fields (`markerHash`, `status`) are absent when the
  * command runs without a database connection.
- *
- * Closes M6 AC2 — every contract space is observable in `migration
- * status`, with each space's pending count + current marker state.
  */
 export interface MigrationStatusSpaceEntry {
   readonly spaceId: string;
@@ -189,7 +186,7 @@ export interface MigrationStatusResult {
    * The legacy top-level fields (`migrations`, `markerHash`,
    * `targetHash`, `pathDecision`, …) describe the **app member**
    * specifically — back-compat with single-space callers. Per-space
-   * detail for extension members lives only on this list (M6 AC2).
+   * detail for extension members lives only on this list.
    */
   readonly spaces?: readonly MigrationStatusSpaceEntry[];
   /** Cross-space pending-migration total (sum of `spaces[].pendingCount`). Present when `spaces` is. */
