@@ -4,6 +4,9 @@
  * server isn't reachable so a clean clone of the repo doesn't fail
  * unexpectedly; you opt in by running `pnpm db:up`.
  */
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
