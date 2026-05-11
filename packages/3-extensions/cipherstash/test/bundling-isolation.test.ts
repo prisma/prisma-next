@@ -37,8 +37,8 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'pathe';
 import { describe, expect, it } from 'vitest';
 
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -98,7 +98,14 @@ function readChunk(file: string): ChunkFile {
   return { file, body, size: Buffer.byteLength(body, 'utf8') };
 }
 
-const RELATIVE_IMPORT_RE = /from\s+["'](\.\/[^"']+\.mjs)["']/g;
+// Captures relative `.mjs` edges in three forms:
+//   `from "./x.mjs"`            — `import ... from`, `export ... from`
+//   `import "./x.mjs"`          — side-effect imports
+//   `import("./x.mjs")`         — dynamic imports
+// Without each of these the disjointness check can silently pass for a
+// chunk graph that re-exports cross-plane state through side-effect
+// imports or `export ... from` edges.
+const RELATIVE_IMPORT_RE = /(?:from|import)\s*\(?\s*["'](\.\/[^"']+\.mjs)["']/g;
 
 function collectGraph(entry: string): Map<string, ChunkFile> {
   const graph = new Map<string, ChunkFile>();
