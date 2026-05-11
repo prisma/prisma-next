@@ -1,9 +1,11 @@
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { MigrationOps } from '@prisma-next/migration-tools/package';
 import { describe, expect, it } from 'vitest';
+import type {
+  DescriptorMigrationPackage,
+  ExtensionPackInput,
+} from '../../src/utils/extension-pack-inputs';
 import {
-  type DescriptorMigrationPackage,
-  type ExtensionPackInput,
   toDeclaredExtensions,
   toExtensionInputs,
   toExtensionMigrationsInputs,
