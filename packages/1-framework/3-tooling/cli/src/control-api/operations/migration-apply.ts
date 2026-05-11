@@ -13,6 +13,7 @@ import {
   type ContractSpaceMember,
   graphWalkStrategy,
 } from '@prisma-next/migration-tools/aggregate';
+import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { errorNoInvariantPath } from '@prisma-next/migration-tools/errors';
 import { findPathWithDecision } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
@@ -30,7 +31,7 @@ import type {
   MigrationApplySuccess,
   OnControlProgress,
 } from '../types';
-import { applyAggregate, buildPerSpaceBreakdown, collectOrdered } from './apply-aggregate';
+import { applyAggregate, buildPerSpaceBreakdown } from './apply-aggregate';
 
 /**
  * Inputs for the aggregate-walking `migration apply` control-api
@@ -142,6 +143,12 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
   // to their own head ref.
   const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
   const perSpacePlans = new Map<string, AggregatePerSpacePlan>();
+  // Already-at-head empty-graph members (typically extensions whose
+  // head ref is the empty sentinel, or whose live marker already
+  // matches the target). Kept out of the runner schedule so we don't
+  // write spurious markers for greenfield extensions, but merged back
+  // into the success envelope so every loaded member is represented.
+  const atHeadResolutions = new Map<string, AggregatePerSpacePlan>();
   for (const member of allMembers) {
     const isAppMember = member.spaceId === aggregate.app.spaceId;
     const targetHash = isAppMember && refHash !== undefined ? refHash : member.headRef.hash;
@@ -150,12 +157,29 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     // Empty-graph members fail loudly: replay needs an on-disk path
     // and an empty graph means the user has never planned this space.
     if (member.migrations.graph.nodes.size === 0) {
-      // Edge case: target == EMPTY (greenfield, nothing to do).
-      // Loader integrity allows this for extensions whose head ref
-      // is the empty sentinel. Treat as no-op for that member.
+      // Edge case: target == EMPTY (greenfield, nothing to do) or
+      // the live marker already matches the target. Loader integrity
+      // allows this for extensions whose head ref is the empty
+      // sentinel. Record a zero-op resolution so the aggregate result
+      // still surfaces the member in `perSpace[]` as already-at-head;
+      // the runner is not invoked for these members because they have
+      // no authored ops and (for greenfield extensions) no marker to
+      // advance.
       const liveHash = liveMarker?.storageHash;
-      if (targetHash === liveHash || (liveHash === undefined && targetHash === EMPTY_SENTINEL)) {
-        continue; // skip — nothing to do
+      if (
+        targetHash === liveHash ||
+        (liveHash === undefined && targetHash === EMPTY_CONTRACT_HASH)
+      ) {
+        atHeadResolutions.set(
+          member.spaceId,
+          buildAtHeadResolution({
+            aggregateTargetId: aggregate.targetId,
+            member,
+            targetHash,
+            liveMarker,
+          }),
+        );
+        continue;
       }
       return notOk(buildNeverPlannedFailure(member.spaceId, targetHash));
     }
@@ -207,29 +231,40 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     perSpacePlans.set(member.spaceId, walked.result);
   }
 
-  const applyOrder = [...aggregate.extensions.map((m) => m.spaceId), aggregate.app.spaceId].filter(
-    (spaceId) => perSpacePlans.has(spaceId),
-  );
+  const canonicalOrder = [...aggregate.extensions.map((m) => m.spaceId), aggregate.app.spaceId];
+  const applyOrder = canonicalOrder.filter((spaceId) => perSpacePlans.has(spaceId));
 
-  // Short-circuit: nothing pending across any space.
+  // Short-circuit: nothing pending across any space (no runner-bound
+  // plans). Surfaces every loaded member — including at-head empty-
+  // graph extensions — in `perSpace[]` so the result reflects the
+  // full aggregate, not just the spaces the runner would have touched.
   const totalPlannedOps = sumPlannedOps(applyOrder, perSpacePlans);
   if (totalPlannedOps === 0) {
-    const orderedResolutions = collectOrdered(applyOrder, perSpacePlans);
-    const perSpace = buildPerSpaceBreakdown(orderedResolutions, aggregate.app.spaceId, {
+    const ordered = canonicalOrder
+      .filter((spaceId) => perSpacePlans.has(spaceId) || atHeadResolutions.has(spaceId))
+      .map((spaceId) => {
+        const entry = perSpacePlans.get(spaceId) ?? atHeadResolutions.get(spaceId);
+        if (entry === undefined) {
+          throw new Error(`Unreachable: missing per-space plan for "${spaceId}"`);
+        }
+        return { spaceId, entry };
+      });
+    const perSpace = buildPerSpaceBreakdown(ordered, aggregate.app.spaceId, {
       includeMarkers: true,
     });
+    const totalSpaces = ordered.length;
     return ok(
       buildSuccess({
         aggregate,
-        orderedResolutions,
+        orderedResolutions: ordered,
         perSpace,
         totalOpsExecuted: 0,
         summary:
-          applyOrder.length === 0
+          totalSpaces === 0
             ? 'Already up to date — no contract spaces are loaded'
-            : applyOrder.length === 1
+            : totalSpaces === 1
               ? 'Already up to date'
-              : `Already up to date across ${applyOrder.length} space(s)`,
+              : `Already up to date across ${totalSpaces} space(s)`,
       }),
     );
   }
@@ -257,24 +292,71 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     return notOk(failure);
   }
 
+  // Merge at-head zero-op resolutions back into the canonical order
+  // so the success envelope surfaces every loaded member, not just
+  // those the runner executed.
+  const orderedAll = canonicalOrder
+    .filter((spaceId) => perSpacePlans.has(spaceId) || atHeadResolutions.has(spaceId))
+    .map((spaceId) => {
+      if (perSpacePlans.has(spaceId)) {
+        const fromRunner = applied.value.orderedResolutions.find((r) => r.spaceId === spaceId);
+        if (fromRunner !== undefined) return fromRunner;
+      }
+      const entry = atHeadResolutions.get(spaceId);
+      if (entry === undefined) {
+        throw new Error(`Unreachable: missing per-space plan for "${spaceId}"`);
+      }
+      return { spaceId, entry };
+    });
+  const perSpaceAll = buildPerSpaceBreakdown(orderedAll, aggregate.app.spaceId, {
+    includeMarkers: true,
+  });
   const totalMigrationsApplied = applied.value.orderedResolutions.reduce(
     (sum, r) => sum + (r.entry.migrationEdges?.length ?? 0),
     0,
   );
-  const summary = `Applied ${totalMigrationsApplied} migration(s) (${applied.value.totalOpsExecuted} operation(s)) across ${applied.value.orderedResolutions.length} contract space(s)`;
+  const summary = `Applied ${totalMigrationsApplied} migration(s) (${applied.value.totalOpsExecuted} operation(s)) across ${orderedAll.length} contract space(s)`;
 
   return ok(
     buildSuccess({
       aggregate,
-      orderedResolutions: applied.value.orderedResolutions,
-      perSpace: applied.value.perSpace,
+      orderedResolutions: orderedAll,
+      perSpace: perSpaceAll,
       totalOpsExecuted: applied.value.totalOpsExecuted,
       summary,
     }),
   );
 }
 
-const EMPTY_SENTINEL = 'sha256:0000000000000000000000000000000000000000000000000000000000000000';
+/**
+ * Build a zero-op {@link AggregatePerSpacePlan} for an empty-graph
+ * member whose live marker already matches the target. Lets the apply
+ * pipeline thread the member through `perSpacePlans` -> `applyOrder`
+ * -> the success envelope's `perSpace[]` block so the result reflects
+ * every loaded space, even when there is nothing to execute.
+ */
+function buildAtHeadResolution(args: {
+  readonly aggregateTargetId: string;
+  readonly member: ContractSpaceMember;
+  readonly targetHash: string;
+  readonly liveMarker: ContractMarkerRecordLike | null;
+}): AggregatePerSpacePlan {
+  const { aggregateTargetId, member, targetHash, liveMarker } = args;
+  return {
+    plan: {
+      targetId: aggregateTargetId,
+      spaceId: member.spaceId,
+      origin: liveMarker === null ? null : { storageHash: liveMarker.storageHash },
+      destination: { storageHash: targetHash },
+      operations: [],
+      providedInvariants: [],
+    },
+    displayOps: [],
+    destinationContract: member.contract,
+    strategy: 'graph-walk',
+    migrationEdges: [],
+  };
+}
 
 function sumPlannedOps(
   applyOrder: readonly string[],
