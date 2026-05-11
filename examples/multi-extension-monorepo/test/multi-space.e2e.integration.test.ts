@@ -41,7 +41,7 @@
  *          updated the marker).
  *
  *   4. **Order-independent across `extensionPacks` declaration order
- *      (NFR6).** Re-running the apply path with the extensions
+ *      .** Re-running the apply path with the extensions
  *      declared in reverse order produces the same marker hashes —
  *      cross-space ordering is determined by space id, not by
  *      declaration order.
@@ -49,7 +49,7 @@
  * The fixtures (`audit*`, `featureFlags*`) are pulled from each
  * package's descriptor `contractSpace` rather than from
  * (now-deleted) per-package `contract.ts` / `migrations.ts` modules —
- * after M3.5 R3 each internal package authors via the on-disk
+ * each internal package now authors via the on-disk
  * `prisma-next contract emit` / `prisma-next migration plan` pipeline,
  * and the descriptor is the canonical reader of those artefacts.
  */
@@ -373,7 +373,7 @@ describe.sequential(
       expect(appRows.rows[0]?.email).toBe('alice@example.com');
     });
 
-    it('marker hashes are independent of `extensionPacks` declaration order (NFR6)', async () => {
+    it('marker hashes are independent of `extensionPacks` declaration order', async () => {
       project = await setupTestProject();
 
       const result = await executeDbInit({

@@ -1,5 +1,5 @@
 /**
- * "Deletable `node_modules`" fixture for AC-15 / TC-26.
+ * "Deletable `node_modules`" fixture.
  *
  * Locks in the property that the per-space verifier and runner **read
  * only the user's repo** — on-disk `contract.json` / `contract.d.ts` /
@@ -8,7 +8,7 @@
  * so the absence of `node_modules` (or any other path that resolves the
  * descriptor) does not affect verify / apply outcomes.
  *
- * Scoped to the framework helpers shipped in this round
+ * Scoped to the framework helpers
  * (`emitContractSpaceArtefacts` + `listContractSpaceDirectories` +
  * `verifyContractSpaces` + `concatenateSpaceApplyInputs`). The test
  * intentionally **does not import** the synthetic
@@ -66,9 +66,9 @@ async function setupProjectWithTestSpace(): Promise<ProjectFixture> {
 
   // Stand-in for an installed extension package — the descriptor module
   // would normally live under `node_modules/<pkg>/...`. The test deletes
-  // this directory before invoking the verifier to model the AC-15 case
-  // ("verifier + runner succeed when extension descriptor not
-  // importable, e.g. node_modules removed").
+  // this directory before invoking the verifier to confirm the verifier
+  // + runner succeed when the extension descriptor is not importable
+  // (e.g. node_modules removed).
   await mkdir(join(nodeModulesPath, '@prisma-next', 'synthetic-extension-stand-in'), {
     recursive: true,
   });
@@ -82,7 +82,7 @@ async function setupProjectWithTestSpace(): Promise<ProjectFixture> {
   return { projectRoot, projectMigrationsDir, nodeModulesPath };
 }
 
-describe('per-space verifier + runner against a project with deleted node_modules (AC-15 / TC-26)', () => {
+describe('per-space verifier + runner against a project with deleted node_modules', () => {
   let fixture: ProjectFixture;
 
   beforeEach(async () => {
@@ -179,9 +179,9 @@ describe('per-space verifier + runner against a project with deleted node_module
 });
 
 /**
- * AC15 (M2.5) lock for the loader → planner → verifier pipeline.
+ * Lock for the loader → planner → verifier pipeline.
  *
- * The aggregate refactor (M2.5) makes the loader the single
+ * The aggregate refactor makes the loader the single
  * descriptor-import boundary for `db init` / `db update` / `db verify`:
  * once `loadContractSpaceAggregate` returns, the planner and verifier
  * operate purely on the in-memory aggregate. This test exercises that

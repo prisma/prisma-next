@@ -101,7 +101,7 @@ Two pieces of plumbing connect the hook to the planner:
 
 The cast-at-integration-site pattern mirrors the existing `extractCodecControlHooks` shape and the rest of the SQL family's codec-control surface: `extractCodecControlHooks` already erases target-details to `unknown` because codec hooks are inherently cross-target (one codec implementation works for both Postgres and SQLite). Either we widen the type at the consumer site (current pattern) or every hook is generic over its target — the latter inflates type complexity for marginal benefit.
 
-This is a documented departure from the framework-mechanism sub-spec's first-cut intention to keep the surface generic over `TTargetDetails` end-to-end. It is structural-not-cosmetic — the helper boundary at `unknown` is what makes target-agnostic codec packages possible — and is called out here so future readers don't try to "tighten" the type without understanding why it's loose.
+This is a deliberate departure from the original intention to keep the surface generic over `TTargetDetails` end-to-end. It is structural-not-cosmetic — the helper boundary at `unknown` is what makes target-agnostic codec packages possible — and is called out here so future readers don't try to "tighten" the type without understanding why it's loose.
 
 ### Op order
 
