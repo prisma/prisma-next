@@ -188,13 +188,6 @@ const postgisPackMetaBase = {
         },
       ],
     },
-    operationTypes: {
-      import: {
-        package: '@prisma-next/extension-postgis/operation-types',
-        named: 'OperationTypes',
-        alias: 'PostgisOperationTypes',
-      },
-    },
     queryOperationTypes: {
       import: {
         package: '@prisma-next/extension-postgis/operation-types',
