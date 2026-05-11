@@ -123,27 +123,14 @@ async function encodeParamValue(
   try {
     return await codec.encode(value, ctx);
   } catch (error) {
-    // Pass-through stable runtime envelopes:
-    //
-    // - `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED`: per-library JSON-with-
-    //   schema codecs validate inside `encode` (ADR 208 § Case J) and
-    //   throw the stable schema-failure code directly. The unified codec
-    //   descriptor model promises this code surfaces unchanged on both
-    //   directions of the wire boundary.
-    // - `RUNTIME.ENCODE_FAILED`: a codec body that already constructed
-    //   the wrapped envelope itself (carrying its own `details`/`cause`
-    //   contract) must pass through, not be re-wrapped. This matches the
-    //   "no double wrap" guarantee documented on `encodeParams` below.
-    //
-    // Anything else flows through `wrapEncodeFailure` to produce a
-    // canonical `RUNTIME.ENCODE_FAILED` envelope for un-stamped errors.
-    if (
-      isRuntimeError(error) &&
-      (error.code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED' ||
-        error.code === 'RUNTIME.ENCODE_FAILED')
-    ) {
-      throw error;
-    }
+    // Any `runtimeError`-built envelope is stable by construction — let
+    // it pass through unchanged. This covers codec-authored
+    // `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` (per-library JSON-with-
+    // schema codecs validate inside `encode` per ADR 208 § Case J),
+    // codec-authored `RUNTIME.ENCODE_FAILED` (no double wrap), and any
+    // future stable code thrown from a codec body. Symmetric with the
+    // decode-side guard.
+    if (isRuntimeError(error)) throw error;
     wrapEncodeFailure(error, metadata, paramIndex, codec.id);
   }
 }
