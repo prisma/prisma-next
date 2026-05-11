@@ -58,24 +58,23 @@ export default defineConfig({
 
 ```ts
 // app/db.ts
-import postgres from '@prisma-next/postgres/runtime';
-import { createSupabaseRuntime } from '@prisma-next/extension-supabase/runtime';
+import supabase from '@prisma-next/extension-supabase/runtime';
 import type { Contract, TypeMaps } from '../migrations/app/contract.d';
 import contractJson from '../migrations/app/contract.json' with { type: 'json' };
 
-const baseDb = postgres<Contract, TypeMaps>({
+export const db = supabase<Contract, TypeMaps>({
   contractJson,
   url: process.env['DATABASE_URL']!,
-});
-
-export const supabaseDb = createSupabaseRuntime(baseDb, {
-  serviceRoleKey: process.env['SUPABASE_SERVICE_ROLE_KEY'],
+  jwtSecret: process.env['SUPABASE_JWT_SECRET']!,
 });
 
 // In a request handler:
-//   supabaseDb.asUser(jwt).sql.from(Profile).select({ ... }).build()
-//   supabaseDb.asServiceRole().sql.from(Profile).update({ ... }).build()
+//   db.asUser(jwt).sql.from(Profile).select({ ... }).build()
+//   db.asAnon().sql.from(Profile).select({ ... }).build()
+//   db.asServiceRole().sql.from(Profile).update({ ... }).build()
 ```
+
+One facade, one factory call. There is no top-level `db.sql` — `db` requires a role first (`asUser` / `asAnon` / `asServiceRole`) before queries can be built. In a Supabase app there's no meaningful "no role" execution context; making it impossible by construction is intentional.
 
 That's the user's surface. Everything below explains what the framework does to make this work and what we have to build.
 
@@ -89,18 +88,26 @@ We deliver six capabilities. Each has its own design note; this list is the map.
 
 3. **RLS policies as first-class Postgres IR.** `PostgresRlsPolicy` as a target-only IR kind hanging off `PostgresTable`. Inline DSL: `c.rlsPolicy({ name, command, roles, using, check })`. Plain-string predicates for v0.1. Migration ops via `OpFactoryCall`. Verifier diffs against `pg_policies`. See [`rls.md`](rls.md).
 
-4. **The `@prisma-next/extension-supabase` package.** A hand-authored `contract.json` describing the `auth`, `storage`, `realtime`, `extensions` schemas as externally-managed. A `createSupabaseRuntime` factory layered on top of the postgres runtime. Service-role / anon / authenticated runtime split. RLS session-state injection (the request user's JWT becomes a session-scoped role + claim set). Typed role constants. See [`extension-package.md`](extension-package.md).
+4. **The `@prisma-next/extension-supabase` package.** A hand-authored `contract.json` describing the `auth`, `storage`, `realtime`, `extensions` schemas as externally-managed. A `supabase()` runtime facade that composes the Postgres runtime internally and exposes `asUser` / `asAnon` / `asServiceRole` role helpers as top-level methods. RLS session-state injection (the request user's JWT becomes a session-scoped role + claim set). Typed role constants. See [`extension-package.md`](extension-package.md).
 
 5. **Authoring DSL surface from TML-2459 (assumed).** Namespace declaration in PSL/TS, per-model namespace, cross-namespace FKs within a single contract. **This is already in scope of TML-2459 and is assumed available.** We're listing it here only because the Supabase example wouldn't make sense without it.
 
-6. **Developer experience.** Scaffold (`prisma-next init --supabase` or equivalent), getting-started docs, the canonical example app, a migration guide for users coming from the Supabase JS client. See [`developer-experience.md`](developer-experience.md).
+6. **Developer experience.** Scaffold (`prisma-next init --supabase` or equivalent), getting-started docs, a migration guide for users coming from the Supabase JS client. See [`developer-experience.md`](developer-experience.md).
+
+7. **Working example app (`examples/supabase/`).** A committed, runnable example app that exercises `refIn`, RLS policies, the `supabase()` runtime facade, and all three role helpers. **Must-have** — this is the proof that the integration works end-to-end and the primary onboarding artifact.
+
+### Stretch goals
+
+These are desirable but not required for v0.1. The IR refactor from TML-2459 makes them easy to add once the foundation lands.
+
+- **Postgres triggers and functions as first-class IR.** The canonical Supabase "create a profile when a user signs up" pattern uses `CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE PROCEDURE handle_new_user()`. Being able to author this trigger + the function it calls from the contract DSL (rather than dropping to raw SQL migrations) would close the last gap in the canonical Supabase onboarding story.
 
 ## How a request flows through the stack
 
 The runtime flow is worth tracing once because RLS makes it non-obvious.
 
 1. A request arrives with a Supabase-issued JWT.
-2. The app calls `supabaseDb.asUser(jwt)` (or `.asAnon()` or `.asServiceRole()`).
+2. The app calls `db.asUser(jwt)` (or `.asAnon()` or `.asServiceRole()`).
 3. The runtime opens (or checks out from a pool) a connection, then runs `SET LOCAL role = '<role>'` and `SET LOCAL request.jwt.claims = '<jwt-claims-json>'`. Postgres-side `auth.uid()` and friends read from those session vars.
 4. The user's SQL plan executes under that role. RLS policies are enforced by Postgres because the role has limited privileges; the framework didn't have to do anything special at query time.
 5. On request completion, the transaction commits (or the session is reset before returning to the pool).

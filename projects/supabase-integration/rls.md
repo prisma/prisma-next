@@ -142,7 +142,7 @@ The Supabase extension's own contract declares the policies it ships (if any) as
 
 ### Runtime interaction
 
-The runtime side of RLS is in [`extension-package.md`](extension-package.md). The short version: the `createSupabaseRuntime` wrapper sets `role` and `request.jwt.claims` session vars before executing each query, which is what makes `auth.uid()` resolve correctly inside policy predicates. The IR layer doesn't have to know about this.
+The runtime side of RLS is in [`extension-package.md`](extension-package.md). The short version: the `supabase()` runtime facade sets `role` and `request.jwt.claims` session vars before executing each query, which is what makes `auth.uid()` resolve correctly inside policy predicates. The IR layer doesn't have to know about this.
 
 ## Open questions
 

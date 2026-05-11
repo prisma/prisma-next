@@ -20,7 +20,7 @@ This is the user-visible npm package they install.
 ├── package.json
 ├── src/
 │   ├── index.ts                # the `supabase` namespace export (contract helper, role consts, pack factory)
-│   ├── runtime.ts              # createSupabaseRuntime
+│   ├── runtime.ts              # the supabase() runtime facade factory
 │   ├── pack.ts                 # extension pack descriptor
 │   └── roles.ts                # role constants
 ├── contract/
@@ -97,28 +97,43 @@ export const supabase = {
 
 The `supabase()` shorthand used in `extensionPacks: [supabase()]` is sugar for `supabase.pack()`.
 
-### Runtime factory
+### Runtime facade
+
+One factory, one returned object. The user never touches the underlying Postgres runtime — the facade composes it internally because Supabase is target-locked to Postgres.
 
 ```ts
 // @prisma-next/extension-supabase/runtime
-import type { Db } from '@prisma-next/postgres/runtime';
+import type { Db, PoolOptions } from '@prisma-next/postgres/runtime';
 
 export interface SupabaseRuntimeOptions {
-  serviceRoleKey?: string;
-  // … connection-pool knobs, JWT validation options, etc.
+  contractJson: unknown;
+  url: string;
+  /** Supabase project's JWT signing secret. Required if you call asUser(). */
+  jwtSecret?: string;
+  /** Alternative to jwtSecret: a JWKS endpoint to fetch the signing key from. */
+  jwksUrl?: string;
+  /** Pool knobs forwarded to the underlying Postgres runtime. */
+  pool?: PoolOptions;
 }
 
-export interface SupabaseRuntime<TContract, TTypeMaps> {
+export interface SupabaseDb<TContract, TTypeMaps> {
+  /** Bind the connection to the `authenticated` role with the user's JWT claims. */
   asUser(jwt: string): Db<TContract, TTypeMaps>;
+  /** Bind the connection to the `anon` role. */
   asAnon(): Db<TContract, TTypeMaps>;
+  /** Bind the connection to the `service_role` (bypasses RLS). */
   asServiceRole(): Db<TContract, TTypeMaps>;
 }
 
-export function createSupabaseRuntime<TContract, TTypeMaps>(
-  baseDb: Db<TContract, TTypeMaps>,
-  options?: SupabaseRuntimeOptions,
-): SupabaseRuntime<TContract, TTypeMaps> { /* … */ }
+export default function supabase<TContract, TTypeMaps>(
+  options: SupabaseRuntimeOptions,
+): SupabaseDb<TContract, TTypeMaps>;
 ```
+
+Two design points worth being explicit about:
+
+- **`SupabaseDb` is not a `Db`.** It does not extend `Db`; there's no `db.sql.from(...)` at the top level. A user must pick a role before they can build a query. In a Supabase app there's no meaningful "no role" execution context — the alternative (defaulting to whatever Postgres role the connection authenticated as, typically a privileged one) is exactly the silent-RLS-bypass footgun the design is trying to make impossible.
+- **No `serviceRoleKey` option.** Supabase's `service_role` *key* is a JWT identity used by the `@supabase/supabase-js` client to authenticate to PostgREST as service_role. We're below PostgREST — connecting directly to Postgres with a privileged URL, the runtime just emits `SET LOCAL role = 'service_role'`. The only Supabase-issued secret we need is `jwtSecret` (or `jwksUrl`) to validate *user* JWTs.
 
 What `asUser` / `asAnon` / `asServiceRole` actually do at the connection level:
 
@@ -126,12 +141,12 @@ What `asUser` / `asAnon` / `asServiceRole` actually do at the connection level:
 2. Run within a transaction or scoped session:
    ```sql
    SET LOCAL role = '<role>';
-   SET LOCAL request.jwt.claims = '<jwt-claims-json>';
+   SET LOCAL request.jwt.claims = '<jwt-claims-json>';  -- only on asUser
    ```
 3. Execute the user's queries under that role context. RLS is enforced by Postgres because the role's grants + the policies' `USING` clauses do the work.
-4. On scope exit (request complete), reset/return the connection.
+4. On scope exit (request complete), the transaction commits or rolls back, which automatically resets `SET LOCAL` state before the connection is returned to the pool.
 
-The framework's middleware machinery (TML-2459 didn't touch this; existing infrastructure) is the natural place to hang the role-binding step. The Supabase runtime is essentially a middleware-installing wrapper around the base postgres runtime.
+The framework's middleware machinery (existing infrastructure, not touched by TML-2459) is the natural place to hang the role-binding step. The facade is structurally a thin wrapper that constructs a Postgres runtime, installs the Supabase middleware, and exposes the three role helpers — but the user only sees the one returned object.
 
 ### Pool considerations
 
@@ -154,7 +169,8 @@ Loading happens at `prisma-next` CLI invocation time. The pack contributes its c
 ## Open questions
 
 - **Where does the JWT validation happen?** Two options: (a) the Supabase runtime validates the JWT signature itself (using the Supabase project's JWK or shared secret); (b) the app validates upstream and we trust the claims. Working assumption: **(a) — validate the JWT signature in the runtime, parameterised by JWT secret or JWKS URL in `SupabaseRuntimeOptions`.** It's safer by default and most apps will appreciate not having to wire this themselves.
-- **JWT claim mapping into `auth.uid()` etc.** Postgres-side `auth.uid()` is a function defined in Supabase's `auth` schema that reads from the `request.jwt.claims` session var. We rely on Supabase's standard SQL functions; we don't reimplement them. The Supabase contract should declare those functions as externally-managed so users can call them in RLS predicates without them looking like unrecognised symbols. **Function-level posture isn't worked out yet (see [`posture.md`](posture.md) — current sketch is table/index/constraint-level only). May need to extend.**
+- **JWT claim mapping into `auth.uid()` etc.** Postgres-side `auth.uid()` is a function defined in Supabase's `auth` schema that reads from the `request.jwt.claims` session var. We rely on Supabase's standard SQL functions; we don't reimplement them. The Supabase contract declares `auth.uid()`, `auth.jwt()`, `auth.role()` as externally-managed functions (see [`posture.md`](posture.md) § "Function-level posture") so the verifier knows they exist but the planner emits no DDL for them.
 - **What about Supabase storage?** The `storage.*` tables exist but app code rarely references them directly. We declare them in the shipped contract under `externally-managed` posture and don't add any custom DSL for them. If user feedback pushes towards "ergonomic storage uploads," that's a future iteration.
 - **Migration path for a user already running Supabase migrations.** They probably have hand-rolled `auth.*` modifications, custom roles, custom policies. The "adopt existing schema" workflow is broader than this project; cross-link to [`developer-experience.md`](developer-experience.md).
 - **Custom auth schemas.** Some Supabase users extend `auth.*` with extra columns or tables. `contractOverride` is the v0.1 escape hatch; an introspection-based emit is the future polish.
+- **Multi-extension composition.** The `supabase()` facade composes one Postgres runtime with one extension middleware stack. Apps that need to stack additional Postgres extensions (Supabase + observability + caching, say) currently fall back to the lower-level `postgres()` factory from `@prisma-next/postgres/runtime`, which accepts an explicit extension list. Whether to grow `supabase()` to accept extra middleware, or whether the lower-level fallback is the documented escape hatch, is unresolved. Working assumption: **document the lower-level fallback for v0.1; don't grow `supabase()`'s surface.** The risk is users who actually need the composed shape have to construct it themselves and lose the `asUser`/`asAnon`/`asServiceRole` ergonomics — acceptable v0.1 trade.

@@ -8,7 +8,7 @@ The framework needs to know its relationship to each database-persisted object's
 
 ## Design intent
 
-**Posture is a generic, target-agnostic property** that lives in the framework domain. It applies to any IR node that represents a database-persisted object (tables, columns, indexes, constraints, RLS policies, …). Targets can extend the set of postures if they need to, but the four below are framework-level.
+**Posture is a generic, target-agnostic property** that lives in the framework domain. It applies to any IR node that represents a database-persisted object (tables, columns, indexes, constraints, RLS policies, **functions**, …). Targets can extend the set of postures if they need to, but the four below are framework-level.
 
 | Posture | Verifier behaviour | Planner / migration behaviour |
 |---|---|---|
@@ -38,7 +38,32 @@ interface TableDeclaration {
 }
 ```
 
-Same for indexes, constraints, RLS policies, etc. — posture is per-object, not per-contract, because a single contract might mix postures (rare for v0.1, but the IR shouldn't forbid it).
+Same for indexes, constraints, RLS policies, functions, etc. — posture is per-object, not per-contract, because a single contract might mix postures (rare for v0.1, but the IR shouldn't forbid it).
+
+### Function-level posture
+
+Posture **must** apply to functions, not just tables and constraints. The Supabase extension contract needs to declare `auth.uid()`, `auth.jwt()`, `auth.role()` as externally-managed functions so the verifier knows they exist and won't trip on RLS predicates that reference them, while the planner emits no DDL for them. Without function-level posture, the central Supabase use case (RLS policies that call `auth.uid()`) has a gap: the verifier can't resolve those function references.
+
+The function declaration in the contract looks like:
+
+```jsonc
+{
+  "functions": {
+    "auth.uid": {
+      "namespace": "auth",
+      "posture": "externally-managed",
+      "returns": "uuid"
+    },
+    "auth.jwt": {
+      "namespace": "auth",
+      "posture": "externally-managed",
+      "returns": "jsonb"
+    }
+  }
+}
+```
+
+The framework IR gains a `FunctionDeclaration` node with a `posture` property. The verifier checks function existence against `pg_proc` (Postgres) under the same posture dispatch table. The planner never emits `CREATE FUNCTION` for externally-managed functions.
 
 ### Authoring surface
 

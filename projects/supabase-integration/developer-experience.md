@@ -27,7 +27,7 @@ my-app/
 ├── prisma-next.config.ts
 ├── app/
 │   ├── contract.ts                # one example Profile model with RLS, comments
-│   └── db.ts                      # createSupabaseRuntime wired up
+│   └── db.ts                      # the supabase() facade wired up
 ├── migrations/
 │   ├── app/
 │   │   ├── contract.json          # emitted from app/contract.ts
@@ -49,7 +49,7 @@ Lives in `docs/` (canonical) or in the package's `README.md` (entry-point friend
 2. **Setup.** `prisma-next init --supabase`; what env vars to populate; one paragraph on how the Supabase project's database connection URL maps to `DATABASE_URL`.
 3. **Your first model.** Walk through the scaffolded `Profile` model. Explain `refIn`, `posture` (implicit via Supabase contract), `c.rlsPolicy`.
 4. **Your first migration.** Run the planner; show the generated DDL; explain what's *not* in it (no `CREATE TABLE auth.users` because it's externally-managed).
-5. **Your first query.** Show `supabaseDb.asUser(jwt).sql.from(Profile)...`. Show what RLS enforcement looks like (a query that would return another user's row returns empty).
+5. **Your first query.** Show `db.asUser(jwt).sql.from(Profile)...`. Show what RLS enforcement looks like (a query that would return another user's row returns empty).
 6. **What's next.** Link to ref docs (Postgres target, contract authoring, RLS, etc.).
 
 ### Migration from `@supabase/supabase-js`
@@ -99,5 +99,8 @@ The example app from the scaffold becomes a referenceable artifact in the docs s
 
 - **`prisma-next adopt` introspection emitter.** Real feature, probably out of v0.1 scope. Punt to a follow-up project. Could be the "next obvious thing after Supabase v0.1 ships." Decide when project shape is settled.
 - **JWT generation in the local dev loop.** Users want to test RLS locally without spinning up a real Supabase project. A `supabase.dev.signJwt({ sub: 'test-user-1', role: 'authenticated' })` test helper would be invaluable. Working assumption: **ship it in `@prisma-next/extension-supabase/test` or similar. Small effort, big DX win.**
-- **Where does the example app live?** Inline in the package README? A separate `examples/supabase/` directory in the prisma-next monorepo? Both? Probably both — README has the short version, `examples/` has the full runnable app.
 - **Tutorials beyond the canonical Profile example.** Comments, posts, "social app" tutorial, e-commerce tutorial. Out of v0.1 scope; the canonical example is enough to ship.
+
+## Settled decisions
+
+- **Working example app is a must-have.** Lives in `examples/supabase/` in the monorepo as a committed, runnable app. The package README links to it. This is the proof that the integration works end-to-end and the primary onboarding artifact for new users.

@@ -17,6 +17,12 @@ Explicit list of things we've decided are **not** part of the Supabase integrati
 - **Pre-canned RLS policy patterns.** "Owner can read/write" policy helpers, "public read, owner write" helpers, etc. Tempting but premature; we ship the raw API and revisit after user feedback.
 - **Per-column posture.** Posture inherits from parent table. No per-column override in v0.1.
 - **`drift` posture in v0.1.** Possibly drop to ship only `modeled / tolerated / externally-managed` if the design pressure pushes that way. Decided when we settle the spec; the four-posture story is the working assumption.
+- **RPC / Postgres function call surface.** No typed `rpc('fn_name', args)` equivalent. Not a regression from the status quo (users don't have this without Prisma Next either); raw SQL escape hatch is the v0.1 fallback.
+- **`CREATE EXTENSION` statements.** Handled by target-specific extension packs (e.g., the existing pgvector extension). Not a Supabase-specific concern.
+
+## Stretch goals (in-scope if time permits)
+
+- **Postgres triggers and functions as first-class IR.** Enables the canonical "create profile on signup" trigger pattern from the contract DSL instead of raw SQL migrations. Straightforward to model once TML-2459's polymorphic IR lands. See [`overview.md`](overview.md) § "Stretch goals."
 
 ## Carried by TML-2459 (not redone here)
 

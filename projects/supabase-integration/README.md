@@ -10,8 +10,8 @@
 | [`posture.md`](posture.md) | The `modeled / tolerated / externally-managed / drift` posture as a generic IR property. How the verifier and planner dispatch on it. |
 | [`cross-contract-refs.md`](cross-contract-refs.md) | `refIn(otherContract, 'ModelName', 'fieldName')` — cross-contract-space FK references. Authoring DSL in PSL + TS, IR shape, resolution against loaded aggregate, extension publish pipeline. |
 | [`rls.md`](rls.md) | RLS policies as first-class Postgres IR. `PostgresRlsPolicy` node, inline `m.constraints.rlsPolicy({...})` DSL, migration ops, verifier against `pg_policies`. |
-| [`extension-package.md`](extension-package.md) | The `@prisma-next/extension-supabase` package shape. Hand-authored `contract.json`, `createSupabaseRuntime` factory, service-role / anon / authenticated runtime split, RLS session-state injection, typed role constants. |
-| [`developer-experience.md`](developer-experience.md) | Scaffold (`prisma-next init --supabase` or equivalent), getting-started docs, the canonical end-to-end example app. |
+| [`extension-package.md`](extension-package.md) | The `@prisma-next/extension-supabase` package shape. Hand-authored `contract.json`, single `supabase()` runtime facade composing Postgres internally, `asUser` / `asAnon` / `asServiceRole` role helpers, RLS session-state injection, typed role constants. |
+| [`developer-experience.md`](developer-experience.md) | Scaffold (`prisma-next init --supabase` or equivalent), getting-started docs, working example app (must-have). |
 | [`deferred.md`](deferred.md) | Things we've explicitly decided to defer or rule out (visibility/encapsulation, introspection-based emit, realtime, etc.). |
 
 ## Foundation that's already settled
