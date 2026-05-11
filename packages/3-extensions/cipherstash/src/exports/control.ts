@@ -34,11 +34,7 @@
 import { fileURLToPath } from 'node:url';
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
-import type {
-  ContractSpace,
-  MigrationPlanOperation,
-} from '@prisma-next/framework-components/control';
-import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import type { ContractSpace } from '@prisma-next/framework-components/control';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import baselineMetadata from '../../migrations/cipherstash/20260601T0000_install_eql_bundle/migration.json' with {
@@ -56,6 +52,11 @@ import {
 } from '../extension-metadata/constants';
 import { cipherstashPackMeta } from '../extension-metadata/descriptor-meta';
 import { cipherstashStringCodecHooks } from '../migration/cipherstash-codec';
+import {
+  asCipherstashContract,
+  asCipherstashMigrationMetadata,
+  asCipherstashMigrationOps,
+} from './contract-space-typing';
 
 /**
  * Resolve a migration package's on-disk path from this descriptor module's
@@ -74,12 +75,12 @@ function resolveMigrationDirPath(dirName: string): string {
 const baselinePackage: OnDiskMigrationPackage = {
   dirName: CIPHERSTASH_BASELINE_MIGRATION_NAME,
   dirPath: resolveMigrationDirPath(CIPHERSTASH_BASELINE_MIGRATION_NAME),
-  metadata: baselineMetadata as unknown as MigrationMetadata,
-  ops: baselineOps as unknown as readonly MigrationPlanOperation[],
+  metadata: asCipherstashMigrationMetadata(baselineMetadata),
+  ops: asCipherstashMigrationOps(baselineOps),
 };
 
 const cipherstashContractSpace: ContractSpace<Contract<SqlStorage>> = {
-  contractJson: contractJson as unknown as Contract<SqlStorage>,
+  contractJson: asCipherstashContract(contractJson),
   migrations: [baselinePackage],
   headRef,
 };
