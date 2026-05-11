@@ -74,3 +74,21 @@ The runtime enforces the invariant defensively: the codec's factory runs at exec
 - The codec is library-bound (`arktype/json@1`), not target-bound. Other schema libraries ship as parallel extensions (`zod/json@1`, `valibot/json@1`) when their serialize/rehydrate stories materialize.
 - `decode` validates internally and throws on rejection. JSON-Schema validation lives uniformly inside the resolved codec's `decode` body; the framework no longer maintains a parallel validator registry. Validation rejections surface as `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED`.
 - For untyped raw JSON columns, use `jsonColumn` / `jsonbColumn` from `@prisma-next/adapter-postgres/column-types` instead.
+
+## Data integrity: validate-on-decode, not on encode
+
+Schema validation runs only on `decode` / `decodeJson`. `encode` checks JSON representability but does not invoke the schema. This is intentional — ADR 208 keeps `encode` parameter-independent so it can be dispatched by `codecId` without resolving per-column schemas — but it has a consequence callers must plan for: **a schema-invalid write commits the row to the database, and only then fails on the read-back through `RETURNING`**.
+
+The TypeScript types prevent this at the call site, so well-typed callers are safe. The footgun is reachable only when types are bypassed (`as never`, `// @ts-ignore`, untyped data from a third-party feed, runtime drift between writers). In that case:
+
+1. `ORM.create({ ... })` calls `codec.encode` — succeeds, because encode skips the schema.
+2. `INSERT … RETURNING` runs in autocommit — the row commits to the database.
+3. Decoding the `RETURNING` payload invokes `codec.decode` — throws `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED`.
+4. The caller sees an error from `create`, but the bad row is now in the table and every subsequent read of it will fail the same way.
+
+If your inputs cross a type boundary you don't fully control, mitigate:
+
+- **Wrap mutations in `withTransaction`** so a `RETURNING`-decode failure rolls back the `INSERT`.
+- **Pre-validate** with `schema.allows(value)` (or `schema(value) instanceof ArkErrors`) before calling `create` / `update`.
+
+In a fully-typed application path this never fires; the warning is for the boundary where ergonomics collide with foreign data.
