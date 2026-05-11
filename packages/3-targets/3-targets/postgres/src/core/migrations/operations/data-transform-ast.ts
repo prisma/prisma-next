@@ -23,7 +23,7 @@ export interface DataTransformAstOptions {
   readonly run: DataTransformAstClosure | readonly DataTransformAstClosure[];
 }
 
-const AST_BOUND_SENTINEL = '-- AST-bound: lowered at apply time --';
+export const AST_BOUND_SENTINEL = '-- AST-bound: lowered at apply time --';
 
 /**
  * Migration op factory that embeds the serialized AST in the op payload
