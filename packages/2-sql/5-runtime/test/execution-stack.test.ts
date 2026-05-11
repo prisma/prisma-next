@@ -36,11 +36,7 @@ function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> 
             id: 'test-profile',
             target: 'postgres',
             capabilities: {},
-            markerExistsStatement: () => ({ sql: '', params: [] }),
-            readMarkerStatement: () => ({ sql: '', params: [] }),
-            parseMarkerRow: () => {
-              throw new Error('stub adapter does not implement parseMarkerRow');
-            },
+            readMarker: async () => ({ kind: 'absent' as const }),
           },
           lower() {
             return Object.freeze({ sql: '', params: [] });

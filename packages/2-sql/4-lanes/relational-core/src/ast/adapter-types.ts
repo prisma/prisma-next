@@ -1,4 +1,5 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { SqlQueryable } from './driver-types';
 import type { LoweredStatement } from './types';
 
 export type AdapterTarget = string;
@@ -8,22 +9,22 @@ export interface MarkerStatement {
   readonly params: readonly unknown[];
 }
 
+/**
+ * Outcome of an adapter's marker read. `no-table` means the marker storage itself is absent (e.g. attaching to a database that was never `db init`'d); `absent` means the storage exists but holds no row for the requested space; `present` carries the parsed record. Callers distinguish these so runtime telemetry and `requireMarker` policy can react to each case appropriately.
+ */
+export type MarkerReadResult =
+  | { readonly kind: 'present'; readonly record: ContractMarkerRecord }
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'no-table' };
+
 export interface AdapterProfile<TTarget extends AdapterTarget = AdapterTarget> {
   readonly id: string;
   readonly target: TTarget;
   readonly capabilities: Record<string, unknown>;
   /**
-   * Returns a probe statement that yields one row iff the marker table exists. Callers treat an empty result as "no marker present" so a missing marker table does not surface as a driver error before the runtime's `requireMarker` policy is consulted.
+   * Reads the contract marker via the supplied queryable. The adapter owns the full flow — probing for the marker storage, issuing the read, and decoding the row — so callers receive a tagged result rather than a raw driver error when the marker storage is absent.
    */
-  markerExistsStatement(): MarkerStatement;
-  /**
-   * Returns the SQL statement to read the contract marker from the database. Each adapter provides target-specific SQL (e.g. schema-qualified table names, parameter placeholder style).
-   */
-  readMarkerStatement(): MarkerStatement;
-  /**
-   * Parses a row returned by the adapter's `readMarkerStatement()` into a `ContractMarkerRecord`. Each adapter is responsible for any target-specific decoding before delegating to the shared row schema. Throws on shape violation.
-   */
-  parseMarkerRow(row: unknown): ContractMarkerRecord;
+  readMarker(queryable: SqlQueryable): Promise<MarkerReadResult>;
 }
 
 export interface LowererContext<TContract = unknown> {

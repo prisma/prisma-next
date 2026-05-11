@@ -32,7 +32,6 @@ import {
   createSqlExecutionStack,
   ensureSchemaStatement,
   ensureTableStatement,
-  parseContractMarkerRow,
   writeContractMarker,
 } from '../src/exports';
 import type {
@@ -296,19 +295,7 @@ export function createStubAdapter(): StubAdapter {
       id: 'stub-profile',
       target: 'postgres',
       capabilities: {},
-      markerExistsStatement() {
-        return {
-          sql: 'select 1 from information_schema.tables where table_schema = $1 and table_name = $2',
-          params: ['prisma_contract', 'marker'],
-        };
-      },
-      readMarkerStatement() {
-        return {
-          sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
-          params: ['app'],
-        };
-      },
-      parseMarkerRow: parseContractMarkerRow,
+      readMarker: async () => ({ kind: 'absent' as const }),
     },
     lower(ast: SelectAst, ctx: { contract: Contract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);

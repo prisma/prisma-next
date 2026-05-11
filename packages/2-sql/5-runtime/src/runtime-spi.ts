@@ -1,18 +1,11 @@
-import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { ExecutionPlan } from '@prisma-next/framework-components/runtime';
-import type { MarkerStatement } from '@prisma-next/sql-relational-core/ast';
+import type { MarkerReadResult, SqlQueryable } from '@prisma-next/sql-relational-core/ast';
 
 /**
- * Reader of the SQL contract marker. SQL runtimes verify the database's
- * `prisma_contract.marker` row against the runtime's contract by issuing
- * this statement before executing user queries (when `verify` is enabled).
- * Each adapter is responsible for any target-specific row decoding before
- * delegating to the shared row schema.
+ * Reader of the SQL contract marker. SQL runtimes call `readMarker` before executing user queries (when `verify` is enabled). The adapter owns the full marker-read flow — probing for storage, issuing the read, decoding the row — and returns a tagged result so callers can distinguish "marker storage missing", "no row for this space", and "present".
  */
 export interface MarkerReader {
-  markerExistsStatement(): MarkerStatement;
-  readMarkerStatement(): MarkerStatement;
-  parseMarkerRow(row: unknown): ContractMarkerRecord;
+  readMarker(queryable: SqlQueryable): Promise<MarkerReadResult>;
 }
 
 /**

@@ -21,7 +21,6 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it, vi } from 'vitest';
-import { parseContractMarkerRow } from '../src/marker';
 import type {
   SqlRuntimeAdapterDescriptor,
   SqlRuntimeAdapterInstance,
@@ -107,13 +106,7 @@ function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
       id: 'test-profile',
       target: 'postgres',
       capabilities: {},
-      markerExistsStatement() {
-        return { sql: 'select 1', params: [] };
-      },
-      readMarkerStatement() {
-        return { sql: 'select 1', params: [] };
-      },
-      parseMarkerRow: parseContractMarkerRow,
+      readMarker: async () => ({ kind: 'absent' as const }),
     },
     lower(ast: unknown) {
       return Object.freeze({ sql: JSON.stringify(ast), params: [] });

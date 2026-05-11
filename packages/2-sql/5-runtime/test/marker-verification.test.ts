@@ -1,4 +1,4 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import {
   type ExecutionStackInstance,
@@ -7,11 +7,15 @@ import {
   type RuntimeExtensionInstance,
 } from '@prisma-next/framework-components/execution';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { Codec, SqlDriver, SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
+import type {
+  Codec,
+  MarkerReadResult,
+  SqlDriver,
+  SqlExecuteRequest,
+} from '@prisma-next/sql-relational-core/ast';
 import { SelectAst, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it, vi } from 'vitest';
-import { parseContractMarkerRow } from '../src/marker';
 import type {
   SqlRuntimeAdapterDescriptor,
   SqlRuntimeAdapterInstance,
@@ -23,7 +27,7 @@ import { defineTestCodec } from './test-codec';
 import { descriptorsFromCodecs } from './utils';
 
 /**
- * Pins the per-error-class branches of `verifyMarker` in `sql-runtime.ts`: missing marker (with `requireMarker: true`), missing marker tolerated (with `requireMarker: false`), and profile-hash mismatch. Storage-hash mismatch is covered by `marker-vs-intercept-ordering.test.ts`.
+ * Pins the per-result-kind branches of `verifyMarker` in `sql-runtime.ts`: missing marker (with `requireMarker: true`), missing marker tolerated (with `requireMarker: false`), and profile-hash mismatch. Storage-hash mismatch is covered by `marker-vs-intercept-ordering.test.ts`.
  */
 
 const testContract: Contract<SqlStorage> = {
@@ -49,7 +53,21 @@ function createCodecs(): ReadonlyArray<Codec<string>> {
   ];
 }
 
-function createStubAdapter(codecs: ReadonlyArray<Codec<string>>) {
+function markerRecord(overrides: Partial<ContractMarkerRecord> = {}): ContractMarkerRecord {
+  return {
+    storageHash: 'sha256:test',
+    profileHash: 'sha256:test-profile',
+    contractJson: null,
+    canonicalVersion: 1,
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+    appTag: null,
+    meta: {},
+    invariants: [],
+    ...overrides,
+  };
+}
+
+function createStubAdapter(codecs: ReadonlyArray<Codec<string>>, markerResult: MarkerReadResult) {
   return {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
@@ -60,13 +78,7 @@ function createStubAdapter(codecs: ReadonlyArray<Codec<string>>) {
       codecs() {
         return codecs;
       },
-      markerExistsStatement() {
-        return { sql: 'select 1 from information_schema.tables', params: [] };
-      },
-      readMarkerStatement() {
-        return { sql: 'select * from prisma_contract.marker', params: [1] };
-      },
-      parseMarkerRow: parseContractMarkerRow,
+      readMarker: async () => markerResult,
     },
     lower(ast: SelectAst) {
       return Object.freeze({ sql: JSON.stringify(ast), params: [] });
@@ -74,19 +86,8 @@ function createStubAdapter(codecs: ReadonlyArray<Codec<string>>) {
   };
 }
 
-interface MarkerRow {
-  readonly core_hash: string;
-  readonly profile_hash: string;
-  readonly contract_json: null;
-  readonly canonical_version: number;
-  readonly updated_at: Date;
-  readonly app_tag: null;
-  readonly meta: null;
-  readonly invariants: readonly never[];
-}
-
-function createDriver(rows: readonly MarkerRow[]): SqlDriver {
-  const query = vi.fn().mockResolvedValue({ rows, rowCount: rows.length });
+function createDriver(): SqlDriver {
+  const query = vi.fn().mockResolvedValue({ rows: [], rowCount: 0 });
   const execute = vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
     yield {} as Record<string, unknown>;
   });
@@ -133,9 +134,24 @@ function createAdapterDescriptor(
   };
 }
 
-function createSetup(driver: SqlDriver, requireMarker: boolean) {
+type SqlTestStackInstance = ExecutionStackInstance<
+  'sql',
+  'postgres',
+  SqlRuntimeAdapterInstance<'postgres'>,
+  RuntimeDriverInstance<'sql', 'postgres'>,
+  RuntimeExtensionInstance<'sql', 'postgres'>
+>;
+
+interface RuntimeOptions {
+  readonly markerResult: MarkerReadResult;
+  readonly verifyMode: 'always' | 'startup' | 'onFirstUse';
+  readonly requireMarker: boolean;
+  readonly driver?: SqlDriver;
+}
+
+function buildRuntime({ markerResult, verifyMode, requireMarker, driver }: RuntimeOptions) {
   const codecs = createCodecs();
-  const adapter = createStubAdapter(codecs);
+  const adapter = createStubAdapter(codecs, markerResult);
   const target = createTargetDescriptor();
   const adapterDesc = createAdapterDescriptor(adapter);
   const stack = createSqlExecutionStack({
@@ -143,13 +159,6 @@ function createSetup(driver: SqlDriver, requireMarker: boolean) {
     adapter: adapterDesc,
     extensionPacks: [],
   });
-  type SqlTestStackInstance = ExecutionStackInstance<
-    'sql',
-    'postgres',
-    SqlRuntimeAdapterInstance<'postgres'>,
-    RuntimeDriverInstance<'sql', 'postgres'>,
-    RuntimeExtensionInstance<'sql', 'postgres'>
-  >;
   const stackInstance = instantiateExecutionStack(stack) as SqlTestStackInstance;
   const context = createExecutionContext({
     contract: testContract,
@@ -158,8 +167,8 @@ function createSetup(driver: SqlDriver, requireMarker: boolean) {
   return createRuntime({
     stackInstance,
     context,
-    driver,
-    verify: { mode: 'always', requireMarker },
+    driver: driver ?? createDriver(),
+    verify: { mode: verifyMode, requireMarker },
   });
 }
 
@@ -178,39 +187,13 @@ function createPlan(): SqlExecutionPlan {
   };
 }
 
-function createStartupSetup(driver: SqlDriver) {
-  const codecs = createCodecs();
-  const adapter = createStubAdapter(codecs);
-  const target = createTargetDescriptor();
-  const adapterDesc = createAdapterDescriptor(adapter);
-  const stack = createSqlExecutionStack({
-    target,
-    adapter: adapterDesc,
-    extensionPacks: [],
-  });
-  type SqlTestStackInstance = ExecutionStackInstance<
-    'sql',
-    'postgres',
-    SqlRuntimeAdapterInstance<'postgres'>,
-    RuntimeDriverInstance<'sql', 'postgres'>,
-    RuntimeExtensionInstance<'sql', 'postgres'>
-  >;
-  const stackInstance = instantiateExecutionStack(stack) as SqlTestStackInstance;
-  const context = createExecutionContext({
-    contract: testContract,
-    stack: { target, adapter: adapterDesc, extensionPacks: [] },
-  });
-  return createRuntime({
-    stackInstance,
-    context,
-    driver,
-    verify: { mode: 'startup', requireMarker: false },
-  });
-}
-
 describe('verifyMarker', () => {
-  it('throws CONTRACT.MARKER_MISSING when no marker row exists and requireMarker is true', async () => {
-    const runtime = createSetup(createDriver([]), true);
+  it('throws CONTRACT.MARKER_MISSING when the marker is absent and requireMarker is true', async () => {
+    const runtime = buildRuntime({
+      markerResult: { kind: 'absent' },
+      verifyMode: 'always',
+      requireMarker: true,
+    });
 
     await expect(runtime.execute(createPlan()).toArray()).rejects.toMatchObject({
       code: 'CONTRACT.MARKER_MISSING',
@@ -218,70 +201,102 @@ describe('verifyMarker', () => {
     });
   });
 
-  it('runs verification on first execute when mode is "startup"', async () => {
-    const driver = createDriver([
-      {
-        core_hash: 'sha256:test',
-        profile_hash: 'sha256:test-profile',
-        contract_json: null,
-        canonical_version: 1,
-        updated_at: new Date('2026-01-01T00:00:00Z'),
-        app_tag: null,
-        meta: null,
-        invariants: [],
-      },
-    ]);
-    const runtime = createStartupSetup(driver);
+  it('throws CONTRACT.MARKER_MISSING when the marker table is missing and requireMarker is true', async () => {
+    const runtime = buildRuntime({
+      markerResult: { kind: 'no-table' },
+      verifyMode: 'always',
+      requireMarker: true,
+    });
 
-    await runtime.execute(createPlan()).toArray();
-    const callsAfterFirst = driver.query.mock.calls.length;
-    await runtime.execute(createPlan()).toArray();
-    const callsAfterSecond = driver.query.mock.calls.length;
-
-    expect(callsAfterFirst).toBeGreaterThan(0);
-    expect(callsAfterSecond).toBe(callsAfterFirst);
+    await expect(runtime.execute(createPlan()).toArray()).rejects.toMatchObject({
+      code: 'CONTRACT.MARKER_MISSING',
+    });
   });
 
-  it('skips verification when no marker row exists and requireMarker is false', async () => {
-    const runtime = createSetup(createDriver([]), false);
+  it('caches verification past the first execute when mode is "startup"', async () => {
+    const readMarker = vi.fn(async () => ({ kind: 'present', record: markerRecord() }) as const);
+    const codecs = createCodecs();
+    const target = createTargetDescriptor();
+    const adapter = {
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      profile: {
+        id: 'test-profile',
+        target: 'postgres',
+        capabilities: {},
+        codecs: () => codecs,
+        readMarker,
+      },
+      lower(ast: SelectAst) {
+        return Object.freeze({ sql: JSON.stringify(ast), params: [] });
+      },
+    };
+    const adapterDesc = createAdapterDescriptor(adapter);
+    const stack = createSqlExecutionStack({
+      target,
+      adapter: adapterDesc,
+      extensionPacks: [],
+    });
+    const stackInstance = instantiateExecutionStack(stack) as SqlTestStackInstance;
+    const context = createExecutionContext({
+      contract: testContract,
+      stack: { target, adapter: adapterDesc, extensionPacks: [] },
+    });
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver: createDriver(),
+      verify: { mode: 'startup', requireMarker: false },
+    });
+
+    await runtime.execute(createPlan()).toArray();
+    await runtime.execute(createPlan()).toArray();
+
+    expect(readMarker).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips verification when the marker is absent and requireMarker is false', async () => {
+    const runtime = buildRuntime({
+      markerResult: { kind: 'absent' },
+      verifyMode: 'always',
+      requireMarker: false,
+    });
 
     const rows = await runtime.execute(createPlan()).toArray();
     expect(rows).toBeDefined();
   });
 
-  it('passes verification when marker matches contract storage and profile hash', async () => {
-    const driver = createDriver([
-      {
-        core_hash: 'sha256:test',
-        profile_hash: 'sha256:test-profile',
-        contract_json: null,
-        canonical_version: 1,
-        updated_at: new Date('2026-01-01T00:00:00Z'),
-        app_tag: null,
-        meta: null,
-        invariants: [],
-      },
-    ]);
-    const runtime = createSetup(driver, true);
+  it('skips verification when the marker table is missing and requireMarker is false', async () => {
+    const runtime = buildRuntime({
+      markerResult: { kind: 'no-table' },
+      verifyMode: 'always',
+      requireMarker: false,
+    });
+
+    const rows = await runtime.execute(createPlan()).toArray();
+    expect(rows).toBeDefined();
+  });
+
+  it('passes verification when the marker record matches contract storage and profile hash', async () => {
+    const runtime = buildRuntime({
+      markerResult: { kind: 'present', record: markerRecord() },
+      verifyMode: 'always',
+      requireMarker: true,
+    });
 
     const rows = await runtime.execute(createPlan()).toArray();
     expect(rows).toBeDefined();
   });
 
   it('throws CONTRACT.MARKER_MISMATCH when the database profile hash differs from the contract', async () => {
-    const driver = createDriver([
-      {
-        core_hash: 'sha256:test',
-        profile_hash: 'sha256:other-profile',
-        contract_json: null,
-        canonical_version: 1,
-        updated_at: new Date('2026-01-01T00:00:00Z'),
-        app_tag: null,
-        meta: null,
-        invariants: [],
+    const runtime = buildRuntime({
+      markerResult: {
+        kind: 'present',
+        record: markerRecord({ profileHash: 'sha256:other-profile' }),
       },
-    ]);
-    const runtime = createSetup(driver, true);
+      verifyMode: 'always',
+      requireMarker: true,
+    });
 
     await expect(runtime.execute(createPlan()).toArray()).rejects.toMatchObject({
       code: 'CONTRACT.MARKER_MISMATCH',

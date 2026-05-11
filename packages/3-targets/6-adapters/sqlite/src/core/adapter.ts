@@ -18,11 +18,13 @@ import type {
   ListExpression,
   LiteralExpr,
   LowererContext,
+  MarkerReadResult,
   NullCheckExpr,
   OperationExpr,
   OrderByItem,
   ProjectionItem,
   SelectAst,
+  SqlQueryable,
   SubqueryExpr,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
@@ -52,23 +54,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
       id: options?.profileId ?? 'sqlite/default@1',
       target: 'sqlite',
       capabilities: defaultCapabilities,
-      markerExistsStatement: () => ({
-        sql: "select 1 from sqlite_master where type = 'table' and name = ?",
-        params: ['_prisma_marker'],
-      }),
-      readMarkerStatement: () => ({
-        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from _prisma_marker where space = ?',
-        params: [APP_SPACE_ID],
-      }),
-      // SQLite stores arrays as JSON-encoded TEXT (no native array type), so the driver returns `invariants` as a string. Decode before delegating to the shared row schema, which expects `string[]`.
-      parseMarkerRow: (row: unknown) => {
-        const raw = row as Record<string, unknown>;
-        const invariants =
-          typeof raw['invariants'] === 'string'
-            ? (JSON.parse(raw['invariants']) as unknown)
-            : raw['invariants'];
-        return parseContractMarkerRow({ ...raw, invariants });
-      },
+      readMarker: (queryable: SqlQueryable) => readSqliteMarker(queryable),
     });
   }
 
@@ -532,6 +518,32 @@ function renderReturning(returning: ReadonlyArray<ProjectionItem> | undefined): 
       return `${renderExpr(item.expr)} AS ${quoteIdentifier(item.alias)}`;
     })
     .join(', ')}`;
+}
+
+async function readSqliteMarker(queryable: SqlQueryable): Promise<MarkerReadResult> {
+  const exists = await queryable.query(
+    "select 1 from sqlite_master where type = 'table' and name = ?",
+    ['_prisma_marker'],
+  );
+  if (exists.rows.length === 0) {
+    return { kind: 'no-table' };
+  }
+
+  const result = await queryable.query(
+    'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from _prisma_marker where space = ?',
+    [APP_SPACE_ID],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    return { kind: 'absent' };
+  }
+  // SQLite stores arrays as JSON-encoded TEXT (no native array type), so the driver returns `invariants` as a string. Decode before delegating to the shared row schema, which expects `string[]`.
+  const raw = row as Record<string, unknown>;
+  const invariants =
+    typeof raw['invariants'] === 'string'
+      ? (JSON.parse(raw['invariants']) as unknown)
+      : raw['invariants'];
+  return { kind: 'present', record: parseContractMarkerRow({ ...raw, invariants }) };
 }
 
 export function createSqliteAdapter(options?: SqliteAdapterOptions) {

@@ -23,17 +23,7 @@ const testProfile: AdapterProfile = {
   id: 'test/default@1',
   target: 'postgres',
   capabilities: {},
-  markerExistsStatement: () => ({
-    sql: 'SELECT 1 FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2',
-    params: ['prisma_contract', 'marker'],
-  }),
-  readMarkerStatement: () => ({
-    sql: 'SELECT core_hash, profile_hash FROM prisma_contract.marker WHERE space = $1',
-    params: ['app'],
-  }),
-  parseMarkerRow: () => {
-    throw new Error('not needed in test');
-  },
+  readMarker: async () => ({ kind: 'absent' }),
 };
 
 describe('SqlFamilyAdapter', () => {
@@ -42,15 +32,20 @@ describe('SqlFamilyAdapter', () => {
 
     expect(adapter.contract).toBe(testContract);
     expect(adapter.markerReader).toBeDefined();
-    expect(adapter.markerReader.readMarkerStatement).toBeDefined();
+    expect(adapter.markerReader.readMarker).toBeDefined();
   });
 
-  it('delegates readMarkerStatement to adapter profile', () => {
+  it('delegates readMarker to adapter profile', async () => {
     const adapter = new SqlFamilyAdapter(testContract, testProfile);
-    const stmt = adapter.markerReader.readMarkerStatement();
+    const fakeQueryable = {
+      execute: () => {
+        throw new Error('not used');
+      },
+      query: async () => ({ rows: [] }),
+    };
+    const result = await adapter.markerReader.readMarker(fakeQueryable);
 
-    expect(stmt.sql).toContain('prisma_contract.marker');
-    expect(stmt.params).toEqual(['app']);
+    expect(result).toEqual({ kind: 'absent' });
   });
 
   it('validates plan with matching target and hash', () => {

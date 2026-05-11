@@ -11,7 +11,6 @@ import type { Codec, SqlDriver, SqlExecuteRequest } from '@prisma-next/sql-relat
 import { SelectAst, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it, vi } from 'vitest';
-import { parseContractMarkerRow } from '../src/marker';
 import type { SqlMiddleware } from '../src/middleware/sql-middleware';
 import type {
   SqlRuntimeAdapterDescriptor,
@@ -63,19 +62,21 @@ function createStubAdapter(codecs: ReadonlyArray<Codec<string>>) {
       codecs() {
         return codecs;
       },
-      markerExistsStatement() {
-        return {
-          sql: 'select 1 from information_schema.tables where table_schema = $1 and table_name = $2',
-          params: ['prisma_contract', 'marker'],
-        };
-      },
-      readMarkerStatement() {
-        return {
-          sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
-          params: ['app'],
-        };
-      },
-      parseMarkerRow: parseContractMarkerRow,
+      // Stub returns a marker whose `storageHash` does not match the contract's, simulating a database whose schema is out of date relative to the running runtime.
+      readMarker: async () =>
+        ({
+          kind: 'present',
+          record: {
+            storageHash: 'sha256:stale',
+            profileHash: 'sha256:test',
+            contractJson: null,
+            canonicalVersion: 1,
+            updatedAt: new Date('2026-01-01T00:00:00Z'),
+            appTag: null,
+            meta: {},
+            invariants: [],
+          },
+        }) as const,
     },
     lower(ast: SelectAst) {
       return Object.freeze({ sql: JSON.stringify(ast), params: [] });
@@ -83,24 +84,8 @@ function createStubAdapter(codecs: ReadonlyArray<Codec<string>>) {
   };
 }
 
-function createStaleMarkerDriver(): SqlDriver {
-  // Driver returns a marker row with a `core_hash` that does not match the contract's `storage.storageHash`, simulating a database whose schema is out of date relative to the running runtime.
-  const query = vi.fn().mockResolvedValue({
-    rows: [
-      {
-        core_hash: 'sha256:stale',
-        profile_hash: 'sha256:test',
-        contract_json: null,
-        canonical_version: 1,
-        updated_at: new Date('2026-01-01T00:00:00Z'),
-        app_tag: null,
-        meta: null,
-        invariants: [],
-      },
-    ],
-    rowCount: 1,
-  });
-
+function createStubDriver(): SqlDriver {
+  const query = vi.fn().mockResolvedValue({ rows: [], rowCount: 0 });
   const execute = vi.fn().mockImplementation(async function* (_request: SqlExecuteRequest) {
     yield {} as Record<string, unknown>;
   });
@@ -151,7 +136,7 @@ function createTestAdapterDescriptor(
 function createTestSetup(middleware: readonly SqlMiddleware[]) {
   const codecs = createCodecs();
   const adapter = createStubAdapter(codecs);
-  const driver = createStaleMarkerDriver();
+  const driver = createStubDriver();
 
   const targetDescriptor = createTestTargetDescriptor();
   const adapterDescriptor = createTestAdapterDescriptor(adapter);
