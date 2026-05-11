@@ -1,4 +1,7 @@
-import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import {
+  createControlStack,
+  type MigrationPlanOperation,
+} from '@prisma-next/framework-components/control';
 import {
   type ContractMarkerRecordLike,
   graphWalkStrategy,
@@ -732,23 +735,19 @@ async function executeMigrationStatusCommand(
   const contractRawForAggregate = await loadContractRawSafely(config);
   let aggregateSpaces: readonly MigrationStatusSpaceEntry[] = [];
   if (contractRawForAggregate !== null) {
+    // The aggregate loader needs a typed-Contract producer. Build a
+    // real control stack so `validateContract` runs against a fully
+    // composed family instance — descriptors that read stack members
+    // during construction (e.g. codec lookups) get a consistent view.
+    const stack = createControlStack(config);
+    const familyInstance = config.family.create(stack);
     try {
       aggregateSpaces = await loadAggregateStatusSpaces({
         targetId: config.target.targetId,
         migrationsDir,
         appContractRaw: contractRawForAggregate,
-        // biome-ignore lint/suspicious/noExplicitAny: extension descriptors carry family-bound generics
-        extensionPacks: (config.extensionPacks ?? []) as ReadonlyArray<any>,
-        validateContract: (json: unknown) => {
-          // The aggregate loader needs a typed-Contract producer.
-          // The CLI command's existing pipeline goes through the
-          // family at a different seam; we re-run validation here
-          // against an ephemeral family instance.
-          // biome-ignore lint/suspicious/noExplicitAny: factory accepts a stack-shaped object
-          const familyInstance = config.family.create({} as any);
-          // biome-ignore lint/suspicious/noExplicitAny: stand-in for typed Contract
-          return familyInstance.validateContract(json) as any;
-        },
+        extensionPacks: config.extensionPacks ?? [],
+        validateContract: (json: unknown) => familyInstance.validateContract(json),
         markersBySpace: allMarkers,
       });
     } catch {
