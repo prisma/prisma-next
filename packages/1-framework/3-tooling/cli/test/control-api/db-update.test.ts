@@ -607,11 +607,12 @@ describe('executeDbUpdate', () => {
 
     expect(result.ok).toBe(true);
     expect(executeAcrossSpaces).toHaveBeenCalledTimes(1);
-    const callArg = executeAcrossSpaces.mock.calls[0]?.[0] as
-      | { perSpaceOptions: ReadonlyArray<{ executionChecks?: unknown }> }
-      | undefined;
+    const callArg = executeAcrossSpaces.mock.calls[0]?.[0] as unknown as {
+      perSpaceOptions: ReadonlyArray<{ executionChecks?: unknown }>;
+    };
     expect(callArg).toBeDefined();
-    for (const opts of callArg?.perSpaceOptions ?? []) {
+    expect(callArg.perSpaceOptions.length).toBeGreaterThan(0);
+    for (const opts of callArg.perSpaceOptions) {
       // Runner default = all checks enabled (ADR 038). The aggregate apply
       // primitive must not opt out — letting it do so would silently re-execute
       // operations whose postconditions are already satisfied on re-apply.
