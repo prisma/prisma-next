@@ -16,8 +16,6 @@
 import type { DeclaredExtensionEntry } from '@prisma-next/migration-tools/aggregate';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { MigrationOps } from '@prisma-next/migration-tools/package';
-import type { ExtensionMigrationsExtensionInput } from './contract-space-extension-migrations-pass';
-import type { MigrateExtensionInput } from './contract-space-migrate-pass';
 
 /**
  * In-memory authored migration package shipped by an extension descriptor.
@@ -127,39 +125,4 @@ export function toDeclaredExtensions(
     entries.push({ id: pack.id, targetId: pack.targetId });
   }
   return entries;
-}
-
-/** Migrate-time per-space pass projection. */
-export function toMigratePassInputs(
-  inputs: ReadonlyArray<ExtensionPackInput>,
-): readonly MigrateExtensionInput[] {
-  return inputs.map((pack) =>
-    pack.contractSpace
-      ? {
-          id: pack.id,
-          contractSpace: {
-            contractJson: pack.contractSpace.contractJson,
-            headRef: pack.contractSpace.headRef,
-          },
-        }
-      : { id: pack.id },
-  );
-}
-
-/** Extension-migrations materialisation pass projection. */
-export function toExtensionMigrationsInputs(
-  inputs: ReadonlyArray<ExtensionPackInput>,
-): readonly ExtensionMigrationsExtensionInput[] {
-  return inputs.map((pack) =>
-    pack.contractSpace
-      ? {
-          id: pack.id,
-          contractSpace: {
-            contractJson: pack.contractSpace.contractJson,
-            headRef: pack.contractSpace.headRef,
-            migrations: pack.contractSpace.migrations,
-          },
-        }
-      : { id: pack.id },
-  );
 }

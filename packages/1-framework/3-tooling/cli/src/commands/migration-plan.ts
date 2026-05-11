@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import {
-  APP_SPACE_ID,
   createControlStack,
   hasOperationPreview,
   type MigrationPlanOperation,
@@ -43,13 +42,9 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
-import { runContractSpaceExtensionMigrationsPass } from '../utils/contract-space-extension-migrations-pass';
-import { runContractSpaceMigratePass } from '../utils/contract-space-migrate-pass';
-import {
-  toExtensionInputs,
-  toExtensionMigrationsInputs,
-  toMigratePassInputs,
-} from '../utils/extension-pack-inputs';
+import { buildContractSpaceAggregate } from '../utils/contract-space-aggregate-loader';
+import { runContractSpaceSeedPhase } from '../utils/contract-space-seed-phase';
+import { toExtensionInputs } from '../utils/extension-pack-inputs';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -238,34 +233,30 @@ async function executeMigrationPlanCommand(
     );
   }
 
-  // Per-space migrate pass: unconditional on-disk artefact emission for
-  // every loaded extension that exposes a `contractSpace`. Runs *before*
-  // the app-space no-op check so that an extension bump alone (with no
-  // structural app-space change) still re-pins extension artefacts on
-  // disk. The descriptor is authoritative — the framework owns these
-  // files and the helper is idempotent.
-  // Single descriptor-import boundary: every consumer of `extensionPacks`
-  // goes through `toExtensionInputs` + a per-consumer adapter. AC11.
+  // Phase 1 — seed: unconditionally re-emit per-space pinned artefacts
+  // (contract.json / contract.d.ts / refs/head.json) and materialise any
+  // descriptor-shipped migration packages not yet on disk. Runs before
+  // the no-op check so that an extension bump alone (with no structural
+  // app-space change) still re-pins extension artefacts on disk.
   const canonicalExtensionInputs = toExtensionInputs(config.extensionPacks ?? []);
-  await runContractSpaceMigratePass({
+  const seedResult = await runContractSpaceSeedPhase({
     migrationsDir,
-    extensionPacks: toMigratePassInputs(canonicalExtensionInputs),
-  });
-
-  // Materialise descriptor-shipped migration packages onto disk under
-  // `migrations/<spaceId>/<dirName>/` for any package not yet present.
-  // Idempotent (existing dirs are left untouched).
-  // Uses `planAllSpaces` for deterministic ordering + duplicate-spaceId
-  // detection.
-  const extensionMigrationsResult = await runContractSpaceExtensionMigrationsPass({
-    migrationsDir,
-    extensionPacks: toExtensionMigrationsInputs(canonicalExtensionInputs),
+    extensionPacks: canonicalExtensionInputs,
   });
   if (!flags.json && !flags.quiet) {
-    for (const entry of extensionMigrationsResult.emitted) {
-      ui.step(`Emitted ${entry.spaceId}/${entry.dirName}`);
+    for (const record of seedResult.seeded) {
+      if (record.action === 'updated') {
+        const pkgSuffix =
+          record.newMigrationDirs.length > 0
+            ? `; ${record.newMigrationDirs.length} new migration package(s) materialised`
+            : '';
+        ui.step(`Updated ${record.spaceId} to ${record.newHash}${pkgSuffix}`);
+      }
     }
   }
+  const emittedExtensionDirs = seedResult.seeded.flatMap((r) =>
+    r.newMigrationDirs.map((dirName) => ({ spaceId: r.spaceId, dirName })),
+  );
 
   // Check for no-op (same hash means no changes)
   if (fromHash === toStorageHash) {
@@ -275,7 +266,7 @@ async function executeMigrationPlanCommand(
       from: fromHash,
       to: toStorageHash,
       operations: [],
-      emittedExtensionDirs: extensionMigrationsResult.emitted,
+      emittedExtensionDirs,
       summary: 'No changes detected between contracts',
       timings: { total: Date.now() - startTime },
     };
@@ -291,6 +282,27 @@ async function executeMigrationPlanCommand(
       }),
     );
   }
+
+  // Phase 2 — load: build the aggregate against the now-consistent disk
+  // state that phase 1 just seeded. The seed phase guarantees every
+  // declared extension has its head ref pinned, so the loader's
+  // declaredButUnmigrated precheck always passes here.
+  // biome-ignore lint/suspicious/noExplicitAny: factory accepts a stack-shaped object
+  const familyInstanceForValidate = config.family.create({} as any);
+  const aggregateResult = await buildContractSpaceAggregate({
+    targetId: config.target.targetId,
+    migrationsDir,
+    appContract: toContractJson,
+    // biome-ignore lint/suspicious/noExplicitAny: extension descriptors carry family-bound generics
+    extensionPacks: (config.extensionPacks ?? []) as ReadonlyArray<any>,
+    // biome-ignore lint/suspicious/noExplicitAny: stand-in for typed Contract
+    validateContract: (json: unknown) => familyInstanceForValidate.validateContract(json) as any,
+  });
+  if (!aggregateResult.ok) {
+    return notOk(aggregateResult.failure);
+  }
+  const aggregate = aggregateResult.value;
+
   const frameworkComponents = assertFrameworkComponentsCompatible(
     config.family.familyId,
     config.target.targetId,
@@ -323,12 +335,12 @@ async function executeMigrationPlanCommand(
     const planner = migrations.createPlanner(familyInstance);
     const fromSchema = migrations.contractToSchema(fromContract, frameworkComponents);
     const plannerResult = planner.plan({
-      contract: toContractJson,
+      contract: aggregate.app.contract,
       schema: fromSchema,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
       fromContract,
       frameworkComponents,
-      spaceId: APP_SPACE_ID,
+      spaceId: aggregate.app.spaceId,
     });
     if (plannerResult.kind === 'failure') {
       return notOk(
@@ -411,7 +423,7 @@ async function executeMigrationPlanCommand(
         to: toStorageHash,
         dir: relative(process.cwd(), packageDir),
         operations: [],
-        emittedExtensionDirs: extensionMigrationsResult.emitted,
+        emittedExtensionDirs,
         pendingPlaceholders: true,
         summary:
           'Planned migration with placeholder(s) — edit migration.ts then run `node migration.ts` to self-emit',
@@ -434,9 +446,9 @@ async function executeMigrationPlanCommand(
         label: op.label,
         operationClass: op.operationClass,
       })),
-      emittedExtensionDirs: extensionMigrationsResult.emitted,
+      emittedExtensionDirs,
       ...(preview !== undefined ? { preview } : {}),
-      summary: buildPlanSummary(plannedOps.length, extensionMigrationsResult.emitted.length),
+      summary: buildPlanSummary(plannedOps.length, emittedExtensionDirs.length),
       timings: { total: Date.now() - startTime },
     };
     return ok(result);

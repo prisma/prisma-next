@@ -8,8 +8,6 @@ import type {
 import {
   toDeclaredExtensions,
   toExtensionInputs,
-  toExtensionMigrationsInputs,
-  toMigratePassInputs,
 } from '../../src/utils/extension-pack-inputs';
 
 const contractJsonA = { kind: 'sql-contract', tables: { a: {} } } as const;
@@ -100,66 +98,5 @@ describe('toDeclaredExtensions', () => {
       },
     ];
     expect(toDeclaredExtensions(inputs)).toEqual([{ id: 'ext-with-space', targetId: 'postgres' }]);
-  });
-});
-
-describe('toMigratePassInputs', () => {
-  it('passes packs without contractSpace as { id } only', () => {
-    expect(toMigratePassInputs([{ id: 'plain', targetId: 'postgres' }])).toEqual([{ id: 'plain' }]);
-  });
-
-  it('projects contractJson + headRef for packs that declare a contractSpace', () => {
-    const inputs: ExtensionPackInput[] = [
-      {
-        id: 'ext-with-space',
-        targetId: 'postgres',
-        contractSpace: {
-          contractJson: contractJsonA,
-          headRef: { hash: 'sha256:c1', invariants: ['inv-1'] },
-          migrations: [],
-        },
-      },
-    ];
-    expect(toMigratePassInputs(inputs)).toEqual([
-      {
-        id: 'ext-with-space',
-        contractSpace: {
-          contractJson: contractJsonA,
-          headRef: { hash: 'sha256:c1', invariants: ['inv-1'] },
-        },
-      },
-    ]);
-  });
-});
-
-describe('toExtensionMigrationsInputs', () => {
-  it('passes packs without contractSpace as { id } only', () => {
-    expect(toExtensionMigrationsInputs([{ id: 'plain', targetId: 'postgres' }])).toEqual([
-      { id: 'plain' },
-    ]);
-  });
-
-  it('projects contractJson + headRef + migrations for packs that declare a contractSpace', () => {
-    const inputs: ExtensionPackInput[] = [
-      {
-        id: 'ext-with-space',
-        targetId: 'postgres',
-        contractSpace: {
-          contractJson: contractJsonA,
-          headRef: { hash: 'sha256:c1', invariants: [] },
-          migrations: [migrationPkg],
-        },
-      },
-    ];
-    expect(toExtensionMigrationsInputs(inputs)).toEqual([
-      {
-        id: 'ext-with-space',
-        contractSpace: {
-          contractJson: contractJsonA,
-          headRef: { hash: 'sha256:c1', invariants: [] },
-          migrations: [migrationPkg],
-        },
-      },
-    ]);
   });
 });

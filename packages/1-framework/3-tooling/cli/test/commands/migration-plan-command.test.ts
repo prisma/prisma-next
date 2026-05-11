@@ -78,8 +78,8 @@ vi.mock('@prisma-next/framework-components/control', async () => {
 
 const SAME_HASH = 'sha256:same-hash';
 
-function makeContractJson(storageHash: string): string {
-  return JSON.stringify({ storage: { storageHash } });
+function makeContractJson(storageHash: string, target = 'mongo'): string {
+  return JSON.stringify({ storage: { storageHash }, target });
 }
 
 function setupBaseConfig(): void {
@@ -275,7 +275,7 @@ describe('migration plan command', () => {
       const OLD_HASH = 'sha256:old-hash';
       const NEW_HASH = 'sha256:new-hash';
 
-      mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
+      mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH, 'postgres'));
       mocks.loadMigrationPackages.mockResolvedValue({
         bundles: [],
         graph: new Map(),
@@ -312,7 +312,7 @@ describe('migration plan command', () => {
         throw errorUnfilledPlaceholder('backfill-users-status:run');
       });
 
-      mocks.readFile.mockResolvedValue(makeContractJson('sha256:new'));
+      mocks.readFile.mockResolvedValue(makeContractJson('sha256:new', 'postgres'));
       mocks.loadMigrationPackages.mockResolvedValue({
         bundles: [],
         graph: new Map(),
