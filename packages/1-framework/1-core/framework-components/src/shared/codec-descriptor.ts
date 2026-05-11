@@ -39,7 +39,7 @@ export interface CodecDescriptor<P = void> {
   readonly meta?: CodecMeta;
   /** Standard Schema validator for the factory's params. Validates JSON-sourced params at the contract boundary (PSL → IR; `contract.json` → runtime). For non-parameterized codecs (`P = void`), the schema validates `void`/`undefined` — the framework supplies no params at the call boundary. */
   readonly paramsSchema: StandardSchemaV1<P>;
-  /** Whether this descriptor is parameterized — i.e. its `paramsSchema` is something other than the singleton `voidParamsSchema`. Consumers that need to gate column-aware dispatch (e.g. the `validateParamRefRefs` AST-builder pass) read this directly rather than threading a free-floating `(codecId) => boolean` callback. */
+  /** Whether this descriptor is parameterized — i.e. its `paramsSchema` is something other than the singleton `voidParamsSchema`. Consumers that need to gate column-aware dispatch read this directly rather than threading a free-floating `(codecId) => boolean` callback. */
   readonly isParameterized: boolean;
   /** Emit-path string renderer for `contract.d.ts`. Returns the TypeScript output type expression for given params (e.g. `Vector<1536>`). Optional; absent renderers cause the emitter to fall back to the codec's base output type. Non-parameterized codecs typically omit it. */
   readonly renderOutputType?: (params: P) => string | undefined;
@@ -70,7 +70,7 @@ export abstract class CodecDescriptorImpl<TParams = void> implements CodecDescri
 
   abstract readonly paramsSchema: StandardSchemaV1<TParams>;
 
-  /** Boolean derived from `paramsSchema`: `true` whenever the schema is not the singleton `voidParamsSchema`. The framework registry's `validateParamRefRefs` pass reads this through `descriptorFor(codecId).isParameterized` to gate column-ref enforcement. */
+  /** Boolean derived from `paramsSchema`: `true` whenever the schema is not the singleton `voidParamsSchema`. */
   get isParameterized(): boolean {
     return this.paramsSchema !== voidParamsSchema;
   }

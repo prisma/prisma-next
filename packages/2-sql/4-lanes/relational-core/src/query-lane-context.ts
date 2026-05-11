@@ -65,8 +65,7 @@ export type MutationDefaultsOptions = {
 export interface ExecutionContext<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly contract: TContract;
   /**
-   * Contract-bound codec registry built once at context-construction time by walking the contract's columns and resolving each through its descriptor's factory. The dispatch path (`encodeParam` / `decodeRow`) consults `forColumn(table, column)` for column-bound call sites; `forCodecId(codecId)` is the refs-less fallback, permitted only for non-parameterized codec ids (the builder-pipeline validator pass enforces refs on
-   * every parameterized `ParamRef`). Pre-populated with one canonical instance per non-parameterized descriptor so `forCodecId` covers refs-less codec ids that no contract column declares.
+   * Contract-bound codec registry built once at context-construction time by walking the contract's columns and resolving each through its descriptor's factory. Runtime dispatch (`encodeParam` / `decodeRow`) resolves codecs via `forCodecRef(ref)` — the single dispatch shape for AST-bound codec resolution.
    */
   readonly contractCodecs: ContractCodecRegistry;
   /**

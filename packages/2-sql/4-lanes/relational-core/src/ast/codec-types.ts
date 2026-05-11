@@ -79,22 +79,15 @@ export interface Codec<
 /**
  * Contract-bound codec registry.
  *
- * The dispatch interface for encode/decode at runtime: built once at `ExecutionContext` construction time by walking the contract's `storage.tables[].columns[]` and resolving each column through its descriptor's factory (per-instance for parameterized columns; the cached shared codec for non-parameterized columns). The dispatch path calls `forColumn(table, column).encode/decode(...)` and doesn't know whether the codec
- * is parameterized.
+ * Built once at `ExecutionContext` construction time by walking the contract's `storage.tables[].columns[]` and resolving each column through its descriptor's factory. Runtime encode/decode dispatch resolves codecs via `forCodecRef(ref)` — the single dispatch shape for AST-bound codec resolution.
  *
- * `forCodecId(codecId)` is the refs-less fallback. Every column-bound `ParamRef` carries `refs: { table; column }` and the builder-pipeline `validateParamRefRefs` pass enforces refs on every parameterized `ParamRef` before encode runs, so this fallback is only reached for non-parameterized codec ids.
+ * `forColumn(table, column)` is retained for build-time helpers that need column-keyed lookup (e.g. projection stamping); runtime dispatch routes through `forCodecRef`.
  */
 export interface ContractCodecRegistry {
   /**
    * Resolve the codec for `(table, column)`. Returns the per-instance parameterized codec for parameterized columns, the shared codec for non-parameterized columns, or `undefined` if the column is unknown or the codec isn't registered.
    */
   forColumn(table: string, column: string): Codec | undefined;
-
-  /**
-   * Resolve a codec by id. For non-parameterized codecs this returns the canonical shared instance materialized once at context construction; for parameterized codecs it returns the column-resolved instance when a single column declares the codec id, or the `factory(undefined)` representative when the descriptor's factory is parameter-tolerant. Used by refs-less call sites; the validator pass guarantees the call site's
-   * `codecId` is non-parameterized (or parameter-tolerant) at this boundary.
-   */
-  forCodecId(codecId: string): Codec | undefined;
 
   /**
    * Resolve a codec by {@link CodecRef}. The single dispatch shape for AST-bound codec resolution — every codec-bearing AST node carries a `CodecRef` that resolves through this method via the per-`ExecutionContext` `AstCodecResolver`. Two refs with the same `codecId` and structurally equal `typeParams` (regardless of object key order) return the same memoised codec instance. Throws `RUNTIME.CODEC_DESCRIPTOR_MISSING` for unknown `codecId`s and `RUNTIME.TYPE_PARAMS_INVALID` on `paramsSchema` rejection.

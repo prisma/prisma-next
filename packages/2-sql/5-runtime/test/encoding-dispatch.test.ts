@@ -23,7 +23,6 @@ describe('encodeParam — CodecRef dispatch', () => {
     const calls: Array<['forCodecRef', string, unknown]> = [];
     const contractCodecs: ContractCodecRegistry = {
       forColumn: () => undefined,
-      forCodecId: () => undefined,
       forCodecRef: (ref) => {
         calls.push(['forCodecRef', ref.codecId, ref.typeParams]);
         if (ref.typeParams === 1024) return codec1024;
@@ -64,7 +63,7 @@ describe('encodeParam — CodecRef dispatch', () => {
     ]);
   });
 
-  it('falls through to forCodecId when codec has no typeParams and forCodecRef returns undefined', async () => {
+  it('resolves via forCodecRef when codec has no typeParams', async () => {
     const scalarCodec = defineTestCodec({
       typeId: 'test/scalar@1',
       encode: (v: string) => `enc:${v}`,
@@ -74,7 +73,6 @@ describe('encodeParam — CodecRef dispatch', () => {
     const calls: Array<['forCodecRef', string]> = [];
     const contractCodecs: ContractCodecRegistry = {
       forColumn: () => undefined,
-      forCodecId: () => undefined,
       forCodecRef: (ref) => {
         calls.push(['forCodecRef', ref.codecId]);
         return scalarCodec;
@@ -116,7 +114,6 @@ describe('encodeParam — CodecRef dispatch', () => {
 
     const contractCodecs: ContractCodecRegistry = {
       forColumn: () => undefined,
-      forCodecId: () => undefined,
       forCodecRef: () => codec,
     };
 

@@ -18,7 +18,7 @@ import { createStubAdapter, createTestContext } from './utils';
 
 // The codec-registry layer exposes two runtime registries:
 //
-// - `ContractCodecRegistry` (`context.contractCodecs`): per-column resolved-codec dispatch with `forColumn(table, column)` and a codec-id-keyed fallback `forCodecId(codecId)` for sites without a column ref.
+// - `ContractCodecRegistry` (`context.contractCodecs`): per-column resolved-codec dispatch with `forColumn(table, column)` and content-keyed AST dispatch via `forCodecRef(ref)`.
 // - `CodecDescriptorRegistry` (`context.codecDescriptors`): codec-id-keyed metadata read with `descriptorFor(codecId)` — non-branching for parameterized vs. non-parameterized codecs (every non-parameterized codec is auto-lifted into a synthesized `CodecDescriptor<void>`).
 
 function makeVectorCodec(meta?: Record<string, unknown>): Codec {
@@ -248,63 +248,6 @@ describe('ContractCodecRegistry', () => {
 
     expect(context.contractCodecs.forColumn('User', 'nonexistent')).toBeUndefined();
     expect(context.contractCodecs.forColumn('NoSuchTable', 'whatever')).toBeUndefined();
-  });
-
-  it('forCodecId returns a codec by id (legacy registry fallback)', () => {
-    const contract = createTestContract({
-      User: { primary: { nativeType: 'scalar', codecId: 'test/scalar@1', nullable: false } },
-    });
-
-    const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [createNonParameterizedExtensionDescriptor()],
-    });
-
-    const codecById = context.contractCodecs.forCodecId('test/scalar@1');
-    expect(codecById).toBeDefined();
-    expect(codecById?.id).toBe('test/scalar@1');
-  });
-
-  it('forCodecId returns undefined for an unknown codec id', () => {
-    const contract = createTestContract({
-      User: { primary: { nativeType: 'scalar', codecId: 'test/scalar@1', nullable: false } },
-    });
-
-    const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [createNonParameterizedExtensionDescriptor()],
-    });
-
-    expect(context.contractCodecs.forCodecId('does-not-exist@1')).toBeUndefined();
-  });
-
-  // Two parameterized columns with distinct typeParams resolve to two
-  // distinct codec instances under the same codec id. By default that's
-  // ambiguous — `forCodecId` rejects rather than silently bind to the
-  // first registered instance.
-  it('forCodecId throws RUNTIME.TYPE_PARAMS_INVALID when multiple distinct instances share a parameterized codec id', () => {
-    const contract = createTestContract({
-      Doc: {
-        small: {
-          nativeType: 'vector',
-          codecId: 'pg/vector@1',
-          nullable: false,
-          typeParams: { length: 768 },
-        },
-        large: {
-          nativeType: 'vector',
-          codecId: 'pg/vector@1',
-          nullable: false,
-          typeParams: { length: 1536 },
-        },
-      },
-    });
-
-    const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [createVectorExtensionDescriptor()],
-    });
-
-    expect(() => context.contractCodecs.forCodecId('pg/vector@1')).toThrow(
-      /resolves to multiple parameterized instances/,
-    );
   });
 });
 

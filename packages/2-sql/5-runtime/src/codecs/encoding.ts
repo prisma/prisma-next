@@ -12,7 +12,6 @@ import {
   type SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
-import { makeAliasResolver } from './alias-resolver';
 
 interface ParamMetadata {
   readonly codec: CodecRef | undefined;
@@ -24,27 +23,14 @@ const NO_METADATA: ParamMetadata = Object.freeze({
   name: undefined,
 });
 
-/**
- * Resolve the codec for an outgoing param.
- *
- * AST-bound dispatch: when `metadata.codec` is populated by a column-bound construction site, resolve via `contractCodecs.forCodecRef(codec)` — that returns the per-instance codec materialized for the `(codecId, typeParams)` pair, encoding any per-instance state (e.g. `vector(1024)` vs. `vector(1536)`). Content-keyed memoisation inside the registry collapses repeated lookups for the same logical column.
- *
- * The `forCodecRef` path is the single dispatch shape for all codec-bearing AST nodes and closes off the wrong-instance risk structurally: each `CodecRef` carries both the `codecId` and the `typeParams` the column declared, so parameterized codec ids always resolve to the right per-instance codec.
- *
- * // M3c: dead after AST shape change — delete: the forColumn + forCodecId legacy paths below are unreachable because every column-bound ParamRef now carries `codec`. They stay until M3c collapses the byColumn parallel surface.
- */
 function resolveParamCodec(
   metadata: ParamMetadata,
   contractCodecs: ContractCodecRegistry | undefined,
-  _aliasResolver: (alias: string) => string,
 ): Codec | undefined {
   if (metadata.codec && contractCodecs) {
     return contractCodecs.forCodecRef(metadata.codec);
   }
-  // M3c: dead after AST shape change — delete: codec-id-only fallback
-  const codecId = metadata.codec?.codecId;
-  if (!codecId) return undefined;
-  return contractCodecs?.forCodecId(codecId);
+  return undefined;
 }
 
 function paramLabel(metadata: ParamMetadata, paramIndex: number): string {
@@ -89,7 +75,6 @@ export async function encodeParam(
     paramIndex,
     ctx,
     contractCodecs,
-    (alias) => alias,
   );
 }
 
@@ -99,13 +84,12 @@ async function encodeParamValue(
   paramIndex: number,
   ctx: SqlCodecCallContext,
   contractCodecs: ContractCodecRegistry | undefined,
-  aliasResolver: (alias: string) => string,
 ): Promise<unknown> {
   if (value === null || value === undefined) {
     return null;
   }
 
-  const codec = resolveParamCodec(metadata, contractCodecs, aliasResolver);
+  const codec = resolveParamCodec(metadata, contractCodecs);
   if (!codec) {
     return value;
   }
@@ -159,18 +143,9 @@ export async function encodeParams(
     }
   }
 
-  const aliasResolver = makeAliasResolver(plan.ast);
-
   const tasks: Promise<unknown>[] = new Array(paramCount);
   for (let i = 0; i < paramCount; i++) {
-    tasks[i] = encodeParamValue(
-      plan.params[i],
-      metadata[i] ?? NO_METADATA,
-      i,
-      ctx,
-      contractCodecs,
-      aliasResolver,
-    );
+    tasks[i] = encodeParamValue(plan.params[i], metadata[i] ?? NO_METADATA, i, ctx, contractCodecs);
   }
 
   const settled = await raceAgainstAbort(Promise.all(tasks), signal, 'encode');

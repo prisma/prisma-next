@@ -46,7 +46,11 @@ export function createAstCodecResolver(
         );
       }
 
-      const validated = validateTypeParams(descriptor.paramsSchema, ref);
+      const effectiveRef =
+        descriptor.isParameterized && ref.typeParams === undefined
+          ? { codecId: ref.codecId, typeParams: {} }
+          : ref;
+      const validated = validateTypeParams(descriptor.paramsSchema, effectiveRef);
       const ctx = instanceContextFor(ref);
       // The descriptor's `factory` is typed against its own `P`; the registry erases `P` to `unknown`, so callers narrow per codec id at the dispatch boundary. The descriptor's `paramsSchema` validates the input above before we forward it, so this narrow is safe by construction.
       const codec = (

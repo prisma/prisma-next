@@ -24,7 +24,6 @@ import type {
   SqlQueryable,
   SqlTransaction,
 } from '@prisma-next/sql-relational-core/ast';
-import { validateParamRefRefs } from '@prisma-next/sql-relational-core/ast';
 import {
   createSqlParamRefMutator,
   type SqlParamRefMutator,
@@ -194,7 +193,6 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     plan: SqlQueryPlan,
     ctx: SqlCodecCallContext,
   ): Promise<SqlExecutionPlan> {
-    validateParamRefRefs(plan.ast, this.codecDescriptors);
     const lowered = lowerSqlPlan(this.adapter, this.contract, plan);
     return Object.freeze({
       ...lowered,
@@ -257,9 +255,6 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 
       let exec: SqlExecutionPlan;
       if (isExecutionPlan(plan)) {
-        if (plan.ast) {
-          validateParamRefRefs(plan.ast, self.codecDescriptors);
-        }
         exec = Object.freeze({
           ...plan,
           params: await encodeParams(plan, codecCtx, self.contractCodecs),

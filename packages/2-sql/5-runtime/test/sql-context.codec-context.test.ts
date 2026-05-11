@@ -9,7 +9,7 @@ import type { SqlRuntimeExtensionDescriptor } from '../src/sql-context';
 import { createStubAdapter, createTestContext } from './utils';
 
 /**
- * `forColumn(table, column)` dispatch must materialize a fresh codec instance with a column-specific `SqlCodecInstanceContext`. The pre-populated `byCodecId` representative is reserved for `forCodecId` refs-less fallbacks; reusing it for column-bound dispatch erases the per-column context any descriptor whose factory reads `CodecInstanceContext` (for diagnostics, telemetry, or per-column behaviour) would expect.
+ * `forColumn(table, column)` dispatch must materialize a fresh codec instance with a column-specific `SqlCodecInstanceContext`.
  */
 describe('buildContractCodecRegistry — per-column codec instance context', () => {
   function createCtxCapturingExtension(captures: SqlCodecInstanceContext[]): {
@@ -108,26 +108,6 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
     expect(columnCtx?.usedAt).toEqual([{ table: 'users', column: 'field' }]);
   });
 
-  it('preserves the representative `<shared:codecId>` context for forCodecId fallback', () => {
-    const captures: SqlCodecInstanceContext[] = [];
-    const { descriptor, instances } = createCtxCapturingExtension(captures);
-
-    // Contract with no column referencing the descriptor — `forCodecId` resolves through the pre-populated representative only.
-    const contract = contractWith({});
-
-    const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
-    });
-
-    const codecIdInstance = context.contractCodecs.forCodecId('test/captures-ctx@1');
-    expect(codecIdInstance).toBeDefined();
-
-    const sharedCtx = instances.find(({ codec }) => codec === codecIdInstance)?.ctx;
-    expect(sharedCtx).toBeDefined();
-    expect(sharedCtx?.name).toBe('<shared:test/captures-ctx@1>');
-    expect(sharedCtx?.usedAt).toEqual([]);
-  });
-
   it('materializes distinct instances for distinct columns sharing the same codec id', () => {
     const captures: SqlCodecInstanceContext[] = [];
     const { descriptor } = createCtxCapturingExtension(captures);
@@ -155,31 +135,10 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
     expect(usersCtx?.usedAt).toEqual([{ table: 'users', column: 'field' }]);
     expect(ordersCtx?.usedAt).toEqual([{ table: 'orders', column: 'field' }]);
   });
-
-  it('does not reuse the representative instance for forColumn dispatch', () => {
-    const captures: SqlCodecInstanceContext[] = [];
-    const { descriptor } = createCtxCapturingExtension(captures);
-
-    const contract = contractWith({
-      users: { codecId: 'test/captures-ctx@1', nativeType: 'captures' },
-    });
-
-    const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
-    });
-
-    const columnInstance = context.contractCodecs.forColumn('users', 'field');
-    const codecIdInstance = context.contractCodecs.forCodecId('test/captures-ctx@1');
-
-    // The representative is preserved as the `forCodecId` fallback even after a column resolved through `forColumn` — the two paths must surface distinct instances built with distinct ctxs.
-    expect(columnInstance).toBeDefined();
-    expect(codecIdInstance).toBeDefined();
-    expect(columnInstance).not.toBe(codecIdInstance);
-  });
 });
 
 /**
- * `forCodecRef` is the AST-bound dispatch surface: every codec-bearing AST node carries a {@link CodecRef} and the runtime resolves through this method via the per-`ExecutionContext` `AstCodecResolver`. M2 pre-populates the resolver's cache from the contract walk; M3 will collapse `forColumn`/`forCodecId` onto this single dispatch path.
+ * `forCodecRef` is the sole AST-bound dispatch surface: every codec-bearing AST node carries a {@link CodecRef} and the runtime resolves through this method via the per-`ExecutionContext` `AstCodecResolver`.
  */
 describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () => {
   function createCountingVectorExtension(): {

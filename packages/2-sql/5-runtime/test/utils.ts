@@ -142,7 +142,6 @@ export function buildTestContractCodecs(
   }
   return {
     forColumn: () => undefined,
-    forCodecId: (codecId) => byId.get(codecId),
     forCodecRef: (ref) => {
       const codec = byId.get(ref.codecId);
       if (!codec) {

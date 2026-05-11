@@ -12,7 +12,6 @@ import type {
   SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
-import { makeAliasResolver } from './alias-resolver';
 
 type ColumnRef = { table: string; column: string };
 
@@ -42,30 +41,12 @@ function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> 
   return ast.returning;
 }
 
-/**
- * Resolve the per-cell codec for a projection item.
- *
- * AST-bound dispatch: when `item.codec` is populated by a column-bound construction site, resolve via `contractCodecs.forCodecRef(item.codec)` — that returns the per-instance codec materialized for the `(codecId, typeParams)` pair. Content-keyed memoisation collapses repeated lookups.
- *
- * // M3c: dead after AST shape change — delete: the forColumn + forCodecId legacy paths below are unreachable because every column-bound ProjectionItem now carries `codec`. They stay until M3c collapses the byColumn parallel surface.
- */
 function resolveProjectionCodec(
   item: ProjectionItem,
   contractCodecs: ContractCodecRegistry | undefined,
-  aliasResolver: (alias: string) => string,
 ): Codec | undefined {
   if (item.codec && contractCodecs) {
     return contractCodecs.forCodecRef(item.codec);
-  }
-  // M3c: dead after AST shape change — delete: column-ref heuristic fallback
-  if (contractCodecs && item.expr.kind === 'column-ref') {
-    const byColumn = contractCodecs.forColumn(aliasResolver(item.expr.table), item.expr.column);
-    if (byColumn) return byColumn;
-  }
-  // M3c: dead after AST shape change — delete: codec-id-only fallback
-  const codecId = item.codec?.codecId;
-  if (codecId) {
-    return contractCodecs?.forCodecId(codecId);
   }
   return undefined;
 }
@@ -97,19 +78,18 @@ function buildDecodeContext(
   const codecs = new Map<string, Codec>();
   const columnRefs = new Map<string, ColumnRef>();
   const includeAliases = new Set<string>();
-  const aliasResolver = makeAliasResolver(plan.ast);
 
   for (const item of projection) {
     aliases.push(item.alias);
 
-    const codec = resolveProjectionCodec(item, contractCodecs, aliasResolver);
+    const codec = resolveProjectionCodec(item, contractCodecs);
     if (codec) {
       codecs.set(item.alias, codec);
     }
 
     if (item.expr.kind === 'column-ref') {
       columnRefs.set(item.alias, {
-        table: aliasResolver(item.expr.table),
+        table: item.expr.table,
         column: item.expr.column,
       });
     } else if (item.expr.kind === 'subquery' || item.expr.kind === 'json-array-agg') {
@@ -214,8 +194,6 @@ async function decodeField(
 
   const ref = decodeCtx.columnRefs.get(alias);
 
-  // Per-cell ctx: the cell-level `column` is a `SqlColumnRef = { table, name }` projection of the resolved `ColumnRef = { table, column }` (same resolution `wrapDecodeFailure` uses below — no double work). Cells the runtime cannot resolve (aggregate aliases, computed projections without a simple ref) drop the `column` field entirely — explicitly cleared so a previously-populated `rowCtx.column` cannot leak through to
-  // unrelated cells. Destructuring (rather than `column: undefined`) is required because `SqlCodecCallContext.column` is declared `column?: SqlColumnRef` under `exactOptionalPropertyTypes`.
   let cellCtx: SqlCodecCallContext;
   if (ref) {
     cellCtx = { ...rowCtx, column: { table: ref.table, name: ref.column } };
@@ -227,7 +205,6 @@ async function decodeField(
   try {
     return await codec.decode(wireValue, cellCtx);
   } catch (error) {
-    // Codec-authored runtime envelopes (e.g. `RUNTIME.DECODE_FAILED` thrown from inside the codec body, or `RUNTIME.ABORTED` raised via `CodecCallContext.signal` per ADR 207) carry their own per-codec context — wrapping them again would erase that context and coerce the abort intent into a generic decode failure. Pass them through unchanged; only foreign errors get the `wrapDecodeFailure` envelope.
     if (isRuntimeError(error)) {
       throw error;
     }
@@ -287,7 +264,6 @@ export async function decodeRow(
 
   const settled = await raceAgainstAbort(Promise.all(tasks), signal, 'decode');
 
-  // Include aggregates are decoded synchronously after concurrent codec dispatch settles, so any decode failures upstream propagate first.
   for (const entry of includeIndices) {
     settled[entry.index] = decodeIncludeAggregate(entry.alias, entry.value);
   }

@@ -326,7 +326,7 @@ describe('parameterized types', () => {
         extensionPacks: [extensionDescriptor],
       });
 
-      // Skip the representative-materialization call sql-context.ts makes per descriptor for the legacy `forCodecId` fallback (named `<shared:pg/vector@1>` with empty `usedAt`); locate the per-column factory call by the type-instance ctx the test contract declares.
+      // Locate the per-column factory call by the type-instance ctx the test contract declares.
       const perColumnCtx = observedCtxs.find((ctx) => ctx.name === 'Vector1536');
       expect(perColumnCtx?.name).toBe('Vector1536');
       expect(perColumnCtx?.usedAt).toEqual([{ table: 'test', column: 'embedding' }]);
