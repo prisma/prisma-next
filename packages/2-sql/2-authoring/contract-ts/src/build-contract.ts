@@ -17,6 +17,12 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
+import {
+  createIndexTypeRegistry,
+  type IndexTypeMap,
+  type IndexTypeRegistration,
+} from '@prisma-next/sql-contract/index-types';
 import {
   applyFkDefaults,
   type SqlStorage,
@@ -63,11 +69,37 @@ function encodeColumnDefault(
   };
 }
 
-function assertStorageSemantics(storage: SqlStorage): void {
-  const semanticErrors = validateStorageSemantics(storage);
+function assertStorageSemantics(
+  definition: ContractDefinition,
+  contract: Contract<SqlStorage>,
+): void {
+  const semanticErrors = validateStorageSemantics(contract.storage);
   if (semanticErrors.length > 0) {
     throw new Error(`Contract semantic validation failed: ${semanticErrors.join('; ')}`);
   }
+
+  const indexTypeRegistry = createIndexTypeRegistry();
+  const packsToRegister: ReadonlyArray<{ readonly id?: string; readonly indexTypes?: unknown }> = [
+    definition.target,
+    ...Object.values(definition.extensionPacks ?? {}),
+  ];
+  for (const pack of packsToRegister) {
+    const registration = pack.indexTypes;
+    if (registration === undefined) continue;
+    if (
+      typeof registration !== 'object' ||
+      registration === null ||
+      !Array.isArray((registration as { entries?: unknown }).entries)
+    ) {
+      throw new Error(
+        `Pack "${pack.id ?? '<unknown>'}" declares "indexTypes" but its value is not an IndexTypeRegistration (expected an object with an "entries" array; got ${typeof registration}).`,
+      );
+    }
+    for (const entry of (registration as IndexTypeRegistration<IndexTypeMap>).entries) {
+      indexTypeRegistry.register(entry);
+    }
+  }
+  validateIndexTypes(contract, indexTypeRegistry);
 }
 
 function assertKnownTargetModel(
@@ -277,8 +309,8 @@ export function buildSqlContractFromDefinition(
       indexes: (semanticModel.indexes ?? []).map((i) => ({
         columns: i.columns,
         ...ifDefined('name', i.name),
-        ...ifDefined('using', i.using),
-        ...ifDefined('config', i.config),
+        ...ifDefined('type', i.type),
+        ...ifDefined('options', i.options),
       })),
       foreignKeys,
       ...(semanticModel.id
@@ -447,7 +479,7 @@ export function buildSqlContractFromDefinition(
     meta: {},
   };
 
-  assertStorageSemantics(contract.storage);
+  assertStorageSemantics(definition, contract);
 
   return contract;
 }

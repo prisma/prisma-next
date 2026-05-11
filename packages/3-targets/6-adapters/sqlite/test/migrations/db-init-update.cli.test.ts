@@ -1,18 +1,22 @@
 import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
 import { executeDbInit, executeDbUpdate } from '@prisma-next/cli/control-api';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   SqlControlExtensionDescriptor,
+  SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import type {
+  MigrationPlanOperation,
+  OpFactoryCall,
+} from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { timeouts } from '@prisma-next/test-utils';
+import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   contract as appContract,
@@ -412,23 +416,30 @@ describe(
       const hooks: CodecControlHooks = {
         onFieldEvent: (event, ctx) => {
           hookFiredFor.push(`${event}:${ctx.tableName}.${ctx.fieldName}`);
-          return [
-            {
-              id: `codec.${event}.${ctx.tableName}.${ctx.fieldName}`,
-              label: `${event} hook on ${ctx.tableName}.${ctx.fieldName}`,
-              operationClass: 'additive',
-              invariantId: `cs:${ctx.tableName}.${ctx.fieldName}@${event}`,
-              target: { id: 'sqlite' },
-              precheck: [],
-              execute: [
-                {
-                  description: 'codec side-effect (no-op for test)',
-                  sql: 'SELECT 1',
-                },
-              ],
-              postcheck: [],
-            },
-          ];
+          const op: SqlMigrationPlanOperation<unknown> = {
+            id: `codec.${event}.${ctx.tableName}.${ctx.fieldName}`,
+            label: `${event} hook on ${ctx.tableName}.${ctx.fieldName}`,
+            operationClass: 'additive',
+            invariantId: `cs:${ctx.tableName}.${ctx.fieldName}@${event}`,
+            target: { id: 'sqlite' },
+            precheck: [],
+            execute: [
+              {
+                description: 'codec side-effect (no-op for test)',
+                sql: 'SELECT 1',
+              },
+            ],
+            postcheck: [],
+          };
+          const call: OpFactoryCall = {
+            factoryName: op.id,
+            operationClass: op.operationClass,
+            label: op.label,
+            renderTypeScript: () => `${op.id}()`,
+            importRequirements: () => [],
+            toOp: () => op,
+          };
+          return [call];
         },
       };
 
@@ -493,6 +504,79 @@ describe(
       // frameworkComponents).
       const ids = result.value.plan.operations.map((op) => op.id);
       expect(ids).toContain('codec.added.user.email');
+    });
+
+    it('collapses cleanly to a single app member when no extensions are declared (n=1 aggregate-path regression)', async () => {
+      // Every other test in this file declares at least one extension
+      // pack; this one exercises the empty-extensionPacks path through
+      // the aggregate loader / planner / runner so a future refactor
+      // that breaks single-space SQLite does not slip past CI.
+      const tmpDir = createTmpDir();
+      const migrationsDir = join(tmpDir, 'migrations');
+      await mkdir(migrationsDir, { recursive: true });
+
+      const initResult = await executeDbInit({
+        driver: testDb!.driver,
+        familyInstance,
+        contract: appContract,
+        mode: 'apply',
+        migrations: sqliteTargetDescriptor.migrations,
+        frameworkComponents: [...frameworkComponents],
+        migrationsDir,
+        targetId: 'sqlite',
+        extensionPacks: [],
+      });
+
+      if (!initResult.ok) {
+        throw new Error(
+          `Expected ok but got failure: ${JSON.stringify(initResult.failure, null, 2)}`,
+        );
+      }
+
+      const markers = await testDb!.driver.query<{ space: string; core_hash: string }>(
+        'SELECT space, core_hash FROM _prisma_marker ORDER BY space',
+      );
+      expect(markers.rows.map((r) => r.space)).toEqual(['app']);
+      expect(markers.rows[0]!.core_hash).toBe(appContract.storage.storageHash);
+
+      const userTable = await testDb!.driver.query<{ cnt: number }>(
+        "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type = 'table' AND name = 'user'",
+      );
+      expect(userTable.rows[0]!.cnt).toBe(1);
+
+      // Per-space breakdown surfaced to the caller has exactly one
+      // entry, kind `app`, no extension entries.
+      expect(initResult.value.perSpace).toBeDefined();
+      expect(initResult.value.perSpace!.length).toBe(1);
+      expect(initResult.value.perSpace![0]).toMatchObject({ spaceId: 'app', kind: 'app' });
+
+      // Re-running `db update` against the already-applied contract is
+      // a no-op — proves the aggregate path's marker / hash check still
+      // short-circuits when n=1.
+      const updateResult = await executeDbUpdate({
+        driver: testDb!.driver,
+        familyInstance,
+        contract: appContract,
+        mode: 'apply',
+        migrations: sqliteTargetDescriptor.migrations,
+        frameworkComponents: [...frameworkComponents],
+        migrationsDir,
+        targetId: 'sqlite',
+        extensionPacks: [],
+      });
+
+      if (!updateResult.ok) {
+        throw new Error(
+          `Expected ok but got failure: ${JSON.stringify(updateResult.failure, null, 2)}`,
+        );
+      }
+      expect(updateResult.value.execution).toBeDefined();
+      expect(updateResult.value.execution!.operationsExecuted).toBe(0);
+
+      const markersAfter = await testDb!.driver.query<{ space: string }>(
+        'SELECT space FROM _prisma_marker ORDER BY space',
+      );
+      expect(markersAfter.rows.map((r) => r.space)).toEqual(['app']);
     });
 
     it('rolls back ALL spaces and preserves pre-execution markers when any space fails (locks AM4-rollback CLI half)', async () => {

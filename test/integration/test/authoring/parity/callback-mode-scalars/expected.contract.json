@@ -326,13 +326,6 @@
             }
           ]
         },
-        "operationTypes": {
-          "import": {
-            "alias": "PgVectorOperationTypes",
-            "named": "OperationTypes",
-            "package": "@prisma-next/extension-pgvector/operation-types"
-          }
-        },
         "queryOperationTypes": {
           "import": {
             "alias": "PgVectorQueryOperationTypes",

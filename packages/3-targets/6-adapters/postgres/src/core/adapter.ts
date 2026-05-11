@@ -5,6 +5,8 @@ import type {
   AdapterProfile,
   AnyQueryAst,
   LowererContext,
+  MarkerReadResult,
+  SqlQueryable,
 } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
@@ -42,18 +44,34 @@ class PostgresAdapterImpl
       id: options?.profileId ?? 'postgres/default@1',
       target: 'postgres',
       capabilities: defaultCapabilities,
-      readMarkerStatement: () => ({
-        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
-        params: [APP_SPACE_ID],
-      }),
-      // Postgres' driver hydrates `text[]` columns as native JS arrays, so the row is already in the shape the shared parser expects.
-      parseMarkerRow: (row: unknown) => parseContractMarkerRow(row),
+      readMarker: (queryable: SqlQueryable) => readPostgresMarker(queryable),
     });
   }
 
   lower(ast: AnyQueryAst, context: LowererContext<PostgresContract>): PostgresLoweredStatement {
     return renderLoweredSql(ast, context.contract, this.codecLookup);
   }
+}
+
+async function readPostgresMarker(queryable: SqlQueryable): Promise<MarkerReadResult> {
+  const exists = await queryable.query(
+    'select 1 from information_schema.tables where table_schema = $1 and table_name = $2',
+    ['prisma_contract', 'marker'],
+  );
+  if (exists.rows.length === 0) {
+    return { kind: 'no-table' };
+  }
+
+  const result = await queryable.query(
+    'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
+    [APP_SPACE_ID],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    return { kind: 'absent' };
+  }
+  // Postgres' driver hydrates `text[]` columns as native JS arrays, so the row is already in the shape the shared parser expects.
+  return { kind: 'present', record: parseContractMarkerRow(row) };
 }
 
 export function createPostgresAdapter(options?: PostgresAdapterOptions) {

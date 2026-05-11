@@ -1,6 +1,6 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
+import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
@@ -46,15 +46,14 @@ function createTestExtensionDescriptor(options?: {
       ]
     : [];
 
-  const operationsArray: ReadonlyArray<SqlOperationDescriptor> = hasOperations
-    ? [
-        {
-          method: 'testOp',
+  const operations: SqlOperationDescriptors = hasOperations
+    ? {
+        testOp: {
           self: { codecId: 'test/ext@1' },
           impl: () => undefined as never,
         },
-      ]
-    : [];
+      }
+    : {};
 
   return {
     kind: 'extension' as const,
@@ -63,7 +62,7 @@ function createTestExtensionDescriptor(options?: {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
     codecs: () => descriptorsFromCodecs(codecRegistry),
-    queryOperations: () => operationsArray,
+    queryOperations: () => operations,
     create() {
       return {
         familyId: 'sql' as const,
@@ -153,13 +152,12 @@ describe('comprehensive descriptor-based derivation', () => {
       }),
     ];
 
-    const targetOps: SqlOperationDescriptor[] = [
-      {
-        method: 'targetOp',
+    const targetOps: SqlOperationDescriptors = {
+      targetOp: {
         self: { codecId: 'target/special@1' },
         impl: () => undefined as never,
       },
-    ];
+    };
 
     const target: SqlRuntimeTargetDescriptor<'postgres'> = {
       kind: 'target' as const,

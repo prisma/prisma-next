@@ -96,8 +96,8 @@ const UniqueConstraintSchema = type.declare<UniqueConstraint>().type({
 export const IndexSchema = type({
   columns: type.string.array().readonly(),
   'name?': 'string',
-  'using?': 'string',
-  'config?': 'Record<string, unknown>',
+  'type?': 'string',
+  'options?': 'Record<string, unknown>',
 });
 
 export const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferences>().type({
@@ -375,6 +375,9 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
       seenUniqueDefinitions.add(signature);
     }
 
+    const sortOptions = (o: Record<string, unknown> | undefined): Record<string, unknown> | null =>
+      o ? Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b))) : null;
+
     const seenIndexDefinitions = new Set<string>();
     for (const index of table.indexes) {
       const duplicateColumn = findDuplicateValue(index.columns);
@@ -384,8 +387,8 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
 
       const signature = JSON.stringify({
         columns: index.columns,
-        using: index.using ?? null,
-        config: index.config ?? null,
+        type: index.type ?? null,
+        options: sortOptions(index.options),
       });
       if (seenIndexDefinitions.has(signature)) {
         errors.push(

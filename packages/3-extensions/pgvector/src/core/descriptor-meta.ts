@@ -1,12 +1,6 @@
-import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
-import {
-  buildOperation,
-  type CodecExpression,
-  type Expression,
-  refsOf,
-  toExpr,
-} from '@prisma-next/sql-relational-core/expression';
+import { buildOperation, refsOf, toExpr } from '@prisma-next/sql-relational-core/expression';
 import type { CodecTypes } from '../types/codec-types';
+import type { QueryOperationTypes } from '../types/operation-types';
 import { pgvectorAuthoringTypes } from './authoring';
 import { pgvectorCodecRegistry } from './registry';
 
@@ -14,17 +8,11 @@ const pgvectorTypeId = 'pg/vector@1' as const;
 
 type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
 
-export function pgvectorQueryOperations<
-  CT extends CodecTypesBase,
->(): readonly SqlOperationDescriptor[] {
-  return [
-    {
-      method: 'cosineDistance',
+export function pgvectorQueryOperations<CT extends CodecTypesBase>(): QueryOperationTypes<CT> {
+  return {
+    cosineDistance: {
       self: { codecId: pgvectorTypeId },
-      impl: (
-        self: CodecExpression<'pg/vector@1', boolean, CT>,
-        other: CodecExpression<'pg/vector@1', boolean, CT>,
-      ): Expression<{ codecId: 'pg/float8@1'; nullable: false }> => {
+      impl: (self, other) => {
         const selfRefs = refsOf(self);
         return buildOperation({
           method: 'cosineDistance',
@@ -38,13 +26,9 @@ export function pgvectorQueryOperations<
         });
       },
     },
-    {
-      method: 'cosineSimilarity',
+    cosineSimilarity: {
       self: { codecId: pgvectorTypeId },
-      impl: (
-        self: CodecExpression<'pg/vector@1', boolean, CT>,
-        other: CodecExpression<'pg/vector@1', boolean, CT>,
-      ): Expression<{ codecId: 'pg/float8@1'; nullable: false }> => {
+      impl: (self, other) => {
         const selfRefs = refsOf(self);
         return buildOperation({
           method: 'cosineSimilarity',
@@ -58,7 +42,7 @@ export function pgvectorQueryOperations<
         });
       },
     },
-  ];
+  };
 }
 
 const pgvectorPackMetaBase = {
@@ -90,13 +74,6 @@ const pgvectorPackMetaBase = {
           alias: 'Vector',
         },
       ],
-    },
-    operationTypes: {
-      import: {
-        package: '@prisma-next/extension-pgvector/operation-types',
-        named: 'OperationTypes',
-        alias: 'PgVectorOperationTypes',
-      },
     },
     queryOperationTypes: {
       import: {

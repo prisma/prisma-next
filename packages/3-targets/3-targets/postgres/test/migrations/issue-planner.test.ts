@@ -452,6 +452,144 @@ describe('planIssues', () => {
     });
   });
 
+  describe('index_mismatch', () => {
+    it('threads contract index type and options into CreateIndexCall when the index is missing', () => {
+      const toContract = makeContract({
+        tables: {
+          doc: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              body: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [{ columns: ['body'], type: 'gin', options: { fastupdate: false } }],
+            foreignKeys: [],
+          },
+        },
+      });
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'index_mismatch',
+          table: 'doc',
+          expected: 'body',
+          message: 'Table "doc" is missing index: body',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('expected ok');
+      expect(result.value.calls).toHaveLength(1);
+      expect(result.value.calls[0]).toMatchObject({
+        factoryName: 'createIndex',
+        tableName: 'doc',
+        indexType: 'gin',
+        options: { fastupdate: false },
+      });
+    });
+
+    it('uses the contract index name when set', () => {
+      const toContract = makeContract({
+        tables: {
+          doc: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              body: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [
+              {
+                columns: ['body'],
+                name: 'doc_body_bm25_idx',
+                type: 'bm25',
+                options: { key_field: 'id' },
+              },
+            ],
+            foreignKeys: [],
+          },
+        },
+      });
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'index_mismatch',
+          table: 'doc',
+          expected: 'body',
+          message: 'Table "doc" is missing index: body',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('expected ok');
+      expect(result.value.calls[0]).toMatchObject({
+        factoryName: 'createIndex',
+        tableName: 'doc',
+        indexName: 'doc_body_bm25_idx',
+        indexType: 'bm25',
+        options: { key_field: 'id' },
+      });
+    });
+
+    it('falls back to a default index name when the contract index has no name', () => {
+      const toContract = makeContract({
+        tables: {
+          doc: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              body: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [{ columns: ['body'] }],
+            foreignKeys: [],
+          },
+        },
+      });
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'index_mismatch',
+          table: 'doc',
+          expected: 'body',
+          message: 'Table "doc" is missing index: body',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('expected ok');
+      expect(result.value.calls[0]).toMatchObject({
+        factoryName: 'createIndex',
+        tableName: 'doc',
+        indexName: 'doc_body_idx',
+        indexType: undefined,
+        options: undefined,
+      });
+    });
+  });
+
   describe('foreign_key_mismatch', () => {
     it('returns foreignKeyConflict when the destination contract lacks a matching FK entry', () => {
       const toContract = makeContract({

@@ -5,6 +5,7 @@ import type {
   StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type { IndexTypeRegistration } from '@prisma-next/sql-contract/index-types';
 import type {
   ContractWithTypeMaps,
   Index,
@@ -33,6 +34,28 @@ type MergeExtensionCodecTypesSafe<Packs> =
       ? Record<string, never>
       : MergeExtensionCodecTypes<Packs>
     : Record<string, never>;
+
+export type ExtractIndexTypesFromPack<P> = P extends {
+  readonly indexTypes: IndexTypeRegistration<infer M>;
+}
+  ? M
+  : Record<never, never>;
+
+type AllIndexTypeLiterals<Packs> =
+  Packs extends Record<string, unknown>
+    ? { [K in keyof Packs]: keyof ExtractIndexTypesFromPack<Packs[K]> }[keyof Packs] & string
+    : never;
+
+export type MergeExtensionIndexTypes<Packs extends Record<string, unknown>> = {
+  readonly [Lit in AllIndexTypeLiterals<Packs>]: Extract<
+    {
+      [K in keyof Packs]: Lit extends keyof ExtractIndexTypesFromPack<Packs[K]>
+        ? ExtractIndexTypesFromPack<Packs[K]>[Lit]
+        : never;
+    }[keyof Packs],
+    { readonly options: unknown }
+  >;
+};
 
 export type MergeExtensionPackRefs<
   Existing extends Record<string, unknown> | undefined,
@@ -63,6 +86,16 @@ type CodecTypesFromDefinition<Definition> = ExtractCodecTypesFromPack<
   Definition extends { readonly target: infer Target } ? Target : never
 > &
   MergeExtensionCodecTypesSafe<DefinitionExtensionPacks<Definition>>;
+
+type DefinitionTarget<Definition> = Definition extends { readonly target: infer Target }
+  ? Target
+  : never;
+
+type AllPacks<Definition> = DefinitionExtensionPacks<Definition> & {
+  readonly __target: DefinitionTarget<Definition>;
+};
+
+export type IndexTypesFromDefinition<Definition> = MergeExtensionIndexTypes<AllPacks<Definition>>;
 
 type DefinitionModels<Definition> = Definition extends {
   readonly models?: unknown;

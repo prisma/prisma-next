@@ -1,7 +1,7 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { CodecControlHooks } from '@prisma-next/family-sql/control';
+import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, type OpFactoryCall } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { describe, expect, it } from 'vitest';
@@ -30,6 +30,17 @@ function contract(tables: Record<string, StorageTable>, hash = 'sha256:c'): Cont
   };
 }
 
+function wrapOp(op: SqlMigrationPlanOperation<unknown>): OpFactoryCall {
+  return {
+    factoryName: op.id,
+    operationClass: op.operationClass,
+    label: op.label,
+    renderTypeScript: () => `${op.id}()`,
+    importRequirements: () => [],
+    toOp: () => op,
+  };
+}
+
 function makeFrameworkComponents(
   hooks: CodecControlHooks,
 ): ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>> {
@@ -51,7 +62,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
   it('inlines ops emitted by onFieldEvent after structural DDL', () => {
     const hooks: CodecControlHooks = {
       onFieldEvent: (event, ctx) => [
-        {
+        wrapOp({
           id: `codec.${event}.${ctx.tableName}.${ctx.fieldName}`,
           label: `${event} hook on ${ctx.tableName}.${ctx.fieldName}`,
           operationClass: 'additive',
@@ -60,7 +71,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
           precheck: [],
           execute: [{ description: 'side', sql: '-- side' }],
           postcheck: [],
-        },
+        }),
       ],
     };
 
@@ -94,7 +105,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
       onFieldEvent: (event, ctx) => {
         events.push(`${event}:${ctx.tableName}.${ctx.fieldName}`);
         return [
-          {
+          wrapOp({
             id: `codec.${event}.${ctx.tableName}.${ctx.fieldName}`,
             label: 'hook',
             operationClass: event === 'dropped' ? 'destructive' : 'additive',
@@ -103,7 +114,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
             precheck: [],
             execute: [{ description: 'side', sql: '-- side' }],
             postcheck: [],
-          },
+          }),
         ];
       },
     };
@@ -171,7 +182,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
   it('produces byte-identical operations across re-emits (deterministic)', () => {
     const hooks: CodecControlHooks = {
       onFieldEvent: (event, ctx) => [
-        {
+        wrapOp({
           id: `codec.${event}.${ctx.tableName}.${ctx.fieldName}`,
           label: 'hook',
           operationClass: 'additive',
@@ -180,7 +191,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
           precheck: [],
           execute: [{ description: 'side', sql: '-- side' }],
           postcheck: [],
-        },
+        }),
       ],
     };
     const fc = makeFrameworkComponents(hooks);

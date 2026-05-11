@@ -2,7 +2,7 @@ export type {
   AfterExecuteResult,
   RuntimeLog as Log,
 } from '@prisma-next/framework-components/runtime';
-export type { MarkerStatement } from '@prisma-next/sql-relational-core/ast';
+export type { MarkerReadResult, MarkerStatement } from '@prisma-next/sql-relational-core/ast';
 export {
   extractCodecIds,
   validateCodecRegistryCompleteness,

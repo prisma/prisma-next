@@ -18,12 +18,14 @@ export interface OperationEntry {
   readonly impl: (...args: never[]) => unknown;
 }
 
-export type OperationDescriptor<T extends OperationEntry = OperationEntry> = T & {
-  readonly method: string;
-};
+export type OperationDescriptor<T extends OperationEntry = OperationEntry> = T;
+
+export type OperationDescriptors<T extends OperationEntry = OperationEntry> = Readonly<
+  Record<string, OperationDescriptor<T>>
+>;
 
 export interface OperationRegistry<T extends OperationEntry = OperationEntry> {
-  register(descriptor: OperationDescriptor<T>): void;
+  register(name: string, descriptor: OperationDescriptor<T>): void;
   entries(): Readonly<Record<string, T>>;
 }
 
@@ -33,24 +35,21 @@ export function createOperationRegistry<
   const operations: Record<string, T> = Object.create(null);
 
   return {
-    register(descriptor: OperationDescriptor<T>) {
-      if (descriptor.method in operations) {
-        throw new Error(`Operation "${descriptor.method}" is already registered`);
+    register(name: string, descriptor: OperationDescriptor<T>) {
+      if (name in operations) {
+        throw new Error(`Operation "${name}" is already registered`);
       }
       if (descriptor.self) {
         const hasCodecId = descriptor.self.codecId !== undefined;
         const hasTraits = descriptor.self.traits !== undefined && descriptor.self.traits.length > 0;
         if (!hasCodecId && !hasTraits) {
-          throw new Error(`Operation "${descriptor.method}" self has neither codecId nor traits`);
+          throw new Error(`Operation "${name}" self has neither codecId nor traits`);
         }
         if (hasCodecId && hasTraits) {
-          throw new Error(`Operation "${descriptor.method}" self has both codecId and traits`);
+          throw new Error(`Operation "${name}" self has both codecId and traits`);
         }
       }
-      const { method: _method, ...entry } = descriptor;
-      // OperationDescriptor<T> = T & { method }, so stripping method yields T.
-      // TypeScript can't prove Omit<T & { method }, 'method'> = T for generic T.
-      operations[descriptor.method] = entry as unknown as T;
+      operations[name] = descriptor;
     },
     entries() {
       return Object.freeze({ ...operations });

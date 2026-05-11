@@ -147,7 +147,7 @@ describe('SQLite Migration E2E - FK preservation through recreate-table', () => 
       fields: { id: int.id(), email: text, name: text },
     }).sql((ctx) => ({
       indexes: [
-        ctx.constraints.index(ctx.cols.email, { name: 'idx_users_email' }),
+        ctx.constraints.index([ctx.cols.email], { name: 'idx_users_email' }),
         ctx.constraints.index([ctx.cols.name, ctx.cols.email], { name: 'idx_users_name_email' }),
       ],
     }));
@@ -155,7 +155,7 @@ describe('SQLite Migration E2E - FK preservation through recreate-table', () => 
       fields: { id: int.id(), email: text, name: text.optional() },
     }).sql((ctx) => ({
       indexes: [
-        ctx.constraints.index(ctx.cols.email, { name: 'idx_users_email' }),
+        ctx.constraints.index([ctx.cols.email], { name: 'idx_users_email' }),
         ctx.constraints.index([ctx.cols.name, ctx.cols.email], { name: 'idx_users_name_email' }),
       ],
     }));

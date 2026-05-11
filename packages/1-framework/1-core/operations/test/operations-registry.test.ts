@@ -8,11 +8,7 @@ import {
 describe('OperationRegistry', () => {
   const noopImpl = () => undefined;
 
-  const descriptor = (
-    method: string,
-    overrides?: Partial<OperationEntry>,
-  ): OperationDescriptor => ({
-    method,
+  const descriptor = (overrides?: Partial<OperationEntry>): OperationDescriptor => ({
     self: { codecId: 'pg/vector@1' },
     impl: noopImpl,
     ...overrides,
@@ -25,7 +21,7 @@ describe('OperationRegistry', () => {
 
   it('registers and retrieves an operation', () => {
     const registry = createOperationRegistry();
-    registry.register(descriptor('cosineDistance'));
+    registry.register('cosineDistance', descriptor());
 
     const entries = registry.entries();
     expect(entries['cosineDistance']).toEqual({
@@ -36,8 +32,8 @@ describe('OperationRegistry', () => {
 
   it('registers multiple operations', () => {
     const registry = createOperationRegistry();
-    registry.register(descriptor('cosineDistance'));
-    registry.register(descriptor('l2Distance'));
+    registry.register('cosineDistance', descriptor());
+    registry.register('l2Distance', descriptor());
 
     const entries = registry.entries();
     expect(Object.keys(entries)).toEqual(['cosineDistance', 'l2Distance']);
@@ -45,9 +41,9 @@ describe('OperationRegistry', () => {
 
   it('throws on duplicate method name', () => {
     const registry = createOperationRegistry();
-    registry.register(descriptor('cosineDistance'));
+    registry.register('cosineDistance', descriptor());
 
-    expect(() => registry.register(descriptor('cosineDistance'))).toThrow(
+    expect(() => registry.register('cosineDistance', descriptor())).toThrow(
       'Operation "cosineDistance" is already registered',
     );
   });
@@ -56,8 +52,7 @@ describe('OperationRegistry', () => {
     const registry = createOperationRegistry();
 
     expect(() =>
-      registry.register({
-        method: 'bad',
+      registry.register('bad', {
         // @ts-expect-error — SelfSpec requires codecId or traits
         self: {},
         impl: noopImpl,
@@ -69,8 +64,7 @@ describe('OperationRegistry', () => {
     const registry = createOperationRegistry();
 
     expect(() =>
-      registry.register({
-        method: 'bad',
+      registry.register('bad', {
         self: { traits: [] },
         impl: noopImpl,
       }),
@@ -81,8 +75,7 @@ describe('OperationRegistry', () => {
     const registry = createOperationRegistry();
 
     expect(() =>
-      registry.register({
-        method: 'bad',
+      registry.register('bad', {
         // @ts-expect-error — SelfSpec disallows both codecId and traits
         self: { codecId: 'pg/text@1', traits: ['textual'] },
         impl: noopImpl,
@@ -95,7 +88,8 @@ describe('OperationRegistry', () => {
 
     expect(() =>
       registry.register(
-        descriptor('fine', {
+        'fine',
+        descriptor({
           self: { traits: ['textual'] },
         }),
       ),
@@ -106,24 +100,15 @@ describe('OperationRegistry', () => {
     const registry = createOperationRegistry();
 
     expect(() =>
-      registry.register({
-        method: 'builtin',
+      registry.register('builtin', {
         impl: noopImpl,
       }),
     ).not.toThrow();
   });
 
-  it('strips method from stored entry', () => {
-    const registry = createOperationRegistry();
-    registry.register(descriptor('cosineDistance'));
-
-    const entry = registry.entries()['cosineDistance'];
-    expect(entry).not.toHaveProperty('method');
-  });
-
   it('returns frozen entries', () => {
     const registry = createOperationRegistry();
-    registry.register(descriptor('cosineDistance'));
+    registry.register('cosineDistance', descriptor());
 
     const entries = registry.entries();
     expect(Object.isFrozen(entries)).toBe(true);
@@ -135,8 +120,7 @@ describe('OperationRegistry', () => {
     }
 
     const registry = createOperationRegistry<CustomEntry>();
-    registry.register({
-      method: 'custom',
+    registry.register('custom', {
       self: { codecId: 'core/int4' },
       impl: noopImpl,
       extra: 'metadata',

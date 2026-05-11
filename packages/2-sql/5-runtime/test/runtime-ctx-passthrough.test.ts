@@ -11,7 +11,6 @@ import type { Codec, SqlDriver, SqlExecuteRequest } from '@prisma-next/sql-relat
 import { SelectAst, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it, vi } from 'vitest';
-import { parseContractMarkerRow } from '../src/marker';
 import type { SqlMiddleware } from '../src/middleware/sql-middleware';
 import type {
   SqlRuntimeAdapterDescriptor,
@@ -62,10 +61,7 @@ function createStubAdapter() {
       codecs() {
         return codecs;
       },
-      readMarkerStatement() {
-        return { sql: 'select 1', params: [] };
-      },
-      parseMarkerRow: parseContractMarkerRow,
+      readMarker: async () => ({ kind: 'absent' as const }),
     },
     lower(ast: SelectAst) {
       return Object.freeze({ sql: JSON.stringify(ast), params: [] });

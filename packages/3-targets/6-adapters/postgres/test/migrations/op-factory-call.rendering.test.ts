@@ -235,6 +235,16 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     expectFactoryImport(di, 'dropIndex');
   });
 
+  it('CreateIndexCall renders type and options when they are provided', () => {
+    const ci = new CreateIndexCall('public', 'doc', 'doc_body_idx', ['body'], {
+      type: 'gin',
+      options: { fastupdate: false },
+    });
+    expect(ci.renderTypeScript()).toBe(
+      'createIndex("public", "doc", "doc_body_idx", ["body"], { type: "gin", options: { fastupdate: false } })',
+    );
+  });
+
   it('CreateEnumTypeCall emits the enum values as an array literal', () => {
     const call = new CreateEnumTypeCall('public', 'status', ['active', 'archived']);
     expect(call.renderTypeScript()).toBe(

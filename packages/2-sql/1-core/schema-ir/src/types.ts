@@ -68,6 +68,8 @@ export type SqlIndexIR = {
   readonly columns: readonly string[];
   readonly name?: string;
   readonly unique: boolean;
+  readonly type?: string;
+  readonly options?: Record<string, unknown>;
   readonly annotations?: SqlAnnotations;
 };
 

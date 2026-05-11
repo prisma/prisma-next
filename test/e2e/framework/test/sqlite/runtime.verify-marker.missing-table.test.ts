@@ -1,0 +1,132 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { fileURLToPath } from 'node:url';
+import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
+import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
+import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
+import type { Db } from '@prisma-next/sql-builder/types';
+import { validateContract } from '@prisma-next/sql-contract/validate';
+import {
+  createExecutionContext,
+  createRuntime,
+  createSqlExecutionStack,
+  type Runtime,
+  type RuntimeVerifyOptions,
+} from '@prisma-next/sql-runtime';
+import sqliteTarget from '@prisma-next/target-sqlite/runtime';
+import { timeouts } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { Contract } from './fixtures/generated/contract.d';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
+
+interface Harness {
+  readonly db: Db<Contract>;
+  readonly runtime: Runtime;
+  readonly cleanup: () => Promise<void>;
+}
+
+async function buildHarness(verify: RuntimeVerifyOptions): Promise<Harness> {
+  const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8')) as unknown;
+  const contract = validateContract<Contract>(contractJson, emptyCodecLookup);
+
+  const testDir = mkdtempSync(join(tmpdir(), 'prisma-sqlite-verify-marker-'));
+  const dbPath = join(testDir, 'test.db');
+
+  // Deliberately skip `_prisma_marker` — exercises the
+  // attached-to-uninitialised-DB scenario.
+  const rawDb = new DatabaseSync(dbPath);
+  rawDb.exec(`
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      invited_by_id INTEGER
+    )
+  `);
+  rawDb.exec(`
+    INSERT INTO users (id, name, email, invited_by_id)
+    VALUES (1, 'Alice', 'alice@example.com', NULL)
+  `);
+  rawDb.close();
+
+  const stack = createSqlExecutionStack({
+    target: sqliteTarget,
+    adapter: sqliteAdapter,
+    driver: sqliteDriver,
+    extensionPacks: [],
+  });
+
+  const stackInstance = instantiateExecutionStack(stack);
+  const context = createExecutionContext({ contract, stack });
+  const driver = stackInstance.driver;
+  if (!driver) throw new Error('SQLite driver missing from execution stack');
+  await driver.connect({ kind: 'path', path: dbPath });
+
+  const runtime = createRuntime({ stackInstance, context, driver, verify });
+  const db: Db<Contract> = sqlBuilder<Contract>({ context });
+
+  return {
+    db,
+    runtime,
+    async cleanup() {
+      await runtime.close();
+      try {
+        rmSync(testDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    },
+  };
+}
+
+describe(
+  'sqlite runtime verify-marker: missing marker table',
+  { timeout: timeouts.databaseOperation },
+  () => {
+    let harness: Harness | undefined;
+
+    beforeEach(() => {
+      harness = undefined;
+    });
+
+    afterEach(async () => {
+      if (harness) {
+        await harness.cleanup();
+      }
+    });
+
+    it('verify.mode: "onFirstUse" + requireMarker: false tolerates a missing _prisma_marker table', async () => {
+      harness = await buildHarness({ mode: 'onFirstUse', requireMarker: false });
+
+      const rows = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
+
+      expect(rows.map((r) => r.id)).toEqual([1]);
+    });
+
+    it('verify.mode: "always" + requireMarker: false tolerates a missing _prisma_marker table across calls', async () => {
+      harness = await buildHarness({ mode: 'always', requireMarker: false });
+
+      const first = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
+      const second = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
+
+      expect(first.map((r) => r.id)).toEqual([1]);
+      expect(second.map((r) => r.id)).toEqual([1]);
+    });
+
+    it('requireMarker: true surfaces CONTRACT.MARKER_MISSING (not raw driver error) when the marker table is absent', async () => {
+      harness = await buildHarness({ mode: 'onFirstUse', requireMarker: true });
+
+      await expect(
+        harness.runtime.execute(harness.db.users.select('id').build()).toArray(),
+      ).rejects.toMatchObject({
+        code: 'CONTRACT.MARKER_MISSING',
+      });
+    });
+  },
+);

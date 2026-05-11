@@ -34,6 +34,8 @@
   ],
   "exports": {
     "./factories": "./dist/factories.mjs",
+    "./index-type-validation": "./dist/index-type-validation.mjs",
+    "./index-types": "./dist/index-types.mjs",
     "./pack-types": "./dist/pack-types.mjs",
     "./types": "./dist/types.mjs",
     "./validate": "./dist/validate.mjs",

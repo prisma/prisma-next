@@ -1,26 +1,43 @@
 /**
  * Codec lifecycle hook tests for `cipherstash:string@1`.
  *
- * Covers the per-event behaviour table from sub-spec § 4 and the
- * planner-side wiring (the SQL family's `extractCodecControlHooks`
- * reads hooks from `descriptor.types.codecTypes.controlPlaneHooks`,
- * and `planFieldEventOperations` dispatches per `(table, field)` based
- * on the field's `codecId`). The codec runtime path (encoding/
- * decoding `Encrypted<string>` payloads) is out of scope for this file.
+ * Each enabled flag in the column's `typeParams`
+ * maps to its own EQL search-config index:
+ *
+ *   - `equality: true`        → `'unique'` index
+ *   - `freeTextSearch: true`  → `'match'`  index
+ *
+ * The codec hook emits **one `add_search_config@v1` op per enabled
+ * flag** (Decision option a) — each op is independently invertible by
+ * a paired `remove_search_config@v1` op carrying the same index name,
+ * which keeps the op-graph simple and the diff per-flag granular.
+ *
+ * `'altered'` events decompose into per-flag adds and removes against
+ * the prior side: a flag flipped on emits an add op for that index, a
+ * flag flipped off emits a remove op. Flags whose enabled state did
+ * not change yield no op (the index already matches the desired
+ * configuration).
+ *
+ * `invariantId` template:
+ *   `cipherstash-codec:<table>.<field>:<action>:<index>@v1`
+ *
+ * Stable across regenerations — every input is deterministic.
  */
 
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { profileHash } from '@prisma-next/contract/types';
+import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import {
   extractCodecControlHooks,
   planFieldEventOperations,
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
-import { cipherstashStringCodecHooks } from '../src/core/cipherstash-codec';
-import { CIPHERSTASH_STRING_CODEC_ID } from '../src/core/constants';
 import cipherstashExtensionDescriptor from '../src/exports/control';
+import { CIPHERSTASH_STRING_CODEC_ID } from '../src/extension-metadata/constants';
+import { cipherstashStringCodecHooks } from '../src/migration/cipherstash-codec';
 
 const TABLE = 'User';
 const FIELD = 'email';
@@ -49,98 +66,159 @@ function ctx(args: {
   };
 }
 
-describe('cipherstashStringCodecHooks.onFieldEvent', () => {
-  const onFieldEvent = cipherstashStringCodecHooks.onFieldEvent!;
+describe('cipherstashStringCodecHooks.onFieldEvent — flag → index mapping', () => {
+  // The hook returns `OpFactoryCall` instances (ADR 195). These tests
+  // verify the runtime op shape, so we lower each Call to its op via
+  // `.toOp()` once at the test boundary and assert against the
+  // resulting array. Render-side / class-side coverage lives in
+  // migration-call-classes.test.ts.
+  const onFieldEventCalls = cipherstashStringCodecHooks.onFieldEvent!;
+  const onFieldEvent: (
+    ...args: Parameters<typeof onFieldEventCalls>
+  ) => readonly SqlMigrationPlanOperation<unknown>[] = (...args) =>
+    onFieldEventCalls(...args).map((c) => c.toOp() as SqlMigrationPlanOperation<unknown>);
 
-  describe("event 'added'", () => {
-    it('emits add_search_config when newField has searchable: true', () => {
-      const ops = onFieldEvent('added', ctx({ next: { typeParams: { searchable: true } } }));
+  describe("event 'added' — one add op per enabled flag", () => {
+    it('emits add_search_config(unique) when typeParams.equality is true', () => {
+      const ops = onFieldEvent('added', ctx({ next: { typeParams: { equality: true } } }));
       expect(ops).toHaveLength(1);
-      expect(ops[0]!.invariantId).toBe(`cipherstash-codec:${TABLE}.${FIELD}:add-search-config@v1`);
+      expect(ops[0]!.invariantId).toBe(
+        `cipherstash-codec:${TABLE}.${FIELD}:add-search-config:unique@v1`,
+      );
       expect(ops[0]!.execute[0]!.sql).toContain('eql_v2.add_search_config');
+      expect(ops[0]!.execute[0]!.sql).toContain(`'unique'`);
       expect(ops[0]!.execute[0]!.sql).toContain(`'${TABLE}'`);
       expect(ops[0]!.execute[0]!.sql).toContain(`'${FIELD}'`);
     });
 
-    it('emits nothing when typeParams.searchable is missing or false', () => {
+    it('emits add_search_config(match) when typeParams.freeTextSearch is true', () => {
+      const ops = onFieldEvent('added', ctx({ next: { typeParams: { freeTextSearch: true } } }));
+      expect(ops).toHaveLength(1);
+      expect(ops[0]!.invariantId).toBe(
+        `cipherstash-codec:${TABLE}.${FIELD}:add-search-config:match@v1`,
+      );
+      expect(ops[0]!.execute[0]!.sql).toContain(`'match'`);
+    });
+
+    it('emits one op per enabled flag when both flags are true', () => {
+      const ops = onFieldEvent(
+        'added',
+        ctx({ next: { typeParams: { equality: true, freeTextSearch: true } } }),
+      );
+      expect(ops).toHaveLength(2);
+      const invariantIds = ops.map((op) => op.invariantId).sort();
+      expect(invariantIds).toEqual([
+        `cipherstash-codec:${TABLE}.${FIELD}:add-search-config:match@v1`,
+        `cipherstash-codec:${TABLE}.${FIELD}:add-search-config:unique@v1`,
+      ]);
+    });
+
+    it('emits nothing when no flag is enabled', () => {
       expect(onFieldEvent('added', ctx({ next: {} }))).toEqual([]);
       expect(onFieldEvent('added', ctx({ next: { typeParams: {} } }))).toEqual([]);
-      expect(onFieldEvent('added', ctx({ next: { typeParams: { searchable: false } } }))).toEqual(
+      expect(
+        onFieldEvent(
+          'added',
+          ctx({ next: { typeParams: { equality: false, freeTextSearch: false } } }),
+        ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("event 'dropped' — one remove op per previously-enabled flag", () => {
+    it('emits remove_search_config(unique) when prior typeParams.equality was true', () => {
+      const ops = onFieldEvent('dropped', ctx({ prior: { typeParams: { equality: true } } }));
+      expect(ops).toHaveLength(1);
+      expect(ops[0]!.invariantId).toBe(
+        `cipherstash-codec:${TABLE}.${FIELD}:remove-search-config:unique@v1`,
+      );
+      expect(ops[0]!.execute[0]!.sql).toContain('eql_v2.remove_search_config');
+      expect(ops[0]!.execute[0]!.sql).toContain(`'unique'`);
+    });
+
+    it('emits remove_search_config(match) when prior typeParams.freeTextSearch was true', () => {
+      const ops = onFieldEvent('dropped', ctx({ prior: { typeParams: { freeTextSearch: true } } }));
+      expect(ops).toHaveLength(1);
+      expect(ops[0]!.invariantId).toBe(
+        `cipherstash-codec:${TABLE}.${FIELD}:remove-search-config:match@v1`,
+      );
+      expect(ops[0]!.execute[0]!.sql).toContain(`'match'`);
+    });
+
+    it('emits one remove op per previously-enabled flag when both flags were true', () => {
+      const ops = onFieldEvent(
+        'dropped',
+        ctx({ prior: { typeParams: { equality: true, freeTextSearch: true } } }),
+      );
+      expect(ops).toHaveLength(2);
+      const invariantIds = ops.map((op) => op.invariantId).sort();
+      expect(invariantIds).toEqual([
+        `cipherstash-codec:${TABLE}.${FIELD}:remove-search-config:match@v1`,
+        `cipherstash-codec:${TABLE}.${FIELD}:remove-search-config:unique@v1`,
+      ]);
+    });
+
+    it('emits nothing when prior column had no flags enabled', () => {
+      expect(onFieldEvent('dropped', ctx({ prior: {} }))).toEqual([]);
+      expect(onFieldEvent('dropped', ctx({ prior: { typeParams: { equality: false } } }))).toEqual(
         [],
       );
     });
   });
 
-  describe("event 'dropped'", () => {
-    it('emits remove_search_config when priorField had searchable: true', () => {
-      const ops = onFieldEvent('dropped', ctx({ prior: { typeParams: { searchable: true } } }));
-      expect(ops).toHaveLength(1);
-      expect(ops[0]!.invariantId).toBe(
-        `cipherstash-codec:${TABLE}.${FIELD}:remove-search-config@v1`,
-      );
-      expect(ops[0]!.execute[0]!.sql).toContain('eql_v2.remove_search_config');
-    });
-
-    it('emits nothing when prior column was not searchable', () => {
-      expect(onFieldEvent('dropped', ctx({ prior: {} }))).toEqual([]);
-      expect(
-        onFieldEvent('dropped', ctx({ prior: { typeParams: { searchable: false } } })),
-      ).toEqual([]);
-    });
-  });
-
-  describe("event 'altered'", () => {
-    it('emits a rotate op when both sides are searchable but other typeParams differ', () => {
+  describe("event 'altered' — per-flag delta against the prior side", () => {
+    it('emits an add op only for flags newly enabled', () => {
       const ops = onFieldEvent(
         'altered',
         ctx({
-          prior: { typeParams: { searchable: true, indexes: ['match'] } },
-          next: { typeParams: { searchable: true, indexes: ['match', 'unique'] } },
+          prior: { typeParams: { equality: false, freeTextSearch: false } },
+          next: { typeParams: { equality: true, freeTextSearch: false } },
         }),
       );
       expect(ops).toHaveLength(1);
       expect(ops[0]!.invariantId).toBe(
-        `cipherstash-codec:${TABLE}.${FIELD}:rotate-search-config@v1`,
+        `cipherstash-codec:${TABLE}.${FIELD}:add-search-config:unique@v1`,
       );
-      expect(ops[0]!.execute).toHaveLength(2);
-      expect(ops[0]!.execute[0]!.sql).toContain('eql_v2.remove_search_config');
-      expect(ops[0]!.execute[1]!.sql).toContain('eql_v2.add_search_config');
     });
 
-    it('emits nothing when both sides are searchable and all typeParams match', () => {
-      const same = { searchable: true, indexes: ['match'] };
+    it('emits a remove op only for flags newly disabled', () => {
+      const ops = onFieldEvent(
+        'altered',
+        ctx({
+          prior: { typeParams: { equality: true, freeTextSearch: false } },
+          next: { typeParams: { equality: false, freeTextSearch: false } },
+        }),
+      );
+      expect(ops).toHaveLength(1);
+      expect(ops[0]!.invariantId).toBe(
+        `cipherstash-codec:${TABLE}.${FIELD}:remove-search-config:unique@v1`,
+      );
+    });
+
+    it('emits an add and a remove op when one flag flips on while another flips off', () => {
+      const ops = onFieldEvent(
+        'altered',
+        ctx({
+          prior: { typeParams: { equality: true, freeTextSearch: false } },
+          next: { typeParams: { equality: false, freeTextSearch: true } },
+        }),
+      );
+      expect(ops).toHaveLength(2);
+      const invariantIds = ops.map((op) => op.invariantId).sort();
+      expect(invariantIds).toEqual([
+        `cipherstash-codec:${TABLE}.${FIELD}:add-search-config:match@v1`,
+        `cipherstash-codec:${TABLE}.${FIELD}:remove-search-config:unique@v1`,
+      ]);
+    });
+
+    it('emits nothing when flags are unchanged', () => {
+      const same = { equality: true, freeTextSearch: true };
       expect(
         onFieldEvent('altered', ctx({ prior: { typeParams: same }, next: { typeParams: same } })),
       ).toEqual([]);
     });
 
-    it('emits add_search_config when only the new side is searchable', () => {
-      const ops = onFieldEvent(
-        'altered',
-        ctx({
-          prior: { typeParams: { searchable: false } },
-          next: { typeParams: { searchable: true } },
-        }),
-      );
-      expect(ops).toHaveLength(1);
-      expect(ops[0]!.invariantId).toBe(`cipherstash-codec:${TABLE}.${FIELD}:add-search-config@v1`);
-    });
-
-    it('emits remove_search_config when only the prior side is searchable', () => {
-      const ops = onFieldEvent(
-        'altered',
-        ctx({
-          prior: { typeParams: { searchable: true } },
-          next: { typeParams: { searchable: false } },
-        }),
-      );
-      expect(ops).toHaveLength(1);
-      expect(ops[0]!.invariantId).toBe(
-        `cipherstash-codec:${TABLE}.${FIELD}:remove-search-config@v1`,
-      );
-    });
-
-    it('emits nothing when neither side is searchable', () => {
+    it('emits nothing when neither side has flags enabled', () => {
       expect(
         onFieldEvent(
           'altered',
@@ -152,41 +230,51 @@ describe('cipherstashStringCodecHooks.onFieldEvent', () => {
 
   describe('operation labels (AC7 — first-time-user-readable)', () => {
     it('add op label is action-first / column-first and free of extension jargon', () => {
-      const [op] = onFieldEvent('added', ctx({ next: { typeParams: { searchable: true } } }));
+      const [op] = onFieldEvent('added', ctx({ next: { typeParams: { equality: true } } }));
       expect(op!.label).toBe(`Enable cipherstash search on ${TABLE}.${FIELD}`);
       // Legacy wording must not reappear (regression bar).
       expect(op!.label).not.toContain('Register cipherstash search config');
     });
 
     it('remove op label is action-first / column-first', () => {
-      const [op] = onFieldEvent('dropped', ctx({ prior: { typeParams: { searchable: true } } }));
+      const [op] = onFieldEvent('dropped', ctx({ prior: { typeParams: { equality: true } } }));
       expect(op!.label).toBe(`Disable cipherstash search on ${TABLE}.${FIELD}`);
       expect(op!.label).not.toContain('Remove cipherstash search config');
     });
 
-    it('rotate op label is action-first / column-first', () => {
-      const [op] = onFieldEvent(
+    it('altered op labels stay action-first when adding an index alongside an existing one', () => {
+      // Codec emits per-flag deltas: flipping `freeTextSearch` on while
+      // `equality` stays on produces a single add op (the rotate UX is
+      // expressed as add+remove pairs across flag transitions).
+      const ops = onFieldEvent(
         'altered',
         ctx({
-          prior: { typeParams: { searchable: true, indexes: ['match'] } },
-          next: { typeParams: { searchable: true, indexes: ['match', 'unique'] } },
+          prior: { typeParams: { equality: true } },
+          next: { typeParams: { equality: true, freeTextSearch: true } },
         }),
       );
-      expect(op!.label).toBe(`Rotate cipherstash search on ${TABLE}.${FIELD}`);
-      expect(op!.label).not.toContain('Rotate cipherstash search config');
+      expect(ops).toHaveLength(1);
+      expect(ops[0]!.label).toBe(`Enable cipherstash search on ${TABLE}.${FIELD}`);
+      expect(ops[0]!.label).not.toContain('Register cipherstash search config');
     });
   });
 
   describe('invariantId + SQL conventions', () => {
     it('namespaces every emitted op under cipherstash-codec:*', () => {
       const allOps = [
-        ...onFieldEvent('added', ctx({ next: { typeParams: { searchable: true } } })),
-        ...onFieldEvent('dropped', ctx({ prior: { typeParams: { searchable: true } } })),
+        ...onFieldEvent(
+          'added',
+          ctx({ next: { typeParams: { equality: true, freeTextSearch: true } } }),
+        ),
+        ...onFieldEvent(
+          'dropped',
+          ctx({ prior: { typeParams: { equality: true, freeTextSearch: true } } }),
+        ),
         ...onFieldEvent(
           'altered',
           ctx({
-            prior: { typeParams: { searchable: true, x: 1 } },
-            next: { typeParams: { searchable: true, x: 2 } },
+            prior: { typeParams: { equality: false, freeTextSearch: true } },
+            next: { typeParams: { equality: true, freeTextSearch: false } },
           }),
         ),
       ];
@@ -202,11 +290,28 @@ describe('cipherstashStringCodecHooks.onFieldEvent', () => {
         ctx({
           tableName: "us'er",
           fieldName: "em'ail",
-          next: { typeParams: { searchable: true } },
+          next: { typeParams: { equality: true } },
         }),
       );
       expect(ops[0]!.execute[0]!.sql).toContain("'us''er'");
       expect(ops[0]!.execute[0]!.sql).toContain("'em''ail'");
+    });
+
+    it('classifies add ops as additive and remove ops as destructive', () => {
+      const adds = onFieldEvent(
+        'added',
+        ctx({ next: { typeParams: { equality: true, freeTextSearch: true } } }),
+      );
+      const removes = onFieldEvent(
+        'dropped',
+        ctx({ prior: { typeParams: { equality: true, freeTextSearch: true } } }),
+      );
+      for (const op of adds) {
+        expect(op.operationClass).toBe('additive');
+      }
+      for (const op of removes) {
+        expect(op.operationClass).toBe('destructive');
+      }
     });
   });
 });
@@ -230,13 +335,7 @@ describe('cipherstash descriptor wiring', () => {
 });
 
 describe('planFieldEventOperations driving the cipherstash hook', () => {
-  /**
-   * End-to-end fixture exercising the M2 R1 codec-hook plumbing with
-   * the real cipherstash hook attached. Mirrors the planner integration
-   * site (sub-spec § 5): `extractCodecControlHooks` →
-   * `planFieldEventOperations` → ops appended after structural DDL.
-   */
-  function userTable(searchable: boolean): StorageTable {
+  function userTable(typeParams?: Record<string, unknown>): StorageTable {
     return {
       columns: {
         id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
@@ -244,7 +343,7 @@ describe('planFieldEventOperations driving the cipherstash hook', () => {
           codecId: CIPHERSTASH_STRING_CODEC_ID,
           nativeType: 'eql_v2_encrypted',
           nullable: false,
-          typeParams: { searchable },
+          ...ifDefined('typeParams', typeParams),
         },
       },
       uniques: [],
@@ -274,30 +373,40 @@ describe('planFieldEventOperations driving the cipherstash hook', () => {
     cipherstashExtensionDescriptor as unknown as TargetBoundComponentDescriptor<'sql', string>,
   ]);
 
-  it('inlines add_search_config on first emit (priorContract null) when searchable', () => {
+  it('inlines per-flag add ops on first emit (priorContract null) when flags are enabled', () => {
     const ops = planFieldEventOperations({
       priorContract: null,
-      newContract: build({ User: userTable(true) }),
+      newContract: build({ User: userTable({ equality: true, freeTextSearch: true }) }),
       codecHooks,
     });
-    expect(ops).toHaveLength(1);
-    expect(ops[0]!.invariantId).toBe('cipherstash-codec:User.email:add-search-config@v1');
+    expect(ops).toHaveLength(2);
+    const ids = ops.map((c) => c.toOp().invariantId).sort();
+    expect(ids).toEqual([
+      'cipherstash-codec:User.email:add-search-config:match@v1',
+      'cipherstash-codec:User.email:add-search-config:unique@v1',
+    ]);
   });
 
-  it('inlines remove_search_config when a searchable column is dropped', () => {
+  it('inlines per-flag remove ops when previously-flagged column is dropped', () => {
+    const prior = build({ User: userTable({ equality: true, freeTextSearch: true }) });
+    const newer = build({
+      User: { ...userTable(), columns: { id: userTable().columns['id']! } },
+    });
     const ops = planFieldEventOperations({
-      priorContract: build({ User: userTable(true) }),
-      newContract: build({
-        User: { ...userTable(true), columns: { id: userTable(true).columns['id']! } },
-      }),
+      priorContract: prior,
+      newContract: newer,
       codecHooks,
     });
-    expect(ops).toHaveLength(1);
-    expect(ops[0]!.invariantId).toBe('cipherstash-codec:User.email:remove-search-config@v1');
+    expect(ops).toHaveLength(2);
+    const ids = ops.map((c) => c.toOp().invariantId).sort();
+    expect(ids).toEqual([
+      'cipherstash-codec:User.email:remove-search-config:match@v1',
+      'cipherstash-codec:User.email:remove-search-config:unique@v1',
+    ]);
   });
 
   it('emits nothing when contract is unchanged', () => {
-    const c = build({ User: userTable(true) });
+    const c = build({ User: userTable({ equality: true }) });
     expect(planFieldEventOperations({ priorContract: c, newContract: c, codecHooks })).toEqual([]);
   });
 });

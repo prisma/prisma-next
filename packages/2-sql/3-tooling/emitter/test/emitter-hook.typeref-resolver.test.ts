@@ -95,7 +95,6 @@ describe('sqlEmission.resolveFieldTypeParams (integration via generateContractDt
       contract,
       sqlEmission,
       [],
-      [],
       testHashes,
       undefined,
       vectorCodecLookup(),
@@ -157,7 +156,6 @@ describe('sqlEmission.resolveFieldTypeParams (integration via generateContractDt
     const dts = generateContractDts(
       contract,
       sqlEmission,
-      [],
       [],
       testHashes,
       undefined,

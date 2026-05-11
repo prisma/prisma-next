@@ -1,4 +1,3 @@
-import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 import {
   buildOperation,
   type CodecExpression,
@@ -7,6 +6,7 @@ import {
   toExpr,
 } from '@prisma-next/sql-relational-core/expression';
 import type { CodecTypes } from '../types/codec-types';
+import type { QueryOperationTypes } from '../types/operation-types';
 import { postgisAuthoringTypes } from './authoring';
 import { postgisCodecRegistry } from './registry';
 
@@ -23,17 +23,14 @@ type CodecTypesBase = Record<string, { readonly input: unknown; readonly output:
  * `geometry`/`float8`/`bool` casts already wired up by the SQL family —
  * we only add the PostGIS-specific function names.
  */
-export function postgisQueryOperations<
-  CT extends CodecTypesBase,
->(): readonly SqlOperationDescriptor[] {
+export function postgisQueryOperations<CT extends CodecTypesBase>(): QueryOperationTypes<CT> {
   type GeoExpr = CodecExpression<'pg/geometry@1', boolean, CT>;
   type FloatExpr = CodecExpression<'pg/float8@1', boolean, CT>;
   type Float = Expression<{ codecId: 'pg/float8@1'; nullable: false }>;
   type Bool = Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
 
-  return [
-    {
-      method: 'distance',
+  return {
+    distance: {
       self: { codecId: postgisTypeId },
       impl: (self: GeoExpr, other: GeoExpr): Float => {
         const selfRefs = refsOf(self);
@@ -49,8 +46,7 @@ export function postgisQueryOperations<
         });
       },
     },
-    {
-      method: 'distanceSphere',
+    distanceSphere: {
       self: { codecId: postgisTypeId },
       impl: (self: GeoExpr, other: GeoExpr): Float => {
         const selfRefs = refsOf(self);
@@ -66,8 +62,7 @@ export function postgisQueryOperations<
         });
       },
     },
-    {
-      method: 'dwithin',
+    dwithin: {
       self: { codecId: postgisTypeId },
       impl: (self: GeoExpr, other: GeoExpr, distance: FloatExpr): Bool => {
         const selfRefs = refsOf(self);
@@ -87,8 +82,7 @@ export function postgisQueryOperations<
         });
       },
     },
-    {
-      method: 'contains',
+    contains: {
       self: { codecId: postgisTypeId },
       impl: (self: GeoExpr, other: GeoExpr): Bool => {
         const selfRefs = refsOf(self);
@@ -104,8 +98,7 @@ export function postgisQueryOperations<
         });
       },
     },
-    {
-      method: 'within',
+    within: {
       self: { codecId: postgisTypeId },
       impl: (self: GeoExpr, other: GeoExpr): Bool => {
         const selfRefs = refsOf(self);
@@ -121,8 +114,7 @@ export function postgisQueryOperations<
         });
       },
     },
-    {
-      method: 'intersects',
+    intersects: {
       self: { codecId: postgisTypeId },
       impl: (self: GeoExpr, other: GeoExpr): Bool => {
         const selfRefs = refsOf(self);
@@ -138,8 +130,7 @@ export function postgisQueryOperations<
         });
       },
     },
-    {
-      method: 'intersectsBbox',
+    intersectsBbox: {
       self: { codecId: postgisTypeId },
       impl: (self: GeoExpr, other: GeoExpr): Bool => {
         const selfRefs = refsOf(self);
@@ -155,7 +146,7 @@ export function postgisQueryOperations<
         });
       },
     },
-  ];
+  };
 }
 
 const postgisPackMetaBase = {

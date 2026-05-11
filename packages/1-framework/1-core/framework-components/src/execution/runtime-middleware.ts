@@ -9,6 +9,25 @@ export interface RuntimeLog {
   debug?(event: unknown): void;
 }
 
+/**
+ * Per-execute context threaded through every middleware phase
+ * (`beforeExecute`, `onRow`, `afterExecute`). Allocated once per
+ * `runtime.execute()` call and shared by reference across all
+ * middleware in the chain.
+ *
+ * - `signal` carries the per-query `AbortSignal` -- the same
+ *   reference that `runtime.execute(plan, { signal })` was invoked
+ *   with, and the same reference threaded into the per-call
+ *   `CodecCallContext` (ADR 207). Middleware that wraps a
+ *   network-backed SDK forwards `ctx.signal` into that SDK to
+ *   propagate caller cancellation; pure-CPU middleware ignores it.
+ *
+ * Symmetric plumbing across all middleware phases (rather than only
+ * `beforeExecute`) is a deliberate choice: a middleware that wraps a
+ * downstream observability hook or post-processor in `afterExecute` /
+ * `onRow` needs the same cancellation reach as its `beforeExecute`
+ * counterpart.
+ */
 export interface RuntimeMiddlewareContext {
   readonly contract: unknown;
   readonly mode: 'strict' | 'permissive';
@@ -32,6 +51,13 @@ export interface RuntimeMiddlewareContext {
    * — it is not (and should not be) further hashed by callers.
    */
   contentHash(exec: ExecutionPlan): Promise<string>;
+  /**
+   * Per-execute cancellation signal threaded through every middleware
+   * phase. Middleware that wraps async work or downstream cancellable
+   * primitives should observe this and abort early when the consumer
+   * cancels.
+   */
+  readonly signal?: AbortSignal;
 }
 
 export interface AfterExecuteResult {
@@ -79,14 +105,37 @@ export interface InterceptResult {
 }
 
 /**
+ * Marker interface for family-specific param-ref mutators threaded into
+ * `beforeExecute` as the third argument. The framework treats the mutator
+ * opaquely — it allocates and forwards the family's mutator instance so
+ * `runWithMiddleware` can stay family-agnostic. SQL extends this with
+ * `SqlParamRefMutator` (over `ParamRef`); Mongo extends with
+ * `MongoParamRefMutator` (over `MongoParamRef`).
+ *
+ * Extension authors target the family-specific mutator type, not this
+ * marker.
+ */
+declare const PARAM_REF_MUTATOR_BRAND: unique symbol;
+export type ParamRefMutator = { readonly [PARAM_REF_MUTATOR_BRAND]?: never };
+
+/**
  * Family-agnostic middleware SPI parameterized over the plan marker.
  *
  * `TPlan` defaults to the framework `QueryPlan` marker so a generic
  * middleware (e.g. cross-family telemetry) can be authored without
  * naming a family. Family-specific middleware (`SqlMiddleware`,
  * `MongoMiddleware`) narrow `TPlan` to their concrete plan type.
+ *
+ * `TMutator` is the family-specific {@link ParamRefMutator} the runtime
+ * threads into `beforeExecute(plan, ctx, params)` as a third argument.
+ * Existing `(plan)` / `(plan, ctx)` middleware bodies continue to compile
+ * — TypeScript permits assigning a function with fewer parameters to a
+ * function-typed slot that declares more. The third arg is additive.
  */
-export interface RuntimeMiddleware<TPlan extends QueryPlan = QueryPlan> {
+export interface RuntimeMiddleware<
+  TPlan extends QueryPlan = QueryPlan,
+  TMutator extends ParamRefMutator = ParamRefMutator,
+> {
   readonly name: string;
   readonly familyId?: string;
   readonly targetId?: string;
@@ -113,7 +162,11 @@ export interface RuntimeMiddleware<TPlan extends QueryPlan = QueryPlan> {
    * rows directly: caching, mocks, rate limiting, circuit breaking.
    */
   intercept?(plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<InterceptResult | undefined>;
-  beforeExecute?(plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<void>;
+  beforeExecute?(
+    plan: TPlan,
+    ctx: RuntimeMiddlewareContext,
+    params?: TMutator,
+  ): void | Promise<void>;
   onRow?(row: Record<string, unknown>, plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<void>;
   afterExecute?(
     plan: TPlan,

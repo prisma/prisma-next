@@ -25,7 +25,7 @@ Provide a deterministic, verifiable representation of the application's data con
 - **Validate**: Core structure validation (family-specific validation is the caller's responsibility)
 - **Canonicalize**: Compute `storageHash` (schema meaning), `executionHash` (execution defaults), and `profileHash` (capabilities/pins) from canonical JSON
 - **Emit**: Generate `contract.json` and `contract.d.ts` with family-specific type generation
-- **Descriptor-Agnostic**: The emitter is completely agnostic to how descriptors are produced. It receives pre-assembled `OperationRegistry`, `codecTypeImports`, `operationTypeImports`, and `extensionIds` from the CLI or family helpers—no pack manifest parsing happens inside the emitter.
+- **Descriptor-Agnostic**: The emitter is completely agnostic to how descriptors are produced. It receives pre-assembled `OperationRegistry`, `codecTypeImports`, and `extensionIds` from the CLI or family helpers—no pack manifest parsing happens inside the emitter.
 
 **Note**: The emitter does NOT normalize contracts. Normalization must happen in the contract builder when the contract is created. The emitter assumes contracts are already normalized (all required fields present, including `schemaVersion`, `models`, `relations`, `storage`, `extensions`, `capabilities`, `meta`, and `sources`). All fields can be empty objects/arrays, but they must be present.
 
@@ -162,7 +162,6 @@ const result = await emit(contract, {
   outputDir: './dist',
   operationRegistry: createOperationRegistry(), // Pre-assembled from packs
   codecTypeImports: [], // Extracted from packs (codec types)
-  operationTypeImports: [], // Extracted from packs (operation types)
   extensionIds: ['postgres', 'pg'], // Extracted from packs
 }, sqlEmission);
 

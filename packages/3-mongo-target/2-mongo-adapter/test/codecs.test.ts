@@ -219,8 +219,7 @@ describe('mongo descriptor factory', () => {
 });
 
 describe('vector operation descriptors (production-defined)', () => {
-  it('mongoVectorNearOperation has method near', () => {
-    expect(mongoVectorNearOperation.method).toBe('near');
+  it('mongoVectorNearOperation targets the vector codec', () => {
     expect(mongoVectorNearOperation.self?.codecId).toBe(MONGO_VECTOR_CODEC_ID);
   });
 
@@ -230,14 +229,14 @@ describe('vector operation descriptors (production-defined)', () => {
   });
 
   it('mongoVectorOperationDescriptors includes near', () => {
-    expect(mongoVectorOperationDescriptors).toHaveLength(1);
-    expect(mongoVectorOperationDescriptors[0]).toBe(mongoVectorNearOperation);
+    expect(Object.keys(mongoVectorOperationDescriptors)).toEqual(['near']);
+    expect(mongoVectorOperationDescriptors['near']).toBe(mongoVectorNearOperation);
   });
 
   it('registers production-defined operations in registry', () => {
     const registry = createOperationRegistry();
-    for (const op of mongoVectorOperationDescriptors) {
-      registry.register(op);
+    for (const [name, op] of Object.entries(mongoVectorOperationDescriptors)) {
+      registry.register(name, op);
     }
 
     const entries = registry.entries();

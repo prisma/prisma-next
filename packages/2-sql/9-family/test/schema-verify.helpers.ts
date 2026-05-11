@@ -84,7 +84,12 @@ export function createContractTable(
       index?: boolean;
     }>;
     uniques?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
-    indexes?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
+    indexes?: ReadonlyArray<{
+      columns: readonly string[];
+      name?: string;
+      type?: string;
+      options?: Record<string, unknown>;
+    }>;
   },
 ): StorageTable {
   const result: StorageTable = {
@@ -130,7 +135,13 @@ export function createSchemaTable(
       onUpdate?: SqlReferentialAction;
     }>;
     uniques?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
-    indexes?: ReadonlyArray<{ columns: readonly string[]; unique: boolean; name?: string }>;
+    indexes?: ReadonlyArray<{
+      columns: readonly string[];
+      unique: boolean;
+      name?: string;
+      type?: string;
+      options?: Record<string, unknown>;
+    }>;
   },
 ): SqlTableIR {
   const result: SqlTableIR = {

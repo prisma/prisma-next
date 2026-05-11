@@ -23,8 +23,7 @@ describe('postgis operations', () => {
 
   it('exposes the seven geospatial operations', () => {
     const operations = postgisDescriptor.queryOperations!();
-    const methodNames = operations.map((op) => op.method).sort();
-    expect(methodNames).toEqual(
+    expect(Object.keys(operations).sort()).toEqual(
       [
         'contains',
         'distance',
@@ -50,7 +49,7 @@ describe('postgis operations', () => {
     ];
 
     for (const [method, template] of cases) {
-      const op = operations.find((o) => o.method === method);
+      const op = operations[method];
       expect(op, method).toBeDefined();
       const expr = op?.impl(
         ParamRef.of({ type: 'Point', coordinates: [0, 0] }, { codecId: 'pg/geometry@1' }) as never,
@@ -67,7 +66,7 @@ describe('postgis operations', () => {
   });
 
   it('dwithin impl has three-argument template', () => {
-    const op = postgisDescriptor.queryOperations!().find((o) => o.method === 'dwithin');
+    const op = postgisDescriptor.queryOperations!().dwithin;
     expect(op).toBeDefined();
     const expr = op?.impl(
       ParamRef.of({ type: 'Point', coordinates: [0, 0] }, { codecId: 'pg/geometry@1' }) as never,
@@ -96,7 +95,7 @@ describe('postgis operations', () => {
       'intersectsBbox',
     ] as const;
     for (const method of binaryMethods) {
-      const op = operations.find((o) => o.method === method);
+      const op = operations[method];
       expect(op, method).toBeDefined();
       const expr = op?.impl(
         columnSelf as never,
@@ -114,7 +113,7 @@ describe('postgis operations', () => {
   });
 
   it('dwithin threads refs onto its geometry arg', () => {
-    const op = postgisDescriptor.queryOperations!().find((o) => o.method === 'dwithin');
+    const op = postgisDescriptor.queryOperations!().dwithin;
     expect(op).toBeDefined();
     const columnSelf = {
       buildAst: () => ColumnRef.of('cafe', 'location'),
@@ -134,7 +133,9 @@ describe('postgis operations', () => {
   it('operations register into a SqlOperationRegistry', () => {
     const operations = postgisDescriptor.queryOperations!();
     const registry = createSqlOperationRegistry();
-    for (const op of operations) registry.register(op);
+    for (const [name, op] of Object.entries(operations)) {
+      registry.register(name, op);
+    }
 
     const entries = registry.entries();
     expect(entries['distance']).toBeDefined();

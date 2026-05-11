@@ -36,10 +36,7 @@ function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> 
             id: 'test-profile',
             target: 'postgres',
             capabilities: {},
-            readMarkerStatement: () => ({ sql: '', params: [] }),
-            parseMarkerRow: () => {
-              throw new Error('stub adapter does not implement parseMarkerRow');
-            },
+            readMarker: async () => ({ kind: 'absent' as const }),
           },
           lower() {
             return Object.freeze({ sql: '', params: [] });
@@ -74,12 +71,11 @@ function createStubExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgre
     }),
   ];
 
-  const operations = [
-    {
-      method: 'example',
+  const operations = {
+    example: {
       impl: () => undefined as never,
     },
-  ];
+  };
 
   return {
     kind: 'extension',

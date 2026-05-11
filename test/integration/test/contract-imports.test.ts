@@ -7,11 +7,7 @@ import { promisify } from 'node:util';
 import type { EmitStackInput } from '@prisma-next/emitter';
 import { emit } from '@prisma-next/emitter';
 import { createTestContract } from '@prisma-next/emitter/test/utils';
-import {
-  extractCodecTypeImports,
-  extractComponentIds,
-  extractOperationTypeImports,
-} from '@prisma-next/family-sql/test-utils';
+import { extractCodecTypeImports, extractComponentIds } from '@prisma-next/family-sql/test-utils';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -149,11 +145,9 @@ describe('contract.d.ts imports resolution', () => {
       const { adapter, target, extensions } = getSqlDescriptorBundle();
       const allDescriptors = [target, adapter, ...extensions];
       const codecTypeImports = extractCodecTypeImports(allDescriptors);
-      const operationTypeImports = extractOperationTypeImports(allDescriptors);
       const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
       const options: EmitStackInput = {
         codecTypeImports,
-        operationTypeImports,
         extensionIds,
       };
 
@@ -284,11 +278,9 @@ type UserIdColumn = UserColumns['id'];
       const { adapter, target, extensions } = getSqlDescriptorBundle();
       const allDescriptors = [target, adapter, ...extensions];
       const codecTypeImports = extractCodecTypeImports(allDescriptors);
-      const operationTypeImports = extractOperationTypeImports(allDescriptors);
       const extensionIds = extractComponentIds({ id: 'sql' }, target, adapter, extensions);
       const options: EmitStackInput = {
         codecTypeImports,
-        operationTypeImports,
         extensionIds,
       };
 

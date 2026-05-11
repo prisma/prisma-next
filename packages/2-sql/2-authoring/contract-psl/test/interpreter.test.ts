@@ -1,5 +1,7 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
+import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
@@ -10,6 +12,15 @@ import {
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
+
+const testIndexPack = {
+  kind: 'extension',
+  id: 'test-index-pack',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.1',
+  indexTypes: defineIndexTypes().add('bm25', { options: type('object') }),
+} as const;
 
 describe('interpretPslDocumentToSqlContract', () => {
   const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
@@ -554,6 +565,178 @@ model OrderItem {
           primaryKey: { columns: ['org_id', 'user_id'], name: 'membership_pkey' },
         },
       },
+    });
+  });
+
+  describe('@@index type and options', () => {
+    it('lowers @@index([body], type: "bm25", options: { key_field: "id" }) to an IR index node with type and options', () => {
+      const document = parsePslDocument({
+        schema: `model Doc {
+  id Int @id
+  body String
+  @@index([body], type: "bm25", options: { key_field: "id" }, map: "doc_body_bm25_idx")
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        composedExtensionPacks: [testIndexPack.id],
+        composedExtensionPackRefs: [testIndexPack],
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(result.value.storage).toMatchObject({
+        tables: {
+          doc: {
+            indexes: [
+              {
+                columns: ['body'],
+                name: 'doc_body_bm25_idx',
+                type: 'bm25',
+                options: { key_field: 'id' },
+              },
+            ],
+          },
+        },
+      });
+    });
+
+    it('accepts a multi-key options object with string-literal leaves', () => {
+      const document = parsePslDocument({
+        schema: `model Doc {
+  id Int @id
+  body String
+  @@index([body], type: "bm25", options: { key_field: "id", language: "en" })
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        composedExtensionPacks: [testIndexPack.id],
+        composedExtensionPackRefs: [testIndexPack],
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.storage).toMatchObject({
+        tables: {
+          doc: {
+            indexes: [{ type: 'bm25', options: { key_field: 'id', language: 'en' } }],
+          },
+        },
+      });
+    });
+
+    it('rejects a non-string-literal leaf in options (boolean)', () => {
+      const document = parsePslDocument({
+        schema: `model Doc {
+  id Int @id
+  body String
+  @@index([body], type: "bm25", options: { key_field: "id", fastupdate: false })
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(
+        result.failure.diagnostics.some((d) => /must be a quoted string literal/.test(d.message)),
+      ).toBe(true);
+    });
+
+    it('rejects a non-string-literal leaf in options (number)', () => {
+      const document = parsePslDocument({
+        schema: `model Doc {
+  id Int @id
+  body String
+  @@index([body], type: "bm25", options: { fillfactor: 70 })
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(
+        result.failure.diagnostics.some((d) => /must be a quoted string literal/.test(d.message)),
+      ).toBe(true);
+    });
+
+    it('rejects an options argument with no surrounding type argument', () => {
+      const document = parsePslDocument({
+        schema: `model Doc {
+  id Int @id
+  body String
+  @@index([body], options: { key_field: "id" })
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(
+        result.failure.diagnostics.some((d) =>
+          /options argument requires a type argument/.test(d.message),
+        ),
+      ).toBe(true);
+    });
+
+    it('rejects a malformed options object literal', () => {
+      const document = parsePslDocument({
+        schema: `model Doc {
+  id Int @id
+  body String
+  @@index([body], type: "bm25", options: { not_an_assignment })
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(
+        result.failure.diagnostics.some((d) => /missing a "key: value" colon/.test(d.message)),
+      ).toBe(true);
+    });
+
+    it('accepts @@index without type or options (existing behaviour unchanged)', () => {
+      const document = parsePslDocument({
+        schema: `model Doc {
+  id Int @id
+  body String
+  @@index([body])
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.storage).toMatchObject({
+        tables: { doc: { indexes: [{ columns: ['body'] }] } },
+      });
     });
   });
 });

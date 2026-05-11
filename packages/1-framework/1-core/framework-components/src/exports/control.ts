@@ -1,3 +1,4 @@
+export type { ImportRequirement } from '@prisma-next/ts-render';
 export type {
   MigratableTargetDescriptor,
   OperationPreviewCapable,
@@ -102,7 +103,6 @@ export {
   extractCodecLookup,
   extractCodecTypeImports,
   extractComponentIds,
-  extractOperationTypeImports,
   extractQueryOperationTypeImports,
 } from '../control/control-stack';
 export type {
