@@ -152,33 +152,21 @@ export function lints(options?: LintsOptions): SqlMiddleware {
     familyId: 'sql' as const,
 
     async beforeExecute(plan: SqlExecutionPlan, ctx: SqlMiddlewareContext) {
+      const findings: LintFinding[] = [];
       if (isQueryAst(plan.ast)) {
-        const findings = evaluateAstLints(plan.ast);
-
-        for (const lint of findings) {
-          const configuredSeverity = getConfiguredSeverity(lint.code, options);
-          const effectiveSeverity = configuredSeverity ?? lint.severity;
-
-          if (effectiveSeverity === 'error') {
-            throw runtimeError(lint.code, lint.message, lint.details);
-          }
-          if (effectiveSeverity === 'warn') {
-            ctx.log.warn({
-              code: lint.code,
-              message: lint.message,
-              details: lint.details,
-            });
-          }
+        findings.push(...evaluateAstLints(plan.ast));
+        // Raw-SQL ASTs opt out of structural AST lints (no LIMIT /
+        // WHERE shape to inspect) but the embedded SQL text still
+        // wants the raw-heuristic guardrails. Without this the lint
+        // middleware would silently disable both for raw plans.
+        if (plan.ast.kind === 'raw-sql') {
+          findings.push(...evaluateRawGuardrails(plan).lints);
         }
-        return;
+      } else if (fallback !== 'skip') {
+        findings.push(...evaluateRawGuardrails(plan).lints);
       }
 
-      if (fallback === 'skip') {
-        return;
-      }
-
-      const evaluation = evaluateRawGuardrails(plan);
-      for (const lint of evaluation.lints) {
+      for (const lint of findings) {
         const configuredSeverity = getConfiguredSeverity(lint.code, options);
         const effectiveSeverity = configuredSeverity ?? lint.severity;
 
