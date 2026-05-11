@@ -192,7 +192,7 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
 
     const schema = readFileSync(join(tmpDir, 'prisma/contract.ts'), 'utf-8');
     expect(schema).toContain('defineContract');
-    expect(schema).toContain("from '@prisma-next/sql-contract-ts/contract-builder'");
+    expect(schema).toContain("from '@prisma-next/postgres/contract-builder'");
 
     const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
     expect(config).toContain('contract: "./prisma/contract.ts"');
