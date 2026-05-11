@@ -259,6 +259,24 @@
       "plane": "runtime"
     },
     {
+      "glob": "packages/3-extensions/postgres/src/exports/contract-builder.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/postgres/src/exports/pack.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/postgres/src/exports/target.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/3-extensions/mongo/src/config/**",
       "domain": "extensions",
       "layer": "adapters",
@@ -281,6 +299,24 @@
       "domain": "extensions",
       "layer": "adapters",
       "plane": "runtime"
+    },
+    {
+      "glob": "packages/3-extensions/mongo/src/exports/contract-builder.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/mongo/src/exports/pack.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/mongo/src/exports/target.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
     },
     {
       "glob": "packages/3-targets/3-targets/sqlite/src/core/**",
