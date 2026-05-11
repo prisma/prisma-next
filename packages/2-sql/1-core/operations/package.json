@@ -18,7 +18,7 @@
   "dependencies": {
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
-    "arktype": "^2.1.29"
+    "arktype": "^2.2.0"
   },
   "devDependencies": {
     "@prisma-next/emitter": "workspace:*",

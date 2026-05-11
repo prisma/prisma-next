@@ -18,7 +18,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
-    "arktype": "^2.1.29"
+    "arktype": "^2.2.0"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",

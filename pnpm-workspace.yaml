@@ -17,7 +17,7 @@ catalog:
   '@prisma/dev': 0.24.7
   '@types/node': 24.10.4
   '@types/pg': 8.20.0
-  arktype: ^2.1.29
+  arktype: ^2.2.0
   gray-matter: ^4.0.3
   mongodb: ^6.16.0
   mongodb-memory-server: 10.4.3
