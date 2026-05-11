@@ -70,7 +70,12 @@ describe('createSqlParamRefMutator entries()', () => {
     const mutator = createSqlParamRefMutator(plan);
 
     const [entry] = [...mutator.entries()];
-    mutator.replaceValue(entry!.ref, 99);
+    if (!entry) throw new Error('expected one entry');
+    if (entry.codecId === undefined) {
+      mutator.replaceValue(entry.ref, 99);
+    } else {
+      mutator.replaceValue(entry.ref, 99);
+    }
 
     const next = mutator.currentParams();
     expect(next).not.toBe(plan.params);
@@ -136,7 +141,12 @@ describe('createSqlParamRefMutator entries()', () => {
     const mutator = createSqlParamRefMutator(plan);
 
     const [first] = [...mutator.entries()];
-    mutator.replaceValue(first!.ref, 42);
+    if (!first) throw new Error('expected one entry');
+    if (first.codecId === undefined) {
+      mutator.replaceValue(first.ref, 42);
+    } else {
+      mutator.replaceValue(first.ref, 42);
+    }
 
     const [reWalked] = [...mutator.entries()];
     expect(reWalked?.value).toBe(42);
