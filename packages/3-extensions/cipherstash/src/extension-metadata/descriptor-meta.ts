@@ -43,6 +43,18 @@ export const cipherstashPackMeta = {
   types: {
     codecTypes: {
       codecInstances: [cipherstashStringCodecMetadata],
+      // `renderOutputType` returns the bare type name `EncryptedString`
+      // for parameterized cipherstash columns; the contract emitter
+      // needs to import the type alongside that occurrence so the
+      // generated `.d.ts` typechecks cleanly. Mirrors pgvector's
+      // `Vector` typeImports declaration.
+      typeImports: [
+        {
+          package: '@prisma-next/extension-cipherstash/runtime',
+          named: 'EncryptedString',
+          alias: 'EncryptedString',
+        },
+      ],
     },
     operationTypes: {
       import: {

@@ -13,6 +13,7 @@ import type { Timestamptz } from '@prisma-next/target-postgres/codec-types';
 import type { Time } from '@prisma-next/target-postgres/codec-types';
 import type { Timetz } from '@prisma-next/target-postgres/codec-types';
 import type { Interval } from '@prisma-next/target-postgres/codec-types';
+import type { EncryptedString } from '@prisma-next/extension-cipherstash/runtime';
 import type { OperationTypes as CipherstashOperationTypes } from '@prisma-next/extension-cipherstash/operation-types';
 import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';
 import type { QueryOperationTypes as CipherstashQueryOperationTypes } from '@prisma-next/extension-cipherstash/operation-types';
@@ -46,7 +47,7 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 export type FieldOutputTypes = {
   readonly User: {
     readonly id: CodecTypes['pg/text@1']['output'];
-    readonly email: EncryptedString;
+    readonly email: CodecTypes['cipherstash/string@1']['output'];
   };
 };
 export type FieldInputTypes = {
@@ -140,7 +141,41 @@ type ContractBase = ContractType<
       readonly kind: 'extension';
       readonly targetId: 'postgres';
       readonly types: {
-        readonly codecTypes: {};
+        readonly codecTypes: {
+          readonly codecInstances: readonly [
+            {
+              readonly descriptor: {
+                readonly codecId: 'cipherstash/string@1';
+                readonly factory: unknown;
+                readonly isParameterized: false;
+                readonly meta: {
+                  readonly db: {
+                    readonly sql: {
+                      readonly postgres: { readonly nativeType: 'eql_v2_encrypted' };
+                    };
+                  };
+                };
+                readonly paramsSchema: {
+                  readonly '~standard': {
+                    readonly validate: unknown;
+                    readonly vendor: 'cipherstash';
+                    readonly version: 1;
+                  };
+                };
+                readonly renderOutputType: unknown;
+                readonly targetTypes: readonly ['eql_v2_encrypted'];
+                readonly traits: readonly [];
+              };
+            },
+          ];
+          readonly typeImports: readonly [
+            {
+              readonly alias: 'EncryptedString';
+              readonly named: 'EncryptedString';
+              readonly package: '@prisma-next/extension-cipherstash/runtime';
+            },
+          ];
+        };
         readonly operationTypes: {
           readonly import: {
             readonly alias: 'CipherstashOperationTypes';
