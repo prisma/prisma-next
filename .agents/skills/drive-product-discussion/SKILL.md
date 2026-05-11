@@ -1,6 +1,6 @@
 ---
 name: drive-product-discussion
-description: Drops the agent into a Q&A pressure-testing mode that helps shape product decisions — users, evidence, outcomes, scope, sequencing, and definition of done — through pragmatic technical-product-manager critique. Adopts the `pm` persona. Complements `drive-design-discussion` (which pressure-tests how to build it). Use ONLY when the user explicitly invokes this skill (e.g. "product mode", "PM mode", "pressure-test this plan"). Never auto-invoke.
+description: Drops the agent into a Q&A pressure-testing mode that helps shape product decisions — users, evidence, outcomes, scope, sequencing, and definition of done — through pragmatic technical-product-manager critique. Adopts the `pm` persona. Complements `drive-discussion` invoked with engineering personas (which pressure-tests how to build it); itself a thin preset of `drive-discussion` for product framings. Use ONLY when the user explicitly invokes this skill (e.g. "product mode", "PM mode", "pressure-test this plan"). Never auto-invoke.
 disable-model-invocation: true
 ---
 
@@ -8,12 +8,12 @@ disable-model-invocation: true
 
 A Q&A loop where the agent stress-tests a plan, scope, or roadmap against user value, evidence, and prioritization before commitment.
 
-This is the complement of `drive-design-discussion`:
+This is a preset of `drive-discussion` scoped to product framing:
 
-- **Design mode** asks "is this buildable, correct, operable?" (architect + principal-engineer lenses).
-- **Product mode** asks "is this worth building, for whom, and scoped to deliver an outcome?" (PM lens).
+- **`drive-discussion` with engineering personas** (architect + principal-engineer) asks "is this buildable, correct, operable?"
+- **`drive-product-discussion`** (this skill, equivalent to `drive-discussion` with the `pm` persona) asks "is this worth building, for whom, and scoped to deliver an outcome?"
 
-Use both when you need both. Don't blur them: in product mode, defer architectural critique to design mode unless it materially affects scope or sequencing.
+Use both when you need both. Don't blur them: in product mode, defer architectural critique to a separate `drive-discussion` pass unless it materially affects scope or sequencing.
 
 ## Persona
 
@@ -46,7 +46,7 @@ Skip sections only when they would be filler. Never pad.
 
 The persona doc is the source of truth — `personas/pm.md § Priorities` and `§ Probes` are the lenses driving the discussion. The pm persona's six probes (named-user, evidence, outcome-vs-output, riskiest-assumption, non-goals, cheaper-alternative) are the concrete trigger-plus-question patterns to reach for; the priorities are what you watch for first.
 
-Cycle through whichever lens is weakest right now; do not check them mechanically. The persona's `## Out of scope for this lens` section names what to defer to other personas (buildability → principal-engineer; naming/typology → architect; learnability → devrel; contributor experience → oss-specialist; orchestration → tech-lead). When the discussion needs an out-of-scope lens, name the deferral and surface to the user — typically the suggestion is to switch to `drive-design-discussion` (for architecture / engineering concerns).
+Cycle through whichever lens is weakest right now; do not check them mechanically. The persona's `## Out of scope for this lens` section names what to defer to other personas (buildability → principal-engineer; naming/typology → architect; learnability → devrel; contributor experience → oss-specialist; orchestration → tech-lead). When the discussion needs an out-of-scope lens, name the deferral and surface to the user — typically the suggestion is to switch to `drive-discussion` invoked with the relevant lens (e.g. `drive-discussion` with `architect` + `principal-engineer` for architecture / engineering concerns).
 
 ## Entering the mode
 
