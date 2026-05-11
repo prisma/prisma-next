@@ -26,10 +26,10 @@
 
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { profileHash } from '@prisma-next/contract/types';
+import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import {
   extractCodecControlHooks,
   planFieldEventOperations,
-  type SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
