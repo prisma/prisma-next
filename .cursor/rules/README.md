@@ -22,7 +22,6 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 
 **Always-apply rules must be short, globally relevant, and stable.** If a rule only applies to a specific area (SQL, CLI, tests, package layout), scope it with `globs` and set `alwaysApply: false`.
 
-- `.cursor/rules/git-staging.mdc` — Git staging/commit best practices (stage explicitly, keep commits focused)
 - `.cursor/rules/use-correct-tools.mdc` — Use configured tools and scripts
 - `.cursor/rules/no-direct-lockfile-edits.mdc` — Never edit `pnpm-lock.yaml` manually; use `pnpm install`
 - `.cursor/rules/doc-maintenance.mdc` — Keep docs/READMEs/rules up‑to‑date
