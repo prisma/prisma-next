@@ -223,10 +223,13 @@ export function setHandlePlaintextCache(envelope: EncryptedString, plaintext: st
  * write-side envelope's handle. Called by the bulk-encrypt middleware
  * before grouping envelopes into per-routing-key bulk-encrypt batches.
  *
- * Idempotent and write-once-wins: if the handle already carries
- * `(table, column)` (e.g. the envelope was constructed via
- * `fromInternal` on the read side and is being re-inserted), the
- * existing values are preserved.
+ * Idempotent for matching reassignments (re-stamping the same
+ * `(table, column)` is a no-op, which covers envelopes reconstructed
+ * via `fromInternal` on the read side and re-stamped on the way back
+ * in). Conflicting reassignments throw a descriptive error: an
+ * envelope reused across plans with a different routing context is a
+ * programming error — silently keeping the stale binding would lower
+ * to the wrong bulk-encrypt batch.
  */
 export function setHandleRoutingKey(
   envelope: EncryptedString,
@@ -236,9 +239,17 @@ export function setHandleRoutingKey(
   const handle = envelope.expose();
   if (handle.table === undefined) {
     handle.table = table;
+  } else if (handle.table !== table) {
+    throw new Error(
+      `cipherstash envelope: routing-key table conflict — handle already bound to "${handle.table}", refusing to rebind to "${table}". Re-encode the value or construct a fresh envelope for the new routing target.`,
+    );
   }
   if (handle.column === undefined) {
     handle.column = column;
+  } else if (handle.column !== column) {
+    throw new Error(
+      `cipherstash envelope: routing-key column conflict on table "${handle.table}" — handle already bound to "${handle.column}", refusing to rebind to "${column}". Re-encode the value or construct a fresh envelope for the new routing target.`,
+    );
   }
 }
 

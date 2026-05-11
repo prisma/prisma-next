@@ -10,7 +10,7 @@
 
 import { inspect } from 'node:util';
 import { describe, expect, it, vi } from 'vitest';
-import { EncryptedString } from '../src/execution/envelope';
+import { EncryptedString, setHandleRoutingKey } from '../src/execution/envelope';
 import type { CipherstashSdk } from '../src/execution/sdk';
 
 function emptySdk(): CipherstashSdk {
@@ -184,5 +184,37 @@ describe('EncryptedString — accidental-exposure overrides (Rust `secrecy` styl
       { depth: Number.POSITIVE_INFINITY },
     );
     expect(inspected).not.toContain('top-secret');
+  });
+});
+
+describe('setHandleRoutingKey', () => {
+  it('stamps table/column on a fresh envelope', () => {
+    const envelope = EncryptedString.from('a@b.com');
+    setHandleRoutingKey(envelope, 'users', 'email');
+    const handle = envelope.expose();
+    expect(handle.table).toBe('users');
+    expect(handle.column).toBe('email');
+  });
+
+  it('re-stamping the same routing key is a no-op', () => {
+    const envelope = EncryptedString.from('a@b.com');
+    setHandleRoutingKey(envelope, 'users', 'email');
+    expect(() => setHandleRoutingKey(envelope, 'users', 'email')).not.toThrow();
+  });
+
+  it('rejects conflicting table reassignment', () => {
+    const envelope = EncryptedString.from('a@b.com');
+    setHandleRoutingKey(envelope, 'users', 'email');
+    expect(() => setHandleRoutingKey(envelope, 'accounts', 'email')).toThrow(
+      /routing-key table conflict/,
+    );
+  });
+
+  it('rejects conflicting column reassignment', () => {
+    const envelope = EncryptedString.from('a@b.com');
+    setHandleRoutingKey(envelope, 'users', 'email');
+    expect(() => setHandleRoutingKey(envelope, 'users', 'username')).toThrow(
+      /routing-key column conflict/,
+    );
   });
 });
