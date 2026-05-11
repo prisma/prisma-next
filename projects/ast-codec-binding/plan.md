@@ -149,7 +149,13 @@ Cross-package grep before declaring M3c done: `rg 'forCodecId|parameterizedRepre
 - New diagnostic: `runtimeError('RUNTIME.PARAM_REF_CODEC_REQUIRED', ...)`. (No `BUILD.*` error namespace exists in the codebase today; sql-builder errors use bare `throw new Error(...)` or `runtimeError(...)`. We pick `runtimeError` for the structured envelope; the diagnostic message names the value site and the JS type.)
 - Tests: `packages/2-sql/4-lanes/sql-builder/test/raw-sql-codec-required.test.ts` — explicit codec passes, missing codec throws.
 
-**Acceptance.** Existing tests of raw-SQL paths that relied on silent fallback either pass an explicit codec or the test's intent moves to a different surface.
+**Validation gate.**
+
+- `pnpm typecheck` (workspace) — M4 adds a new error code used by the sql-builder; workspace check ensures no downstream breakage.
+- `pnpm test:packages` (workspace) — raw-SQL tests exist across sql-builder + sql-runtime + sql-orm-client.
+- `pnpm lint:deps`
+
+**Acceptance.** All gates green. Existing tests of raw-SQL paths that relied on silent fallback either pass an explicit codec or the test's intent moves to a different surface.
 
 ### M5 — `dataTransformAst` op + round-trip fixture
 
