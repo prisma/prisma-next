@@ -24,12 +24,13 @@
 import { cipherstashAuthoringTypes } from '../contract/authoring';
 import { cipherstashStringCodecMetadata } from './codec-metadata';
 import {
+  CIPHERSTASH_EXTENSION_VERSION,
   CIPHERSTASH_SPACE_ID,
   CIPHERSTASH_STRING_CODEC_ID,
   EQL_V2_ENCRYPTED_TYPE,
 } from './constants';
 
-export const CIPHERSTASH_EXTENSION_VERSION = '0.0.1' as const;
+export { CIPHERSTASH_EXTENSION_VERSION };
 
 export const cipherstashPackMeta = {
   kind: 'extension',

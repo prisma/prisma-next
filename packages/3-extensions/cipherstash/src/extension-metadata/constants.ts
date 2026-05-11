@@ -16,6 +16,16 @@
 export const CIPHERSTASH_SPACE_ID = 'cipherstash';
 
 /**
+ * Version advertised by both `cipherstashPackMeta.version` (control plane)
+ * and the SDK-bound `SqlRuntimeExtensionDescriptor` (runtime plane).
+ *
+ * Single source of truth so the descriptor surfaces and the contract-emit
+ * pack metadata cannot drift apart; consumed downstream by capability
+ * gating and contract round-trips.
+ */
+export const CIPHERSTASH_EXTENSION_VERSION = '0.0.1' as const;
+
+/**
  * Codec id the application-side `Encrypted<string>` lowering targets.
  * Lives here so the codec lifecycle hook (which emits
  * `add_search_config` / `remove_search_config` ops on field events) and

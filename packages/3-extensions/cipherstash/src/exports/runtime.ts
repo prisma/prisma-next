@@ -28,7 +28,10 @@ import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 import { cipherstashQueryOperations } from '../execution/operators';
 import { createParameterizedCodecDescriptors } from '../execution/parameterized';
 import type { CipherstashSdk } from '../execution/sdk';
-import { CIPHERSTASH_SPACE_ID } from '../extension-metadata/constants';
+import {
+  CIPHERSTASH_EXTENSION_VERSION,
+  CIPHERSTASH_SPACE_ID,
+} from '../extension-metadata/constants';
 
 export type { CipherstashStringCodec } from '../execution/codec-runtime';
 export {
@@ -56,7 +59,7 @@ export type {
   CipherstashSingleDecryptArgs,
 } from '../execution/sdk';
 
-export const CIPHERSTASH_EXTENSION_VERSION = '0.0.1' as const;
+export { CIPHERSTASH_EXTENSION_VERSION };
 
 export interface CreateCipherstashRuntimeDescriptorOptions {
   readonly sdk: CipherstashSdk;
