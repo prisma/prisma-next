@@ -192,7 +192,7 @@ export class CipherstashAddSearchConfigCall extends CipherstashOpFactoryCallNode
     // `JSON.stringify(call)` lays out keys in the byte order the
     // baseline `ops.json` carries.
     this.id = `cipherstash-codec.${table}.${column}.add-search-config.${index}`;
-    this.label = `Register cipherstash search config (${index}) for ${table}.${column}`;
+    this.label = `Enable cipherstash search on ${table}.${column}`;
     this.operationClass = 'additive';
     this.invariantId = invariantIdFor(table, column, 'add-search-config', index);
     this.target = { id: 'postgres' };
@@ -270,7 +270,7 @@ export class CipherstashRemoveSearchConfigCall extends CipherstashOpFactoryCallN
     super();
     this.#args = { table, column, index };
     this.id = `cipherstash-codec.${table}.${column}.remove-search-config.${index}`;
-    this.label = `Remove cipherstash search config (${index}) for ${table}.${column}`;
+    this.label = `Disable cipherstash search on ${table}.${column}`;
     this.operationClass = 'destructive';
     this.invariantId = invariantIdFor(table, column, 'remove-search-config', index);
     this.target = { id: 'postgres' };

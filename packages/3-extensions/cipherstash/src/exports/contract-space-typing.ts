@@ -56,13 +56,13 @@ export function asCipherstashContract(value: unknown): Contract<SqlStorage> {
 /**
  * Narrow a JSON-imported `migration.json` value to `MigrationMetadata`.
  * The framework's runner consumes the metadata for ordering /
- * provenance; missing `space` / `dirName` here means a non-emitted
- * artefact slipped into the import path.
+ * provenance; missing `to` or a non-string `migrationHash` here means
+ * a non-emitted artefact slipped into the import path.
  */
 export function asCipherstashMigrationMetadata(value: unknown): MigrationMetadata {
   if (!isRecord(value)) fail('<root>', value);
-  if (typeof value['space'] !== 'string') fail('space', value['space']);
-  if (typeof value['dirName'] !== 'string') fail('dirName', value['dirName']);
+  if (typeof value['to'] !== 'string') fail('to', value['to']);
+  if (typeof value['migrationHash'] !== 'string') fail('migrationHash', value['migrationHash']);
   return value as unknown as MigrationMetadata;
 }
 

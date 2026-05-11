@@ -33,14 +33,14 @@ describe('CipherstashAddSearchConfigCall', () => {
     const call = new CipherstashAddSearchConfigCall(TABLE, FIELD, 'unique');
     expect(call.factoryName).toBe('cipherstashAddSearchConfig');
     expect(call.operationClass).toBe('additive');
-    expect(call.label).toBe(`Register cipherstash search config (unique) for ${TABLE}.${FIELD}`);
+    expect(call.label).toBe(`Enable cipherstash search on ${TABLE}.${FIELD}`);
   });
 
   it('toOp() produces the canonical add_search_config@v1 op shape', () => {
     const call = new CipherstashAddSearchConfigCall(TABLE, FIELD, 'unique');
     expect(call.toOp()).toEqual({
       id: `cipherstash-codec.${TABLE}.${FIELD}.add-search-config.unique`,
-      label: `Register cipherstash search config (unique) for ${TABLE}.${FIELD}`,
+      label: `Enable cipherstash search on ${TABLE}.${FIELD}`,
       operationClass: 'additive',
       invariantId: `cipherstash-codec:${TABLE}.${FIELD}:add-search-config:unique@v1`,
       target: { id: 'postgres' },
@@ -111,14 +111,14 @@ describe('CipherstashRemoveSearchConfigCall', () => {
     const call = new CipherstashRemoveSearchConfigCall(TABLE, FIELD, 'match');
     expect(call.factoryName).toBe('cipherstashRemoveSearchConfig');
     expect(call.operationClass).toBe('destructive');
-    expect(call.label).toBe(`Remove cipherstash search config (match) for ${TABLE}.${FIELD}`);
+    expect(call.label).toBe(`Disable cipherstash search on ${TABLE}.${FIELD}`);
   });
 
   it('toOp() produces the canonical remove_search_config@v1 op shape', () => {
     const call = new CipherstashRemoveSearchConfigCall(TABLE, FIELD, 'unique');
     expect(call.toOp()).toEqual({
       id: `cipherstash-codec.${TABLE}.${FIELD}.remove-search-config.unique`,
-      label: `Remove cipherstash search config (unique) for ${TABLE}.${FIELD}`,
+      label: `Disable cipherstash search on ${TABLE}.${FIELD}`,
       operationClass: 'destructive',
       invariantId: `cipherstash-codec:${TABLE}.${FIELD}:remove-search-config:unique@v1`,
       target: { id: 'postgres' },

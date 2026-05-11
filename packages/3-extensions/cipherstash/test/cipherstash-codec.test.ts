@@ -230,28 +230,32 @@ describe('cipherstashStringCodecHooks.onFieldEvent — flag → index mapping', 
 
   describe('operation labels (AC7 — first-time-user-readable)', () => {
     it('add op label is action-first / column-first and free of extension jargon', () => {
-      const [op] = onFieldEvent('added', ctx({ next: { typeParams: { searchable: true } } }));
+      const [op] = onFieldEvent('added', ctx({ next: { typeParams: { equality: true } } }));
       expect(op!.label).toBe(`Enable cipherstash search on ${TABLE}.${FIELD}`);
       // Legacy wording must not reappear (regression bar).
       expect(op!.label).not.toContain('Register cipherstash search config');
     });
 
     it('remove op label is action-first / column-first', () => {
-      const [op] = onFieldEvent('dropped', ctx({ prior: { typeParams: { searchable: true } } }));
+      const [op] = onFieldEvent('dropped', ctx({ prior: { typeParams: { equality: true } } }));
       expect(op!.label).toBe(`Disable cipherstash search on ${TABLE}.${FIELD}`);
       expect(op!.label).not.toContain('Remove cipherstash search config');
     });
 
-    it('rotate op label is action-first / column-first', () => {
-      const [op] = onFieldEvent(
+    it('altered op labels stay action-first when adding an index alongside an existing one', () => {
+      // Codec emits per-flag deltas: flipping `freeTextSearch` on while
+      // `equality` stays on produces a single add op (the rotate UX is
+      // expressed as add+remove pairs across flag transitions).
+      const ops = onFieldEvent(
         'altered',
         ctx({
-          prior: { typeParams: { searchable: true, indexes: ['match'] } },
-          next: { typeParams: { searchable: true, indexes: ['match', 'unique'] } },
+          prior: { typeParams: { equality: true } },
+          next: { typeParams: { equality: true, freeTextSearch: true } },
         }),
       );
-      expect(op!.label).toBe(`Rotate cipherstash search on ${TABLE}.${FIELD}`);
-      expect(op!.label).not.toContain('Rotate cipherstash search config');
+      expect(ops).toHaveLength(1);
+      expect(ops[0]!.label).toBe(`Enable cipherstash search on ${TABLE}.${FIELD}`);
+      expect(ops[0]!.label).not.toContain('Register cipherstash search config');
     });
   });
 
