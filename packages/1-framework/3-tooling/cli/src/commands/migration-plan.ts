@@ -82,7 +82,7 @@ export interface MigrationPlanResult {
    * Surfacing these in the result (rather than only via `ui.step` log
    * lines) makes the cross-space side effect explicit to JSON consumers
    * and the success-summary renderer — the same multi-space side effect
-   * that `migration apply` will replay (M6 AC3).
+   * that `migration apply` will replay.
    */
   readonly emittedExtensionDirs: readonly { readonly spaceId: string; readonly dirName: string }[];
   readonly operations: readonly {
@@ -526,7 +526,7 @@ function buildPlanSummary(plannedOpsCount: number, emittedExtensionDirsCount: nu
   return `${base}; materialised ${emittedExtensionDirsCount} ${noun}`;
 }
 
-function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFlags): string {
+export function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFlags): string {
   const lines: string[] = [];
   const useColor = flags.color !== false;
 
@@ -534,10 +534,29 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
   const yellow_ = useColor ? (s: string) => `\x1b[33m${s}\x1b[0m` : (s: string) => s;
   const dim_ = useColor ? (s: string) => `\x1b[2m${s}\x1b[0m` : (s: string) => s;
 
+  // Renders the extension-space materialisation block + canonical apply-step
+  // hint shared by the no-op, placeholder, and full-plan branches. The app
+  // space short-circuits do not skip it: an extension-only bump emits new
+  // `migrations/<spaceId>/<dirName>/` directories on disk that the user
+  // still has to apply, so the success line must surface them.
+  function appendEmittedExtensions(): void {
+    if (result.emittedExtensionDirs.length === 0) return;
+    lines.push('');
+    lines.push(dim_('Emitted extension migrations:'));
+    for (const entry of result.emittedExtensionDirs) {
+      lines.push(dim_(`  ${entry.spaceId} → migrations/${entry.spaceId}/${entry.dirName}`));
+    }
+    lines.push('');
+    lines.push(
+      `Next: review the extension migrations above, then run ${green_('prisma-next migration apply')}.`,
+    );
+  }
+
   if (result.noOp) {
     lines.push(`${green_('✔')} No changes detected`);
     lines.push(dim_(`  from: ${result.from}`));
     lines.push(dim_(`  to:   ${result.to}`));
+    appendEmittedExtensions();
     return lines.join('\n');
   }
 
@@ -554,6 +573,7 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
       'Open migration.ts and replace each `placeholder(...)` call with your actual query.',
     );
     lines.push(`Then run: ${green_(`node ${result.dir ?? '<dir>'}/migration.ts`)}`);
+    appendEmittedExtensions();
     return lines.join('\n');
   }
 
