@@ -139,7 +139,7 @@ export interface SqlCodecInstanceContext extends CodecInstanceContext {
 }
 ```
 
-Pack authors never construct it. The runtime synthesizes it at contract-load time: `name` is the family-agnostic instance identity (in SQL, the `storage.types` entry name, an `<anon:t.c>` for inline-`typeParams` columns, or a `<shared:codecId>` sentinel for non-parameterized codecs); the SQL-extended `usedAt` is plural so a `storage.types` entry shared across multiple columns can derive shared per-instance state from the aggregated set (e.g. a column-scoped encryption codec deriving one key for every column referencing the entry). SQL extensions that consume `usedAt` author against `SqlCodecInstanceContext`; extensions that don't read it stay on the family-agnostic base.
+Pack authors never construct it. The runtime synthesizes it at contract-load time: `name` is the family-agnostic instance identity (in SQL, the `storage.types` entry name, a `<col:t.c>` for inline-`typeParams` columns, a `<codec:codecId>` sentinel for non-parameterized codecs, or the canonical cache key for ad-hoc refs the contract walk did not pre-populate); the SQL-extended `usedAt` is plural so a `storage.types` entry shared across multiple columns can derive shared per-instance state from the aggregated set (e.g. a column-scoped encryption codec deriving one key for every column referencing the entry). SQL extensions that consume `usedAt` author against `SqlCodecInstanceContext`; extensions that don't read it stay on the family-agnostic base.
 
 The split mirrors PR #400's `CodecCallContext` / `SqlCodecCallContext` precedent for the per-call context: SQL-domain vocabulary lives in `sql-relational-core`; framework-components stays family-agnostic.
 
@@ -176,7 +176,7 @@ The runtime's **`AstCodecResolver`** wraps `descriptorFor(codecId).factory(typeP
 
 1. Look up the descriptor by `codecId`.
 2. For typeRef columns, reuse the resolved codec materialized once for the `storage.types` entry; `usedAt` aggregates every column referencing that entry.
-3. For inline-`typeParams` columns, validate via `descriptor.paramsSchema['~standard'].validate(typeParams)` and call `descriptor.factory(validatedParams)({ name: '<anon:t.c>', usedAt: [{ table, column }] })` once.
+3. For inline-`typeParams` columns, validate via `descriptor.paramsSchema['~standard'].validate(typeParams)` and call `descriptor.factory(validatedParams)({ name: '<col:t.c>', usedAt: [{ table, column }] })` once.
 4. For non-parameterized columns, call `descriptor.factory(undefined)(ctx)` once and cache the resulting `Codec` by codec id (the constant-factory contract guarantees the result is shared across columns).
 
 JSON-with-schema validation lives **inside the resolved codec's `decode` body** rather than in a parallel validator registry. The per-library extension's factory rehydrates the schema at materialization time and closes over it; `decode(wire)` parses then validates, throwing a uniform `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` on rejection (which the runtime decode wrapper surfaces as `RUNTIME.DECODE_FAILED` with the original error reachable on `cause`).

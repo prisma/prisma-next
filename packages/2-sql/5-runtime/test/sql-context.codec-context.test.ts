@@ -87,7 +87,7 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
     };
   }
 
-  it('materializes a shared per-codec instance with `<shared:codecId>` context for a single non-parameterized column', () => {
+  it('materializes a shared per-codec instance with `<codec:codecId>` context for a single non-parameterized column', () => {
     const captures: SqlCodecInstanceContext[] = [];
     const { descriptor, instances } = createCtxCapturingExtension(captures);
 
@@ -104,7 +104,7 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
 
     const columnCtx = instances.find(({ codec }) => codec === columnInstance)?.ctx;
     expect(columnCtx).toBeDefined();
-    expect(columnCtx?.name).toBe('<shared:test/captures-ctx@1>');
+    expect(columnCtx?.name).toBe('<codec:test/captures-ctx@1>');
     expect(columnCtx?.usedAt).toEqual([{ table: 'users', column: 'field' }]);
   });
 });
@@ -445,7 +445,7 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
 
     const materialized = instances.find(({ codec }) => codec === usersInstance);
     expect(materialized).toBeDefined();
-    expect(materialized?.ctx.name).toBe('<shared:test/shared@1>');
+    expect(materialized?.ctx.name).toBe('<codec:test/shared@1>');
     expect(materialized?.ctx.usedAt).toEqual([
       { table: 'users', column: 'field' },
       { table: 'orders', column: 'field' },

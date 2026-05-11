@@ -459,7 +459,7 @@ function buildContractCodecRegistry(
         const name =
           ref.typeParams !== undefined
             ? `<col:${tableName}.${columnName}>`
-            : `<shared:${ref.codecId}>`;
+            : `<codec:${ref.codecId}>`;
         nameByKey.set(key, name);
       }
     }
