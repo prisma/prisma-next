@@ -61,7 +61,5 @@
     "./serverless": "./dist/serverless.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/runtime.mjs",
-  "module": "./dist/runtime.mjs",
   "types": "./dist/runtime.d.mts"
 }

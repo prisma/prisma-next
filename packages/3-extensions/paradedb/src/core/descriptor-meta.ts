@@ -1,12 +1,7 @@
-import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 import { LiteralExpr } from '@prisma-next/sql-relational-core/ast';
-import {
-  buildOperation,
-  type CodecExpression,
-  type Expression,
-  toExpr,
-} from '@prisma-next/sql-relational-core/expression';
+import { buildOperation, toExpr } from '@prisma-next/sql-relational-core/expression';
 import { paradedbIndexTypes } from '../types/index-types';
+import type { QueryOperationTypes } from '../types/operation-types';
 import { PARADEDB_EXTENSION_ID } from './constants';
 import { ParadeDbProximityChain } from './proximity-chain';
 
@@ -17,83 +12,86 @@ const BOOL = 'pg/bool@1' as const;
 const FLOAT4 = 'pg/float4@1' as const;
 const INT4 = 'pg/int4@1' as const;
 
-// `@@@` accepts both text and structured query types on its RHS;
-// `|||`/`&&&`/`===`/`###` are text-RHS-only.
-// https://docs.paradedb.com/documentation/full-text/match
-// https://docs.paradedb.com/documentation/full-text/term
-// https://docs.paradedb.com/documentation/full-text/phrase
-function matchOp<CT extends CodecTypesBase>(
-  method: string,
-  operator: '@@@' | '|||' | '&&&' | '===' | '###',
-): SqlOperationDescriptor {
+export function paradedbQueryOperations<CT extends CodecTypesBase>(): QueryOperationTypes<CT> {
   return {
-    method,
-    self: { codecId: TEXT },
-    impl: (
-      self: CodecExpression<'pg/text@1', boolean, CT>,
-      query: CodecExpression<'pg/text@1', boolean, CT>,
-    ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> =>
-      buildOperation({
-        method,
-        args: [toExpr(self, TEXT), toExpr(query, TEXT)],
-        returns: { codecId: BOOL, nullable: false },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          template: `{{self}} ${operator} {{arg0}}`,
-        },
-      }),
-  };
-}
-
-// PG rejects parameterized typmods, so the cast argument lowers to a literal.
-// https://docs.paradedb.com/documentation/full-text/fuzzy
-// https://docs.paradedb.com/documentation/sorting/boost
-// https://docs.paradedb.com/documentation/full-text/phrase
-function typmodCastOp<CT extends CodecTypesBase>(
-  method: string,
-  pdbType: 'fuzzy' | 'boost' | 'const' | 'slop',
-  validate: (n: number) => string | null,
-): SqlOperationDescriptor {
-  return {
-    method,
-    self: { codecId: TEXT },
-    impl: (
-      self: CodecExpression<'pg/text@1', boolean, CT>,
-      n: number,
-    ): Expression<{ codecId: 'pg/text@1'; nullable: false }> => {
-      const error = validate(n);
-      if (error) throw new Error(`${method}: ${error}; got ${String(n)}`);
-      return buildOperation({
-        method,
-        args: [toExpr(self, TEXT), LiteralExpr.of(n)],
-        returns: { codecId: TEXT, nullable: false },
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          template: `{{self}}::pdb.${pdbType}({{arg0}})`,
-        },
-      });
+    // `@@@` accepts both text and structured query types on its RHS.
+    // https://docs.paradedb.com/documentation/full-text/match
+    paradeDbMatch: {
+      self: { codecId: TEXT },
+      impl: (self, query) =>
+        buildOperation({
+          method: 'paradeDbMatch',
+          args: [toExpr(self, TEXT), toExpr(query, TEXT)],
+          returns: { codecId: BOOL, nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: '{{self}} @@@ {{arg0}}',
+          },
+        }),
     },
-  };
-}
-
-export function paradedbQueryOperations<
-  CT extends CodecTypesBase,
->(): readonly SqlOperationDescriptor[] {
-  return [
-    matchOp('paradeDbMatch', '@@@'),
-    matchOp('paradeDbMatchAny', '|||'),
-    matchOp('paradeDbMatchAll', '&&&'),
-    matchOp('paradeDbTerm', '==='),
-    matchOp('paradeDbPhrase', '###'),
-    {
-      // https://docs.paradedb.com/documentation/sorting/score
-      method: 'paradeDbScore',
+    paradeDbMatchAny: {
+      self: { codecId: TEXT },
+      impl: (self, query) =>
+        buildOperation({
+          method: 'paradeDbMatchAny',
+          args: [toExpr(self, TEXT), toExpr(query, TEXT)],
+          returns: { codecId: BOOL, nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: '{{self}} ||| {{arg0}}',
+          },
+        }),
+    },
+    paradeDbMatchAll: {
+      self: { codecId: TEXT },
+      impl: (self, query) =>
+        buildOperation({
+          method: 'paradeDbMatchAll',
+          args: [toExpr(self, TEXT), toExpr(query, TEXT)],
+          returns: { codecId: BOOL, nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: '{{self}} &&& {{arg0}}',
+          },
+        }),
+    },
+    // https://docs.paradedb.com/documentation/full-text/term
+    paradeDbTerm: {
+      self: { codecId: TEXT },
+      impl: (self, query) =>
+        buildOperation({
+          method: 'paradeDbTerm',
+          args: [toExpr(self, TEXT), toExpr(query, TEXT)],
+          returns: { codecId: BOOL, nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: '{{self}} === {{arg0}}',
+          },
+        }),
+    },
+    // https://docs.paradedb.com/documentation/full-text/phrase
+    paradeDbPhrase: {
+      self: { codecId: TEXT },
+      impl: (self, query) =>
+        buildOperation({
+          method: 'paradeDbPhrase',
+          args: [toExpr(self, TEXT), toExpr(query, TEXT)],
+          returns: { codecId: BOOL, nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: '{{self}} ### {{arg0}}',
+          },
+        }),
+    },
+    // https://docs.paradedb.com/documentation/sorting/score
+    paradeDbScore: {
       self: { codecId: INT4 },
-      impl: (
-        self: CodecExpression<'pg/int4@1', boolean, CT>,
-      ): Expression<{ codecId: 'pg/float4@1'; nullable: false }> =>
+      impl: (self) =>
         buildOperation({
           method: 'paradeDbScore',
           args: [toExpr(self, INT4)],
@@ -105,28 +103,91 @@ export function paradedbQueryOperations<
           },
         }),
     },
-    typmodCastOp('paradeDbFuzzy', 'fuzzy', (n) =>
-      Number.isInteger(n) && n >= 0 && n <= 2 ? null : 'distance must be an integer in [0, 2]',
-    ),
-    typmodCastOp('paradeDbBoost', 'boost', (n) =>
-      Number.isInteger(n) && n >= -2048 && n <= 2048
-        ? null
-        : 'boost must be an integer in [-2048, 2048]',
-    ),
-    typmodCastOp('paradeDbConst', 'const', (n) =>
-      Number.isInteger(n) ? null : 'value must be an integer',
-    ),
-    typmodCastOp('paradeDbSlop', 'slop', (n) =>
-      Number.isInteger(n) && n >= 0 ? null : 'slop must be a non-negative integer',
-    ),
-    {
-      // https://docs.paradedb.com/documentation/full-text/proximity
-      method: 'paradeDbProximity',
+    // PG rejects parameterized typmods, so the cast argument lowers to a literal.
+    // https://docs.paradedb.com/documentation/full-text/fuzzy
+    paradeDbFuzzy: {
       self: { codecId: TEXT },
-      impl: (start: CodecExpression<'pg/text@1', boolean, CT>): ParadeDbProximityChain =>
-        new ParadeDbProximityChain(start),
+      impl: (self, distance) => {
+        if (!Number.isInteger(distance) || distance < 0 || distance > 2) {
+          throw new Error(
+            `paradeDbFuzzy: distance must be an integer in [0, 2]; got ${String(distance)}`,
+          );
+        }
+        return buildOperation({
+          method: 'paradeDbFuzzy',
+          args: [toExpr(self, TEXT), LiteralExpr.of(distance)],
+          returns: { codecId: TEXT, nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: '{{self}}::pdb.fuzzy({{arg0}})',
+          },
+        });
+      },
     },
-  ];
+    // https://docs.paradedb.com/documentation/sorting/boost
+    paradeDbBoost: {
+      self: { codecId: TEXT },
+      impl: (self, weight) => {
+        if (!Number.isInteger(weight) || weight < -2048 || weight > 2048) {
+          throw new Error(
+            `paradeDbBoost: boost must be an integer in [-2048, 2048]; got ${String(weight)}`,
+          );
+        }
+        return buildOperation({
+          method: 'paradeDbBoost',
+          args: [toExpr(self, TEXT), LiteralExpr.of(weight)],
+          returns: { codecId: TEXT, nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: '{{self}}::pdb.boost({{arg0}})',
+          },
+        });
+      },
+    },
+    paradeDbConst: {
+      self: { codecId: TEXT },
+      impl: (self, value) => {
+        if (!Number.isInteger(value)) {
+          throw new Error(`paradeDbConst: value must be an integer; got ${String(value)}`);
+        }
+        return buildOperation({
+          method: 'paradeDbConst',
+          args: [toExpr(self, TEXT), LiteralExpr.of(value)],
+          returns: { codecId: TEXT, nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: '{{self}}::pdb.const({{arg0}})',
+          },
+        });
+      },
+    },
+    paradeDbSlop: {
+      self: { codecId: TEXT },
+      impl: (self, slop) => {
+        if (!Number.isInteger(slop) || slop < 0) {
+          throw new Error(`paradeDbSlop: slop must be a non-negative integer; got ${String(slop)}`);
+        }
+        return buildOperation({
+          method: 'paradeDbSlop',
+          args: [toExpr(self, TEXT), LiteralExpr.of(slop)],
+          returns: { codecId: TEXT, nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: '{{self}}::pdb.slop({{arg0}})',
+          },
+        });
+      },
+    },
+    // https://docs.paradedb.com/documentation/full-text/proximity
+    paradeDbProximity: {
+      self: { codecId: TEXT },
+      impl: (start) => new ParadeDbProximityChain(start),
+    },
+  };
 }
 
 export const paradedbPackMeta = {

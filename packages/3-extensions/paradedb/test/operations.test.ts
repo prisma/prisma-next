@@ -5,8 +5,8 @@ import { ParadeDbProximityChain } from '../src/core/proximity-chain';
 import paradedbDescriptor from '../src/exports/runtime';
 
 function getProximityChain(start: unknown): ParadeDbProximityChain {
-  const operations = paradedbDescriptor.queryOperations?.() ?? [];
-  const op = operations.find((o) => o.method === 'paradeDbProximity');
+  const operations = paradedbDescriptor.queryOperations?.() ?? {};
+  const op = operations['paradeDbProximity'];
   if (!op) throw new Error('paradeDbProximity not found');
   const result = op.impl(start as never) as unknown;
   if (!(result instanceof ParadeDbProximityChain)) {
@@ -34,8 +34,8 @@ describe('paradedb operations', () => {
   });
 
   it('descriptor provides query operations whose impls build AST with lowering', () => {
-    const operations = paradedbDescriptor.queryOperations?.() ?? [];
-    expect(operations).toHaveLength(11);
+    const operations = paradedbDescriptor.queryOperations?.() ?? {};
+    expect(Object.keys(operations)).toHaveLength(11);
 
     const matchOps: ReadonlyArray<readonly [string, string]> = [
       ['paradeDbMatch', '@@@'],
@@ -46,7 +46,7 @@ describe('paradedb operations', () => {
     ];
     for (const [method, op] of matchOps) {
       const ast = buildOpAst(
-        operations.find((o) => o.method === method),
+        operations[method],
         ParamRef.of('hello', { codecId: 'pg/text@1' }),
         'world',
       );
@@ -59,7 +59,7 @@ describe('paradedb operations', () => {
     }
 
     const scoreAst = buildOpAst(
-      operations.find((op) => op.method === 'paradeDbScore'),
+      operations['paradeDbScore'],
       ParamRef.of(1, { codecId: 'pg/int4@1' }),
     );
     expect(scoreAst.lowering).toEqual({
@@ -75,11 +75,7 @@ describe('paradedb operations', () => {
       ['paradeDbSlop', 'slop', 2],
     ];
     for (const [method, pdbType, n] of typmodOps) {
-      const ast = buildOpAst(
-        operations.find((op) => op.method === method),
-        ParamRef.of('q', { codecId: 'pg/text@1' }),
-        n,
-      );
+      const ast = buildOpAst(operations[method], ParamRef.of('q', { codecId: 'pg/text@1' }), n);
       expect(ast.lowering).toEqual({
         targetFamily: 'sql',
         strategy: 'function',
@@ -128,9 +124,9 @@ describe('paradedb operations', () => {
   });
 
   it('typmod-cast ops reject out-of-range / non-integer values', () => {
-    const operations = paradedbDescriptor.queryOperations?.() ?? [];
+    const operations = paradedbDescriptor.queryOperations?.() ?? {};
     const find = (method: string) => {
-      const op = operations.find((o) => o.method === method);
+      const op = operations[method];
       if (!op) throw new Error(`${method} not found`);
       return op;
     };
@@ -163,7 +159,7 @@ describe('paradedb operations', () => {
   });
 
   it('operations carry self codec dispatch hints', () => {
-    const operations = paradedbDescriptor.queryOperations?.() ?? [];
+    const operations = paradedbDescriptor.queryOperations?.() ?? {};
 
     const textOps = [
       'paradeDbMatch',
@@ -178,21 +174,17 @@ describe('paradedb operations', () => {
       'paradeDbProximity',
     ];
     for (const method of textOps) {
-      expect(operations.find((op) => op.method === method)?.self).toEqual({
-        codecId: 'pg/text@1',
-      });
+      expect(operations[method]?.self).toEqual({ codecId: 'pg/text@1' });
     }
-    expect(operations.find((op) => op.method === 'paradeDbScore')?.self).toEqual({
-      codecId: 'pg/int4@1',
-    });
+    expect(operations['paradeDbScore']?.self).toEqual({ codecId: 'pg/int4@1' });
   });
 
   it('operations can be registered in registry', () => {
-    const operations = paradedbDescriptor.queryOperations?.() ?? [];
+    const operations = paradedbDescriptor.queryOperations?.() ?? {};
 
     const registry = createSqlOperationRegistry();
-    for (const op of operations) {
-      registry.register(op);
+    for (const [name, op] of Object.entries(operations)) {
+      registry.register(name, op);
     }
 
     const entries = registry.entries();
@@ -213,10 +205,8 @@ describe('paradedb operations', () => {
     }
   });
 
-  it('descriptor exposes empty codec and parameterized codec registries', () => {
-    const codecs = paradedbDescriptor.codecs();
-    expect(codecs).toBeDefined();
-    expect(paradedbDescriptor.parameterizedCodecs()).toEqual([]);
+  it('descriptor exposes empty codec registry', () => {
+    expect(paradedbDescriptor.codecs()).toEqual([]);
   });
 
   it('instance is minimal (identity only)', () => {
