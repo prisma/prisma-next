@@ -145,7 +145,7 @@ export async function applyAggregate<TFamilyId extends string, TTargetId extends
     action,
     kind: 'spanStart',
     spanId: APPLY_SPAN_ID,
-    label: 'Applying migration plan across spaces',
+    label: progressLabelForAction(action),
   });
 
   const perSpaceOptions: MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>[] =
@@ -258,6 +258,23 @@ export function collectOrdered(
     }
     return { spaceId, entry };
   });
+}
+
+/**
+ * Action-appropriate label for the `spanStart` event the apply
+ * primitive emits. `applyAggregate` is shared by `db init`, `db update`,
+ * and `migration apply`; the span label tracks the user-visible action
+ * so structured-progress output reads naturally for each surface.
+ */
+function progressLabelForAction(action: AggregateApplyAction): string {
+  switch (action) {
+    case 'dbInit':
+      return 'Initialising database across spaces';
+    case 'dbUpdate':
+      return 'Updating database across spaces';
+    case 'migrationApply':
+      return 'Applying migration plan across spaces';
+  }
 }
 
 function labelForAction(action: AggregateApplyAction): string {

@@ -666,6 +666,12 @@ describe('executeDbUpdate', () => {
       expect(spanIds).toContain('introspect');
       expect(spanIds).toContain('plan');
 
+      const applyStart = events.find((e) => e.kind === 'spanStart' && e.spanId === 'apply');
+      expect(applyStart).toMatchObject({
+        action: 'dbUpdate',
+        label: 'Updating database across spaces',
+      });
+
       const applyEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'apply');
       expect(applyEnd).toMatchObject({ outcome: 'ok' });
     });

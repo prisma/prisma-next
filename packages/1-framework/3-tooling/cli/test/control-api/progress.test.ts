@@ -158,6 +158,10 @@ describe('executeDbInit progress emission', () => {
 
     const applySpanStart = events.find((e) => e.kind === 'spanStart' && e.spanId === 'apply');
     expect(applySpanStart).toBeDefined();
+    expect(applySpanStart).toMatchObject({
+      action: 'dbInit',
+      label: 'Initialising database across spaces',
+    });
 
     const applySpanEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'apply');
     expect(applySpanEnd).toMatchObject({ outcome: 'ok' });
