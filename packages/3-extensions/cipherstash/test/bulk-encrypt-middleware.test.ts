@@ -291,12 +291,11 @@ describe('bulkEncryptMiddleware', () => {
     });
 
     it('rejects re-binding a pre-stamped envelope to a different routing target', async () => {
-      // Pre-A10 the middleware silently preserved the prior routing key
-      // ("write-once-wins"); after A10, `setHandleRoutingKey` throws on
-      // a conflicting reassignment. Reusing an envelope already bound to
-      // one routing target inside a plan that lowers to a different
-      // target is a programming error — silently keeping the stale
-      // binding would lower to the wrong bulk-encrypt batch.
+      // Reusing an envelope already bound to one (table, column) routing
+      // target inside a bulk-encrypt plan that lowers to a different
+      // target is a programming error: `setHandleRoutingKey` throws on a
+      // conflicting reassignment so the envelope cannot silently retain
+      // a stale binding and route to the wrong bulk-encrypt batch.
       const sdk = makeCounterSdk();
       const middleware = bulkEncryptMiddleware(sdk);
       const envelope = EncryptedString.from('alice@example.com');
