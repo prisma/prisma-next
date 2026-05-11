@@ -520,7 +520,7 @@ function buildContractCodecRegistry(
       const descriptor = codecDescriptors.descriptorFor(ref.codecId);
       // Skip codec ids the descriptor registry doesn't recognise — today's contract walk silently leaves `resolvedCodec` undefined for unregistered ids and we preserve that behaviour rather than throwing CODEC_DESCRIPTOR_MISSING during context construction.
       if (!descriptor) continue;
-      // Parameterized codec column with neither `typeRef` nor `typeParams` — the legitimate "undimensioned" form for codecs that ship a no-params column variant alongside a parameterized one (e.g. pgvector's `vectorColumn` vs. `vector(N)`). The descriptor's `paramsSchema` would reject `undefined`; encode/decode for these columns flows through `forCodecId` until M3 unifies dispatch onto `forCodecRef`.
+      // Defensive: a parameterized codec column with neither `typeRef` nor `typeParams` would fail the descriptor's `paramsSchema` validation on `undefined`. No production codec currently declares such a column shape, but the guard keeps the warm pass robust against future authors who might.
       if (descriptor.isParameterized && ref.typeParams === undefined) continue;
       resolver.forCodecRef(ref);
     }

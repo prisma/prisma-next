@@ -108,22 +108,6 @@ describe('pgvector codecs', () => {
     );
   });
 
-  // The runtime materializes a representative codec for parameterized descriptors
-  // via `factory(undefined)(ctx)` so undimensioned `vectorColumn` columns (no
-  // `typeParams.length`) still resolve through codec encode/decode. This guards
-  // against silently regressing back to passing arrays through node-postgres,
-  // which formats them as PG array literals (`{"0.1","0.2"}`) rejected by the
-  // `vector` type.
-  it('factory(undefined) yields a length-agnostic codec (representative for undimensioned columns)', async () => {
-    const factory = pgVectorDescriptor.factory as unknown as (
-      params: undefined,
-    ) => (ctx: { name: string }) => AsyncVectorCodec;
-    const codec = factory(undefined)({ name: 'representative' });
-    expect(await codec.encode([0.1, 0.2, 0.3])).toBe('[0.1,0.2,0.3]');
-    expect(await codec.encode([1, 2, 3, 4, 5])).toBe('[1,2,3,4,5]');
-    expect(await codec.decode('[0.4,0.5]')).toEqual([0.4, 0.5]);
-  });
-
   it('rejects decoding when the wire payload contains a non-number token', async () => {
     const vectorCodec = asAsyncCodec(3);
     await expect(vectorCodec.decode('[1,foo,3]')).rejects.toThrow(

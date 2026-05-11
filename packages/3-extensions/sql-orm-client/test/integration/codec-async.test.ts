@@ -59,8 +59,8 @@ describe('integration/codec-async', () => {
       await withCollectionRuntime(async (runtime) => {
         await seedUsers(runtime, [{ id: 1, name: 'A', email: 'a@example.com' }]);
         await seedPosts(runtime, [
-          { id: 1, title: 'First', userId: 1, views: 0, embedding: [0.1, 0.2] },
-          { id: 2, title: 'Second', userId: 1, views: 0, embedding: [0.3, 0.4] },
+          { id: 1, title: 'First', userId: 1, views: 0, embedding: [0.1, 0.2, 0.3] },
+          { id: 2, title: 'Second', userId: 1, views: 0, embedding: [0.3, 0.4, 0.5] },
         ]);
 
         const posts = createPostsCollection(runtime);
@@ -72,8 +72,8 @@ describe('integration/codec-async', () => {
         }
 
         expect(collected).toEqual([
-          { id: 1, embedding: [0.1, 0.2] },
-          { id: 2, embedding: [0.3, 0.4] },
+          { id: 1, embedding: [0.1, 0.2, 0.3] },
+          { id: 2, embedding: [0.3, 0.4, 0.5] },
         ]);
         expect(Array.isArray(collected[0]?.embedding)).toBe(true);
       });
@@ -149,7 +149,7 @@ describe('integration/codec-async', () => {
       await withCollectionRuntime(async (runtime) => {
         await seedUsers(runtime, [{ id: 1, name: 'A', email: 'a@example.com' }]);
         await seedPosts(runtime, [
-          { id: 1, title: 'Hello', userId: 1, views: 0, embedding: [0.1, 0.2] },
+          { id: 1, title: 'Hello', userId: 1, views: 0, embedding: [0.1, 0.2, 0.3] },
         ]);
 
         const posts = createReturningPostsCollection(runtime);

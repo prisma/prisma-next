@@ -1,21 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { VECTOR_MAX_DIM } from '../src/core/constants';
-import { vector, vectorColumn } from '../src/exports/column-types';
+import { vector } from '../src/exports/column-types';
 
 describe('pgvector column-types', () => {
-  describe('vectorColumn (static)', () => {
-    it('has correct codecId and nativeType', () => {
-      expect(vectorColumn).toMatchObject({
-        codecId: 'pg/vector@1',
-        nativeType: 'vector',
-      });
-    });
-
-    it('has no typeParams', () => {
-      expect(vectorColumn).not.toHaveProperty('typeParams');
-    });
-  });
-
   describe('vector() factory', () => {
     it('creates descriptor with typeParams.length', () => {
       const descriptor = vector(1536);
