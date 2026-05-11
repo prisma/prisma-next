@@ -18,7 +18,7 @@
  * and runs the helpers against on-disk artefacts on disk plus a fake set of
  * marker rows.
  *
- * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
+ * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  *   — "Pinned per-space artefacts" / verifier reads only the user repo.
  */
 

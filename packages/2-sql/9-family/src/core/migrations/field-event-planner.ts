@@ -19,7 +19,7 @@
  * `'altered'` is suppressed when only `codecId` differs (codec rotation is a
  * v1 non-goal).
  *
- * See: `docs/architecture docs/adrs/ADR 212 - Codec lifecycle hooks.md`.
+ * See: `docs/architecture docs/adrs/ADR 213 - Codec lifecycle hooks.md`.
  */
 
 import type { Contract } from '@prisma-next/contract/types';

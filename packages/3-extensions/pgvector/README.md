@@ -217,7 +217,7 @@ this package using the same pipeline application authors use:
   planner currently refuses to scaffold the baseline migration with
   `PN-CLI-4020 Contract changed but planner produced no operations`
   (this is **Path B** authoring per
-  [ADR 211](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md#on-disk-in-package-authoring-convention)).
+  [ADR 212](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md#on-disk-in-package-authoring-convention)).
   That directory was hand-authored once (Migration subclass + seed
   `migration.json` preserving the full `toContract`) and `pnpm tsx
   migrations/pgvector/<dirName>/migration.ts` re-emits `ops.json` +
@@ -234,7 +234,7 @@ this package using the same pipeline application authors use:
 The descriptor at `src/exports/control.ts` then JSON-imports those
 artefacts and synthesises the framework's `MigrationPackage` shape.
 
-See [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
+See [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md)
 ("On-disk-in-package authoring convention") for the full rationale and
 [`packages/3-extensions/test-contract-space`](../test-contract-space)
 for the reference model.
@@ -244,6 +244,6 @@ for the reference model.
 - [pgvector documentation](https://github.com/pgvector/pgvector)
 - [Prisma Next Architecture Overview](../../../docs/Architecture%20Overview.md)
 - [Extension Packs Guide](../../../docs/reference/Extension-Packs-Naming-and-Layout.md)
-- [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
+- [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md)
 
 Pack refs (`@prisma-next/extension-pgvector/pack`) are pure data objects generated from the hydrated manifest (`src/core/manifest.ts`), so TypeScript contract builders can enable the pgvector namespace in both emit and no-emit workflows without touching the filesystem.
