@@ -15,11 +15,20 @@ export interface RuntimeErrorEnvelope extends Error {
  * - `'decode'` — abort fired during `decodeRow` / `decodeField`.
  * - `'stream'` — abort fired between rows or before any codec call
  *   (already-aborted at entry).
+ * - `'beforeExecute'` / `'afterExecute'` / `'onRow'` — abort fired
+ *   on entry to or during the corresponding middleware phase
+ *   (cooperative cancellation per the param-transform seam).
  */
 export const RUNTIME_ABORTED = 'RUNTIME.ABORTED' as const;
 
 /** Discriminator placed in `details.phase` of a `RUNTIME.ABORTED` envelope. */
-export type RuntimeAbortedPhase = 'encode' | 'decode' | 'stream';
+export type RuntimeAbortedPhase =
+  | 'encode'
+  | 'decode'
+  | 'stream'
+  | 'beforeExecute'
+  | 'afterExecute'
+  | 'onRow';
 
 /**
  * Type guard for the runtime-error envelope produced by `runtimeError`.
@@ -72,10 +81,12 @@ function resolveCategory(code: string): RuntimeErrorEnvelope['category'] {
 
 /**
  * Construct a `RUNTIME.ABORTED` envelope. Phase distinguishes where the
- * abort was observed (encode / decode / stream); cause carries `signal.reason`
- * verbatim from the platform — native abort produces a `DOMException`,
- * explicit `controller.abort(reason)` produces whatever the caller passed.
- * No synthesis happens here.
+ * abort was observed — codec call sites (`encode` / `decode` / `stream`)
+ * or middleware seams (`beforeExecute` / `afterExecute` / `onRow`), as
+ * enumerated on {@link RuntimeAbortedPhase}. Cause carries
+ * `signal.reason` verbatim from the platform — native abort produces a
+ * `DOMException`, explicit `controller.abort(reason)` produces whatever
+ * the caller passed. No synthesis happens here.
  */
 export function runtimeAborted(phase: RuntimeAbortedPhase, cause?: unknown): RuntimeErrorEnvelope {
   const envelope = runtimeError(RUNTIME_ABORTED, `Operation aborted during ${phase}`, { phase });

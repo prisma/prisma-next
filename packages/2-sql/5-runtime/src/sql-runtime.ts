@@ -25,6 +25,11 @@ import type {
   SqlTransaction,
 } from '@prisma-next/sql-relational-core/ast';
 import { validateParamRefRefs } from '@prisma-next/sql-relational-core/ast';
+import {
+  createSqlParamRefMutator,
+  type SqlParamRefMutator,
+  type SqlParamRefMutatorInternal,
+} from '@prisma-next/sql-relational-core/middleware';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
@@ -241,6 +246,11 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     const signal = options?.signal;
     // One ctx per execute() call — the same reference is shared by encodeParams (lower), decodeRow (per-row), and the stream loop's between-row checks. Per-cell ctx allocations inside decodeField add `column` for resolvable cells without re-wrapping the signal. The ctx object is always allocated; the `signal` field is only included when a signal was supplied (exactOptionalPropertyTypes).
     const codecCtx: SqlCodecCallContext = signal === undefined ? {} : { signal };
+    // Per-execute view of the middleware ctx that carries the per-query
+    // signal. `self.ctx` is allocated once at construction (no signal); we
+    // shallow-clone it here so middleware sees the same `AbortSignal`
+    // reference threaded into `codecCtx.signal` (ADR 207 identity).
+    const execMiddlewareCtx = signal === undefined ? self.ctx : { ...self.ctx, signal };
 
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       checkAborted(codecCtx, 'stream');
@@ -277,15 +287,25 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
           await self.verifyMarker();
         }
 
-        const stream = runWithMiddleware<SqlExecutionPlan, Record<string, unknown>>(
+        const paramsMutator: SqlParamRefMutatorInternal = createSqlParamRefMutator(exec);
+        const stream = runWithMiddleware<
+          SqlExecutionPlan,
+          Record<string, unknown>,
+          SqlParamRefMutator
+        >(
           exec,
           self.middleware,
-          self.ctx,
+          execMiddlewareCtx,
           () =>
             queryable.execute<Record<string, unknown>>({
               sql: exec.sql,
-              params: exec.params,
+              // Read params after the `beforeExecute` middleware chain has
+              // run so that any `mutator.replaceValue(...)` calls land in
+              // the driver-bound params array. When no middleware mutated,
+              // `currentParams()` returns `exec.params` by reference identity.
+              params: paramsMutator.currentParams(),
             }),
+          paramsMutator,
         );
 
         // Manually drive the driver's async iterator so the between-row abort check fires *before* requesting the next row. With a `for await...of` loop the runtime would await `iterator.next()` first, leaving a window where one extra row is pulled through the driver after the signal aborted.

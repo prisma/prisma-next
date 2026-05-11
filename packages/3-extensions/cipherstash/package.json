@@ -6,6 +6,7 @@
   "sideEffects": false,
   "description": "CipherStash EQL extension for Prisma Next: contract-space authoring of the encrypted-column scaffolding (eql_v2_configuration table, eql_v2_encrypted/ore_* composite types, eql_v2 domains) plus a baseline migration that installs the vendored EQL bundle SQL byte-for-byte.",
   "scripts": {
+    "build:contract-space": "prisma-next contract emit",
     "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -20,17 +21,27 @@
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/migration-tools": "workspace:*",
-    "@prisma-next/sql-contract": "workspace:*"
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-operations": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "@prisma-next/ts-render": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
+    "arktype": "catalog:"
   },
   "devDependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/psl-parser": "workspace:*",
+    "@prisma-next/sql-contract-psl": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
+    "pathe": "^2.0.3",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
@@ -40,12 +51,19 @@
     "src"
   ],
   "exports": {
+    "./column-types": "./dist/column-types.mjs",
     "./control": "./dist/control.mjs",
+    "./middleware": "./dist/middleware.mjs",
+    "./migration": "./dist/migration.mjs",
+    "./operation-types": "./dist/operation-types.mjs",
+    "./pack": "./dist/pack.mjs",
+    "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/3-extensions/cipherstash"
-  }
+  },
+  "types": "./dist/control.d.mts"
 }

@@ -16,6 +16,7 @@ import type {
   MigrationRunnerFailure,
   MigrationRunnerSuccessValue,
   OperationContext,
+  OpFactoryCall,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import type {
@@ -174,10 +175,7 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
    * (the new field's codec for `'added'` / `'altered'`; the prior field's
    * codec for `'dropped'`).
    */
-  onFieldEvent?: (
-    event: FieldEvent,
-    ctx: FieldEventContext,
-  ) => readonly SqlMigrationPlanOperation<TTargetDetails>[];
+  onFieldEvent?: (event: FieldEvent, ctx: FieldEventContext) => readonly OpFactoryCall[];
 }
 
 export interface SqlControlExtensionDescriptor<TTargetId extends string>
