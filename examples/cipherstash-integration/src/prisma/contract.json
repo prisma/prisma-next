@@ -94,6 +94,40 @@
       "kind": "extension",
       "targetId": "postgres",
       "types": {
+        "codecTypes": {
+          "codecInstances": [
+            {
+              "descriptor": {
+                "codecId": "cipherstash/string@1",
+                "meta": {
+                  "db": {
+                    "sql": {
+                      "postgres": {
+                        "nativeType": "eql_v2_encrypted"
+                      }
+                    }
+                  }
+                },
+                "paramsSchema": {
+                  "~standard": {
+                    "vendor": "cipherstash",
+                    "version": 1
+                  }
+                },
+                "targetTypes": [
+                  "eql_v2_encrypted"
+                ]
+              }
+            }
+          ],
+          "typeImports": [
+            {
+              "alias": "EncryptedString",
+              "named": "EncryptedString",
+              "package": "@prisma-next/extension-cipherstash/runtime"
+            }
+          ]
+        },
         "operationTypes": {
           "import": {
             "alias": "CipherstashOperationTypes",
