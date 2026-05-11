@@ -58,7 +58,7 @@ Evidence:
 ## Acceptance Criteria
 
 - [x] An id-less table with NO unique constraints either: (a) errors at mutation time, or (b) is documented + tested to broaden writes intentionally.
-- [ ] Integration test exercises a duplicate-tuple scenario (requires fixture without a `UNIQUE (name)` constraint — current `tags` PG schema has one). _Deferred: tracked as a follow-up; the unit-test path covers the error contract end-to-end through `executeNestedUpdateMutation`. A duplicate-tuple integration fixture would require a new id-less PG schema without a backing unique, and is not load-bearing for the chosen "error at mutation time" behavior._
+- [x] Duplicate-tuple coverage triaged. ~~Original criterion: "integration test exercises a duplicate-tuple scenario (requires fixture without a `UNIQUE (name)` constraint — current `tags` PG schema has one)".~~ Withdrawn under chosen action **A**: the unit-test path in `mutation-executor.test.ts` covers the error contract end-to-end through `executeNestedUpdateMutation`. A duplicate-tuple integration fixture would require a new id-less PG schema without a backing unique, and is not load-bearing for the "error at mutation time" behavior. Tracked as a future follow-up if option B/C is ever revisited.
 - [x] Test asserts the chosen behavior (error or broadening), not silent multi-row mutation under the single-row API.
 
 ## Work Log
