@@ -429,7 +429,7 @@ function determineLimit(opts: MigrationStatusOptions) {
  * version reports per-space marker + pending state alongside the
  * cross-space totals.
  */
-async function loadAggregateStatusSpaces(args: {
+export async function loadAggregateStatusSpaces(args: {
   readonly targetId: string;
   readonly migrationsDir: string;
   readonly appContractRaw: unknown;
@@ -709,8 +709,11 @@ async function executeMigrationStatusCommand(
       } catch {
         // Older family instances may not implement `readAllMarkers`.
         // Per-space enumeration falls back to "marker unknown" rather
-        // than failing the whole status command.
-        allMarkers = new Map();
+        // than failing the whole status command — leaving
+        // `allMarkers` as `null` signals "unknown" to the aggregate
+        // loader (an empty `Map` would instead mean "every space has
+        // no marker", which is a different condition).
+        allMarkers = null;
       }
     } catch {
       if (!flags.json && !flags.quiet) {
