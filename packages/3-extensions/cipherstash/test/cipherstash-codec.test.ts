@@ -154,7 +154,7 @@ describe('cipherstashStringCodecHooks.onFieldEvent', () => {
     it('add op label is action-first / column-first and free of extension jargon', () => {
       const [op] = onFieldEvent('added', ctx({ next: { typeParams: { searchable: true } } }));
       expect(op!.label).toBe(`Enable cipherstash search on ${TABLE}.${FIELD}`);
-      // The pre-M6 wording must not reappear (regression bar).
+      // Legacy wording must not reappear (regression bar).
       expect(op!.label).not.toContain('Register cipherstash search config');
     });
 
