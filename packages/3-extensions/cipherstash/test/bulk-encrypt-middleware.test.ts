@@ -289,7 +289,13 @@ describe('bulkEncryptMiddleware', () => {
       });
     });
 
-    it('preserves a pre-stamped routing context (write-once-wins)', async () => {
+    it('rejects re-binding a pre-stamped envelope to a different routing target', async () => {
+      // Pre-A10 the middleware silently preserved the prior routing key
+      // ("write-once-wins"); after A10, `setHandleRoutingKey` throws on
+      // a conflicting reassignment. Reusing an envelope already bound to
+      // one routing target inside a plan that lowers to a different
+      // target is a programming error — silently keeping the stale
+      // binding would lower to the wrong bulk-encrypt batch.
       const sdk = makeCounterSdk();
       const middleware = bulkEncryptMiddleware(sdk);
       const envelope = EncryptedString.from('alice@example.com');
@@ -297,10 +303,24 @@ describe('bulkEncryptMiddleware', () => {
       const plan = buildInsertPlan('user', [{ email: envelope }]);
       const params = createSqlParamRefMutator(plan);
 
+      await expect(middleware.beforeExecute?.(plan, createCtx(), params)).rejects.toThrow(
+        /routing-key table conflict/,
+      );
+      expect(sdk.bulkEncryptCalls).toHaveLength(0);
+    });
+
+    it('re-stamping with the same routing target is a no-op', async () => {
+      const sdk = makeCounterSdk();
+      const middleware = bulkEncryptMiddleware(sdk);
+      const envelope = EncryptedString.from('alice@example.com');
+      setHandleRoutingKey(envelope, 'user', 'email');
+      const plan = buildInsertPlan('user', [{ email: envelope }]);
+      const params = createSqlParamRefMutator(plan);
+
       await middleware.beforeExecute?.(plan, createCtx(), params);
 
       expect(sdk.bulkEncryptCalls[0]?.routingKey).toEqual({
-        table: 'admin',
+        table: 'user',
         column: 'email',
       });
     });
