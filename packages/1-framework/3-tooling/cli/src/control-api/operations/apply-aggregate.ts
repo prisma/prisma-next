@@ -90,7 +90,8 @@ export interface ApplyAggregateValue {
   readonly totalOpsExecuted: number;
   /**
    * Per-space breakdown ready to thread into action-specific success
-   * envelopes. Markers populated (M6 AC4 / AC5).
+   * envelopes. Each entry carries the post-apply marker (live storage hash
+   * plus invariants) so callers can render it directly without re-reading.
    */
   readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
 }
