@@ -1,0 +1,246 @@
+import type { Contract } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
+import { voidParamsSchema } from '@prisma-next/framework-components/codec';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
+import { describe, expect, it } from 'vitest';
+import type { SqlRuntimeExtensionDescriptor } from '../src/sql-context';
+import { createStubAdapter, createTestContext } from './utils';
+
+/**
+ * Build-time integrity check that surfaces (codecId, isParameterized, typeParams) mismatches in `storage.tables[t].columns[c]` before any AST-bound codec resolution can mask them. The legacy "tolerate codec references without params" patterns silently skipped malformed columns; the integrity check throws explicit envelope codes instead.
+ */
+describe('createExecutionContext — column codec integrity', () => {
+  function makeCodec(): Codec {
+    return {
+      id: 'whatever',
+      encode: (v: unknown) => Promise.resolve(v),
+      decode: (w: unknown) => Promise.resolve(w),
+      encodeJson: (v) => v as never,
+      decodeJson: (j) => j as never,
+    };
+  }
+
+  function parameterizedExtension(): SqlRuntimeExtensionDescriptor<'postgres'> {
+    const descriptor: CodecDescriptor<{ length: number }> = {
+      codecId: 'pgvector/vector@1',
+      traits: [],
+      targetTypes: ['vector'],
+      paramsSchema: {
+        '~standard': {
+          version: 1,
+          vendor: 'test',
+          validate: (value) => ({ value: value as { length: number } }),
+        },
+      },
+      isParameterized: true,
+      factory: ((_params: { length: number }) => (_ctx: SqlCodecInstanceContext) =>
+        makeCodec()) as unknown as CodecDescriptor<{ length: number }>['factory'],
+    };
+    return {
+      kind: 'extension' as const,
+      id: 'pgvector-test',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      codecs: () => [descriptor as unknown as CodecDescriptor],
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+  }
+
+  function nonParameterizedExtension(): SqlRuntimeExtensionDescriptor<'postgres'> {
+    const descriptor: CodecDescriptor<void> = {
+      codecId: 'test/scalar@1',
+      traits: [],
+      targetTypes: ['scalar'],
+      paramsSchema: voidParamsSchema,
+      isParameterized: false,
+      factory: ((_params: undefined) => (_ctx: SqlCodecInstanceContext) =>
+        makeCodec()) as unknown as CodecDescriptor<void>['factory'],
+    };
+    return {
+      kind: 'extension' as const,
+      id: 'scalar-test',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      codecs: () => [descriptor],
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+  }
+
+  function contractWithColumn(column: {
+    readonly codecId: string;
+    readonly nativeType: string;
+    readonly typeParams?: Record<string, unknown>;
+    readonly typeRef?: string;
+  }): Contract<SqlStorage> {
+    const storage: SqlStorage = {
+      storageHash: coreHash('sha256:test'),
+      tables: {
+        Doc: {
+          columns: {
+            field: {
+              nativeType: column.nativeType,
+              codecId: column.codecId,
+              nullable: false,
+              ...(column.typeParams ? { typeParams: column.typeParams } : {}),
+              ...(column.typeRef ? { typeRef: column.typeRef } : {}),
+            },
+          },
+          primaryKey: { columns: ['field'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    };
+    return {
+      targetFamily: 'sql',
+      target: 'postgres',
+      profileHash: profileHash('sha256:test'),
+      models: {},
+      roots: {},
+      storage,
+      extensionPacks: {},
+      capabilities: {},
+      meta: {},
+    };
+  }
+
+  it('throws CODEC_DESCRIPTOR_MISSING when a column references an unregistered codecId', () => {
+    const contract = contractWithColumn({
+      codecId: 'nope/missing@1',
+      nativeType: 'vector',
+    });
+    expect(() =>
+      createTestContext(contract, createStubAdapter(), {
+        extensionPacks: [parameterizedExtension()],
+      }),
+    ).toThrow(/CODEC_DESCRIPTOR_MISSING|nope\/missing@1/);
+  });
+
+  it('throws CODEC_PARAMETERIZATION_MISMATCH when a parameterized codec column lacks typeParams', () => {
+    const contract = contractWithColumn({
+      codecId: 'pgvector/vector@1',
+      nativeType: 'vector',
+    });
+    expect(() =>
+      createTestContext(contract, createStubAdapter(), {
+        extensionPacks: [parameterizedExtension()],
+      }),
+    ).toThrow(/CODEC_PARAMETERIZATION_MISMATCH|pgvector\/vector@1/);
+  });
+
+  it('throws CODEC_PARAMETERIZATION_MISMATCH when a non-parameterized codec column carries typeParams', () => {
+    const contract = contractWithColumn({
+      codecId: 'test/scalar@1',
+      nativeType: 'scalar',
+      typeParams: { unexpected: 1 },
+    });
+    expect(() =>
+      createTestContext(contract, createStubAdapter(), {
+        extensionPacks: [nonParameterizedExtension()],
+      }),
+    ).toThrow(/CODEC_PARAMETERIZATION_MISMATCH|test\/scalar@1/);
+  });
+
+  it('error message names the (table, column) site for missing codec', () => {
+    const contract = contractWithColumn({
+      codecId: 'nope/missing@1',
+      nativeType: 'vector',
+    });
+    expect(() =>
+      createTestContext(contract, createStubAdapter(), {
+        extensionPacks: [parameterizedExtension()],
+      }),
+    ).toThrow(/Doc.*field|field.*Doc/);
+  });
+
+  it('error message names the (table, column) site for parameterization mismatch', () => {
+    const contract = contractWithColumn({
+      codecId: 'pgvector/vector@1',
+      nativeType: 'vector',
+    });
+    expect(() =>
+      createTestContext(contract, createStubAdapter(), {
+        extensionPacks: [parameterizedExtension()],
+      }),
+    ).toThrow(/Doc.*field|field.*Doc/);
+  });
+
+  it('accepts a parameterized column with typeParams', () => {
+    const contract = contractWithColumn({
+      codecId: 'pgvector/vector@1',
+      nativeType: 'vector',
+      typeParams: { length: 1536 },
+    });
+    expect(() =>
+      createTestContext(contract, createStubAdapter(), {
+        extensionPacks: [parameterizedExtension()],
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts a non-parameterized column without typeParams', () => {
+    const contract = contractWithColumn({
+      codecId: 'test/scalar@1',
+      nativeType: 'scalar',
+    });
+    expect(() =>
+      createTestContext(contract, createStubAdapter(), {
+        extensionPacks: [nonParameterizedExtension()],
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts a typeRef column whose typed instance carries typeParams', () => {
+    const storage: SqlStorage = {
+      storageHash: coreHash('sha256:test'),
+      tables: {
+        Doc: {
+          columns: {
+            embedding: {
+              nativeType: 'vector',
+              codecId: 'pgvector/vector@1',
+              nullable: false,
+              typeRef: 'V1536',
+            },
+          },
+          primaryKey: { columns: ['embedding'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+      types: {
+        V1536: {
+          codecId: 'pgvector/vector@1',
+          nativeType: 'vector',
+          typeParams: { length: 1536 },
+        },
+      },
+    };
+    const contract: Contract<SqlStorage> = {
+      targetFamily: 'sql',
+      target: 'postgres',
+      profileHash: profileHash('sha256:test'),
+      models: {},
+      roots: {},
+      storage,
+      extensionPacks: {},
+      capabilities: {},
+      meta: {},
+    };
+    expect(() =>
+      createTestContext(contract, createStubAdapter(), {
+        extensionPacks: [parameterizedExtension()],
+      }),
+    ).not.toThrow();
+  });
+});

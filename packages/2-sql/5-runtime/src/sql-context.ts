@@ -352,6 +352,66 @@ function validateColumnTypeParams(
 }
 
 /**
+ * Build-time contract-integrity check: every `(table, column)` resolves to a {@link CodecRef} whose `codecId` is registered and whose `typeParams` presence matches the descriptor's `isParameterized` flag.
+ *
+ * Surfaces three classes of malformed contract that AST-bound codec resolution would otherwise mask silently:
+ *
+ * - column references a codecId no contributor registered → `RUNTIME.CODEC_DESCRIPTOR_MISSING`.
+ * - parameterized codec, no `typeParams` (legacy "tolerate refs without params" shape) → `RUNTIME.CODEC_PARAMETERIZATION_MISMATCH`.
+ * - non-parameterized codec, `typeParams` supplied → `RUNTIME.CODEC_PARAMETERIZATION_MISMATCH`.
+ *
+ * Runs unconditionally from `createExecutionContext` so contract bugs fail fast at construction time instead of silently skipping affected columns in the codec registry's pre-population walk.
+ */
+function assertColumnCodecIntegrity(
+  storage: SqlStorage,
+  codecDescriptors: CodecDescriptorRegistry,
+): void {
+  for (const [tableName, table] of Object.entries(storage.tables)) {
+    for (const columnName of Object.keys(table.columns)) {
+      const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+      if (!ref) continue;
+
+      const descriptor = codecDescriptors.descriptorFor(ref.codecId);
+      if (!descriptor) {
+        throw runtimeError(
+          'RUNTIME.CODEC_DESCRIPTOR_MISSING',
+          `Column '${tableName}.${columnName}' references codec '${ref.codecId}' but no contributor registered a codec descriptor for that codecId. Add the extension pack that owns the codec to the runtime stack.`,
+          { table: tableName, column: columnName, codecId: ref.codecId },
+        );
+      }
+
+      if (descriptor.isParameterized && ref.typeParams === undefined) {
+        throw runtimeError(
+          'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH',
+          `Column '${tableName}.${columnName}' uses parameterized codec '${ref.codecId}' but no typeParams are supplied. Provide typeParams on the column, or use a typeRef pointing at a storage.types entry that carries them.`,
+          {
+            table: tableName,
+            column: columnName,
+            codecId: ref.codecId,
+            expected: 'parameterized',
+            actual: 'no typeParams',
+          },
+        );
+      }
+
+      if (!descriptor.isParameterized && ref.typeParams !== undefined) {
+        throw runtimeError(
+          'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH',
+          `Column '${tableName}.${columnName}' supplies typeParams to non-parameterized codec '${ref.codecId}'. Remove the typeParams or switch to a parameterized codec id.`,
+          {
+            table: tableName,
+            column: columnName,
+            codecId: ref.codecId,
+            expected: 'non-parameterized',
+            actual: 'has typeParams',
+          },
+        );
+      }
+    }
+  }
+}
+
+/**
  * Build a {@link ContractCodecRegistry} that resolves codecs exclusively through the `forCodecRef` content-keyed cache.
  *
  * One pre-population pass walks `storage.types` and `storage.tables[].columns[]` to seed the resolver's per-ref instance context with the *aggregated* `usedAt` set for each canonical `(codecId, typeParams)` key. The same codec materialised through `forColumn` or `forCodecRef` is therefore one instance with one `SqlCodecInstanceContext` — stateful codecs reading `usedAt` see the full column set regardless of which surface the caller used.
@@ -641,6 +701,7 @@ export function createExecutionContext<
   }
 
   const codecDescriptors = buildCodecDescriptorRegistry(allCodecDescriptors, contract.storage);
+  assertColumnCodecIntegrity(contract.storage, codecDescriptors);
   const mutationDefaultGeneratorRegistry = collectMutationDefaultGenerators(contributors);
   assertMutationDefaultGeneratorsAvailable(contract, mutationDefaultGeneratorRegistry);
 
