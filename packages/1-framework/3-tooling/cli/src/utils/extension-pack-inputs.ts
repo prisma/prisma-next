@@ -8,8 +8,6 @@
  * downstream code consumes the canonical shape and maps it to its own
  * narrower shape via the per-consumer adapters below.
  *
- * This is the AC11 helper for the M6 (extension-contract-spaces) milestone.
- *
  * The CLI receives extension descriptors typed against the SQL family
  * (or any other family in the future); this helper only depends on the
  * structural shape of `contractSpace`. SQL-family callers pass the same
@@ -63,7 +61,8 @@ export interface ExtensionPackInput {
  * The CLI is the descriptor-import boundary; `extensionPacks` is the only
  * surface where the SQL-family-typed `ControlExtensionDescriptor` flows
  * into framework-neutral helpers. The structural cast lives here, and
- * here alone (AC11).
+ * here alone — every other CLI consumer reads the canonical
+ * {@link ExtensionPackInput} shape produced by {@link toExtensionInputs}.
  */
 type ExtensionPackLike = {
   readonly id: string;
