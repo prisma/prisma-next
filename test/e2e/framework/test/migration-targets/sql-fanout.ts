@@ -91,33 +91,47 @@ export type SqlTargetName = 'sqlite' | 'postgres';
 // biome-ignore lint/suspicious/noExplicitAny: ContractModelBuilder is generic over name/fields/relations/attrs/sql — we accept any concrete instance
 export type AnyContractModelBuilder = ContractModelBuilder<any, any, any, any, any>;
 
+// ---------------------------------------------------------------------------
+// Target-neutral typing via unions
+// ---------------------------------------------------------------------------
+//
+// `SqlFanoutContext` exposes `defineContract`, `int`/`text` (field
+// builders), and `integerColumn`/`textColumn` (raw column descriptors)
+// with target-NEUTRAL types — unions over every supported SQL target's
+// pack/column types. No target is privileged; adding a new SQL target
+// means extending these unions (and adding a case below).
+//
+// Each case's runtime values use ITS OWN concrete pack and column
+// descriptors. The union types are upper bounds for the static
+// interface; runtime values are subtypes of the unions. Codec lookups
+// inside `Db<TContract>` operate over whichever pack the contract was
+// built with (per case) — every concrete pack supplies the codecs its
+// own column descriptors reference, so the JS scalar types resolve
+// correctly per case without any cross-pack synthesis.
+
+type SupportedSqlPack = typeof sqlitePack | typeof postgresPack;
+type SupportedIntColumn = typeof sqliteIntegerColumn | typeof int4Column;
+type SupportedTextColumn = typeof sqliteTextColumn | typeof pgTextColumn;
+
 /**
- * `defineContract` pre-bound to a target's family/target pack. The
- * `const Models` generic preserves the inferred model/column literal
- * types end-to-end (table keys, column keys, scalar JS types), so
- * `db.<ModelName>.<col>` works in test bodies with full type checking.
- *
- * The function below provides the sqlite-flavored canonical typing for
- * `DefineSqlContract`. The postgres case's runtime uses a different
- * target pack at execution time, but the model/storage-tables literal
- * shape produced by both is identical at the type level (only codec /
- * native-type details differ, which migration tests don't probe via
- * the DSL).
+ * Typing-only signature for `defineContract`. The Target generic is the
+ * union of supported SQL packs; each case's actual implementation calls
+ * `baseDefineContract` with its own concrete pack value. The `const
+ * Models` generic preserves the inferred model/column literal types
+ * end-to-end (table keys, column keys, scalar JS types).
  */
-function sqliteDefineContractTyping<
+function defineSqlContractTyping<
   const Models extends Record<string, AnyContractModelBuilder>,
 >(args: {
   models: Models;
 }): ReturnType<
-  typeof baseDefineContract<typeof sqlFamilyPack, typeof sqlitePack, Record<never, never>, Models>
+  typeof baseDefineContract<typeof sqlFamilyPack, SupportedSqlPack, Record<never, never>, Models>
 > {
-  return baseDefineContract({
-    family: sqlFamilyPack,
-    target: sqlitePack,
-    models: args.models,
-  });
+  // Unreachable: each case provides its own concrete impl.
+  void args;
+  throw new Error('typing-only stub — use a per-case `defineContract` implementation');
 }
-export type DefineSqlContract = typeof sqliteDefineContractTyping;
+export type DefineSqlContract = typeof defineSqlContractTyping;
 
 /**
  * Context passed to `before` (typed against the origin contract).
@@ -155,25 +169,22 @@ export interface RunMigrationOptions<
 
 export interface SqlFanoutContext {
   readonly name: SqlTargetName;
-  // Typed against sqlite's canonical column types so the resulting
-  // `ScalarFieldBuilder<ScalarFieldState<'<codecId>', ...>>` has a
-  // literal codecId — without this, `ReturnType<typeof field.column>`
-  // (no generic arg) defaults the codecId to `string`, the codec lookup
-  // produces `never`, and downstream `db.<Model>.insert({...})` typing
-  // collapses to `never` for every column. The postgres case's runtime
-  // values use postgres column types but cast to the canonical sqlite
-  // typing here; the JS scalar types (number/string/etc.) coincide
-  // across both targets for primitives, which is all the DSL needs.
-  readonly int: ReturnType<typeof field.column<typeof sqliteIntegerColumn>>;
-  readonly text: ReturnType<typeof field.column<typeof sqliteTextColumn>>;
-  readonly integerColumn: typeof sqliteIntegerColumn;
-  readonly textColumn: typeof sqliteTextColumn;
+  // Field builders + raw column descriptors with a literal codecId
+  // (`ReturnType<typeof field.column>` with no generic arg defaults
+  // codecId to `string`, the codec lookup produces `never`, and
+  // `db.<Model>.insert({...})` typing collapses to `never` for every
+  // column). The canonical type is shared across cases — see
+  // CanonicalSqlPack above for the rationale.
+  readonly int: ReturnType<typeof field.column<SupportedIntColumn>>;
+  readonly text: ReturnType<typeof field.column<SupportedTextColumn>>;
+  readonly integerColumn: SupportedIntColumn;
+  readonly textColumn: SupportedTextColumn;
   // Declared as a method (not a property) so the `const Models` generic
   // is preserved through call-site inference. As a property, TS would
   // widen Models when reading the property value at the call site.
   defineContract<const Models extends Record<string, AnyContractModelBuilder>>(args: {
     models: Models;
-  }): ReturnType<typeof sqliteDefineContractTyping<Models>>;
+  }): ReturnType<typeof defineSqlContractTyping<Models>>;
   runMigration<
     const TOrigin extends Contract<SqlStorage>,
     const TDestination extends Contract<SqlStorage>,
@@ -280,30 +291,33 @@ interface CaseSpec {
   readonly name: SqlTargetName;
   // biome-ignore lint/suspicious/noExplicitAny: heterogeneous targets dispatched per iteration; helper hides the union
   readonly target: any;
-  // Typed against sqlite's canonical column descriptors so SqlFanoutContext
-  // can expose `int` and `text` with literal codecIds (without which the
-  // JS scalar lookup at `db.<Model>.insert({...})` collapses to `never`).
-  // The postgres case provides its concrete column descriptor at runtime
-  // (different codecId) but typed to match the canonical sqlite shape.
-  readonly intCol: typeof sqliteIntegerColumn;
-  readonly textCol: typeof sqliteTextColumn;
+  // Each case provides its own concrete column descriptors at runtime;
+  // they're typed against the canonical shape (see CanonicalSqlPack
+  // above) so they fit a single CaseSpec interface and SqlFanoutContext
+  // can expose them with a single literal codecId.
+  readonly intCol: SupportedIntColumn;
+  readonly textCol: SupportedTextColumn;
   readonly defineContract: DefineSqlContract;
   readonly buildRuntime: BuildRuntime;
 }
 
-// Sqlite's defineContract uses sqlite pack; postgres uses postgres pack
-// at runtime. Both share the canonical `DefineSqlContract` signature —
-// model/storage-tables literal structure is identical between targets
-// at the type level. The postgres impl casts to the canonical type
-// because TypeScript treats the two return types as distinct (different
-// Target generic instantiation), but they're structurally compatible
-// for the DSL surface (table keys, column keys, scalar JS types) which
-// is what test bodies use.
-const sqliteDefineContract: DefineSqlContract = <
+// Per-case `defineContract` implementations. Each uses its OWN target
+// pack at runtime; both share the `DefineSqlContract` typing
+// (SupportedSqlPack union). Both impls cast via `as unknown as`
+// because each returns a contract with a SPECIFIC Target (its own
+// pack), which TypeScript treats as nominally distinct from the union
+// Target the interface advertises — even though the specific is a
+// subtype of the union structurally for our DSL purposes.
+const sqliteDefineContract: DefineSqlContract = (<
   const Models extends Record<string, AnyContractModelBuilder>,
 >(args: {
   models: Models;
-}) => baseDefineContract({ family: sqlFamilyPack, target: sqlitePack, models: args.models });
+}) =>
+  baseDefineContract({
+    family: sqlFamilyPack,
+    target: sqlitePack,
+    models: args.models,
+  })) as unknown as DefineSqlContract;
 
 const postgresDefineContract: DefineSqlContract = (<
   const Models extends Record<string, AnyContractModelBuilder>,
@@ -328,11 +342,8 @@ const cases: readonly CaseSpec[] = [
   {
     name: 'postgres',
     target: postgresTestTarget,
-    // Cast: postgres's int4Column has codecId 'pg/int4@1' but the
-    // canonical typing is sqlite's. JS-scalar resolution coincides (both
-    // resolve to `number` for the DSL).
-    intCol: int4Column as unknown as typeof sqliteIntegerColumn,
-    textCol: pgTextColumn as unknown as typeof sqliteTextColumn,
+    intCol: int4Column,
+    textCol: pgTextColumn,
     defineContract: postgresDefineContract,
     buildRuntime: buildPostgresRuntime,
   },
