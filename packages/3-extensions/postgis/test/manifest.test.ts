@@ -22,11 +22,11 @@ describe('postgis descriptor', () => {
     });
   });
 
-  it('has operation types import', () => {
-    expect(postgisExtensionDescriptor.types?.operationTypes?.import).toEqual({
+  it('has query operation types import', () => {
+    expect(postgisExtensionDescriptor.types?.queryOperationTypes?.import).toEqual({
       package: '@prisma-next/extension-postgis/operation-types',
-      named: 'OperationTypes',
-      alias: 'PostgisOperationTypes',
+      named: 'QueryOperationTypes',
+      alias: 'PostgisQueryOperationTypes',
     });
   });
 
