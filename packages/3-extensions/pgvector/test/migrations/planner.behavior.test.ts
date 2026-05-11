@@ -4,7 +4,6 @@ import {
   coreHash,
   profileHash,
 } from '@prisma-next/contract/types';
-import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
 import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
@@ -13,6 +12,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
 import { describe, expect, it } from 'vitest';
+import pgvectorDescriptor from '../../src/exports/control';
 
 describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   const planner = createPostgresMigrationPlanner();
