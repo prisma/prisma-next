@@ -200,13 +200,14 @@ async function writeExtensionContractSpaceArtefacts(args: {
 
 /**
  * Build a structurally-valid `SqlControlExtensionDescriptor` with the
- * `contractSpace` field the aggregate loader inspects. The descriptor's
- * `contractJson` is the same reference the test will pass to the loader,
- * and `headRef.hash` matches the on-disk on-disk head ref so drift
- * detection passes. Other descriptor fields (`create`, `migrations`)
- * are unused on the `db init` / `db update` path — the loader reads
- * migrations from disk and `create()` is only invoked on the
- * `migrate` path. They are stubbed minimally to satisfy the type.
+ * `contractSpace` field the migrate-time seed pass reads. The
+ * descriptor's `contractJson` is the same reference the test will pass
+ * to the loader, and `headRef.hash` matches the on-disk head ref so
+ * the loader's integrity check passes. Other descriptor fields
+ * (`create`, `migrations`) are unused on the `db init` / `db update`
+ * path — the loader reads migrations from disk and `create()` is only
+ * invoked on the `migrate` path. They are stubbed minimally to satisfy
+ * the type.
  */
 function buildExtensionPack(args: {
   readonly contractJson: Contract<SqlStorage>;

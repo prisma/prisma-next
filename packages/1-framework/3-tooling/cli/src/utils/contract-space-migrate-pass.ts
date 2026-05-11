@@ -1,9 +1,4 @@
-import {
-  detectSpaceContractDrift,
-  emitContractSpaceArtefacts,
-  readContractSpaceHeadRef,
-  type SpaceContractDriftResult,
-} from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 
 /**
  * Minimal descriptor view consumed by the migrate-time per-space pass.
@@ -37,56 +32,26 @@ export interface ContractSpaceMigratePassInputs {
 }
 
 export interface ContractSpaceMigratePassResult {
-  readonly drifts: readonly SpaceContractDriftResult[];
   readonly emittedSpaceIds: readonly string[];
 }
 
 /**
- * Run drift detection + on-disk artefact emission for every loaded
- * extension space at `migrate` time.
+ * Unconditionally re-emit on-disk artefacts for every loaded extension
+ * space at `migrate` time.
  *
- * Per sub-spec § 3:
- *
- * - For each declared extension that exposes a `contractSpace`:
- *   - Read the on-disk head hash from `migrations/<spaceId>/refs/head.json`
- *     (returns `null` on first emit).
- *   - Compare against the descriptor's `headRef.hash` via
- *     `detectSpaceContractDrift`. The `kind` discriminant decides whether
- *     the user sees a warning (`drift`), a no-op silent emit (`firstEmit`,
- *     `noDrift`), or nothing at all.
- *   - Always re-emit the on-disk artefacts (`contract.json`, `contract.d.ts`,
- *     `refs/head.json`). The framework owns these files and the helper is
- *     idempotent.
- *
- * Drift warnings are returned to the caller for formatting (TerminalUI,
- * structured-output envelope, etc.) — the helper does not print directly,
- * keeping it framework-neutral and unit-testable.
- *
- * Extension migration packages (the descriptor's pre-canned `migrations`
- * array → `migrations/<spaceId>/<dirName>/`) are intentionally not
- * materialised here — that interaction will be wired in a follow-on round
- * once the runner-side single-tx slice (sub-spec § 6) is in place.
- * On-disk artefacts are sufficient to lock the drift-warning behaviour
- * and the always-on re-emit AC for R2.
- *
- * @see specs/framework-mechanism.spec.md § 3 — Drift detection (T1.9).
+ * For each declared extension that exposes a `contractSpace`, write
+ * `contract.json` / `contract.d.ts` / `refs/head.json` from the
+ * descriptor. The framework owns these files; the helper is idempotent
+ * and the descriptor wins (no comparison against on-disk state).
  */
 export async function runContractSpaceMigratePass(
   inputs: ContractSpaceMigratePassInputs,
 ): Promise<ContractSpaceMigratePassResult> {
-  const drifts: SpaceContractDriftResult[] = [];
   const emittedSpaceIds: string[] = [];
 
   for (const pack of inputs.extensionPacks) {
     if (pack.contractSpace === undefined) continue;
     const { contractJson, headRef } = pack.contractSpace;
-
-    const onDiskHeadRef = await readContractSpaceHeadRef(inputs.migrationsDir, pack.id);
-    const drift = detectSpaceContractDrift(pack.id, {
-      descriptorHash: headRef.hash,
-      priorHeadHash: onDiskHeadRef?.hash ?? null,
-    });
-    drifts.push(drift);
 
     await emitContractSpaceArtefacts(inputs.migrationsDir, pack.id, {
       contract: contractJson,
@@ -96,26 +61,7 @@ export async function runContractSpaceMigratePass(
     emittedSpaceIds.push(pack.id);
   }
 
-  return { drifts, emittedSpaceIds };
-}
-
-/**
- * Format the user-facing drift warning for a single space. Callers
- * funnel this through their preferred output channel (TerminalUI line,
- * structured-output envelope `warnings[]`, etc.).
- *
- * Locks AM7 — drift warning surfaces the extension name and the diff
- * direction (descriptor → on-disk head).
- */
-export function formatContractSpaceDriftWarning(drift: SpaceContractDriftResult): string {
-  if (drift.kind !== 'drift') {
-    throw new Error(`formatContractSpaceDriftWarning called with non-drift result: ${drift.kind}`);
-  }
-  return (
-    `Contract-space drift detected for "${drift.spaceId}": descriptor hash ` +
-    `${drift.descriptorHash} differs from on-disk head hash ${drift.priorHeadHash ?? '<none>'}. ` +
-    `The on-disk artefacts under migrations/${drift.spaceId}/ will be refreshed to match the descriptor.`
-  );
+  return { emittedSpaceIds };
 }
 
 /**

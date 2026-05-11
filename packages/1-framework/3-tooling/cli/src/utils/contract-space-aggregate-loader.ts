@@ -15,9 +15,9 @@ import { toDeclaredExtensions, toExtensionInputs } from './extension-pack-inputs
 /**
  * Render a {@link LoadAggregateError} into a CLI structured-error
  * envelope. Preserves error codes `5001` (layout) and `5002` (marker /
- * drift / disjointness / etc.) so existing integration tests and
- * downstream tooling continue to assert on the same `meta.violations[]`
- * shape they did under the old precheck/marker-check helpers.
+ * disjointness / etc.) so existing integration tests and downstream
+ * tooling continue to assert on the same `meta.violations[]` shape
+ * they did under the old precheck/marker-check helpers.
  */
 export function mapLoadAggregateError(error: LoadAggregateError): CliStructuredError {
   if (error.kind === 'layoutViolation') {
@@ -36,24 +36,6 @@ export function mapLoadAggregateError(error: LoadAggregateError): CliStructuredE
           kind: v.kind,
           spaceId: v.spaceId,
         })),
-      },
-    });
-  }
-  if (error.kind === 'driftViolation') {
-    return new CliStructuredError('5002', `Contract-space drift detected for "${error.spaceId}"`, {
-      domain: 'MIG',
-      why: `The on-disk contract for space "${error.spaceId}" (hash ${error.priorHeadHash}) does not match the live extension descriptor (hash ${error.liveHash}).`,
-      fix: 'Run `prisma-next migrate` to refresh the on-disk artefacts to match the live descriptor.',
-      docsUrl: 'https://pris.ly/contract-spaces',
-      meta: {
-        violations: [
-          {
-            kind: 'drift',
-            spaceId: error.spaceId,
-            priorHeadHash: error.priorHeadHash,
-            liveHash: error.liveHash,
-          },
-        ],
       },
     });
   }
@@ -174,25 +156,14 @@ export async function buildContractSpaceAggregate<
 >(
   inputs: BuildAggregateInputs<TFamilyId, TTargetId>,
 ): Promise<Result<ContractSpaceAggregate, CliStructuredError>> {
-  const { entries, hashByContractJson } = toDeclaredExtensions(
-    toExtensionInputs(inputs.extensionPacks),
-  );
+  const declaredExtensions = toDeclaredExtensions(toExtensionInputs(inputs.extensionPacks));
 
   const loadInput: LoadAggregateInput = {
     targetId: inputs.targetId,
     migrationsDir: inputs.migrationsDir,
     appContract: inputs.appContract,
-    declaredExtensions: entries,
+    declaredExtensions,
     validateContract: inputs.validateContract,
-    hashContract: (contractJson: unknown) => {
-      const precomputed = hashByContractJson.get(contractJson);
-      if (precomputed === undefined) {
-        throw new Error(
-          'CLI aggregate loader: encountered an extension contract without a pre-computed descriptor hash. This is a wiring bug.',
-        );
-      }
-      return precomputed;
-    },
     appMigrationPackages: inputs.appMigrationPackages ?? [],
   };
 

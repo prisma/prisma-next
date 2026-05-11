@@ -82,14 +82,12 @@ describe('toExtensionInputs', () => {
 });
 
 describe('toDeclaredExtensions', () => {
-  it('emits entries without contractSpace for non-contributing packs', () => {
+  it('filters out packs without a contractSpace declaration', () => {
     const inputs: ExtensionPackInput[] = [{ id: 'plain', targetId: 'postgres' }];
-    const { entries, hashByContractJson } = toDeclaredExtensions(inputs);
-    expect(entries).toEqual([{ id: 'plain', targetId: 'postgres' }]);
-    expect(hashByContractJson.size).toBe(0);
+    expect(toDeclaredExtensions(inputs)).toEqual([]);
   });
 
-  it('emits entries with contractSpace and keys the hash map by contractJson identity', () => {
+  it('emits entries with id + targetId only for contract-space-bearing packs', () => {
     const inputs: ExtensionPackInput[] = [
       {
         id: 'ext-with-space',
@@ -101,15 +99,7 @@ describe('toDeclaredExtensions', () => {
         },
       },
     ];
-    const { entries, hashByContractJson } = toDeclaredExtensions(inputs);
-    expect(entries).toEqual([
-      {
-        id: 'ext-with-space',
-        targetId: 'postgres',
-        contractSpace: { contractJson: contractJsonA },
-      },
-    ]);
-    expect(hashByContractJson.get(contractJsonA)).toBe('sha256:c1');
+    expect(toDeclaredExtensions(inputs)).toEqual([{ id: 'ext-with-space', targetId: 'postgres' }]);
   });
 });
 

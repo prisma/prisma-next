@@ -15,17 +15,6 @@ import { spaceMigrationDirectory } from '../../src/space-layout';
 import { writeTestPackage } from '../fixtures';
 
 /**
- * Hash function used by the loader's drift-detection step. The tests
- * use a deterministic, content-based stub so they can predict the
- * descriptor hash without round-tripping through the SQL family's
- * canonical pipeline. The loader treats the hasher as opaque, so any
- * hash strategy is fine.
- */
-function stubHash(value: unknown): string {
-  return `sha256:test:${JSON.stringify(value)}`;
-}
-
-/**
  * Identity validator: returns the JSON value as a `Contract` (typed,
  * not validated). The loader's contract is that the validator either
  * returns a Contract or throws — both branches are exercised below.
@@ -58,7 +47,6 @@ function buildInput(overrides: Partial<LoadAggregateInput>): LoadAggregateInput 
     appContract,
     declaredExtensions: [],
     validateContract: makeIdentityValidator(new Map()),
-    hashContract: stubHash,
     appMigrationPackages: [],
     ...overrides,
   };
@@ -97,7 +85,6 @@ describe('loadContractSpaceAggregate', () => {
       const declaredExtension: DeclaredExtensionEntry = {
         id: 'cipherstash',
         targetId: 'sqlite',
-        contractSpace: { contractJson: { id: 'cipher' } },
       };
       const result = await loadContractSpaceAggregate(
         buildInput({
@@ -135,7 +122,6 @@ describe('loadContractSpaceAggregate', () => {
             {
               id: 'unmigrated_ext',
               targetId: 'postgres',
-              contractSpace: { contractJson: { id: 'unmigrated' } },
             },
           ],
         }),
@@ -172,7 +158,6 @@ describe('loadContractSpaceAggregate', () => {
       const declaredExtension: DeclaredExtensionEntry = {
         id: 'cipherstash',
         targetId: 'postgres',
-        contractSpace: { contractJson: { id: 'cipher' } },
       };
       const result = await loadContractSpaceAggregate(
         buildInput({
@@ -189,10 +174,9 @@ describe('loadContractSpaceAggregate', () => {
     });
 
     it('reports integrityFailure when the on-disk head ref is not in the on-disk migration graph', async () => {
-      // Pin a head ref whose hash matches the descriptor's hash (so
-      // drift does not fire) but that no migration package walks to.
+      // Pin a head ref to a hash that no migration package walks to.
       const cipherContract = { id: 'cipher' };
-      const priorHeadHash = stubHash(cipherContract);
+      const priorHeadHash = 'sha256:cipher-pinned-head';
       await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
         contract: cipherContract,
         contractDts: '\n',
@@ -215,12 +199,10 @@ describe('loadContractSpaceAggregate', () => {
         buildInput({
           migrationsDir,
           validateContract: validator,
-          hashContract: stubHash,
           declaredExtensions: [
             {
               id: 'cipherstash',
               targetId: 'postgres',
-              contractSpace: { contractJson: cipherContract },
             },
           ],
         }),
@@ -257,7 +239,6 @@ describe('loadContractSpaceAggregate', () => {
             {
               id: 'cipherstash',
               targetId: 'postgres',
-              contractSpace: { contractJson: cipherContract },
             },
           ],
         }),
@@ -271,49 +252,36 @@ describe('loadContractSpaceAggregate', () => {
     });
   });
 
-  describe('driftViolation', () => {
-    it('reports driftViolation (fatal) when descriptor hash differs from the on-disk head hash', async () => {
-      const spaceContractJson = { id: 'cipher', version: 1 };
-      const liveJson = { id: 'cipher', version: 2 };
-
-      // The framework's emit pipeline normally writes the same hash that
-      // matches the descriptor's contract; here we simulate post-emit
-      // drift by pinning a stale hash.
+  describe('descriptor independence', () => {
+    it('does not read the descriptor at load time (load succeeds with on-disk pinned hash regardless of descriptor value)', async () => {
+      // The loader's contract is that the descriptor's `contractJson` is
+      // never consulted at load time — only the on-disk pinned head and
+      // the on-disk `contract.json` mirror are. As a regression guard,
+      // assemble on-disk state with one pinned hash and prove the load
+      // succeeds without any descriptor input beyond `id` / `targetId`.
+      const cipherJson = { id: 'cipher' };
+      const cipherHeadHash = 'sha256:cipher-pinned';
       await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-        contract: spaceContractJson,
+        contract: cipherJson,
         contractDts: '\n',
-        headRef: { hash: stubHash(spaceContractJson), invariants: [] },
+        headRef: { hash: cipherHeadHash, invariants: [] },
       });
-
+      await writeTestPackage(
+        join(spaceMigrationDirectory(migrationsDir, 'cipherstash'), '20260101T0000_init'),
+        { from: null, to: cipherHeadHash },
+      );
       const validator = makeIdentityValidator(
-        new Map([
-          [JSON.stringify(spaceContractJson), createSqlContract({ target: 'postgres' })],
-          [JSON.stringify(liveJson), createSqlContract({ target: 'postgres' })],
-        ]),
+        new Map([[JSON.stringify(cipherJson), createSqlContract({ target: 'postgres' })]]),
       );
 
       const result = await loadContractSpaceAggregate(
         buildInput({
           migrationsDir,
           validateContract: validator,
-          hashContract: stubHash,
-          declaredExtensions: [
-            {
-              id: 'cipherstash',
-              targetId: 'postgres',
-              contractSpace: { contractJson: liveJson },
-            },
-          ],
+          declaredExtensions: [{ id: 'cipherstash', targetId: 'postgres' }],
         }),
       );
-
-      expect(result.ok).toBe(false);
-      const failure = result.assertNotOk();
-      expect(failure.kind).toBe('driftViolation');
-      if (failure.kind !== 'driftViolation') return;
-      expect(failure.spaceId).toBe('cipherstash');
-      expect(failure.priorHeadHash).toBe(stubHash(spaceContractJson));
-      expect(failure.liveHash).toBe(stubHash(liveJson));
+      expect(result.ok).toBe(true);
     });
   });
 
@@ -330,7 +298,7 @@ describe('loadContractSpaceAggregate', () => {
       });
 
       const cipherJson = { id: 'cipher-collides' };
-      const cipherHeadHash = stubHash(cipherJson);
+      const cipherHeadHash = 'sha256:cipher-collides-head';
       await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
         contract: cipherJson,
         contractDts: '\n',
@@ -349,12 +317,10 @@ describe('loadContractSpaceAggregate', () => {
           migrationsDir,
           appContract,
           validateContract: validator,
-          hashContract: stubHash,
           declaredExtensions: [
             {
               id: 'cipherstash',
               targetId: 'postgres',
-              contractSpace: { contractJson: cipherJson },
             },
           ],
         }),
@@ -377,13 +343,8 @@ describe('loadContractSpaceAggregate', () => {
       // `concatenateSpaceApplyInputs` ordering) rely on it.
       const cipherJson = { id: 'cipher' };
       const pgvectorJson = { id: 'pgvector' };
-      // Pin head hashes that match `stubHash(contractJson)` so drift
-      // detection passes. Both extensions point at the empty-contract
-      // sentinel because no migrations have been authored yet — the
-      // loader tolerates an empty graph when the head ref equals
-      // EMPTY_CONTRACT_HASH (greenfield extensions).
-      const cipherHeadHash = stubHash(cipherJson);
-      const pgvectorHeadHash = stubHash(pgvectorJson);
+      const cipherHeadHash = 'sha256:cipher-head';
+      const pgvectorHeadHash = 'sha256:pgvector-head';
       await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
         contract: cipherJson,
         contractDts: '\n',
@@ -434,18 +395,15 @@ describe('loadContractSpaceAggregate', () => {
             storage: { tables: { app_user: {} } },
           }),
           validateContract: validator,
-          hashContract: stubHash,
           declaredExtensions: [
             // Declaration order does NOT determine apply order.
             {
               id: 'pgvector',
               targetId: 'postgres',
-              contractSpace: { contractJson: pgvectorJson },
             },
             {
               id: 'cipherstash',
               targetId: 'postgres',
-              contractSpace: { contractJson: cipherJson },
             },
           ],
         }),

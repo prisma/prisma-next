@@ -10,11 +10,6 @@ export {
 export type { SpaceApplyInput } from '../concatenate-space-apply-inputs';
 export { contractSpaceFromJson } from '../contract-space-from-json';
 export {
-  type DetectSpaceContractDriftInputs,
-  detectSpaceContractDrift,
-  type SpaceContractDriftResult,
-} from '../detect-space-contract-drift';
-export {
   type ContractSpaceArtefactInputs,
   emitContractSpaceArtefacts,
 } from '../emit-contract-space-artefacts';

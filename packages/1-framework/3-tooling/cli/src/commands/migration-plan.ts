@@ -44,10 +44,7 @@ import {
   setCommandExamples,
 } from '../utils/command-helpers';
 import { runContractSpaceExtensionMigrationsPass } from '../utils/contract-space-extension-migrations-pass';
-import {
-  formatContractSpaceDriftWarning,
-  runContractSpaceMigratePass,
-} from '../utils/contract-space-migrate-pass';
+import { runContractSpaceMigratePass } from '../utils/contract-space-migrate-pass';
 import {
   toExtensionInputs,
   toExtensionMigrationsInputs,
@@ -241,26 +238,19 @@ async function executeMigrationPlanCommand(
     );
   }
 
-  // Per-space migrate pass: drift detection + on-disk artefact emission for
+  // Per-space migrate pass: unconditional on-disk artefact emission for
   // every loaded extension that exposes a `contractSpace`. Runs *before*
   // the app-space no-op check so that an extension bump alone (with no
   // structural app-space change) still re-pins extension artefacts on
-  // disk. Drift warnings are non-fatal — the on-disk artefacts are refreshed
-  // and the user is notified that the bump is being captured.
+  // disk. The descriptor is authoritative — the framework owns these
+  // files and the helper is idempotent.
   // Single descriptor-import boundary: every consumer of `extensionPacks`
   // goes through `toExtensionInputs` + a per-consumer adapter. AC11.
   const canonicalExtensionInputs = toExtensionInputs(config.extensionPacks ?? []);
-  const migratePass = await runContractSpaceMigratePass({
+  await runContractSpaceMigratePass({
     migrationsDir,
     extensionPacks: toMigratePassInputs(canonicalExtensionInputs),
   });
-  if (!flags.json && !flags.quiet) {
-    for (const drift of migratePass.drifts) {
-      if (drift.kind === 'drift') {
-        ui.stderr(formatContractSpaceDriftWarning(drift));
-      }
-    }
-  }
 
   // Materialise descriptor-shipped migration packages onto disk under
   // `migrations/<spaceId>/<dirName>/` for any package not yet present.

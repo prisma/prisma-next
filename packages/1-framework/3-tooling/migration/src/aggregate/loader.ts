@@ -1,7 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { EMPTY_CONTRACT_HASH } from '../constants';
-import { detectSpaceContractDrift } from '../detect-space-contract-drift';
 import { readMigrationsDir } from '../io';
 import { reconstructGraph } from '../migration-graph';
 import type { OnDiskMigrationPackage } from '../package';
@@ -12,18 +11,6 @@ import { listContractSpaceDirectories } from '../verify-contract-spaces';
 import type { ContractSpaceAggregate, ContractSpaceMember, HydratedMigrationGraph } from './types';
 
 /**
- * Hash function used by drift detection. Defaults to a canonical-JSON +
- * SHA-256 pipeline that mirrors the framework's contract-hash convention,
- * but the loader accepts a callback so SQL-family callers can pass their
- * `coreHash` / `storageHash` derivation through unchanged.
- *
- * The contract value passed in is the framework-neutral `unknown` form;
- * callers that have already validated typed contracts can simply hand
- * the validated value back through.
- */
-export type AggregateContractHasher = (contract: unknown) => string;
-
-/**
  * Single declared extension entry the loader needs from `Config.extensionPacks`.
  *
  * Only the subset of fields the loader operates on:
@@ -32,20 +19,20 @@ export type AggregateContractHasher = (contract: unknown) => string;
  * - `targetId` — the configured `Config.adapter.targetId` value the
  *   declaring extension declared. The loader rejects mismatches against
  *   the aggregate's `targetId` with `targetMismatch`.
- * - `contractSpace` — present iff the descriptor declares a contract
- *   space (extensions can ship without one and remain runtime-only /
- *   codec-only). Drift detection compares the descriptor's
- *   `contractJson` hash against the on-disk on-disk head hash; the loader
- *   rejects drift fatally.
+ *
+ * Whether the descriptor declares a contract space is decided by whether
+ * its corresponding `migrations/<id>/` directory exists on disk
+ * (materialised by the seed phase before the loader runs); the loader
+ * never reads the descriptor's `contractJson` itself. That makes the
+ * aggregate's apply / verify paths byte-for-byte independent of the
+ * descriptor module — `db verify` succeeds even if the descriptor's
+ * `contractJson` is a throwing getter.
  *
  * Typed structurally so the migration-tools layer stays framework-neutral.
  */
 export interface DeclaredExtensionEntry {
   readonly id: string;
   readonly targetId: string;
-  readonly contractSpace?: {
-    readonly contractJson: unknown;
-  };
 }
 
 /**
@@ -63,7 +50,6 @@ export interface LoadAggregateInput {
   readonly appContract: Contract;
   readonly declaredExtensions: ReadonlyArray<DeclaredExtensionEntry>;
   readonly validateContract: (contractJson: unknown) => Contract;
-  readonly hashContract: AggregateContractHasher;
   /**
    * Hydrated migration graph for the **app member**.
    *
@@ -90,12 +76,6 @@ export type LoadAggregateError =
   | { readonly kind: 'layoutViolation'; readonly violations: readonly LayoutViolation[] }
   | { readonly kind: 'integrityFailure'; readonly spaceId: string; readonly detail: string }
   | { readonly kind: 'validationFailure'; readonly spaceId: string; readonly detail: string }
-  | {
-      readonly kind: 'driftViolation';
-      readonly spaceId: string;
-      readonly priorHeadHash: string;
-      readonly liveHash: string;
-    }
   | {
       readonly kind: 'disjointnessViolation';
       readonly element: string;
@@ -139,20 +119,22 @@ interface LoadedExtensionState {
 
 /**
  * Hydrate a {@link ContractSpaceAggregate} from on-disk state and
- * caller-provided descriptor data.
+ * the app contract value the caller supplies.
  *
- * This is the **only** descriptor-import boundary in the post-M2.5
- * pipeline: callers read `extensionPacks` from `Config`, validate the
- * app contract, and pass everything through. The loader composes
- * existing migration-tools primitives — layout precheck (via
+ * The loader is the **only** descriptor-import boundary at apply /
+ * verify time, but it intentionally does **not** read the extension
+ * descriptor's `contractJson` value. Each extension space's contract
+ * is read from its on-disk `migrations/<id>/contract.json` mirror; the
+ * descriptor's role is exhausted by the seed phase that wrote that
+ * mirror in the first place. The loader composes existing
+ * migration-tools primitives — layout precheck (via
  * {@link listContractSpaceDirectories}), integrity checks (via
  * {@link readMigrationsDir} / {@link readContractSpaceHeadRef} /
- * {@link readContractSpaceContract} / `validateContract`), drift detection
- * (via {@link detectSpaceContractDrift}), and disjointness — into a
- * single typed value.
+ * {@link readContractSpaceContract} / `validateContract`), and
+ * disjointness — into a single typed value.
  *
  * Failure semantics: every failure variant in {@link LoadAggregateError}
- * short-circuits the load. Drift is fatal (M2.5 spec § Loader, step 5).
+ * short-circuits the load.
  */
 export async function loadContractSpaceAggregate(
   input: LoadAggregateInput,
@@ -180,8 +162,14 @@ export async function loadContractSpaceAggregate(
   }
 
   // 2. Layout precheck: bundle every layout offence at once.
-  const declaredWithSpace = input.declaredExtensions.filter((e) => e.contractSpace !== undefined);
-  const declaredSpaceIds = new Set(declaredWithSpace.map((e) => e.id));
+  //
+  // Every declared extension contributes an entry to the aggregate when
+  // a corresponding `migrations/<id>/` directory exists on disk. The
+  // loader treats the directory's presence as the membership signal —
+  // the descriptor itself is not read — so codec-only extensions (no
+  // on-disk dir) and contract-space extensions (dir present) are
+  // distinguished structurally.
+  const declaredSpaceIds = new Set(input.declaredExtensions.map((e) => e.id));
   const allDirs = await listContractSpaceDirectories(input.migrationsDir);
   // The app member is implicitly declared (it is always part of the
   // aggregate); its `migrations/<APP_SPACE_ID>/` directory may exist or
@@ -206,9 +194,9 @@ export async function loadContractSpaceAggregate(
     return notOk({ kind: 'layoutViolation', violations: layoutViolations });
   }
 
-  // 3-5. Per-extension: read + validate + integrity-check + drift.
+  // 3-5. Per-extension: read + validate + integrity-check.
   const loadedExtensions: LoadedExtensionState[] = [];
-  for (const entry of [...declaredWithSpace].sort((a, b) => a.id.localeCompare(b.id))) {
+  for (const entry of [...input.declaredExtensions].sort((a, b) => a.id.localeCompare(b.id))) {
     const headRef = await readContractSpaceHeadRef(input.migrationsDir, entry.id);
     if (headRef === null) {
       return notOk({
@@ -247,24 +235,6 @@ export async function loadContractSpaceAggregate(
         expected: input.targetId,
         actual: spaceContract.target,
       });
-    }
-
-    // Drift: compare descriptor's live `contractJson` to on-disk
-    // `refs/head.json.hash`.
-    if (entry.contractSpace) {
-      const liveHash = input.hashContract(entry.contractSpace.contractJson);
-      const drift = detectSpaceContractDrift(entry.id, {
-        descriptorHash: liveHash,
-        priorHeadHash: headRef.hash,
-      });
-      if (drift.kind === 'drift') {
-        return notOk({
-          kind: 'driftViolation',
-          spaceId: entry.id,
-          priorHeadHash: drift.priorHeadHash ?? '',
-          liveHash: drift.descriptorHash,
-        });
-      }
     }
 
     // Read + integrity-check the migration packages. `readMigrationsDir`
