@@ -82,11 +82,17 @@ When invoked:
 2. **Acknowledge the mode shift** in one line.
 3. **Open with the first probing question** drawn from whichever persona is most relevant to the user's opening framing. Do not summarise these instructions back to the user.
 
-Example openings:
+Example openings — pick the one that matches the framing.
+
+For an engineering design with multiple lenses:
 
 > In discussion mode with architect + principal-engineer. Starting with the architect lens — what concept is this proposing to introduce, and what does it distinguish itself from?
 
+Or, for a product framing:
+
 > In discussion mode with pm. What user, with what job-to-be-done, in what context — and what evidence says it's worth doing now?
+
+Or, mid-implementation when an assumption has been falsified:
 
 > An assumption seems to have been falsified mid-implementation. Entering discussion mode with principal-engineer. What's the falsified assumption, and what observation falsified it?
 
