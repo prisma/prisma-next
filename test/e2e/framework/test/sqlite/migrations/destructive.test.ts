@@ -147,6 +147,14 @@ describeSqlMigration(
       });
     });
 
+    // Exercises the typed DSL on both sides of the migration:
+    //   - `before.db` is typed against the origin contract (User has `temp`);
+    //     the insert must include all three fields.
+    //   - `after.db` is typed against the destination contract (User has no
+    //     `temp`); selecting `temp` would be a compile error.
+    // The two contracts are different TypeScript types, so this also proves
+    // that the harness threads each contract's literal types through to its
+    // phase's `db` correctly.
     it('drops a column and preserves remaining data', async () => {
       await runMigration({
         origin: defineContract({
@@ -158,23 +166,24 @@ describeSqlMigration(
           models: { User: model('User', { fields: { id: int.id(), name: text } }) },
         }),
         policy: ALL,
-        before: async ({ driver }) => {
-          await driver.query('INSERT INTO "User" (id, name, temp) VALUES (?, ?, ?)', [
-            1,
-            'Alice',
-            'remove-me',
-          ]);
-        },
-        after: async ({ driver }) => {
-          const rows = await driver.query<{ id: number; name: string }>(
-            'SELECT * FROM "User" ORDER BY id',
+        before: async ({ db, runtime }) => {
+          await runtime.execute(
+            db.User.insert({ id: 1, name: 'Alice', temp: 'remove-me' }).build(),
           );
-          expect(rows.rows).toHaveLength(1);
-          expect(rows.rows[0]).toMatchObject({ id: 1, name: 'Alice' });
+        },
+        after: async ({ db, runtime }) => {
+          const rows = await runtime.execute(db.User.select('id', 'name').orderBy('id').build());
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({ id: 1, name: 'Alice' });
         },
       });
     });
 
+    // Column type change with data preservation. Origin's `value` is text;
+    // destination's is integer. Inserts happen via the origin-typed db
+    // (string value); selects come back through the destination-typed db
+    // (number value). The runtime / adapter handle dialect-specific casts
+    // — on sqlite via recreate-table, on postgres via ALTER ... USING.
     it('changes a column type and preserves data', async () => {
       await runMigration({
         origin: defineContract({
@@ -184,20 +193,18 @@ describeSqlMigration(
           models: { Item: model('Item', { fields: { id: int.id(), value: int.optional() } }) },
         }),
         policy: ALL,
-        before: async ({ driver }) => {
-          await driver.query('INSERT INTO "Item" (id, value) VALUES (?, ?)', [1, '42']);
-          await driver.query('INSERT INTO "Item" (id, value) VALUES (?, ?)', [2, '0']);
+        before: async ({ db, runtime }) => {
+          await runtime.execute(db.Item.insert({ id: 1, value: '42' }).build());
+          await runtime.execute(db.Item.insert({ id: 2, value: '0' }).build());
         },
-        after: async ({ driver, schema }) => {
+        after: async ({ db, runtime, schema }) => {
           expect(schema.tables['Item']!.columns['value']!.nativeType).toBe(
             expectedIntNativeType[name],
           );
-          const rows = await driver.query<{ id: number; value: number }>(
-            'SELECT * FROM "Item" ORDER BY id',
-          );
-          expect(rows.rows).toHaveLength(2);
-          expect(rows.rows[0]).toMatchObject({ id: 1, value: 42 });
-          expect(rows.rows[1]).toMatchObject({ id: 2, value: 0 });
+          const rows = await runtime.execute(db.Item.select('id', 'value').orderBy('id').build());
+          expect(rows).toHaveLength(2);
+          expect(rows[0]).toMatchObject({ id: 1, value: 42 });
+          expect(rows[1]).toMatchObject({ id: 2, value: 0 });
         },
       });
     });
