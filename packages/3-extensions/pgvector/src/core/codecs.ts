@@ -112,7 +112,6 @@ export class PgVectorDescriptor extends CodecDescriptorImpl<VectorParams> {
   override readonly targetTypes = ['vector'] as const;
   override readonly meta = PG_VECTOR_META;
   override readonly paramsSchema: StandardSchemaV1<VectorParams> = vectorParamsSchema;
-  override readonly encodeIsParamsIndependent = true;
   override renderOutputType(params: VectorParams): string {
     return `Vector<${params.length}>`;
   }

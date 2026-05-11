@@ -52,11 +52,11 @@ describe('pgvector descriptor', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('parameterized vector descriptor declares encodeIsParamsIndependent', () => {
+  it('parameterized vector descriptor does not expose encode fallback opt-out metadata', () => {
     const vectorDescriptor = pgvectorRuntimeDescriptor
       .codecs()
       .find((descriptor) => descriptor.codecId === VECTOR_CODEC_ID);
     expect(vectorDescriptor).toBeDefined();
-    expect(vectorDescriptor?.encodeIsParamsIndependent).toBe(true);
+    expect(vectorDescriptor).not.toHaveProperty('encodeIsParamsIndependent');
   });
 });

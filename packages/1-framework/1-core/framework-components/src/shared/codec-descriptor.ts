@@ -45,8 +45,6 @@ export interface CodecDescriptor<P = void> {
   readonly renderOutputType?: (params: P) => string | undefined;
   /** The curried higher-order codec. For non-parameterized codecs, the factory is constant — every call returns the same shared codec instance. For parameterized codecs, the factory is called once per `storage.types` instance (or once per inline-`typeParams` column), with `ctx` carrying the column set the resulting codec serves. */
   readonly factory: (params: P) => (ctx: CodecInstanceContext) => Codec;
-  /** Declares that every resolved instance of this codec id encodes to the same wire shape regardless of params, so codec-id fallback dispatch can tolerate multiple parameterized instances. */
-  readonly encodeIsParamsIndependent?: boolean;
 }
 
 /**
@@ -71,7 +69,6 @@ export abstract class CodecDescriptorImpl<TParams = void> implements CodecDescri
   readonly meta?: CodecMeta;
 
   abstract readonly paramsSchema: StandardSchemaV1<TParams>;
-  readonly encodeIsParamsIndependent?: boolean;
 
   /** Boolean derived from `paramsSchema`: `true` whenever the schema is not the singleton `voidParamsSchema`. The framework registry's `validateParamRefRefs` pass reads this through `descriptorFor(codecId).isParameterized` to gate column-ref enforcement. */
   get isParameterized(): boolean {

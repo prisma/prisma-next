@@ -458,24 +458,7 @@ function buildContractCodecRegistry(
         if (existing === undefined) {
           byCodecId.set(column.codecId, resolvedCodec);
         } else if (existing !== resolvedCodec && parameterizedDescriptors.has(column.codecId)) {
-          // Two distinct resolved instances under the same parameterized
-          // codec id (e.g. `Vector<1024>` and `Vector<1536>`, or two
-          // `arktypeJson(...)` columns with different schemas). The
-          // encode-side `forCodecId` fallback can't honor a column-
-          // specific call site, so by default we mark the codec id
-          // ambiguous and reject the fallback.
-          //
-          // Opt-out: descriptors that declare `encodeIsParamsIndependent`
-          // produce wire-identical output across all resolved instances
-          // (pgvector formats `[v1,v2,…]` regardless of dimension;
-          // arktype-json's encode is `JSON.stringify` with no schema
-          // check). For those, picking any resolved instance at the
-          // encode call site is safe — decode dispatch still uses
-          // `forColumn` to get the instance-specific schema.
-          const parameterizedDescriptor = parameterizedDescriptors.get(column.codecId);
-          if (!parameterizedDescriptor?.encodeIsParamsIndependent) {
-            ambiguousCodecIds.add(column.codecId);
-          }
+          ambiguousCodecIds.add(column.codecId);
         }
       }
     }

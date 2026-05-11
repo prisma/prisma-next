@@ -182,7 +182,7 @@ describe('arktypeJsonDescriptor.factory(params)', () => {
     expect(arktypeJsonDescriptor.traits).toEqual(['equality']);
     expect(arktypeJsonDescriptor.targetTypes).toEqual(['jsonb']);
     expect(arktypeJsonDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('jsonb');
-    expect(arktypeJsonDescriptor.encodeIsParamsIndependent).toBe(true);
+    expect(arktypeJsonDescriptor).not.toHaveProperty('encodeIsParamsIndependent');
   });
 
   it('renderOutputType returns the eager-extracted expression', () => {

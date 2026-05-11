@@ -160,7 +160,6 @@ export class ArktypeJsonDescriptor extends CodecDescriptorImpl<ArktypeJsonTypePa
   override readonly targetTypes = [ARKTYPE_JSON_NATIVE_TYPE] as const;
   override readonly meta = ARKTYPE_JSON_META;
   override readonly paramsSchema: StandardSchemaV1<ArktypeJsonTypeParams> = arktypeJsonParamsSchema;
-  override readonly encodeIsParamsIndependent = true;
   override renderOutputType(params: ArktypeJsonTypeParams): string {
     return renderArktypeJsonOutputType(params);
   }
