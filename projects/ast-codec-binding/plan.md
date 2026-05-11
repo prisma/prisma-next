@@ -170,7 +170,16 @@ Cross-package grep before declaring M3c done: `rg 'forCodecId|parameterizedRepre
 - `packages/3-targets/3-targets/postgres/test/migrations/data-transform-ast.test.ts` — unit + integration tests covering build → JSON → parse → resolver → encode/execute path.
 - New migration directory `examples/prisma-next-demo/migrations/app/<timestamp>_vector-backfill-ast/` with a `migration.ts` that authors a `dataTransformAst`, an emitted `ops.json`, and the corresponding fixture entries `pnpm fixtures:check` validates byte-for-byte.
 
-**Acceptance.** `pnpm fixtures:check` covers the new fixture. `pnpm test:integration` exercises the apply path.
+**Validation gate.**
+
+- `pnpm typecheck` (workspace) — new files + new op type.
+- `pnpm test:packages` (workspace) — new test files in relational-core + postgres-target.
+- `pnpm test:integration` — the apply path exercises real Postgres.
+- `pnpm lint:deps` — new cross-package imports (relational-core → framework-components for parse; postgres-target → relational-core for `parseAnyQueryAst`).
+- `pnpm fixtures:check` — validates the new demo fixture byte-for-byte.
+- `pnpm build` — new exports from postgres-target.
+
+**Acceptance.** All gates green. `pnpm fixtures:check` covers the new fixture. `pnpm test:integration` exercises the apply path.
 
 ### M6 — Documentation
 
