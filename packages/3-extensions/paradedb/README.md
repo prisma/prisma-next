@@ -75,10 +75,10 @@ ParadeDB BM25 indexes require a `key_field` — a unique column that identifies 
 
 The extension's contract + baseline migration are emitted on-disk inside this package using the same pipeline application authors use:
 
-- `pnpm build:contract-space` — runs `prisma-next contract emit` to produce `<package>/contract.{json,d.ts}` from the TS source at `src/contract-source.ts`.
+- `pnpm build:contract-space` — runs `prisma-next contract emit` to produce `<package>/src/contract/contract.{json,d.ts}` from the TS source at `src/contract/contract-source.ts`.
 - `pnpm exec prisma-next migration plan --name <slug>` (run from this package directory) — scaffolds a new migration directory under `migrations/paradedb/<dirName>/` for schema changes. **Not chained into `pnpm build`**: `migration plan` is non-idempotent (each invocation generates a new timestamped directory), so it runs manually when the contract source changes. Note: paradedb's contract declares no tables or models, so the planner currently refuses to scaffold the baseline migration (this is **Path B** authoring per [ADR 212](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md#on-disk-in-package-authoring-convention)). That directory was hand-authored once (Migration subclass + seed `migration.json` preserving the full `toContract`) and `pnpm tsx migrations/paradedb/<dirName>/migration.ts` re-emits `ops.json` + `migration.json` deterministically. Future migrations that add tables or models can use `migration plan` directly (Path A).
 - `pnpm tsx migrations/paradedb/<dirName>/migration.ts` (run from this package directory) — re-emits `ops.json` + `migration.json` from the hand-edited subclass. Use `tsx`, not bare `node`, because the Migration subclass imports relative TypeScript siblings which Node's native loader can't resolve without a TS-aware loader.
-- `refs/head.json` is hand-pinned with the latest migration's `to` hash + `providedInvariants`.
+- `migrations/paradedb/refs/head.json` is hand-pinned with the latest migration's `to` hash + `providedInvariants`.
 
 The descriptor at `src/exports/control.ts` then JSON-imports those artefacts and synthesises the framework's `MigrationPackage` shape.
 
