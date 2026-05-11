@@ -51,8 +51,8 @@ export default class M extends Migration {
             sql: "SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'eql_v2')",
           },
           {
-            description: 'verify "eql_v2_encrypted" composite type exists',
-            sql: "SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'eql_v2_encrypted')",
+            description: 'verify "eql_v2.eql_v2_encrypted" composite type exists',
+            sql: "SELECT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'eql_v2' AND t.typname = 'eql_v2_encrypted')",
           },
         ],
       }),
