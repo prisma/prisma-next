@@ -33,6 +33,7 @@ import {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import cipherstashExtensionDescriptor from '../src/exports/control';
 import { CIPHERSTASH_STRING_CODEC_ID } from '../src/extension-metadata/constants';
@@ -338,7 +339,7 @@ describe('planFieldEventOperations driving the cipherstash hook', () => {
           codecId: CIPHERSTASH_STRING_CODEC_ID,
           nativeType: 'eql_v2_encrypted',
           nullable: false,
-          ...(typeParams !== undefined ? { typeParams } : {}),
+          ...ifDefined('typeParams', typeParams),
         },
       },
       uniques: [],

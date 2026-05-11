@@ -34,6 +34,7 @@ import type {
   OpFactoryCall,
 } from '@prisma-next/framework-components/control';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 const CIPHERSTASH_MIGRATION_MODULE = '@prisma-next/extension-cipherstash/migration';
 
@@ -231,7 +232,7 @@ export class CipherstashAddSearchConfigCall extends CipherstashOpFactoryCallNode
       table: this.#args.table,
       column: this.#args.column,
       index: this.#args.index,
-      ...(this.#args.castAs !== DEFAULT_CAST_AS ? { castAs: this.#args.castAs } : {}),
+      ...ifDefined('castAs', this.#args.castAs !== DEFAULT_CAST_AS ? this.#args.castAs : undefined),
     };
     return `cipherstashAddSearchConfig(${jsonToTsSource(args)})`;
   }
