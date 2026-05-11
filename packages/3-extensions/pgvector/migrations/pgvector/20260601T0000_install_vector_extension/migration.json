@@ -1,6 +1,6 @@
 {
   "from": null,
-  "to": "sha256:a9332fa03df5f9a354837771d52806a5acfe236851ccc5bac8e50f84fb92ebc5",
+  "to": "sha256:382dae5bb1548e62cbc449530ea08a9ce0a0dbb280401e9588642223f33783ae",
   "labels": [],
   "providedInvariants": [
     "pgvector:install-vector-v1"
@@ -15,12 +15,13 @@
     "roots": {},
     "models": {},
     "storage": {
-      "storageHash": "sha256:a9332fa03df5f9a354837771d52806a5acfe236851ccc5bac8e50f84fb92ebc5",
+      "storageHash": "sha256:382dae5bb1548e62cbc449530ea08a9ce0a0dbb280401e9588642223f33783ae",
       "tables": {},
       "types": {
         "vector": {
           "codecId": "pg/vector@1",
-          "nativeType": "vector"
+          "nativeType": "vector",
+          "typeParams": {}
         }
       }
     },
@@ -51,5 +52,5 @@
     "applied": [],
     "plannerVersion": "2.0.0"
   },
-  "migrationHash": "sha256:4337598ad37de04648f6e2d9bb76bb0e10938627c195649274f998d3caffd114"
+  "migrationHash": "sha256:a8be5b5f3e0bb2a3cb6e3a8c496fede72973256ce4a761334b59fd46805e325f"
 }

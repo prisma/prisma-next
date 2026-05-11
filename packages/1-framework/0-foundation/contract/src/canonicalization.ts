@@ -98,6 +98,15 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
           ['storage', 'tables', 'foreignKeys'],
         );
 
+      // `storage.types.<name>.typeParams` is part of the StorageTypeInstance
+      // shape (validators require it). Preserve it even when empty so the
+      // emitted contract.json remains structurally valid after a round-trip.
+      const isStorageTypeTypeParams =
+        currentPath.length === 4 &&
+        currentPath[0] === 'storage' &&
+        currentPath[1] === 'types' &&
+        key === 'typeParams';
+
       const isFkBooleanField =
         currentPath.length === 5 &&
         currentPath[0] === 'storage' &&
@@ -124,7 +133,8 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isTableIndexes &&
         !isTableForeignKeys &&
         !isFkBooleanField &&
-        !isNullableField
+        !isNullableField &&
+        !isStorageTypeTypeParams
       ) {
         continue;
       }
