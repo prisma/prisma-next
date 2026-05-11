@@ -66,7 +66,7 @@ describe('postgis operations', () => {
   });
 
   it('dwithin impl has three-argument template', () => {
-    const op = postgisDescriptor.queryOperations!().dwithin;
+    const op = postgisDescriptor.queryOperations!()['dwithin'];
     expect(op).toBeDefined();
     const expr = op?.impl(
       ParamRef.of({ type: 'Point', coordinates: [0, 0] }, { codecId: 'pg/geometry@1' }) as never,
@@ -113,7 +113,7 @@ describe('postgis operations', () => {
   });
 
   it('dwithin threads refs onto its geometry arg', () => {
-    const op = postgisDescriptor.queryOperations!().dwithin;
+    const op = postgisDescriptor.queryOperations!()['dwithin'];
     expect(op).toBeDefined();
     const columnSelf = {
       buildAst: () => ColumnRef.of('cafe', 'location'),
