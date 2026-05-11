@@ -1,3 +1,4 @@
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { ParamSpec } from '@prisma-next/operations';
 import type { QueryOperationReturn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
@@ -74,19 +75,35 @@ export function toExpr(value: unknown, codec?: CodecRef): AstExpression {
   if (isExpressionLike(value)) {
     return value.buildAst();
   }
-  if (codec === undefined) return ParamRef.of(value);
+  if (codec === undefined) {
+    throw runtimeError(
+      'RUNTIME.PARAM_REF_CODEC_REQUIRED',
+      `Cannot construct a ParamRef for a ${value === null ? 'null' : typeof value} value without an explicit codec. ` +
+        'Provide a CodecRef at the call site or use a column-bound builder path.',
+    );
+  }
   return ParamRef.of(value, { codec });
 }
 
 /**
- * Derive the {@link CodecRef} carried by an expression-like value when it is column-bound. Returns `undefined` for non-column-bound expressions and for raw scalar values.
+ * Derive the {@link CodecRef} carried by an expression-like value.
  *
- * Reads the wrapper's `codec` slot directly (the SQL builder's `ExpressionImpl` derives and stamps the ref at field-proxy time). Operation implementations call this on the column-bound side of a comparison and forward the ref to {@link toExpr} on the user-value side so the resulting `ParamRef` carries the codec required by encode-side dispatch.
+ * Resolution order:
+ * 1. `wrapper.codec` — explicit column-bound {@link CodecRef} stamped at field-proxy time.
+ * 2. `wrapper.returnType.codec` — scope-level codec when the scope was built from contract storage.
+ * 3. `{ codecId: wrapper.returnType.codecId }` — minimal ref derived from the expression's declared codec id (covers synthetic expressions like `count()` whose returnType has a known codec id but no explicit column binding).
+ *
+ * Returns `undefined` for raw scalar values (non-expression-like).
  */
 export function codecOf(value: unknown): CodecRef | undefined {
   if (!isExpressionLike(value)) return undefined;
-  const wrapper = value as { codec?: CodecRef };
+  const wrapper = value as {
+    codec?: CodecRef;
+    returnType?: { codec?: CodecRef; codecId?: string };
+  };
   if (wrapper.codec) return wrapper.codec;
+  if (wrapper.returnType?.codec) return wrapper.returnType.codec;
+  if (wrapper.returnType?.codecId) return { codecId: wrapper.returnType.codecId };
   return undefined;
 }
 

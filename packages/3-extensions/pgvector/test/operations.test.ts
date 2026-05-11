@@ -1,7 +1,13 @@
+import type { CodecRef } from '@prisma-next/framework-components/codec';
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
 import { OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../src/exports/runtime';
+
+function vectorExpr(value: number[], codec: CodecRef) {
+  const ref = ParamRef.of(value, { codec });
+  return { returnType: { codecId: codec.codecId, nullable: false }, buildAst: () => ref, codec };
+}
 
 describe('pgvector operations', () => {
   it('descriptor has correct metadata', () => {
@@ -27,11 +33,12 @@ describe('pgvector operations', () => {
     expect(operations).toBeDefined();
     expect(Object.keys(operations).sort()).toEqual(['cosineDistance', 'cosineSimilarity']);
 
+    const vectorCodec: CodecRef = { codecId: 'pg/vector@1' };
     const cosineDistanceOp = operations['cosineDistance'];
     expect(cosineDistanceOp).toBeDefined();
     const distExpr = cosineDistanceOp?.impl(
-      ParamRef.of([1, 2], { codec: { codecId: 'pg/vector@1' } }) as never,
-      [3, 4] as never,
+      vectorExpr([1, 2], vectorCodec) as never,
+      vectorExpr([3, 4], vectorCodec) as never,
     ) as unknown as { buildAst(): OperationExpr };
     const distAst = distExpr.buildAst();
     expect(distAst).toBeInstanceOf(OperationExpr);
@@ -44,8 +51,8 @@ describe('pgvector operations', () => {
     const cosineSimilarityOp = operations['cosineSimilarity'];
     expect(cosineSimilarityOp).toBeDefined();
     const simExpr = cosineSimilarityOp?.impl(
-      ParamRef.of([1, 2], { codec: { codecId: 'pg/vector@1' } }) as never,
-      [3, 4] as never,
+      vectorExpr([1, 2], vectorCodec) as never,
+      vectorExpr([3, 4], vectorCodec) as never,
     ) as unknown as { buildAst(): OperationExpr };
     const simAst = simExpr.buildAst();
     expect(simAst).toBeInstanceOf(OperationExpr);
