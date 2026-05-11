@@ -162,12 +162,10 @@ function makeAdapter() {
   });
 }
 
-const cipherstashOperatorsByMethod = new Map(
-  cipherstashQueryOperations().map((op) => [op.method, op] as const),
-);
+const cipherstashOperatorsByMethod = cipherstashQueryOperations();
 
 function getOperator(method: string): SqlOperationDescriptor {
-  const op = cipherstashOperatorsByMethod.get(method);
+  const op = cipherstashOperatorsByMethod[method];
   if (!op) {
     throw new Error(`cipherstash operator descriptor for method "${method}" not found`);
   }
@@ -339,10 +337,10 @@ describe('createCipherstashRuntimeDescriptor — queryOperations registration', 
     // overriding them. The trade-off is documented in
     // `src/execution/operators.ts`'s top-level docblock.
     const descriptor = createCipherstashRuntimeDescriptor({ sdk: emptySdk() });
-    const ops = descriptor.queryOperations?.() ?? [];
-    const methods = ops.map((op) => op.method).sort();
+    const ops = descriptor.queryOperations?.() ?? {};
+    const methods = Object.keys(ops).sort();
     expect(methods).toEqual(['cipherstashEq', 'cipherstashIlike']);
-    for (const op of ops) {
+    for (const op of Object.values(ops)) {
       expect(op.self).toEqual({ codecId: CIPHERSTASH_STRING_CODEC_ID });
     }
   });

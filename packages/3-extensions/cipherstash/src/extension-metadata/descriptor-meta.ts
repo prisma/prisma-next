@@ -57,13 +57,6 @@ export const cipherstashPackMeta = {
         },
       ],
     },
-    operationTypes: {
-      import: {
-        package: '@prisma-next/extension-cipherstash/operation-types',
-        named: 'OperationTypes',
-        alias: 'CipherstashOperationTypes',
-      },
-    },
     queryOperationTypes: {
       import: {
         package: '@prisma-next/extension-cipherstash/operation-types',
