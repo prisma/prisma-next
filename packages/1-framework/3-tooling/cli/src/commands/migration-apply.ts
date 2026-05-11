@@ -261,6 +261,7 @@ async function executeMigrationApplyCommand(
       appMigrationPackages: appPackages.bundles,
       ...ifDefined('refHash', refEntry?.hash),
       ...(refEntry?.invariants ? { refInvariants: refEntry.invariants } : {}),
+      ...(refEntry !== undefined ? ifDefined('refName', refName) : {}),
     });
 
     if (!applyResult.ok) {

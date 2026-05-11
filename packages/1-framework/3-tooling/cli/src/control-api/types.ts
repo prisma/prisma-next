@@ -563,6 +563,13 @@ export interface MigrationApplyOptions {
    */
   readonly refInvariants?: readonly string[];
   /**
+   * Resolved name of the user-supplied app-space ref (the literal the
+   * user passed to `--ref`). Decorates `pathDecision.refName` and any
+   * `MIGRATION.NO_INVARIANT_PATH` envelope raised during graph-walk.
+   * Ignored when `refHash` is absent.
+   */
+  readonly refName?: string;
+  /**
    * Database connection. If provided, migrationApply will connect before executing.
    * If omitted, the client must already be connected.
    */

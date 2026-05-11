@@ -81,6 +81,14 @@ export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetI
    * is absent the file's `member.headRef.invariants` are used.
    */
   readonly refInvariants?: readonly string[];
+  /**
+   * Resolved name of the user-supplied app-space ref. Surfaces in
+   * `pathDecision.refName` and in `MIGRATION.NO_INVARIANT_PATH`
+   * error envelopes so diagnostics name what the user actually
+   * passed (`--ref prod`) instead of a synthetic placeholder.
+   * Ignored when `refHash` is absent.
+   */
+  readonly refName?: string;
   readonly onProgress?: OnControlProgress;
 }
 
@@ -119,6 +127,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
     appMigrationPackages,
     refHash,
     refInvariants,
+    refName,
     onProgress,
   } = options;
 
@@ -197,6 +206,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
       aggregateTargetId: aggregate.targetId,
       member: targetMember,
       currentMarker: liveMarker,
+      ...(isAppMember && refName !== undefined ? { refName } : {}),
     });
     if (walked.kind === 'unreachable') {
       return notOk(buildPathNotFoundFailure(member.spaceId, liveMarker, targetHash));
@@ -221,7 +231,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
             }))
           : [];
       throw errorNoInvariantPath({
-        ...(refHash !== undefined ? { refName: 'app-ref' } : {}),
+        ...(isAppMember && refName !== undefined ? { refName } : {}),
         required: targetInvariants,
         missing: walked.missing,
         structuralPath,

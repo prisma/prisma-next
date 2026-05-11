@@ -481,6 +481,7 @@ class ControlClientImpl implements ControlClient {
       appMigrationPackages: options.appMigrationPackages,
       ...ifDefined('refHash', options.refHash),
       ...ifDefined('refInvariants', options.refInvariants),
+      ...ifDefined('refName', options.refName),
       ...ifDefined('onProgress', onProgress),
     });
   }
