@@ -6,6 +6,7 @@ import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { errorPostgresMigrationStackMissing } from '../errors';
 import { type DataTransformOptions, dataTransform } from './operations/data-transform';
+import { type DataTransformAstOptions, dataTransformAst } from './operations/data-transform-ast';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 /**
@@ -66,5 +67,20 @@ export abstract class PostgresMigration extends SqlMigration<
       throw errorPostgresMigrationStackMissing();
     }
     return dataTransform(contract, name, options, this.controlAdapter);
+  }
+
+  /**
+   * Instance-method wrapper around the free `dataTransformAst` factory.
+   * Embeds the raw AST in the op payload for deferred lowering at apply time.
+   */
+  protected dataTransformAst<TContract extends Contract<SqlStorage>>(
+    contract: TContract,
+    name: string,
+    options: DataTransformAstOptions,
+  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+    if (!this.controlAdapter) {
+      throw errorPostgresMigrationStackMissing();
+    }
+    return dataTransformAst(contract, name, options, this.controlAdapter);
   }
 }
