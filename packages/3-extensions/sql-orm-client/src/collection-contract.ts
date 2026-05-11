@@ -322,6 +322,25 @@ export function resolvePrimaryKeyColumn(contract: Contract<SqlStorage>, tableNam
   return contract.storage.tables[tableName]?.primaryKey?.columns[0] ?? 'id';
 }
 
+export function resolveRowIdentityColumns(
+  contract: Contract<SqlStorage>,
+  tableName: string,
+): readonly string[] {
+  const table = contract.storage.tables[tableName];
+  if (!table) {
+    return [];
+  }
+  if (table.primaryKey && table.primaryKey.columns.length > 0) {
+    return table.primaryKey.columns;
+  }
+  for (const unique of table.uniques) {
+    if (unique.columns.length > 0) {
+      return unique.columns;
+    }
+  }
+  return [];
+}
+
 export function assertReturningCapability(contract: Contract<SqlStorage>, action: string): void {
   if (hasContractCapability(contract, 'returning')) {
     return;
