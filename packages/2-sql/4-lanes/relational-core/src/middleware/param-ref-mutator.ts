@@ -34,9 +34,9 @@ export interface ParamRefHandle<TCodecId extends string | undefined = string | u
  * `value` is the current value (post any prior middleware mutations);
  * `codecId` is the codec id declared on the underlying `ParamRef`;
  * `column` is populated for `ParamRef`s the lowering site could resolve
- * to a single `(table, column)` (encode-side column metadata is the
- * middleware's domain — encode itself currently leaves `ctx.column`
- * unset).
+ * to a single `(table, column)` via `ParamRef.refs` (encode-side column
+ * metadata is the middleware's domain — encode itself currently leaves
+ * `ctx.column` unset).
  */
 export interface ParamRefEntry<TCodecId extends string | undefined = string | undefined> {
   readonly ref: ParamRefHandle<TCodecId>;
@@ -172,14 +172,20 @@ export function createSqlParamRefMutator<
       const handle = ref as unknown as ParamRefHandle<string | undefined>;
       const value = i < view.length ? view[i] : ref.value;
       const codecId = ref.codecId;
+      // Surface the column binding the lowering site resolved onto
+      // `ParamRef.refs` so column-aware middleware (e.g. cipherstash
+      // routing-key resolution) can address the cell without
+      // re-walking the AST. ParamRefs without a column binding stay
+      // `column: undefined`.
+      const column = ref.refs
+        ? ({ table: ref.refs.table, name: ref.refs.column } as const)
+        : undefined;
       // The runtime erases the discriminated union to a single shape; the
       // public type pins each entry's `ref` to the matching `codecId`
       // arm at compile time.
-      const entry: ParamRefEntry<string | undefined> = {
-        ref: handle,
-        value,
-        codecId,
-      };
+      const entry: ParamRefEntry<string | undefined> = column
+        ? { ref: handle, value, codecId, column }
+        : { ref: handle, value, codecId };
       yield entry as ParamRefEntryUnion<TCodecMap>;
     }
   }
