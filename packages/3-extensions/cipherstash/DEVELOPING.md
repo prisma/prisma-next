@@ -26,6 +26,7 @@ packages/3-extensions/cipherstash/
     └── exports/
         ├── control.ts            SqlControlExtensionDescriptor (control-plane entry)
         ├── runtime.ts            EncryptedString + SDK + parameterized codec (runtime entry)
+        ├── middleware.ts         bulkEncryptMiddleware (runtime middleware entry)
         ├── pack.ts               cipherstashPackMeta default export (TS contract authoring)
         └── column-types.ts       encryptedString({...}) TS contract factory
 ```
