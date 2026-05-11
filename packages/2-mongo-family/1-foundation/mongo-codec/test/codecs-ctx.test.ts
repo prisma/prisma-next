@@ -6,7 +6,6 @@ describe('mongoCodec() factory — CodecCallContext arity', () => {
   it('lifts a single-arg `(value)` author unchanged (back-compat)', async () => {
     const c = mongoCodec({
       typeId: 'demo/single-arg-encode@1',
-      targetTypes: ['string'],
       encode: (value: string) => value.toUpperCase(),
       decode: (wire: string) => wire,
     });
@@ -17,7 +16,6 @@ describe('mongoCodec() factory — CodecCallContext arity', () => {
     let observed: CodecCallContext | undefined;
     const c = mongoCodec({
       typeId: 'demo/ctx-encode@1',
-      targetTypes: ['string'],
       encode: (value: string, ctx?: CodecCallContext) => {
         observed = ctx;
         return value;
@@ -35,7 +33,6 @@ describe('mongoCodec() factory — CodecCallContext arity', () => {
     let observed: CodecCallContext | undefined;
     const c = mongoCodec({
       typeId: 'demo/ctx-decode@1',
-      targetTypes: ['string'],
       encode: (value: string) => value,
       decode: (wire: string, ctx?: CodecCallContext) => {
         observed = ctx;
@@ -53,7 +50,6 @@ describe('mongoCodec() factory — CodecCallContext arity', () => {
     let observedSignal: AbortSignal | undefined;
     const c = mongoCodec({
       typeId: 'demo/identity@1',
-      targetTypes: ['string'],
       encode: (value: string, ctx?: CodecCallContext) => {
         observedSignal = ctx?.signal;
         return value;
@@ -69,7 +65,6 @@ describe('mongoCodec() factory — CodecCallContext arity', () => {
     let observed: unknown = 'sentinel';
     const c = mongoCodec({
       typeId: 'demo/empty-ctx@1',
-      targetTypes: ['string'],
       encode: (value: string, ctx?: CodecCallContext) => {
         observed = ctx;
         return value;
@@ -84,7 +79,6 @@ describe('mongoCodec() factory — CodecCallContext arity', () => {
   it('async ctx-bearing encode resolves with the produced value', async () => {
     const c = mongoCodec({
       typeId: 'demo/async-ctx@1',
-      targetTypes: ['string'],
       encode: async (value: string, _ctx?: CodecCallContext) => `enc:${value}`,
       decode: (wire: string) => wire,
     });

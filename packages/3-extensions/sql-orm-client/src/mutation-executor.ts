@@ -135,7 +135,7 @@ export function buildRowIdentityCriterion(
   const criterion: Record<string, unknown> = {};
   const fieldToColumn = getFieldToColumnMap(contract, modelName);
   for (const fieldName of Object.keys(fieldToColumn)) {
-    if (!(fieldName in row)) continue;
+    if (!Object.hasOwn(row, fieldName)) continue;
     const value = row[fieldName];
     if (value === undefined || value === null) continue;
     criterion[fieldName] = value;

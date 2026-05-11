@@ -44,9 +44,9 @@ Evidence:
 
 ## Acceptance Criteria
 
-- [ ] Decision recorded (A/B/C).
-- [ ] If A or B: implementation + test.
-- [ ] If C: ADR or doc paragraph stating the explicit decision.
+- [x] Decision recorded (C).
+- [x] Runtime implementation and tests intentionally deferred because A/B were not selected.
+- [x] Doc paragraph states the explicit decision.
 
 ## Resources
 

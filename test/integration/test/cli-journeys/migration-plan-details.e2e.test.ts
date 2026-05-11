@@ -83,7 +83,7 @@ withTempDir(({ createTempDir }) => {
         expect(tableOp, 'H.02: has user table operation').toBeDefined();
 
         // H.03: verify attestation on disk
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const packages = await readMigrationsDir(migrationsDir);
         expect(packages, 'H.03: one migration package').toHaveLength(1);
 
@@ -157,11 +157,11 @@ withTempDir(({ createTempDir }) => {
         // run the scaffolded `migration.ts` explicitly to produce ops.json.
         const dropDir = getLatestMigrationDir(ctx);
         expect(dropDir, 'I.03: drop-email migration dir').toBeTruthy();
-        const dropEmitResult = await runMigrationEmit(ctx, ['--dir', `migrations/${dropDir}`]);
+        const dropEmitResult = await runMigrationEmit(ctx, ['--dir', `migrations/app/${dropDir}`]);
         expect(dropEmitResult.exitCode, `I.03: emit drop-email: ${dropEmitResult.stderr}`).toBe(0);
 
         // I.04: verify destructive operation class on disk
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const packages = await readMigrationsDir(migrationsDir);
         expect(packages, 'I.04: two migration packages').toHaveLength(2);
 

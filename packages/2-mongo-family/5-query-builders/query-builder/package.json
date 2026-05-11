@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/mongo-query-builder",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "Type-safe MongoDB query builder (reads, writes, find-and-modify, pipeline-terminal writes) with document shape tracking",

@@ -5,7 +5,11 @@ import type {
   SqlMigrationPlannerPlanOptions,
   SqlPlannerFailureResult,
 } from '@prisma-next/family-sql/control';
-import { extractCodecControlHooks, plannerFailure } from '@prisma-next/family-sql/control';
+import {
+  extractCodecControlHooks,
+  planFieldEventOperations,
+  plannerFailure,
+} from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -64,15 +68,28 @@ export class SqliteMigrationPlanner
      */
     readonly fromContract: Contract | null;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+    /**
+     * Contract space this plan applies to. Stamped onto the produced
+     * {@link TypeScriptRenderableSqliteMigration.spaceId} so the runner keys
+     * the marker row by the right space.
+     */
+    readonly spaceId: string;
   }): SqlitePlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
 
-  emptyMigration(context: MigrationScaffoldContext): TypeScriptRenderableSqliteMigration {
-    return new TypeScriptRenderableSqliteMigration([], {
-      from: context.fromHash,
-      to: context.toHash,
-    });
+  emptyMigration(
+    context: MigrationScaffoldContext,
+    spaceId: string,
+  ): TypeScriptRenderableSqliteMigration {
+    return new TypeScriptRenderableSqliteMigration(
+      [],
+      {
+        from: context.fromHash,
+        to: context.toHash,
+      },
+      spaceId,
+    );
   }
 
   private planSql(options: SqlMigrationPlannerPlanOptions): SqlitePlanResult {
@@ -99,6 +116,22 @@ export class SqliteMigrationPlanner
       return plannerFailure(result.failure);
     }
 
+    // Codec lifecycle hook (T2.2): inline `onFieldEvent`-emitted ops after
+    // structural DDL. Sub-spec § 5 fixes the ordering as
+    // `structural → added → dropped → altered`, with within-group sorting by
+    // `(tableName, fieldName)` deterministic for byte-stable re-emits.
+    // Hook fires only at the application emitter — extension-space planning
+    // (M2 R2) never reaches this helper.
+    const fieldEventOps = planFieldEventOperations({
+      priorContract: options.fromContract,
+      newContract: options.contract,
+      codecHooks,
+    });
+    // Codec-emitted calls already conform to `OpFactoryCall` — render +
+    // toOp + importRequirements ride directly through the same emit path
+    // as structural ops, no `RawSqlCall` wrap.
+    const calls = [...result.value.calls, ...fieldEventOps];
+
     const destination: SqliteMigrationDestinationInfo = {
       storageHash: options.contract.storage.storageHash,
       ...(options.contract.profileHash !== undefined
@@ -109,11 +142,12 @@ export class SqliteMigrationPlanner
     return {
       kind: 'success' as const,
       plan: new TypeScriptRenderableSqliteMigration(
-        result.value.calls,
+        calls,
         {
           from: options.fromContract?.storage.storageHash ?? null,
           to: options.contract.storage.storageHash,
         },
+        options.spaceId,
         destination,
       ),
     };

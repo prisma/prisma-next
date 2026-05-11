@@ -23,9 +23,17 @@ This directory contains the primary documentation for the repository.
 - [Glossary](./glossary.md) — user-facing terminology (source of truth for naming)
 - [Commands](./commands/README.md) — command docs and entry points
 - [Reference docs](./reference/) — conventions and patterns used across the codebase
+- [Codec authoring guide](./reference/codec-authoring-guide.md) — class-based codecs (`CodecImpl`, `CodecDescriptorImpl`) and column helpers
+- [Mongo Pipeline Builder](./reference/Mongo%20Pipeline%20Builder.md) — typed builder for MongoDB aggregation pipelines, reads, writes, and find-and-modify
 - [CLI Style Guide](./CLI%20Style%20Guide.md) — CLI UX conventions
 
 ## Working with AI agents
 
 - [Cursor Cloud Agents](./onboarding/Cursor-Cloud-Agents.md) — how cloud agents run against this repo, where config lives, how to change it, how to debug a failed run
+
+## OSS posture
+
+- [OSS posture overview](./oss/README.md) — index of governance, supply-chain, and contribution policies
+- [Governance](./oss/governance.md) — maintainer team, decision-making, DCO basis
+- [Supply chain](./oss/supply-chain.md) — license validation, NOTICE audit, npm provenance, Dependabot cooldown
 

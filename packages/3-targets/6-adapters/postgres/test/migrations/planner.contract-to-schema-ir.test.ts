@@ -12,6 +12,7 @@ import {
   extractCodecControlHooks,
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { postgresRenderDefault } from '@prisma-next/target-postgres/control';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
@@ -87,6 +88,7 @@ function planFromStorages(
     policy: { allowedOperationClasses: ['additive'] },
     fromContract: null,
     frameworkComponents: [],
+    spaceId: APP_SPACE_ID,
   });
 }
 
@@ -122,6 +124,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       policy: { allowedOperationClasses: ['additive'] },
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -160,6 +163,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       policy: { allowedOperationClasses: ['additive'] },
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -224,6 +228,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       policy: { allowedOperationClasses: ['additive'] },
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -278,6 +283,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       policy: { allowedOperationClasses: ['additive'] },
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -848,6 +854,7 @@ describe('incremental migration with full contract surface (extensions, enums, F
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -877,6 +884,7 @@ describe('incremental migration with full contract surface (extensions, enums, F
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -901,6 +909,7 @@ describe('incremental migration with full contract surface (extensions, enums, F
       policy: { allowedOperationClasses: ['additive'] },
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');

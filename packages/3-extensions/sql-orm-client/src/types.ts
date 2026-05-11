@@ -19,11 +19,8 @@ import {
 import type { Expression } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { ComputeColumnJsType, RuntimeScope } from '@prisma-next/sql-relational-core/types';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { RowSelection } from './collection-internal-types';
-
-// ---------------------------------------------------------------------------
-// Comparison / Filter / Order / Include
-// ---------------------------------------------------------------------------
 
 export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
 
@@ -63,10 +60,6 @@ export interface IncludeExpr {
   readonly scalar: IncludeScalar<unknown> | undefined;
   readonly combine: Readonly<Record<string, IncludeCombineBranch>> | undefined;
 }
-
-// ---------------------------------------------------------------------------
-// CollectionState — plain data, no query builder types
-// ---------------------------------------------------------------------------
 
 export interface CollectionState {
   readonly filters: readonly AnyExpression[];
@@ -112,10 +105,6 @@ export type DefaultCollectionTypeState = {
   readonly variantName: undefined;
 };
 
-// ---------------------------------------------------------------------------
-// CollectionContext — bundles lane context + runtime
-// ---------------------------------------------------------------------------
-
 export interface RuntimeConnection extends RuntimeScope {
   release?(): Promise<void>;
   transaction?(): Promise<RuntimeTransaction>;
@@ -136,10 +125,6 @@ export interface CollectionContext<TContract extends Contract<SqlStorage>> {
   readonly context: ExecutionContext<TContract>;
 }
 
-// ---------------------------------------------------------------------------
-// ModelAccessor — type-safe proxy for where() callbacks
-// ---------------------------------------------------------------------------
-
 export type ComparisonMethodFns<T> = {
   eq(value: T): AnyExpression;
   neq(value: T): AnyExpression;
@@ -157,8 +142,7 @@ export type ComparisonMethodFns<T> = {
 };
 
 /**
- * Trait-gated comparison methods. Only methods whose required traits are
- * all present in `Traits` are included.
+ * Trait-gated comparison methods. Only methods whose required traits are all present in `Traits` are included.
  *
  * - `traits: []` → always available (isNull, isNotNull)
  */
@@ -167,10 +151,6 @@ export type ComparisonMethods<T, Traits> = {
     ? K
     : never]: ComparisonMethodFns<T>[K];
 };
-
-// ---------------------------------------------------------------------------
-// Extension operation result — returned by calling an extension method
-// ---------------------------------------------------------------------------
 
 type QueryOperationReturnTraits<
   Returns,
@@ -209,9 +189,7 @@ type IsBooleanReturn<Returns, TCodecTypes extends Record<string, unknown>> = Ret
   : false;
 
 /**
- * Extract the `{codecId, nullable}` spec carried inside an `Expression<T>`.
- * Used to recover the op's return spec from its impl signature so the
- * pre-existing `QueryOperationReturn*` helpers can consume it unchanged.
+ * Extract the `{codecId, nullable}` spec carried inside an `Expression<T>`. Used to recover the op's return spec from its impl signature so the pre-existing `QueryOperationReturn*` helpers can consume it unchanged.
  */
 type SpecOf<E> = E extends Expression<infer T> ? T : never;
 
@@ -220,14 +198,8 @@ type ImplReturnSpec<Impl> = Impl extends (...args: never[]) => infer Ret ? SpecO
 /**
  * Builds the ORM column-method signature for an operation.
  *
- * - User args: drops the impl's first parameter (the column is bound at access
- *   time) and forwards the rest unchanged. Each remaining arg keeps its
- *   authored `CodecExpression` / `TraitExpression` shape — so callers can pass
- *   a raw JS value, another column handle (which itself implements
- *   `Expression`), or `null` when nullable.
- * - Return: predicate ops (boolean-traited return) yield `AnyExpression`;
- *   non-predicate ops yield `ComparisonMethods<JsType, Traits>` of the return
- *   codec.
+ * - User args: drops the impl's first parameter (the column is bound at access time) and forwards the rest unchanged. Each remaining arg keeps its authored `CodecExpression` / `TraitExpression` shape — so callers can pass a raw JS value, another column handle (which itself implements `Expression`), or `null` when nullable.
+ * - Return: predicate ops (boolean-traited return) yield `AnyExpression`; non-predicate ops yield `ComparisonMethods<JsType, Traits>` of the return codec.
  */
 type QueryOperationMethod<Op, TCodecTypes extends Record<string, unknown>> = Op extends {
   readonly impl: (...args: never[]) => unknown;
@@ -247,9 +219,7 @@ type QueryOperationMethod<Op, TCodecTypes extends Record<string, unknown>> = Op 
   : never;
 
 /**
- * Tests whether an operation's `self` dispatch hint reaches a field with the
- * given codec identity. Codec hints match by identity; trait hints match when
- * every required trait is present in the field codec's trait set.
+ * Tests whether an operation's `self` dispatch hint reaches a field with the given codec identity. Codec hints match by identity; trait hints match when every required trait is present in the field codec's trait set.
  */
 type OpMatchesField<Op, CodecId extends string, CT extends Record<string, unknown>> = Op extends {
   readonly self: infer Self;
@@ -285,21 +255,43 @@ type FieldOperations<
     : unknown
   : unknown;
 
-// ---------------------------------------------------------------------------
-// COMPARISON_METHODS_META — single source of truth for traits + factories
-// ---------------------------------------------------------------------------
-
-function param(codecId: string | undefined, value: unknown): ParamRef {
-  return codecId ? ParamRef.of(value, { codecId }) : ParamRef.of(value);
+/**
+ * Resolve the unique column ref carried by `left` so its surrounding `ParamRef` can dispatch through `forColumn`. The previous implementation only matched bare `column-ref` expressions, which lost refs the moment the expression got wrapped (`upper(f.id)`, `BinaryExpr`, function-call expressions, etc.) — and column-aware dispatch (AC-5) silently degraded for any predicate that touched a computed column.
+ *
+ * Walking via `collectColumnRefs()` and accepting only a single unambiguous ref gives `eq(upper(f.id), value)` and friends correct dispatch without inventing refs for ambiguous shapes (e.g. `eq(concat(f.firstName, f.lastName), value)` returns `undefined` and falls through to the codec-id path, which is correct for non-parameterized comparisons).
+ */
+function refsFromLeft(left: AnyExpression): { table: string; column: string } | undefined {
+  if (left.kind === 'column-ref') {
+    return { table: left.table, column: left.column };
+  }
+  const columnRefs = left.collectColumnRefs();
+  if (columnRefs.length !== 1) return undefined;
+  const single = columnRefs[0];
+  if (!single) return undefined;
+  return { table: single.table, column: single.column };
 }
 
-function paramList(codecId: string | undefined, values: readonly unknown[]): ListExpression {
-  return ListExpression.of(values.map((value) => param(codecId, value)));
+function param(
+  codecId: string | undefined,
+  value: unknown,
+  refs: { table: string; column: string } | undefined,
+): ParamRef {
+  if (codecId === undefined && refs === undefined) return ParamRef.of(value);
+  return ParamRef.of(value, {
+    ...ifDefined('codecId', codecId),
+    ...ifDefined('refs', refs),
+  });
 }
 
-// never[] is intentional: factories have heterogeneous signatures (value: unknown,
-// values: readonly unknown[], pattern: string, etc.) but are only called through
-// the typed ComparisonMethodFns interface, never through this type directly.
+function paramList(
+  codecId: string | undefined,
+  values: readonly unknown[],
+  refs: { table: string; column: string } | undefined,
+): ListExpression {
+  return ListExpression.of(values.map((value) => param(codecId, value, refs)));
+}
+
+// never[] is intentional: factories have heterogeneous signatures (value: unknown, values: readonly unknown[], pattern: string, etc.) but are only called through the typed ComparisonMethodFns interface, never through this type directly.
 type MethodFactory = (
   left: AnyExpression,
   codecId: string | undefined,
@@ -312,12 +304,16 @@ type ComparisonMethodMeta = {
 
 function scalarComparisonMethod(op: BinaryOp) {
   return ((left, codecId) => (value: unknown) =>
-    new BinaryExpr(op, left, param(codecId, value))) satisfies MethodFactory;
+    new BinaryExpr(op, left, param(codecId, value, refsFromLeft(left)))) satisfies MethodFactory;
 }
 
 function listComparisonMethod(op: BinaryOp) {
   return ((left, codecId) => (values: readonly unknown[]) =>
-    new BinaryExpr(op, left, paramList(codecId, values))) satisfies MethodFactory;
+    new BinaryExpr(
+      op,
+      left,
+      paramList(codecId, values, refsFromLeft(left)),
+    )) satisfies MethodFactory;
 }
 
 /**
@@ -422,17 +418,9 @@ export type ModelAccessor<
   ModelName extends string,
 > = ScalarModelAccessor<TContract, ModelName> & RelationModelAccessor<TContract, ModelName>;
 
-// ---------------------------------------------------------------------------
-// DefaultModelRow — all scalar fields with JS types
-// ---------------------------------------------------------------------------
-
 export type DefaultModelRow<TContract extends Contract<SqlStorage>, ModelName extends string> = {
   [K in keyof FieldsOf<TContract, ModelName> & string]: FieldJsType<TContract, ModelName, K>;
 };
-
-// ---------------------------------------------------------------------------
-// InferRootRow — discriminated union for polymorphic base models
-// ---------------------------------------------------------------------------
 
 type Simplify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -554,10 +542,6 @@ export type ShorthandWhereFilter<
     | undefined;
 }>;
 
-// ---------------------------------------------------------------------------
-// Helpers for extracting fields / types from the contract
-// ---------------------------------------------------------------------------
-
 type ModelsOf<TContract extends Contract<SqlStorage>> =
   TContract['models'] extends Record<string, unknown> ? TContract['models'] : Record<string, never>;
 
@@ -670,10 +654,6 @@ type FieldStorageColumn<
   ModelName extends string,
   FieldName extends string,
 > = ResolvedStorageColumn<TContract, ModelName, FieldName>;
-
-// ---------------------------------------------------------------------------
-// Field trait resolution from contract CodecTypes
-// ---------------------------------------------------------------------------
 
 type FieldCodecId<
   TContract extends Contract<SqlStorage>,
@@ -794,10 +774,6 @@ export type CreateInput<TContract extends Contract<SqlStorage>, ModelName extend
     Pick<DefaultModelRow<TContract, ModelName>, OptionalCreateFieldNames<TContract, ModelName>>
   > &
   RelationMutationFields<TContract, ModelName>;
-
-// ---------------------------------------------------------------------------
-// Polymorphic write gating
-// ---------------------------------------------------------------------------
 
 type IsPolymorphicBase<TContract extends Contract<SqlStorage>, ModelName extends string> = ModelDef<
   TContract,
@@ -1069,10 +1045,6 @@ export type MutationUpdateInput<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
 > = Partial<DefaultModelRow<TContract, ModelName>> & RelationMutationFields<TContract, ModelName>;
-
-// ---------------------------------------------------------------------------
-// Relation helpers
-// ---------------------------------------------------------------------------
 
 type ModelRelations<TContract extends Contract<SqlStorage>, ModelName extends string> = ModelDef<
   TContract,

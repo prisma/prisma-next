@@ -4,6 +4,7 @@ import type {
   ControlFamilyInstance,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
+import { ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
 import { executeDbInit } from '../../src/control-api/operations/db-init';
 
@@ -16,14 +17,18 @@ function createMockDriver() {
 function createMockFamilyInstance() {
   return {
     familyId: 'sql',
-    readMarker: async () => null,
+    readAllMarkers: async () => new Map(),
     introspect: async () => ({ tables: {}, dependencies: [] }),
     validateContract: (ir: unknown) => ir as Contract,
     toOperationPreview: () => ({ statements: [] }),
   } as unknown as ControlFamilyInstance<'sql', unknown>;
 }
 
-const dummyContract = { schemaVersion: '1', target: 'postgres' } as unknown as Contract;
+const dummyContract = {
+  schemaVersion: '1',
+  target: 'postgres',
+  storage: { storageHash: 'sha256:dummy', tables: {} },
+} as unknown as Contract;
 
 describe('executeDbInit', () => {
   it('passes fromContract: null to planner.plan (no prior contract under reconciliation)', async () => {
@@ -38,7 +43,16 @@ describe('executeDbInit', () => {
 
     const migrations = {
       createPlanner: () => ({ plan: planFn }),
-      createRunner: () => ({ execute: vi.fn() }),
+      createRunner: () => ({
+        execute: vi.fn(),
+        executeAcrossSpaces: vi.fn().mockResolvedValue(
+          ok({
+            perSpaceResults: [
+              { space: 'app', value: { operationsPlanned: 0, operationsExecuted: 0 } },
+            ],
+          }),
+        ),
+      }),
     } as unknown as TargetMigrationsCapability<
       'sql',
       'postgres',
@@ -52,13 +66,15 @@ describe('executeDbInit', () => {
       mode: 'plan',
       migrations,
       frameworkComponents: [],
+      migrationsDir: '/tmp/__test-db-init-migrations',
+      targetId: 'postgres',
     });
 
     expect(planFn).toHaveBeenCalledWith(
       expect.objectContaining({
-        // `db init` reconciles against the live introspected schema and has no
-        // prior contract; the required `fromContract: null` is the structural
-        // representation of "no origin contract" (AC-5).
+        // `db init` reconciles against the live introspected schema and has
+        // no prior contract; the required `fromContract: null` is the
+        // structural representation of "no origin contract" (AC-5).
         fromContract: null,
       }),
     );

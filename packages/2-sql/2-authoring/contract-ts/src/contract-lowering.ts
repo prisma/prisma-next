@@ -1,4 +1,4 @@
-import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
+import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type {
   ContractDefinition,

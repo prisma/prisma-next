@@ -12,7 +12,7 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import type { MigrationPackage } from '@prisma-next/migration-tools/package';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { resolveByHashPrefix } from '../../src/commands/migration-show';
@@ -146,7 +146,7 @@ describe('resolveByHashPrefix', () => {
   });
 
   it('returns error for no matches', () => {
-    const packages: MigrationPackage[] = [
+    const packages: OnDiskMigrationPackage[] = [
       {
         dirName: '20260101_100000_test',
         dirPath: '/tmp/test',
@@ -174,7 +174,7 @@ describe('resolveByHashPrefix', () => {
 
   it('returns error for ambiguous prefix', () => {
     const contract = createContract();
-    const packages: MigrationPackage[] = [
+    const packages: OnDiskMigrationPackage[] = [
       {
         dirName: '20260101_100000_first',
         dirPath: '/tmp/first',
@@ -217,7 +217,7 @@ describe('resolveByHashPrefix', () => {
   });
 
   it('resolves prefix without sha256: scheme', () => {
-    const packages: MigrationPackage[] = [
+    const packages: OnDiskMigrationPackage[] = [
       {
         dirName: '20260101_100000_test',
         dirPath: '/tmp/test',
@@ -248,7 +248,7 @@ describe('resolveByHashPrefix', () => {
     // `migrationHash` — there is no longer a "skip draft" branch. The
     // prefix lookup simply returns no-match if nothing in the chain
     // shares the requested prefix.
-    const packages: MigrationPackage[] = [
+    const packages: OnDiskMigrationPackage[] = [
       {
         dirName: '20260101_100000_only',
         dirPath: '/tmp/only',
@@ -332,8 +332,13 @@ describe('formatMigrationShowOutput', () => {
 
     expect(stripped).toContain('├');
     expect(stripped).toContain('└');
-    expect(stripped).toContain('[additive]');
-    expect(stripped).toContain('[destructive]');
+    // M6 (T6.6 / AC8): operationClass tags no longer inlined in the
+    // human-readable line. Destructive ops still render a "(destructive)"
+    // marker (replaces the old "[destructive]" tag); additive/widening/
+    // mutative/data render bare.
+    expect(stripped).not.toContain('[additive]');
+    expect(stripped).not.toContain('[destructive]');
+    expect(stripped).toContain('(destructive)');
   });
 
   it('shows destructive warning when operations include destructive', () => {

@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
 import {
   buildWriteMarkerStatements,
@@ -35,6 +36,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
 
     const emptyPlan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [],
@@ -85,6 +87,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     await executeStatement(driver, ensureMarkerTableStatement);
     await executeStatement(driver, ensureLedgerTableStatement);
     const mismatchedMarker = buildWriteMarkerStatements({
+      space: APP_SPACE_ID,
       storageHash: 'sha256:other-contract',
       profileHash: 'sha256:other-profile',
       contractJson: { storageHash: 'sha256:other-contract' },
@@ -97,6 +100,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
     const emptyPlan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: {
         storageHash: 'sha256:expected-origin',
         profileHash: 'sha256:expected-profile',
@@ -120,8 +124,8 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     expect(failure.summary).toMatch(/does not match plan origin/i);
 
     const markerRow = await driver.query<{ core_hash: string; profile_hash: string }>(
-      'SELECT core_hash, profile_hash FROM _prisma_marker WHERE id = ?',
-      [1],
+      'SELECT core_hash, profile_hash FROM _prisma_marker WHERE space = ?',
+      ['app'],
     );
     expect(markerRow.rows[0]).toMatchObject({
       core_hash: 'sha256:other-contract',
@@ -141,6 +145,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
 
     const planWithFailingPostcheck = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [
@@ -195,6 +200,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
 
     const planWithInvalidSql = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [
@@ -237,6 +243,63 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     await expectNoMarkerOrLedgerWrites(driver);
   });
 
+  it('fails with LEGACY_MARKER_SHAPE when a legacy single-row marker table exists', async () => {
+    // Reproduce the pre-cleanup shape that `migrateMarkerSchemaSqlite` used
+    // to auto-promote: `id` PK with no `space` column. The detection step at
+    // boot must surface this rather than silently rebuilding the table.
+    testDb = createTestDatabase();
+    const { driver } = testDb;
+
+    await driver.query(`CREATE TABLE _prisma_marker (
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      core_hash TEXT NOT NULL,
+      profile_hash TEXT NOT NULL,
+      contract_json TEXT,
+      canonical_version INTEGER,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      app_tag TEXT,
+      meta TEXT NOT NULL DEFAULT '{}',
+      invariants TEXT NOT NULL DEFAULT '[]'
+    )`);
+
+    const runner = sqliteTargetDescriptor.createRunner(familyInstance);
+    const emptyPlan = createMigrationPlan<SqlitePlanTargetDetails>({
+      targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
+      origin: null,
+      destination: toPlanContractInfo(contract),
+      operations: [],
+      providedInvariants: [],
+    });
+
+    const result = await runner.execute({
+      plan: emptyPlan,
+      driver,
+      destinationContract: contract,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents,
+    });
+
+    expect(result.ok).toBe(false);
+    const failure = result.assertNotOk();
+    expect(failure.code).toBe('LEGACY_MARKER_SHAPE');
+    expect(failure.summary).toMatch(/legacy marker-table shape/i);
+    expect(failure.summary).toMatch(/dbInit/);
+    expect(failure.summary).toMatch(/_prisma_marker/);
+    expect(failure.meta).toMatchObject({ table: '_prisma_marker' });
+
+    // Detection must not mutate the legacy table — operator dropping it is
+    // the explicit remediation.
+    const info = await driver.query<{ name: string; pk: number }>(
+      'PRAGMA table_info("_prisma_marker")',
+    );
+    const pkColumns = info.rows
+      .filter((r) => r.pk > 0)
+      .sort((a, b) => a.pk - b.pk)
+      .map((r) => r.name);
+    expect(pkColumns).toEqual(['id']);
+  });
+
   it('fails with DESTINATION_CONTRACT_MISMATCH when plan hash differs from contract', async () => {
     testDb = createTestDatabase();
     const { driver } = testDb;
@@ -244,6 +307,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
 
     const plan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: { storageHash: 'sha256:plan-hash', profileHash: 'sha256:plan-profile' },
       operations: [],
@@ -278,6 +342,7 @@ describe('SqliteMigrationRunner - Policy Violations', () => {
 
     const planWithPolicyViolation = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [

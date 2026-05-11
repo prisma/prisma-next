@@ -311,6 +311,12 @@ function parsePslAuthoringArgumentValue(
   switch (descriptor.kind) {
     case 'string':
       return unquoteStringLiteral(rawValue);
+    case 'boolean': {
+      const trimmed = rawValue.trim();
+      if (trimmed === 'true') return true;
+      if (trimmed === 'false') return false;
+      return INVALID_AUTHORING_ARGUMENT;
+    }
     case 'number': {
       const parsed = Number(unquoteStringLiteral(rawValue));
       return Number.isNaN(parsed) ? INVALID_AUTHORING_ARGUMENT : parsed;

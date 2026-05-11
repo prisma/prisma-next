@@ -1,5 +1,5 @@
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
-import { createCodecRegistry, OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
+import { OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../src/exports/runtime';
 
@@ -12,13 +12,14 @@ describe('pgvector operations', () => {
     expect(pgvectorDescriptor.version).toBe('0.0.1');
   });
 
-  it('descriptor provides codec registry with vector codec', () => {
-    const codecs = pgvectorDescriptor.codecs();
-    expect(codecs).toBeDefined();
+  it('descriptor contributes the pg/vector@1 codec descriptor', () => {
+    const descriptors = pgvectorDescriptor.codecs();
+    expect(descriptors).toBeDefined();
+    expect(descriptors.length).toBe(1);
 
-    const vectorCodec = codecs.get('pg/vector@1');
-    expect(vectorCodec).toBeDefined();
-    expect(vectorCodec?.id).toBe('pg/vector@1');
+    const vectorDescriptor = descriptors.find((d) => d.codecId === 'pg/vector@1');
+    expect(vectorDescriptor).toBeDefined();
+    expect(vectorDescriptor?.codecId).toBe('pg/vector@1');
   });
 
   it('descriptor provides query operations whose impls build AST with lowering', () => {
@@ -68,18 +69,13 @@ describe('pgvector operations', () => {
     expect(entries['cosineSimilarity']).toBeDefined();
   });
 
-  it('codecs can be registered in codec registry', () => {
-    const descriptorCodecs = pgvectorDescriptor.codecs();
-    expect(descriptorCodecs).toBeDefined();
+  it('descriptor materializes a runtime codec when its factory is called', () => {
+    const descriptors = pgvectorDescriptor.codecs();
+    const vectorDescriptor = descriptors.find((d) => d.codecId === 'pg/vector@1');
+    expect(vectorDescriptor).toBeDefined();
 
-    const registry = createCodecRegistry();
-    for (const codec of descriptorCodecs.values()) {
-      registry.register(codec);
-    }
-
-    const vectorCodec = registry.get('pg/vector@1');
-    expect(vectorCodec).toBeDefined();
-    expect(vectorCodec?.id).toBe('pg/vector@1');
+    const codec = vectorDescriptor!.factory({ length: 3 })({ name: '<test>' });
+    expect(codec.id).toBe('pg/vector@1');
   });
 
   it('instance is minimal (identity only)', () => {

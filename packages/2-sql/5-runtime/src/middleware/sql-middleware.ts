@@ -6,6 +6,7 @@ import type {
 } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
+import type { SqlParamRefMutator } from '@prisma-next/sql-relational-core/middleware';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 
 export interface SqlMiddlewareContext extends RuntimeMiddlewareContext {
@@ -21,7 +22,8 @@ export interface DraftPlan {
   readonly meta: PlanMeta;
 }
 
-export interface SqlMiddleware extends RuntimeMiddleware<SqlExecutionPlan> {
+export interface SqlMiddleware<TCodecMap extends Record<string, unknown> = Record<string, unknown>>
+  extends RuntimeMiddleware<SqlExecutionPlan, SqlParamRefMutator<TCodecMap>> {
   readonly familyId?: 'sql';
   /**
    * Rewrite the query AST before it is lowered to SQL. Middlewares run in
@@ -42,7 +44,24 @@ export interface SqlMiddleware extends RuntimeMiddleware<SqlExecutionPlan> {
    * See `docs/architecture docs/subsystems/4. Runtime & Middleware Framework.md`.
    */
   beforeCompile?(draft: DraftPlan, ctx: SqlMiddlewareContext): Promise<DraftPlan | undefined>;
-  beforeExecute?(plan: SqlExecutionPlan, ctx: SqlMiddlewareContext): Promise<void>;
+  /**
+   * Mutate `ParamRef.value` slots before encode runs. The third `params`
+   * argument is a {@link SqlParamRefMutator} scoped to value slots only —
+   * SQL strings, projections, and `ParamRef` membership are not mutable.
+   * Existing `(plan)` and `(plan, ctx)` middleware bodies that ignore the
+   * additional argument continue to compile and run unchanged.
+   *
+   * `ctx.signal` carries the per-query `AbortSignal` (ADR 207); middleware
+   * that wraps a network SDK forwards `ctx.signal` to that SDK.
+   * Cooperative cancellation: a body that ignores the signal still
+   * surfaces `RUNTIME.ABORTED { phase: 'beforeExecute' }` promptly via
+   * the runtime's race against the signal.
+   */
+  beforeExecute?(
+    plan: SqlExecutionPlan,
+    ctx: SqlMiddlewareContext,
+    params?: SqlParamRefMutator<TCodecMap>,
+  ): void | Promise<void>;
   onRow?(
     row: Record<string, unknown>,
     plan: SqlExecutionPlan,

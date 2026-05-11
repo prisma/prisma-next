@@ -8,7 +8,8 @@ import {
   findLatestMigration,
   reconstructGraph,
 } from '@prisma-next/migration-tools/migration-graph';
-import type { MigrationPackage } from '@prisma-next/migration-tools/package';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
+import { APP_SPACE_ID, spaceMigrationDirectory } from '@prisma-next/migration-tools/spaces';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -64,9 +65,9 @@ function looksLikePath(target: string): boolean {
 }
 
 export function resolveByHashPrefix(
-  packages: readonly MigrationPackage[],
+  packages: readonly OnDiskMigrationPackage[],
   prefix: string,
-): Result<MigrationPackage, CliStructuredError> {
+): Result<OnDiskMigrationPackage, CliStructuredError> {
   const normalizedPrefix = prefix.startsWith('sha256:') ? prefix : `sha256:${prefix}`;
   const matches = packages.filter((p) => p.metadata.migrationHash.startsWith(normalizedPrefix));
 
@@ -103,16 +104,17 @@ async function executeMigrationShowCommand(
     ? relative(process.cwd(), resolve(options.config))
     : 'prisma-next.config.ts';
 
-  const migrationsDir = resolve(
+  const migrationsDirRoot = resolve(
     options.config ? resolve(options.config, '..') : process.cwd(),
     config.migrations?.dir ?? 'migrations',
   );
-  const migrationsRelative = relative(process.cwd(), migrationsDir);
+  const appMigrationsDir = spaceMigrationDirectory(migrationsDirRoot, APP_SPACE_ID);
+  const appMigrationsRelative = relative(process.cwd(), appMigrationsDir);
 
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
-      { label: 'migrations', value: migrationsRelative },
+      { label: 'migrations', value: appMigrationsRelative },
     ];
     if (target) {
       details.push({ label: 'target', value: target });
@@ -126,17 +128,17 @@ async function executeMigrationShowCommand(
     ui.stderr(header);
   }
 
-  let pkg: MigrationPackage;
+  let pkg: OnDiskMigrationPackage;
 
   try {
     if (target && looksLikePath(target)) {
       pkg = await readMigrationPackage(resolve(target));
     } else {
-      const allPackages = await readMigrationsDir(migrationsDir);
+      const allPackages = await readMigrationsDir(appMigrationsDir);
       if (allPackages.length === 0) {
         return notOk(
           errorRuntime('No migrations found', {
-            why: `No migration packages found in ${migrationsRelative}`,
+            why: `No migration packages found in ${appMigrationsRelative}`,
             fix: 'Run `prisma-next migration plan` to create a migration first.',
           }),
         );

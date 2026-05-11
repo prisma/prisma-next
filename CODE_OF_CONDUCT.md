@@ -49,10 +49,11 @@ Tensions can occur between community members even when they are trying their bes
 
 When an incident does occur, it is important to report it promptly.
 
-To report a possible violation, please use our Discord server: https://pris.ly/discord
+**To report a possible violation, please email `conduct@prisma.io`.** Reports are received privately by the maintainers and treated as confidential.
 
-- Send a private message to a server moderator, or
-- If the server has a private moderation channel/ticket flow, use that.
+If you are uncomfortable using email, or if the report concerns one of the maintainers, you may instead reach out via our Discord server (<https://pris.ly/discord>) by sending a private message to any moderator or, where available, using the server's private moderation channel.
+
+Please do not file public GitHub issues for code-of-conduct concerns; doing so may amplify harm to the people involved.
 
 Maintainers and moderators take reports of violations seriously and will make every effort to respond in a timely manner. They will investigate all reports of code of conduct violations, which may include reviewing messages, logs, and recordings, or interviewing witnesses and other participants. Maintainers and moderators will keep investigation and enforcement actions as transparent as possible while prioritizing safety and confidentiality. In order to honor these values, enforcement actions are carried out in private with the involved parties, but communicating to the whole community may be part of a mutually agreed upon resolution.
 

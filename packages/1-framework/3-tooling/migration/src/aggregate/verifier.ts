@@ -1,0 +1,230 @@
+import type { Result } from '@prisma-next/utils/result';
+import { notOk, ok } from '@prisma-next/utils/result';
+import type { ContractMarkerRecordLike } from './marker-types';
+import { projectSchemaToSpace } from './project-schema-to-space';
+import type { ContractSpaceAggregate, ContractSpaceMember } from './types';
+
+/**
+ * Caller policy for the aggregate verifier. Today's only knob is
+ * `mode`: `strict` treats orphan elements (live tables not claimed by
+ * any aggregate member) as errors; `lenient` treats them as
+ * informational. Maps directly to `db verify --strict`.
+ */
+export interface AggregateVerifierInput<TSchemaResult> {
+  readonly aggregate: ContractSpaceAggregate;
+  readonly markersBySpaceId: ReadonlyMap<string, ContractMarkerRecordLike | null>;
+  readonly schemaIntrospection: unknown;
+  readonly mode: 'strict' | 'lenient';
+  /**
+   * Caller-supplied per-space schema verifier. The CLI wires this to
+   * the family's `verifySqlSchema` (SQL) / equivalent (other
+   * families). The aggregate verifier projects the schema to the
+   * member's slice via {@link projectSchemaToSpace} before invoking
+   * the callback, so single-contract semantics are preserved.
+   *
+   * Typed structurally with a generic `TSchemaResult` so the
+   * migration-tools layer doesn't depend on the SQL family's
+   * `VerifySqlSchemaResult`. CLI callers pass the family's type
+   * through unchanged.
+   */
+  readonly verifySchemaForMember: (
+    projectedSchema: unknown,
+    member: ContractSpaceMember,
+    mode: 'strict' | 'lenient',
+  ) => TSchemaResult;
+}
+
+/**
+ * Marker-check result per member. Mirrors the four cases the
+ * `verifyContractSpaces` primitive surfaces today, plus an `'absent'`
+ * case for greenfield spaces (no marker row written yet — `db init`
+ * not run).
+ */
+export type MarkerCheckResult =
+  | { readonly kind: 'ok' }
+  | { readonly kind: 'absent' }
+  | {
+      readonly kind: 'hashMismatch';
+      readonly markerHash: string;
+      readonly expected: string;
+    }
+  | { readonly kind: 'missingInvariants'; readonly missing: readonly string[] };
+
+export interface MarkerCheckSection {
+  readonly perSpace: ReadonlyMap<string, MarkerCheckResult>;
+  readonly orphanMarkers: readonly {
+    readonly spaceId: string;
+    readonly row: ContractMarkerRecordLike;
+  }[];
+}
+
+/**
+ * A live storage element (today: a top-level table) not claimed by any
+ * member of the aggregate. The aggregate verifier always reports these;
+ * the caller decides what to do — `db verify --strict` treats them as
+ * errors, the lenient default treats them as informational.
+ *
+ * Today only `kind: 'table'` exists. The discriminated shape leaves
+ * room for orphan columns / indexes / sequences in the future without
+ * breaking the type contract.
+ */
+export type OrphanElement = { readonly kind: 'table'; readonly name: string };
+
+export interface SchemaCheckSection<TSchemaResult> {
+  readonly perSpace: ReadonlyMap<string, TSchemaResult>;
+  /**
+   * Live elements present in the introspected schema that are not
+   * claimed by **any** aggregate member. Sorted alphabetically by name.
+   */
+  readonly orphanElements: readonly OrphanElement[];
+}
+
+export interface AggregateVerifierSuccess<TSchemaResult> {
+  readonly markerCheck: MarkerCheckSection;
+  readonly schemaCheck: SchemaCheckSection<TSchemaResult>;
+}
+
+export type AggregateVerifierError = {
+  readonly kind: 'introspectionFailure';
+  readonly detail: string;
+};
+
+export type AggregateVerifierOutput<TSchemaResult> = Result<
+  AggregateVerifierSuccess<TSchemaResult>,
+  AggregateVerifierError
+>;
+
+/**
+ * Verify a {@link ContractSpaceAggregate} against the live database
+ * state. Bundles two checks:
+ *
+ * - `markerCheck` per member: compare the live marker row against the
+ *   member's `headRef.hash` + `headRef.invariants`. Absence is a
+ *   distinct kind, not an error (callers — `db verify` strict vs
+ *   `db init` precondition — choose how to interpret it).
+ * - `schemaCheck` per member: project the live schema to the slice
+ *   the member claims via {@link projectSchemaToSpace}, then delegate
+ *   to the caller-supplied `verifySchemaForMember`. The pre-projection
+ *   means the family's single-contract verifier no longer sees other
+ *   members' tables as `extras`, so a multi-member deployment never
+ *   surfaces cross-member tables as orphaned schema elements.
+ *
+ * `markerCheck.orphanMarkers` lists every marker row whose `space` is
+ * not a member of the aggregate. `db verify` callers reject orphans;
+ * future tooling may not.
+ *
+ * Pure synchronous function; no I/O. The caller (CLI) gathers
+ * `markersBySpaceId` and `schemaIntrospection` ahead of the call.
+ */
+export function verifyAggregate<TSchemaResult>(
+  input: AggregateVerifierInput<TSchemaResult>,
+): AggregateVerifierOutput<TSchemaResult> {
+  try {
+    return runVerifyAggregate(input);
+  } catch (error) {
+    return notOk({
+      kind: 'introspectionFailure',
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+function runVerifyAggregate<TSchemaResult>(
+  input: AggregateVerifierInput<TSchemaResult>,
+): AggregateVerifierOutput<TSchemaResult> {
+  const { aggregate, markersBySpaceId, schemaIntrospection, mode, verifySchemaForMember } = input;
+  const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
+  const memberSpaceIds = new Set(allMembers.map((m) => m.spaceId));
+
+  // Marker check per member.
+  const markerPerSpace = new Map<string, MarkerCheckResult>();
+  for (const member of allMembers) {
+    const marker = markersBySpaceId.get(member.spaceId) ?? null;
+    if (marker === null) {
+      markerPerSpace.set(member.spaceId, { kind: 'absent' });
+      continue;
+    }
+    if (marker.storageHash !== member.headRef.hash) {
+      markerPerSpace.set(member.spaceId, {
+        kind: 'hashMismatch',
+        markerHash: marker.storageHash,
+        expected: member.headRef.hash,
+      });
+      continue;
+    }
+    const markerInvariants = new Set(marker.invariants);
+    const missing = member.headRef.invariants.filter((id) => !markerInvariants.has(id));
+    if (missing.length > 0) {
+      markerPerSpace.set(member.spaceId, {
+        kind: 'missingInvariants',
+        missing: [...missing].sort(),
+      });
+      continue;
+    }
+    markerPerSpace.set(member.spaceId, { kind: 'ok' });
+  }
+
+  // Orphan markers: entries in markersBySpaceId whose spaceId is not a
+  // member of the aggregate.
+  const orphanMarkers: { spaceId: string; row: ContractMarkerRecordLike }[] = [];
+  for (const [spaceId, row] of markersBySpaceId) {
+    if (row !== null && !memberSpaceIds.has(spaceId)) {
+      orphanMarkers.push({ spaceId, row });
+    }
+  }
+  orphanMarkers.sort((a, b) => a.spaceId.localeCompare(b.spaceId));
+
+  // Schema check per member (with per-space pre-projection).
+  const schemaPerSpace = new Map<string, TSchemaResult>();
+  for (const member of allMembers) {
+    const others = allMembers.filter((m) => m.spaceId !== member.spaceId);
+    const projected = projectSchemaToSpace(schemaIntrospection, member, others);
+    schemaPerSpace.set(member.spaceId, verifySchemaForMember(projected, member, mode));
+  }
+
+  return ok({
+    markerCheck: {
+      perSpace: markerPerSpace,
+      orphanMarkers,
+    },
+    schemaCheck: {
+      perSpace: schemaPerSpace,
+      orphanElements: detectOrphanElements(schemaIntrospection, allMembers),
+    },
+  });
+}
+
+/**
+ * Live tables not claimed by any aggregate member. Duck-typed against
+ * the introspected schema's `tables` map; schemas whose shape doesn't
+ * match return an empty list (consistent with
+ * {@link projectSchemaToSpace}'s fall-through).
+ */
+function detectOrphanElements(
+  schemaIntrospection: unknown,
+  members: ReadonlyArray<ContractSpaceMember>,
+): readonly OrphanElement[] {
+  if (typeof schemaIntrospection !== 'object' || schemaIntrospection === null) return [];
+  const liveTables = (schemaIntrospection as { readonly tables?: unknown }).tables;
+  if (typeof liveTables !== 'object' || liveTables === null) return [];
+
+  const claimedTables = new Set<string>();
+  for (const member of members) {
+    const storage = (member.contract as { readonly storage?: unknown }).storage;
+    if (typeof storage !== 'object' || storage === null) continue;
+    const tables = (storage as { readonly tables?: unknown }).tables;
+    if (typeof tables !== 'object' || tables === null) continue;
+    for (const tableName of Object.keys(tables as Record<string, unknown>)) {
+      claimedTables.add(tableName);
+    }
+  }
+
+  const orphans: OrphanElement[] = [];
+  for (const tableName of Object.keys(liveTables as Record<string, unknown>)) {
+    if (!claimedTables.has(tableName)) {
+      orphans.push({ kind: 'table', name: tableName });
+    }
+  }
+  orphans.sort((a, b) => a.name.localeCompare(b.name));
+  return orphans;
+}

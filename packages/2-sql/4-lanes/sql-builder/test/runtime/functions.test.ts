@@ -154,6 +154,45 @@ describe('createFunctions', () => {
     });
   });
 
+  describe('refs propagation', () => {
+    it('eq(field, value) propagates refs from the column-bound left side onto the ParamRef', () => {
+      const result = fns.eq(f().email, 'alice@example.com');
+      const ast = result.buildAst() as BinaryExpr;
+      const right = ast.right as ParamRef;
+
+      expect(right).toBeInstanceOf(ParamRef);
+      expect(right.refs).toEqual({ table: 'users', column: 'email' });
+    });
+
+    it('eq(value, field) propagates refs from the column-bound right side onto the ParamRef', () => {
+      const result = fns.eq('alice@example.com', f().email);
+      const ast = result.buildAst() as BinaryExpr;
+      const left = ast.left as ParamRef;
+
+      expect(left).toBeInstanceOf(ParamRef);
+      expect(left.refs).toEqual({ table: 'users', column: 'email' });
+    });
+
+    it('comparison operators propagate refs onto value-side ParamRefs', () => {
+      const result = fns.gt(f().id, 5);
+      const ast = result.buildAst() as BinaryExpr;
+      const right = ast.right as ParamRef;
+
+      expect(right.refs).toEqual({ table: 'users', column: 'id' });
+    });
+
+    it('in() propagates refs onto every value ParamRef in the list', () => {
+      const result = fns.in(f().email, ['a@x', 'b@x', 'c@x']);
+      const ast = result.buildAst() as BinaryExpr;
+      const list = ast.right as ListExpression;
+
+      for (const value of list.values) {
+        expect(value).toBeInstanceOf(ParamRef);
+        expect((value as ParamRef).refs).toEqual({ table: 'users', column: 'email' });
+      }
+    });
+  });
+
   describe('in / notIn', () => {
     it('in with array produces BinaryExpr with ListExpression of ParamRefs', () => {
       const result = fns.in(f().id, [1, 2, 3]);

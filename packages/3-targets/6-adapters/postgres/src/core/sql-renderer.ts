@@ -21,8 +21,8 @@ import {
   type OrderByItem,
   type ParamRef,
   type ProjectionItem,
+  type RawSqlExpr,
   type SelectAst,
-  type Codec as SqlCodec,
   type SubqueryExpr,
   type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
@@ -30,21 +30,11 @@ import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql
 import type { PostgresContract } from './types';
 
 /**
- * Postgres native types whose unknown-OID parameter inference is reliable in
- * arbitrary expression positions. Parameters bound to a codec whose
- * `meta.db.sql.postgres.nativeType` falls in this set are emitted as plain
- * `$N`; everything else (including `json`, `jsonb`, extension types like
- * `vector`, and unknown user types) is emitted as `$N::<nativeType>` so the
- * planner picks an unambiguous overload.
+ * Postgres native types whose unknown-OID parameter inference is reliable in arbitrary expression positions. Parameters bound to a codec whose `meta.db.sql.postgres.nativeType` falls in this set are emitted as plain `$N`; everything else (including `json`, `jsonb`, extension types like `vector`, and unknown user types) is emitted as `$N::<nativeType>` so the planner picks an unambiguous overload.
  *
- * `json` / `jsonb` are intentionally excluded despite being Postgres builtins:
- * their operator overloads make context inference unreliable in expression
- * positions (e.g. `$1 -> 'key'` is ambiguous between the two).
+ * `json` / `jsonb` are intentionally excluded despite being Postgres builtins: their operator overloads make context inference unreliable in expression positions (e.g. `$1 -> 'key'` is ambiguous between the two).
  *
- * Spellings match the on-disk `meta.db.sql.postgres.nativeType` values in
- * `@prisma-next/target-postgres`'s codec definitions, not the `udt_name`
- * abbreviations that ADR 205 used as illustrative shorthand. The lookup-based
- * cast policy compares against these strings directly.
+ * Spellings match the on-disk `meta.db.sql.postgres.nativeType` values in `@prisma-next/target-postgres`'s codec definitions, not the `udt_name` abbreviations that ADR 205 used as illustrative shorthand. The lookup-based cast policy compares against these strings directly.
  */
 const POSTGRES_INFERRABLE_NATIVE_TYPES: ReadonlySet<string> = new Set([
   // Numeric
@@ -80,12 +70,7 @@ function renderTypedParam(
   if (codecId === undefined) {
     return `$${index}`;
   }
-  // SQL codecs extend the framework `Codec` base with an optional
-  // `meta: CodecMeta`; the framework `CodecLookup.get` returns the base type,
-  // so we narrow to `SqlCodec` to read `meta`. Every codec actually
-  // registered into a SQL codec lookup conforms to `SqlCodec`.
-  const codec = codecLookup.get(codecId) as SqlCodec | undefined;
-  if (codec === undefined) {
+  if (codecLookup.get(codecId) === undefined) {
     throw new Error(
       `Postgres lowering: ParamRef carries codecId "${codecId}" but the ` +
         'assembled codec lookup has no entry for it. This usually indicates ' +
@@ -95,18 +80,24 @@ function renderTypedParam(
         "if it's a builtin.",
     );
   }
-  const nativeType = codec.meta?.db?.sql?.postgres?.nativeType;
-  if (nativeType !== undefined && !POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
+  // The framework `CodecLookup.metaFor` returns the family-agnostic `CodecMeta` whose `db` is `Record<string, unknown>`. The SQL family populates a narrower shape with `db.sql.<dialect>.nativeType: string`; navigate that path defensively and string-check the leaf.
+  const meta = codecLookup.metaFor(codecId);
+  const dbRecord = meta?.db;
+  const sqlBlock = isRecord(dbRecord) ? dbRecord['sql'] : undefined;
+  const dialectBlock = isRecord(sqlBlock) ? sqlBlock['postgres'] : undefined;
+  const nativeType = isRecord(dialectBlock) ? dialectBlock['nativeType'] : undefined;
+  if (typeof nativeType === 'string' && !POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
     return `$${index}::${nativeType}`;
   }
   return `$${index}`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 /**
- * Per-render carrier threaded through every helper. Bundles the param-index
- * map (for `$N` numbering) and the assembled-stack `codecLookup` (for
- * cast policy at the `renderTypedParam` chokepoint). Carrying both on a
- * single value keeps helper signatures stable.
+ * Per-render carrier threaded through every helper. Bundles the param-index map (for `$N` numbering) and the assembled-stack `codecLookup` (for cast policy at the `renderTypedParam` chokepoint). Carrying both on a single value keeps helper signatures stable.
  */
 interface ParamIndexMap {
   readonly indexMap: Map<ParamRef, number>;
@@ -116,9 +107,7 @@ interface ParamIndexMap {
 /**
  * Render a SQL query AST to a Postgres-flavored `{ sql, params }` payload.
  *
- * Shared between the runtime (`PostgresAdapterImpl.lower`) and control
- * (`PostgresControlAdapter.lower`) entrypoints so emit-time and run-time
- * paths produce byte-identical output for the same AST.
+ * Shared between the runtime (`PostgresAdapterImpl.lower`) and control (`PostgresControlAdapter.lower`) entrypoints so emit-time and run-time paths produce byte-identical output for the same AST.
  */
 export function renderLoweredSql(
   ast: AnyQueryAst,
@@ -147,6 +136,9 @@ export function renderLoweredSql(
       break;
     case 'delete':
       sql = renderDelete(node, contract, pim);
+      break;
+    case 'raw-sql':
+      sql = renderRawSql(node, contract, pim);
       break;
     // v8 ignore next 4
     default:
@@ -309,15 +301,9 @@ function renderNullCheck(
 }
 
 /**
- * Atomic expression kinds whose rendered SQL is already self-delimited
- * (a column reference, parameter, literal, function call, aggregate, etc.)
- * and therefore does not need surrounding parentheses when used as the
- * left operand of a postfix predicate like `IS NULL` or `IS NOT NULL`,
- * or as either operand of a binary infix operator.
+ * Atomic expression kinds whose rendered SQL is already self-delimited (a column reference, parameter, literal, function call, aggregate, etc.) and therefore does not need surrounding parentheses when used as the left operand of a postfix predicate like `IS NULL` or `IS NOT NULL`, or as either operand of a binary infix operator.
  *
- * Anything not in this set is treated as composite (binary, AND/OR/NOT,
- * EXISTS, nested IS NULL, subqueries, operation templates) and gets
- * wrapped to preserve grouping.
+ * Anything not in this set is treated as composite (binary, AND/OR/NOT, EXISTS, nested IS NULL, subqueries, operation templates) and gets wrapped to preserve grouping.
  */
 function isAtomicExpressionKind(kind: AnyExpression['kind']): boolean {
   switch (kind) {
@@ -571,12 +557,7 @@ function renderOperation(
     return renderExpr(arg, contract, pim);
   });
 
-  // Resolve `{{self}}` and `{{argN}}` from the original template in a single
-  // pass. Doing this with sequential `String.prototype.replace` calls is
-  // unsafe: a substituted fragment can itself contain text that matches a
-  // later token (e.g. an arg literal containing the substring `{{arg1}}`),
-  // and the next iteration would corrupt it. A single regex callback never
-  // re-scans already-substituted output.
+  // Resolve `{{self}}` and `{{argN}}` from the original template in a single pass. Doing this with sequential `String.prototype.replace` calls is unsafe: a substituted fragment can itself contain text that matches a later token (e.g. an arg literal containing the substring `{{arg1}}`), and the next iteration would corrupt it. A single regex callback never re-scans already-substituted output.
   return expr.lowering.template.replace(
     /\{\{self\}\}|\{\{arg(\d+)\}\}/g,
     (token, argIndex: string | undefined) => {
@@ -775,4 +756,18 @@ function renderDelete(ast: DeleteAst, contract: PostgresContract, pim: ParamInde
     : '';
 
   return `DELETE FROM ${table}${whereClause}${returningClause}`;
+}
+
+function renderRawSql(ast: RawSqlExpr, contract: PostgresContract, pim: ParamIndexMap): string {
+  const out: string[] = [];
+  for (let i = 0; i < ast.fragments.length; i++) {
+    out.push(ast.fragments[i] ?? '');
+    if (i < ast.args.length) {
+      const arg = ast.args[i];
+      if (arg !== undefined) {
+        out.push(renderExpr(arg, contract, pim));
+      }
+    }
+  }
+  return out.join('');
 }

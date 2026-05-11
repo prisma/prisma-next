@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/sql-operations",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "SQL-specific operations for Prisma Next",
@@ -17,7 +18,7 @@
   "dependencies": {
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
-    "arktype": "^2.1.26"
+    "arktype": "^2.1.29"
   },
   "devDependencies": {
     "@prisma-next/emitter": "workspace:*",

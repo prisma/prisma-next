@@ -148,6 +148,47 @@ export function errorInvalidDestName(destName: string): MigrationToolsError {
   });
 }
 
+export function errorInvalidSpaceId(spaceId: string): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.INVALID_SPACE_ID',
+    'Invalid contract space identifier',
+    {
+      why: `The space id "${spaceId}" does not match the required pattern /^[a-z][a-z0-9_-]{0,63}$/. Space ids are used as filesystem directory names under \`migrations/\`, so the pattern is conservative on purpose.`,
+      fix: 'Pick a lowercase identifier that begins with a letter and contains only lowercase letters, digits, hyphens, or underscores; max 64 characters total.',
+      details: { spaceId },
+    },
+  );
+}
+
+export function errorDescriptorHeadHashMismatch(args: {
+  readonly extensionId: string;
+  readonly recomputedHash: string;
+  readonly headRefHash: string;
+}): MigrationToolsError {
+  const { extensionId, recomputedHash, headRefHash } = args;
+  return new MigrationToolsError(
+    'MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH',
+    "Extension descriptor's headRef.hash does not match its contractJson",
+    {
+      why: `Extension "${extensionId}" publishes a \`contractSpace\` whose \`headRef.hash\` (${headRefHash}) does not match the canonical hash recomputed from \`contractSpace.contractJson\` (${recomputedHash}). This means the extension descriptor was published with stale \`headRef.hash\` — typically because the contract was bumped without rerunning the extension's emit pipeline.`,
+      fix: 'Re-run the extension authoring pipeline so `contractJson.storage.storageHash` and `headRef.hash` agree, then republish the extension. If you are the extension author and you intentionally bumped `contractJson`, recompute and update `headRef.hash` (and refresh any on-disk migration metadata that derives from it).',
+      details: { extensionId, recomputedHash, headRefHash },
+    },
+  );
+}
+
+export function errorDuplicateSpaceId(spaceId: string): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.DUPLICATE_SPACE_ID',
+    'Duplicate contract space identifier',
+    {
+      why: `The space id "${spaceId}" appears more than once in the per-space planner input. Each space id must be unique across the inputs (the per-space planner emits one output entry per id).`,
+      fix: 'Deduplicate the inputs before passing them to `planAllSpaces` — typically by checking your `extensionPacks` declaration for repeated entries.',
+      details: { spaceId },
+    },
+  );
+}
+
 export function errorSameSourceAndTarget(dir: string, hash: string): MigrationToolsError {
   const dirName = basename(dir);
   return new MigrationToolsError(

@@ -1,3 +1,4 @@
+export type { ImportRequirement } from '@prisma-next/ts-render';
 export type {
   MigratableTargetDescriptor,
   OperationPreviewCapable,
@@ -6,6 +7,7 @@ export type {
 } from '../control/control-capabilities';
 export {
   hasMigrations,
+  hasMultiSpaceRunner,
   hasOperationPreview,
   hasPslContractInfer,
   hasSchemaView,
@@ -25,6 +27,8 @@ export type {
   ControlTargetInstance,
 } from '../control/control-instances';
 export type {
+  MigrationHints,
+  MigrationMetadata,
   MigrationOperationClass,
   MigrationOperationPolicy,
   MigrationPlan,
@@ -41,6 +45,11 @@ export type {
   MigrationRunnerResult,
   MigrationRunnerSuccessValue,
   MigrationScaffoldContext,
+  MultiSpaceCapableRunner,
+  MultiSpaceRunnerFailure,
+  MultiSpaceRunnerPerSpaceOptions,
+  MultiSpaceRunnerResult,
+  MultiSpaceRunnerSuccessValue,
   OpFactoryCall,
   SerializedQueryPlan,
   TargetMigrationsCapability,
@@ -74,6 +83,12 @@ export type {
   SchemaTreeVisitor,
 } from '../control/control-schema-view';
 export { SchemaTreeNode } from '../control/control-schema-view';
+export type {
+  ContractSpace,
+  ContractSpaceHeadRef,
+  MigrationPackage,
+} from '../control/control-spaces';
+export { APP_SPACE_ID } from '../control/control-spaces';
 export type {
   AssembledAuthoringContributions,
   ControlStack,

@@ -78,7 +78,7 @@ withTempDir(({ createTempDir }) => {
         const planResult = await runMigrationPlan(ctx, ['--name', 'retype-score-to-int']);
         expect(planResult.exitCode, `plan: ${planResult.stdout}\n${planResult.stderr}`).toBe(0);
 
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const migrationDirs = readdirSync(migrationsDir)
           .filter((d) => d.includes('retype_score_to_int'))
           .sort();

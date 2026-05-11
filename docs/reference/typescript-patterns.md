@@ -77,87 +77,9 @@ interface ColumnBuilderState<
 
 ## Interface-Based Design with Factory Functions
 
-**Pattern**: Export interfaces and factory functions, keep classes as private implementation details.
+This architectural pattern is now documented in the architecture pattern catalogue under [`interface-plus-factory.md`](../architecture%20docs/patterns/interface-plus-factory.md). The catalogue is the source of truth for the pattern's intent, structure, when-to-use boundaries, and reference implementations.
 
-### Why?
-
-This aligns with the "Types-Only Emission" principle and allows for better abstraction. Consumers work with interfaces, not concrete classes, which enables:
-- Better encapsulation
-- Easier testing with mocks
-- Future flexibility to change implementations
-- Cleaner API surface
-
-### Implementation
-
-**✅ CORRECT: Export interface and factory function**
-
-```typescript
-export interface CodecRegistry {
-  register(codec: Codec<string>): void;
-  get(id: string): Codec<string> | undefined;
-  has(id: string): boolean;
-  // ... other methods
-}
-
-export function createCodecRegistry(): CodecRegistry {
-  return new CodecRegistryImpl();  // Private implementation class
-}
-
-// Private implementation - not exported
-class CodecRegistryImpl implements CodecRegistry {
-  private codecs = new Map<string, Codec<string>>();
-
-  register(codec: Codec<string>): void {
-    this.codecs.set(codec.id, codec);
-  }
-
-  get(id: string): Codec<string> | undefined {
-    return this.codecs.get(id);
-  }
-
-  has(id: string): boolean {
-    return this.codecs.has(id);
-  }
-}
-```
-
-**❌ WRONG: Don't export classes directly**
-
-```typescript
-// Don't do this - exposes implementation details
-export class CodecRegistry {
-  private codecs = new Map<string, Codec<string>>();
-  // ...
-}
-```
-
-### Examples in Codebase
-
-- `CodecRegistry` → `createCodecRegistry()`
-- `CodecDefBuilder` → `defineCodecs()`
-- `Runtime` → `createRuntime()`
-- `PostgresDriver` → `postgresRuntimeDriverDescriptor.create()` + `connect(binding)`
-- `PostgresAdapter` → `createPostgresAdapter()`
-
-### Internal Use
-
-If you need the interface or type for internal use (e.g., in tests), you can export it from an internal module or use it within the same package:
-
-```typescript
-// ✅ CORRECT: Export interface for internal use
-export interface ColumnBuilder {
-  // ...
-}
-
-// Internal implementation - not exported
-class ColumnBuilderImpl implements ColumnBuilder {
-  // ...
-}
-
-export function createColumnBuilder(): ColumnBuilder {
-  return new ColumnBuilderImpl();
-}
-```
+This reference doc retains only the TypeScript-mechanical guidance below — the language-level caveat about classes with private properties in exported types — because that is a TypeScript trap rather than a structural pattern.
 
 ### Exception: Classes with Private Properties in Exported Types
 
@@ -310,7 +232,7 @@ Use `Record<never, never>` for empty object types without index signatures:
 **❌ WRONG: `{}` can be problematic**
 
 ```typescript
-type CodecDefBuilder<
+type CodecMap<
   ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = {}
 > = {
   // ...
@@ -320,7 +242,7 @@ type CodecDefBuilder<
 **✅ CORRECT: `Record<never, never>` is explicit empty type**
 
 ```typescript
-type CodecDefBuilder<
+type CodecMap<
   ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>
 > = {
   // ...
@@ -335,7 +257,7 @@ When extracting literal types from codecs, use mapped types that extract keys (w
 
 ```typescript
 // Extract the Id type from a Codec by using the key in a mapped type
-type ExtractDataTypes<
+type ExtractCodecIds<
   ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> }
 > = {
   readonly [K in keyof ScalarNames]: ScalarNames[K] extends Codec<infer Id>
@@ -606,16 +528,16 @@ It's easy to add unnecessary type casts (`as unknown as T`) or optional chaining
 
 ```typescript
 // Codec accepts string | Date, but we cast Date to string
-const codec = codecDefinitions['timestamp']?.codec;
-const encoded = codec.encode!(date as unknown as string);  // Unnecessary cast!
+const c = codecLookup.get('pg/timestamptz@1');
+const encoded = c.encode(date as unknown as string);  // Unnecessary cast!
 ```
 
 **✅ CORRECT: Check the actual type signature first**
 
 ```typescript
-// Codec interface: encode?(value: string | Date): string
-const codec = codecDefinitions['timestamp'].codec;
-const encoded = codec.encode!(date);  // Date is already accepted!
+// Codec interface: encode(value: string | Date): Promise<string>
+const c = codecLookup.get('pg/timestamptz@1');
+const encoded = await c.encode(date);  // Date is already accepted!
 ```
 
 **When to use type casts:**
@@ -628,23 +550,20 @@ const encoded = codec.encode!(date);  // Date is already accepted!
 **❌ WRONG: Using optional chaining when values are guaranteed to exist**
 
 ```typescript
-// codecDefinitions['timestamp'] is guaranteed to exist in tests
-const codec = codecDefinitions['timestamp']?.codec as
-  | { encode: (value: string | Date) => string }
+// codecLookup.get('pg/timestamptz@1') is guaranteed to return a codec in tests
+const c = codecLookup.get('pg/timestamptz@1') as
+  | { encode: (value: string | Date) => Promise<string> }
   | undefined;
-if (!codec) {
+if (!c) {
   throw new Error('codec not found');
 }
 ```
 
-**✅ CORRECT: Use dot notation when values are guaranteed**
+**✅ CORRECT: Use a non-null assertion (or assert) when values are guaranteed**
 
 ```typescript
-// In test context, codecDefinitions['timestamp'] is guaranteed to exist
-const codec = codecDefinitions['timestamp'].codec as {
-  encode: (value: string | Date) => string;
-  decode: (wire: string | Date) => string;
-};
+// In test context, the codec lookup always has the timestamp codec registered
+const c = codecLookup.get('pg/timestamptz@1')!;
 ```
 
 **When to use optional chaining:**
@@ -657,18 +576,15 @@ const codec = codecDefinitions['timestamp'].codec as {
 **❌ WRONG: Adding `| undefined` to type assertions when values are guaranteed**
 
 ```typescript
-const codec = codecDefinitions['timestamp']?.codec as
-  | { encode: (value: string | Date) => string }
+const c = codecLookup.get('pg/timestamptz@1') as
+  | { encode: (value: string | Date) => Promise<string> }
   | undefined;  // Unnecessary - value is guaranteed to exist
 ```
 
 **✅ CORRECT: Only include `| undefined` if the value might actually be undefined**
 
 ```typescript
-const codec = codecDefinitions['timestamp'].codec as {
-  encode: (value: string | Date) => string;
-  decode: (wire: string | Date) => string;
-};
+const c = codecLookup.get('pg/timestamptz@1')!;
 ```
 
 ### Best Practices
@@ -744,8 +660,7 @@ const _plan = sql<Contract, CodecTypes>({ contract, adapter })
 type Row = ResultType<typeof _plan>;  // _plan indicates it's intentionally unused
 ```
 
-**Biome Configuration:**
-The `noUnusedVariables` rule is configured to ignore variables starting with `_` via the `ignorePattern: '^_'` option.
+**Biome Configuration:** The `noUnusedVariables` rule is configured to ignore variables starting with `_` via the `ignorePattern: '^_'` option.
 
 ### Empty Object Types
 

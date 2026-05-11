@@ -17,6 +17,7 @@ const TSX_BIN = resolve(__dirname, '../../../node_modules/.bin/tsx');
 import {
   executeCommand,
   getExitCode,
+  parseJsonObjectFromCliCapture,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
@@ -54,8 +55,12 @@ async function runMigrationPlan(testDir: string, args: readonly string[]): Promi
 }
 
 function getLatestMigrationDir(testDir: string): string | undefined {
-  const migrationsDir = join(testDir, 'migrations');
-  const dirs = readdirSync(migrationsDir).filter((d) => !d.startsWith('.'));
+  const migrationsDir = join(testDir, 'migrations', 'app');
+  const dirs = readdirSync(migrationsDir).filter((d) => {
+    if (d.startsWith('.')) return false;
+    if (d === 'refs') return false;
+    return statSync(join(migrationsDir, d)).isDirectory();
+  });
   if (dirs.length === 0) return undefined;
   let newest = dirs[0]!;
   let newestMtime = statSync(join(migrationsDir, newest)).mtimeMs;
@@ -73,7 +78,7 @@ function getLatestMigrationDir(testDir: string): string | undefined {
 async function selfEmitLatestMigration(testDir: string): Promise<void> {
   const latest = getLatestMigrationDir(testDir);
   if (!latest) return;
-  const migrationTs = join(testDir, 'migrations', latest, 'migration.ts');
+  const migrationTs = join(testDir, 'migrations', 'app', latest, 'migration.ts');
   await execFileAsync(TSX_BIN, [migrationTs], { cwd: testDir });
 }
 
@@ -129,8 +134,7 @@ withTempDir(({ createTempDir }) => {
             consoleErrors.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
-            const output = consoleOutput.join('\n').trim();
-            const parsed = JSON.parse(output) as MigrationApplyResult;
+            const parsed = parseJsonObjectFromCliCapture(consoleOutput) as MigrationApplyResult;
 
             expect(parsed.ok).toBe(true);
             expect(parsed.migrationsApplied).toBe(1);
@@ -149,8 +153,8 @@ withTempDir(({ createTempDir }) => {
             // Verify marker was written
             await withClient(connectionString, async (client) => {
               const result = await client.query(
-                'SELECT core_hash FROM prisma_contract.marker WHERE id = $1',
-                [1],
+                'SELECT core_hash FROM prisma_contract.marker WHERE space = $1',
+                ['app'],
               );
               expect(result.rows.length).toBe(1);
               expect(result.rows[0]?.core_hash).toBe(parsed.markerHash);
@@ -190,8 +194,7 @@ withTempDir(({ createTempDir }) => {
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
-            const output = consoleOutput.join('\n').trim();
-            const parsed = JSON.parse(output) as MigrationApplyResult;
+            const parsed = parseJsonObjectFromCliCapture(consoleOutput) as MigrationApplyResult;
 
             expect(parsed.ok).toBe(true);
             expect(parsed.migrationsApplied).toBe(0);
@@ -299,8 +302,7 @@ withTempDir(({ createTempDir }) => {
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
-            const output = consoleOutput.join('\n').trim();
-            const parsed = JSON.parse(output) as MigrationApplyResult;
+            const parsed = parseJsonObjectFromCliCapture(consoleOutput) as MigrationApplyResult;
 
             expect(parsed.ok).toBe(true);
             expect(parsed.migrationsApplied).toBe(2);
@@ -349,7 +351,7 @@ withTempDir(({ createTempDir }) => {
             // Apply first migration successfully.
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
-            const firstApply = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
+            const firstApply = parseJsonObjectFromCliCapture(consoleOutput) as MigrationApplyResult;
             expect(firstApply.migrationsApplied).toBe(1);
 
             // Insert rows with duplicate emails so a unique constraint will fail.
@@ -387,7 +389,7 @@ withTempDir(({ createTempDir }) => {
             expect(getExitCode()).toBe(1);
 
             // Marker must remain at the first migration hash (resume point).
-            const migrationsDir = join(testDir, 'migrations');
+            const migrationsDir = join(testDir, 'migrations', 'app');
             const packages = await readMigrationsDir(migrationsDir);
             const firstMigration = packages.find((p) => p.metadata.from === null);
             const secondMigration = packages.find(
@@ -398,8 +400,8 @@ withTempDir(({ createTempDir }) => {
 
             await withClient(connectionString, async (client) => {
               const marker = await client.query(
-                'SELECT core_hash FROM prisma_contract.marker WHERE id = $1',
-                [1],
+                'SELECT core_hash FROM prisma_contract.marker WHERE space = $1',
+                ['app'],
               );
               expect(marker.rows[0]?.core_hash).toBe(firstMigration!.metadata.to);
             });
@@ -411,8 +413,8 @@ withTempDir(({ createTempDir }) => {
 
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
-            const resumeResult = JSON.parse(
-              consoleOutput.join('\n').trim(),
+            const resumeResult = parseJsonObjectFromCliCapture(
+              consoleOutput,
             ) as MigrationApplyResult;
             expect(resumeResult.migrationsApplied).toBe(1);
             expect(resumeResult.markerHash).toBe(secondMigration!.metadata.to);
@@ -480,7 +482,7 @@ withTempDir(({ createTempDir }) => {
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
-            const firstApply = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
+            const firstApply = parseJsonObjectFromCliCapture(consoleOutput) as MigrationApplyResult;
             expect(firstApply.ok).toBe(true);
             expect(firstApply.migrationsApplied).toBe(1);
 
@@ -512,7 +514,9 @@ withTempDir(({ createTempDir }) => {
             consoleErrors.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
-            const secondApply = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
+            const secondApply = parseJsonObjectFromCliCapture(
+              consoleOutput,
+            ) as MigrationApplyResult;
             expect(secondApply.ok).toBe(true);
             expect(secondApply.migrationsApplied).toBe(1);
 
@@ -528,8 +532,8 @@ withTempDir(({ createTempDir }) => {
             // Verify marker was updated
             await withClient(connectionString, async (client) => {
               const result = await client.query(
-                'SELECT core_hash FROM prisma_contract.marker WHERE id = $1',
-                [1],
+                'SELECT core_hash FROM prisma_contract.marker WHERE space = $1',
+                ['app'],
               );
               expect(result.rows.length).toBe(1);
               expect(result.rows[0]?.core_hash).toBe(secondApply.markerHash);
@@ -589,7 +593,7 @@ withTempDir(({ createTempDir }) => {
             consoleOutput.length = 0;
             await runMigrationApply(testDir, ['--config', configPath, '--json', '--no-color']);
 
-            const result = JSON.parse(consoleOutput.join('\n').trim()) as MigrationApplyResult;
+            const result = parseJsonObjectFromCliCapture(consoleOutput) as MigrationApplyResult;
             expect(result.ok).toBe(true);
             expect(result.migrationsApplied).toBe(3);
 

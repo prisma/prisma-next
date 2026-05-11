@@ -1,10 +1,9 @@
 import { expectTypeOf, test } from 'vitest';
-import { codec } from '../../src/ast/codec-types';
+import { defineTestCodec } from './test-codec';
 
 test('factory accepts sync encode and decode and produces Promise-returning methods', () => {
-  const c = codec({
+  const c = defineTestCodec({
     typeId: 'demo/sync@1',
-    targetTypes: ['text'],
     encode: (value: string) => value,
     decode: (wire: string) => wire,
   });
@@ -16,9 +15,8 @@ test('factory accepts sync encode and decode and produces Promise-returning meth
 });
 
 test('factory accepts async encode and decode', () => {
-  const c = codec({
+  const c = defineTestCodec({
     typeId: 'demo/async@1',
-    targetTypes: ['text'],
     encode: async (value: string) => value,
     decode: async (wire: string) => wire,
   });
@@ -28,9 +26,8 @@ test('factory accepts async encode and decode', () => {
 });
 
 test('factory accepts mixed sync encode + async decode', () => {
-  const c = codec({
+  const c = defineTestCodec({
     typeId: 'demo/mixed-a@1',
-    targetTypes: ['text'],
     encode: (value: string) => value,
     decode: async (wire: string) => wire,
   });
@@ -40,9 +37,8 @@ test('factory accepts mixed sync encode + async decode', () => {
 });
 
 test('factory accepts mixed async encode + sync decode', () => {
-  const c = codec({
+  const c = defineTestCodec({
     typeId: 'demo/mixed-b@1',
-    targetTypes: ['text'],
     encode: async (value: string) => value,
     decode: (wire: string) => wire,
   });
@@ -52,14 +48,17 @@ test('factory accepts mixed async encode + sync decode', () => {
 });
 
 test('factory rejects an omitted encode — the property is required', () => {
-  // @ts-expect-error encode is required at the codec() factory call site; the factory installs no identity fallback.
-  codec({ typeId: 'demo/no-encode@1', targetTypes: ['text'], decode: (wire: string) => wire });
+  // @ts-expect-error encode is required at the defineTestCodec() factory call site; the factory installs no identity fallback.
+  defineTestCodec({
+    typeId: 'demo/no-encode@1',
+    targetTypes: ['text'],
+    decode: (wire: string) => wire,
+  });
 });
 
 test('factory passes encodeJson and decodeJson through as synchronous', () => {
-  const c = codec({
+  const c = defineTestCodec({
     typeId: 'demo/json@1',
-    targetTypes: ['text'],
     encode: (value: string) => value,
     decode: (wire: string) => wire,
     encodeJson: (value: string) => value,

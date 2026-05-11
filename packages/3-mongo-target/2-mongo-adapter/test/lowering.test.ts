@@ -1,5 +1,5 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
-import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
+import { mongoCodec, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import {
   MongoAddFieldsStage,
   MongoAggAccumulator,
@@ -51,9 +51,8 @@ import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import { lowerAggExpr, lowerFilter, lowerPipeline, lowerStage } from '../src/lowering';
 
-// Default fixtures: tests that don't exercise codecs use an empty registry
-// and an empty ctx. Tests that need codec encoding shadow `registry` locally.
-const registry = createMongoCodecRegistry();
+// Default fixtures: tests that don't exercise codecs use an empty registry and an empty ctx. Tests that need codec encoding shadow `registry` locally.
+const registry = newMongoCodecRegistry();
 const ctx: CodecCallContext = {};
 
 describe('lowerFilter', () => {
@@ -149,11 +148,10 @@ describe('lowerFilter', () => {
   });
 
   it('encodes MongoParamRef field-filter values via the codec registry when provided', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'test/uppercase@1',
-        targetTypes: ['string'],
         decode: (wire: string) => wire,
         encode: (value: string) => value.toUpperCase(),
       }),
@@ -166,11 +164,10 @@ describe('lowerFilter', () => {
   });
 
   it('forwards the codec registry through composite filters', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'test/uppercase@1',
-        targetTypes: ['string'],
         decode: (wire: string) => wire,
         encode: (value: string) => value.toUpperCase(),
       }),
@@ -192,11 +189,10 @@ describe('lowerFilter', () => {
   });
 
   it('passes the registry through $match in a pipeline', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'test/uppercase@1',
-        targetTypes: ['string'],
         decode: (wire: string) => wire,
         encode: (value: string) => value.toUpperCase(),
       }),

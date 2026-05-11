@@ -1,6 +1,6 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
-import { createMongoCodecRegistry, type MongoCodecRegistry } from '@prisma-next/mongo-codec';
+import { type MongoCodecRegistry, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it, vi } from 'vitest';
@@ -52,7 +52,7 @@ function recordingAdapter(): RecordingAdapter {
 }
 
 function makeContext(adapter: MongoAdapter): MongoExecutionContext {
-  const codecs: MongoCodecRegistry = createMongoCodecRegistry();
+  const codecs: MongoCodecRegistry = newMongoCodecRegistry();
   const adapterInstance: MongoRuntimeAdapterInstance<'mongo'> = {
     familyId: 'mongo',
     targetId: 'mongo',
@@ -64,7 +64,7 @@ function makeContext(adapter: MongoAdapter): MongoExecutionContext {
     familyId: 'mongo',
     targetId: 'mongo',
     version: '0.0.1',
-    codecs: () => createMongoCodecRegistry(),
+    codecs: () => newMongoCodecRegistry(),
     create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
   };
   const adapterDescriptor: MongoRuntimeAdapterDescriptor<'mongo'> = {
@@ -73,7 +73,7 @@ function makeContext(adapter: MongoAdapter): MongoExecutionContext {
     familyId: 'mongo',
     targetId: 'mongo',
     version: '0.0.1',
-    codecs: () => createMongoCodecRegistry(),
+    codecs: () => newMongoCodecRegistry(),
     create: () => adapterInstance,
   };
   const stack: MongoExecutionStack<'mongo'> = {

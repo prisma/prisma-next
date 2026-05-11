@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/config",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "Prisma Next config authoring types and validation",
@@ -18,7 +19,7 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/utils": "workspace:*",
-    "arktype": "^2.1.26"
+    "arktype": "^2.1.29"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",

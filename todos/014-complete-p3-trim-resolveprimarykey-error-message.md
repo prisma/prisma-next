@@ -44,7 +44,7 @@ A.
 
 ## Acceptance Criteria
 
-- [ ] Error message is one sentence + (optional) doc reference.
+- [x] Error message is one sentence + (optional) doc reference.
 
 ## Resources
 

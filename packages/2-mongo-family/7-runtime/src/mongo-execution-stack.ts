@@ -12,16 +12,13 @@ import {
 } from '@prisma-next/framework-components/execution';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { MongoCodec } from '@prisma-next/mongo-codec';
-import { createMongoCodecRegistry, type MongoCodecRegistry } from '@prisma-next/mongo-codec';
+import { type MongoCodecRegistry, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter } from '@prisma-next/mongo-lowering';
 
 /**
  * Mongo-specific static contributions a runtime descriptor declares.
  *
- * Mirrors `SqlStaticContributions` in shape: a `codecs()` getter that yields
- * a `MongoCodecRegistry` populated with this contributor's codecs. The
- * registry is then walked by `createMongoExecutionContext` and folded into
- * the single per-execution registry the runtime reads from at decode time.
+ * Mirrors `SqlStaticContributions` in shape: a `codecs()` getter that yields a `MongoCodecRegistry` populated with this contributor's codecs. The registry is then walked by `createMongoExecutionContext` and folded into the single per-execution registry the runtime reads from at decode time.
  */
 export interface MongoStaticContributions {
   readonly codecs: () => MongoCodecRegistry;
@@ -59,9 +56,7 @@ export interface MongoRuntimeExtensionDescriptor<TTargetId extends string = 'mon
 }
 
 /**
- * The Mongo execution stack: target + adapter + optional driver + extension
- * packs. Mirrors `SqlExecutionStack`. Constructed via
- * `createMongoExecutionStack`.
+ * The Mongo execution stack: target + adapter + optional driver + extension packs. Mirrors `SqlExecutionStack`. Constructed via `createMongoExecutionStack`.
  */
 export interface MongoExecutionStack<TTargetId extends string = 'mongo'> {
   readonly target: MongoRuntimeTargetDescriptor<TTargetId>;
@@ -102,10 +97,7 @@ export function createMongoExecutionStack<TTargetId extends string = 'mongo'>(op
 /**
  * Read-only view of the codec registry exposed on `MongoExecutionContext`.
  *
- * Hides `register()` and the iterator from public surface — users do not
- * mutate the per-execution codec registry. Internal aggregation in
- * `createMongoExecutionContext` keeps using the full `MongoCodecRegistry`
- * (it needs `register()`).
+ * Hides `register()` and the iterator from public surface — users do not mutate the per-execution codec registry. Internal aggregation in `createMongoExecutionContext` keeps using the full `MongoCodecRegistry` (it needs `register()`).
  */
 export interface MongoCodecLookup {
   get(id: string): MongoCodec<string> | undefined;
@@ -115,14 +107,9 @@ export interface MongoCodecLookup {
 /**
  * Per-execution context aggregated from a `MongoExecutionStack`.
  *
- * Carries the user's contract, a read-only lookup over the codec registry
- * composed from every stack contributor, and a back-reference to the stack
- * itself so the runtime can reach the adapter without users threading it
- * explicitly.
+ * Carries the user's contract, a read-only lookup over the codec registry composed from every stack contributor, and a back-reference to the stack itself so the runtime can reach the adapter without users threading it explicitly.
  *
- * Mirrors SQL's `ExecutionContext` in role; Mongo's flavour is leaner
- * because there are no parameterised codecs, JSON-schema validators, or
- * mutation-default generators in scope yet.
+ * Mirrors SQL's `ExecutionContext` in role; Mongo's flavour is leaner because there are no parameterised codecs, JSON-schema validators, or mutation-default generators in scope yet.
  */
 export interface MongoExecutionContext<TTargetId extends string = 'mongo'> {
   readonly contract: unknown;
@@ -134,7 +121,7 @@ export function createMongoExecutionContext<TTargetId extends string = 'mongo'>(
   readonly contract: unknown;
   readonly stack: MongoExecutionStack<TTargetId>;
 }): MongoExecutionContext<TTargetId> {
-  const registry = createMongoCodecRegistry();
+  const registry = newMongoCodecRegistry();
   const owners = new Map<string, string>();
 
   const contributors: ReadonlyArray<MongoStaticContributions & { readonly id: string }> = [

@@ -84,7 +84,7 @@ In practice the two tiers carried very little independent value:
 - The middleware orchestration loop existed twice — once in `runtime-executor` for the cross-family path, once in each family for SQL's `beforeCompile` chain. Drift between them was a recurring review concern.
 - Plumbing a generic middleware to observe both SQL and Mongo required threading the same context shape through both tiers in each family.
 
-The cross-family runtime unification project ([TML-2242](https://linear.app/prisma-company/issue/TML-2242/)) introduced three primitives — `QueryPlan` / `ExecutionPlan` markers, the abstract `RuntimeCore<TPlan, TExec, TMiddleware>` class, and the `runWithMiddleware` helper — that, together, leave the inner kernel with no responsibilities the abstract base cannot own. At that point the composition tier becomes pure forwarding and is worth removing.
+The cross-family runtime unification project introduced three primitives — `QueryPlan` / `ExecutionPlan` markers, the abstract `RuntimeCore<TPlan, TExec, TMiddleware>` class, and the `runWithMiddleware` helper — that, together, leave the inner kernel with no responsibilities the abstract base cannot own. At that point the composition tier becomes pure forwarding and is worth removing.
 
 ## Rationale
 

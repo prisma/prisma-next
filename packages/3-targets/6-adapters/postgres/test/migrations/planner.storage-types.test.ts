@@ -3,6 +3,7 @@ import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
@@ -94,6 +95,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
 
     expectNarrowedType(result.kind === 'success');
@@ -163,6 +165,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result).toMatchObject({
@@ -256,6 +259,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
 
     expectNarrowedType(result.kind === 'success');
@@ -316,6 +320,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents: [pgvectorDescriptor],
+      spaceId: APP_SPACE_ID,
     });
 
     expectNarrowedType(result.kind === 'success');
@@ -375,6 +380,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         policy: INIT_ADDITIVE_POLICY,
         fromContract: null,
         frameworkComponents: [],
+        spaceId: APP_SPACE_ID,
       }),
     ).toThrow(
       'Column declares typeParams for nativeType "vector" but no expandNativeType hook is registered for codecId "pg/vector@1".',

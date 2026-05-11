@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import {
+  APP_SPACE_ID,
   createControlStack,
   hasOperationPreview,
   type MigrationPlanOperation,
@@ -42,6 +43,16 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import { runContractSpaceExtensionMigrationsPass } from '../utils/contract-space-extension-migrations-pass';
+import {
+  formatContractSpaceDriftWarning,
+  runContractSpaceMigratePass,
+} from '../utils/contract-space-migrate-pass';
+import {
+  toExtensionInputs,
+  toExtensionMigrationsInputs,
+  toMigratePassInputs,
+} from '../utils/extension-pack-inputs';
 import { formatStyledHeader } from '../utils/formatters/styled';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import type { CommonCommandOptions } from '../utils/global-flags';
@@ -61,6 +72,19 @@ export interface MigrationPlanResult {
   readonly from: string | null;
   readonly to: string;
   readonly dir?: string;
+  /**
+   * Extension-space migration packages materialised onto disk during this
+   * `plan` run. Each entry names a `migrations/<spaceId>/<dirName>/`
+   * tree the framework wrote alongside the app-space migration directory.
+   * Empty when the project has no extension packs declaring a contract
+   * space, or when every extension-space package is already on disk.
+   *
+   * Surfacing these in the result (rather than only via `ui.step` log
+   * lines) makes the cross-space side effect explicit to JSON consumers
+   * and the success-summary renderer — the same multi-space side effect
+   * that `migration apply` will replay.
+   */
+  readonly emittedExtensionDirs: readonly { readonly spaceId: string; readonly dirName: string }[];
   readonly operations: readonly {
     readonly id: string;
     readonly label: string;
@@ -91,10 +115,8 @@ async function executeMigrationPlanCommand(
   startTime: number,
 ): Promise<Result<MigrationPlanResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative } = resolveMigrationPaths(
-    options.config,
-    config,
-  );
+  const { configPath, migrationsDir, appMigrationsDir, appMigrationsRelative } =
+    resolveMigrationPaths(options.config, config);
 
   const contractPathAbsolute = resolveContractPath(config);
   const contractPath = relative(process.cwd(), contractPathAbsolute);
@@ -103,7 +125,7 @@ async function executeMigrationPlanCommand(
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
       { label: 'contract', value: contractPath },
-      { label: 'migrations', value: migrationsRelative },
+      { label: 'migrations', value: appMigrationsRelative },
     ];
     if (options.from) {
       details.push({ label: 'from', value: options.from });
@@ -169,7 +191,7 @@ async function executeMigrationPlanCommand(
   let fromContractSourceDir: string | null = null;
 
   try {
-    const { bundles, graph } = await loadMigrationPackages(migrationsDir);
+    const { bundles, graph } = await loadMigrationPackages(appMigrationsDir);
 
     if (options.from) {
       const resolved = resolveBundleByPrefix(bundles, options.from);
@@ -178,11 +200,11 @@ async function executeMigrationPlanCommand(
         return notOk(
           f.reason === 'ambiguous'
             ? errorRuntime('Multiple matching migrations found', {
-                why: `Prefix "${options.from}" matches ${f.count} migrations in ${migrationsRelative}`,
+                why: `Prefix "${options.from}" matches ${f.count} migrations in ${appMigrationsRelative}`,
                 fix: 'Provide a longer prefix to disambiguate, or omit --from to use the latest migration target.',
               })
             : errorRuntime('Starting contract not found', {
-                why: `No migration with to hash matching "${options.from}" exists in ${migrationsRelative}`,
+                why: `No migration with to hash matching "${options.from}" exists in ${appMigrationsRelative}`,
                 fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the latest migration target.',
               }),
         );
@@ -219,6 +241,42 @@ async function executeMigrationPlanCommand(
     );
   }
 
+  // Per-space migrate pass: drift detection + on-disk artefact emission for
+  // every loaded extension that exposes a `contractSpace`. Runs *before*
+  // the app-space no-op check so that an extension bump alone (with no
+  // structural app-space change) still re-pins extension artefacts on
+  // disk. Drift warnings are non-fatal — the on-disk artefacts are refreshed
+  // and the user is notified that the bump is being captured.
+  // Single descriptor-import boundary: every consumer of `extensionPacks`
+  // goes through `toExtensionInputs` + a per-consumer adapter. AC11.
+  const canonicalExtensionInputs = toExtensionInputs(config.extensionPacks ?? []);
+  const migratePass = await runContractSpaceMigratePass({
+    migrationsDir,
+    extensionPacks: toMigratePassInputs(canonicalExtensionInputs),
+  });
+  if (!flags.json && !flags.quiet) {
+    for (const drift of migratePass.drifts) {
+      if (drift.kind === 'drift') {
+        ui.stderr(formatContractSpaceDriftWarning(drift));
+      }
+    }
+  }
+
+  // Materialise descriptor-shipped migration packages onto disk under
+  // `migrations/<spaceId>/<dirName>/` for any package not yet present.
+  // Idempotent (existing dirs are left untouched).
+  // Uses `planAllSpaces` for deterministic ordering + duplicate-spaceId
+  // detection.
+  const extensionMigrationsResult = await runContractSpaceExtensionMigrationsPass({
+    migrationsDir,
+    extensionPacks: toExtensionMigrationsInputs(canonicalExtensionInputs),
+  });
+  if (!flags.json && !flags.quiet) {
+    for (const entry of extensionMigrationsResult.emitted) {
+      ui.step(`Emitted ${entry.spaceId}/${entry.dirName}`);
+    }
+  }
+
   // Check for no-op (same hash means no changes)
   if (fromHash === toStorageHash) {
     const result: MigrationPlanResult = {
@@ -227,6 +285,7 @@ async function executeMigrationPlanCommand(
       from: fromHash,
       to: toStorageHash,
       operations: [],
+      emittedExtensionDirs: extensionMigrationsResult.emitted,
       summary: 'No changes detected between contracts',
       timings: { total: Date.now() - startTime },
     };
@@ -252,7 +311,7 @@ async function executeMigrationPlanCommand(
   const timestamp = new Date();
   const slug = options.name ?? 'migration';
   const dirName = formatMigrationDirName(timestamp, slug);
-  const packageDir = join(migrationsDir, dirName);
+  const packageDir = join(appMigrationsDir, dirName);
 
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash' | 'providedInvariants'> = {
     from: fromHash,
@@ -279,6 +338,7 @@ async function executeMigrationPlanCommand(
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
       fromContract,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
     if (plannerResult.kind === 'failure') {
       return notOk(
@@ -361,6 +421,7 @@ async function executeMigrationPlanCommand(
         to: toStorageHash,
         dir: relative(process.cwd(), packageDir),
         operations: [],
+        emittedExtensionDirs: extensionMigrationsResult.emitted,
         pendingPlaceholders: true,
         summary:
           'Planned migration with placeholder(s) — edit migration.ts then run `node migration.ts` to self-emit',
@@ -383,8 +444,9 @@ async function executeMigrationPlanCommand(
         label: op.label,
         operationClass: op.operationClass,
       })),
+      emittedExtensionDirs: extensionMigrationsResult.emitted,
       ...(preview !== undefined ? { preview } : {}),
-      summary: `Planned ${plannedOps.length} operation(s)`,
+      summary: buildPlanSummary(plannedOps.length, extensionMigrationsResult.emitted.length),
       timings: { total: Date.now() - startTime },
     };
     return ok(result);
@@ -442,7 +504,29 @@ export function createMigrationPlanCommand(): Command {
   return command;
 }
 
-function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFlags): string {
+/**
+ * Compose the success-line summary so the cross-space side effect
+ * (extension-space migration packages materialised on disk during
+ * this `plan` run) is visible in the top line — not just in the
+ * step log above it.
+ *
+ * Example outputs:
+ *   - `Planned 3 operation(s)` (app-space-only project)
+ *   - `Planned 3 operation(s); materialised 1 extension-space migration` (one extension)
+ *   - `Planned 3 operation(s); materialised 2 extension-space migrations` (two extensions)
+ *
+ * Locks AC3 at the summary-line level: a reader of the success line
+ * can tell that something happened beyond the app space.
+ */
+function buildPlanSummary(plannedOpsCount: number, emittedExtensionDirsCount: number): string {
+  const base = `Planned ${plannedOpsCount} operation(s)`;
+  if (emittedExtensionDirsCount === 0) return base;
+  const noun =
+    emittedExtensionDirsCount === 1 ? 'extension-space migration' : 'extension-space migrations';
+  return `${base}; materialised ${emittedExtensionDirsCount} ${noun}`;
+}
+
+export function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFlags): string {
   const lines: string[] = [];
   const useColor = flags.color !== false;
 
@@ -450,10 +534,29 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
   const yellow_ = useColor ? (s: string) => `\x1b[33m${s}\x1b[0m` : (s: string) => s;
   const dim_ = useColor ? (s: string) => `\x1b[2m${s}\x1b[0m` : (s: string) => s;
 
+  // Renders the extension-space materialisation block + canonical apply-step
+  // hint shared by the no-op, placeholder, and full-plan branches. The app
+  // space short-circuits do not skip it: an extension-only bump emits new
+  // `migrations/<spaceId>/<dirName>/` directories on disk that the user
+  // still has to apply, so the success line must surface them.
+  function appendEmittedExtensions(): void {
+    if (result.emittedExtensionDirs.length === 0) return;
+    lines.push('');
+    lines.push(dim_('Emitted extension migrations:'));
+    for (const entry of result.emittedExtensionDirs) {
+      lines.push(dim_(`  ${entry.spaceId} → migrations/${entry.spaceId}/${entry.dirName}`));
+    }
+    lines.push('');
+    lines.push(
+      `Next: review the extension migrations above, then run ${green_('prisma-next migration apply')}.`,
+    );
+  }
+
   if (result.noOp) {
     lines.push(`${green_('✔')} No changes detected`);
     lines.push(dim_(`  from: ${result.from}`));
     lines.push(dim_(`  to:   ${result.to}`));
+    appendEmittedExtensions();
     return lines.join('\n');
   }
 
@@ -470,6 +573,7 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
       'Open migration.ts and replace each `placeholder(...)` call with your actual query.',
     );
     lines.push(`Then run: ${green_(`node ${result.dir ?? '<dir>'}/migration.ts`)}`);
+    appendEmittedExtensions();
     return lines.join('\n');
   }
 
@@ -482,11 +586,11 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
       const op = result.operations[i]!;
       const isLast = i === result.operations.length - 1;
       const treeChar = isLast ? '└' : '├';
-      const opClassLabel =
-        op.operationClass === 'destructive'
-          ? yellow_(`[${op.operationClass}]`)
-          : dim_(`[${op.operationClass}]`);
-      lines.push(`${dim_(treeChar)}─ ${op.label} ${opClassLabel}`);
+      // operationClass tag is intentionally NOT inlined per spec:
+      // a destructive footer warning still surfaces below this list.
+      const destructiveMarker =
+        op.operationClass === 'destructive' ? ` ${yellow_('(destructive)')}` : '';
+      lines.push(`${dim_(treeChar)}─ ${op.label}${destructiveMarker}`);
     }
 
     const hasDestructive = result.operations.some((op) => op.operationClass === 'destructive');
@@ -502,10 +606,22 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
   lines.push(dim_(`from:   ${result.from}`));
   lines.push(dim_(`to:     ${result.to}`));
   if (result.dir) {
-    lines.push(dim_(`dir:    ${result.dir}`));
+    lines.push(dim_(`App space → ${result.dir}`));
+  }
+  // Per-space block: surface the extension-space directories materialised
+  // alongside the app-space migration. Without this block the cross-space
+  // side effect is invisible in the success summary (e2e finding F1).
+  for (const entry of result.emittedExtensionDirs) {
+    lines.push(
+      dim_(`Extension space ${entry.spaceId} → migrations/${entry.spaceId}/${entry.dirName}`),
+    );
   }
 
   lines.push('');
+  // The "Next:" hint always points at the canonical apply path
+  // (`prisma-next migration apply`) regardless of how many spaces
+  // were materialised — `db update` is a dev-time convenience, not
+  // the canonical replay step.
   lines.push(
     `Next: review ${green_(result.dir ?? '<dir>')} if needed, then run ${green_('prisma-next migration apply')}.`,
   );

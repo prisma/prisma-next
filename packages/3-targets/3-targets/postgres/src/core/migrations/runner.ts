@@ -1,6 +1,7 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
+  MultiSpaceRunnerResult,
   SqlControlFamilyInstance,
   SqlMigrationPlanContractInfo,
   SqlMigrationPlanOperation,
@@ -9,13 +10,16 @@ import type {
   SqlMigrationRunnerExecuteOptions,
   SqlMigrationRunnerFailure,
   SqlMigrationRunnerResult,
+  SqlMigrationRunnerSuccessValue,
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
+import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
-import { ok, okVoid } from '@prisma-next/utils/result';
+import { notOk, ok, okVoid } from '@prisma-next/utils/result';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
@@ -82,66 +86,98 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   async execute(
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
   ): Promise<SqlMigrationRunnerResult> {
-    const schema = options.schemaName ?? this.config.defaultSchema;
     const driver = options.driver;
-    const lockKey = `${LOCK_DOMAIN}:${schema}`;
 
-    // Static checks - fail fast before transaction
+    // Static checks fail fast before any transaction work — no point
+    // burning a BEGIN/ROLLBACK round-trip on a destination-contract
+    // mismatch the caller can fix locally.
     const destinationCheck = this.ensurePlanMatchesDestinationContract(
       options.plan.destination,
       options.destinationContract,
     );
-    if (!destinationCheck.ok) {
-      return destinationCheck;
-    }
+    if (!destinationCheck.ok) return destinationCheck;
 
     const policyCheck = this.enforcePolicyCompatibility(options.policy, options.plan.operations);
-    if (!policyCheck.ok) {
-      return policyCheck;
-    }
+    if (!policyCheck.ok) return policyCheck;
 
-    // Begin transaction for DB operations
     await this.beginTransaction(driver);
     let committed = false;
     try {
-      await this.acquireLock(driver, lockKey);
-      await this.ensureControlTables(driver);
-      const existingMarker = await this.family.readMarker({ driver });
-
-      // Validate plan origin matches existing marker (needs marker from DB)
-      const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
-      if (!markerCheck.ok) {
-        return markerCheck;
+      const result = await this.executeOnConnection(options);
+      if (!result.ok) {
+        return result;
       }
-
-      // db update (origin: null) always applies; migration-apply (origin set,
-      // origin !== destination) skips if marker already matches destination.
-      // Self-edges (origin === destination) intentionally bypass the skip:
-      // the migration is data-only, and the data transform's own check
-      // decides whether `run` fires.
-      const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
-      const isSelfEdge = options.plan.origin?.storageHash === options.plan.destination.storageHash;
-      const skipOperations = markerAtDestination && options.plan.origin != null && !isSelfEdge;
-      let applyValue: ApplyPlanSuccessValue;
-
-      if (skipOperations) {
-        applyValue = { operationsExecuted: 0, executedOperations: [] };
-      } else {
-        const applyResult = await this.applyPlan(driver, options);
-        if (!applyResult.ok) {
-          return applyResult;
-        }
-        applyValue = applyResult.value;
+      await this.commitTransaction(driver);
+      committed = true;
+      return result;
+    } finally {
+      if (!committed) {
+        await this.rollbackTransaction(driver);
       }
+    }
+  }
 
-      // Verify resulting schema matches contract
-      // Step 1: Introspect live schema (DB I/O, family-owned)
+  /**
+   * Body of the migration runner without transaction management. The
+   * caller (single-space `execute(...)` above, or the multi-space
+   * outer-tx orchestrator at the SQL family level) owns the
+   * `BEGIN`/`COMMIT`/`ROLLBACK` lifecycle.
+   */
+  async executeOnConnection(
+    options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
+  ): Promise<SqlMigrationRunnerResult> {
+    const schema = options.schemaName ?? this.config.defaultSchema;
+    const driver = options.driver;
+    if (options.space !== undefined && options.space !== options.plan.spaceId) {
+      throw new Error(
+        `SqlMigrationRunner: options.space (${options.space}) does not match plan.spaceId (${options.plan.spaceId})`,
+      );
+    }
+    const space = options.plan.spaceId;
+    const lockKey = `${LOCK_DOMAIN}:${schema}:${space}`;
+
+    // Static checks (idempotent — safe to run again when the caller is
+    // `execute(...)` because the cost is a single object comparison).
+    const destinationCheck = this.ensurePlanMatchesDestinationContract(
+      options.plan.destination,
+      options.destinationContract,
+    );
+    if (!destinationCheck.ok) return destinationCheck;
+
+    const policyCheck = this.enforcePolicyCompatibility(options.policy, options.plan.operations);
+    if (!policyCheck.ok) return policyCheck;
+
+    await this.acquireLock(driver, lockKey);
+    const ensureResult = await this.ensureControlTables(driver);
+    if (!ensureResult.ok) return ensureResult;
+    const existingMarker = await this.family.readMarker({ driver, space });
+
+    const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
+    if (!markerCheck.ok) return markerCheck;
+
+    const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
+    const isSelfEdge = options.plan.origin?.storageHash === options.plan.destination.storageHash;
+    const skipOperations = markerAtDestination && options.plan.origin != null && !isSelfEdge;
+    let applyValue: ApplyPlanSuccessValue;
+
+    if (skipOperations) {
+      applyValue = { operationsExecuted: 0, executedOperations: [] };
+    } else {
+      const applyResult = await this.applyPlan(driver, options);
+      if (!applyResult.ok) return applyResult;
+      applyValue = applyResult.value;
+    }
+
+    // Schema verification on app-space only — extension spaces don't
+    // own user-facing tables in the live schema, and `verifySqlSchema`
+    // matches the destination contract against the database, which
+    // would flag every app-space table as "extra" when called against
+    // an extension contract.
+    if (space === APP_SPACE_ID) {
       const schemaIR = await this.family.introspect({
         driver,
         contract: options.destinationContract,
       });
-
-      // Step 2: Pure verification (no DB I/O)
       const schemaVerifyResult = verifySqlSchema({
         contract: options.destinationContract,
         schema: schemaIR,
@@ -155,47 +191,60 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       if (!schemaVerifyResult.ok) {
         return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
           why: 'The resulting database schema does not satisfy the destination contract.',
-          meta: {
-            issues: schemaVerifyResult.schema.issues,
-          },
+          meta: { issues: schemaVerifyResult.schema.issues },
         });
       }
+    }
 
-      // Self-edge no-op detection: a self-edge migration whose ops all
-      // self-skipped (every op pre-satisfied) and that brings no new
-      // invariants produced no observable change. Skip the marker +
-      // ledger writes so an idempotent re-apply of a self-edge data
-      // transform doesn't churn updatedAt or pile up empty ledger
-      // entries. With data transforms now flowing through the unified
-      // op loop, a pre-satisfied DT lands in the
-      // `postcheckAlreadySatisfied` skip path which does not increment
-      // `operationsExecuted`, so the check below correctly distinguishes
-      // "every op self-skipped" from "the plan had ops that ran". `db
-      // update` no-ops still write a ledger entry as audit trail.
-      const incomingInvariants = options.plan.providedInvariants ?? [];
-      const existingInvariants = new Set(existingMarker?.invariants ?? []);
-      const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
-        existingInvariants.has(id),
-      );
-      const isSelfEdgeNoOp =
-        isSelfEdge && applyValue.operationsExecuted === 0 && incomingIsSubsetOfExisting;
+    const incomingInvariants = options.plan.providedInvariants ?? [];
+    const existingInvariants = new Set(existingMarker?.invariants ?? []);
+    const incomingIsSubsetOfExisting = incomingInvariants.every((id) => existingInvariants.has(id));
+    const isSelfEdgeNoOp =
+      isSelfEdge && applyValue.operationsExecuted === 0 && incomingIsSubsetOfExisting;
 
-      if (!isSelfEdgeNoOp) {
-        await this.upsertMarker(driver, options, existingMarker);
-        await this.recordLedgerEntry(
-          driver,
-          options,
-          existingMarker,
-          applyValue.executedOperations,
-        );
+    if (!isSelfEdgeNoOp) {
+      await this.upsertMarker(driver, options, existingMarker, space);
+      await this.recordLedgerEntry(driver, options, existingMarker, applyValue.executedOperations);
+    }
+
+    return runnerSuccess({
+      operationsPlanned: options.plan.operations.length,
+      operationsExecuted: applyValue.operationsExecuted,
+    });
+  }
+
+  async executeAcrossSpaces(options: {
+    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly perSpaceOptions: ReadonlyArray<
+      SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>
+    >;
+  }): Promise<MultiSpaceRunnerResult> {
+    const driver = options.driver;
+    const perSpaceOptions = options.perSpaceOptions;
+
+    if (perSpaceOptions.length === 0) {
+      return ok({ perSpaceResults: [] });
+    }
+
+    await this.beginTransaction(driver);
+    let committed = false;
+    try {
+      const perSpaceResults: Array<{
+        space: string;
+        value: SqlMigrationRunnerSuccessValue;
+      }> = [];
+      for (const spaceOptions of perSpaceOptions) {
+        const space = spaceOptions.space ?? spaceOptions.plan.spaceId;
+        const result = await this.executeOnConnection({ ...spaceOptions, driver, space });
+        if (!result.ok) {
+          return notOk({ ...result.failure, failingSpace: space });
+        }
+        perSpaceResults.push({ space, value: result.value });
       }
 
       await this.commitTransaction(driver);
       committed = true;
-      return runnerSuccess({
-        operationsPlanned: options.plan.operations.length,
-        operationsExecuted: applyValue.operationsExecuted,
-      });
+      return ok({ perSpaceResults });
     } finally {
       if (!committed) {
         await this.rollbackTransaction(driver);
@@ -271,10 +320,49 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
 
   private async ensureControlTables(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-  ): Promise<void> {
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     await this.executeStatement(driver, ensurePrismaContractSchemaStatement);
+    // Pre-1.0 zero-range guardrail: detect a pre-cleanup single-row
+    // marker table (no `space` column) and surface a structured failure
+    // rather than silently auto-migrating it to the per-space shape.
+    // See `specs/framework-mechanism.spec.md § 2`.
+    const legacyDetection = await this.detectLegacyMarkerShape(driver);
+    if (!legacyDetection.ok) {
+      return legacyDetection;
+    }
     await this.executeStatement(driver, ensureMarkerTableStatement);
     await this.executeStatement(driver, ensureLedgerTableStatement);
+    return okVoid();
+  }
+
+  private async detectLegacyMarkerShape(
+    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
+    const result = await driver.query<{ column_name: string }>(
+      `select column_name
+         from information_schema.columns
+        where table_schema = 'prisma_contract'
+          and table_name = 'marker'`,
+    );
+    if (result.rows.length === 0) {
+      return okVoid();
+    }
+    const columns = new Set(result.rows.map((row) => row.column_name));
+    if (columns.has('space')) {
+      return okVoid();
+    }
+    return runnerFailure(
+      'LEGACY_MARKER_SHAPE',
+      'Legacy marker-table shape detected on prisma_contract.marker (no `space` column). ' +
+        'Prisma Next is in pre-1.0; the previous transitional auto-migration to the per-space-row schema has been removed. ' +
+        'Drop `prisma_contract.marker` and re-run `dbInit` to reinitialise from a clean baseline.',
+      {
+        meta: {
+          table: 'prisma_contract.marker',
+          columns: [...columns].sort(),
+        },
+      },
+    );
   }
 
   private async runExpectationSteps(
@@ -545,9 +633,11 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
+    space: string,
   ): Promise<void> {
     const incomingInvariants = options.plan.providedInvariants ?? [];
     const writeStatements = buildMergeMarkerStatements({
+      space,
       storageHash: options.plan.destination.storageHash,
       profileHash:
         options.plan.destination.profileHash ??

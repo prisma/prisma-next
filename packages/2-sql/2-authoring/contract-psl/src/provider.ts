@@ -20,9 +20,7 @@ function buildColumnDescriptorMap(
 ): ReadonlyMap<string, ColumnDescriptor> {
   const result = new Map<string, ColumnDescriptor>();
   for (const [typeName, codecId] of scalarTypeDescriptors) {
-    const codec = codecLookup.get(codecId);
-    if (!codec) continue;
-    const nativeType = codec.targetTypes[0];
+    const nativeType = codecLookup.targetTypesFor(codecId)?.[0];
     if (nativeType === undefined) continue;
     result.set(typeName, { codecId, nativeType });
   }

@@ -338,6 +338,25 @@ describe('compileSelectWithIncludeStrategy', () => {
     expect(childRows.limit).toBe(2);
   });
 
+  it('builds lateral include joins with child distinct', () => {
+    const { collection } = createCollection();
+    const state = collection.include('posts', (posts) => posts.distinct('title')).state;
+
+    const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'lateral');
+    expectSelectAst(plan.ast);
+
+    const join = plan.ast.joins?.[0];
+    expect(join?.kind).toBe('join');
+    expectDerivedTableSource(join?.source);
+
+    const aggregateQuery = join.source.query;
+    expectDerivedTableSource(aggregateQuery.from);
+
+    const childRows = aggregateQuery.from.query;
+    expect(childRows.distinct).toBe(true);
+    expect(childRows.distinctOn).toBeUndefined();
+  });
+
   it('rejects scalar include selectors for single-query include strategies', () => {
     const { collection } = createCollection();
     const state = collection.include('posts', (posts) => posts.count()).state;
@@ -376,6 +395,27 @@ describe('compileSelect MTI JOINs', () => {
     ColumnRef.of('tasks', 'id'),
     ColumnRef.of('features', 'id'),
   );
+
+  it('single-query include planning adds MTI joins', () => {
+    const contract = buildMixedPolyContract();
+    const plan = compileSelectWithIncludeStrategy(
+      contract,
+      'tasks',
+      emptyState(),
+      'lateral',
+      'Task',
+    );
+
+    expectSelectAst(plan.ast);
+    expect(plan.ast.joins).toEqual([JoinAst.left(TableSource.named('features'), featuresJoinOn)]);
+    expect(plan.ast.projection).toContainEqual(
+      ProjectionItem.of(
+        'features__priority',
+        ColumnRef.of('features', 'priority'),
+        codecForColumn(contract, 'features', 'priority'),
+      ),
+    );
+  });
 
   it('base query LEFT JOINs MTI variant tables with table-qualified aliases', () => {
     const contract = buildMixedPolyContract();

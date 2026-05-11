@@ -34,6 +34,24 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, string>>;
   }): Promise<VerifyDatabaseSchemaResult>;
 
+  /**
+   * Verify a contract against an already-introspected schema slice.
+   *
+   * Difference from {@link schemaVerify}: no `driver`, no introspection
+   * — the caller hands over the schema directly. Used by the aggregate
+   * verifier to invoke the family's verification logic per member,
+   * with the schema **pre-projected** to that member's claimed slice
+   * via {@link import('@prisma-next/migration-tools/aggregate').projectSchemaToSpace}.
+   *
+   * Synchronous — no I/O. Idempotent.
+   */
+  schemaVerifyAgainstSchema(options: {
+    readonly contract: unknown;
+    readonly schema: TSchemaIR;
+    readonly strict: boolean;
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, string>>;
+  }): VerifyDatabaseSchemaResult;
+
   sign(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;
     readonly contract: unknown;
@@ -41,9 +59,37 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
     readonly configPath?: string;
   }): Promise<SignDatabaseResult>;
 
+  /**
+   * Reads the contract marker for `space` from the database, returning
+   * `null` if no marker row exists for that space (or if the marker
+   * table itself is missing).
+   *
+   * `space` is required at every call site so the type system surfaces
+   * every place that needs to thread the value: callers in single-app
+   * paths pass {@link import('./control-spaces').APP_SPACE_ID}
+   * (`'app'`); per-extension callers pass the extension's space id.
+   * Defaulting at the family-interface level was a silent bug door —
+   * it let multi-space-aware callers forget to pass `space` and
+   * collapse onto the app's marker row.
+   *
+   * Families whose underlying storage doesn't yet support per-space
+   * markers (Mongo, today) accept `space` for interface conformance and
+   * reject any non-`APP_SPACE_ID` value rather than silently ignoring
+   * it; see the family-specific implementation for details.
+   */
   readMarker(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;
+    readonly space: string;
   }): Promise<ContractMarkerRecord | null>;
+
+  /**
+   * Reads every marker row keyed by `space`. Used by the per-space
+   * verifier to detect orphan marker rows and marker-vs-on-disk drift.
+   * Returns an empty map when the marker table does not yet exist.
+   */
+  readAllMarkers(options: {
+    readonly driver: ControlDriverInstance<TFamilyId, string>;
+  }): Promise<ReadonlyMap<string, ContractMarkerRecord>>;
 
   introspect(options: {
     readonly driver: ControlDriverInstance<TFamilyId, string>;

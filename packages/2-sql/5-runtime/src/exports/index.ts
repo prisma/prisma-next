@@ -44,6 +44,7 @@ export {
 } from '../sql-context';
 export type { SqlStatement } from '../sql-marker';
 export {
+  APP_SPACE_ID,
   ensureSchemaStatement,
   ensureTableStatement,
   readContractMarker,

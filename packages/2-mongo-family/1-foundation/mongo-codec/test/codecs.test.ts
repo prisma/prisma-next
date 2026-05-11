@@ -1,20 +1,17 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import { createMongoCodecRegistry } from '../src/codec-registry';
+import { newMongoCodecRegistry } from '../src/codec-registry';
 import { type MongoCodec, mongoCodec } from '../src/codecs';
 
 describe('mongoCodec()', () => {
   it('creates a codec with the given config', async () => {
     const codec = mongoCodec({
       typeId: 'test/string@1',
-      targetTypes: ['string'],
       decode: (wire: string) => wire,
       encode: (value: string) => value,
     });
 
     expect(codec.id).toBe('test/string@1');
-    expect(codec.targetTypes).toEqual(['string']);
-    expect(codec.traits).toBeUndefined();
     expect(await codec.decode('hello', {})).toBe('hello');
     expect(await codec.encode('hello', {})).toBe('hello');
   });
@@ -22,7 +19,6 @@ describe('mongoCodec()', () => {
   it('creates a codec with encode and decode', async () => {
     const codec = mongoCodec({
       typeId: 'test/upper@1',
-      targetTypes: ['text'],
       decode: (wire: string) => wire.toUpperCase(),
       encode: (value: string) => value.toLowerCase(),
     });
@@ -34,7 +30,6 @@ describe('mongoCodec()', () => {
   it('lifts sync author functions to Promise-returning methods', () => {
     const codec = mongoCodec({
       typeId: 'test/sync@1',
-      targetTypes: ['string'],
       decode: (wire: string) => wire,
       encode: (value: string) => value,
     });
@@ -48,7 +43,6 @@ describe('mongoCodec()', () => {
   it('accepts async author functions and uses them directly', async () => {
     const codec = mongoCodec({
       typeId: 'test/async@1',
-      targetTypes: ['string'],
       decode: async (wire: string) => `decoded:${wire}`,
       encode: async (value: string) => `encoded:${value}`,
     });
@@ -62,14 +56,13 @@ describe('MongoCodecRegistry', () => {
   function makeCodec(id: string): MongoCodec<string> {
     return mongoCodec<string, readonly [], JsonValue, JsonValue>({
       typeId: id,
-      targetTypes: ['test'],
       decode: (wire: JsonValue) => wire,
       encode: (value: JsonValue) => value,
     });
   }
 
   it('registers and retrieves a codec by id', () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     const codec = makeCodec('test/a@1');
     registry.register(codec);
 
@@ -77,12 +70,12 @@ describe('MongoCodecRegistry', () => {
   });
 
   it('returns undefined for unregistered id', () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     expect(registry.get('nonexistent')).toBeUndefined();
   });
 
   it('has() returns true for registered, false for unregistered', () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     const codec = makeCodec('test/b@1');
     registry.register(codec);
 
@@ -91,7 +84,7 @@ describe('MongoCodecRegistry', () => {
   });
 
   it('throws on duplicate registration', () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     const codec = makeCodec('test/dup@1');
     registry.register(codec);
 
@@ -101,7 +94,7 @@ describe('MongoCodecRegistry', () => {
   });
 
   it('iterates over registered codecs', () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     const a = makeCodec('test/x@1');
     const b = makeCodec('test/y@1');
     registry.register(a);
@@ -114,7 +107,7 @@ describe('MongoCodecRegistry', () => {
   });
 
   it('values() returns an iterable of codecs', () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     const a = makeCodec('test/v@1');
     registry.register(a);
 

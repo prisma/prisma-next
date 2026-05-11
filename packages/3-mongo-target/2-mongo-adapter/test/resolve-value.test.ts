@@ -1,4 +1,4 @@
-import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
+import { mongoCodec, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import { resolveValue } from '../src/resolve-value';
@@ -11,19 +11,18 @@ interface RuntimeErrorShape extends Error {
 
 const uppercaseCodec = mongoCodec({
   typeId: 'test/uppercase@1',
-  targetTypes: ['string'],
   decode: (wire: string) => wire.toLowerCase(),
   encode: (value: string) => value.toUpperCase(),
 });
 
 function testRegistry() {
-  const registry = createMongoCodecRegistry();
+  const registry = newMongoCodecRegistry();
   registry.register(uppercaseCodec);
   return registry;
 }
 
 function emptyRegistry() {
-  return createMongoCodecRegistry();
+  return newMongoCodecRegistry();
 }
 
 const noCtx = {} as const;
@@ -103,7 +102,6 @@ describe('resolveValue', () => {
 
       const asyncACodec = mongoCodec({
         typeId: 'test/async-a@1',
-        targetTypes: ['string'],
         decode: (wire: string) => wire,
         encode: (value: string) => {
           callOrder.push('encode-a-start');
@@ -112,7 +110,6 @@ describe('resolveValue', () => {
       });
       const asyncBCodec = mongoCodec({
         typeId: 'test/async-b@1',
-        targetTypes: ['string'],
         decode: (wire: string) => wire,
         encode: (value: string) => {
           callOrder.push('encode-b-start');
@@ -120,7 +117,7 @@ describe('resolveValue', () => {
         },
       });
 
-      const registry = createMongoCodecRegistry();
+      const registry = newMongoCodecRegistry();
       registry.register(asyncACodec);
       registry.register(asyncBCodec);
 
@@ -131,8 +128,7 @@ describe('resolveValue', () => {
 
       const resultPromise = resolveValue(doc, registry, noCtx);
 
-      // Both encode functions must have started before either resolves —
-      // i.e. dispatch is concurrent, not sequential.
+      // Both encode functions must have started before either resolves — i.e. dispatch is concurrent, not sequential.
       await new Promise((r) => setImmediate(r));
       expect(callOrder).toEqual(['encode-a-start', 'encode-b-start']);
 
@@ -151,7 +147,6 @@ describe('resolveValue', () => {
 
       const codec = mongoCodec({
         typeId: 'test/seq@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: async (value: string) => {
           callOrder.push(`start:${value}`);
@@ -160,7 +155,7 @@ describe('resolveValue', () => {
         },
       });
 
-      const registry = createMongoCodecRegistry();
+      const registry = newMongoCodecRegistry();
       registry.register(codec);
 
       const arr = [
@@ -192,13 +187,12 @@ describe('resolveValue', () => {
     it('wraps codec.encode failures in RUNTIME.ENCODE_FAILED with cause and codec id', async () => {
       const failingCodec = mongoCodec({
         typeId: 'test/failing@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: async (_v: string) => {
           throw new Error('kms-key-resolution-failed');
         },
       });
-      const registry = createMongoCodecRegistry();
+      const registry = newMongoCodecRegistry();
       registry.register(failingCodec);
 
       const ref = new MongoParamRef('plaintext', { codecId: 'test/failing@1' });
@@ -217,13 +211,12 @@ describe('resolveValue', () => {
     it('uses MongoParamRef.name as the envelope label when available', async () => {
       const failingCodec = mongoCodec({
         typeId: 'test/failing@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: async (_v: string) => {
           throw new Error('boom');
         },
       });
-      const registry = createMongoCodecRegistry();
+      const registry = newMongoCodecRegistry();
       registry.register(failingCodec);
 
       const ref = new MongoParamRef('plaintext', {
@@ -241,13 +234,12 @@ describe('resolveValue', () => {
     it('falls back to codec id as the envelope label when MongoParamRef has no name', async () => {
       const failingCodec = mongoCodec({
         typeId: 'test/failing@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: async (_v: string) => {
           throw new Error('boom');
         },
       });
-      const registry = createMongoCodecRegistry();
+      const registry = newMongoCodecRegistry();
       registry.register(failingCodec);
 
       const ref = new MongoParamRef('plaintext', { codecId: 'test/failing@1' });
@@ -261,7 +253,6 @@ describe('resolveValue', () => {
     it('preserves an existing RUNTIME.ENCODE_FAILED envelope without re-wrapping', async () => {
       const innerCodec = mongoCodec({
         typeId: 'test/already-wrapped@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: async (_v: string) => {
           const err = new Error('original') as RuntimeErrorShape;
@@ -269,7 +260,7 @@ describe('resolveValue', () => {
           throw err;
         },
       });
-      const registry = createMongoCodecRegistry();
+      const registry = newMongoCodecRegistry();
       registry.register(innerCodec);
 
       const ref = new MongoParamRef('x', { codecId: 'test/already-wrapped@1' });

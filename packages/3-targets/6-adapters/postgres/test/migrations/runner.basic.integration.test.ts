@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -55,6 +56,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           policy: INIT_ADDITIVE_POLICY,
           fromContract: null,
           frameworkComponents,
+          spaceId: APP_SPACE_ID,
         });
         expect(result.kind).toBe('success');
         if (result.kind !== 'success') {
@@ -84,7 +86,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
         const markerRow = await driver!.query<{
           core_hash: string;
           profile_hash: string;
-        }>('select core_hash, profile_hash from prisma_contract.marker where id = $1', [1]);
+        }>('select core_hash, profile_hash from prisma_contract.marker where space = $1', ['app']);
         expect(markerRow.rows[0]).toMatchObject({
           core_hash: contract.storage.storageHash,
           profile_hash: contract.profileHash,
@@ -115,6 +117,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           policy: INIT_ADDITIVE_POLICY,
           fromContract: null,
           frameworkComponents,
+          spaceId: APP_SPACE_ID,
         });
         if (initialPlan.kind !== 'success') {
           throw new Error('expected initial planner success');
@@ -129,6 +132,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
 
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [],
@@ -151,8 +155,8 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
         }
 
         const markerCount = await driver!.query<{ count: string }>(
-          'select count(*)::text as count from prisma_contract.marker where id = $1',
-          [1],
+          'select count(*)::text as count from prisma_contract.marker where space = $1',
+          ['app'],
         );
         expect(markerCount.rows[0]?.count).toBe('1');
         const ledgerCount = await driver!.query<{ count: string }>(

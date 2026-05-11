@@ -29,14 +29,14 @@
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
-    "@react-router/node": "^7.14.0",
-    "@react-router/serve": "^7.14.0",
-    "dotenv": "^16.4.5",
-    "isbot": "^5.1.17",
+    "@react-router/node": "^7.15.0",
+    "@react-router/serve": "^7.15.0",
+    "dotenv": "^17.4.2",
+    "isbot": "^5.1.40",
     "pg": "catalog:",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "react-router": "^7.14.0"
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-router": "^7.15.0"
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
@@ -53,7 +53,7 @@
     "pathe": "^2.0.3",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-tsconfig-paths": "^5.1.4",
+    "vite-tsconfig-paths": "^6.1.1",
     "vitest": "catalog:"
   }
 }

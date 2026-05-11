@@ -14,6 +14,7 @@ export {
 export type {
   AfterExecuteResult,
   InterceptResult,
+  ParamRefMutator,
   RuntimeExecuteOptions,
   RuntimeExecutor,
   RuntimeLog,

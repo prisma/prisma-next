@@ -4,7 +4,11 @@ import type {
   SqlMigrationPlannerPlanOptions,
   SqlPlannerFailureResult,
 } from '@prisma-next/family-sql/control';
-import { extractCodecControlHooks, plannerFailure } from '@prisma-next/family-sql/control';
+import {
+  extractCodecControlHooks,
+  planFieldEventOperations,
+  plannerFailure,
+} from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -101,15 +105,28 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly fromContract: Contract | null;
     readonly schemaName?: string;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+    /**
+     * Contract space this plan applies to. Stamped onto the produced
+     * {@link TypeScriptRenderablePostgresMigration.spaceId} so the runner keys
+     * the marker row by the right space.
+     */
+    readonly spaceId: string;
   }): PostgresPlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
 
-  emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
-    return new TypeScriptRenderablePostgresMigration([], {
-      from: context.fromHash,
-      to: context.toHash,
-    });
+  emptyMigration(
+    context: MigrationScaffoldContext,
+    spaceId: string,
+  ): MigrationPlanWithAuthoringSurface {
+    return new TypeScriptRenderablePostgresMigration(
+      [],
+      {
+        from: context.fromHash,
+        to: context.toHash,
+      },
+      spaceId,
+    );
   }
 
   private planSql(options: SqlMigrationPlannerPlanOptions): PostgresPlanResult {
@@ -145,12 +162,31 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return plannerFailure(result.failure);
     }
 
+    // Inline `onFieldEvent`-emitted ops after structural DDL. The fixed
+    // ordering is `structural → added → dropped → altered`, with
+    // within-group sorting by `(tableName, fieldName)` so re-emits are
+    // byte-stable. The hook fires only at the application emitter —
+    // extension-space planning never reaches this helper.
+    const fieldEventOps = planFieldEventOperations({
+      priorContract: options.fromContract,
+      newContract: options.contract,
+      codecHooks,
+    });
+    // Codec-emitted calls already conform to `OpFactoryCall` — render +
+    // toOp + importRequirements ride directly through the same emit path
+    // as structural ops, no `RawSqlCall` wrap.
+    const calls = [...result.value.calls, ...fieldEventOps];
+
     return Object.freeze({
       kind: 'success' as const,
-      plan: new TypeScriptRenderablePostgresMigration(result.value.calls, {
-        from: options.fromContract?.storage.storageHash ?? null,
-        to: options.contract.storage.storageHash,
-      }),
+      plan: new TypeScriptRenderablePostgresMigration(
+        calls,
+        {
+          from: options.fromContract?.storage.storageHash ?? null,
+          to: options.contract.storage.storageHash,
+        },
+        options.spaceId,
+      ),
     });
   }
 

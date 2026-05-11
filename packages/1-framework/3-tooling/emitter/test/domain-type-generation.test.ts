@@ -79,16 +79,13 @@ describe('serializeValue', () => {
   });
 
   describe('injection safety', () => {
-    // Lock the escape behavior so attacker-controlled (or merely weird) strings
-    // in a schema.prisma cannot break out of the emitted single-quoted literal
-    // and inject arbitrary TypeScript into contract.d.ts.
+    // Lock the escape behavior so attacker-controlled (or merely weird) strings in a schema.prisma cannot break out of the emitted single-quoted literal and inject arbitrary TypeScript into contract.d.ts.
 
     it('escapes a string attempting to terminate the literal', () => {
       const injected = "x'; export let foo = 'bar";
       const serialized = serializeValue(injected);
       expect(serialized).toBe("'x\\'; export let foo = \\'bar'");
-      // The serialized form is a single valid string literal: exactly two
-      // outer single quotes, and every inner single quote is backslash-escaped.
+      // The serialized form is a single valid string literal: exactly two outer single quotes, and every inner single quote is backslash-escaped.
       expect(serialized.match(/(?<!\\)'/g)?.length).toBe(2);
     });
 
@@ -98,9 +95,7 @@ describe('serializeValue', () => {
     });
 
     it('passes through control characters and line separators as raw bytes', () => {
-      // U+2028/U+2029 are JavaScript line terminators in legacy parsers.
-      // The current emitter does not escape them but they cannot break the
-      // single-quoted literal since they are not \' or \\. Pin the behavior.
+      // U+2028/U+2029 are JavaScript line terminators in legacy parsers. The current emitter does not escape them but they cannot break the single-quoted literal since they are not \' or \\. Pin the behavior.
       expect(serializeValue('a\u2028b')).toBe("'a\u2028b'");
       expect(serializeValue('a\u2029b')).toBe("'a\u2029b'");
       expect(serializeValue('a\nb')).toBe("'a\nb'");
@@ -765,18 +760,28 @@ describe('generateValueObjectTypeAliases', () => {
   });
 });
 
-function stubCodec(overrides: Partial<Codec> & { id: string }): Codec {
+type CodecStub = Codec & {
+  readonly targetTypes?: readonly string[];
+  readonly renderOutputType?: (params: Record<string, unknown>) => string | undefined;
+};
+
+function stubCodec(overrides: Partial<CodecStub> & { id: string }): CodecStub {
   return {
     targetTypes: [],
     decode: (w: unknown) => w,
     encodeJson: (v: unknown) => v,
     decodeJson: (j: unknown) => j,
     ...overrides,
-  } as unknown as Codec;
+  } as unknown as CodecStub;
 }
 
-function stubCodecLookup(codecs: Record<string, Codec>): CodecLookup {
-  return { get: (id) => codecs[id] };
+function stubCodecLookup(codecs: Record<string, CodecStub>): CodecLookup {
+  return {
+    get: (id) => codecs[id],
+    targetTypesFor: (id) => codecs[id]?.targetTypes,
+    metaFor: () => undefined,
+    renderOutputTypeFor: (id, params) => codecs[id]?.renderOutputType?.(params),
+  };
 }
 
 describe('generateFieldResolvedType', () => {
@@ -997,12 +1002,7 @@ describe('resolveFieldType', () => {
 });
 
 describe('generateBothFieldTypesMaps with resolveFieldTypeParams', () => {
-  // Phase A: SQL `typeRef`-shaped columns carry their `typeParams` on a named
-  // `storage.types[ref]` entry rather than inline on the framework's domain
-  // `ContractField`. The framework emit path consults a per-family resolver
-  // (`EmissionSpi.resolveFieldTypeParams`) to recover those typeParams so the
-  // codec's `renderOutputType` runs and the parameterized output type is
-  // emitted instead of the generic `CodecTypes[...]['output']` fallback.
+  // SQL `typeRef`-shaped columns carry their `typeParams` on a named `storage.types[ref]` entry rather than inline on the framework's domain `ContractField`. The framework emit path consults a per-family resolver (`EmissionSpi.resolveFieldTypeParams`) to recover those typeParams so the codec's `renderOutputType` runs and the parameterized output type is emitted instead of the generic `CodecTypes[...]['output']` fallback.
 
   it('uses resolved typeParams from the family resolver when domain field has none', () => {
     const lookup = stubCodecLookup({

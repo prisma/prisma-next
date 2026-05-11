@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { Collection } from '../src/collection';
 import { withReturningCapability } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, getTestContract } from './helpers';
+import { createMockRuntime, getTestContract, withoutPrimaryKey } from './helpers';
 
 // Synthetic 36-char Tag ids — Tag.id is typed `Char<36>` in the test contract.
 const TAG_ID_1 =
@@ -65,12 +65,10 @@ function buildTagWithUpdatedAtContract(): TestContract {
   return contract;
 }
 
-function setupTagCollection(): {
+function createTagCollectionForContract(contract: TestContract): {
   collection: Collection<TestContract, 'Tag'>;
   runtime: MockRuntime;
-  contract: TestContract;
 } {
-  const contract = buildTagWithUpdatedAtContract();
   const context = createExecutionContext({
     contract,
     stack: createSqlExecutionStack({
@@ -81,12 +79,49 @@ function setupTagCollection(): {
   });
   const runtime = createMockRuntime();
   const collection = new Collection({ runtime, context }, 'Tag');
-  return { collection, runtime, contract };
+  return { collection, runtime };
+}
+
+function setupTagCollection(): {
+  collection: Collection<TestContract, 'Tag'>;
+  runtime: MockRuntime;
+  contract: TestContract;
+} {
+  const contract = buildTagWithUpdatedAtContract();
+  return { ...createTagCollectionForContract(contract), contract };
+}
+
+function setupTagCollectionWithoutReturning(): {
+  collection: Collection<TestContract, 'Tag'>;
+  runtime: MockRuntime;
+} {
+  const contract = { ...buildTagWithUpdatedAtContract(), capabilities: {} } as TestContract;
+  return createTagCollectionForContract(contract);
+}
+
+function setupTagCollectionWithoutCountColumns(): {
+  collection: Collection<TestContract, 'Tag'>;
+} {
+  const contract = withoutPrimaryKey(buildTagWithUpdatedAtContract(), 'tags');
+  const tagsTable = contract.storage.tables.tags as {
+    columns: Record<string, unknown>;
+    primaryKey?: unknown;
+  };
+  tagsTable.columns = {};
+  tagsTable.primaryKey = undefined;
+  return createTagCollectionForContract(contract);
 }
 
 function planParams(execution: { plan: unknown } | undefined): readonly unknown[] {
   const plan = execution?.plan as { params?: readonly unknown[] } | undefined;
   return plan?.params ?? [];
+}
+
+function planReturningAliases(execution: { plan: unknown } | undefined): readonly string[] {
+  const plan = execution?.plan as
+    | { ast?: { returning?: readonly { alias: string }[] } }
+    | undefined;
+  return plan?.ast?.returning?.map((item) => item.alias) ?? [];
 }
 
 const TAG_A_ID = `${TAG_ID_1.slice(0, -1)}A` as string;
@@ -243,10 +278,12 @@ describe('@updatedAt mutation defaults via Collection', () => {
       const { collection, runtime } = setupTagCollection();
       runtime.setNextResults([[{ id: TAG_ID_1 }]]);
 
-      await collection.where({ id: tagId(TAG_ID_1) }).updateCount({ name: 'eng-v2' });
+      const count = await collection.where({ id: tagId(TAG_ID_1) }).updateCount({ name: 'eng-v2' });
 
       // updateCount issues a single UPDATE…RETURNING and counts the streamed rows.
+      expect(count).toBe(1);
       expect(runtime.executions).toHaveLength(1);
+      expect(planReturningAliases(runtime.executions[0])).toEqual(['id']);
       const params = planParams(runtime.executions[0]);
       const dateParam = params.find((p) => p instanceof Date);
       expect(dateParam).toBeInstanceOf(Date);
@@ -262,40 +299,36 @@ describe('@updatedAt mutation defaults via Collection', () => {
     });
 
     it('throws when the contract does not declare the returning capability', async () => {
-      // setupTagCollection wires `withReturningCapability`; rebuild without it.
-      const contract = buildTagWithUpdatedAtContract();
-      const stripped = { ...contract, capabilities: {} } as TestContract;
-      const context = createExecutionContext({
-        contract: stripped,
-        stack: createSqlExecutionStack({
-          target: postgresTarget,
-          adapter: postgresAdapter,
-          extensionPacks: [pgvectorRuntime],
-        }),
-      });
-      const runtime: MockRuntime = createMockRuntime();
-      const collection = new Collection({ context, runtime }, 'Tag');
+      const { collection } = setupTagCollectionWithoutReturning();
 
       await expect(
         collection.where({ id: tagId(TAG_ID_1) }).updateCount({ name: 'x' }),
       ).rejects.toThrow(/updateCount\(\) requires contract capability "returning"/);
     });
+
+    it('throws when no column can be returned for counting', async () => {
+      const { collection } = setupTagCollectionWithoutCountColumns();
+
+      await expect(collection.where({}).updateCount({ name: 'x' })).rejects.toThrow(
+        /Table "tags" has no columns for count RETURNING/,
+      );
+    });
   });
 
   describe('deleteCount', () => {
+    it('counts streamed rows with a minimal returning column', async () => {
+      const { collection, runtime } = setupTagCollection();
+      runtime.setNextResults([[{ id: TAG_ID_1 }, { id: TAG_B_ID }]]);
+
+      const count = await collection.where({ name: 'eng' }).deleteCount();
+
+      expect(count).toBe(2);
+      expect(runtime.executions).toHaveLength(1);
+      expect(planReturningAliases(runtime.executions[0])).toEqual(['id']);
+    });
+
     it('throws when the contract does not declare the returning capability', async () => {
-      const contract = buildTagWithUpdatedAtContract();
-      const stripped = { ...contract, capabilities: {} } as TestContract;
-      const context = createExecutionContext({
-        contract: stripped,
-        stack: createSqlExecutionStack({
-          target: postgresTarget,
-          adapter: postgresAdapter,
-          extensionPacks: [pgvectorRuntime],
-        }),
-      });
-      const runtime: MockRuntime = createMockRuntime();
-      const collection = new Collection({ context, runtime }, 'Tag');
+      const { collection } = setupTagCollectionWithoutReturning();
 
       await expect(collection.where({ id: tagId(TAG_ID_1) }).deleteCount()).rejects.toThrow(
         /deleteCount\(\) requires contract capability "returning"/,
@@ -336,6 +369,48 @@ describe('@updatedAt mutation defaults via Collection', () => {
       // Only the create branch's timestamp; the empty update branch must not
       // generate or apply one.
       expect(dateParams).toHaveLength(1);
+    });
+
+    it('throws when a non-empty update conflict returns no row', async () => {
+      const { collection, runtime } = setupTagCollection();
+      runtime.setNextResults([[]]);
+
+      await expect(
+        collection.upsert({
+          create: { id: tagId(TAG_ID_1), name: 'eng' },
+          update: { name: 'eng-v2' },
+          conflictOn: { id: tagId(TAG_ID_1) },
+        }),
+      ).rejects.toThrow(/upsert\(\) for model "Tag" did not return a row/);
+    });
+
+    it('throws when an empty update conflict cannot reload an existing row', async () => {
+      const { collection, runtime } = setupTagCollection();
+      runtime.setNextResults([[], []]);
+
+      await expect(
+        collection.upsert({
+          create: { id: tagId(TAG_ID_1), name: 'eng' },
+          update: {},
+          conflictOn: { id: tagId(TAG_ID_1) },
+        }),
+      ).rejects.toThrow(/upsert\(\) for model "Tag" did not return a row/);
+    });
+
+    it('rejects conflict columns that are absent from create values during reload', async () => {
+      const { collection, runtime } = setupTagCollection();
+      runtime.setNextResults([[]]);
+      const conflictOn = {
+        ...({ missing: 'x' } as Record<string, unknown>),
+      } as NonNullable<Parameters<Collection<TestContract, 'Tag'>['upsert']>[0]['conflictOn']>;
+
+      await expect(
+        collection.upsert({
+          create: { id: tagId(TAG_ID_1), name: 'eng' },
+          update: {},
+          conflictOn,
+        }),
+      ).rejects.toThrow(/requires create value for conflict column "missing"/);
     });
   });
 });

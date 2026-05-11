@@ -113,7 +113,7 @@ export function createInitCommand(): Command {
  *   we honour it (e.g. testing flows where stdin is stubbed).
  *
  * Exported so callers and tests can derive the same value without
- * touching `process` globals — F14 of the M1/M2 review.
+ * touching `process` globals.
  */
 export function deriveCanPrompt(opts: {
   readonly flagsInteractive: boolean | undefined;

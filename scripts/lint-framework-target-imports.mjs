@@ -8,13 +8,13 @@
  * embedded inside string literals (e.g. code that scaffolds a migration.ts
  * file with a literal `import { ... } from "@prisma-next/target-..."`).
  *
- * After the target-owned-scaffolding refactor (see
- * `projects/mongo-migration-authoring/specs/target-owned-migration-scaffolding.md`),
- * the framework no longer renders any part of a migration.ts file — targets
- * own the full content. As a result there are no known violations today, and
- * this script acts purely as a regression guardrail: any future attempt to
- * reintroduce a string-encoded target import into Domain 1 will fail the
- * `pnpm lint:deps` run that executes this check.
+ * The framework does not render any part of a migration.ts file — targets
+ * own the full content (see `docs/architecture docs/subsystems/7. Migration System.md`
+ * and ADR 195 / ADR 198 on the planner IR and runner ↔ driver visitor SPIs).
+ * As a result there are no known violations today, and this script acts purely
+ * as a regression guardrail: any future attempt to reintroduce a string-encoded
+ * target import into Domain 1 will fail the `pnpm lint:deps` run that executes
+ * this check.
  *
  * Domain 1 (framework) must never name a Domain 3 (target) package, not even
  * inside a string. See `.cursor/rules/directory-layout.mdc`.

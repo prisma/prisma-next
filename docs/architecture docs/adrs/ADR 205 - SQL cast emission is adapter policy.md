@@ -1,5 +1,7 @@
 # ADR 205 — Postgres cast emission is adapter policy, codec metadata stays descriptive
 
+> **Retrospective note.** This ADR's examples use the `defineCodec({...})` factory. That factory was retired in favor of class-based descriptors (`CodecDescriptorImpl`) and codecs (`CodecImpl`) as described in [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md). The decision this ADR records — that the SQL renderer reads `meta.db.sql.<adapter>.nativeType` as descriptive metadata and the adapter applies cast policy — is unchanged. `meta` is declared on the descriptor class today (`readonly meta = { db: { sql: { postgres: { nativeType: 'vector' } } } } as const;`). See [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) and the [Codec authoring guide](../../reference/codec-authoring-guide.md).
+
 ## TL;DR
 
 The Postgres SQL renderer sometimes has to suffix a parameter with `::<type>` (e.g. `$1::vector`) so Postgres can resolve the parameter's type. Today it picks which casts to emit by hardcoding three codec IDs in the renderer — including a codec ID owned by an extension package, which inverts the dependency between core adapter and extension. We're moving the decision out of the renderer and onto the **adapter as policy**: the renderer reads each codec's existing `nativeType` field and casts only when the type isn't in an adapter-local "infers cleanly" allow-list. Codec authors set no new flags; extensions just work.
@@ -90,7 +92,7 @@ Anything outside the set — including `json`, `jsonb`, all extension types, all
 The pgvector extension declares its codec the same way it does today, with no new fields:
 
 ```ts
-const pgVectorCodec = codec({
+const pgVectorCodec = defineCodec({
   typeId: 'pg/vector@1',
   meta: { db: { sql: { postgres: { nativeType: 'vector' } } } },
   // … encode/decode …
@@ -113,7 +115,7 @@ function renderTypedParam(index, codecId, codecLookup) {
 A user who registers a PostGIS codec gets correct emission with zero adapter change:
 
 ```ts
-const geographyCodec = codec({
+const geographyCodec = defineCodec({
   typeId: 'app/geography@1',
   meta: { db: { sql: { postgres: { nativeType: 'geography' } } } },
   // …

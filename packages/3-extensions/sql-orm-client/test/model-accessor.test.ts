@@ -1,12 +1,9 @@
-import type { JsonValue } from '@prisma-next/contract/types';
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
-import type { CodecRegistry, CodecTrait } from '@prisma-next/sql-relational-core/ast';
+import type { CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
   BinaryExpr,
   ColumnRef,
-  codec,
-  createCodecRegistry,
   ExistsExpr,
   ListExpression,
   NotExpr,
@@ -31,7 +28,7 @@ describe('createModelAccessor', () => {
       { columns: Record<string, { codecId?: string }> } | undefined
     >;
     const codecId = tables[table]?.columns[column]?.codecId;
-    return codecId ? ParamRef.of(value, { codecId }) : ParamRef.of(value);
+    return codecId ? ParamRef.of(value, { codecId, refs: { table, column } }) : ParamRef.of(value);
   }
 
   function expectBinaryParam(
@@ -44,22 +41,6 @@ describe('createModelAccessor', () => {
     expect(actual).toEqual(
       new BinaryExpr(op, ColumnRef.of(table, column), paramRef(table, column, value)),
     );
-  }
-
-  function makeRegistry(entries: Record<string, readonly CodecTrait[]>): CodecRegistry {
-    const registry = createCodecRegistry();
-    for (const [id, traits] of Object.entries(entries)) {
-      registry.register(
-        codec({
-          typeId: id,
-          targetTypes: [],
-          traits,
-          encode: (v: JsonValue) => v,
-          decode: (v: JsonValue) => v,
-        }),
-      );
-    }
-    return registry;
   }
 
   function makeDescriptors(
@@ -79,8 +60,8 @@ describe('createModelAccessor', () => {
               validate: (_value: unknown) => ({ value: undefined }),
             },
           },
-          // The trait-gating tests don't materialize codecs; the
-          // factory is shape-only and never invoked.
+          isParameterized: false,
+          // The trait-gating tests don't materialize codecs; the factory is shape-only and never invoked.
           factory: () => () => {
             throw new Error('test descriptor factory not exercised');
           },
@@ -138,8 +119,7 @@ describe('createModelAccessor', () => {
       string,
       unknown
     >;
-    // Non-predicate return → ComparisonMethods wrapper; the underlying AST is
-    // behind the comparison methods. Invoke a comparison to observe it.
+    // Non-predicate return → ComparisonMethods wrapper; the underlying AST is behind the comparison methods. Invoke a comparison to observe it.
     const gt = (result['gt'] as (value: number) => BinaryExpr)(0.5);
     expect(gt).toBeInstanceOf(BinaryExpr);
     const opExpr = gt.left as OperationExpr;
@@ -152,10 +132,7 @@ describe('createModelAccessor', () => {
   });
 
   it('cosineDistance accepts another vector column and produces a ColumnRef on arg0 (cross-column composition)', () => {
-    // Cross-column composition: the second argument is another column handle
-    // (an Expression with buildAst → ColumnRef), not a raw JS value.
-    // The factory must detect it as an Expression and emit a ColumnRef, not a
-    // ParamRef wrapping the accessor object.
+    // Cross-column composition: the second argument is another column handle (an Expression with buildAst → ColumnRef), not a raw JS value. The factory must detect it as an Expression and emit a ColumnRef, not a ParamRef wrapping the accessor object.
     const post = createModelAccessor(context, 'Post');
     const otherPost = createModelAccessor(context, 'Post');
 
@@ -263,14 +240,12 @@ describe('createModelAccessor', () => {
     const user = createModelAccessor(context, 'User');
     expect((user as Record<PropertyKey, unknown>)[Symbol.iterator]).toBeUndefined();
 
-    // Unknown fields in a shorthand predicate are surfaced loudly — silent
-    // skip would drop user intent (a typo'd filter would match every row).
+    // Unknown fields in a shorthand predicate are surfaced loudly — silent skip would drop user intent (a typo'd filter would match every row).
     expect(() => user['posts']!.some({ unknown: 'value' })).toThrow(
       /Shorthand filter on "Post\.unknown": field is not defined on the model/,
     );
 
-    // Undefined values are skipped before the field lookup, so a shorthand
-    // with an unknown field and undefined value is a no-op.
+    // Undefined values are skipped before the field lookup, so a shorthand with an unknown field and undefined value is a no-op.
     const someUndefined = user['posts']!.some({ unknown: undefined }) as ExistsExpr;
     expect(someUndefined.subquery.where).toEqual(
       BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
@@ -413,11 +388,7 @@ describe('createModelAccessor', () => {
       },
     };
 
-    // Contract claims the User model lives in `users_storage`, but
-    // storage.tables has no entry for it. The Proxy returns undefined for
-    // fields whose column cannot be resolved, matching plain JS object
-    // semantics. Downstream consumers (or TypeScript at compile time) are
-    // responsible for noticing the missing column.
+    // Contract claims the User model lives in `users_storage`, but storage.tables has no entry for it. The Proxy returns undefined for fields whose column cannot be resolved, matching plain JS object semantics. Downstream consumers (or TypeScript at compile time) are responsible for noticing the missing column.
     const accessor = createModelAccessor(
       { ...context, contract: storageFallbackContract } as never,
       'User',
@@ -489,9 +460,8 @@ describe('createModelAccessor', () => {
 
   describe('runtime trait-gating', () => {
     it('only creates equality methods when codec has equality trait', () => {
-      const codecs = makeRegistry({ 'pg/int4@1': ['equality'] });
       const codecDescriptors = makeDescriptors({ 'pg/int4@1': ['equality'] });
-      const accessor = createModelAccessor({ ...context, codecs, codecDescriptors }, 'Post');
+      const accessor = createModelAccessor({ ...context, codecDescriptors }, 'Post');
       const field = accessor['id'] as unknown as Record<string, unknown>;
 
       expect(typeof field['eq']).toBe('function');
@@ -511,13 +481,10 @@ describe('createModelAccessor', () => {
     });
 
     it('creates all methods when codec has all relevant traits', () => {
-      const codecs = makeRegistry({
-        'pg/text@1': ['equality', 'order', 'textual'],
-      });
       const codecDescriptors = makeDescriptors({
         'pg/text@1': ['equality', 'order', 'textual'],
       });
-      const accessor = createModelAccessor({ ...context, codecs, codecDescriptors }, 'User');
+      const accessor = createModelAccessor({ ...context, codecDescriptors }, 'User');
       const field = accessor['name'] as unknown as Record<string, unknown>;
 
       for (const method of [
@@ -540,9 +507,8 @@ describe('createModelAccessor', () => {
     });
 
     it('throws when relation shorthand filter targets a field without equality trait', () => {
-      const codecs = makeRegistry({ 'pg/int4@1': ['order'] });
       const codecDescriptors = makeDescriptors({ 'pg/int4@1': ['order'] });
-      const accessor = createModelAccessor({ ...context, codecs, codecDescriptors }, 'Post');
+      const accessor = createModelAccessor({ ...context, codecDescriptors }, 'Post');
 
       expect(() => accessor['comments']!.some({ postId: 42 })).toThrow(
         /does not support equality comparisons/,
@@ -598,7 +564,12 @@ describe('createModelAccessor', () => {
       const opExpr = binary.left as unknown as OperationExpr;
       expect(opExpr.method).toBe('cosineDistance');
       expect(opExpr.self).toEqual(ColumnRef.of('posts', 'embedding'));
-      expect(opExpr.args[0]).toEqual(ParamRef.of([1, 2, 3], { codecId: 'pg/vector@1' }));
+      expect(opExpr.args[0]).toEqual(
+        ParamRef.of([1, 2, 3], {
+          codecId: 'pg/vector@1',
+          refs: { table: 'posts', column: 'embedding' },
+        }),
+      );
     });
 
     it('cosineDistance().asc() produces OrderByItem', () => {
@@ -628,10 +599,9 @@ describe('createModelAccessor', () => {
         'pg/int4@1': ['equality'],
         'pg/bool@1': ['equality', 'boolean'],
       };
-      const codecs = makeRegistry(traitsByCodec);
       const codecDescriptors = makeDescriptors(traitsByCodec);
 
-      const ctx = { ...context, queryOperations, codecs, codecDescriptors };
+      const ctx = { ...context, queryOperations, codecDescriptors };
       const user = createModelAccessor(ctx, 'User');
       const post = createModelAccessor(ctx, 'Post');
 

@@ -11,11 +11,18 @@ export default defineConfig({
     maxWorkers: 1,
     isolate: false,
     fileParallelism: false,
+    sequence: { groupOrder: 1 },
     testTimeout: timeouts.vitestPackageDefault,
     hookTimeout: timeouts.vitestPackageDefault,
     setupFiles: ['./test/setup.ts'],
     env: {
       CI: 'true',
+      // Disable ANSI colors so snapshot tests in test/utils/formatters/ stay
+      // stable regardless of how vitest is invoked (per-package vs. root
+      // projects, where TTY/FORCE_COLOR detection differs). Some renderer
+      // call sites in src/utils/formatters/graph-render.ts bypass the
+      // explicit `colorize: false` wrapper and call colorette directly.
+      NO_COLOR: '1',
     },
     coverage: {
       provider: 'v8',
@@ -65,11 +72,25 @@ export default defineConfig({
         'src/utils/progress-adapter.ts',
         // Migration command scaffold — orchestration code tested via e2e tests
         'src/utils/migration-command-scaffold.ts',
+        'src/utils/migration-types.ts',
+        // Init / migration wiring — exercised by integration cli-journeys and fixture apps
+        // (test/integration/test/cli-journeys/*.e2e.test.ts, cli.init-templates.e2e.test.ts)
+        'src/commands/init/**',
+        'src/commands/migration-new.ts',
+        'src/migration-cli.ts',
+        'src/config-path-validation.ts',
+        'src/utils/publish-contract-artifact-pair.ts',
+        'src/utils/validate-contract-deps.ts',
         // Defensive error handling branches
         'src/api/emit-contract.ts',
         'src/load-ts-contract.ts',
         // Control API — tested via integration tests (test/integration/test/control-api.test.ts)
         'src/control-api/**',
+        // Aggregate loader CLI wrapper — translates loader failures into CLI
+        // error envelopes. Exercised end-to-end via the contract-space verifier
+        // suites (test/integration/test/cli.db-init.contract-space-verifier.test.ts,
+        // cli.db-update.contract-space-verifier.test.ts, cli.db-verify.aggregate-schema.test.ts).
+        'src/utils/contract-space-aggregate-loader.ts',
       ],
       thresholds: {
         lines: 95,

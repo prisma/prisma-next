@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
@@ -70,7 +70,7 @@ async function executeMigrationNewCommand(
   options: MigrationNewOptions,
 ): Promise<Result<MigrationNewResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { migrationsDir, migrationsRelative } = resolveMigrationPaths(options.config, config);
+  const { appMigrationsDir, appMigrationsRelative } = resolveMigrationPaths(options.config, config);
 
   const contractPathAbsolute = resolveContractPath(config);
 
@@ -120,7 +120,7 @@ async function executeMigrationNewCommand(
   let fromContractSourceDir: string | null = null;
 
   try {
-    const packages = await readMigrationsDir(migrationsDir);
+    const packages = await readMigrationsDir(appMigrationsDir);
 
     if (packages.length > 0) {
       const graph = reconstructGraph(packages);
@@ -130,7 +130,7 @@ async function executeMigrationNewCommand(
         if (!match) {
           return notOk(
             errorRuntime('Starting contract not found', {
-              why: `No migration with to hash matching "${options.from}" exists in ${migrationsRelative}`,
+              why: `No migration with to hash matching "${options.from}" exists in ${appMigrationsRelative}`,
               fix: 'Check that the --from hash matches a known migration target hash.',
             }),
           );
@@ -171,7 +171,7 @@ async function executeMigrationNewCommand(
   const timestamp = new Date();
   const slug = options.name ?? 'migration';
   const dirName = formatMigrationDirName(timestamp, slug);
-  const packageDir = join(migrationsDir, dirName);
+  const packageDir = join(appMigrationsDir, dirName);
 
   // `migration new` scaffolds an empty `migration.ts` for the user to
   // fill, so we attest over `ops: []`. Re-running self-emit after the
@@ -231,12 +231,15 @@ async function executeMigrationNewCommand(
     const stack = createControlStack(config);
     const familyInstance = config.family.create(stack);
     const planner = migrations.createPlanner(familyInstance);
-    const emptyPlan = planner.emptyMigration({
-      packageDir,
-      contractJsonPath: join(packageDir, 'end-contract.json'),
-      fromHash,
-      toHash: toStorageHash,
-    });
+    const emptyPlan = planner.emptyMigration(
+      {
+        packageDir,
+        contractJsonPath: join(packageDir, 'end-contract.json'),
+        fromHash,
+        toHash: toStorageHash,
+      },
+      APP_SPACE_ID,
+    );
     await writeMigrationTs(packageDir, emptyPlan.renderTypeScript());
 
     return ok({

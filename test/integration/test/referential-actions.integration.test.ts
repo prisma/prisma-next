@@ -6,7 +6,7 @@ import sql, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -617,6 +617,7 @@ describe('referential actions integration', () => {
             policy: INIT_ADDITIVE_POLICY,
             fromContract: null,
             frameworkComponents,
+            spaceId: APP_SPACE_ID,
           });
 
           expect(planResult.kind).toBe('success');

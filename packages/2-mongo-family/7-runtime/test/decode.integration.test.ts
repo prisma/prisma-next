@@ -30,8 +30,7 @@ describe('Mongo runtime decode integration', () => {
         embeddings: vec,
       });
 
-      // User-facing path: build the plan through the query-builder so the
-      // Row type is contract-derived (no explicit annotation on execute).
+      // User-facing path: build the plan through the query-builder so the Row type is contract-derived (no explicit annotation on execute).
       const plan = mongoQuery<TDecodeFixtureContract>({ contractJson: contract })
         .from('users')
         .match((f) =>
@@ -52,16 +51,10 @@ describe('Mongo runtime decode integration', () => {
 
   it('decode failure surfaces RUNTIME.DECODE_FAILED with details and cause', async () => {
     await withMongod(async (ctx) => {
-      // The synthetic codec id (`test/throws-on-decode@1`) is not a contract
-      // field codec, so this test legitimately needs a stub `resultShape` —
-      // the user-facing `mongoQuery(...)` path can't construct a shape
-      // referencing a codec the contract doesn't declare. The tradeoff is
-      // intentional: this test exercises the failure-envelope plumbing, not
-      // the lane-population path. The other two integration tests in this
-      // file go through the query-builder.
+      // The synthetic codec id (`test/throws-on-decode@1`) is not a contract field codec, so this test legitimately needs a stub `resultShape` — the user-facing `mongoQuery(...)` path can't construct a shape referencing a codec the contract doesn't declare. The tradeoff is intentional: this test exercises the failure-envelope plumbing, not the lane-population path. The other two integration tests in this file go through the
+      // query-builder.
       const failing = mongoCodec({
         typeId: 'test/throws-on-decode@1',
-        targetTypes: ['any'],
         encode: (v: string) => v,
         decode: () => {
           throw new Error('decode explosion');
@@ -120,13 +113,8 @@ describe('Mongo runtime decode integration', () => {
 
   it('unknown shape slot leaves driver value for that field intact', async () => {
     await withMongod(async (ctx) => {
-      // No contract-modelled lane currently emits `kind: 'unknown'` for a
-      // sibling-of-leaf slot — lanes either emit a fully-described
-      // document shape or omit `resultShape` entirely. This test
-      // exercises the runtime's unknown-slot behavior with a hand-rolled
-      // shape; the match filter still goes through `MongoParamRef` for
-      // the encode-side codec round-trip (no `as unknown as MongoValue`
-      // cast — `MongoParamRef` is a member of `MongoValue`).
+      // No contract-modelled lane currently emits `kind: 'unknown'` for a sibling-of-leaf slot — lanes either emit a fully-described document shape or omit `resultShape` entirely. This test exercises the runtime's unknown-slot behavior with a hand-rolled shape; the match filter still goes through `MongoParamRef` for the encode-side codec round-trip (no `as unknown as MongoValue` cast — `MongoParamRef` is a member of
+      // `MongoValue`).
       const nested = { city: 'Paris' };
       const insert = await ctx.client
         .db(ctx.dbName)
