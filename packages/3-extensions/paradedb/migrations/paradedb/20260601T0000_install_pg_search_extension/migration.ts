@@ -4,7 +4,7 @@
  * extension and register the invariantId for the BM25 full-text search
  * surface downstream consumers depend on.
  *
- * The contract IR (see `<package>/contract.json`) declares no tables or
+ * The contract IR (see `<package>/src/contract/contract.json`) declares no tables or
  * native types — paradedb ships none of its own. The single op here
  * carries the `CREATE EXTENSION IF NOT EXISTS pg_search` DDL plus pre-
  * and postconditions; downstream BM25 indexes in user contracts rely on

@@ -4,7 +4,7 @@
  * Authored against the on-disk-in-package convention. The same emit
  * pipeline application authors use is applied here:
  *
- *   `prisma-next contract emit` → `<package>/contract.{json,d.ts}`
+ *   `prisma-next contract emit` → `<package>/src/contract/contract.{json,d.ts}`
  *   `prisma-next migration plan` → `<package>/migrations/paradedb/<dirName>/`
  *
  * The descriptor at `src/exports/control.ts` then wires the emitted
