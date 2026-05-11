@@ -351,6 +351,7 @@ describe('decryptAll — forwards opts.signal to the SDK', () => {
 
     await decryptAll([envelope]);
 
+    expect(sdk.bulkDecryptCalls).toHaveLength(1);
     expect(sdk.bulkDecryptCalls[0]?.signal).toBeUndefined();
   });
 
@@ -365,6 +366,7 @@ describe('decryptAll — forwards opts.signal to the SDK', () => {
 
     await decryptAll([envelope], {});
 
+    expect(sdk.bulkDecryptCalls).toHaveLength(1);
     expect(sdk.bulkDecryptCalls[0]?.signal).toBeUndefined();
   });
 });
@@ -402,7 +404,8 @@ describe('decryptAll — diagnostics on misuse', () => {
     // SDK error taxonomy. RUNTIME.ABORTED phase-tag wrapping lives in
     // the cancellation umbrella, not here.
     const sdk = makeCounterSdk();
-    sdk.bulkDecrypt = vi.fn(() => Promise.reject(new Error('SDK boom')));
+    const bulkDecryptSpy = vi.fn(() => Promise.reject(new Error('SDK boom')));
+    sdk.bulkDecrypt = bulkDecryptSpy;
     const envelope = makeReadEnvelope({
       plaintext: 'alice',
       table: 'User',
@@ -411,5 +414,6 @@ describe('decryptAll — diagnostics on misuse', () => {
     });
 
     await expect(decryptAll([envelope])).rejects.toThrow('SDK boom');
+    expect(bulkDecryptSpy).toHaveBeenCalledTimes(1);
   });
 });
