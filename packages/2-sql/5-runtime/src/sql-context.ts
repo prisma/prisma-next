@@ -32,7 +32,6 @@ import {
 import type {
   Adapter,
   AnyQueryAst,
-  Codec,
   ContractCodecRegistry,
   LoweredStatement,
   SqlCodecInstanceContext,
@@ -352,110 +351,66 @@ function validateColumnTypeParams(
   }
 }
 
-function isResolvedCodec(candidate: unknown): candidate is Codec {
-  return (
-    candidate !== null &&
-    typeof candidate === 'object' &&
-    'id' in candidate &&
-    'decode' in candidate
-  );
-}
-
 /**
- * Walk the contract's `storage.tables[].columns[]` and resolve each column to a `Codec` through the unified descriptor map. Per-instance behavior:
+ * Build a {@link ContractCodecRegistry} that resolves codecs exclusively through the `forCodecRef` content-keyed cache.
  *
- * - **typeRef columns**: reuse the resolved codec materialized once by `initializeTypeHelpers` for the `storage.types` entry. Multiple columns sharing one typeRef share one codec instance.
- * - **inline-typeParams columns**: call `descriptor.factory(typeParams) (ctx)` once per column (per-column anonymous instance).
- * - **non-parameterized columns**: call `descriptor.factory()(ctx)` once. The synthesized descriptor's factory is constant — every call returns the same shared codec instance — so columns sharing a non-parameterized codec id share one resolved codec without explicit caching.
+ * One pre-population pass walks `storage.types` and `storage.tables[].columns[]` to seed the resolver's per-ref instance context with the *aggregated* `usedAt` set for each canonical `(codecId, typeParams)` key. The same codec materialised through `forColumn` or `forCodecRef` is therefore one instance with one `SqlCodecInstanceContext` — stateful codecs reading `usedAt` see the full column set regardless of which surface the caller used.
  *
- * Codec-registry-unification spec § AC-4: every column resolves through one descriptor map without branching on parameterization. JSON-Schema validation, when required, lives inside the resolved codec's `decode` body (see `arktype-json`'s `ArktypeJsonCodecClass`); the framework no longer maintains a parallel validator registry.
+ * Per-key instance-name policy:
+ *
+ * - typeRef-shared columns use the `storage.types[name]` name.
+ * - inline-`typeParams` columns use `<col:Table.column>` (the first column observed at that key; additional columns sharing the key extend `usedAt`).
+ * - non-parameterized codec ids use `<shared:codecId>`, aggregating every column on that codec id into one `usedAt` set.
+ *
+ * `forColumn(t, c)` is a thin delegate over `forCodecRef(codecRefForColumn(t, c))`; encode/decode hot paths read the resolver directly via `forCodecRef`.
  */
 function buildContractCodecRegistry(
   contract: Contract<SqlStorage>,
   codecDescriptors: CodecDescriptorRegistry,
-  types: TypeHelperRegistry,
-  parameterizedDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): ContractCodecRegistry {
-  const byColumn = new Map<string, Codec>();
-
-  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
-    for (const [columnName, column] of Object.entries(table.columns)) {
-      const columnKey = `${tableName}.${columnName}`;
-      const descriptor = codecDescriptors.descriptorFor(column.codecId);
-
-      let resolvedCodec: Codec | undefined;
-
-      if (descriptor) {
-        const isParameterized = parameterizedDescriptors.has(column.codecId);
-
-        if (column.typeRef) {
-          const helper = types[column.typeRef];
-          if (isResolvedCodec(helper)) {
-            resolvedCodec = helper;
-          }
-        } else if (column.typeParams && isParameterized) {
-          const parameterizedDescriptor = parameterizedDescriptors.get(column.codecId);
-          if (parameterizedDescriptor) {
-            const validatedParams = validateTypeParams(column.typeParams, parameterizedDescriptor, {
-              tableName,
-              columnName,
-            });
-            const ctx: SqlCodecInstanceContext = {
-              name: `<col:${tableName}.${columnName}>`,
-              usedAt: [{ table: tableName, column: columnName }],
-            };
-            resolvedCodec = parameterizedDescriptor.factory(validatedParams)(ctx);
-          }
-        } else if (!isParameterized) {
-          const ctx: SqlCodecInstanceContext = {
-            name: `<col:${tableName}.${columnName}>`,
-            usedAt: [{ table: tableName, column: columnName }],
-          };
-          resolvedCodec = descriptor.factory(undefined)(ctx);
-        }
-      }
-
-      if (resolvedCodec) {
-        byColumn.set(columnKey, resolvedCodec);
-      }
-    }
-  }
-
-  const refToCtx = new Map<string, SqlCodecInstanceContext>();
-  const typeRefSites = collectTypeRefSites(contract.storage);
   const refKeyOf = (ref: CodecRef): string => `${ref.codecId}:${canonicalizeJson(ref.typeParams)}`;
+
+  const usedAtByKey = new Map<string, Array<{ readonly table: string; readonly column: string }>>();
+  const nameByKey = new Map<string, string>();
+
+  const typeRefSites = collectTypeRefSites(contract.storage);
   for (const [typeName, typeInstance] of Object.entries(contract.storage.types ?? {})) {
     const ref: CodecRef = {
       codecId: typeInstance.codecId,
       typeParams: typeInstance.typeParams as JsonValue,
     };
-    refToCtx.set(refKeyOf(ref), {
-      name: typeName,
-      usedAt: typeRefSites.get(typeName) ?? [],
-    });
+    const key = refKeyOf(ref);
+    usedAtByKey.set(key, [...(typeRefSites.get(typeName) ?? [])]);
+    nameByKey.set(key, typeName);
   }
+
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
       if (column.typeRef !== undefined) continue;
-      if (column.typeParams === undefined) continue;
-      const ref: CodecRef = {
-        codecId: column.codecId,
-        typeParams: column.typeParams as JsonValue,
-      };
+      const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+      if (!ref) continue;
       const key = refKeyOf(ref);
-      if (!refToCtx.has(key)) {
-        refToCtx.set(key, {
-          name: `<anon:${tableName}.${columnName}>`,
-          usedAt: [{ table: tableName, column: columnName }],
-        });
+      const site = { table: tableName, column: columnName };
+      const existing = usedAtByKey.get(key);
+      if (existing) {
+        existing.push(site);
+      } else {
+        usedAtByKey.set(key, [site]);
+        const name =
+          ref.typeParams !== undefined
+            ? `<col:${tableName}.${columnName}>`
+            : `<shared:${ref.codecId}>`;
+        nameByKey.set(key, name);
       }
     }
   }
 
   const resolver = createAstCodecResolver(codecDescriptors, (ref) => {
-    const existing = refToCtx.get(refKeyOf(ref));
-    if (existing) return existing;
-    return { name: `<shared:${ref.codecId}>`, usedAt: [] };
+    const key = refKeyOf(ref);
+    return {
+      name: nameByKey.get(key) ?? `<shared:${ref.codecId}>`,
+      usedAt: usedAtByKey.get(key) ?? [],
+    };
   });
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
@@ -472,7 +427,13 @@ function buildContractCodecRegistry(
 
   const registry: ContractCodecRegistry = {
     forColumn(table, column) {
-      return byColumn.get(`${table}.${column}`);
+      const ref = codecDescriptors.codecRefForColumn(table, column);
+      if (!ref) return undefined;
+      const descriptor = codecDescriptors.descriptorFor(ref.codecId);
+      if (!descriptor) return undefined;
+      if (descriptor.isParameterized && ref.typeParams === undefined) return undefined;
+      if (!descriptor.isParameterized && ref.typeParams !== undefined) return undefined;
+      return resolver.forCodecRef(ref);
     },
     forCodecRef(ref) {
       return resolver.forCodecRef(ref);
@@ -689,12 +650,7 @@ export function createExecutionContext<
 
   const types = initializeTypeHelpers(contract.storage, parameterizedCodecDescriptors);
 
-  const contractCodecs = buildContractCodecRegistry(
-    contract,
-    codecDescriptors,
-    types,
-    parameterizedCodecDescriptors,
-  );
+  const contractCodecs = buildContractCodecRegistry(contract, codecDescriptors);
 
   return {
     contract,

@@ -87,7 +87,7 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
     };
   }
 
-  it('materializes a fresh per-column codec instance with `<col:table.column>` context for forColumn dispatch', () => {
+  it('materializes a shared per-codec instance with `<shared:codecId>` context for a single non-parameterized column', () => {
     const captures: SqlCodecInstanceContext[] = [];
     const { descriptor, instances } = createCtxCapturingExtension(captures);
 
@@ -104,36 +104,8 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
 
     const columnCtx = instances.find(({ codec }) => codec === columnInstance)?.ctx;
     expect(columnCtx).toBeDefined();
-    expect(columnCtx?.name).toBe('<col:users.field>');
+    expect(columnCtx?.name).toBe('<shared:test/captures-ctx@1>');
     expect(columnCtx?.usedAt).toEqual([{ table: 'users', column: 'field' }]);
-  });
-
-  it('materializes distinct instances for distinct columns sharing the same codec id', () => {
-    const captures: SqlCodecInstanceContext[] = [];
-    const { descriptor } = createCtxCapturingExtension(captures);
-
-    const contract = contractWith({
-      users: { codecId: 'test/captures-ctx@1', nativeType: 'captures' },
-      orders: { codecId: 'test/captures-ctx@1', nativeType: 'captures' },
-    });
-
-    const context = createTestContext(contract, createStubAdapter(), {
-      extensionPacks: [descriptor],
-    });
-
-    const usersInstance = context.contractCodecs.forColumn('users', 'field');
-    const ordersInstance = context.contractCodecs.forColumn('orders', 'field');
-
-    expect(usersInstance).toBeDefined();
-    expect(ordersInstance).toBeDefined();
-    expect(usersInstance).not.toBe(ordersInstance);
-
-    const usersCtx = captures.find((ctx) => ctx.name === '<col:users.field>');
-    const ordersCtx = captures.find((ctx) => ctx.name === '<col:orders.field>');
-    expect(usersCtx).toBeDefined();
-    expect(ordersCtx).toBeDefined();
-    expect(usersCtx?.usedAt).toEqual([{ table: 'users', column: 'field' }]);
-    expect(ordersCtx?.usedAt).toEqual([{ table: 'orders', column: 'field' }]);
   });
 });
 
@@ -356,5 +328,127 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
     expect(() => context.contractCodecs.forCodecRef({ codecId: 'nope/missing@1' })).toThrow(
       /CODEC_DESCRIPTOR_MISSING|nope\/missing@1/,
     );
+  });
+});
+
+/**
+ * Architectural invariant: `forColumn` is a convenience wrapper over `forCodecRef`. Both surfaces must return the exact same `Codec` instance for the same logical codec, so stateful codecs consuming `SqlCodecInstanceContext.usedAt` get one materialization regardless of which surface the caller picks.
+ */
+describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', () => {
+  function createSharedCodecExtension(): {
+    descriptor: SqlRuntimeExtensionDescriptor<'postgres'>;
+    instances: Array<{ ctx: SqlCodecInstanceContext; codec: Codec }>;
+  } {
+    const instances: Array<{ ctx: SqlCodecInstanceContext; codec: Codec }> = [];
+    const codecDescriptor: CodecDescriptor<void> = {
+      codecId: 'test/shared@1',
+      traits: [],
+      targetTypes: ['shared'],
+      paramsSchema: voidParamsSchema,
+      isParameterized: false,
+      factory: ((_params: undefined) => (ctx: SqlCodecInstanceContext) => {
+        const codec: Codec = {
+          id: 'test/shared@1',
+          encode: (v: unknown) => Promise.resolve(v),
+          decode: (w: unknown) => Promise.resolve(w),
+          encodeJson: (v) => v as never,
+          decodeJson: (j) => j as never,
+        };
+        instances.push({ ctx, codec });
+        return codec;
+      }) as unknown as CodecDescriptor<void>['factory'],
+    };
+
+    return {
+      descriptor: {
+        kind: 'extension' as const,
+        id: 'test-shared',
+        version: '0.0.1',
+        familyId: 'sql' as const,
+        targetId: 'postgres' as const,
+        codecs: () => [codecDescriptor],
+        create() {
+          return { familyId: 'sql' as const, targetId: 'postgres' as const };
+        },
+      },
+      instances,
+    };
+  }
+
+  function contractWith(
+    columns: Record<string, { codecId: string; nativeType: string }>,
+  ): Contract<SqlStorage> {
+    const tables: SqlStorage['tables'] = {};
+    for (const [tableName, columnSpec] of Object.entries(columns)) {
+      tables[tableName] = {
+        columns: {
+          field: {
+            nativeType: columnSpec.nativeType,
+            codecId: columnSpec.codecId,
+            nullable: false,
+          },
+        },
+        primaryKey: { columns: ['field'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      };
+    }
+    return {
+      targetFamily: 'sql',
+      target: 'postgres',
+      profileHash: profileHash('sha256:test'),
+      models: {},
+      roots: {},
+      storage: { storageHash: coreHash('sha256:test'), tables },
+      extensionPacks: {},
+      capabilities: {},
+      meta: {},
+    };
+  }
+
+  it('forColumn(t, c) and forCodecRef(codecRefForColumn(t, c)) return the same codec instance', () => {
+    const { descriptor } = createSharedCodecExtension();
+    const contract = contractWith({
+      users: { codecId: 'test/shared@1', nativeType: 'shared' },
+    });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [descriptor],
+    });
+
+    const fromColumn = context.contractCodecs.forColumn('users', 'field');
+    const ref = context.codecDescriptors.codecRefForColumn('users', 'field');
+    expect(ref).toBeDefined();
+    const fromRef = context.contractCodecs.forCodecRef(ref!);
+
+    expect(fromColumn).toBeDefined();
+    expect(fromColumn).toBe(fromRef);
+  });
+
+  it('two columns sharing one non-parameterized codec id share one codec instance with aggregated usedAt', () => {
+    const { descriptor, instances } = createSharedCodecExtension();
+    const contract = contractWith({
+      users: { codecId: 'test/shared@1', nativeType: 'shared' },
+      orders: { codecId: 'test/shared@1', nativeType: 'shared' },
+    });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [descriptor],
+    });
+
+    const usersInstance = context.contractCodecs.forColumn('users', 'field');
+    const ordersInstance = context.contractCodecs.forColumn('orders', 'field');
+
+    expect(usersInstance).toBeDefined();
+    expect(ordersInstance).toBe(usersInstance);
+
+    const materialized = instances.find(({ codec }) => codec === usersInstance);
+    expect(materialized).toBeDefined();
+    expect(materialized?.ctx.name).toBe('<shared:test/shared@1>');
+    expect(materialized?.ctx.usedAt).toEqual([
+      { table: 'users', column: 'field' },
+      { table: 'orders', column: 'field' },
+    ]);
   });
 });
