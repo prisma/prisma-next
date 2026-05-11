@@ -24,6 +24,13 @@ export interface GraphWalkStrategyInputs {
   readonly aggregateTargetId: string;
   readonly member: ContractSpaceMember;
   readonly currentMarker: ContractMarkerRecordLike | null;
+  /**
+   * Optional ref name to decorate the resulting `PathDecision`. Used by
+   * `migration apply` to surface the user-supplied `--ref <name>` in
+   * structured-progress events and invariant-path error envelopes. The
+   * strategy itself does not interpret it.
+   */
+  readonly refName?: string;
 }
 
 /**
@@ -42,14 +49,17 @@ export interface GraphWalkStrategyInputs {
  * `computeExtensionSpaceApplyPath` semantics.
  */
 export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutcome {
-  const { aggregateTargetId, member, currentMarker } = input;
+  const { aggregateTargetId, member, currentMarker, refName } = input;
   const { graph, packagesByMigrationHash } = member.migrations;
 
   const fromHash = currentMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
   const markerInvariants = new Set(currentMarker?.invariants ?? []);
   const required = new Set(member.headRef.invariants.filter((id) => !markerInvariants.has(id)));
 
-  const outcome = findPathWithDecision(graph, fromHash, member.headRef.hash, { required });
+  const outcome = findPathWithDecision(graph, fromHash, member.headRef.hash, {
+    required,
+    ...(refName !== undefined ? { refName } : {}),
+  });
 
   if (outcome.kind === 'unreachable') {
     return { kind: 'unreachable' };

@@ -94,6 +94,37 @@ describe('graphWalkStrategy', () => {
     expect(outcome.missing).toEqual(['cipher:create-v1']);
   });
 
+  it('decorates the pathDecision with the supplied refName', () => {
+    const headHash = 'sha256:cipher-head';
+    const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
+
+    const outcome = graphWalkStrategy({
+      aggregateTargetId: 'postgres',
+      member: makeMember([pkg], headHash),
+      currentMarker: null,
+      refName: 'prod',
+    });
+
+    expect(outcome.kind).toBe('ok');
+    if (outcome.kind !== 'ok') return;
+    expect(outcome.result.pathDecision?.refName).toBe('prod');
+  });
+
+  it('omits pathDecision.refName when no refName is supplied', () => {
+    const headHash = 'sha256:cipher-head';
+    const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
+
+    const outcome = graphWalkStrategy({
+      aggregateTargetId: 'postgres',
+      member: makeMember([pkg], headHash),
+      currentMarker: null,
+    });
+
+    expect(outcome.kind).toBe('ok');
+    if (outcome.kind !== 'ok') return;
+    expect(outcome.result.pathDecision?.refName).toBeUndefined();
+  });
+
   it('returns ok with empty pathOps when the marker is already at the head ref', () => {
     const headHash = 'sha256:cipher-head';
     const pkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
