@@ -22,7 +22,7 @@ import {
   type ColumnSpec,
   column,
 } from '@prisma-next/framework-components/codec';
-import { runtimeError } from '@prisma-next/framework-components/runtime';
+import { isRuntimeError, runtimeError } from '@prisma-next/framework-components/runtime';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { ArkErrors, ark, type Type, type } from 'arktype';
 
@@ -79,12 +79,40 @@ function serializeToJsonSafe<TInferred>(value: TInferred): { wire: string; json:
   return { wire, json };
 }
 
-function parseWireValue(wire: string | JsonValue): JsonValue {
-  if (typeof wire !== 'string') return wire;
+function parseJsonText(wire: string): JsonValue | undefined {
   try {
     return JSON.parse(wire) as JsonValue;
   } catch {
-    return wire;
+    return undefined;
+  }
+}
+
+function isJsonStringText(wire: string): boolean {
+  return wire.length >= 2 && wire[0] === '"' && wire[wire.length - 1] === '"';
+}
+
+function decodeWireValue<TInferred>(
+  schema: ArktypeSchemaLike,
+  wire: string | JsonValue,
+): TInferred {
+  if (typeof wire !== 'string') return validateSchema<TInferred>(schema, wire);
+
+  const parsedStringText = isJsonStringText(wire) ? parseJsonText(wire) : undefined;
+  if (parsedStringText !== undefined) {
+    return validateSchema<TInferred>(schema, parsedStringText);
+  }
+
+  try {
+    return validateSchema<TInferred>(schema, wire);
+  } catch (error) {
+    if (!isRuntimeError(error) || error.code !== 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED') {
+      throw error;
+    }
+    const parsed = parseJsonText(wire);
+    if (parsed === undefined) {
+      throw error;
+    }
+    return validateSchema<TInferred>(schema, parsed);
   }
 }
 
@@ -135,7 +163,7 @@ export class ArktypeJsonCodecClass<TInferred> extends CodecImpl<
   }
 
   async decode(wire: string | JsonValue, _ctx: CodecCallContext): Promise<TInferred> {
-    return validateSchema<TInferred>(this.schema, parseWireValue(wire));
+    return decodeWireValue<TInferred>(this.schema, wire);
   }
 
   encodeJson(value: TInferred): JsonValue {

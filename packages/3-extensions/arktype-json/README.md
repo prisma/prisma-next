@@ -10,7 +10,7 @@ Given an arktype `Type`, `arktypeJson(schema)` produces a column descriptor that
 - Eagerly serializes `schema.expression` (TypeScript-source-like rendering) and `schema.json` (arktype's internal IR) into `typeParams`. The IR is the lossless rehydration source; the expression is the emit-path renderer's input.
 - At runtime, the framework's unified codec descriptor map rehydrates the schema via `ark.schema(typeParams.jsonIr)` and returns a `Codec` whose `decode` validates wire payloads via the rehydrated schema. Validation failures throw `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED`.
 - `encode` is schema-independent and only checks JSON representability; validation runs on `decode` and `decodeJson`.
-- The no-emit resolver and emitter render the column's TS type as the schema's `expression` (e.g. `{ name: string; price: number }`).
+- The emitted `contract.d.ts` renders the column's TS type as the schema's `expression` (e.g. `{ name: string; price: number }`). No-emit contracts currently fall back to the base codec output type (`unknown`).
 
 ## Why a per-library extension
 
@@ -31,14 +31,13 @@ const contract = defineContract({ /* ... */ }, ({ field, model }) => ({
       fields: {
         id: field.id.uuidv4(),
         spec: field.column(arktypeJson(ProductSchema)),
-        //                  ^? Type<{ name: string; price: number; description?: string }>
       },
     }).sql({ table: 'product' }),
   },
 }));
 ```
 
-In the no-emit type path and the emitted `contract.d.ts`, `Product.spec` resolves to `{ name: string; price: number; description?: string }` — the schema's expression renders directly into the field type.
+After emit, `Product.spec` in `contract.d.ts` resolves to `{ name: string; price: number; description?: string }` because the schema's expression renders directly into the field type. In the no-emit TypeScript path, the column still carries `typeParams` and runtime validation, but `FieldOutputType` currently falls back to `CodecTypes['arktype/json@1']['output']` (`unknown`), so use emitted contracts when user-facing field types must preserve the arktype schema shape.
 
 ## Pack registration
 

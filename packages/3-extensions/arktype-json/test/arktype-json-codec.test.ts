@@ -151,6 +151,14 @@ describe('arktypeJsonColumn encode/encodeJson agreement', () => {
     expect(await codec.decode('alice', CALL_CTX)).toBe('alice');
   });
 
+  it('decode preserves pre-parsed JSON-looking string primitives', async () => {
+    const stringSchema = type('string');
+    const codec = arktypeJsonColumn(stringSchema).codecFactory(SYNTH_CTX);
+    for (const value of ['42', 'true', 'null', '{"x":1}']) {
+      expect(await codec.decode(value, CALL_CTX)).toBe(value);
+    }
+  });
+
   it('decode parses raw JSON text for string-schema columns', async () => {
     const stringSchema = type('string');
     const codec = arktypeJsonColumn(stringSchema).codecFactory(SYNTH_CTX);
