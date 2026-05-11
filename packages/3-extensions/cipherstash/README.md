@@ -50,7 +50,6 @@ export default defineConfig({
 
 ### PSL
 
-<<<<<<< HEAD
 ```prisma
 model User {
   id    Int @id @default(autoincrement())
@@ -101,6 +100,19 @@ After `prisma-next migrate plan`, the user's repo gains:
 - `migrations/cipherstash/<name>/` migration directories.
 
 `db apply` then runs CipherStash's migrations against the live database in the same transaction as any application-space migration emitted in the same `migrate` invocation.
+
+## Authoring (maintainers)
+
+The extension's contract + baseline migration are emitted on-disk inside this package using the same pipeline application authors use:
+
+- `pnpm build:contract-space` — runs `prisma-next contract emit` to produce `<package>/contract.{json,d.ts}` from the TS source at `src/contract-source.ts`.
+- `pnpm exec prisma-next migration plan --name <slug>` (run from this package directory) — scaffolds a new migration directory under `migrations/cipherstash/<dirName>/`. **Not chained into `pnpm build`**: `migration plan` is non-idempotent (each invocation generates a new timestamped directory), so it runs manually when the contract source changes — same convention application authors follow. The baseline migration's `migration.ts` is then hand-edited so that its `operations` getter installs the EQL bundle byte-for-byte plus the structural `cipherstash:*` no-op ops that register invariantIds for typed objects the bundle creates (see the comment in `migrations/cipherstash/20260601T0000_install_eql_bundle/migration.ts`).
+- `pnpm tsx migrations/cipherstash/<dirName>/migration.ts` (run from this package directory) — re-emits `ops.json` + `migration.json` from the hand-edited subclass. Use `tsx`, not bare `node`, because the Migration subclass imports relative TypeScript siblings (`../../../src/core/constants`, `../../../src/core/eql-bundle`) which Node's native loader can't resolve without a TS-aware loader.
+- `refs/head.json` is hand-pinned with the latest migration's `to` hash + `providedInvariants`.
+
+The descriptor at `src/exports/control.ts` then JSON-imports those artefacts and synthesises the framework's `MigrationPackage` shape (with `dirPath` resolved from `import.meta.url`).
+
+See [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md) ("On-disk-in-package authoring convention") for the full rationale and [`packages/3-extensions/test-contract-space`](../test-contract-space) for the reference model.
 
 ## Runtime usage
 
