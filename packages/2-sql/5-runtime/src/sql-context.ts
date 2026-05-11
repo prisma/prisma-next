@@ -477,10 +477,6 @@ function buildContractCodecRegistry(
     for (const columnName of Object.keys(table.columns)) {
       const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
       if (!ref) continue;
-      const descriptor = codecDescriptors.descriptorFor(ref.codecId);
-      if (!descriptor) continue;
-      if (descriptor.isParameterized && ref.typeParams === undefined) continue;
-      if (!descriptor.isParameterized && ref.typeParams !== undefined) continue;
       resolver.forCodecRef(ref);
     }
   }
@@ -488,12 +484,7 @@ function buildContractCodecRegistry(
   const registry: ContractCodecRegistry = {
     forColumn(table, column) {
       const ref = codecDescriptors.codecRefForColumn(table, column);
-      if (!ref) return undefined;
-      const descriptor = codecDescriptors.descriptorFor(ref.codecId);
-      if (!descriptor) return undefined;
-      if (descriptor.isParameterized && ref.typeParams === undefined) return undefined;
-      if (!descriptor.isParameterized && ref.typeParams !== undefined) return undefined;
-      return resolver.forCodecRef(ref);
+      return ref ? resolver.forCodecRef(ref) : undefined;
     },
     forCodecRef(ref) {
       return resolver.forCodecRef(ref);
