@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AndExpr,
   BinaryExpr,
+  type CodecRef,
   ColumnRef,
   ParamRef,
   ProjectionItem,
@@ -10,32 +11,31 @@ import {
 } from '../../src/exports/ast';
 import { shiftParamRef } from './test-helpers';
 
-const userEmailRefs = { table: 'user', column: 'email' } as const;
+const userEmailCodec: CodecRef = {
+  codecId: 'sql/varchar@1',
+  typeParams: { length: 320 },
+};
 
 function selectWithEmailFilter(ref: ParamRef): SelectAst {
   return SelectAst.from(TableSource.named('user'))
-    .withProjection([
-      ProjectionItem.of('email', ColumnRef.of('user', 'email'), 'sql/varchar@1', userEmailRefs),
-    ])
+    .withProjection([ProjectionItem.of('email', ColumnRef.of('user', 'email'), userEmailCodec)])
     .withWhere(AndExpr.of([BinaryExpr.eq(ColumnRef.of('user', 'email'), ref)]));
 }
 
-describe('ParamRef refs — AST rewriter propagation', () => {
-  it('ParamRef.rewrite with no paramRef rewriter returns the same instance (refs preserved)', () => {
+describe('ParamRef codec — AST rewriter propagation', () => {
+  it('ParamRef.rewrite with no paramRef rewriter returns the same instance (codec preserved)', () => {
     const original = ParamRef.of('a@b.com', {
       name: 'p1',
-      codecId: 'sql/varchar@1',
-      refs: userEmailRefs,
+      codec: userEmailCodec,
     });
     const rewritten = original.rewrite({});
     expect(rewritten).toBe(original);
   });
 
-  it('SelectAst.rewrite with an identity paramRef rewriter preserves refs on every ParamRef', () => {
+  it('SelectAst.rewrite with an identity paramRef rewriter preserves codec on every ParamRef', () => {
     const ref = ParamRef.of('a@b.com', {
       name: 'p1',
-      codecId: 'sql/varchar@1',
-      refs: userEmailRefs,
+      codec: userEmailCodec,
     });
     const ast = selectWithEmailFilter(ref);
 
@@ -44,15 +44,14 @@ describe('ParamRef refs — AST rewriter propagation', () => {
     const rewrittenWhere = rewritten.where as AndExpr;
     const eq = rewrittenWhere.exprs[0] as BinaryExpr;
     const right = eq.right as ParamRef;
-    expect(right.refs).toEqual(userEmailRefs);
-    expect(right.codecId).toBe('sql/varchar@1');
+    expect(right.codec).toEqual(userEmailCodec);
   });
 
-  it('SelectAst.rewrite with a non-identity paramRef rewriter that propagates refs preserves them', () => {
+  it('SelectAst.rewrite with a non-identity paramRef rewriter that propagates codec preserves it', () => {
+    const ageCodec: CodecRef = { codecId: 'sql/int@1' };
     const ref = ParamRef.of(7, {
       name: 'p1',
-      codecId: 'sql/int@1',
-      refs: { table: 'user', column: 'age' },
+      codec: ageCodec,
     });
     const ast = SelectAst.from(TableSource.named('user'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
@@ -64,14 +63,13 @@ describe('ParamRef refs — AST rewriter propagation', () => {
     const eq = where.exprs[0] as BinaryExpr;
     const right = eq.right as ParamRef;
     expect(right.value).toBe(17);
-    expect(right.refs).toEqual({ table: 'user', column: 'age' });
+    expect(right.codec).toEqual(ageCodec);
   });
 
-  it('SelectAst.rewrite preserves ProjectionItem refs through rewriteProjectionItem', () => {
+  it('SelectAst.rewrite preserves ProjectionItem codec through rewriteProjectionItem', () => {
     const ref = ParamRef.of('a@b.com', {
       name: 'p1',
-      codecId: 'sql/varchar@1',
-      refs: userEmailRefs,
+      codec: userEmailCodec,
     });
     const ast = selectWithEmailFilter(ref);
 
@@ -80,19 +78,15 @@ describe('ParamRef refs — AST rewriter propagation', () => {
     });
 
     const projection = rewritten.projection[0];
-    expect(projection?.refs).toEqual(userEmailRefs);
-    expect(projection?.codecId).toBe('sql/varchar@1');
+    expect(projection?.codec).toEqual(userEmailCodec);
   });
 
-  it('ProjectionItem.withCodecId preserves refs', () => {
-    const item = ProjectionItem.of(
-      'email',
-      ColumnRef.of('user', 'email'),
-      'sql/varchar@1',
-      userEmailRefs,
-    );
-    const updated = item.withCodecId('sql/varchar@2');
-    expect(updated.codecId).toBe('sql/varchar@2');
-    expect(updated.refs).toEqual(userEmailRefs);
+  it('ProjectionItem.withCodec replaces the stamped CodecRef', () => {
+    const item = ProjectionItem.of('email', ColumnRef.of('user', 'email'), userEmailCodec);
+    const replacement: CodecRef = { codecId: 'sql/varchar@1', typeParams: { length: 64 } };
+    const updated = item.withCodec(replacement);
+    expect(updated.codec).toEqual(replacement);
+    expect(updated.alias).toBe(item.alias);
+    expect(updated.expr).toBe(item.expr);
   });
 });

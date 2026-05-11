@@ -24,16 +24,10 @@ describe('static context (no runtime)', () => {
     expect(ast.limit).toBe(1);
     expect(ast.projection).toHaveLength(2);
     expect(ast.projection[0]).toEqual(
-      ProjectionItem.of('id', IdentifierRef.of('id'), 'sql/char@1', {
-        table: 'user',
-        column: 'id',
-      }),
+      ProjectionItem.of('id', IdentifierRef.of('id'), { codecId: 'sql/char@1' }),
     );
     expect(ast.projection[1]).toEqual(
-      ProjectionItem.of('email', IdentifierRef.of('email'), 'pg/text@1', {
-        table: 'user',
-        column: 'email',
-      }),
+      ProjectionItem.of('email', IdentifierRef.of('email'), { codecId: 'pg/text@1' }),
     );
   });
 

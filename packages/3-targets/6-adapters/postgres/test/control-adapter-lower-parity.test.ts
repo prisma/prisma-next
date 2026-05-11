@@ -73,11 +73,11 @@ describe('PostgresControlAdapter.lower / PostgresAdapterImpl.lower parity', () =
     const ast = InsertAst.into(TableSource.named('user'))
       .withRows([
         {
-          id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
-          email: ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
+          id: ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
+          email: ParamRef.of('a@example.com', { name: 'email', codec: { codecId: 'pg/text@1' } }),
         },
         {
-          id: ParamRef.of(2, { name: 'id2', codecId: 'pg/int4@1' }),
+          id: ParamRef.of(2, { name: 'id2', codec: { codecId: 'pg/int4@1' } }),
           email: new DefaultValueExpr(),
         },
       ])
@@ -92,11 +92,13 @@ describe('PostgresControlAdapter.lower / PostgresAdapterImpl.lower parity', () =
 
   it('matches on UPDATE with parameterized WHERE', () => {
     const ast = UpdateAst.table(TableSource.named('user'))
-      .withSet({ email: ParamRef.of('b@example.com', { name: 'email', codecId: 'pg/text@1' }) })
+      .withSet({
+        email: ParamRef.of('b@example.com', { name: 'email', codec: { codecId: 'pg/text@1' } }),
+      })
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'id'),
-          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
         ),
       )
       .withReturning([ProjectionItem.of('email', ColumnRef.of('user', 'email'))]);
@@ -108,7 +110,7 @@ describe('PostgresControlAdapter.lower / PostgresAdapterImpl.lower parity', () =
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'id'),
-          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
         ),
       )
       .withReturning([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]);
@@ -121,7 +123,7 @@ describe('PostgresControlAdapter.lower / PostgresAdapterImpl.lower parity', () =
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'profile'),
-          ParamRef.of({ active: true }, { name: 'profile', codecId: 'pg/jsonb@1' }),
+          ParamRef.of({ active: true }, { name: 'profile', codec: { codecId: 'pg/jsonb@1' } }),
         ),
       );
     const jsonAst = SelectAst.from(TableSource.named('user'))
@@ -129,7 +131,7 @@ describe('PostgresControlAdapter.lower / PostgresAdapterImpl.lower parity', () =
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'settings'),
-          ParamRef.of({ darkMode: true }, { name: 'settings', codecId: 'pg/json@1' }),
+          ParamRef.of({ darkMode: true }, { name: 'settings', codec: { codecId: 'pg/json@1' } }),
         ),
       );
     expectParity(jsonbAst);

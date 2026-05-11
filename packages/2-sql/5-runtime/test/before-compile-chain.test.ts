@@ -213,7 +213,10 @@ describe('runBeforeCompileChain', () => {
     async () => {
       const draft = createDraft();
       const ctx = createContext();
-      const introducedParam = ParamRef.of(1, { name: 'mw_user_id', codecId: 'pg/int4@1' });
+      const introducedParam = ParamRef.of(1, {
+        name: 'mw_user_id',
+        codec: { codecId: 'pg/int4@1' },
+      });
       const idEqOne = BinaryExpr.eq(ColumnRef.of('users', 'id'), introducedParam);
       const mw: SqlMiddleware = {
         name: 'onlyAlice',
@@ -236,8 +239,8 @@ describe('runBeforeCompileChain', () => {
     async () => {
       const draft = createDraft();
       const ctx = createContext();
-      const gteRef = ParamRef.of(2, { name: 'mw_gte', codecId: 'pg/int4@1' });
-      const lteRef = ParamRef.of(3, { name: 'mw_lte', codecId: 'pg/int4@1' });
+      const gteRef = ParamRef.of(2, { name: 'mw_gte', codec: { codecId: 'pg/int4@1' } });
+      const lteRef = ParamRef.of(3, { name: 'mw_lte', codec: { codecId: 'pg/int4@1' } });
       const gte2 = BinaryExpr.gte(ColumnRef.of('users', 'id'), gteRef);
       const lte3 = BinaryExpr.lte(ColumnRef.of('users', 'id'), lteRef);
       const lower: SqlMiddleware = {
@@ -301,7 +304,7 @@ describe('runBeforeCompileChain', () => {
       const ctx = createContext();
       const pred = BinaryExpr.eq(
         ColumnRef.of('users', 'id'),
-        ParamRef.of(7, { codecId: 'pg/int4@1' }),
+        ParamRef.of(7, { codec: { codecId: 'pg/int4@1' } }),
       );
       const mw: SqlMiddleware = {
         name: 'add-where',
@@ -352,7 +355,7 @@ describe('runBeforeCompileChain', () => {
       ];
 
       const initialAst = SelectAst.from(TableSource.named('users')).withProjection([
-        ProjectionItem.of('id', ColumnRef.of('users', 'id'), 'pg/int4@1'),
+        ProjectionItem.of('id', ColumnRef.of('users', 'id'), { codecId: 'pg/int4@1' }),
       ]);
       const initial: DraftPlan = { ast: initialAst, meta };
       const ctx = createContext();
@@ -363,7 +366,7 @@ describe('runBeforeCompileChain', () => {
         async beforeCompile(d) {
           if (d.ast.kind !== 'select') return;
           const renamed = d.ast.projection.map((item) =>
-            ProjectionItem.of('user_id', item.expr, item.codecId),
+            ProjectionItem.of('user_id', item.expr, item.codec),
           );
           return { ...d, ast: d.ast.withProjection(renamed) };
         },
@@ -374,7 +377,7 @@ describe('runBeforeCompileChain', () => {
       expect(result.ast.kind).toBe('select');
       const select = result.ast as SelectAst;
       expect(select.projection.map((p) => p.alias)).toEqual(['user_id']);
-      expect(select.projection[0]?.codecId).toBe('pg/int4@1');
+      expect(select.projection[0]?.codec?.codecId).toBe('pg/int4@1');
 
       const { decodeRow } = await import('../src/codecs/decoding');
       const plan: SqlExecutionPlan = {
@@ -409,8 +412,10 @@ describe('runBeforeCompileChain', () => {
       ];
 
       const insert = InsertAst.into(TableSource.named('users'))
-        .withRows([{ id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }) }])
-        .withReturning([ProjectionItem.of('id', ColumnRef.of('users', 'id'), 'pg/int4@1')]);
+        .withRows([{ id: ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }) }])
+        .withReturning([
+          ProjectionItem.of('id', ColumnRef.of('users', 'id'), { codecId: 'pg/int4@1' }),
+        ]);
 
       const { decodeRow } = await import('../src/codecs/decoding');
       const plan: SqlExecutionPlan = {

@@ -57,7 +57,7 @@ describe('makeAliasResolver', () => {
 
   it('records the target table for mutation ASTs (DELETE)', () => {
     const ast = DeleteAst.from(TableSource.named('post', 'p1')).withWhere(
-      BinaryExpr.eq(ColumnRef.of('p1', 'id'), ParamRef.of(1, { codecId: 'pg/int4@1' })),
+      BinaryExpr.eq(ColumnRef.of('p1', 'id'), ParamRef.of(1, { codec: { codecId: 'pg/int4@1' } })),
     );
     const resolver = makeAliasResolver(ast);
     expect(resolver('p1')).toBe('post');

@@ -190,7 +190,7 @@ function projectingExecutionPlan(
   codecId: string,
 ): SqlExecutionPlan {
   const ast = SelectAst.from(TableSource.named(table)).withProjection([
-    ProjectionItem.of(alias, ColumnRef.of(table, column), codecId),
+    ProjectionItem.of(alias, ColumnRef.of(table, column), { codecId }),
   ]);
   return {
     sql: 'select 1',

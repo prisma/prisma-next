@@ -1,5 +1,12 @@
 import type { CodecControlHooks, ExpandNativeTypeInput } from '@prisma-next/family-sql/control';
-import { buildOperation, refsOf, toExpr } from '@prisma-next/sql-relational-core/expression';
+import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
+import {
+  buildOperation,
+  type CodecExpression,
+  type Expression,
+  type TraitExpression,
+  toExpr,
+} from '@prisma-next/sql-relational-core/expression';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
@@ -32,7 +39,6 @@ import {
   SQL_VARCHAR_CODEC_ID,
 } from '@prisma-next/target-postgres/codec-ids';
 import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
-import type { QueryOperationTypes } from '../types/operation-types';
 import { pgEnumControlHooks } from './enum-control-hooks';
 
 // ============================================================================ Helper functions for reducing boilerplate ============================================================================
@@ -128,21 +134,26 @@ const identityHooks: CodecControlHooks = { expandNativeType: ({ nativeType }) =>
 
 type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
 
-export function postgresQueryOperations<CT extends CodecTypesBase>(): QueryOperationTypes<CT> {
-  return {
-    ilike: {
+export function postgresQueryOperations<
+  CT extends CodecTypesBase,
+>(): readonly SqlOperationDescriptor[] {
+  return [
+    {
+      method: 'ilike',
       self: { traits: ['textual'] },
-      impl: (self, pattern) => {
-        const selfRefs = refsOf(self);
+      impl: (
+        self: TraitExpression<readonly ['textual'], false, CT>,
+        pattern: CodecExpression<'pg/text@1', false, CT>,
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
         return buildOperation({
           method: 'ilike',
-          args: [toExpr(self), toExpr(pattern, PG_TEXT_CODEC_ID, selfRefs)],
+          args: [toExpr(self), toExpr(pattern, { codecId: PG_TEXT_CODEC_ID })],
           returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
           lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} ILIKE {{arg0}}' },
         });
       },
     },
-  };
+  ];
 }
 
 export const postgresAdapterDescriptorMeta = {

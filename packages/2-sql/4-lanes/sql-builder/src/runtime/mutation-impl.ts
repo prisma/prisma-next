@@ -24,6 +24,7 @@ import {
   BuilderBase,
   type BuilderContext,
   buildQueryPlan,
+  codecRefFor,
   combineWhereExprs,
 } from './builder-base';
 import { createFieldProxy } from './field-proxy';
@@ -41,19 +42,13 @@ function buildParamValues(
   const params: Record<string, ParamRef> = {};
   for (const [col, value] of Object.entries(values)) {
     const column = table.columns[col];
-    params[col] = ParamRef.of(
-      value,
-      column ? { codecId: column.codecId, refs: { table: tableName, column: col } } : undefined,
-    );
+    const codec = column ? codecRefFor(ctx, tableName, col) : undefined;
+    params[col] = ParamRef.of(value, codec ? { codec } : undefined);
   }
   for (const def of ctx.applyMutationDefaults({ op, table: tableName, values })) {
     const column = table.columns[def.column];
-    params[def.column] = ParamRef.of(
-      def.value,
-      column
-        ? { codecId: column.codecId, refs: { table: tableName, column: def.column } }
-        : undefined,
-    );
+    const codec = column ? codecRefFor(ctx, tableName, def.column) : undefined;
+    params[def.column] = ParamRef.of(def.value, codec ? { codec } : undefined);
   }
   return params;
 }
@@ -64,7 +59,7 @@ function buildReturningProjections(
   rowFields: Record<string, ScopeField>,
 ): ProjectionItem[] {
   return columns.map((col) =>
-    ProjectionItem.of(col, ColumnRef.of(tableName, col), rowFields[col]?.codecId),
+    ProjectionItem.of(col, ColumnRef.of(tableName, col), rowFields[col]?.codec),
   );
 }
 

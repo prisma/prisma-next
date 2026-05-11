@@ -29,14 +29,14 @@ describe('SQL ORM rich AST query plans', () => {
       .where(() =>
         BinaryExpr.eq(
           ColumnRef.of('users', 'name'),
-          ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+          ParamRef.of('Alice', { name: 'name', codec: { codecId: 'pg/text@1' } }),
         ),
       )
       .include('posts', (posts) =>
         posts.where(() =>
           BinaryExpr.gte(
             ColumnRef.of('posts', 'views'),
-            ParamRef.of(100, { name: 'views', codecId: 'pg/int4@1' }),
+            ParamRef.of(100, { name: 'views', codec: { codecId: 'pg/int4@1' } }),
           ),
         ),
       )

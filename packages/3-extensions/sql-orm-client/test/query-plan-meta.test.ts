@@ -44,8 +44,8 @@ describe('query plan meta', () => {
   it('produces a plan whose meta carries no execution-metadata sidecars', () => {
     const ast = SelectAst.from(TableSource.named('users'))
       .withProjection([
-        ProjectionItem.of('id', ColumnRef.of('users', 'id'), 'pg/int4@1'),
-        ProjectionItem.of('email', ColumnRef.of('users', 'email'), 'pg/text@1'),
+        ProjectionItem.of('id', ColumnRef.of('users', 'id'), { codecId: 'pg/int4@1' }),
+        ProjectionItem.of('email', ColumnRef.of('users', 'email'), { codecId: 'pg/text@1' }),
       ])
       .withLimit(5);
 
@@ -60,15 +60,15 @@ describe('query plan meta', () => {
 
   it('codecIds for projections live on ProjectionItem, not the meta', () => {
     const ast = SelectAst.from(TableSource.named('users')).withProjection([
-      ProjectionItem.of('id', ColumnRef.of('users', 'id'), 'pg/int4@1'),
-      ProjectionItem.of('email', ColumnRef.of('users', 'email'), 'pg/text@1'),
+      ProjectionItem.of('id', ColumnRef.of('users', 'id'), { codecId: 'pg/int4@1' }),
+      ProjectionItem.of('email', ColumnRef.of('users', 'email'), { codecId: 'pg/text@1' }),
     ]);
 
     const plan = buildOrmQueryPlan(baseContract, ast, []);
 
     expect(plan.ast.kind).toBe('select');
     if (plan.ast.kind !== 'select') return;
-    expect(plan.ast.projection.map((item) => [item.alias, item.codecId])).toEqual([
+    expect(plan.ast.projection.map((item) => [item.alias, item.codec?.codecId])).toEqual([
       ['id', 'pg/int4@1'],
       ['email', 'pg/text@1'],
     ]);

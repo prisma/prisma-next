@@ -519,7 +519,7 @@ function renderParamRef(ref: ParamRef, pim: ParamIndexMap): string {
   if (index === undefined) {
     throw new Error('ParamRef not found in index map');
   }
-  return renderTypedParam(index, ref.codecId, pim.codecLookup);
+  return renderTypedParam(index, ref.codec?.codecId, pim.codecLookup);
 }
 
 function renderLiteral(expr: LiteralExpr): string {

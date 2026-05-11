@@ -55,7 +55,7 @@ describe('Collection', () => {
             toWhereExpr: () =>
               BinaryExpr.eq(
                 ColumnRef.of('users', 'name'),
-                ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+                ParamRef.of('Alice', { name: 'name', codec: { codecId: 'pg/text@1' } }),
               ),
           }) satisfies ToWhereExpr,
       );
@@ -63,20 +63,20 @@ describe('Collection', () => {
       expect(filtered.state.filters).toEqual([
         BinaryExpr.eq(
           ColumnRef.of('users', 'name'),
-          ParamRef.of('Alice', { name: 'name', codecId: 'pg/text@1' }),
+          ParamRef.of('Alice', { name: 'name', codec: { codecId: 'pg/text@1' } }),
         ),
       ]);
 
       const bare = collection.where((_user) =>
         BinaryExpr.eq(
           ColumnRef.of('users', 'id'),
-          ParamRef.of(7, { name: 'id', codecId: 'pg/int4@1' }),
+          ParamRef.of(7, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
         ),
       );
       expect(bare.state.filters).toEqual([
         BinaryExpr.eq(
           ColumnRef.of('users', 'id'),
-          ParamRef.of(7, { name: 'id', codecId: 'pg/int4@1' }),
+          ParamRef.of(7, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
         ),
       ]);
     });
@@ -132,7 +132,7 @@ describe('Collection', () => {
       const opExpr = new OperationExpr({
         method: 'cosineDistance',
         self: ColumnRef.of('posts', 'embedding'),
-        args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+        args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codec: { codecId: 'pg/vector@1' } })],
         returns: { codecId: 'builtin/float8', nullable: false },
         lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
       });
@@ -147,7 +147,7 @@ describe('Collection', () => {
       const opExpr = new OperationExpr({
         method: 'cosineDistance',
         self: ColumnRef.of('posts', 'embedding'),
-        args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+        args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codec: { codecId: 'pg/vector@1' } })],
         returns: { codecId: 'builtin/float8', nullable: false },
         lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
       });

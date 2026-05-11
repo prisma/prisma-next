@@ -45,14 +45,14 @@ describe('ast/delete', () => {
   it('rewrite descends into returning ProjectionItem.expr', () => {
     const deleteAst = DeleteAst.from(table('user'))
       .withWhere(BinaryExpr.eq(col('user', 'id'), param(0, 'userId')))
-      .withReturning([ProjectionItem.of('id', col('user', 'id'), 'pg/int4@1')]);
+      .withReturning([ProjectionItem.of('id', col('user', 'id'), { codecId: 'pg/int4@1' })]);
 
     const rewritten = deleteAst.rewrite({
       columnRef: (ref) => ColumnRef.of(ref.table, `${ref.column}_renamed`),
     });
 
     expect(rewritten.returning).toEqual([
-      ProjectionItem.of('id', ColumnRef.of('user', 'id_renamed'), 'pg/int4@1'),
+      ProjectionItem.of('id', ColumnRef.of('user', 'id_renamed'), { codecId: 'pg/int4@1' }),
     ]);
   });
 });

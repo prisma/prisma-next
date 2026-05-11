@@ -6,54 +6,45 @@ import {
 } from '@prisma-next/framework-components/runtime';
 import {
   type Codec,
+  type CodecRef,
   type ContractCodecRegistry,
   collectOrderedParamRefs,
-  type ParamRefBindingRefs,
   type SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { makeAliasResolver } from './alias-resolver';
 
 interface ParamMetadata {
-  readonly codecId: string | undefined;
+  readonly codec: CodecRef | undefined;
   readonly name: string | undefined;
-  readonly refs: ParamRefBindingRefs | undefined;
 }
 
 const NO_METADATA: ParamMetadata = Object.freeze({
-  codecId: undefined,
+  codec: undefined,
   name: undefined,
-  refs: undefined,
 });
 
 /**
  * Resolve the codec for an outgoing param.
  *
- * Column-aware dispatch: when `metadata.refs` is populated by a column-bound construction site, prefer `contractCodecs.forColumn(refs.table, refs.column)` — that returns the per-instance codec the contract walk materialized for the `(table, column)` pair, encoding the column's typeParams (e.g. `vector(1024)` vs. `vector(1536)`).
+ * AST-bound dispatch: when `metadata.codec` is populated by a column-bound construction site, resolve via `contractCodecs.forCodecRef(codec)` — that returns the per-instance codec materialized for the `(codecId, typeParams)` pair, encoding any per-instance state (e.g. `vector(1024)` vs. `vector(1536)`). Content-keyed memoisation inside the registry collapses repeated lookups for the same logical column.
  *
- * On a column-lookup miss the resolver falls through to `forCodecId`. The wrong-instance risk for parameterized codecs is closed off structurally:
+ * The `forCodecRef` path is the single dispatch shape for all codec-bearing AST nodes and closes off the wrong-instance risk structurally: each `CodecRef` carries both the `codecId` and the `typeParams` the column declared, so parameterized codec ids always resolve to the right per-instance codec.
  *
- * 1. `buildContractCodecRegistry` pre-populates `byCodecId` with one canonical instance per non-parameterized descriptor; parameterized descriptors are intentionally absent from this pre-population. 2. `forCodecId` rejects ambiguous parameterized fallbacks (`ambiguousCodecIds`) — if the contract walk resolved more than one distinct instance under a single parameterized id, the call throws rather than binding to
- * whichever landed first. 3. For the non-ambiguous parameterized case (a single column with that id), `byCodecId` stores the column-correct per-instance codec, so the fall-through still resolves to the right instance.
- *
- * Refs-less fallback: ParamRefs constructed outside a column-bound site (literals, transient builder state) carry a non-parameterized `codecId` whose dispatch is ambiguity-free. The validator pass (`validateParamRefRefs`) already enforced refs on every parameterized ParamRef before encode runs.
+ * // M3c: dead after AST shape change — delete: the forColumn + forCodecId legacy paths below are unreachable because every column-bound ParamRef now carries `codec`. They stay until M3c collapses the byColumn parallel surface.
  */
 function resolveParamCodec(
   metadata: ParamMetadata,
   contractCodecs: ContractCodecRegistry | undefined,
-  aliasResolver: (alias: string) => string,
+  _aliasResolver: (alias: string) => string,
 ): Codec | undefined {
-  if (!metadata.codecId) return undefined;
-  if (metadata.refs && contractCodecs) {
-    const byColumn = contractCodecs.forColumn(
-      aliasResolver(metadata.refs.table),
-      metadata.refs.column,
-    );
-    // Only honour `byColumn` when its codec id agrees with the `ParamRef`'s declared `codecId`. They can legitimately disagree when a heuristic (e.g. the ORM's `refsFromLeft`) lifts column refs out of an `OperationExpr` that changed the codec id — e.g. `cosineDistance(p.embedding, x).lt(1)` carries `refs={post,embedding}` (a vector column) but the comparison side's codec is `pg/float8@1`. Trusting `byColumn` blindly would dispatch the float
-    // literal through the vector codec.
-    if (byColumn && byColumn.id === metadata.codecId) return byColumn;
+  if (metadata.codec && contractCodecs) {
+    return contractCodecs.forCodecRef(metadata.codec);
   }
-  return contractCodecs?.forCodecId(metadata.codecId);
+  // M3c: dead after AST shape change — delete: codec-id-only fallback
+  const codecId = metadata.codec?.codecId;
+  if (!codecId) return undefined;
+  return contractCodecs?.forCodecId(codecId);
 }
 
 function paramLabel(metadata: ParamMetadata, paramIndex: number): string {
@@ -85,9 +76,8 @@ function wrapEncodeFailure(
 export async function encodeParam(
   value: unknown,
   paramRef: {
-    readonly codecId?: string;
+    readonly codec?: CodecRef;
     readonly name?: string;
-    readonly refs?: ParamRefBindingRefs;
   },
   paramIndex: number,
   ctx: SqlCodecCallContext,
@@ -95,7 +85,7 @@ export async function encodeParam(
 ): Promise<unknown> {
   return encodeParamValue(
     value,
-    { codecId: paramRef.codecId, name: paramRef.name, refs: paramRef.refs },
+    { codec: paramRef.codec, name: paramRef.name },
     paramIndex,
     ctx,
     contractCodecs,
@@ -164,7 +154,7 @@ export async function encodeParams(
     for (let i = 0; i < paramCount && i < refs.length; i++) {
       const ref = refs[i];
       if (ref) {
-        metadata[i] = { codecId: ref.codecId, name: ref.name, refs: ref.refs };
+        metadata[i] = { codec: ref.codec, name: ref.name };
       }
     }
   }

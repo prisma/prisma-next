@@ -5,6 +5,7 @@ import {
   AndExpr,
   type AnyExpression,
   BinaryExpr,
+  type CodecRef,
   ColumnRef,
   NotExpr,
   NullCheckExpr,
@@ -13,6 +14,7 @@ import {
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan, deriveParamsFromAst } from './query-plan-meta';
 import type { AggregateSelector } from './types';
@@ -22,11 +24,11 @@ function toAggregateProjection(
   contract: Contract<SqlStorage>,
   tableName: string,
   selector: AggregateSelector<unknown>,
-): { expr: AggregateExpr; codecId: string | undefined } {
+): { expr: AggregateExpr; codec: CodecRef | undefined } {
   if (selector.fn === 'count') {
     // count() returns a target-specific bigint; mapping isn't derivable here
-    // without target coupling, so we leave codecId unstamped.
-    return { expr: AggregateExpr.count(), codecId: undefined };
+    // without target coupling, so we leave the codec slot empty.
+    return { expr: AggregateExpr.count(), codec: undefined };
   }
 
   if (!selector.column) {
@@ -38,10 +40,10 @@ function toAggregateProjection(
   // sum widens (int4 → int8 in Postgres) and avg → numeric; both need
   // target+input-aware mapping that doesn't exist yet, so leave unstamped.
   if (selector.fn === 'min' || selector.fn === 'max') {
-    const codecId = contract.storage.tables[tableName]?.columns[selector.column]?.codecId;
-    return { expr, codecId };
+    const codec = codecRefForStorageColumn(contract.storage, tableName, selector.column);
+    return { expr, codec };
   }
-  return { expr, codecId: undefined };
+  return { expr, codec: undefined };
 }
 
 // ORM HAVING filters use literal binding (values inlined at plan-build time),
@@ -130,8 +132,8 @@ export function compileAggregate(
   }
 
   const projection: ProjectionItem[] = entries.map(([alias, selector]) => {
-    const { expr, codecId } = toAggregateProjection(contract, tableName, selector);
-    return ProjectionItem.of(alias, expr, codecId);
+    const { expr, codec } = toAggregateProjection(contract, tableName, selector);
+    return ProjectionItem.of(alias, expr, codec);
   });
   let ast = SelectAst.from(TableSource.named(tableName)).withProjection(projection);
   const where = combineWhereExprs(filters);
@@ -160,14 +162,17 @@ export function compileGroupedAggregate(
     throw new Error('groupBy().aggregate() requires at least one aggregation selector');
   }
 
-  const table = contract.storage.tables[tableName];
   const projection: ProjectionItem[] = [
     ...groupByColumns.map((column) =>
-      ProjectionItem.of(column, ColumnRef.of(tableName, column), table?.columns[column]?.codecId),
+      ProjectionItem.of(
+        column,
+        ColumnRef.of(tableName, column),
+        codecRefForStorageColumn(contract.storage, tableName, column),
+      ),
     ),
     ...entries.map(([alias, selector]) => {
-      const { expr, codecId } = toAggregateProjection(contract, tableName, selector);
-      return ProjectionItem.of(alias, expr, codecId);
+      const { expr, codec } = toAggregateProjection(contract, tableName, selector);
+      return ProjectionItem.of(alias, expr, codec);
     }),
   ];
 

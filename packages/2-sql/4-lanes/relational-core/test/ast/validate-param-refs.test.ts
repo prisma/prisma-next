@@ -36,33 +36,32 @@ function selectWithWhere(...where: Parameters<typeof AndExpr.of>[0]): SelectAst 
 }
 
 describe('validateParamRefRefs', () => {
-  it('passes when refs are present on a parameterized-codec ParamRef', () => {
+  it('passes when typeParams are present on a parameterized-codec ParamRef', () => {
     const ref = ParamRef.of('a@b.com', {
       name: 'p1',
-      codecId: 'sql/varchar@1',
-      refs: { table: 'user', column: 'email' },
+      codec: { codecId: 'sql/varchar@1', typeParams: { length: 320 } },
     });
     const ast = selectWithWhere(BinaryExpr.eq(ColumnRef.of('user', 'email'), ref));
 
     expect(() => validateParamRefRefs(ast, registry)).not.toThrow();
   });
 
-  it('passes when codecId is a non-parameterized id and refs are absent', () => {
-    const ref = ParamRef.of(42, { name: 'p1', codecId: 'sql/int@1' });
+  it('passes when codec is a non-parameterized id without typeParams', () => {
+    const ref = ParamRef.of(42, { name: 'p1', codec: { codecId: 'sql/int@1' } });
     const ast = selectWithWhere(BinaryExpr.eq(ColumnRef.of('user', 'age'), ref));
 
     expect(() => validateParamRefRefs(ast, registry)).not.toThrow();
   });
 
-  it('passes when codecId is undefined (untyped ParamRef)', () => {
+  it('passes when codec is undefined (untyped ParamRef)', () => {
     const ref = ParamRef.of('whatever');
     const ast = selectWithWhere(BinaryExpr.eq(ColumnRef.of('user', 'name'), ref));
 
     expect(() => validateParamRefRefs(ast, registry)).not.toThrow();
   });
 
-  it('throws RUNTIME.PARAM_REF_REFS_REQUIRED when a parameterized-codec ParamRef lacks refs', () => {
-    const ref = ParamRef.of('hello', { name: 'p1', codecId: 'sql/varchar@1' });
+  it('throws RUNTIME.PARAM_REF_REFS_REQUIRED when a parameterized-codec ParamRef lacks typeParams', () => {
+    const ref = ParamRef.of('hello', { name: 'p1', codec: { codecId: 'sql/varchar@1' } });
     const ast = selectWithWhere(BinaryExpr.eq(ColumnRef.of('user', 'email'), ref));
 
     expect(() => validateParamRefRefs(ast, registry)).toThrowError(/sql\/varchar@1/);
@@ -83,20 +82,20 @@ describe('validateParamRefRefs', () => {
   });
 
   it("uses '<anonymous>' label when ParamRef has no name", () => {
-    const ref = ParamRef.of([1, 2], { codecId: 'pgvector/vector@1' });
+    const ref = ParamRef.of([1, 2], { codec: { codecId: 'pgvector/vector@1' } });
     const ast = selectWithWhere(BinaryExpr.eq(ColumnRef.of('post', 'embedding'), ref));
 
     expect(() => validateParamRefRefs(ast, registry)).toThrowError(/<anonymous>/);
   });
 
-  it('passes when codecId is unknown to the registry (descriptorFor returns undefined)', () => {
+  it('passes when codec id is unknown to the registry (descriptorFor returns undefined)', () => {
     const sparseRegistry: CodecDescriptorRegistry = {
       descriptorFor: () => undefined,
       codecRefForColumn: () => undefined,
       *values() {},
       byTargetType: () => Object.freeze([]),
     };
-    const ref = ParamRef.of('hello', { name: 'p1', codecId: 'unknown/codec@1' });
+    const ref = ParamRef.of('hello', { name: 'p1', codec: { codecId: 'unknown/codec@1' } });
     const ast = selectWithWhere(BinaryExpr.eq(ColumnRef.of('user', 'email'), ref));
 
     expect(() => validateParamRefRefs(ast, sparseRegistry)).not.toThrow();

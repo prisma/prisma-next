@@ -16,7 +16,7 @@ const TEST_HASH = coreHash('sha256:test');
 
 function buildPlan(): SqlExecutionPlan {
   const ast = SelectAst.from(TableSource.named('users')).withProjection([
-    ProjectionItem.of('value', ColumnRef.of('users', 'value'), 'test/passthrough@1'),
+    ProjectionItem.of('value', ColumnRef.of('users', 'value'), { codecId: 'test/passthrough@1' }),
   ]);
   return {
     sql: 'select value from users',

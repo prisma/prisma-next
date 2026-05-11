@@ -1,5 +1,6 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { StorageTable } from '@prisma-next/sql-contract/types';
+import type { CodecRef } from '@prisma-next/framework-components/codec';
+import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlOperationEntry } from '@prisma-next/sql-operations';
 import {
   AndExpr,
@@ -11,6 +12,7 @@ import {
   SelectAst,
   type TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   AppliedMutationDefault,
@@ -77,9 +79,25 @@ export interface BuilderContext {
   readonly queryOperationTypes: Readonly<Record<string, SqlOperationEntry>>;
   readonly target: string;
   readonly storageHash: string;
+  /**
+   * Contract storage carried by the builder context so column-bound `ParamRef` / `ProjectionItem` construction sites can derive a {@link CodecRef} for each `(table, column)` via {@link codecRefFor}. Builder paths that mint AST nodes without storage (rare — tests, ad-hoc lower paths) leave it undefined; the codec slot then stays `undefined` on the resulting nodes.
+   */
+  readonly storage: SqlStorage | undefined;
   readonly applyMutationDefaults: (
     options: MutationDefaultsOptions,
   ) => ReadonlyArray<AppliedMutationDefault>;
+}
+
+/**
+ * Derive the canonical {@link CodecRef} for a `(table, column)` from the builder context's storage. Returns `undefined` when the builder context has no storage attached or when the column is unknown to the contract.
+ */
+export function codecRefFor(
+  ctx: BuilderContext,
+  tableName: string,
+  columnName: string,
+): CodecRef | undefined {
+  if (!ctx.storage) return undefined;
+  return codecRefForStorageColumn(ctx.storage, tableName, columnName);
 }
 
 export function emptyState(from: TableSource, scope: Scope): BuilderState {
@@ -108,20 +126,6 @@ export function combineWhereExprs(exprs: readonly AstExpression[]): AstExpressio
   if (exprs.length === 0) return undefined;
   if (exprs.length === 1) return exprs[0];
   return AndExpr.of(exprs);
-}
-
-/**
- * Same uniqueness rule as the field-proxy's `findUniqueNamespaceFor`: when exactly one namespace owns a top-level field, the binding is unambiguous. Used by `select('col', ...)` to attach `refs` metadata to the resulting `ProjectionItem` while keeping the AST as `IdentifierRef` (so SQL renders unchanged).
- */
-function findUniqueNamespaceFor(scope: Scope, fieldName: string): string | undefined {
-  let found: string | undefined;
-  for (const [namespace, fields] of Object.entries(scope.namespaces)) {
-    if (Object.hasOwn(fields, fieldName)) {
-      if (found !== undefined) return undefined;
-      found = namespace;
-    }
-  }
-  return found;
 }
 
 export function buildSelectAst(state: BuilderState): SelectAst {
@@ -164,12 +168,23 @@ export function buildPlan<Row = unknown>(
   return buildQueryPlan<Row>(buildSelectAst(state), ctx);
 }
 
-export function tableToScope(name: string, table: StorageTable): Scope {
+export function tableToScope(
+  alias: string,
+  table: StorageTable,
+  options?: { readonly storage?: SqlStorage | undefined; readonly tableName?: string | undefined },
+): Scope {
+  const storage = options?.storage;
+  const lookupName = options?.tableName ?? alias;
   const fields: ScopeTable = {};
   for (const [colName, col] of Object.entries(table.columns)) {
-    fields[colName] = { codecId: col.codecId, nullable: col.nullable };
+    const codec = storage ? codecRefForStorageColumn(storage, lookupName, colName) : undefined;
+    fields[colName] = {
+      codecId: col.codecId,
+      nullable: col.nullable,
+      ...(codec !== undefined ? { codec } : {}),
+    };
   }
-  return { topLevel: { ...fields }, namespaces: { [name]: fields } };
+  return { topLevel: { ...fields }, namespaces: { [alias]: fields } };
 }
 
 export function mergeScopes<A extends Scope, B extends Scope>(a: A, b: B): MergeScopes<A, B> {
@@ -190,7 +205,11 @@ export function nullableScope<S extends Scope>(scope: S): NullableScope<S> {
   const mkNullable = (tbl: ScopeTable): ScopeTable => {
     const result: ScopeTable = {};
     for (const [k, v] of Object.entries(tbl)) {
-      result[k] = { codecId: v.codecId, nullable: true };
+      result[k] = {
+        codecId: v.codecId,
+        nullable: true,
+        ...(v.codec !== undefined ? { codec: v.codec } : {}),
+      };
     }
     return result;
   };
@@ -239,9 +258,7 @@ export function resolveSelectArgs(
     for (const colName of args as string[]) {
       const field = scope.topLevel[colName];
       if (!field) throw new Error(`Column "${colName}" not found in scope`);
-      const namespace = findUniqueNamespaceFor(scope, colName);
-      const refs = namespace ? { table: namespace, column: colName } : undefined;
-      projections.push(ProjectionItem.of(colName, IdentifierRef.of(colName), field.codecId, refs));
+      projections.push(ProjectionItem.of(colName, IdentifierRef.of(colName), field.codec));
       newRowFields[colName] = field;
     }
     return { projections, newRowFields };
@@ -256,7 +273,7 @@ export function resolveSelectArgs(
     const fns = createAggregateFunctions(ctx.queryOperationTypes);
     const result = exprFn(createFieldProxy(scope), fns);
     const field = result.returnType;
-    projections.push(ProjectionItem.of(alias, result.buildAst(), field.codecId));
+    projections.push(ProjectionItem.of(alias, result.buildAst(), field.codec));
     newRowFields[alias] = field;
     return { projections, newRowFields };
   }
@@ -270,7 +287,7 @@ export function resolveSelectArgs(
     const record = callbackFn(createFieldProxy(scope), fns);
     for (const [key, expr] of Object.entries(record)) {
       const field = expr.returnType;
-      projections.push(ProjectionItem.of(key, expr.buildAst(), field.codecId));
+      projections.push(ProjectionItem.of(key, expr.buildAst(), field.codec));
       newRowFields[key] = field;
     }
     return { projections, newRowFields };

@@ -21,6 +21,7 @@ import {
   SubqueryExpr,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import {
   type PolymorphismInfo,
@@ -49,9 +50,12 @@ function buildProjection(
       ? [...selectedFields]
       : resolveTableColumns(contract, tableName);
 
-  const table = contract.storage.tables[tableName];
   return columns.map((column) =>
-    ProjectionItem.of(column, ColumnRef.of(tableRef, column), table?.columns[column]?.codecId),
+    ProjectionItem.of(
+      column,
+      ColumnRef.of(tableRef, column),
+      codecRefForStorageColumn(contract.storage, tableName, column),
+    ),
   );
 }
 
@@ -406,7 +410,6 @@ function buildMtiJoins(
     joins.push(join);
 
     const variantColumns = resolveTableColumns(contract, variant.table);
-    const variantTable = contract.storage.tables[variant.table];
     for (const col of variantColumns) {
       if (col === pkColumn) continue;
       const alias = `${variant.table}__${col}`;
@@ -414,7 +417,7 @@ function buildMtiJoins(
         ProjectionItem.of(
           alias,
           ColumnRef.of(variant.table, col),
-          variantTable?.columns[col]?.codecId,
+          codecRefForStorageColumn(contract.storage, variant.table, col),
         ),
       );
     }

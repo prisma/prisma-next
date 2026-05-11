@@ -154,41 +154,45 @@ describe('createFunctions', () => {
     });
   });
 
-  describe('refs propagation', () => {
-    it('eq(field, value) propagates refs from the column-bound left side onto the ParamRef', () => {
+  describe('codec propagation', () => {
+    it('eq(field, value) propagates codec from the column-bound left side onto the ParamRef', () => {
       const result = fns.eq(f().email, 'alice@example.com');
       const ast = result.buildAst() as BinaryExpr;
       const right = ast.right as ParamRef;
 
       expect(right).toBeInstanceOf(ParamRef);
-      expect(right.refs).toEqual({ table: 'users', column: 'email' });
+      expect(right.codec).toBeDefined();
+      expect(right.codec?.codecId).toBe('pg/text@1');
     });
 
-    it('eq(value, field) propagates refs from the column-bound right side onto the ParamRef', () => {
+    it('eq(value, field) propagates codec from the column-bound right side onto the ParamRef', () => {
       const result = fns.eq('alice@example.com', f().email);
       const ast = result.buildAst() as BinaryExpr;
       const left = ast.left as ParamRef;
 
       expect(left).toBeInstanceOf(ParamRef);
-      expect(left.refs).toEqual({ table: 'users', column: 'email' });
+      expect(left.codec).toBeDefined();
+      expect(left.codec?.codecId).toBe('pg/text@1');
     });
 
-    it('comparison operators propagate refs onto value-side ParamRefs', () => {
+    it('comparison operators propagate codec onto value-side ParamRefs', () => {
       const result = fns.gt(f().id, 5);
       const ast = result.buildAst() as BinaryExpr;
       const right = ast.right as ParamRef;
 
-      expect(right.refs).toEqual({ table: 'users', column: 'id' });
+      expect(right.codec).toBeDefined();
+      expect(right.codec?.codecId).toBe('pg/int4@1');
     });
 
-    it('in() propagates refs onto every value ParamRef in the list', () => {
+    it('in() propagates codec onto every value ParamRef in the list', () => {
       const result = fns.in(f().email, ['a@x', 'b@x', 'c@x']);
       const ast = result.buildAst() as BinaryExpr;
       const list = ast.right as ListExpression;
 
       for (const value of list.values) {
         expect(value).toBeInstanceOf(ParamRef);
-        expect((value as ParamRef).refs).toEqual({ table: 'users', column: 'email' });
+        expect((value as ParamRef).codec).toBeDefined();
+        expect((value as ParamRef).codec?.codecId).toBe('pg/text@1');
       }
     });
   });

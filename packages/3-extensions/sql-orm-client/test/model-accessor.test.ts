@@ -28,7 +28,7 @@ describe('createModelAccessor', () => {
       { columns: Record<string, { codecId?: string }> } | undefined
     >;
     const codecId = tables[table]?.columns[column]?.codecId;
-    return codecId ? ParamRef.of(value, { codecId, refs: { table, column } }) : ParamRef.of(value);
+    return codecId ? ParamRef.of(value, { codec: { codecId } }) : ParamRef.of(value);
   }
 
   function expectBinaryParam(
@@ -567,8 +567,7 @@ describe('createModelAccessor', () => {
       expect(opExpr.self).toEqual(ColumnRef.of('posts', 'embedding'));
       expect(opExpr.args[0]).toEqual(
         ParamRef.of([1, 2, 3], {
-          codecId: 'pg/vector@1',
-          refs: { table: 'posts', column: 'embedding' },
+          codec: { codecId: 'pg/vector@1', typeParams: { length: 3 } },
         }),
       );
     });

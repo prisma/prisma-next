@@ -38,15 +38,19 @@ interface ProjectionSpec {
 const TEST_HASH = coreHash('sha256:test');
 
 function paramRefFromSpec(spec: ParamSpec): ParamRef {
-  const options: { name?: string; codecId?: string } = {};
+  const options: { name?: string; codec?: { codecId: string } } = {};
   if (spec.name !== undefined) options.name = spec.name;
-  if (spec.codecId !== undefined) options.codecId = spec.codecId;
+  if (spec.codecId !== undefined) options.codec = { codecId: spec.codecId };
   return ParamRef.of(spec.value, options);
 }
 
 function projectionFromSpec(spec: ProjectionSpec): ProjectionItem {
   const ref = spec.column ?? { table: 'user', column: spec.alias };
-  return ProjectionItem.of(spec.alias, ColumnRef.of(ref.table, ref.column), spec.codecId);
+  return ProjectionItem.of(
+    spec.alias,
+    ColumnRef.of(ref.table, ref.column),
+    spec.codecId ? { codecId: spec.codecId } : undefined,
+  );
 }
 
 function buildAstPlan(options: {
@@ -257,13 +261,14 @@ describe('encodeParams — async, concurrent dispatch', () => {
     expect([...result]).toEqual([null, null]);
   });
 
-  it('passes through values when no codec is registered for the ParamRef.codecId', async () => {
+  it('throws RUNTIME.CODEC_DESCRIPTOR_MISSING when codec is registered on ParamRef but absent from registry', async () => {
     const registry: ReadonlyArray<Codec<string>> = [];
     const plan = buildAstPlan({
       params: [{ value: 'raw', codecId: 'test/missing@1' }],
     });
-    const result = await encodeParams(plan, {}, buildTestContractCodecs(registry));
-    expect([...result]).toEqual(['raw']);
+    await expect(encodeParams(plan, {}, buildTestContractCodecs(registry))).rejects.toMatchObject({
+      code: 'RUNTIME.CODEC_DESCRIPTOR_MISSING',
+    });
   });
 
   it('passes parameters through unchanged for raw plans (no AST, no codec encoding)', async () => {

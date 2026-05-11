@@ -30,7 +30,7 @@ describe('pgvector operations', () => {
     const cosineDistanceOp = operations['cosineDistance'];
     expect(cosineDistanceOp).toBeDefined();
     const distExpr = cosineDistanceOp?.impl(
-      ParamRef.of([1, 2], { codecId: 'pg/vector@1' }) as never,
+      ParamRef.of([1, 2], { codec: { codecId: 'pg/vector@1' } }) as never,
       [3, 4] as never,
     ) as unknown as { buildAst(): OperationExpr };
     const distAst = distExpr.buildAst();
@@ -44,7 +44,7 @@ describe('pgvector operations', () => {
     const cosineSimilarityOp = operations['cosineSimilarity'];
     expect(cosineSimilarityOp).toBeDefined();
     const simExpr = cosineSimilarityOp?.impl(
-      ParamRef.of([1, 2], { codecId: 'pg/vector@1' }) as never,
+      ParamRef.of([1, 2], { codec: { codecId: 'pg/vector@1' } }) as never,
       [3, 4] as never,
     ) as unknown as { buildAst(): OperationExpr };
     const simAst = simExpr.buildAst();

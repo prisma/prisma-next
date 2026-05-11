@@ -174,7 +174,7 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
     const debug = vi.fn<(event: unknown) => void>();
     const idEqOne = BinaryExpr.eq(
       ColumnRef.of('users', 'id'),
-      ParamRef.of(1, { name: 'middleware_user_id', codecId: 'pg/int4@1' }),
+      ParamRef.of(1, { name: 'middleware_user_id', codec: { codecId: 'pg/int4@1' } }),
     );
     const onlyAlice = rewriteUserSelects('onlyAlice', (ast) => withPredicate(ast, idEqOne));
     const runtime = buildRuntime([onlyAlice], {
@@ -200,12 +200,12 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
     const idGte = (v: number, suffix: string) =>
       BinaryExpr.gte(
         ColumnRef.of('users', 'id'),
-        ParamRef.of(v, { name: `mw_${suffix}`, codecId: 'pg/int4@1' }),
+        ParamRef.of(v, { name: `mw_${suffix}`, codec: { codecId: 'pg/int4@1' } }),
       );
     const idLte = (v: number, suffix: string) =>
       BinaryExpr.lte(
         ColumnRef.of('users', 'id'),
-        ParamRef.of(v, { name: `mw_${suffix}`, codecId: 'pg/int4@1' }),
+        ParamRef.of(v, { name: `mw_${suffix}`, codec: { codecId: 'pg/int4@1' } }),
       );
     const lowerBound = rewriteUserSelects('idGte2', (ast) => withPredicate(ast, idGte(2, 'gte2')));
     const upperBound = rewriteUserSelects('idLte3', (ast) => withPredicate(ast, idLte(3, 'lte3')));

@@ -38,7 +38,7 @@ function codecForColumn(table: string, column: string): string {
 }
 
 function paramCodecs(plan: { ast: { collectParamRefs(): ParamRef[] } }): Array<string | undefined> {
-  return [...new Set(plan.ast.collectParamRefs())].map((ref) => ref.codecId);
+  return [...new Set(plan.ast.collectParamRefs())].map((ref) => ref.codec?.codecId);
 }
 
 function expectSelectAst(ast: unknown): asserts ast is SelectAst {
@@ -158,7 +158,7 @@ describe('compileSelectWithIncludeStrategy', () => {
     const opExpr = new OperationExpr({
       method: 'cosineDistance',
       self: ColumnRef.of('posts', 'embedding'),
-      args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+      args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codec: { codecId: 'pg/vector@1' } })],
       returns: { codecId: 'builtin/float8', nullable: false },
       lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
     });
@@ -180,14 +180,14 @@ describe('compileSelectWithIncludeStrategy', () => {
     expect(plan.params).toEqual([[1, 2, 3]]);
     const params = [...new Set(plan.ast.collectParamRefs())];
     expect(params).toHaveLength(1);
-    expect(params[0]).toMatchObject({ name: 'searchVec', codecId: 'pg/vector@1' });
+    expect(params[0]).toMatchObject({ name: 'searchVec', codec: { codecId: 'pg/vector@1' } });
   });
 
   it('cursor pagination ignores expression-based orders', () => {
     const opExpr = new OperationExpr({
       method: 'cosineDistance',
       self: ColumnRef.of('posts', 'embedding'),
-      args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+      args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codec: { codecId: 'pg/vector@1' } })],
       returns: { codecId: 'builtin/float8', nullable: false },
       lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
     });
@@ -216,7 +216,7 @@ describe('compileSelectWithIncludeStrategy', () => {
     const opExpr = new OperationExpr({
       method: 'cosineDistance',
       self: ColumnRef.of('posts', 'embedding'),
-      args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+      args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codec: { codecId: 'pg/vector@1' } })],
       returns: { codecId: 'builtin/float8', nullable: false },
       lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
     });
@@ -237,7 +237,7 @@ describe('compileSelectWithIncludeStrategy', () => {
     expect(params).toHaveLength(1);
     expect(params[0]).toMatchObject({
       name: 'searchVec',
-      codecId: 'pg/vector@1',
+      codec: { codecId: 'pg/vector@1' },
     });
   });
 
@@ -245,7 +245,7 @@ describe('compileSelectWithIncludeStrategy', () => {
     const opExpr = new OperationExpr({
       method: 'cosineDistance',
       self: ColumnRef.of('posts', 'embedding'),
-      args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codecId: 'pg/vector@1' })],
+      args: [ParamRef.of([1, 2, 3], { name: 'searchVec', codec: { codecId: 'pg/vector@1' } })],
       returns: { codecId: 'builtin/float8', nullable: false },
       lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
     });
@@ -255,7 +255,7 @@ describe('compileSelectWithIncludeStrategy', () => {
     const orderOpExpr = new OperationExpr({
       method: 'cosineDistance',
       self: ColumnRef.of('posts', 'embedding'),
-      args: [ParamRef.of([4, 5, 6], { name: 'orderVec', codecId: 'pg/vector@1' })],
+      args: [ParamRef.of([4, 5, 6], { name: 'orderVec', codec: { codecId: 'pg/vector@1' } })],
       returns: { codecId: 'builtin/float8', nullable: false },
       lowering: { targetFamily: 'sql', strategy: 'function', template: '{{self}} <=> {{arg0}}' },
     });
@@ -352,6 +352,14 @@ describe('compileSelect MTI JOINs', () => {
   type AnyContract = {
     storage: { tables: Record<string, { columns: Record<string, { codecId: string }> }> };
   };
+  function codecRefForColumn(
+    contract: AnyContract,
+    table: string,
+    column: string,
+  ): { codecId: string } | undefined {
+    const codecId = contract.storage.tables[table]?.columns[column]?.codecId;
+    return codecId ? { codecId } : undefined;
+  }
   function projectionFor(
     contract: AnyContract,
     table: string,
@@ -361,16 +369,9 @@ describe('compileSelect MTI JOINs', () => {
       ProjectionItem.of(
         column,
         ColumnRef.of(table, column),
-        contract.storage.tables[table]?.columns[column]?.codecId,
+        codecRefForColumn(contract, table, column),
       ),
     );
-  }
-  function codecForColumn(
-    contract: AnyContract,
-    table: string,
-    column: string,
-  ): string | undefined {
-    return contract.storage.tables[table]?.columns[column]?.codecId;
   }
   const featuresJoinOn = EqColJoinOn.of(
     ColumnRef.of('tasks', 'id'),
@@ -389,7 +390,7 @@ describe('compileSelect MTI JOINs', () => {
       ProjectionItem.of(
         'features__priority',
         ColumnRef.of('features', 'priority'),
-        codecForColumn(contract, 'features', 'priority'),
+        codecRefForColumn(contract, 'features', 'priority'),
       ),
     ];
 
@@ -416,7 +417,7 @@ describe('compileSelect MTI JOINs', () => {
       ProjectionItem.of(
         'features__priority',
         ColumnRef.of('features', 'priority'),
-        codecForColumn(contract, 'features', 'priority'),
+        codecRefForColumn(contract, 'features', 'priority'),
       ),
     ];
 

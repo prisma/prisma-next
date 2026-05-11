@@ -45,33 +45,27 @@ function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> 
 /**
  * Resolve the per-cell codec for a projection item.
  *
- * When a `(table, column)` ref is available — either implicit on a `column-ref` expression or carried explicitly via `item.refs` for column-bound non-`column-ref` projections — prefer `contractCodecs.forColumn(table, column)`: that returns the per-instance codec materialized from the descriptor's factory for that column, encoding any per-instance state (typeParams like vector length, schema validators, etc.).
+ * AST-bound dispatch: when `item.codec` is populated by a column-bound construction site, resolve via `contractCodecs.forCodecRef(item.codec)` — that returns the per-instance codec materialized for the `(codecId, typeParams)` pair. Content-keyed memoisation collapses repeated lookups.
  *
- * The wrong-instance risk for parameterized codecs is closed off structurally:
- *
- * 1. `buildContractCodecRegistry` pre-populates `byCodecId` with one canonical instance per non-parameterized descriptor; parameterized descriptors are intentionally absent. 2. `forCodecId` rejects ambiguous parameterized fallbacks (`ambiguousCodecIds`). 3. The non-ambiguous parameterized case stores the column-correct per-instance codec under `byCodecId`, so the fall-through still resolves to the right instance.
- *
- * The `forCodecId` fallback otherwise covers projections that are *not* column-bound (computed projections, raw SQL aliases) but still carry a `codecId` (ADR 205 stamps every `ProjectionItem` with the producer's codec id).
- *
- * Codec-registry-unification spec § AC-4 / AC-5.
+ * // M3c: dead after AST shape change — delete: the forColumn + forCodecId legacy paths below are unreachable because every column-bound ProjectionItem now carries `codec`. They stay until M3c collapses the byColumn parallel surface.
  */
 function resolveProjectionCodec(
   item: ProjectionItem,
   contractCodecs: ContractCodecRegistry | undefined,
   aliasResolver: (alias: string) => string,
 ): Codec | undefined {
-  if (contractCodecs) {
-    if (item.expr.kind === 'column-ref') {
-      const byColumn = contractCodecs.forColumn(aliasResolver(item.expr.table), item.expr.column);
-      // Only honour `byColumn` when its codec id agrees with `item.codecId`. They can legitimately disagree when an `OperationExpr`-shaped projection carries a single inner column-ref but transforms the value's codec (e.g. `cosineDistance(col, x)` projects `pg/float8@1` while the inner column-ref points at a `pg/vector@1` column).
-      if (byColumn && (item.codecId === undefined || byColumn.id === item.codecId)) return byColumn;
-    } else if (item.refs) {
-      const byColumn = contractCodecs.forColumn(aliasResolver(item.refs.table), item.refs.column);
-      if (byColumn && (item.codecId === undefined || byColumn.id === item.codecId)) return byColumn;
-    }
+  if (item.codec && contractCodecs) {
+    return contractCodecs.forCodecRef(item.codec);
   }
-  if (item.codecId) {
-    return contractCodecs?.forCodecId(item.codecId);
+  // M3c: dead after AST shape change — delete: column-ref heuristic fallback
+  if (contractCodecs && item.expr.kind === 'column-ref') {
+    const byColumn = contractCodecs.forColumn(aliasResolver(item.expr.table), item.expr.column);
+    if (byColumn) return byColumn;
+  }
+  // M3c: dead after AST shape change — delete: codec-id-only fallback
+  const codecId = item.codec?.codecId;
+  if (codecId) {
+    return contractCodecs?.forCodecId(codecId);
   }
   return undefined;
 }
@@ -117,11 +111,6 @@ function buildDecodeContext(
       columnRefs.set(item.alias, {
         table: aliasResolver(item.expr.table),
         column: item.expr.column,
-      });
-    } else if (item.refs) {
-      columnRefs.set(item.alias, {
-        table: aliasResolver(item.refs.table),
-        column: item.refs.column,
       });
     } else if (item.expr.kind === 'subquery' || item.expr.kind === 'json-array-agg') {
       includeAliases.add(item.alias);

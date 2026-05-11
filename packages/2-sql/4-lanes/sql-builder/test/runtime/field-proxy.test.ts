@@ -16,6 +16,7 @@ describe('createFieldProxy', () => {
     expect((idExpr as ExpressionImpl).returnType).toEqual({
       codecId: 'pg/int4@1',
       nullable: false,
+      codec: { codecId: 'pg/int4@1' },
     });
   });
 
@@ -46,14 +47,14 @@ describe('createFieldProxy', () => {
     expect((proxy as Record<string, unknown>)['nonexistent']).toBeUndefined();
   });
 
-  it('attaches refs metadata for top-level fields backed by a unique namespace', () => {
+  it('attaches codec metadata for top-level fields with a codec', () => {
     const proxy = createFieldProxy(usersScope);
     const idExpr = proxy.id as ExpressionImpl;
 
-    expect(idExpr.refs).toEqual({ table: 'users', column: 'id' });
+    expect(idExpr.codec).toEqual(usersScope.topLevel.id.codec);
   });
 
-  it('omits refs for top-level fields when multiple namespaces own the field', () => {
+  it('codec is undefined for top-level fields without a codec', () => {
     const ambiguousScope = {
       topLevel: { name: { codecId: 'pg/text@1', nullable: false } },
       namespaces: {
@@ -64,6 +65,6 @@ describe('createFieldProxy', () => {
     const proxy = createFieldProxy(ambiguousScope);
     const nameExpr = proxy.name as ExpressionImpl;
 
-    expect(nameExpr.refs).toBeUndefined();
+    expect(nameExpr.codec).toBeUndefined();
   });
 });

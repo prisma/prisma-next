@@ -20,7 +20,9 @@ import { normalizeWhereArg } from '../src/where-interop';
 
 const col = (table: string, column: string) => ColumnRef.of(table, column);
 const param = (value: unknown, name?: string, codecId = 'pg/text@1') =>
-  name !== undefined ? ParamRef.of(value, { name, codecId }) : ParamRef.of(value, { codecId });
+  name !== undefined
+    ? ParamRef.of(value, { name, codec: { codecId } })
+    : ParamRef.of(value, { codec: { codecId } });
 const literal = (value: unknown) => LiteralExpr.of(value);
 
 function op(self: ColumnRef, args: Array<ColumnRef | ParamRef | LiteralExpr>): OperationExpr {

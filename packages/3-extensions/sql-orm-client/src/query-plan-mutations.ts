@@ -12,6 +12,7 @@ import {
   TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import { combineWhereExprs } from './where-utils';
@@ -26,9 +27,12 @@ function buildReturningColumns(
       ? [...returningColumns]
       : resolveTableColumns(contract, tableName);
 
-  const table = contract.storage.tables[tableName];
   return columns.map((column) =>
-    ProjectionItem.of(column, ColumnRef.of(tableName, column), table?.columns[column]?.codecId),
+    ProjectionItem.of(
+      column,
+      ColumnRef.of(tableName, column),
+      codecRefForStorageColumn(contract.storage, tableName, column),
+    ),
   );
 }
 
@@ -47,14 +51,13 @@ function toParamAssignments(
   }
 
   for (const [column, value] of Object.entries(values)) {
-    const codecId = table.columns[column]?.codecId;
-    if (!codecId) {
+    if (!table.columns[column]) {
       throw new Error(`Unknown column "${column}" in table "${tableName}"`);
     }
+    const codec = codecRefForStorageColumn(contract.storage, tableName, column);
     assignments[column] = ParamRef.of(value, {
       name: column,
-      codecId,
-      refs: { table: tableName, column },
+      ...(codec ? { codec } : {}),
     });
   }
 
@@ -85,6 +88,11 @@ function normalizeInsertRows(
     }
   }
 
+  const table = contract.storage.tables[tableName];
+  if (!table) {
+    throw new Error(`Unknown table "${tableName}"`);
+  }
+
   const normalizedRows = rows.map((row) => {
     if (orderedColumns.length === 0) {
       return {};
@@ -93,18 +101,13 @@ function normalizeInsertRows(
     const normalizedRow: Record<string, ParamRef | DefaultValueExpr> = {};
     for (const column of orderedColumns) {
       if (Object.hasOwn(row, column)) {
-        const table = contract.storage.tables[tableName];
-        if (!table) {
-          throw new Error(`Unknown table "${tableName}"`);
-        }
-        const codecId = table?.columns[column]?.codecId;
-        if (!codecId) {
+        if (!table.columns[column]) {
           throw new Error(`Unknown column "${column}" in table "${tableName}"`);
         }
+        const codec = codecRefForStorageColumn(contract.storage, tableName, column);
         normalizedRow[column] = ParamRef.of(row[column], {
           name: column,
-          codecId,
-          refs: { table: tableName, column },
+          ...(codec ? { codec } : {}),
         });
         continue;
       }

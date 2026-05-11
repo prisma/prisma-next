@@ -80,7 +80,7 @@ function selectWithParam(column: string, codecId: string | undefined, value: unk
   const ref =
     codecId === undefined
       ? ParamRef.of(value, { name: column })
-      : ParamRef.of(value, { name: column, codecId });
+      : ParamRef.of(value, { name: column, codec: { codecId } });
   return SelectAst.from(TableSource.named('user'))
     .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
     .withWhere(BinaryExpr.eq(ColumnRef.of('user', column), ref));
@@ -186,7 +186,7 @@ describe('renderLoweredSql cast policy', () => {
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'id'),
-          ParamRef.of(1, { name: 'unknown', codecId: 'app/never-used@1' }),
+          ParamRef.of(1, { name: 'unknown', codec: { codecId: 'app/never-used@1' } }),
         ),
       );
 
