@@ -226,6 +226,7 @@ describe('bulkEncryptMiddleware', () => {
 
       await middleware.beforeExecute?.(plan, createCtx(), params);
 
+      expect(sdk.bulkEncryptCalls).toHaveLength(1);
       expect(sdk.bulkEncryptCalls[0]?.signal).toBeUndefined();
     });
   });
