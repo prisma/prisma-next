@@ -500,7 +500,13 @@ describe('planFieldEventOperations', () => {
     const opsA = planFieldEventOperations({ priorContract: fromContract, newContract, codecHooks });
     const opsB = planFieldEventOperations({ priorContract: fromContract, newContract, codecHooks });
 
-    expect(JSON.stringify(opsA)).toBe(JSON.stringify(opsB));
+    // Materialise each `OpFactoryCall` rather than `JSON.stringify`-ing
+    // the array — function members like `toOp` / `renderTypeScript` get
+    // silently dropped by stringify, which would mask determinism drift
+    // in exactly the surfaces this test is meant to lock down.
+    expect(opsA.map((c) => c.toOp())).toEqual(opsB.map((c) => c.toOp()));
+    expect(opsA.map((c) => c.renderTypeScript())).toEqual(opsB.map((c) => c.renderTypeScript()));
+    expect(opsA.map((c) => c.factoryName)).toEqual(opsB.map((c) => c.factoryName));
   });
 
   it('handles whole-table additions and drops by treating each field as its own event', () => {
