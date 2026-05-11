@@ -506,13 +506,11 @@ describe(
       expect(ids).toContain('codec.added.user.email');
     });
 
-    it('collapses cleanly to a single app member when no extensions are declared (TML-2463 AC4 — n=1 regression)', async () => {
-      // AC4 of TML-2463: "No regression on single-space (n=1, app-only)
-      // SQLite workspaces — the aggregate path collapses cleanly to one
-      // app member." Every other test in this file declares at least
-      // one extension pack; this one exercises the empty-extensionPacks
-      // path through the aggregate loader / planner / runner so a future
-      // refactor that breaks single-space SQLite does not slip past CI.
+    it('collapses cleanly to a single app member when no extensions are declared (n=1 aggregate-path regression)', async () => {
+      // Every other test in this file declares at least one extension
+      // pack; this one exercises the empty-extensionPacks path through
+      // the aggregate loader / planner / runner so a future refactor
+      // that breaks single-space SQLite does not slip past CI.
       const tmpDir = createTmpDir();
       const migrationsDir = join(tmpDir, 'migrations');
       await mkdir(migrationsDir, { recursive: true });
