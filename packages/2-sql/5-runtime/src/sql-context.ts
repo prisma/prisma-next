@@ -1,5 +1,13 @@
-import type { Contract, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
-import type { AnyCodecDescriptor, CodecDescriptor } from '@prisma-next/framework-components/codec';
+import type {
+  Contract,
+  ExecutionMutationDefaultValue,
+  JsonValue,
+} from '@prisma-next/contract/types';
+import type {
+  AnyCodecDescriptor,
+  CodecDescriptor,
+  CodecRef,
+} from '@prisma-next/framework-components/codec';
 import type { ComponentDescriptor } from '@prisma-next/framework-components/components';
 import { checkContractComponentRequirements } from '@prisma-next/framework-components/components';
 import {
@@ -15,6 +23,7 @@ import {
   type RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
+import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   createSqlOperationRegistry,
@@ -37,6 +46,7 @@ import type {
   MutationDefaultsOptions,
   TypeHelperRegistry,
 } from '@prisma-next/sql-relational-core/query-lane-context';
+import { createAstCodecResolver } from './codecs/ast-codec-resolver';
 
 /**
  * Runtime parameterized codec descriptor.
@@ -464,6 +474,58 @@ function buildContractCodecRegistry(
     }
   }
 
+  // Pre-compute the `CodecInstanceContext` each ref hands to its descriptor factory the first time the resolver materialises it. Order matters: typeRef instances seed `name: typeName` (typeRef-shared columns share one named instance); inline `typeParams` columns fall back to `<anon:Table.column>`; non-parameterized codecs and AST-supplied refs the contract didn't declare share `<shared:codecId>`.
+  const refToCtx = new Map<string, SqlCodecInstanceContext>();
+  const typeRefSites = collectTypeRefSites(contract.storage);
+  const refKeyOf = (ref: CodecRef): string => `${ref.codecId}:${canonicalizeJson(ref.typeParams)}`;
+  for (const [typeName, typeInstance] of Object.entries(contract.storage.types ?? {})) {
+    const ref: CodecRef = {
+      codecId: typeInstance.codecId,
+      // `typeParams` on contract storage is `Record<string, unknown>` but every value must be JSON-shaped to survive serialization to `contract.json`; descriptors validate via `paramsSchema` at the JSON boundary. The narrow is safe by that invariant.
+      typeParams: typeInstance.typeParams as JsonValue,
+    };
+    refToCtx.set(refKeyOf(ref), {
+      name: typeName,
+      usedAt: typeRefSites.get(typeName) ?? [],
+    });
+  }
+  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
+    for (const [columnName, column] of Object.entries(table.columns)) {
+      if (column.typeRef !== undefined) continue;
+      if (column.typeParams === undefined) continue;
+      const ref: CodecRef = {
+        codecId: column.codecId,
+        typeParams: column.typeParams as JsonValue,
+      };
+      const key = refKeyOf(ref);
+      if (!refToCtx.has(key)) {
+        refToCtx.set(key, {
+          name: `<anon:${tableName}.${columnName}>`,
+          usedAt: [{ table: tableName, column: columnName }],
+        });
+      }
+    }
+  }
+
+  const resolver = createAstCodecResolver(codecDescriptors, (ref) => {
+    const existing = refToCtx.get(refKeyOf(ref));
+    if (existing) return existing;
+    return { name: `<shared:${ref.codecId}>`, usedAt: [] };
+  });
+
+  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
+    for (const columnName of Object.keys(table.columns)) {
+      const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+      if (!ref) continue;
+      const descriptor = codecDescriptors.descriptorFor(ref.codecId);
+      // Skip codec ids the descriptor registry doesn't recognise — today's contract walk silently leaves `resolvedCodec` undefined for unregistered ids and we preserve that behaviour rather than throwing CODEC_DESCRIPTOR_MISSING during context construction.
+      if (!descriptor) continue;
+      // Parameterized codec column with neither `typeRef` nor `typeParams` — the legitimate "undimensioned" form for codecs that ship a no-params column variant alongside a parameterized one (e.g. pgvector's `vectorColumn` vs. `vector(N)`). The descriptor's `paramsSchema` would reject `undefined`; encode/decode for these columns flows through `forCodecId` until M3 unifies dispatch onto `forCodecRef`.
+      if (descriptor.isParameterized && ref.typeParams === undefined) continue;
+      resolver.forCodecRef(ref);
+    }
+  }
+
   const registry: ContractCodecRegistry = {
     forColumn(table, column) {
       return byColumn.get(`${table}.${column}`);
@@ -481,6 +543,9 @@ function buildContractCodecRegistry(
         );
       }
       return byCodecId.get(codecId) ?? parameterizedRepresentatives.get(codecId);
+    },
+    forCodecRef(ref) {
+      return resolver.forCodecRef(ref);
     },
   };
 
@@ -684,7 +749,7 @@ export function createExecutionContext<
     }
   }
 
-  const codecDescriptors = buildCodecDescriptorRegistry(allCodecDescriptors);
+  const codecDescriptors = buildCodecDescriptorRegistry(allCodecDescriptors, contract.storage);
   const mutationDefaultGeneratorRegistry = collectMutationDefaultGenerators(contributors);
   assertMutationDefaultGeneratorsAvailable(contract, mutationDefaultGeneratorRegistry);
 

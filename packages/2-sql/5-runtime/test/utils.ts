@@ -11,6 +11,7 @@ import {
   type RuntimeDriverDescriptor,
 } from '@prisma-next/framework-components/execution';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -142,6 +143,17 @@ export function buildTestContractCodecs(
   return {
     forColumn: () => undefined,
     forCodecId: (codecId) => byId.get(codecId),
+    forCodecRef: (ref) => {
+      const codec = byId.get(ref.codecId);
+      if (!codec) {
+        throw runtimeError(
+          'RUNTIME.CODEC_DESCRIPTOR_MISSING',
+          `Test ContractCodecRegistry has no codec for codecId '${ref.codecId}'.`,
+          { codecId: ref.codecId },
+        );
+      }
+      return codec;
+    },
   };
 }
 

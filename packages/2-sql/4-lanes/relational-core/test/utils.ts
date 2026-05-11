@@ -35,6 +35,9 @@ export function createTestContext<TContract extends Contract<SqlStorage>>(
     contractCodecs: {
       forColumn: () => undefined,
       forCodecId: () => undefined,
+      forCodecRef: () => {
+        throw new Error('relational-core test ContractCodecRegistry stub: forCodecRef not stubbed');
+      },
     },
     codecDescriptors: {
       descriptorFor: () => undefined,

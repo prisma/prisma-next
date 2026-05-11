@@ -3,12 +3,14 @@ import type {
   CodecCallContext,
   CodecDescriptor,
   CodecInstanceContext,
+  CodecRef,
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
 
 export type {
   CodecCallContext,
   CodecDescriptor,
+  CodecRef,
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
 
@@ -93,6 +95,13 @@ export interface ContractCodecRegistry {
    * `codecId` is non-parameterized (or parameter-tolerant) at this boundary.
    */
   forCodecId(codecId: string): Codec | undefined;
+
+  /**
+   * Resolve a codec by {@link CodecRef}. The single dispatch shape for AST-bound codec resolution — every codec-bearing AST node carries a `CodecRef` that resolves through this method via the per-`ExecutionContext` `AstCodecResolver`. Two refs with the same `codecId` and structurally equal `typeParams` (regardless of object key order) return the same memoised codec instance. Throws `RUNTIME.CODEC_DESCRIPTOR_MISSING` for unknown `codecId`s and `RUNTIME.TYPE_PARAMS_INVALID` on `paramsSchema` rejection.
+   *
+   * Pre-populated from the contract walk at registry construction time (so contract-declared codecs hit on first call); grows lazily for AST-supplied refs not seen at contract-load time (deserialised migration ops, refs-less raw SQL with an explicit codec).
+   */
+  forCodecRef(ref: CodecRef): Codec;
 }
 
 /**

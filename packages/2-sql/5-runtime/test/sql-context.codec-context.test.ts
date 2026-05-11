@@ -177,3 +177,225 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
     expect(columnInstance).not.toBe(codecIdInstance);
   });
 });
+
+/**
+ * `forCodecRef` is the AST-bound dispatch surface: every codec-bearing AST node carries a {@link CodecRef} and the runtime resolves through this method via the per-`ExecutionContext` `AstCodecResolver`. M2 pre-populates the resolver's cache from the contract walk; M3 will collapse `forColumn`/`forCodecId` onto this single dispatch path.
+ */
+describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () => {
+  function createCountingVectorExtension(): {
+    descriptor: SqlRuntimeExtensionDescriptor<'postgres'>;
+    factoryCalls: () => number;
+  } {
+    let factoryCalls = 0;
+    const codecDescriptor: CodecDescriptor<{ length: number }> = {
+      codecId: 'pgvector/vector@1',
+      traits: ['equality'],
+      targetTypes: ['vector'],
+      paramsSchema: {
+        '~standard': {
+          version: 1,
+          vendor: 'test',
+          validate: (value) => ({ value: value as { length: number } }),
+        },
+      },
+      isParameterized: true,
+      factory: ((params: { length: number }) => (ctx: SqlCodecInstanceContext) => {
+        factoryCalls += 1;
+        const codec: Codec = {
+          id: 'pgvector/vector@1',
+          encode: (v: unknown) => Promise.resolve(v),
+          decode: (w: unknown) => Promise.resolve(w),
+          encodeJson: (v) => v as never,
+          decodeJson: (j) => j as never,
+        };
+        return Object.assign({}, codec, {
+          meta: { length: params.length, ctxName: ctx.name },
+        }) as Codec;
+      }) as unknown as CodecDescriptor<{ length: number }>['factory'],
+    };
+
+    return {
+      descriptor: {
+        kind: 'extension' as const,
+        id: 'pgvector-test',
+        version: '0.0.1',
+        familyId: 'sql' as const,
+        targetId: 'postgres' as const,
+        codecs: () => [codecDescriptor as unknown as CodecDescriptor],
+        create() {
+          return { familyId: 'sql' as const, targetId: 'postgres' as const };
+        },
+      },
+      factoryCalls: () => factoryCalls,
+    };
+  }
+
+  function contractWithVector(
+    columns: Record<string, { typeRef?: string; typeParams?: { length: number } }>,
+    types?: Record<string, { length: number }>,
+  ): Contract<SqlStorage> {
+    const tables: SqlStorage['tables'] = {};
+    for (const [tableName, spec] of Object.entries(columns)) {
+      tables[tableName] = {
+        columns: {
+          embedding: {
+            nativeType: 'vector',
+            codecId: 'pgvector/vector@1',
+            nullable: false,
+            ...(spec.typeRef ? { typeRef: spec.typeRef } : {}),
+            ...(spec.typeParams ? { typeParams: spec.typeParams } : {}),
+          },
+        },
+        primaryKey: { columns: ['embedding'] },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      };
+    }
+
+    const storage: SqlStorage = {
+      storageHash: coreHash('sha256:test'),
+      tables,
+      ...(types
+        ? {
+            types: Object.fromEntries(
+              Object.entries(types).map(([name, params]) => [
+                name,
+                {
+                  codecId: 'pgvector/vector@1',
+                  nativeType: 'vector',
+                  typeParams: params as Record<string, unknown>,
+                },
+              ]),
+            ),
+          }
+        : {}),
+    };
+
+    return {
+      targetFamily: 'sql',
+      target: 'postgres',
+      profileHash: profileHash('sha256:test'),
+      models: {},
+      roots: {},
+      storage,
+      extensionPacks: {},
+      capabilities: {},
+      meta: {},
+    };
+  }
+
+  it('returns the same codec instance for two refs with the same `(codecId, typeParams)`', () => {
+    const { descriptor } = createCountingVectorExtension();
+    const contract = contractWithVector({ Doc: { typeParams: { length: 1536 } } });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [descriptor],
+    });
+
+    const a = context.contractCodecs.forCodecRef({
+      codecId: 'pgvector/vector@1',
+      typeParams: { length: 1536 },
+    });
+    const b = context.contractCodecs.forCodecRef({
+      codecId: 'pgvector/vector@1',
+      typeParams: { length: 1536 },
+    });
+
+    expect(a).toBe(b);
+  });
+
+  it('keys cache by canonicalised typeParams so object key order does not matter', () => {
+    const { descriptor } = createCountingVectorExtension();
+    const contract = contractWithVector({
+      Doc: { typeParams: { length: 768 } as { length: number } },
+    });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [descriptor],
+    });
+
+    const a = context.contractCodecs.forCodecRef({
+      codecId: 'pgvector/vector@1',
+      typeParams: { length: 1024, normalized: true } as never,
+    });
+    const b = context.contractCodecs.forCodecRef({
+      codecId: 'pgvector/vector@1',
+      typeParams: { normalized: true, length: 1024 } as never,
+    });
+
+    expect(a).toBe(b);
+  });
+
+  it('pre-populates the cache from the contract walk so contract-declared refs hit on first call', () => {
+    const { descriptor, factoryCalls } = createCountingVectorExtension();
+    const contract = contractWithVector({ Doc: { typeParams: { length: 1536 } } });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [descriptor],
+    });
+
+    const callsAfterContextConstruction = factoryCalls();
+    expect(callsAfterContextConstruction).toBeGreaterThan(0);
+
+    const codec = context.contractCodecs.forCodecRef({
+      codecId: 'pgvector/vector@1',
+      typeParams: { length: 1536 },
+    });
+
+    expect(codec).toBeDefined();
+    expect(factoryCalls()).toBe(callsAfterContextConstruction);
+  });
+
+  it('lazy-materialises a codec when the AST supplies a ref the contract walk did not declare', () => {
+    const { descriptor, factoryCalls } = createCountingVectorExtension();
+    const contract = contractWithVector({ Doc: { typeParams: { length: 1536 } } });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [descriptor],
+    });
+
+    const before = factoryCalls();
+    const codec = context.contractCodecs.forCodecRef({
+      codecId: 'pgvector/vector@1',
+      typeParams: { length: 2048 },
+    });
+
+    expect(codec).toBeDefined();
+    expect(factoryCalls()).toBe(before + 1);
+  });
+
+  it('typeRef-shared columns resolve through forCodecRef to the same named-instance codec', () => {
+    const { descriptor } = createCountingVectorExtension();
+    const contract = contractWithVector(
+      { Doc: { typeRef: 'V1536' }, Page: { typeRef: 'V1536' } },
+      { V1536: { length: 1536 } },
+    );
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [descriptor],
+    });
+
+    const codec = context.contractCodecs.forCodecRef({
+      codecId: 'pgvector/vector@1',
+      typeParams: { length: 1536 },
+    });
+
+    expect(codec).toBeDefined();
+    // Pre-population uses the typeRef ctx — the cached codec's meta.ctxName carries the `storage.types` name.
+    expect((codec as Codec & { meta: { ctxName: string } }).meta.ctxName).toBe('V1536');
+  });
+
+  it('throws RUNTIME.CODEC_DESCRIPTOR_MISSING when the codecId is unknown to the resolver', () => {
+    const { descriptor } = createCountingVectorExtension();
+    const contract = contractWithVector({ Doc: { typeParams: { length: 1536 } } });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [descriptor],
+    });
+
+    expect(() => context.contractCodecs.forCodecRef({ codecId: 'nope/missing@1' })).toThrow(
+      /CODEC_DESCRIPTOR_MISSING|nope\/missing@1/,
+    );
+  });
+});

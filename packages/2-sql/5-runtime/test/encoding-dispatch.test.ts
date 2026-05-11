@@ -7,6 +7,10 @@ import { describe, expect, it } from 'vitest';
 import { encodeParam } from '../src/codecs/encoding';
 import { defineTestCodec } from './test-codec';
 
+const stubForCodecRef: ContractCodecRegistry['forCodecRef'] = () => {
+  throw new Error('encoding-dispatch test stub: forCodecRef not used');
+};
+
 /**
  * Encode-side dispatch (AC-5):
  *
@@ -37,6 +41,7 @@ describe('encodeParam — column-aware dispatch', () => {
         calls.push(['forCodecId', codecId]);
         return undefined;
       },
+      forCodecRef: stubForCodecRef,
     };
 
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
@@ -92,6 +97,7 @@ describe('encodeParam — column-aware dispatch', () => {
         calls.push(['forCodecId', codecId]);
         return scalarCodec;
       },
+      forCodecRef: stubForCodecRef,
     };
 
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
@@ -123,6 +129,7 @@ describe('encodeParam — column-aware dispatch', () => {
     const contractCodecs: ContractCodecRegistry = {
       forColumn: () => columnCodec,
       forCodecId: () => fallbackCodec,
+      forCodecRef: stubForCodecRef,
     };
 
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
@@ -158,6 +165,7 @@ describe('encodeParam — column-aware dispatch', () => {
     const contractCodecs: ContractCodecRegistry = {
       forColumn: () => vectorCodec,
       forCodecId: () => float8Codec,
+      forCodecRef: stubForCodecRef,
     };
 
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
@@ -191,6 +199,7 @@ describe('encodeParam — column-aware dispatch', () => {
     const contractCodecs: ContractCodecRegistry = {
       forColumn: () => codec,
       forCodecId: () => codec,
+      forCodecRef: stubForCodecRef,
     };
 
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
