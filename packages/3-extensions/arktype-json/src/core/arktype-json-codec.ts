@@ -68,15 +68,23 @@ function validateSchema<TInferred>(schema: ArktypeSchemaLike, value: unknown): T
   return result as TInferred;
 }
 
-function serializeToJsonSafe<TInferred>(value: TInferred): { wire: string; json: JsonValue } {
+function serializeWire<TInferred>(value: TInferred): string {
   const wire: string | undefined = JSON.stringify(value);
   if (typeof wire !== 'string') {
     throw new Error(
       `arktype-json value is not representable as JSON (codecId: ${ARKTYPE_JSON_CODEC_ID})`,
     );
   }
-  const json = JSON.parse(wire) as JsonValue;
-  return { wire, json };
+  return wire;
+}
+
+function serializeJson<TInferred>(value: TInferred): JsonValue {
+  // The stringify → parse round-trip both validates JSON-representability
+  // (matching `serializeWire`) and produces a deep-cloned `JsonValue` that
+  // strips class prototypes / `toJSON` side effects, so callers reading
+  // the in-memory `JsonValue` see exactly the shape that would round-trip
+  // through the database.
+  return JSON.parse(serializeWire(value)) as JsonValue;
 }
 
 function parseJsonText(wire: string): JsonValue | undefined {
@@ -162,7 +170,7 @@ export class ArktypeJsonCodecClass<TInferred> extends CodecImpl<
   }
 
   async encode(value: TInferred, _ctx: CodecCallContext): Promise<string> {
-    return serializeToJsonSafe(value).wire;
+    return serializeWire(value);
   }
 
   async decode(wire: string | JsonValue, _ctx: CodecCallContext): Promise<TInferred> {
@@ -170,7 +178,7 @@ export class ArktypeJsonCodecClass<TInferred> extends CodecImpl<
   }
 
   encodeJson(value: TInferred): JsonValue {
-    return serializeToJsonSafe(value).json;
+    return serializeJson(value);
   }
 
   decodeJson(json: JsonValue): TInferred {
