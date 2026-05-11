@@ -24,11 +24,6 @@ import {
   useDevDatabase,
 } from '../utils/journey-test-helpers';
 
-function messageFrom(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
-
 withTempDir(({ createTempDir }) => {
   describe('Composite Primary Key Greenfield', () => {
     const db = useDevDatabase();
@@ -62,6 +57,12 @@ withTempDir(({ createTempDir }) => {
         expect(init.exitCode, `db init\n${stripAnsi(init.stderr)}`).toBe(0);
         expect(stripAnsi(init.stdout), 'init applied work').toContain('Applied');
 
+        const tablesAfterInit = await sql(
+          db.connectionString,
+          `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'membership'`,
+        );
+        expect(tablesAfterInit.rows, 'membership table created').toHaveLength(1);
+
         const primaryKeyColumns = await sql(
           db.connectionString,
           `SELECT c.conname, a.attname
@@ -90,18 +91,13 @@ withTempDir(({ createTempDir }) => {
           `INSERT INTO "membership" (org_id, user_id, role) VALUES (1, 1, 'owner')`,
         );
 
-        let duplicateError: unknown;
-        try {
-          await sql(
+        await expect(
+          sql(
             db.connectionString,
             `INSERT INTO "membership" (org_id, user_id, role) VALUES (1, 1, 'viewer')`,
-          );
-        } catch (error) {
-          duplicateError = error;
-        }
-        expect(messageFrom(duplicateError), 'duplicate membership fails on primary key').toContain(
-          'membership_pkey',
-        );
+          ),
+          'duplicate membership fails on primary key',
+        ).rejects.toThrow(/membership_pkey/);
 
         const membershipCount = await sql(
           db.connectionString,
