@@ -1,3 +1,4 @@
+import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { validateContract } from '@prisma-next/sql-contract/validate';
@@ -13,7 +14,6 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import type { PostgresContract } from '../src/core/types';
 import { createComposedPostgresAdapter } from './helpers/composed-adapter';
 
 const contract = validateContract<PostgresContract>(
