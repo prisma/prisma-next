@@ -30,7 +30,7 @@
  * when planning a contract diff.
  *
  * @see ADR 195 — Planner IR with two renderers.
- * @see ADR 212 — Codec lifecycle hooks.
+ * @see ADR 213 — Codec lifecycle hooks.
  */
 
 export type {

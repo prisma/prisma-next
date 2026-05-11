@@ -1,6 +1,6 @@
 # Contract-spaces overhead — NFR5 measurement
 
-NFR5 (TML-2397, [project spec § Non-functional](../adrs/ADR%20211%20-%20Contract%20spaces.md))
+NFR5 (TML-2397, [project spec § Non-functional](../adrs/ADR%20212%20-%20Contract%20spaces.md))
 budgets the contract-space mechanism at **< 5 %** of `emit + dbInit` for an
 app-only project versus the same project with **one** extension contract space
 loaded. This note captures the measurement we ran to validate that bound.
@@ -119,5 +119,5 @@ Captured raw output from the runs above lives next to the bench file:
 
 ## Related
 
-- [ADR 211 — Contract spaces](../adrs/ADR%20211%20-%20Contract%20spaces.md)
+- [ADR 212 — Contract spaces](../adrs/ADR%20212%20-%20Contract%20spaces.md)
 - [ADR 208 — Invariant-aware migration routing](../adrs/ADR%20208%20-%20Invariant-aware%20migration%20routing.md)

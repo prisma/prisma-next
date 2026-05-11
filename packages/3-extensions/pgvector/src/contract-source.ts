@@ -28,7 +28,7 @@
  * pgvector's `vector` IS representable in today's IR via
  * {@link StorageTypeInstance}.
  *
- * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
+ * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
 
 import sqlFamily from '@prisma-next/family-sql/pack';

@@ -2,7 +2,7 @@
 
 ## Status
 
-**Superseded by [ADR 211 — Contract spaces](./ADR%20211%20-%20Contract%20spaces.md)** (TML-2397). The `databaseDependencies` mechanism described below was removed from the framework — schema-contributing extensions now use the per-space planner / runner / verifier described in ADR 211, and codec-driven per-field schema work is described in [ADR 212 — Codec lifecycle hooks](./ADR%20212%20-%20Codec%20lifecycle%20hooks.md). The body of this ADR is preserved unchanged for historical context; the "Supersession" section at the bottom captures what changed.
+**Superseded by [ADR 212 — Contract spaces](./ADR%20212%20-%20Contract%20spaces.md)** (TML-2397). The `databaseDependencies` mechanism described below was removed from the framework — schema-contributing extensions now use the per-space planner / runner / verifier described in ADR 211, and codec-driven per-field schema work is described in [ADR 213 — Codec lifecycle hooks](./ADR%20213%20-%20Codec%20lifecycle%20hooks.md). The body of this ADR is preserved unchanged for historical context; the "Supersession" section at the bottom captures what changed.
 
 ## Context
 
@@ -103,12 +103,12 @@ Related design issue: planner inputs are asymmetric (`from` as `SqlSchemaIR`, `t
 
 ## Supersession
 
-[ADR 211 — Contract spaces](./ADR%20211%20-%20Contract%20spaces.md) replaces the `databaseDependencies` mechanism with a uniform per-space planner / runner / verifier surface. The relevant differences from the v1 model captured above:
+[ADR 212 — Contract spaces](./ADR%20212%20-%20Contract%20spaces.md) replaces the `databaseDependencies` mechanism with a uniform per-space planner / runner / verifier surface. The relevant differences from the v1 model captured above:
 
 - **Schema visibility.** Extensions declare their owned schema in a `contract.json` of their own (a "contract space"). The verifier aggregates loaded spaces in memory and checks the live database against the union — extension-installed objects are no longer "extras" the verifier has to be told to ignore via the `databaseDependencies.installs.{tables,schemas}` allowlist.
 - **No fuzzy matching, no `pg_extension` introspection.** The "current implementation compromise (v1)" in this ADR — adapter-owned ID-presence checks against `pg_extension` rows mapped to `postgres.extension.<extname>` — is removed. Adapters fully participate in the per-space verifier without a dependency-tree node; `SqlSchemaIR.dependencies` is gone.
-- **No `dependency_missing` SchemaIssue.** The same diagnostic is now reported through ADR 211's per-space verifier as `EXTENSION_HEAD_REF_DRIFT` / `EXTENSION_HEAD_REF_MISSING` (or one of `verifyContractSpaces`'s five structural violation kinds), each carrying an actionable remediation hint.
-- **Schema-driven per-column work.** The narrow case `databaseDependencies.init` was sometimes used for — schema-driven per-column scaffolding (e.g. cipherstash registering each searchable column with EQL) — is covered by [ADR 212 — Codec lifecycle hooks](./ADR%20212%20-%20Codec%20lifecycle%20hooks.md).
+- **No `dependency_missing` SchemaIssue.** The same diagnostic is now reported through ADR 212's per-space verifier as `EXTENSION_HEAD_REF_DRIFT` / `EXTENSION_HEAD_REF_MISSING` (or one of `verifyContractSpaces`'s five structural violation kinds), each carrying an actionable remediation hint.
+- **Schema-driven per-column work.** The narrow case `databaseDependencies.init` was sometimes used for — schema-driven per-column scaffolding (e.g. cipherstash registering each searchable column with EQL) — is covered by [ADR 213 — Codec lifecycle hooks](./ADR%20213%20-%20Codec%20lifecycle%20hooks.md).
 
 The migration story is demonstrated end-to-end by:
 
@@ -121,6 +121,6 @@ After both extensions migrated, `ComponentDatabaseDependencies`, `ComponentDatab
 
 - ADR 005 — Thin Core Fat Targets
 - ADR 150 — Family-Agnostic CLI and Pack Entry Points
-- [ADR 211 — Contract spaces](./ADR%20211%20-%20Contract%20spaces.md) — supersedes this ADR.
-- [ADR 212 — Codec lifecycle hooks](./ADR%20212%20-%20Codec%20lifecycle%20hooks.md) — schema-driven companion mechanism.
+- [ADR 212 — Contract spaces](./ADR%20212%20-%20Contract%20spaces.md) — supersedes this ADR.
+- [ADR 213 — Codec lifecycle hooks](./ADR%20213%20-%20Codec%20lifecycle%20hooks.md) — schema-driven companion mechanism.
 - Subsystem: Migration System

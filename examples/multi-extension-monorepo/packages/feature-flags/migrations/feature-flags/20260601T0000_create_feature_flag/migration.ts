@@ -3,7 +3,7 @@
  * Feature-flags baseline migration — create the `feature_flag` table.
  *
  * Hand-edited (M3.5 R3 Path A — see `docs/architecture docs/adrs/
- * ADR 211 - Contract spaces.md`) so the operation carries the
+ * ADR 212 - Contract spaces.md`) so the operation carries the
  * established `feature-flags:create-feature_flag-v1` invariantId and
  * matches the original handcrafted SQL byte-for-byte.
  *

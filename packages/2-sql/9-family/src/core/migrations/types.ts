@@ -63,7 +63,7 @@ export interface ResolveIdentityValueInput {
  *
  * Fired during app-space migration emission as the SQL family diffs the
  * prior contract against the new contract. See
- * `docs/architecture docs/adrs/ADR 212 - Codec lifecycle hooks.md`
+ * `docs/architecture docs/adrs/ADR 213 - Codec lifecycle hooks.md`
  * for the wiring contract.
  *
  * - `'added'`     — the field is present in the new contract but not the prior.
@@ -146,7 +146,7 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
    * (the new field's codec for `'added'` / `'altered'`; the prior field's
    * codec for `'dropped'`).
    *
-   * See `docs/architecture docs/adrs/ADR 212 - Codec lifecycle hooks.md`
+   * See `docs/architecture docs/adrs/ADR 213 - Codec lifecycle hooks.md`
    * for the wiring contract and the deterministic ordering rule.
    */
   onFieldEvent?: (event: FieldEvent, ctx: FieldEventContext) => readonly OpFactoryCall[];

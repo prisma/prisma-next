@@ -33,7 +33,7 @@ export function validateInvariantId(invariantId: string): boolean {
  * Throws `MIGRATION.INVALID_INVARIANT_ID` on a malformed id and
  * `MIGRATION.DUPLICATE_INVARIANT_IN_EDGE` on duplicates.
  *
- * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
+ * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  *   — extension migrations carry `invariantId`s on additive ops; e.g.
  *   cipherstash's `installEqlBundle` and structural `create-*` ops are
  *   additive-class but carry `cipherstash:*` invariantIds.
