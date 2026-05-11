@@ -53,7 +53,7 @@ The engineer supplies a settled design (directly or via prompt) that needs to be
 
 - If no design was given yet, ask:
   *"Walk me through the design: the problem, who's affected, the approach you've settled on, and what's forcing the work now. I'll capture it as a spec."*
-- If the description sounds like the design isn't settled (multiple competing approaches still under consideration, fundamental questions unresolved), say so and suggest the engineer use a design-discussion skill first rather than drafting a spec prematurely.
+- If the description sounds like the design isn't settled (multiple competing approaches still under consideration, fundamental questions unresolved), say so and suggest the engineer use the `drive-discussion` skill first rather than drafting a spec prematurely.
 - Once a settled design is in hand, proceed to **Drafting**.
 
 ### 3. Conversation summary
@@ -294,7 +294,7 @@ _The residual decisions left for the implementer (or for resolution before/durin
 
 **Don't:**
 
-- Use this skill to facilitate a design discussion. If the design isn't settled, stop and use a design-discussion skill first.
+- Use this skill to facilitate a design discussion. If the design isn't settled, stop and use the `drive-discussion` skill first.
 - Leave sections blank with "TBD": either fill with an assumption or add an open question.
 - Ask questions the engineer already answered in their description.
 - Over-index on formality: this is a working document, not a contract.
