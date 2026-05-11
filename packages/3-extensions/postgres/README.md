@@ -83,6 +83,18 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - `poolOptions.connectionTimeoutMillis` (default `20_000`)
 - `poolOptions.idleTimeoutMillis` (default `30_000`)
 
+### `@prisma-next/postgres/contract-builder`
+
+Re-exports the TypeScript contract authoring DSL (`defineContract`, `field`, `model`, `rel`, ...) so a generated `prisma/contract.ts` can author its contract using only this facade package.
+
+### `@prisma-next/postgres/pack`
+
+Re-exports the SQL family pack (the value passed as `family:` to `defineContract`).
+
+### `@prisma-next/postgres/target`
+
+Re-exports the Postgres target pack (the value passed as `target:` to `defineContract`).
+
 ### `@prisma-next/postgres/serverless`
 
 `@prisma-next/postgres/serverless` exposes `postgresServerless(...)` for per-request runtimes. The returned client exposes only:

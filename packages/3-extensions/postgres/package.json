@@ -57,8 +57,11 @@
   },
   "exports": {
     "./config": "./dist/config.mjs",
+    "./contract-builder": "./dist/contract-builder.mjs",
+    "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./serverless": "./dist/serverless.mjs",
+    "./target": "./dist/target.mjs",
     "./package.json": "./package.json"
   },
   "types": "./dist/runtime.d.mts"
