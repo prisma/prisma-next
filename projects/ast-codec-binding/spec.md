@@ -151,8 +151,29 @@ Every artifact below is removed:
 ### AC-5. Honest descriptor signatures
 
 - `PgVectorDescriptor.factory(params: VectorParams)` reads `params.length` directly. The `(params as VectorParams | undefined)?.length` defensive cast deletes.
+- `PgVectorCodec.length` narrows from `number | undefined` to `number` (matches the now-honest factory signature).
 - The runtime `as unknown as` cast widening void-factory params to `unknown` deletes.
 - No descriptor's factory receives `undefined` as an unsigned proxy for "no params known". Non-parameterized factories still receive `undefined` (which matches their `P = void` declared signature); parameterized factories receive validated `P` always.
+
+**Breaking change: undimensioned `vectorColumn` retires.**
+
+The pgvector extension currently exports two column-type helpers from `@prisma-next/extension-pgvector/column-types`:
+
+- `vector(N)` — dimensioned vector with `typeParams: { length: N }`.
+- `vectorColumn` — undimensioned vector with no `typeParams`. Today's runtime serves this column shape via the `parameterizedRepresentatives` cache + the `factory(undefined)` representative-codec hack.
+
+Once that hack retires (this AC), an undimensioned `vectorColumn` produces `CodecRef = { codecId: 'pg/vector@1', typeParams: undefined }`; the resolver tries `paramsSchema.validate(undefined)` and throws `RUNTIME.TYPE_PARAMS_INVALID`. There is no honest signature for `factory` that supports both dimensioned and undimensioned use without re-introducing the defensive cast.
+
+**Resolution.** `vectorColumn` is removed in M3a together with the descriptor honesty changes:
+
+- `vectorColumn` deletes from `packages/3-extensions/pgvector/src/exports/column-types.ts`.
+- The barrel re-export in `packages/3-extensions/pgvector/src/exports/index.ts` (if any) deletes.
+- The `vectorColumn (static)` test block in `packages/3-extensions/pgvector/test/column-types.test.ts` deletes.
+- The `factory(undefined)` representative-codec test in `packages/3-extensions/pgvector/test/codecs.test.ts` deletes (the behavior under test is gone).
+- The internal consumer in `packages/3-extensions/sql-orm-client/test/fixtures/contract.ts:25` migrates from `field.column(vectorColumn)` to `field.column(vector(1536))`.
+- A user-facing changelog entry under the next release notes calls out the removal and the migration path: replace `vectorColumn` with `vector(N)` for an explicit dimension.
+
+This is acceptable scope for TML-2456 because the only usable wire shape is dimension-known (the codec needs `length` to validate `assertVector`); the undimensioned form was a workaround for the representative-codec hack that this project deletes. No other column shape (parameterized-codec-without-params) is shipped in this codebase.
 
 ### AC-6. Builder construction sites populate `CodecRef`
 

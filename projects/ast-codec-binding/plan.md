@@ -67,7 +67,14 @@ Instead: **the AST shape change and the heuristic deletion land together at M3**
 
 **Scope.** This is the substantive milestone. AST nodes get `codec: CodecRef | undefined`; eight heuristics retire; every builder site migrates. **Lands as three sub-commits** within M3 for review tractability:
 
-- **M3a** — Descriptor honesty (AC-5): `PgVectorDescriptor.factory` signature honest; `PgVectorCodec.length` narrows to `number`; defensive `(params as VectorParams | undefined)?.length` cast deletes. Reviewable as a standalone descriptor cleanup; tests for the existing pgvector path keep passing because the runtime still calls `factory({length})` with real params (the representative-codec call site goes away in M3c).
+- **M3a** — Descriptor honesty + `vectorColumn` retirement (AC-5):
+  - `PgVectorDescriptor.factory(params: VectorParams)` reads `params.length` directly; defensive `(params as VectorParams | undefined)?.length` cast deletes.
+  - `PgVectorCodec.length` narrows from `number | undefined` to `number`.
+  - **Public API breaking change**: `vectorColumn` (undimensioned) deletes from `packages/3-extensions/pgvector/src/exports/column-types.ts` (and from the `column-types` barrel re-export if any). The undimensioned form has no honest representation under `forCodecRef` once the representative-codec hack retires (`forCodecRef({ codecId: 'pg/vector@1', typeParams: undefined })` would throw `RUNTIME.TYPE_PARAMS_INVALID`). Users migrate to `vector(N)`.
+  - Internal consumer migration: `packages/3-extensions/sql-orm-client/test/fixtures/contract.ts:25` switches from `field.column(vectorColumn).optional()` to `field.column(vector(1536)).optional()`.
+  - Test deletions: the `vectorColumn (static)` describe block in `packages/3-extensions/pgvector/test/column-types.test.ts` deletes; the `factory(undefined)` representative-codec test in `packages/3-extensions/pgvector/test/codecs.test.ts` deletes (behavior under test is gone in M3c; M3a removes its sole consumer).
+  - Changelog entry under the next release notes calls out the removal and the `vector(N)` migration path.
+  - Reviewable as a standalone descriptor cleanup; the rest of the pgvector path keeps passing because the runtime still calls `factory({length})` with real params (the representative-codec call site goes away in M3c).
 - **M3b** — AST shape + builder migration: `ParamRef` and `ProjectionItem` carry `codec: CodecRef | undefined`; legacy `codecId`/`refs` fields delete in the same commit; every builder construction site migrates. Atomic by necessity — partial migration would leave the AST in a half-shape state. Includes the column-ref ProjectionItem stamping change (every column-bound projection populates `codec`, including bare `column-ref` expressions).
 - **M3c** — Heuristic deletion: `validateParamRefRefs`, `alias-resolver.ts`, codec-id consistency check, `byCodecId`, `parameterizedRepresentatives`, `ambiguousCodecIds`, `forCodecId`, `factory.bind(descriptor)` all delete. The encode/decode dispatch collapses to `resolver.forCodecRef(node.codec)`.
 
@@ -122,7 +129,15 @@ Descriptor-side honesty (AC-5):
 - Augment `packages/2-sql/5-runtime/test/sql-context.codec-context.test.ts`: assert `forCodecId` removed from registry; assert content-keyed dispatch.
 - Add tests for self-join case (Case S in spec): two `ParamRef`s in a self-join carry identical `CodecRef`s; encode produces one resolver lookup per ref, no alias resolution.
 
-**Acceptance.** `pnpm typecheck` green. All package tests green. `pnpm fixtures:check` green (demo emit unchanged). Real-Postgres e2e (vector encode/decode) green.
+**Validation gate (per sub-commit).**
+
+- **M3a gate**: `pnpm --filter @prisma-next/extension-pgvector test`, `pnpm --filter @prisma-next/sql-orm-client test`, `pnpm --filter @prisma-next/extension-pgvector typecheck`, `pnpm --filter @prisma-next/sql-orm-client typecheck`, `pnpm --filter @prisma-next/extension-pgvector build`, `pnpm lint:deps`. M3a is package-scoped (pgvector + sql-orm-client fixture migration); workspace-wide deferred to the M3c gate.
+- **M3b gate**: `pnpm typecheck` (workspace), `pnpm test:packages` (workspace), `pnpm lint:deps`, `pnpm build`. M3b changes the AST shape consumer-visible everywhere; the workspace gate is mandatory.
+- **M3c gate**: `pnpm typecheck`, `pnpm test:packages`, `pnpm test:integration`, `pnpm test:e2e`, `pnpm lint:deps`, `pnpm fixtures:check`. M3c retires public exports (`forCodecId`, `parameterizedRepresentatives`, `validateParamRefRefs`, `alias-resolver.ts`); the cross-package + integration + e2e gate is mandatory per the SKILL § cross-package gates rule.
+
+Cross-package grep before declaring M3c done: `rg 'forCodecId|parameterizedRepresentatives|ambiguousCodecIds|validateParamRefRefs|alias-resolver' packages/ examples/` — any production hit is a regression.
+
+**Acceptance.** All gates green per sub-commit. Demo emit byte-identical against `origin/main` baseline. Real-Postgres e2e (vector encode/decode) green at M3c.
 
 ### M4 — Refs-less raw SQL hard fail
 
