@@ -26,21 +26,19 @@ const tableRegistry = {
 } as const;
 
 function lookup(routingKey: CipherstashRoutingKey) {
-  const tableName = routingKey.table as keyof typeof tableRegistry;
-  const entry = tableRegistry[tableName];
-  if (!entry) {
+  if (!Object.hasOwn(tableRegistry, routingKey.table)) {
     throw new Error(
       `cipherstash SDK: unknown routing-key table "${routingKey.table}". ` +
         'Add it to the schema in src/encryption/index.ts and the registry in src/sdk.ts.',
     );
   }
-  const columnName = routingKey.column as keyof typeof entry.columns;
-  const column = entry.columns[columnName];
-  if (!column) {
+  const entry = tableRegistry[routingKey.table as keyof typeof tableRegistry];
+  if (!Object.hasOwn(entry.columns, routingKey.column)) {
     throw new Error(
       `cipherstash SDK: unknown routing-key column "${routingKey.column}" on table "${routingKey.table}".`,
     );
   }
+  const column = entry.columns[routingKey.column as keyof typeof entry.columns];
   return { table: entry.table, column };
 }
 
