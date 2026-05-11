@@ -194,8 +194,8 @@ describe('per-space verifier + runner against a project with deleted node_module
  * pipeline ever silently re-touches a descriptor module, this test
  * does not catch it on its own (descriptor modules are imported
  * eagerly by their consumers); but combined with the fact that the
- * loader is the only place that calls `validateContract` / `hashContract`,
- * the property is locked at the API surface.
+ * loader's only descriptor-shaped input is `id` / `targetId`, the
+ * property is locked at the API surface.
  */
 describe('aggregate pipeline (loader → planner → verifier) against deleted node_modules', () => {
   const HEAD_HASH = 'sha256:abc123';
@@ -215,9 +215,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
     );
 
     // Pin the contract-space artefacts the loader reads. The contract
-    // value here is the same shape the validator will return; the
-    // hashContract callback hashes it to HEAD_HASH so drift detection
-    // sees no drift.
+    // value here is the same shape the validator will return.
     const spaceContract = createSqlContract({
       target: 'postgres',
       storage: { tables: { test_box: { columns: { x: {}, y: {} } } } },
@@ -247,25 +245,13 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
   });
 
   it('loader → verifier walk to completion with node_modules removed', async () => {
-    // Reconstruct the same on-disk contract value the writer used (the
-    // emitter rounds it through the canonical-JSON pipeline; the test
-    // hands the validator back an identity value structurally identical
-    // to what was written).
-    const spaceContract = createSqlContract({
-      target: 'postgres',
-      storage: { tables: { test_box: { columns: { x: {}, y: {} } } } },
-    });
     const appContract = createSqlContract({
       target: 'postgres',
       storage: { tables: { user: { columns: { id: {} } } } },
     });
 
     const declaredExtensions: ReadonlyArray<DeclaredExtensionEntry> = [
-      {
-        id: TEST_SPACE_ID,
-        targetId: 'postgres',
-        contractSpace: { contractJson: spaceContract as unknown as Record<string, unknown> },
-      },
+      { id: TEST_SPACE_ID, targetId: 'postgres' },
     ];
 
     const loaded = await loadContractSpaceAggregate({
@@ -274,7 +260,6 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       appContract,
       declaredExtensions,
       validateContract: (json: unknown): Contract => json as Contract,
-      hashContract: () => HEAD_HASH,
       appMigrationPackages: [],
     });
     expect(loaded.ok).toBe(true);

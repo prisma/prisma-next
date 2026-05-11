@@ -3,10 +3,7 @@ import { tmpdir } from 'node:os';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  formatContractSpaceDriftWarning,
-  runContractSpaceMigratePass,
-} from '../../src/utils/contract-space-migrate-pass';
+import { runContractSpaceMigratePass } from '../../src/utils/contract-space-migrate-pass';
 
 const HASH_A = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const HASH_B = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -31,7 +28,7 @@ describe('runContractSpaceMigratePass', () => {
     }
   });
 
-  it('emits on-disk artefacts on first emit and reports kind=firstEmit', async () => {
+  it('emits on-disk artefacts for a contract-space-bearing extension', async () => {
     const out = await runContractSpaceMigratePass({
       migrationsDir: requireDir(),
       extensionPacks: [
@@ -46,7 +43,6 @@ describe('runContractSpaceMigratePass', () => {
     });
 
     expect(out.emittedSpaceIds).toEqual(['cipherstash']);
-    expect(out.drifts.map((d) => d.kind)).toEqual(['firstEmit']);
 
     const headJson = JSON.parse(
       await readFile(join(requireDir(), 'cipherstash', 'refs', 'head.json'), 'utf-8'),
@@ -56,37 +52,14 @@ describe('runContractSpaceMigratePass', () => {
     expect(dts).toContain('@ts-nocheck');
   });
 
-  it('reports kind=noDrift when descriptor matches the on-disk head (idempotent re-pin)', async () => {
+  it('refreshes the on-disk head hash when the descriptor diverges from the prior pin', async () => {
     await emitContractSpaceArtefacts(requireDir(), 'cipherstash', {
       contract: { v: 1 },
       contractDts: '\n',
       headRef: { hash: HASH_A, invariants: [] },
     });
 
-    const out = await runContractSpaceMigratePass({
-      migrationsDir: requireDir(),
-      extensionPacks: [
-        {
-          id: 'cipherstash',
-          contractSpace: {
-            contractJson: { v: 1 },
-            headRef: { hash: HASH_A, invariants: [] },
-          },
-        },
-      ],
-    });
-
-    expect(out.drifts.map((d) => d.kind)).toEqual(['noDrift']);
-  });
-
-  it('reports kind=drift when descriptor hash diverges from the on-disk head', async () => {
-    await emitContractSpaceArtefacts(requireDir(), 'cipherstash', {
-      contract: { v: 1 },
-      contractDts: '\n',
-      headRef: { hash: HASH_A, invariants: [] },
-    });
-
-    const out = await runContractSpaceMigratePass({
+    await runContractSpaceMigratePass({
       migrationsDir: requireDir(),
       extensionPacks: [
         {
@@ -99,17 +72,6 @@ describe('runContractSpaceMigratePass', () => {
       ],
     });
 
-    expect(out.drifts.map((d) => d.kind)).toEqual(['drift']);
-    const drift = out.drifts[0];
-    if (drift?.kind !== 'drift') {
-      throw new Error(`expected drift result, got ${drift?.kind ?? 'undefined'}`);
-    }
-    const warning = formatContractSpaceDriftWarning(drift);
-    expect(warning).toContain('cipherstash');
-    expect(warning).toContain(HASH_A);
-    expect(warning).toContain(HASH_B);
-
-    // Head hash on disk is refreshed to descriptor hash.
     const headJson = JSON.parse(
       await readFile(join(requireDir(), 'cipherstash', 'refs', 'head.json'), 'utf-8'),
     );
@@ -122,7 +84,6 @@ describe('runContractSpaceMigratePass', () => {
       extensionPacks: [{ id: 'codec-only' }],
     });
     expect(out.emittedSpaceIds).toEqual([]);
-    expect(out.drifts).toEqual([]);
   });
 
   it('processes multiple extension spaces in a single pass', async () => {
@@ -147,40 +108,5 @@ describe('runContractSpaceMigratePass', () => {
     });
 
     expect([...out.emittedSpaceIds].sort()).toEqual(['audit', 'cipherstash']);
-    expect(out.drifts.length).toBe(2);
-  });
-});
-
-describe('formatContractSpaceDriftWarning', () => {
-  it('throws if called with a non-drift result (caller guard)', () => {
-    expect(() =>
-      formatContractSpaceDriftWarning({
-        kind: 'noDrift',
-        spaceId: 'x',
-        descriptorHash: HASH_A,
-        priorHeadHash: HASH_A,
-      }),
-    ).toThrow();
-  });
-
-  it('renders priorHeadHash when present', () => {
-    const message = formatContractSpaceDriftWarning({
-      kind: 'drift',
-      spaceId: 'pgvector',
-      descriptorHash: HASH_A,
-      priorHeadHash: HASH_B,
-    });
-    expect(message).toContain(`differs from on-disk head hash ${HASH_B}`);
-    expect(message).toContain('pgvector');
-  });
-
-  it('renders <none> when priorHeadHash is null (first-run drift)', () => {
-    const message = formatContractSpaceDriftWarning({
-      kind: 'drift',
-      spaceId: 'cipherstash',
-      descriptorHash: HASH_A,
-      priorHeadHash: null,
-    });
-    expect(message).toContain('differs from on-disk head hash <none>');
   });
 });

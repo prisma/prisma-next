@@ -108,30 +108,25 @@ export function toExtensionInputs(
 // ---------------------------------------------------------------------------
 
 /**
- * Aggregate-loader projection: surfaces `targetId` + `contractSpace.contractJson`
- * to {@link import('./contract-space-aggregate-loader').buildContractSpaceAggregate}
- * and a `hashByContractJson` map keyed by the same `contractJson` reference
- * the loader hands to its hash callback.
+ * Aggregate-loader projection. Surfaces `id` + `targetId` per
+ * contract-space-bearing extension to
+ * {@link import('./contract-space-aggregate-loader').buildContractSpaceAggregate}.
+ *
+ * Codec-only extensions (no `contractSpace` declaration) are filtered
+ * out: they are not contract-space members, so the aggregate loader
+ * has nothing to do with them. Filtering happens at this descriptor-
+ * import boundary so the loader stays oblivious to that distinction —
+ * every entry it sees expects an on-disk `migrations/<id>/` directory.
  */
-export function toDeclaredExtensions(inputs: ReadonlyArray<ExtensionPackInput>): {
-  readonly entries: ReadonlyArray<DeclaredExtensionEntry>;
-  readonly hashByContractJson: Map<unknown, string>;
-} {
+export function toDeclaredExtensions(
+  inputs: ReadonlyArray<ExtensionPackInput>,
+): readonly DeclaredExtensionEntry[] {
   const entries: DeclaredExtensionEntry[] = [];
-  const hashByContractJson = new Map<unknown, string>();
   for (const pack of inputs) {
-    if (pack.contractSpace) {
-      entries.push({
-        id: pack.id,
-        targetId: pack.targetId,
-        contractSpace: { contractJson: pack.contractSpace.contractJson },
-      });
-      hashByContractJson.set(pack.contractSpace.contractJson, pack.contractSpace.headRef.hash);
-    } else {
-      entries.push({ id: pack.id, targetId: pack.targetId });
-    }
+    if (pack.contractSpace === undefined) continue;
+    entries.push({ id: pack.id, targetId: pack.targetId });
   }
-  return { entries, hashByContractJson };
+  return entries;
 }
 
 /** Migrate-time per-space pass projection. */

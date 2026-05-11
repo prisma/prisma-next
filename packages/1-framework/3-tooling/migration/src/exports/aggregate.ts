@@ -1,5 +1,4 @@
 export {
-  type AggregateContractHasher,
   type DeclaredExtensionEntry,
   type LayoutViolation,
   type LoadAggregateError,
