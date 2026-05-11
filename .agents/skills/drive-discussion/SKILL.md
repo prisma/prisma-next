@@ -38,7 +38,7 @@ In order of preference:
 
 - **Single persona** — adopt it at entry; stay in it for the body; reload `tech-lead` at synthesis (see § Synthesis).
 - **Multiple personas** — sequence per the personas' own dependency relationships. Typical defaults: shape-class lenses before buildability-class lenses (e.g. `architect` before `principal-engineer`); scope-class lenses before shape-class lenses when scope is unsettled (e.g. `pm` before `architect`). When the user names a sequence explicitly, honour it. The default sequence is a heuristic, not a contract.
-- **Cross-pollination is expected** and load-bearing. Mid-thread, the conversation can pull a concern back across a persona boundary (*"the user is proposing a new naming scheme; switch to architect for this subthread"*). Switch silently for the subthread, then return to the lens that was driving.
+- **Cross-pollination is expected** and load-bearing. Mid-thread, the conversation can pull a concern back across a persona boundary (*"the user is proposing a new naming scheme; switch to architect for this subthread"*). Declare the subthread switch explicitly in-line (a one-line *"switching to architect for this subthread"* override), then explicitly return to the lens that was driving when the subthread closes.
 - **Reload `tech-lead` at synthesis** for the closing summary and the documentation offer. The orchestrator lens is the right one for packaging the outcome.
 
 Persona is *the lens, not a phase the conversation is locked into.* Per the agent-personas library, each persona load is visible in the workflow body and persona is not propagated — the agent re-loads at every boundary rather than carrying the prior persona through.
