@@ -13,7 +13,7 @@ This extension pack adds support for the `vector` data type and vector similarit
 - **CLI Integration**: Provides extension descriptor for `prisma-next.config.ts` configuration
 - **Runtime Extension**: Registers codecs and operations at runtime for vector column operations
 - **Pack Ref Export**: Ships a pure `/pack` entrypoint for TypeScript contract authoring without runtime filesystem access
-- **Database Dependencies**: Declares the `vector` Postgres extension as a database dependency, which the migration planner emits as a `CREATE EXTENSION IF NOT EXISTS vector` operation and the verifier checks against the schema IR
+- **Baseline Migration**: Ships an on-disk baseline migration in its contract space that installs the `vector` Postgres extension (`CREATE EXTENSION IF NOT EXISTS vector`) when the extension is composed into an application
 
 ## Dependencies
 
@@ -30,15 +30,15 @@ pnpm add @prisma-next/extension-pgvector
 
 ## Database Setup
 
-The pgvector extension declares its database requirements as component-owned database dependencies. When using the `prisma-next db init` command, the migration planner automatically includes a `CREATE EXTENSION IF NOT EXISTS vector` operation.
+The pgvector extension ships an on-disk baseline migration in its contract space; applying that migration installs pgvector with `CREATE EXTENSION IF NOT EXISTS vector`. When the extension is composed into an application via `extensionPacks`, `prisma-next db init` and `prisma-next db update` apply the baseline (and any subsequent migrations) automatically.
 
-For manual database setup, ensure the pgvector extension is installed:
+For manual database setup, the equivalent DDL is:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-The verifier will check for the presence of the `vector` extension in your database schema and report an error if it's missing.
+Ensure the baseline migration (or equivalent DDL) has been applied before running workloads that use vector columns.
 
 ## Configuration
 

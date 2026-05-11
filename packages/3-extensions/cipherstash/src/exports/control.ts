@@ -49,7 +49,6 @@ import headRef from '../../migrations/cipherstash/refs/head.json' with { type: '
 import contractJson from '../contract/contract.json' with { type: 'json' };
 import {
   CIPHERSTASH_BASELINE_MIGRATION_NAME,
-  CIPHERSTASH_SPACE_ID,
   CIPHERSTASH_STRING_CODEC_ID,
 } from '../extension-metadata/constants';
 import { cipherstashPackMeta } from '../extension-metadata/descriptor-meta';

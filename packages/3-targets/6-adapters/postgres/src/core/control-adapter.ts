@@ -180,7 +180,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * and returns the schema structure without type mapping or contract enrichment.
    * Type mapping and enrichment are handled separately by enrichment helpers.
    *
-   * Uses batched queries to minimize database round trips (7 queries instead of 5T+3).
+   * Uses batched queries to minimize database round trips (6 queries instead of 5T+1).
    *
    * @param driver - ControlDriverInstance<'sql', 'postgres'> instance for executing queries
    * @param contract - Optional contract for contract-guided introspection (filtering, optimization)
@@ -344,6 +344,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           indisunique: boolean;
           attname: string;
           attnum: number;
+          amname: string | null;
+          reloptions: string[] | null;
         }>(
           `SELECT
            i.tablename,
@@ -529,7 +531,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           // Drop btree (the Postgres default) so a contract index without an
           // explicit type matches a default-method introspected index without
           // forcing DROP+CREATE on every plan.
-          const indexType = idxRow.amname === 'btree' ? undefined : idxRow.amname;
+          const indexType = idxRow.amname && idxRow.amname !== 'btree' ? idxRow.amname : undefined;
           const indexOptions = parsePgReloptions(idxRow.reloptions, idxRow.indexname);
           indexesMap.set(idxRow.indexname, {
             columns: [idxRow.attname],
