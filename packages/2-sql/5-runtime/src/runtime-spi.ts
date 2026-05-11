@@ -10,6 +10,7 @@ import type { MarkerStatement } from '@prisma-next/sql-relational-core/ast';
  * delegating to the shared row schema.
  */
 export interface MarkerReader {
+  markerExistsStatement(): MarkerStatement;
   readMarkerStatement(): MarkerStatement;
   parseMarkerRow(row: unknown): ContractMarkerRecord;
 }

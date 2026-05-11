@@ -23,6 +23,10 @@ const testProfile: AdapterProfile = {
   id: 'test/default@1',
   target: 'postgres',
   capabilities: {},
+  markerExistsStatement: () => ({
+    sql: 'SELECT 1 FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2',
+    params: ['prisma_contract', 'marker'],
+  }),
   readMarkerStatement: () => ({
     sql: 'SELECT core_hash, profile_hash FROM prisma_contract.marker WHERE space = $1',
     params: ['app'],

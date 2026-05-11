@@ -52,6 +52,10 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
       id: options?.profileId ?? 'sqlite/default@1',
       target: 'sqlite',
       capabilities: defaultCapabilities,
+      markerExistsStatement: () => ({
+        sql: "select 1 from sqlite_master where type = 'table' and name = ?",
+        params: ['_prisma_marker'],
+      }),
       readMarkerStatement: () => ({
         sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from _prisma_marker where space = ?',
         params: [APP_SPACE_ID],

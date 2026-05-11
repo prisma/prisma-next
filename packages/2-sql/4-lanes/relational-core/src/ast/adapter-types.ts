@@ -13,6 +13,10 @@ export interface AdapterProfile<TTarget extends AdapterTarget = AdapterTarget> {
   readonly target: TTarget;
   readonly capabilities: Record<string, unknown>;
   /**
+   * Returns a probe statement that yields one row iff the marker table exists. Callers treat an empty result as "no marker present" so a missing marker table does not surface as a driver error before the runtime's `requireMarker` policy is consulted.
+   */
+  markerExistsStatement(): MarkerStatement;
+  /**
    * Returns the SQL statement to read the contract marker from the database. Each adapter provides target-specific SQL (e.g. schema-qualified table names, parameter placeholder style).
    */
   readMarkerStatement(): MarkerStatement;

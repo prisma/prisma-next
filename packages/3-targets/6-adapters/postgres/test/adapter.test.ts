@@ -299,6 +299,12 @@ describe('Postgres adapter', () => {
     expect(marker.params).toEqual(['app']);
   });
 
+  it('exposes a marker-exists probe that targets information_schema', () => {
+    const probe = adapter.profile.markerExistsStatement();
+    expect(probe.sql).toContain('from information_schema.tables');
+    expect(probe.params).toEqual(['prisma_contract', 'marker']);
+  });
+
   it('honours an overridden profile id from PostgresAdapterOptions', () => {
     const customAdapter = createPostgresAdapter({ profileId: 'postgres/custom@9' });
     expect(customAdapter.profile.id).toBe('postgres/custom@9');

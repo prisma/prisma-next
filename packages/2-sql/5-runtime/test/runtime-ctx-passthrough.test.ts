@@ -62,6 +62,9 @@ function createStubAdapter() {
       codecs() {
         return codecs;
       },
+      markerExistsStatement() {
+        return { sql: 'select 1', params: [] };
+      },
       readMarkerStatement() {
         return { sql: 'select 1', params: [] };
       },

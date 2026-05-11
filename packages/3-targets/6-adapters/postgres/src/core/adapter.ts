@@ -42,6 +42,10 @@ class PostgresAdapterImpl
       id: options?.profileId ?? 'postgres/default@1',
       target: 'postgres',
       capabilities: defaultCapabilities,
+      markerExistsStatement: () => ({
+        sql: 'select 1 from information_schema.tables where table_schema = $1 and table_name = $2',
+        params: ['prisma_contract', 'marker'],
+      }),
       readMarkerStatement: () => ({
         sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
         params: [APP_SPACE_ID],

@@ -107,6 +107,9 @@ function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
       id: 'test-profile',
       target: 'postgres',
       capabilities: {},
+      markerExistsStatement() {
+        return { sql: 'select 1', params: [] };
+      },
       readMarkerStatement() {
         return { sql: 'select 1', params: [] };
       },

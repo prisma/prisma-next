@@ -13,6 +13,7 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
       id: 'stub-profile',
       target: 'postgres',
       capabilities: {},
+      markerExistsStatement: () => ({ sql: '', params: [] }),
       readMarkerStatement: () => ({ sql: '', params: [] }),
       parseMarkerRow: () => {
         throw new Error('stub adapter does not implement parseMarkerRow');

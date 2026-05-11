@@ -399,6 +399,19 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   }
 
   private async verifyMarker(): Promise<void> {
+    const existsStatement = this.familyAdapter.markerReader.markerExistsStatement();
+    const existsResult = await this.driver.query(existsStatement.sql, existsStatement.params);
+
+    const markerMissing = existsResult.rows.length === 0;
+    if (markerMissing) {
+      if (this.verify.requireMarker) {
+        throw runtimeError('CONTRACT.MARKER_MISSING', 'Contract marker not found in database');
+      }
+
+      this.verified = true;
+      return;
+    }
+
     const readStatement = this.familyAdapter.markerReader.readMarkerStatement();
     const result = await this.driver.query(readStatement.sql, readStatement.params);
 

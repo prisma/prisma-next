@@ -60,6 +60,9 @@ function createStubAdapter(codecs: ReadonlyArray<Codec<string>>) {
       codecs() {
         return codecs;
       },
+      markerExistsStatement() {
+        return { sql: 'select 1 from information_schema.tables', params: [] };
+      },
       readMarkerStatement() {
         return { sql: 'select * from prisma_contract.marker', params: [1] };
       },
@@ -231,9 +234,12 @@ describe('verifyMarker', () => {
     const runtime = createStartupSetup(driver);
 
     await runtime.execute(createPlan()).toArray();
+    const callsAfterFirst = driver.query.mock.calls.length;
     await runtime.execute(createPlan()).toArray();
+    const callsAfterSecond = driver.query.mock.calls.length;
 
-    expect(driver.query).toHaveBeenCalledTimes(1);
+    expect(callsAfterFirst).toBeGreaterThan(0);
+    expect(callsAfterSecond).toBe(callsAfterFirst);
   });
 
   it('skips verification when no marker row exists and requireMarker is false', async () => {
