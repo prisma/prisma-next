@@ -467,8 +467,9 @@ function buildContractCodecRegistry(
 
   const resolver = createAstCodecResolver(codecDescriptors, (ref) => {
     const key = refKeyOf(ref);
+    // Fallback uses the canonical cache key as the instance name. Two ad-hoc refs with the same `codecId` but different `typeParams` resolve to distinct codecs (different cache keys) and must therefore expose distinct `name`s; a `codecId`-only fallback would collide and break stateful codecs that key per-instance state on `name`.
     return {
-      name: nameByKey.get(key) ?? `<shared:${ref.codecId}>`,
+      name: nameByKey.get(key) ?? key,
       usedAt: usedAtByKey.get(key) ?? [],
     };
   });
