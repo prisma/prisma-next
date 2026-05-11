@@ -200,44 +200,16 @@ The extension declares the following capabilities:
 
 ## Authoring (maintainers)
 
-The extension's contract + baseline migration are emitted on-disk inside
-this package using the same pipeline application authors use:
+The extension's contract + baseline migration are emitted on-disk inside this package using the same pipeline application authors use:
 
-- `pnpm build:contract-space` — runs `prisma-next contract emit` to
-  produce `<package>/contract.{json,d.ts}` from the TS source at
-  `src/contract-source.ts`.
-- `pnpm exec prisma-next migration plan --name <slug>` (run from this
-  package directory) — scaffolds a new migration directory under
-  `migrations/pgvector/<dirName>/` for schema changes that touch
-  tables / models. **Not chained into `pnpm build`**: `migration plan`
-  is non-idempotent (each invocation generates a new timestamped
-  directory), so it runs manually when the contract source changes.
-  Note: pgvector's contract declares only the parameterised `vector`
-  native type under `storage.types` (no tables / models), so the
-  planner currently refuses to scaffold the baseline migration with
-  `PN-CLI-4020 Contract changed but planner produced no operations`
-  (this is **Path B** authoring per
-  [ADR 212](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md#on-disk-in-package-authoring-convention)).
-  That directory was hand-authored once (Migration subclass + seed
-  `migration.json` preserving the full `toContract`) and `pnpm tsx
-  migrations/pgvector/<dirName>/migration.ts` re-emits `ops.json` +
-  `migration.json` deterministically. Future migrations that add
-  tables / models can use `migration plan` directly (Path A).
-- `pnpm tsx migrations/pgvector/<dirName>/migration.ts` (run from this
-  package directory) — re-emits `ops.json` + `migration.json` from the
-  hand-edited subclass. Use `tsx`, not bare `node`, because the
-  Migration subclass imports relative TypeScript siblings which Node's
-  native loader can't resolve without a TS-aware loader.
-- `refs/head.json` is hand-pinned with the latest migration's `to`
-  hash + `providedInvariants`.
+- `pnpm build:contract-space` — runs `prisma-next contract emit` to produce `<package>/contract.{json,d.ts}` from the TS source at `src/contract-source.ts`.
+- `pnpm exec prisma-next migration plan --name <slug>` (run from this package directory) — scaffolds a new migration directory under `migrations/pgvector/<dirName>/` for schema changes that touch tables / models. **Not chained into `pnpm build`**: `migration plan` is non-idempotent (each invocation generates a new timestamped directory), so it runs manually when the contract source changes. Note: pgvector's contract declares only the parameterised `vector` native type under `storage.types` (no tables / models), so the planner currently refuses to scaffold the baseline migration with `PN-CLI-4020 Contract changed but planner produced no operations` (this is **Path B** authoring per [ADR 212](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md#on-disk-in-package-authoring-convention)). That directory was hand-authored once (Migration subclass + seed `migration.json` preserving the full `toContract`) and `pnpm tsx migrations/pgvector/<dirName>/migration.ts` re-emits `ops.json` + `migration.json` deterministically. Future migrations that add tables / models can use `migration plan` directly (Path A).
+- `pnpm tsx migrations/pgvector/<dirName>/migration.ts` (run from this package directory) — re-emits `ops.json` + `migration.json` from the hand-edited subclass. Use `tsx`, not bare `node`, because the Migration subclass imports relative TypeScript siblings which Node's native loader can't resolve without a TS-aware loader.
+- `refs/head.json` is hand-pinned with the latest migration's `to` hash + `providedInvariants`.
 
-The descriptor at `src/exports/control.ts` then JSON-imports those
-artefacts and synthesises the framework's `MigrationPackage` shape.
+The descriptor at `src/exports/control.ts` then JSON-imports those artefacts and synthesises the framework's `MigrationPackage` shape.
 
-See [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md)
-("On-disk-in-package authoring convention") for the full rationale and
-[`packages/3-extensions/test-contract-space`](../test-contract-space)
-for the reference model.
+See [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md) ("On-disk-in-package authoring convention") for the full rationale and [`packages/3-extensions/test-contract-space`](../test-contract-space) for the reference model.
 
 ## References
 

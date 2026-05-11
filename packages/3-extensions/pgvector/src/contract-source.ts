@@ -1,9 +1,8 @@
 /**
  * TS contract source for the `extension-pgvector` package.
  *
- * Authored against the on-disk-in-package convention introduced in M3.5
- * R1 (project: extension-contract-spaces, TML-2397). The same emit
- * pipeline application authors use is applied here:
+ * Authored against the on-disk-in-package convention (TML-2397). The
+ * same emit pipeline application authors use is applied here:
  *
  *   `prisma-next contract emit` → `<package>/contract.{json,d.ts}`
  *   `prisma-next migration plan` → `<package>/migrations/pgvector/<dirName>/`
@@ -11,7 +10,7 @@
  * The descriptor at `src/exports/control.ts` then wires the emitted
  * JSON artefacts via JSON-import declarations.
  *
- * ## R3 IR coverage
+ * ## IR coverage
  *
  * pgvector ships **no tables** of its own. The single object the
  * extension contributes to the contract IR is the parameterised native

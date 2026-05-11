@@ -7,9 +7,9 @@
  * `SqliteMigrationPlanner`) so codec-emitted ops are inlined alongside
  * structural DDL in the app-space migration's `ops.json`. Pure, target-
  * agnostic, and only ever invoked at the app-space emitter; extension-space
- * planning never reaches this helper (sub-spec § 5).
+ * planning never reaches this helper.
  *
- * Ordering rules (sub-spec § 5):
+ * Ordering rules (see ADR 213):
  *
  * - Events are grouped by phase: `'added'` → `'dropped'` → `'altered'`.
  * - Within each phase, entries are sorted alphabetically by
@@ -123,7 +123,7 @@ function appendCalls(
 }
 
 /**
- * Per sub-spec § 5, the context's prior/new sides are scoped to the event:
+ * The context's prior/new sides are scoped to the event:
  *
  * - `'added'`   — only `newTable` / `newField` populated.
  * - `'dropped'` — only `priorTable` / `priorField` populated.
@@ -158,9 +158,9 @@ function buildContext(event: FieldEvent, entry: FieldEntry): FieldEventContext {
  * `'altered'` predicate. Returns `false` whenever `codecId` differs —
  * any codec change suppresses the `altered` event entirely, including
  * cases where another property also differs in the same diff. Codec
- * rotation is a v1 non-goal (project spec § Non-goals); avoiding the
- * mixed event keeps the migration semantics for codec changes explicit
- * (out of scope) rather than smuggling them through as `altered`.
+ * rotation is a v1 non-goal; avoiding the mixed event keeps the
+ * migration semantics for codec changes explicit rather than smuggling
+ * them through as `altered`.
  *
  * For non-`codecId` diffs, returns `true` iff any other column property
  * differs.

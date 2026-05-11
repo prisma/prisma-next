@@ -2,7 +2,7 @@
  * Control-plane descriptor for the internal `audit` contract-space
  * package.
  *
- * **On-disk-in-package authoring (M3.5 R3).** The package's contract +
+ * **On-disk-in-package authoring.** The package's contract +
  * migrations are emitted by the same pipeline application authors use:
  *
  *   `prisma-next contract emit` → `<package>/contract.{json,d.ts}`
@@ -17,7 +17,7 @@
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  *   (on-disk-in-package authoring convention).
  * @see packages/3-extensions/cipherstash/src/exports/control.ts
- *   (R2 reference model — first real extension to adopt the convention).
+ *   (reference model — first real extension to adopt the convention).
  */
 
 import type { Contract } from '@prisma-next/contract/types';
