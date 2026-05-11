@@ -56,7 +56,13 @@ Instead: **the AST shape change and the heuristic deletion land together at M3**
 - `packages/2-sql/5-runtime/src/codecs/encoding.ts` — `resolveParamCodec` rewritten to consult resolver. Path narrows to: `if (paramRef.refs) → forColumn(refs.table, refs.column)` (legacy path, M3 deletes). The codec-id consistency check stays in M2 (still needed because legacy AST shape still in play); deletes in M3.
 - `packages/2-sql/5-runtime/test/sql-context.codec-context.test.ts` — augment existing tests with `byCodecRef` cache assertions; preserve all current `byColumn`/`forCodecId` assertions (some delete in M3).
 
-**Acceptance.** All existing tests pass. New `codecRefForColumn` and `byCodecRef` cache exercised.
+**Validation gate.**
+
+- `pnpm typecheck` — workspace-wide; M2 changes the `ContractCodecRegistry` shape (adds `forCodecRef` / `codecRefForColumn`).
+- `pnpm test:packages` — workspace-wide; the `sql-context` rewrite is consumer-visible from `sql-orm-client`, `sql-builder`, `pgvector`, `postgres-target`.
+- `pnpm lint:deps` — validate that `codecRefForColumn`'s contract walk doesn't introduce a layering violation.
+
+**Acceptance.** All gates green. All existing tests pass. New `codecRefForColumn` and `byCodecRef` cache exercised. The codec-id consistency check still runs (its deletion is M3c).
 
 ### M3 — AST shape change + heuristic deletion (the core change)
 
