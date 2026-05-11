@@ -8,17 +8,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { contract } from './sql-builder/fixtures/contract';
 import type { Contract } from './sql-builder/fixtures/generated/contract';
 
-/**
- * Exercises the `requireMarker: false` contract: when the `prisma_contract.marker`
- * table is entirely absent (e.g. a fresh database PN is being attached to without
- * `prisma-next db init`), the runtime should treat that case the same as a
- * marker-table-with-no-row and continue. Today it errors with the raw driver
- * `relation "prisma_contract.marker" does not exist` because `verifyMarker`
- * runs the marker SELECT before checking `requireMarker`.
- *
- * See `marker-verify-table-missing.md` at the repo root.
- */
-
 const sqlContract = validateContract<Contract>(contract, emptyCodecLookup);
 
 describe(
@@ -33,9 +22,8 @@ describe(
       connectionString = database.connectionString;
       closeFns.push(() => database.close());
 
-      // Provision only the user-visible tables. Crucially we do NOT create
-      // `prisma_contract.marker` — the bug repro is "PN attaches to an existing
-      // DB that has never had `db init` run".
+      // Deliberately skip `prisma_contract.marker` — the scenario under test
+      // is PN attaching to a database that has never had `db init` run.
       await withClient(connectionString, async (client) => {
         await client.query(`
           CREATE TABLE users (

@@ -22,17 +22,6 @@ import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract.d';
 
-/**
- * SQLite counterpart of the Postgres `requireMarker: false` repro in
- * `test/integration/test/runtime.verify-marker.missing-table.integration.test.ts`.
- *
- * SQLite uses `_prisma_marker` rather than `prisma_contract.marker`, but
- * the runtime path is shared (`SqlRuntimeImpl.verifyMarker` reads the marker
- * via `markerReader.readMarkerStatement()` regardless of target), so the
- * same asymmetry — table-missing surfaces a raw driver error rather than
- * being treated as "no marker" — applies here too.
- */
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const contractJsonPath = resolve(__dirname, 'fixtures/generated/contract.json');
 
@@ -49,7 +38,8 @@ async function buildHarness(verify: RuntimeVerifyOptions): Promise<Harness> {
   const testDir = mkdtempSync(join(tmpdir(), 'prisma-sqlite-verify-marker-'));
   const dbPath = join(testDir, 'test.db');
 
-  // Provision user-visible tables only. Deliberately skip `_prisma_marker`.
+  // Deliberately skip `_prisma_marker` — exercises the
+  // attached-to-uninitialised-DB scenario.
   const rawDb = new DatabaseSync(dbPath);
   rawDb.exec(`
     CREATE TABLE users (
