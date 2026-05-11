@@ -1,6 +1,4 @@
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
-import pgvectorControl from '@prisma-next/extension-pgvector/control';
-import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -13,6 +11,8 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
+import pgvectorControl from '../src/exports/control';
+import pgvectorRuntime from '../src/exports/runtime';
 import {
   createComposedPostgresAdapter,
   createComposedPostgresControlAdapter,
