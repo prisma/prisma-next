@@ -17,20 +17,18 @@ describeSqlMigration(
   'Migration E2E - integer default drift',
   ({ int, integerColumn, defineContract, runMigration }) => {
     it('verifies an integer `@default(42)` without drift', async () => {
-      await runMigration(
-        {
-          destination: defineContract({
-            models: {
-              Setting: model('Setting', {
-                fields: {
-                  id: int.id(),
-                  priority: field.column(integerColumn).default(42),
-                },
-              }),
-            },
-          }),
-        },
-        async ({ driver }) => {
+      await runMigration({
+        destination: defineContract({
+          models: {
+            Setting: model('Setting', {
+              fields: {
+                id: int.id(),
+                priority: field.column(integerColumn).default(42),
+              },
+            }),
+          },
+        }),
+        after: async ({ driver }) => {
           await driver.query('INSERT INTO "Setting" (id) VALUES (?)', [1]);
           const rows = await driver.query<{ priority: number }>(
             'SELECT priority FROM "Setting" WHERE id = ?',
@@ -38,7 +36,7 @@ describeSqlMigration(
           );
           expect(rows.rows[0]!.priority).toBe(42);
         },
-      );
+      });
     });
   },
 );

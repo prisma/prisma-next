@@ -14,19 +14,17 @@ describeSqlMigration(
     const WIDENING = { allowedOperationClasses: ['additive', 'widening'] } as const;
 
     it('relaxes NOT NULL to nullable', async () => {
-      await runMigration(
-        {
-          origin: defineContract({
-            models: { User: model('User', { fields: { id: int.id(), name: text, bio: text } }) },
-          }),
-          destination: defineContract({
-            models: {
-              User: model('User', { fields: { id: int.id(), name: text, bio: text.optional() } }),
-            },
-          }),
-          policy: WIDENING,
-        },
-        async ({ schema, driver }) => {
+      await runMigration({
+        origin: defineContract({
+          models: { User: model('User', { fields: { id: int.id(), name: text, bio: text } }) },
+        }),
+        destination: defineContract({
+          models: {
+            User: model('User', { fields: { id: int.id(), name: text, bio: text.optional() } }),
+          },
+        }),
+        policy: WIDENING,
+        after: async ({ schema, driver }) => {
           expect(schema.tables['User']!.columns['bio']!.nullable).toBe(true);
           await driver.query('INSERT INTO "User" (id, name, bio) VALUES (?, ?, ?)', [
             1,
@@ -38,29 +36,27 @@ describeSqlMigration(
               .rows[0]!.bio,
           ).toBeNull();
         },
-      );
+      });
     });
 
     it('changes a column default', async () => {
-      await runMigration(
-        {
-          origin: defineContract({
-            models: {
-              Setting: model('Setting', {
-                fields: { id: int.id(), status: text.default('draft') },
-              }),
-            },
-          }),
-          destination: defineContract({
-            models: {
-              Setting: model('Setting', {
-                fields: { id: int.id(), status: text.default('active') },
-              }),
-            },
-          }),
-          policy: WIDENING,
-        },
-        async ({ driver }) => {
+      await runMigration({
+        origin: defineContract({
+          models: {
+            Setting: model('Setting', {
+              fields: { id: int.id(), status: text.default('draft') },
+            }),
+          },
+        }),
+        destination: defineContract({
+          models: {
+            Setting: model('Setting', {
+              fields: { id: int.id(), status: text.default('active') },
+            }),
+          },
+        }),
+        policy: WIDENING,
+        after: async ({ driver }) => {
           await driver.query('INSERT INTO "Setting" (id) VALUES (?)', [1]);
           expect(
             (
@@ -71,29 +67,27 @@ describeSqlMigration(
             ).rows[0]!.status,
           ).toBe('active');
         },
-      );
+      });
     });
 
     it('round-trips a string default with an apostrophe', async () => {
-      await runMigration(
-        {
-          origin: defineContract({
-            models: {
-              User: model('User', {
-                fields: { id: int.id(), nickname: text.default('old') },
-              }),
-            },
-          }),
-          destination: defineContract({
-            models: {
-              User: model('User', {
-                fields: { id: int.id(), nickname: text.default("It's") },
-              }),
-            },
-          }),
-          policy: WIDENING,
-        },
-        async ({ schema, driver }) => {
+      await runMigration({
+        origin: defineContract({
+          models: {
+            User: model('User', {
+              fields: { id: int.id(), nickname: text.default('old') },
+            }),
+          },
+        }),
+        destination: defineContract({
+          models: {
+            User: model('User', {
+              fields: { id: int.id(), nickname: text.default("It's") },
+            }),
+          },
+        }),
+        policy: WIDENING,
+        after: async ({ schema, driver }) => {
           expect(schema.tables['User']!.columns['nickname']!.default).toBe("'It''s'");
 
           await driver.query('INSERT INTO "User" (id) VALUES (?)', [1]);
@@ -105,37 +99,35 @@ describeSqlMigration(
           ).rows[0];
           expect(row?.nickname).toBe("It's");
         },
-      );
+      });
     });
 
     it('preserves existing data through column-set widening', async () => {
-      await runMigration(
-        {
-          origin: defineContract({
-            models: { User: model('User', { fields: { id: int.id(), name: text, email: text } }) },
-          }),
-          destination: defineContract({
-            models: {
-              User: model('User', {
-                fields: { id: int.id(), name: text, email: text.optional() },
-              }),
-            },
-          }),
-          policy: WIDENING,
-          seed: async (driver) => {
-            await driver.query('INSERT INTO "User" (id, name, email) VALUES (?, ?, ?)', [
-              1,
-              'Alice',
-              'alice@example.com',
-            ]);
-            await driver.query('INSERT INTO "User" (id, name, email) VALUES (?, ?, ?)', [
-              2,
-              'Bob',
-              'bob@example.com',
-            ]);
+      await runMigration({
+        origin: defineContract({
+          models: { User: model('User', { fields: { id: int.id(), name: text, email: text } }) },
+        }),
+        destination: defineContract({
+          models: {
+            User: model('User', {
+              fields: { id: int.id(), name: text, email: text.optional() },
+            }),
           },
+        }),
+        policy: WIDENING,
+        before: async ({ driver }) => {
+          await driver.query('INSERT INTO "User" (id, name, email) VALUES (?, ?, ?)', [
+            1,
+            'Alice',
+            'alice@example.com',
+          ]);
+          await driver.query('INSERT INTO "User" (id, name, email) VALUES (?, ?, ?)', [
+            2,
+            'Bob',
+            'bob@example.com',
+          ]);
         },
-        async ({ driver }) => {
+        after: async ({ driver }) => {
           const rows = await driver.query<{ id: number; name: string; email: string }>(
             'SELECT * FROM "User" ORDER BY id',
           );
@@ -143,7 +135,7 @@ describeSqlMigration(
           expect(rows.rows[0]).toMatchObject({ id: 1, name: 'Alice', email: 'alice@example.com' });
           expect(rows.rows[1]).toMatchObject({ id: 2, name: 'Bob', email: 'bob@example.com' });
         },
-      );
+      });
     });
   },
 );

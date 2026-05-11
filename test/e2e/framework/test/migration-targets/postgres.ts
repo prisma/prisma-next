@@ -3,7 +3,7 @@ import postgresAdapterDescriptor, {
 } from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriverDescriptor, {
-  type PostgresControlDriver,
+  PostgresControlDriver,
 } from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor, {
   INIT_ADDITIVE_POLICY,
@@ -19,8 +19,9 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
-import { createDevDatabase } from '@prisma-next/test-utils';
+import { createDevDatabase, type DevDatabase } from '@prisma-next/test-utils';
 import type { TestTargetAdapter } from '@prisma-next/test-utils/migration-harness';
+import { Client } from 'pg';
 
 const familyInstance = sqlFamilyDescriptor.create(
   createControlStack({
@@ -38,14 +39,25 @@ const CONTROL_TABLES = new Set(['_prisma_marker', '_prisma_ledger']);
 const emptySchema: SqlSchemaIR = { tables: {}, dependencies: [] };
 
 /**
- * Translate `?` placeholders to `$1`, `$2`, … so test SQL written for
- * sqlite-style placeholders runs unchanged on Postgres. The wrapper preserves
- * the `PostgresControlDriver` shape so it remains a `ControlDriverInstance<'sql', 'postgres'>`
- * for `PostgresControlAdapter.introspect`. Introspection queries use `$N`
- * already and contain no `?`, so they pass through unchanged.
+ * Postgres-specific "test driver" — the wrapped control driver that
+ * translates `?` placeholders to `$N` so test SQL written sqlite-style
+ * works unchanged. Tracks the underlying pg.Client + dev database so the
+ * SQL fanout helper can build a runtime against the same connection
+ * (`@prisma/dev` allows only one active connection per database).
  */
-function wrapPostgresDriverForTests(inner: PostgresControlDriver): PostgresControlDriver {
-  return {
+export interface PostgresTestDriver extends PostgresControlDriver {
+  /** Underlying pg.Client — shared with any runtime built via `pgClientFor`. */
+  readonly pgClient: Client;
+  /** Connection string for the dev database, exposed for callers that prefer URL-based connect. */
+  readonly connectionString: string;
+}
+
+function wrapPostgresDriverForTests(
+  inner: PostgresControlDriver,
+  pgClient: Client,
+  connectionString: string,
+): PostgresTestDriver {
+  const wrapper: PostgresControlDriver = {
     familyId: 'sql',
     targetId: 'postgres',
     async query<Row = Record<string, unknown>>(sql: string, params?: readonly unknown[]) {
@@ -54,9 +66,15 @@ function wrapPostgresDriverForTests(inner: PostgresControlDriver): PostgresContr
       return inner.query<Row>(translated, params);
     },
     async close() {
-      return inner.close();
+      // No-op: the pg.Client lifecycle is owned by the test target's
+      // cleanup, not by the control driver. Closing here would race with
+      // any runtime sharing the same client.
     },
   } as PostgresControlDriver;
+  return Object.assign(wrapper as PostgresTestDriver, {
+    pgClient,
+    connectionString,
+  });
 }
 
 function formatFailure(f: SqlMigrationRunnerFailure): string {
@@ -67,10 +85,33 @@ function formatFailure(f: SqlMigrationRunnerFailure): string {
   return parts.join('\n');
 }
 
+// Track per-setup state so cleanup knows what to tear down.
+interface PostgresSetupState {
+  readonly dev: DevDatabase;
+  readonly client: Client;
+}
+
+const setupState = new WeakMap<PostgresTestDriver, PostgresSetupState>();
+
+/**
+ * Internal accessor used by the SQL fanout helper to share the pg.Client
+ * and connection string with a runtime built on the same database.
+ */
+export function getPostgresBinding(driver: PostgresTestDriver): {
+  client: Client;
+  connectionString: string;
+} {
+  const state = setupState.get(driver);
+  if (!state) {
+    throw new Error('Postgres driver was not created by postgresTestTarget.setup()');
+  }
+  return { client: state.client, connectionString: driver.connectionString };
+}
+
 export const postgresTestTarget: TestTargetAdapter<
   Contract<SqlStorage>,
   SqlSchemaIR,
-  PostgresControlDriver,
+  PostgresTestDriver,
   MigrationOperationPolicy
 > = {
   name: 'postgres',
@@ -78,20 +119,24 @@ export const postgresTestTarget: TestTargetAdapter<
 
   async setup() {
     const dev = await createDevDatabase();
-    const inner = await postgresDriverDescriptor.create(dev.connectionString);
-    // Wrap so test SQL written with `?` placeholders works on Postgres without
-    // each test having to dispatch on target. Introspection queries use `$N`
-    // already and pass through unchanged.
-    const driver = wrapPostgresDriverForTests(inner);
+    const client = new Client({ connectionString: dev.connectionString });
+    await client.connect();
+    // Construct the control driver around our managed client so its
+    // close() doesn't end the connection — we'll manage lifecycle here.
+    const inner = new PostgresControlDriver(client);
+    const driver = wrapPostgresDriverForTests(inner, client, dev.connectionString);
+    setupState.set(driver, { dev, client });
+
     return {
       driver,
       async cleanup() {
         try {
-          await driver.close();
+          await client.end();
         } catch {
-          /* already closed */
+          /* already ended */
         }
         await dev.close();
+        setupState.delete(driver);
       },
     };
   },

@@ -39,11 +39,21 @@ const emptySchema: SqlSchemaIR = { tables: {}, dependencies: [] };
 export interface SqliteTestDriver {
   readonly familyId: 'sql';
   readonly targetId: 'sqlite';
+  /** Path to the underlying SQLite database file — shared with any runtime built on the same DB. */
+  readonly databasePath: string;
   query<Row = Record<string, unknown>>(
     sql: string,
     params?: readonly unknown[],
   ): Promise<{ readonly rows: Row[] }>;
   close(): Promise<void>;
+}
+
+/**
+ * Internal accessor for the database file path. The SQL fanout helper
+ * uses this to construct a runtime driver on the same file.
+ */
+export function getSqlitePath(driver: SqliteTestDriver): string {
+  return driver.databasePath;
 }
 
 function formatFailure(f: SqlMigrationRunnerFailure): string {
@@ -66,11 +76,13 @@ export const sqliteTestTarget: TestTargetAdapter<
 
   async setup() {
     const dir = mkdtempSync(join(tmpdir(), 'prisma-sqlite-mig-spike-'));
-    const db = new DatabaseSync(join(dir, 'test.db'));
+    const databasePath = join(dir, 'test.db');
+    const db = new DatabaseSync(databasePath);
     db.exec('PRAGMA foreign_keys = ON');
     const driver: SqliteTestDriver = {
       familyId: 'sql',
       targetId: 'sqlite',
+      databasePath,
       async query<Row = Record<string, unknown>>(sql: string, params?: readonly unknown[]) {
         return {
           rows: db.prepare(sql).all(...((params ?? []) as Array<string | number | null>)) as Row[],
