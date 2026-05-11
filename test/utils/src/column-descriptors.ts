@@ -55,8 +55,3 @@ export const timestamptzColumn: ColumnTypeDescriptor = {
   codecId: 'pg/timestamptz@1',
   nativeType: 'timestamptz',
 } as const;
-
-export const vectorColumn: ColumnTypeDescriptor = {
-  codecId: 'pg/vector@1',
-  nativeType: 'vector',
-} as const;

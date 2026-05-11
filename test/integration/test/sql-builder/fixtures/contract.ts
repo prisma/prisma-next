@@ -1,5 +1,5 @@
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
-import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
+import { vector } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { uuidv4 } from '@prisma-next/ids';
@@ -21,7 +21,7 @@ const Post = model('Post', {
     title: field.column(textColumn),
     userId: field.column(int4Column).column('user_id'),
     views: field.column(int4Column),
-    embedding: field.column(vectorColumn).optional(),
+    embedding: field.column(vector(3)).optional(),
   },
   relations: {
     comments: rel.hasMany(() => Comment, { by: 'postId' }),
