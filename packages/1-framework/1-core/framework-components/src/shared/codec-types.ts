@@ -4,6 +4,31 @@ import type { Codec } from './codec';
 export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
 
 /**
+ * JSON-safe value space. The set of values that survive `JSON.stringify` / `JSON.parse` round-trips structurally identical (modulo object key ordering). Constrains the value space {@link CodecRef.typeParams} accepts so any `CodecRef` carried on an AST node serializes losslessly.
+ */
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly JsonValue[]
+  | { readonly [key: string]: JsonValue };
+
+/**
+ * Serializable codec identity carried by every codec-bearing AST node.
+ *
+ * `(codecId, typeParams?)` is the single fact the runtime needs to materialize a codec via `descriptorFor(codecId).factory(typeParams)(ctx)`. The pair is content-keyed: two refs with the same `codecId` and structurally equal `typeParams` (regardless of object key ordering) resolve to the same memoized {@link Codec} instance.
+ *
+ * `typeParams` is `JsonValue`-constrained so the ref survives JSON serialization (relevant for AST-embedded migration ops). Non-parameterized codecs leave `typeParams` undefined; the descriptor's `paramsSchema` validates the value at the JSON boundary.
+ *
+ * Family-agnostic by design — both SQL and Mongo AST nodes carry `codec: CodecRef | undefined`, and the resolver is the only dispatch path that survives serialization.
+ */
+export interface CodecRef {
+  readonly codecId: string;
+  readonly typeParams?: JsonValue;
+}
+
+/**
  * Per-call context the runtime threads to every `codec.encode` / `codec.decode` invocation for a single `runtime.execute()` call.
  *
  * The framework-level shape is family-agnostic and carries one field:

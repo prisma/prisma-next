@@ -15,7 +15,9 @@ export type {
   CodecInstanceContext,
   CodecLookup,
   CodecMeta,
+  CodecRef,
   CodecTrait,
+  JsonValue,
 } from '../shared/codec-types';
 export { emptyCodecLookup, voidParamsSchema } from '../shared/codec-types';
 export type {
