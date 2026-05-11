@@ -19,6 +19,9 @@ export default defineConfig({
         '**/*.config.ts',
         '**/exports/**',
         '**/types.ts',
+        // contract-source.ts is a declarative defineContract call exercised by
+        // the emit pipeline at build time; it has no runtime branches to cover.
+        'src/contract-source.ts',
       ],
       thresholds: {
         lines: 95,
