@@ -1,3 +1,4 @@
+import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
 import type {
@@ -17,7 +18,6 @@ import { postgresRenderDefault } from '@prisma-next/target-postgres/control';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { describe, expect, it } from 'vitest';
-import postgresAdapterDescriptor from '../../src/exports/control';
 
 const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
 const expandParameterizedNativeType: NativeTypeExpander = (input) => {

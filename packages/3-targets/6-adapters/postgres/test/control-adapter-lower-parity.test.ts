@@ -1,5 +1,3 @@
-import pgvectorControl from '@prisma-next/extension-pgvector/control';
-import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -42,7 +40,6 @@ const contract = validateContract<PostgresContract>(
             email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             profile: { codecId: 'pg/jsonb@1', nativeType: 'jsonb', nullable: true },
             settings: { codecId: 'pg/json@1', nativeType: 'json', nullable: true },
-            vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
           },
           uniques: [],
           indexes: [],
@@ -55,11 +52,8 @@ const contract = validateContract<PostgresContract>(
   emptyCodecLookup,
 );
 
-// Compose a stack with pgvector on both planes so the runtime and control
-// adapters' codec lookups both contain `pg/vector@1`. The parity assertion
-// requires both sides to see the same codec set.
-const runtimeAdapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
-const controlAdapter = createComposedPostgresControlAdapter({ extensionPacks: [pgvectorControl] });
+const runtimeAdapter = createComposedPostgresAdapter({ extensionPacks: [] });
+const controlAdapter = createComposedPostgresControlAdapter({ extensionPacks: [] });
 
 function expectParity(ast: AnyQueryAst): void {
   const runtime = runtimeAdapter.lower(ast, { contract });
@@ -121,7 +115,7 @@ describe('PostgresControlAdapter.lower / PostgresAdapterImpl.lower parity', () =
     expectParity(ast);
   });
 
-  it('matches on JSON, JSONB, and vector ParamRef casts', () => {
+  it('matches on JSON and JSONB ParamRef casts', () => {
     const jsonbAst = SelectAst.from(TableSource.named('user'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
       .withWhere(
@@ -138,20 +132,10 @@ describe('PostgresControlAdapter.lower / PostgresAdapterImpl.lower parity', () =
           ParamRef.of({ darkMode: true }, { name: 'settings', codecId: 'pg/json@1' }),
         ),
       );
-    const vectorAst = SelectAst.from(TableSource.named('user'))
-      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
-      .withWhere(
-        BinaryExpr.eq(
-          ColumnRef.of('user', 'vector'),
-          ParamRef.of([1, 2, 3], { name: 'vec', codecId: 'pg/vector@1' }),
-        ),
-      );
     expectParity(jsonbAst);
     expectParity(jsonAst);
-    expectParity(vectorAst);
 
     expect(runtimeAdapter.lower(jsonbAst, { contract }).sql).toContain('::jsonb');
     expect(runtimeAdapter.lower(jsonAst, { contract }).sql).toContain('::json');
-    expect(runtimeAdapter.lower(vectorAst, { contract }).sql).toContain('::vector');
   });
 });
