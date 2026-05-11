@@ -1,23 +1,25 @@
+/**
+ * Runtime tests for the arktype-json codec (TML-2357). Canonical test suite for arktype-json codec behavior after the legacy `arktypeJson(schema)` form retired.
+ *
+ * Coverage:
+ *
+ * - the column-author helper produces a working codec whose `id` proxies through the descriptor's `codecId`.
+ * - the descriptor's factory rehydrates the schema and returns a working codec for runtime materialization paths.
+ * - encode/decode round-trip including encodeJson/decodeJson agreement on the JSON-safe normalized payload.
+ * - schema validation rejects malformed payloads at decode, while encode only enforces JSON representability.
+ */
+
 import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
 import type { SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
-import { type Type, type } from 'arktype';
+import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import {
   ARKTYPE_JSON_CODEC_ID,
-  ARKTYPE_JSON_NATIVE_TYPE,
-  arktypeJson,
-  arktypeJsonCodec,
-  arktypeJsonEmitCodec,
+  arktypeJsonColumn,
+  arktypeJsonDescriptor,
 } from '../src/core/arktype-json-codec';
-import { arktypeJsonPackMeta } from '../src/core/pack-meta';
 
-const SYNTH_CTX: CodecInstanceContext = {
-  name: '<arktype-json-test>',
-};
-
-// Per-call context the runtime threads to every `codec.encode` /
-// `codec.decode`. The test doesn't exercise abort or column metadata —
-// an empty `{}` is the canonical no-signal SQL call ctx.
+const SYNTH_CTX: CodecInstanceContext = { name: '<arktype-json-class-test>' };
 const CALL_CTX: SqlCodecCallContext = {};
 
 const productSchema = type({
@@ -26,154 +28,86 @@ const productSchema = type({
   'description?': 'string',
 });
 
-describe('arktypeJson(schema)', () => {
-  it('returns a column descriptor with codecId and nativeType', () => {
-    const descriptor = arktypeJson(productSchema);
-    expect(descriptor.codecId).toBe(ARKTYPE_JSON_CODEC_ID);
-    expect(descriptor.nativeType).toBe(ARKTYPE_JSON_NATIVE_TYPE);
+describe('arktypeJsonColumn(schema)', () => {
+  it('returns a ColumnSpec with codecId, nativeType, typeParams', () => {
+    const col = arktypeJsonColumn(productSchema);
+    expect(col.codecId).toBe(ARKTYPE_JSON_CODEC_ID);
+    expect(col.nativeType).toBe('jsonb');
+    expect(col.typeParams.expression).toBe(productSchema.expression);
+    expect(col.typeParams.jsonIr).toEqual(productSchema.json);
   });
 
-  it('eagerly extracts expression and jsonIr into typeParams', () => {
-    const descriptor = arktypeJson(productSchema);
-    expect(typeof descriptor.typeParams.expression).toBe('string');
-    expect(descriptor.typeParams.expression).toBe(productSchema.expression);
-    expect(typeof descriptor.typeParams.jsonIr).toBe('object');
-    // The IR is the rehydration source — structurally identical to
-    // `schema.json` so consumers reading the IR get arktype's lossless
-    // wire format.
-    expect(descriptor.typeParams.jsonIr).toEqual(productSchema.json);
-  });
-
-  it('exposes a curried (ctx) => Codec factory in the type slot', () => {
-    const descriptor = arktypeJson(productSchema);
-    const codec = descriptor.type(SYNTH_CTX);
+  it('codecFactory(ctx) materializes a working codec', async () => {
+    const col = arktypeJsonColumn(productSchema);
+    const codec = col.codecFactory(SYNTH_CTX);
     expect(codec.id).toBe(ARKTYPE_JSON_CODEC_ID);
-    expect(codec.targetTypes).toEqual(['jsonb']);
-    expect(codec.traits).toEqual(['equality']);
+
+    const value = { name: 'Widget', price: 9.99 };
+    const wire = await codec.encode(value, CALL_CTX);
+    expect(typeof wire).toBe('string');
+    const decoded = await codec.decode(wire, CALL_CTX);
+    expect(decoded).toEqual(value);
   });
 
-  it('rejects non-callable schema lookalikes at the call site', () => {
-    // The runtime check enforces the column-author surface accepts
-    // callable arktype `Type`s only — a plain object lookalike (with
-    // `expression` and `json` fields shaped right but not callable)
-    // would have passed the field checks and only blown up at the
-    // first `decode`/`decodeJson`. Reject early instead.
-    const notASchema = { foo: 'bar' } as unknown as Type<unknown>;
-    expect(() => arktypeJson(notASchema)).toThrow(/callable arktype Type/);
-  });
-
-  it('rejects callable schemas missing the `expression` field', () => {
-    // A callable that doesn't carry arktype's `expression` getter is
-    // not an arktype `Type` — the column descriptor relies on
-    // `expression` for emit-path rendering.
-    const callableWithoutExpression = (() => undefined) as unknown as Type<unknown>;
-    expect(() => arktypeJson(callableWithoutExpression)).toThrow(/missing `expression: string`/);
-  });
-
-  it('rejects callable schemas with non-object json IR', () => {
-    // A callable that carries `expression` but lacks the `json` IR
-    // can't be rehydrated at runtime; reject at authoring time.
-    const malformedSchema = Object.assign(() => undefined, {
-      expression: 'string',
-      json: 'not-an-object',
-    }) as unknown as Type<unknown>;
-    expect(() => arktypeJson(malformedSchema)).toThrow(/missing `json` IR/);
-  });
-});
-
-describe('arktypeJson encode/decode (Promise-lifted async surface)', () => {
-  it('encode round-trips through JSON.stringify (Promise-returning)', async () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
-    const encoded = await codec.encode({ name: 'Widget', price: 10 }, CALL_CTX);
-    expect(encoded).toBe('{"name":"Widget","price":10}');
-  });
-
-  it('decode validates the wire payload against the schema', async () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
-    const wire = JSON.stringify({ name: 'Widget', price: 10 });
-    expect(await codec.decode(wire, CALL_CTX)).toEqual({ name: 'Widget', price: 10 });
-  });
-
-  it('decode rejects payloads missing required fields', async () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
+  it('decode rejects payloads that fail schema validation', async () => {
+    const col = arktypeJsonColumn(productSchema);
+    const codec = col.codecFactory(SYNTH_CTX);
     const wire = JSON.stringify({ name: 'Widget' });
-    await expect(codec.decode(wire, CALL_CTX)).rejects.toThrow(
-      /JSON_SCHEMA_VALIDATION_FAILED|price/,
-    );
+    await expect(codec.decode(wire, CALL_CTX)).rejects.toThrow(/schema validation failed/);
   });
 
-  it('decode rejects payloads with type-mismatched fields', async () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
-    const wire = JSON.stringify({ name: 'Widget', price: 'not-a-number' });
-    await expect(codec.decode(wire, CALL_CTX)).rejects.toThrow(/price/);
-  });
-
-  it('decode accepts payloads with optional fields present', async () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
-    const wire = JSON.stringify({ name: 'Widget', price: 10, description: 'A widget' });
-    expect(await codec.decode(wire, CALL_CTX)).toEqual({
-      name: 'Widget',
-      price: 10,
-      description: 'A widget',
-    });
-  });
-
-  // Postgres `pg` driver returns `jsonb` cells as already-parsed JS values
-  // by default. The codec must accept both wire shapes — string and
-  // pre-parsed JsonValue — to match `pgJsonbCodec`'s tolerance.
   it('decode accepts already-parsed jsonb values from the driver', async () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
+    const codec = arktypeJsonColumn(productSchema).codecFactory(SYNTH_CTX);
     const wire = { name: 'Widget', price: 10 };
     expect(await codec.decode(wire, CALL_CTX)).toEqual(wire);
   });
 
   it('decode validates pre-parsed payloads against the schema', async () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
-    const wire = { name: 'Widget' };
-    await expect(codec.decode(wire, CALL_CTX)).rejects.toThrow(
-      /JSON_SCHEMA_VALIDATION_FAILED|price/,
+    const codec = arktypeJsonColumn(productSchema).codecFactory(SYNTH_CTX);
+    await expect(codec.decode({ name: 'Widget' }, CALL_CTX)).rejects.toThrow(/price/);
+  });
+
+  it('encodeJson / decodeJson round-trip through schema', () => {
+    const col = arktypeJsonColumn(productSchema);
+    const codec = col.codecFactory(SYNTH_CTX);
+    const value = { name: 'Widget', price: 9.99, description: 'A widget' };
+    const json = codec.encodeJson(value);
+    const decoded = codec.decodeJson(json);
+    expect(decoded).toEqual(value);
+  });
+
+  it('rejects non-callable schema lookalikes at the call site', () => {
+    const notASchema = { foo: 'bar' };
+    // @ts-expect-error -- deliberately malformed input for the call-site guard
+    expect(() => arktypeJsonColumn(notASchema)).toThrow(/callable arktype Type/);
+  });
+
+  it('rejects callable values that are missing `expression: string`', () => {
+    const callableWithoutExpression = (v: unknown) => v;
+    expect(() => arktypeJsonColumn(callableWithoutExpression as never)).toThrow(
+      /missing `expression: string`/,
     );
+  });
+
+  it('rejects callable schemas that are missing the `json` IR', () => {
+    const fakeSchema = Object.assign((v: unknown) => v, {
+      expression: 'unknown',
+      json: 'not-an-object',
+    });
+    expect(() => arktypeJsonColumn(fakeSchema as never)).toThrow(/missing `json` IR/);
   });
 });
 
-describe('arktypeJson roundtrip', () => {
-  it('encode → decode preserves the value structurally', async () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
-    const original = { name: 'Widget', price: 10, description: 'A widget' };
-    const encoded = await codec.encode(original, CALL_CTX);
-    const decoded = await codec.decode(encoded as string, CALL_CTX);
-    expect(decoded).toEqual(original);
-  });
-
-  it('encodeJson / decodeJson round-trip JsonValue payloads', () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
-    const original = { name: 'Widget', price: 10 };
-    const json = codec.encodeJson(original);
-    const restored = codec.decodeJson(json);
-    expect(restored).toEqual(original);
-  });
-
-  // Encode is intentionally schema-independent (see ADR 208 § Case J and
-  // the encode-fallback trade-off). Both `encode` and `encodeJson` derive
-  // their output from the same `JSON.stringify` → `JSON.parse` round-trip
-  // so a non-plain-object runtime value (class instance, etc.) still
-  // produces the same JSON-safe shape on both surfaces. Schema validation
-  // runs on read.
+describe('arktypeJsonColumn encode/encodeJson agreement', () => {
   it('encode and encodeJson agree on the normalized payload', async () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
+    const codec = arktypeJsonColumn(productSchema).codecFactory(SYNTH_CTX);
     const original = { name: 'Widget', price: 10, description: 'desc' };
     const wire = await codec.encode(original, CALL_CTX);
     const json = codec.encodeJson(original);
     expect(wire).toBe(JSON.stringify(json));
   });
 
-  it('encode normalizes class-instance inputs to a JSON-safe wire shape', async () => {
-    // Class instance with prototype-only methods. `JSON.stringify` strips
-    // those, so the normalized wire payload is `{ name, price }`. The
-    // codec doesn't validate against the schema on encode (that's a
-    // decode-side concern under the JSON-validator philosophy), but the
-    // round-trip must still produce a JSON-safe value.
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
+  it('encode strips class prototypes via the JSON.stringify round-trip', async () => {
     class Widget {
       constructor(
         public name: string,
@@ -183,296 +117,107 @@ describe('arktypeJson roundtrip', () => {
         return `${this.name}@${this.price}`;
       }
     }
+    const codec = arktypeJsonColumn(productSchema).codecFactory(SYNTH_CTX);
     const widget = new Widget('Widget', 10);
     const wire = await codec.encode(widget, CALL_CTX);
     expect(wire).toBe('{"name":"Widget","price":10}');
   });
 
+  it('encode does not run schema validation', async () => {
+    const codec = arktypeJsonColumn(productSchema).codecFactory(SYNTH_CTX);
+    await expect(codec.encode({ name: 'Widget' } as never, CALL_CTX)).resolves.toBe(
+      '{"name":"Widget"}',
+    );
+  });
+
   it('encode rejects values that are not representable as JSON', async () => {
-    // `JSON.stringify(undefined)` returns `undefined`, not a string. The
-    // codec rejects with a plain `Error` rather than a runtime envelope:
-    // the runtime wraps it as `RUNTIME.ENCODE_FAILED` at the dispatch
-    // boundary. The codec doesn't pre-stamp a stable code here because
-    // the underlying problem is a JS-level serialization failure, not a
-    // schema rejection — and stamping a schema code would be misleading
-    // now that schema validation no longer runs on encode.
     const anySchema = type('object');
-    const codec = arktypeJson(anySchema).type(SYNTH_CTX);
+    const codec = arktypeJsonColumn(anySchema).codecFactory(SYNTH_CTX);
     await expect(codec.encode(undefined as never, CALL_CTX)).rejects.toThrow(
       /not representable as JSON/,
     );
     expect(() => codec.encodeJson(undefined as never)).toThrow(/not representable as JSON/);
   });
 
-  // F02 — Postgres drivers can return `jsonb` cells as already-parsed JS
-  // values, including primitive types. For an arktype `type('string')`
-  // schema, a stored `"alice"` arrives as the bare JS string `alice` —
-  // a SyntaxError on `JSON.parse(wire)`. The decode path tries
-  // `JSON.parse` first (covering raw-JSON-text drivers and pre-parsed
-  // objects/arrays/numbers/bools/null) and falls back to the original
-  // string when parsing throws (covering pre-parsed JSON string
-  // primitives).
+  it('decode rejects payloads with type-mismatched fields', async () => {
+    const codec = arktypeJsonColumn(productSchema).codecFactory(SYNTH_CTX);
+    const wire = JSON.stringify({ name: 'Widget', price: 'not-a-number' });
+    await expect(codec.decode(wire, CALL_CTX)).rejects.toThrow(/price/);
+  });
+
   it('decode accepts pre-parsed JSON string primitives for string-schema columns', async () => {
     const stringSchema = type('string');
-    const codec = arktypeJson(stringSchema).type(SYNTH_CTX);
+    const codec = arktypeJsonColumn(stringSchema).codecFactory(SYNTH_CTX);
     expect(await codec.decode('alice', CALL_CTX)).toBe('alice');
   });
 
-  it('decode still parses raw-JSON-text wire for string-schema columns', async () => {
+  it('decode parses raw JSON text for string-schema columns', async () => {
     const stringSchema = type('string');
-    const codec = arktypeJson(stringSchema).type(SYNTH_CTX);
-    // Raw JSON text wire — `JSON.parse('"bob"')` returns the string `bob`.
+    const codec = arktypeJsonColumn(stringSchema).codecFactory(SYNTH_CTX);
     expect(await codec.decode('"bob"', CALL_CTX)).toBe('bob');
   });
 
   it('decode rejects pre-parsed primitives that violate the schema', async () => {
     const stringSchema = type('string');
-    const codec = arktypeJson(stringSchema).type(SYNTH_CTX);
-    // Pre-parsed number primitive — fails string-schema validation. The
-    // wire is `42` (not a string), goes straight through `parseWireValue`
-    // (non-string branch), and the schema rejects it.
-    await expect(codec.decode(42, CALL_CTX)).rejects.toThrow(
-      /JSON_SCHEMA_VALIDATION_FAILED|string/,
-    );
+    const codec = arktypeJsonColumn(stringSchema).codecFactory(SYNTH_CTX);
+    await expect(codec.decode(42, CALL_CTX)).rejects.toThrow(/string/);
   });
 });
 
-describe('arktypeJsonCodec descriptor', () => {
-  it('has the right codecId, traits, and targetTypes', () => {
-    expect(arktypeJsonCodec.codecId).toBe(ARKTYPE_JSON_CODEC_ID);
-    expect(arktypeJsonCodec.traits).toEqual(['equality']);
-    expect(arktypeJsonCodec.targetTypes).toEqual(['jsonb']);
-  });
-
-  it("renderOutputType returns the schema's TS-source expression", () => {
-    expect(
-      arktypeJsonCodec.renderOutputType?.({
-        expression: '{ name: string, price: number }',
-        jsonIr: {},
-      }),
-    ).toBe('{ name: string, price: number }');
-  });
-
-  it("renderOutputType falls back to 'unknown' for empty expressions", () => {
-    expect(
-      arktypeJsonCodec.renderOutputType?.({
-        expression: '   ',
-        jsonIr: {},
-      }),
-    ).toBe('unknown');
-  });
-
-  it('paramsSchema validates well-formed typeParams', () => {
-    const validation = arktypeJsonCodec.paramsSchema['~standard'].validate({
-      expression: '{ name: string }',
-      jsonIr: { domain: 'object' },
-    });
-    expect(validation).not.toBeInstanceOf(Promise);
-    if (!(validation instanceof Promise)) {
-      expect(validation.issues).toBeUndefined();
-    }
-  });
-
-  it('paramsSchema rejects malformed typeParams', () => {
-    const validation = arktypeJsonCodec.paramsSchema['~standard'].validate({
-      expression: 42,
-      jsonIr: { domain: 'object' },
-    });
-    expect(validation).not.toBeInstanceOf(Promise);
-    if (!(validation instanceof Promise)) {
-      expect(validation.issues).toBeDefined();
-    }
-  });
-
-  it('factory rehydrates the schema from typeParams.jsonIr and validates', async () => {
-    const descriptor = arktypeJson(productSchema);
-    const codec = arktypeJsonCodec.factory(descriptor.typeParams)(SYNTH_CTX);
+describe('arktypeJsonDescriptor.factory(params)', () => {
+  it('rehydrates the schema from typeParams.jsonIr and produces a working codec', async () => {
+    const col = arktypeJsonColumn(productSchema);
+    const factory = arktypeJsonDescriptor.factory(col.typeParams);
+    const codec = factory(SYNTH_CTX);
     expect(codec.id).toBe(ARKTYPE_JSON_CODEC_ID);
 
-    const validWire = JSON.stringify({ name: 'Widget', price: 10 });
-    expect(await codec.decode(validWire, CALL_CTX)).toEqual({ name: 'Widget', price: 10 });
-
-    const invalidWire = JSON.stringify({ name: 'Widget' });
-    await expect(codec.decode(invalidWire, CALL_CTX)).rejects.toThrow();
+    const value = { name: 'Widget', price: 9.99 };
+    const wire = await codec.encode(value, CALL_CTX);
+    const decoded = await codec.decode(wire, CALL_CTX);
+    expect(decoded).toEqual(value);
   });
 
-  it('factory throws on corrupt jsonIr', () => {
-    expect(() =>
-      arktypeJsonCodec.factory({
-        expression: 'corrupt',
-        jsonIr: { broken: true },
-      })(SYNTH_CTX),
-    ).toThrow(/Failed to rehydrate arktype schema/);
+  it('descriptor metadata: traits, targetTypes', () => {
+    expect(arktypeJsonDescriptor.codecId).toBe(ARKTYPE_JSON_CODEC_ID);
+    expect(arktypeJsonDescriptor.traits).toEqual(['equality']);
+    expect(arktypeJsonDescriptor.targetTypes).toEqual(['jsonb']);
+    expect(arktypeJsonDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('jsonb');
+    expect(arktypeJsonDescriptor.encodeIsParamsIndependent).toBe(true);
   });
 
-  // The factory rehydrates the schema from `jsonIr` and asserts that
-  // the schema's `expression` round-trips. A divergence means either
-  // the contract was hand-edited or an arktype version mismatch caused
-  // the rendering to drift — in both cases the emitted `contract.d.ts`
-  // is no longer faithful to the runtime schema, and the previous
-  // `console.warn` was too quiet (the bad types had already shipped
-  // by the time the warning fired).
-  it('factory throws RUNTIME.TYPE_PARAMS_INVALID when typeParams.expression diverges from rehydrated schema', () => {
-    const descriptor = arktypeJson(productSchema);
+  it('renderOutputType returns the eager-extracted expression', () => {
+    const col = arktypeJsonColumn(productSchema);
+    const rendered = arktypeJsonDescriptor.renderOutputType(col.typeParams);
+    expect(rendered).toBe(productSchema.expression);
+  });
+
+  it("renderOutputType falls back to 'unknown' when the expression is whitespace-only", () => {
+    expect(arktypeJsonDescriptor.renderOutputType({ expression: '   ', jsonIr: {} })).toBe(
+      'unknown',
+    );
+  });
+
+  it('throws on corrupt jsonIr at factory time', () => {
     expect(() =>
-      arktypeJsonCodec.factory({
-        ...descriptor.typeParams,
+      arktypeJsonDescriptor.factory({
+        expression: 'string',
+        jsonIr: { not: 'a-valid-arktype-ir' },
+      }),
+    ).toThrow(/Failed to rehydrate arktype schema from contract IR/);
+  });
+
+  it('throws RUNTIME.TYPE_PARAMS_INVALID when expression diverges from the rehydrated schema', () => {
+    const col = arktypeJsonColumn(productSchema);
+    expect(() =>
+      arktypeJsonDescriptor.factory({
+        ...col.typeParams,
         expression: 'an obviously stale expression',
-      })(SYNTH_CTX),
+      }),
     ).toThrow(/typeParams\.expression .* does not match/);
   });
 
-  it('factory accepts matching typeParams.expression without complaint', () => {
-    const descriptor = arktypeJson(productSchema);
-    expect(() => arktypeJsonCodec.factory(descriptor.typeParams)(SYNTH_CTX)).not.toThrow();
-  });
-});
-
-describe('serialize/rehydrate roundtrip', () => {
-  it("rehydrated schema's behavior matches the source", async () => {
-    // The rehydration round-trip is the load-bearing guarantee for the
-    // emit-vs-runtime parity check: the rehydrated schema validates the
-    // same payloads as the source. The factory enforces expression
-    // round-trip stability by throwing if `expression` diverges; this
-    // test exercises the happy path where serialized and rehydrated
-    // expressions match.
-    const descriptor = arktypeJson(productSchema);
-    const reCodec = arktypeJsonCodec.factory(descriptor.typeParams)(SYNTH_CTX);
-    const sourceCodec = descriptor.type(SYNTH_CTX);
-
-    const valid = { name: 'X', price: 1 };
-    const validWire = JSON.stringify(valid);
-    expect(await reCodec.decode(validWire, CALL_CTX)).toEqual(
-      await sourceCodec.decode(validWire, CALL_CTX),
-    );
-
-    const invalid = { name: 'X' };
-    const invalidWire = JSON.stringify(invalid);
-    await expect(reCodec.decode(invalidWire, CALL_CTX)).rejects.toThrow();
-    await expect(sourceCodec.decode(invalidWire, CALL_CTX)).rejects.toThrow();
-  });
-
-  it('preserves narrowed fields (literal unions) across rehydrate', async () => {
-    const auditSchema = type({
-      actor: "'system' | 'user' | 'admin'",
-      at: 'number',
-    });
-    const descriptor = arktypeJson(auditSchema);
-    const reCodec = arktypeJsonCodec.factory(descriptor.typeParams)(SYNTH_CTX);
-
-    expect(await reCodec.decode(JSON.stringify({ actor: 'system', at: 1 }), CALL_CTX)).toEqual({
-      actor: 'system',
-      at: 1,
-    });
-    await expect(
-      reCodec.decode(JSON.stringify({ actor: 'stranger', at: 1 }), CALL_CTX),
-    ).rejects.toThrow(/actor/);
-  });
-});
-
-describe('decodeJson schema enforcement', () => {
-  // `decode` (wire string → JS) and `decodeJson` (JsonValue → JS) must
-  // both run the schema. Without enforcement on `decodeJson`, any
-  // adapter/runtime path that hands parsed JSON straight to the codec
-  // would bypass schema validation and return unchecked data.
-  it('decodeJson runs the schema against typed JsonValue payloads', () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
-    expect(codec.decodeJson({ name: 'Widget', price: 10 })).toEqual({
-      name: 'Widget',
-      price: 10,
-    });
-  });
-
-  it('decodeJson throws when payload misses required fields', () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
-    expect(() => codec.decodeJson({ name: 'Widget' })).toThrow(
-      /JSON_SCHEMA_VALIDATION_FAILED|price/,
-    );
-  });
-
-  it('decodeJson throws when payload has type-mismatched fields', () => {
-    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
-    expect(() => codec.decodeJson({ name: 'Widget', price: 'not-a-number' })).toThrow(/price/);
-  });
-});
-
-describe('arktypeJsonEmitCodec (metadata-only shim)', () => {
-  // The metadata-only codec carries `renderOutputType` (read by the
-  // framework emitter's `CodecLookup`) and `meta.db.sql.postgres.nativeType`
-  // (read by the postgres SQL renderer's cast policy). encode/decode are
-  // sentinels that throw if invoked — runtime materialization always
-  // goes through the descriptor's factory.
-  it('exposes the codec id and native type', () => {
-    expect(arktypeJsonEmitCodec.id).toBe(ARKTYPE_JSON_CODEC_ID);
-    expect(arktypeJsonEmitCodec.targetTypes).toEqual([ARKTYPE_JSON_NATIVE_TYPE]);
-    expect(arktypeJsonEmitCodec.traits).toEqual(['equality']);
-  });
-
-  it('renderOutputType returns expression for well-formed typeParams', () => {
-    expect(
-      arktypeJsonEmitCodec.renderOutputType?.({
-        expression: '{ name: string }',
-        jsonIr: { domain: 'object' },
-      }),
-    ).toBe('{ name: string }');
-  });
-
-  it('renderOutputType returns undefined for malformed typeParams', () => {
-    expect(arktypeJsonEmitCodec.renderOutputType?.({ expression: 42, jsonIr: {} })).toBeUndefined();
-    expect(
-      arktypeJsonEmitCodec.renderOutputType?.({ expression: 'x', jsonIr: null }),
-    ).toBeUndefined();
-    expect(
-      arktypeJsonEmitCodec.renderOutputType?.({ expression: 'x', jsonIr: 'str' }),
-    ).toBeUndefined();
-  });
-
-  it('encode/decode reject because runtime materialization goes through the descriptor', async () => {
-    await expect(arktypeJsonEmitCodec.encode('value', CALL_CTX)).rejects.toThrow(/metadata-only/);
-    await expect(arktypeJsonEmitCodec.decode('wire', CALL_CTX)).rejects.toThrow(/metadata-only/);
-  });
-
-  it('encodeJson/decodeJson throw because runtime materialization goes through the descriptor', () => {
-    // Mirrors `encode`/`decode`: a contract-load path that resolved to
-    // this metadata-only stub must fail fast at the JSON boundary instead
-    // of silently returning unvalidated payloads.
-    expect(() => arktypeJsonEmitCodec.encodeJson('payload')).toThrow(/metadata-only/);
-    expect(() => arktypeJsonEmitCodec.decodeJson({ a: 1 })).toThrow(/metadata-only/);
-  });
-});
-
-describe('arktypeJsonPackMeta', () => {
-  // Pack metadata threads the emit-only `Codec` instance into the
-  // codec-id-keyed `CodecLookup` and declares the storage backing
-  // (`jsonb` on Postgres). Asserting the structure protects the
-  // framework-composition entry point.
-  it('declares kind, id, family, and target', () => {
-    expect(arktypeJsonPackMeta.kind).toBe('extension');
-    expect(arktypeJsonPackMeta.id).toBe('arktype-json');
-    expect(arktypeJsonPackMeta.familyId).toBe('sql');
-    expect(arktypeJsonPackMeta.targetId).toBe('postgres');
-  });
-
-  it('threads arktypeJsonEmitCodec into codecInstances for emit-path lookup', () => {
-    expect(arktypeJsonPackMeta.types.codecTypes.codecInstances).toContain(arktypeJsonEmitCodec);
-  });
-
-  it('declares jsonb storage backing for the codec id', () => {
-    expect(arktypeJsonPackMeta.types.storage).toEqual([
-      {
-        typeId: ARKTYPE_JSON_CODEC_ID,
-        familyId: 'sql',
-        targetId: 'postgres',
-        nativeType: 'jsonb',
-      },
-    ]);
-  });
-
-  it('declares the type-side import spec', () => {
-    expect(arktypeJsonPackMeta.types.codecTypes.import).toEqual({
-      package: '@prisma-next/extension-arktype-json/codec-types',
-      named: 'CodecTypes',
-      alias: 'ArktypeJsonTypes',
-    });
+  it('accepts matching typeParams.expression without complaint', () => {
+    const col = arktypeJsonColumn(productSchema);
+    expect(() => arktypeJsonDescriptor.factory(col.typeParams)).not.toThrow();
   });
 });

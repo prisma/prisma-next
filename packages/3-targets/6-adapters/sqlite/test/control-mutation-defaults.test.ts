@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createSqliteDefaultFunctionRegistry } from '../src/core/control-mutation-defaults';
+import {
+  createSqliteDefaultFunctionRegistry,
+  createSqliteMutationDefaultGeneratorDescriptors,
+} from '../src/core/control-mutation-defaults';
+import runtimeAdapterDescriptor from '../src/core/runtime-adapter';
 
 const stubSpan = {
   start: { offset: 0, line: 1, column: 1 },
@@ -72,5 +76,29 @@ describe('createSqliteDefaultFunctionRegistry — dbgenerated canonicalization',
       ok: true,
       value: { kind: 'storage', defaultValue: { kind: 'function', expression: 'random()' } },
     });
+  });
+});
+
+describe('createSqliteMutationDefaultGeneratorDescriptors', () => {
+  const descriptors = createSqliteMutationDefaultGeneratorDescriptors();
+
+  it('includes timestampNow without applicableCodecIds (preset-only generator)', () => {
+    const descriptor = descriptors.find((d) => d.id === 'timestampNow');
+
+    // timestampNow ships only through the temporal.{createdAt,updatedAt}()
+    // preset path; the codec is co-registered there, so the
+    // @default(...) compatibility list is intentionally absent.
+    expect(descriptor).toBeDefined();
+    expect(descriptor?.applicableCodecIds).toBeUndefined();
+  });
+});
+
+describe('sqlite runtime mutation default generators', () => {
+  it('provides timestampNow as a Date generator', () => {
+    const generator = (runtimeAdapterDescriptor.mutationDefaultGenerators?.() ?? []).find(
+      (entry) => entry.id === 'timestampNow',
+    );
+
+    expect(generator?.generate()).toBeInstanceOf(Date);
   });
 });

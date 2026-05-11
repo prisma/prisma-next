@@ -180,21 +180,11 @@ describe('enrichContract', () => {
     });
   });
 
-  it('strips controlPlaneHooks and codecInstances from extension pack metadata', () => {
+  it('strips controlPlaneHooks from extension pack metadata', () => {
     const extension = makeExtension({
       types: {
         codecTypes: {
           controlPlaneHooks: { 'pg/vector@1': { expandNativeType: () => 'vector' } },
-          codecInstances: [
-            {
-              id: 'pg/vector@1',
-              targetTypes: ['vector'],
-              encode: async (v: unknown) => v,
-              decode: async (v: unknown) => v,
-              encodeJson: () => null,
-              decodeJson: () => null,
-            },
-          ],
           import: {
             package: '@ext/pgvector',
             named: 'PgvectorCodecTypes',
@@ -210,7 +200,6 @@ describe('enrichContract', () => {
     const codecTypes = types['codecTypes'] as Record<string, unknown>;
 
     expect(codecTypes).not.toHaveProperty('controlPlaneHooks');
-    expect(codecTypes).not.toHaveProperty('codecInstances');
     expect(codecTypes['import']).toBeDefined();
   });
 

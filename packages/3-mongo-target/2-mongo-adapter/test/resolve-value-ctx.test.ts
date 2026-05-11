@@ -1,5 +1,5 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
-import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
+import { mongoCodec, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import { resolveValue } from '../src/resolve-value';
@@ -21,11 +21,10 @@ function deferred<T>(): {
 describe('resolveValue — CodecCallContext threading', () => {
   it('forwards the same ctx instance to every codec.encode (root-level leaf)', async () => {
     const observed: (CodecCallContext | undefined)[] = [];
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'test/observe@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string, ctx?: CodecCallContext) => {
           observed.push(ctx);
@@ -42,11 +41,10 @@ describe('resolveValue — CodecCallContext threading', () => {
 
   it('preserves ctx identity across nested object/array branches (recursive walk)', async () => {
     const observed: (CodecCallContext | undefined)[] = [];
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'test/observe-recursive@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string, ctx?: CodecCallContext) => {
           observed.push(ctx);
@@ -78,11 +76,10 @@ describe('resolveValue — CodecCallContext threading', () => {
   it('1-arg codec authors observe no behavioral change when the ctx has no signal', async () => {
     let invoked = 0;
     let receivedValue: unknown;
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'test/single-arg-author@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string) => {
           invoked += 1;
@@ -104,11 +101,10 @@ describe('resolveValue — CodecCallContext threading', () => {
 
   it('already-aborted signal at entry short-circuits before any codec.encode call', async () => {
     let callCount = 0;
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'test/counter@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string) => {
           callCount += 1;
@@ -136,11 +132,10 @@ describe('resolveValue — CodecCallContext threading', () => {
 
   it('mid-encode abort surfaces RUNTIME.ABORTED { phase: encode } via the framework race helper', async () => {
     const release = deferred<string>();
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'test/blocking@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string) => release.promise.then((suffix) => `${v}:${suffix}`),
       }),
@@ -165,13 +160,12 @@ describe('resolveValue — CodecCallContext threading', () => {
     release.resolve('done');
   });
 
-  it('passes RUNTIME.ENCODE_FAILED from a codec body through unchanged when the body throws before the runtime sees the abort (AC-ERR4)', async () => {
+  it('passes RUNTIME.ENCODE_FAILED from a codec body through unchanged when the body throws before the runtime sees the abort', async () => {
     const cause = new Error('codec specific failure');
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'test/explody@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: () => {
           throw cause;
@@ -191,11 +185,10 @@ describe('resolveValue — CodecCallContext threading', () => {
 
   it('races each per-level Promise.all against the signal — abort wins even when sibling leaves block forever', async () => {
     const blockingLeaf = deferred<string>();
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'test/level-blocker@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string) => blockingLeaf.promise.then((s) => `${v}:${s}`),
       }),
@@ -204,8 +197,7 @@ describe('resolveValue — CodecCallContext threading', () => {
     const controller = new AbortController();
     const reason = new Error('level race wins');
 
-    // Top-level object with two leaves at the same level — Promise.all races
-    // against the abort signal at this level.
+    // Top-level object with two leaves at the same level — Promise.all races against the abort signal at this level.
     const doc = {
       a: new MongoParamRef('a', { codecId: 'test/level-blocker@1' }),
       b: new MongoParamRef('b', { codecId: 'test/level-blocker@1' }),
@@ -225,11 +217,10 @@ describe('resolveValue — CodecCallContext threading', () => {
 
   it('races inside arrays too — abort wins even when array leaves block forever', async () => {
     const blockingLeaf = deferred<string>();
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'test/array-blocker@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string) => blockingLeaf.promise.then((s) => `${v}:${s}`),
       }),

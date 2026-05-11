@@ -30,58 +30,100 @@ Before this ADR, each parameterized codec encoded its parameter relationship in 
 
 ## Decision
 
-Every codec is described by a single descriptor type:
+Every codec is described by a single descriptor type. The consumer surface is the `CodecDescriptor<P>` interface; codec authors extend the abstract class `CodecDescriptorImpl<P>`:
 
 ```ts
+// Consumer surface (interface, in @prisma-next/framework-components/codec)
 export interface CodecDescriptor<P = void> {
   readonly codecId: string;
   readonly traits: readonly CodecTrait[];
   readonly targetTypes: readonly string[];
   readonly meta?: CodecMeta;
   readonly paramsSchema: StandardSchemaV1<P>;
+  readonly isParameterized: boolean;
   readonly renderOutputType?: (params: P) => string | undefined;
   readonly factory: (params: P) => (ctx: CodecInstanceContext) => Codec;
 }
+
+// Codec-author surface (abstract class — what codec authors `extends`)
+export abstract class CodecDescriptorImpl<P = void> implements CodecDescriptor<P> {
+  abstract readonly codecId: string;
+  abstract readonly traits: readonly CodecTrait[];
+  abstract readonly targetTypes: readonly string[];
+  readonly meta?: CodecMeta;
+  abstract readonly paramsSchema: StandardSchemaV1<P>;
+  readonly isParameterized: boolean; // derived from `paramsSchema !== voidParamsSchema`
+  renderOutputType?(params: P): string | undefined;
+  abstract factory(params: P): (ctx: CodecInstanceContext) => Codec;
+}
 ```
 
-A **parameterized codec** is a curried factory plus the descriptor that registers it. The `vector(N)` codec authors as:
+A **parameterized codec** is three artifacts: the codec class (extending `CodecImpl`), the descriptor class (extending `CodecDescriptorImpl<P>`), and a per-codec column helper that calls `descriptor.factory(...)` directly so TypeScript binds the method-level generic at the call site. The `vector(N)` codec authors as:
 
 ```ts
-// Pack-author surface — what users import and call.
-function vector<N extends number>(length: N): ColumnTypeDescriptor & {
-  readonly typeParams: { readonly length: N };
-} {
-  return { codecId: 'pg/vector@1', nativeType: 'vector', typeParams: { length } };
+// 1. Codec class — `encode`/`decode` (and JSON variants where applicable).
+class VectorCodec<N extends number> extends CodecImpl<
+  'pg/vector@1', readonly ['equality'], string, Vector<N>
+> {
+  constructor(descriptor: PgVectorDescriptor, readonly dimension: N) {
+    super(descriptor);
+  }
+  async encode(value: Vector<N>) { return `[${value.join(',')}]`; }
+  async decode(wire: string) { return parseVector(wire) as Vector<N>; }
 }
 
-// Framework-registration surface — what the descriptor map consumes.
-const pgVectorCodec: CodecDescriptor<{ readonly length: number }> = {
-  codecId: 'pg/vector@1',
-  traits: ['equality'],
-  targetTypes: ['vector'],
-  paramsSchema: type({ length: 'number > 0' }),
-  renderOutputType: ({ length }) => `Vector<${length}>`,
-  factory: (_params) => (_ctx) => sharedVectorCodec,
-};
+// 2. Descriptor class — codec id, metadata, factory.
+class PgVectorDescriptor extends CodecDescriptorImpl<{ readonly length: number }> {
+  override readonly codecId = 'pg/vector@1' as const;
+  override readonly traits = ['equality'] as const;
+  override readonly targetTypes = ['vector'] as const;
+  override readonly paramsSchema = type({ length: 'number > 0' });
+  override renderOutputType({ length }: { length: number }) { return `Vector<${length}>`; }
+  override factory<N extends number>(
+    params: { readonly length: N },
+  ): (ctx: CodecInstanceContext) => VectorCodec<N> {
+    return (ctx) => new VectorCodec<N>(this, params.length);
+  }
+}
+
+export const pgVectorDescriptor = new PgVectorDescriptor();
+
+// 3. Per-codec column helper — direct invocation of `descriptor.factory(...)`
+//    preserves `<N>` at the call site through TypeScript's variance rules.
+export const vector = <N extends number>(length: N) =>
+  column(pgVectorDescriptor.factory({ length }), pgVectorDescriptor.codecId, { length });
+vector satisfies ColumnHelperFor<PgVectorDescriptor>;
 ```
 
-The descriptor registers the codec id with the framework and carries the codec-id-keyed metadata the framework consults without the runtime instance in scope: traits and target types for trait gating; `paramsSchema` for JSON-boundary validation; `renderOutputType` for `contract.d.ts`; the curried `factory` for runtime materialization.
+The descriptor registers the codec id with the framework and carries the codec-id-keyed metadata the framework consults without the runtime instance in scope: traits and target types for trait gating; `paramsSchema` for JSON-boundary validation; `renderOutputType` for `contract.d.ts`; the curried `factory` for runtime materialization. The `satisfies ColumnHelperFor<PgVectorDescriptor>` clause ties the helper to its descriptor at compile time, catching wiring mistakes (wrong `codecId`, wrong factory wired in, mismatched typeParams shape).
 
-**Non-parameterized codecs are the degenerate case.** A non-parameterized codec uses `P = void` and a constant factory that returns the same shared `Codec` instance for every column:
+**Non-parameterized codecs are the degenerate case.** A non-parameterized codec uses `P = void` and a constant factory that returns the same shared codec instance for every column:
 
 ```ts
-const sharedTextCodec: Codec = { id: 'pg/text@1', /* … */ };
+class PgTextCodec extends CodecImpl<'pg/text@1', readonly ['equality', 'order', 'textual'], string, string> {
+  async encode(value: string) { return value; }
+  async decode(wire: string) { return wire; }
+}
 
-const pgTextCodec: CodecDescriptor<void> = {
-  codecId: 'pg/text@1',
-  traits: ['equality', 'order', 'textual'],
-  targetTypes: ['text'],
-  paramsSchema: voidParamsSchema,
-  factory: () => () => sharedTextCodec,
-};
+class PgTextDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = 'pg/text@1' as const;
+  override readonly traits = ['equality', 'order', 'textual'] as const;
+  override readonly targetTypes = ['text'] as const;
+  override readonly paramsSchema = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => PgTextCodec {
+    const shared = new PgTextCodec(this);
+    return () => shared;
+  }
+}
+
+export const pgTextDescriptor = new PgTextDescriptor();
+export const text = () => column(pgTextDescriptor.factory(), pgTextDescriptor.codecId, undefined);
+text satisfies ColumnHelperFor<PgTextDescriptor>;
 ```
 
 Whether a codec id "is parameterized" stops being a registration-time distinction; it's a property of `P` on the descriptor. The descriptor map indexes every descriptor by `codecId`; both `descriptorFor(codecId)` (codec-id-keyed metadata reads) and `forColumn(table, column)` (column-aware dispatch reads) resolve through the same map without branching.
+
+> **Authoring guide.** The class-form authoring pattern (descriptor class + codec class + per-codec helper, tied by `satisfies`), the variance rationale, and the three case studies that pin the design (non-parameterized, parameterized with literal preservation, parameterized with arktype schema) live in [`docs/reference/codec-authoring-guide.md`](../../reference/codec-authoring-guide.md).
 
 `CodecInstanceContext` is a small framework-supplied input the curried factory closes over. The base shape is family-agnostic; SQL-family extensions augment it with domain-shaped column-set metadata.
 
@@ -113,11 +155,7 @@ The same `vector(1536)` participates in four code paths. Each reads a different 
 
 ### 2. No-emit type resolution
 
-> **Status — partial.** As shipped, `@prisma-next/sql-contract-ts`'s `FieldOutputType<Definition, Model, Field>` resolves through `CodecTypesFromDefinition[codecId]['output']` only. Parameterized columns therefore fall back to the codec's base output type in no-emit mode: `vector(1536)` resolves to `number[]` (the codec's base `output`) instead of `Vector<1536>`, and `arktypeJson(schema)` resolves to `unknown` because `@prisma-next/extension-arktype-json/codec-types` declares its `arktype/json@1` entry's `output` as `unknown`. Authors who skip `pnpm emit` get codec-base types, not the parameterized refinements emitted into `contract.d.ts`. Tracked under TML-2357.
->
-> The shape described below is the eventual target: the `type: (ctx: CodecInstanceContext) => Codec<…, Js>` slot is already on `ColumnTypeDescriptor` (authoring-time only, never serialized) so `arktypeJson(schema).type` carries the inferred shape at the type level today. What's missing is the `FieldOutputType` resolver wiring that follows `typeRef` and applies the slot to read the `Js` parameter off the resulting codec.
-
-`@prisma-next/sql-contract-ts`'s `FieldOutputType<Definition, Model, Field>` will follow `typeRef` through `storage.types`, then synthetically apply `CodecInstanceContext` to the column's `type` slot at the type level and read the `Js` parameter off the resulting `Codec<…, Js>`. For `vector(1536)`, this will produce `Vector<1536>` (literal `N` preserved through curried application). For non-parameterized columns (no `type` slot), it falls back to `CodecTypes[codecId]['output']` (today's behavior for every column). Nullability is reattached uniformly.
+`@prisma-next/sql-contract-ts`'s `FieldOutputType<Definition, Model, Field>` follows `typeRef` through `storage.types`, then synthetically applies `CodecInstanceContext` to the column's `type` slot at the type level and reads the `Js` parameter off the resulting `Codec<…, Js>`. For `vector(1536)`, this produces `Vector<1536>` (literal `N` preserved through curried application). For non-parameterized columns (no `type` slot), it falls back to `CodecTypes[codecId]['output']`. Nullability is reattached uniformly.
 
 ### 3. Emit-path rendering
 
@@ -127,7 +165,7 @@ For columns that reference a named storage type via `typeRef` (rather than carry
 
 ### 4. Runtime materialization and dispatch
 
-When `contract.json` loads, `sql-runtime` builds a **descriptor map** keyed by `codecId`. Parameterized descriptors land directly; non-parameterized codecs registered through the legacy `codecs:` slot are auto-lifted into `CodecDescriptor<void>` via `synthesizeNonParameterizedDescriptor(codec)` — a synthesis bridge that wraps an existing async-shaped `Codec` (per [ADR 204 — Single-Path Async Codec Runtime](ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md)) into a descriptor whose constant factory returns the same codec instance for every column. The map exposes two read APIs:
+When `contract.json` loads, `sql-runtime` builds a **descriptor map** keyed by `codecId`. Every contributor (target, adapter, extension pack) ships native `CodecDescriptor`s through the unified `codecs:` slot — both parameterized and non-parameterized descriptors live side-by-side in one array. The framework registers them directly; no synthesis or auto-lifting happens at runtime. The map exposes two read APIs:
 
 - **`descriptorFor(codecId)`** — codec-id-keyed metadata reads (consumed by trait gating, startup validation, the emit path's `renderOutputType` lookup). Non-branching for parameterized vs. non-parameterized.
 - **`forColumn(table, column)`** — column-aware dispatch reads (consumed by encode and decode). Returns the per-instance parameterized codec for parameterized columns, the cached singleton for non-parameterized columns. Pre-built once at context construction by walking `storage.tables[].columns[]`:
@@ -136,7 +174,7 @@ When `contract.json` loads, `sql-runtime` builds a **descriptor map** keyed by `
   3. For inline-`typeParams` columns, validate via `descriptor.paramsSchema['~standard'].validate(typeParams)` and call `descriptor.factory(validatedParams)({ name: '<anon:t.c>', usedAt: [{ table, column }] })` once.
   4. For non-parameterized columns, call `descriptor.factory(undefined)(ctx)` once and cache the resulting `Codec` by codec id (the constant-factory contract guarantees the result is shared across columns).
 
-JSON-with-schema validation lives **inside the resolved codec's `decode` body** rather than in a parallel validator registry. The per-library extension's factory rehydrates the schema at materialization time and closes over it; `decode(wire)` parses then validates, throwing a uniform `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` on rejection.
+JSON-with-schema validation lives **inside the resolved codec's `decode` body** rather than in a parallel validator registry. The per-library extension's factory rehydrates the schema at materialization time and closes over it; `decode(wire)` parses then validates, throwing a uniform `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` on rejection (which the runtime decode wrapper surfaces as `RUNTIME.DECODE_FAILED` with the original error reachable on `cause`).
 
 ## Why this shape
 
@@ -155,7 +193,7 @@ Both problems share a root cause: the type-level facts about a parameterized col
 ### What works better
 
 - **One artifact per codec.** The pack author writes one curried factory function and one descriptor. The descriptor's `renderOutputType` is the only piece the framework owns separately, and only because the emit path runs without the factory in scope.
-- **Type fidelity through the emit path.** `vector(1536)` resolves to `Vector<1536>` at authoring time and in the emitted `contract.d.ts`; `arktypeJson(ProductSchema)` resolves to the schema's inferred output in `contract.d.ts`. The no-emit path still resolves through the codec's base output type today (see § "No-emit type resolution" status block above) — `Vector<1536>` and the arktype schema's inferred shape land in `contract.d.ts` only after `pnpm emit`. Resolver wiring is tracked under TML-2357. Future column-scoped stateful codecs (e.g. encryption) inherit the same staging.
+- **Type fidelity end-to-end.** `vector(1536)` resolves to `Vector<1536>` at authoring time, in the no-emit path, in the emitted `contract.d.ts`, and at runtime decode. `arktypeJson(ProductSchema)` resolves to the schema's inferred output. Future column-scoped stateful codecs (e.g. encryption) resolve to their declared output even though the wire is ciphertext.
 - **Non-branching descriptor reads.** `descriptorFor('pg/text@1').traits` and `descriptorFor('pg/vector@1').traits` use the same call shape. Non-parameterized codecs are the degenerate `P = void` case; consumers don't ask "is this codec parameterized" before reading metadata. The four sites that previously read traits via `context.codecs.traitsOf(codecId)` migrated to `context.codecDescriptors.descriptorFor(codecId).traits` without behavior change.
 - **Framework-components stays library-agnostic.** `paramsSchema: StandardSchemaV1<P>` keeps arktype confined to the codec authors that opt into it; a future extension that prefers zod or valibot satisfies the same descriptor shape without `framework-components` depending on either library.
 - **Forward-compat for column-scoped stateful codecs.** Column-scoped encryption and similar codecs author against `(params, ctx)` today using the same surface pack authors already adopted. The contract-load runtime materialization is a documented contract.
@@ -164,13 +202,12 @@ Both problems share a root cause: the type-level facts about a parameterized col
 
 - **`ColumnTypeDescriptor` grew an authoring-time `type` slot.** The optional `type?: (ctx: CodecInstanceContext) => Codec` field is the price of letting the no-emit resolver read the factory's return type without reaching into the runtime codec registry. The slot is structurally optional, ignored by the IR serializer, and never appears in `contract.json`.
 - **Per-library extensions own JSON-with-schema.** A schema-typed JSON column is not a postgres-adapter concept; it's a per-library concept. The cost is one more import for users who want a typed JSON column; the benefit is that each library ships a lossless pipeline rather than a generic Standard-Schema-driven shape that's lossy for narrowed types.
-- **Encode-side `forCodecId` legacy fallback (carved out, AC-5-deferred).** `ParamRef` carries `codecId` but not `(table, column)` today, so encode-side dispatch consults `contractCodecs.forCodecId(codecId)` instead of `forColumn`. The fallback only works when the parameterized codec's encode is per-instance-stateless w.r.t. params: pgvector formats `[v1,v2,…]` regardless of declared length; arktype-json's encode is `JSON.stringify` with **no schema check** (validation runs on decode only — see § Per-library JSON extensions). Codec descriptors that are encode-equivalent across params declare `encodeIsParamsIndependent: true`, which tells the runtime registry not to mark the codec id ambiguous when multiple distinct resolved instances share it (so a contract with two `arktypeJson(...)` columns or two `vector(N)` columns of different lengths can encode through `forCodecId` without rejection). The carve-out is documented at the registry boundary in `relational-core/src/ast/codec-types.ts:101-129` and retires under TML-2357 once `ParamRef.refs` is threaded through column-bound construction sites — at which point `encodeIsParamsIndependent` becomes vestigial.
-- **Heterogeneous-`P` registry boundary.** `descriptorFor(codecId): CodecDescriptor<P>` is structurally heterogeneous across codec ids — `P` is `void` for `pg/text@1`, `{ length: number }` for `pg/vector@1`, `{ expression; jsonIr }` for `arktype/json@1`, etc. The registry's interface methods cannot be honestly typed at the registry level without `<any>` at the boundary; consumers narrow per codec id at the call site. A typed-dispatch / sealed-visitor refactor would eliminate the suppressions but is not in scope; the registry interface uses `CodecDescriptor<any>` with documented one-line rationale comments at the four production sites.
-- **Emit-only `Codec` shim for per-library extensions.** The framework emitter consults a single codec-id-keyed `CodecLookup` to resolve `renderOutputType`. Per-library extensions whose codec instance is materialized through the descriptor's factory at runtime can't naturally participate in that lookup at emit time. The arktype-json package ships an emit-only `Codec` instance (`arktypeJsonEmitCodec`) carrying just `renderOutputType`; encode/decode are sentinels that throw if invoked. A future cleanup that routes the emit path through `descriptorFor` retires the shim — tracked under TML-2357.
+- **Heterogeneous-`P` registry boundary.** `descriptorFor(codecId): CodecDescriptor<unknown>` is structurally heterogeneous across codec ids — `P` is `void` for `pg/text@1`, `{ length: number }` for `pg/vector@1`, `{ expression; jsonIr }` for `arktype/json@1`, etc. The registry's interface methods cannot be honestly typed at the registry level without `unknown` at the boundary; consumers narrow per codec id at the call site (where the descriptor's `paramsSchema` validates JSON-sourced params before the factory ever sees them, so the runtime narrow is safe). A typed-dispatch / sealed-visitor refactor would eliminate the boundary widening but is not in scope.
+- **`forCodecId` is a constrained fallback.** Encode-side dispatch consults `forColumn(table, column)` for column-bound `ParamRef`s — `ParamRef.refs: { table; column }` is plumbed through column-bound construction sites, and a builder-pipeline validator pass (`validateParamRefRefs`) rejects refs-less `ParamRef`s targeting parameterized codec ids before encode runs. `forCodecId(codecId)` still exists for non-parameterized codec ids and for the few parameterized codecs that explicitly declare `encodeIsParamsIndependent: true` because every resolved instance encodes to the same wire shape (pgvector's `[v1,v2,…]` format and arktype-json's schema-independent `JSON.stringify`). Decode remains column-aware through `forColumn`.
 
 ### Per-library JSON extensions
 
-`@prisma-next/extension-arktype-json` ships `arktypeJson(schema)`. The codec id (`arktype/json@1`) is library-bound, not target-bound. The factory eagerly serializes `schema.expression` (TypeScript-source-like rendering) and `schema.json` (arktype's internal IR) into `typeParams` at the column-author site; the descriptor's factory rehydrates via `ark.schema(typeParams.jsonIr)`. The codec validates against the schema in `decode` (and in `decodeJson` for JsonValue payloads); `encode` is intentionally schema-independent (`JSON.stringify` only) — see the encode-fallback trade-off above. This matches the JSON-validator philosophy: payloads can come from any source (this writer, a previous schema version, a manual SQL `INSERT`), so validate when reading. The emit-path renderer reads `expression` directly so `contract.d.ts` carries the schema's source-like rendering with full fidelity.
+`@prisma-next/extension-arktype-json` ships `arktypeJson(schema)`. The codec id (`arktype/json@1`) is library-bound, not target-bound. The factory eagerly serializes `schema.expression` (TypeScript-source-like rendering) and `schema.json` (arktype's internal IR) into `typeParams` at the column-author site; the descriptor's factory rehydrates via `ark.schema(typeParams.jsonIr)`, fails fast if the rehydrated expression diverges, and validates internally in `decode`. Encode is intentionally schema-independent (`JSON.stringify`) so two columns with distinct schemas can share the codec-id fallback when required. The no-emit resolver and emit-path renderer read the factory return type / `expression` so `contract.d.ts` carries the schema's source-like rendering with full fidelity.
 
 The postgres adapter retains only the non-parameterized raw-JSON / raw-JSONB codecs (`pg/json@1`, `pg/jsonb@1`) — schema-typed JSON columns ship from extension packages. Future per-library extensions (`zod/json@1`, `valibot/json@1`) follow the same pattern when each library has a clean serialize / rehydrate story.
 
@@ -178,7 +215,7 @@ The postgres adapter retains only the non-parameterized raw-JSON / raw-JSONB cod
 
 **Type-level brand or `OutputType` HKT field on the codec.** The codec carries an `OutputType: CodecOutputTypeFn<Params>` field, and `FieldOutputType` consults `Apply<codec.OutputType, typeParams>`. Rejected because the same information already lives in the factory function's TypeScript return type — encoding it twice and synchronizing the two encodings via `renderOutputType` is exactly the drift `function-is-signature` is meant to prevent.
 
-**Optional `init(params, instance)` hook on the codec.** Codec carries `init?` separately from a factory; runtime calls `init` per `storage.types` instance for stateful codecs. Rejected because the higher-order factory IS what `init` was — the same signature, the same lifecycle, the same purpose. One artifact, not two. (The legacy `init?` slot on `CodecParamsDescriptor` and the SQL `Codec` extension persists as an adapter-level surface during the transition; retirement tracked under TML-2357.)
+**Optional `init(params, instance)` hook on the codec.** Codec carries `init?` separately from a factory; runtime calls `init` per `storage.types` instance for stateful codecs. Rejected because the higher-order factory IS what `init` was — the same signature, the same lifecycle, the same purpose. One artifact, not two. The legacy `init?` slot on the SQL `Codec` extension was retired alongside the unified-descriptor migration.
 
 **A shared `columnFor(codec)(params)` helper.** A single `columnFor` helper turns any codec into a column-descriptor factory, type-discriminated on whether the codec is parameterized. Rejected because each pack ships a typed factory directly — `columnFor` would add no type information and would add an indirection at the call site.
 
@@ -186,14 +223,14 @@ The postgres adapter retains only the non-parameterized raw-JSON / raw-JSONB cod
 
 ## Supersedes
 
-The transitional `paramsSchema?` and `init?` fields on the SQL `Codec` extension and the `renderOutputType?` field on the SQL `Codec` and Mongo `MongoCodec` extensions (introduced by [ADR 186](ADR%20186%20-%20Codec-dispatched%20type%20rendering.md)). All three migrate to `CodecDescriptor`. Pack-author column-descriptor factories (`vector(N)`, `charColumn(N)`, `numericColumn(p, s)`, …) are reshaped to return `ColumnTypeDescriptor & { type?: (ctx) => Codec<…> }` for codecs that need no-emit type-level access — the user-call site (`field.column(vector(1536))`) is unchanged.
+The transitional `paramsSchema?` and `init?` fields on the SQL `Codec` extension and the `renderOutputType?` field on the SQL `Codec` and Mongo `MongoCodec` extensions (introduced by [ADR 186](ADR%20186%20-%20Codec-dispatched%20type%20rendering.md)). All three migrated to `CodecDescriptor`. Pack-author column-descriptor factories (`vector(N)`, `charColumn(N)`, `numericColumn(p, s)`, …) are reshaped to return `ColumnTypeDescriptor & { type?: (ctx) => Codec<…> }` for codecs that need no-emit type-level access — the user-call site (`field.column(vector(1536))`) is unchanged.
 
-The intermediate `CodecParamsDescriptor<P>` type at the adapter compile-time boundary persists as a legacy surface during the registration-side migration; retirement tracked under TML-2357 (see "Future work" below). Phase B of this ADR's landing migrated the runtime-side descriptor (in `@prisma-next/sql-runtime`) to the unified shape; the adapter-level `CodecParamsDescriptor` retires alongside the single registration slot.
+The legacy `defineCodec({...})` factory and the family-side `mkCodec({...})` instance constructor were the previous canonical author surface; they have been retired in favor of class-based codecs and descriptors (`CodecImpl`, `CodecDescriptorImpl`, per-codec column helpers, `satisfies`) as described above. The earlier ADRs that show `defineCodec({...})` examples ([ADR 184](ADR%20184%20-%20Codec-owned%20value%20serialization.md), [ADR 186](ADR%20186%20-%20Codec-dispatched%20type%20rendering.md), [ADR 202](ADR%20202%20-%20Codec%20trait%20system.md), [ADR 204](ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md), [ADR 205](ADR%20205%20-%20SQL%20cast%20emission%20is%20adapter%20policy.md)) are accurate as historical records of those decisions, but the authoring shape they show is no longer current — see the retrospective notes at the top of each.
 
 ## Resolves
 
-- **TML-2229 (emit path).** `vector(1536)`, `arktypeJson(schema)`, and other parameterized columns resolve correctly through the emit path (typeRef columns included, via `EmissionSpi.resolveFieldTypeParams`). The no-emit equivalent — `FieldOutputType` walking `typeRef` and reading the column's authoring-time `type` slot — is **not** yet implemented; tracked under TML-2357 alongside the registration-side migration. See the partial-status block in § "No-emit type resolution".
-- **The deferred no-emit `renderOutputType` placement from [ADR 186](ADR%20186%20-%20Codec-dispatched%20type%20rendering.md).** The renderer moves to its long-term home on the descriptor. The no-emit *consumption* of that renderer (resolving through the factory's return type at the type level) is the part that ships under TML-2357.
+- **Parameterized columns (no-emit and emit).** `vector(1536)`, `arktypeJson(schema)`, and other parameterized columns resolve correctly in the no-emit path AND through the emit path (typeRef columns included, via `EmissionSpi.resolveFieldTypeParams`).
+- **The deferred no-emit fix from [ADR 186](ADR%20186%20-%20Codec-dispatched%20type%20rendering.md).** The `renderOutputType` it introduced moves to its long-term home on the descriptor; the no-emit path now resolves through the factory's return type without consulting it.
 
 ## References
 
@@ -203,16 +240,11 @@ The intermediate `CodecParamsDescriptor<P>` type at the adapter compile-time bou
 - [ADR 184 — Codec-owned value serialization](ADR%20184%20-%20Codec-owned%20value%20serialization.md). Established the pattern of codecs owning their representations.
 - [ADR 171 — Parameterized native types in contracts](ADR%20171%20-%20Parameterized%20native%20types%20in%20contracts.md). Established `typeParams` on storage columns.
 - [ADR 168 — Postgres JSON and JSONB typed columns](ADR%20168%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md). Introduced typed JSON columns with Standard Schema. Per-library extensions (`@prisma-next/extension-arktype-json`) now own the typed JSON column shape.
-- [ADR 202 — Codec trait system](ADR%20202%20-%20Codec%20trait%20system.md). The trait system gating per-instance helper extraction (the `'json-validator'` trait gates the JSON-schema validator registry's `validate` extraction; the registry itself is unused by arktype-json, which validates inside its `decode` body).
+- [ADR 202 — Codec trait system](ADR%20202%20-%20Codec%20trait%20system.md). The trait system. The `'json-validator'` trait was a transitional gate for the now-deleted `JsonSchemaValidatorRegistry`; both the trait and the registry were retired — JSON-Schema validation lives uniformly inside the resolved codec's `decode` body.
 
 ## Future work
 
-- **TML-2357 — registration-side migration of the unified `CodecDescriptor`.** This ADR's landing covered the read-surface unification (`descriptorFor` non-branching across parameterized vs. non-parameterized codec ids) and the parameterized-descriptor migration for the codecs main shipped at the time (pgvector, postgres json/jsonb). The remaining work tracked under TML-2357:
-    - **T3.5.2** — narrow the runtime `Codec` instance to drop codec-id-keyed metadata (`id`, `traits`, `targetTypes`, `meta`). The descriptor is the long-term home for those fields; the runtime instance retains them today for the legacy registry's sake.
-    - **T3.5.3** — migrate every non-parameterized codec contributor to ship a `CodecDescriptor` directly (~50 codecs across postgres / sqlite / sql-family / mongo). The synthesis bridge auto-lifts the legacy `codecs:` slot today; T3.5.3 retires the bridge.
-    - **T3.5.4** — collapse the parallel registration slots into one (`codecs:` retires; `parameterizedCodecs:` retires; contributors ship one descriptor list).
-    - **T3.5.9 / T3.5.10 / T3.5.11** — thread `ParamRef.refs: { table; column }` through the SQL builder's column-bound construction sites so encode-side dispatch resolves through `forColumn` (the AC-5-deferred encode fallback retires; the `forCodecId` fallback retires for parameterized codec ids).
-    - **T3.5.12** — delete the `JsonSchemaValidatorRegistry` infrastructure (validation moves into the resolved codec's `decode` body uniformly; the `'json-validator'` trait becomes vestigial or persists only as a structural marker).
-    - **Emit-path consultation through `descriptorFor`.** The framework emitter currently consults a single codec-id-keyed `CodecLookup` for `renderOutputType`. Routing the emit path through the descriptor map directly retires the per-library "emit-only Codec shim" pattern (currently shipped by `@prisma-next/extension-arktype-json`).
-- **Mongo control-plane parameterized-codecs slot.** The Mongo control descriptor doesn't carry the slot today; Mongo demos don't use vectors, so the gap is authoring-time only. A future migration aligns Mongo with the SQL family's slot shape.
-- **Future schema libraries.** zod, valibot, etc. ship as parallel per-library extensions when each has a clean serialize / rehydrate story. The arktype-json package is the structural template.
+- **`pgEnumCodec` factory audit.** The current factory is a placeholder (enum values aren't parameterized in the curried-factory sense). A separate ticket reshapes it.
+- **Mongo registration migration + Mongo runtime `forColumn`.** Separate follow-up for the Mongo family. Mongo demos don't use parameterized codecs today, so the gap is authoring-time only.
+- **Mongo control-plane unified `codecs:` registration surface.** Aligns Mongo with the SQL family's single-slot shape — separate ticket.
+- **Future schema libraries.** zod, valibot, etc. ship as parallel per-library extensions when each library has a clean serialize / rehydrate story. The arktype-json package is the structural template.

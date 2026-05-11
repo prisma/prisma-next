@@ -4,12 +4,7 @@ import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
 
-// Phase A integration test (F01 from Phase A review): exercise the real
-// SQL emitter walk end-to-end for the typeRef-resolver path. Confirms that
-// `sqlEmission.resolveFieldTypeParams` walks `storage.fields → storage.tables[t]
-// .columns[c] → storage.types[ref].typeParams` and that the framework emit
-// path (`generateContractDts`) consults the resolver via the
-// `EmissionSpi.resolveFieldTypeParams` hook plumbed in TA.1-TA.2.
+// Integration test for the typeRef-resolver path: exercise the real SQL emitter walk end-to-end. Confirms that `sqlEmission.resolveFieldTypeParams` walks `storage.fields → storage.tables[t].columns[c] → storage.types[ref].typeParams` and that the framework emit path (`generateContractDts`) consults the resolver via the `EmissionSpi.resolveFieldTypeParams` hook.
 
 function createContract(overrides: Partial<Contract>): Contract {
   return {
@@ -29,31 +24,25 @@ function createContract(overrides: Partial<Contract>): Contract {
 const testHashes = { storageHash: 'sha256:test', profileHash: 'sha256:test' };
 
 function vectorCodecLookup(): CodecLookup {
+  const vectorCodec = {
+    id: 'pg/vector@1',
+    encode: async (v: unknown) => v,
+    decode: async (w: unknown) => w,
+    encodeJson: (v: unknown) => v as never,
+    decodeJson: (j: unknown) => j as never,
+  } as ReturnType<CodecLookup['get']>;
   return {
-    get: (id) =>
-      id === 'pg/vector@1'
-        ? ({
-            id: 'pg/vector@1',
-            targetTypes: ['vector'],
-            renderOutputType: (params) => `Vector<${params['length']}>`,
-            encode: async (v: unknown) => v,
-            decode: async (w: unknown) => w,
-            encodeJson: (v: unknown) => v as never,
-            decodeJson: (j: unknown) => j as never,
-            // The framework `Codec` shape narrows `traits` etc.; the
-            // structural narrow here is enough for the emit-path test.
-          } as unknown as ReturnType<CodecLookup['get']>)
-        : undefined,
+    get: (id) => (id === 'pg/vector@1' ? vectorCodec : undefined),
+    targetTypesFor: (id) => (id === 'pg/vector@1' ? ['vector'] : undefined),
+    metaFor: () => undefined,
+    renderOutputTypeFor: (id, params) =>
+      id === 'pg/vector@1' ? `Vector<${params['length']}>` : undefined,
   };
 }
 
 describe('sqlEmission.resolveFieldTypeParams (integration via generateContractDts)', () => {
   it('renders typeRef-shaped parameterized columns via the codec descriptor', () => {
-    // Two columns share a named storage.types entry. The SQL emitter's
-    // resolveFieldTypeParams walk finds `Embedding1536`'s typeParams via
-    // `storage.fields[embedding].column → storage.tables.post.columns
-    // .embedding.typeRef → storage.types.Embedding1536.typeParams`, then
-    // the framework emit path renders the codec's output expression.
+    // Two columns share a named storage.types entry. The SQL emitter's resolveFieldTypeParams walk finds `Embedding1536`'s typeParams via `storage.fields[embedding].column → storage.tables.post.columns .embedding.typeRef → storage.types.Embedding1536.typeParams`, then the framework emit path renders the codec's output expression.
     const contract = createContract({
       models: {
         Post: {
@@ -117,8 +106,7 @@ describe('sqlEmission.resolveFieldTypeParams (integration via generateContractDt
   });
 
   it('inline column typeParams continue to win over the resolver', () => {
-    // Inline `field.type.typeParams` takes precedence: even though the
-    // SQL resolver could find `Embedding1536`, the inline 768 wins.
+    // Inline `field.type.typeParams` takes precedence: even though the SQL resolver could find `Embedding1536`, the inline 768 wins.
     const contract = createContract({
       models: {
         Post: {

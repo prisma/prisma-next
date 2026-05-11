@@ -190,18 +190,20 @@ describe('sql-target-family-hook', () => {
     }).toThrow('references non-existent table');
   });
 
-  it('validates structure with model table missing primary key', () => {
+  it('validates structure with model table without primary key', () => {
     const ir = createContract({
       models: {
         User: {
-          storage: { table: 'user', fields: {} },
+          storage: { table: 'user', fields: { email: { column: 'email' } } },
           relations: {},
         },
       },
       storage: {
         tables: {
           user: {
-            columns: {},
+            columns: {
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
             uniques: [],
             indexes: [],
             foreignKeys: [],
@@ -212,7 +214,7 @@ describe('sql-target-family-hook', () => {
 
     expect(() => {
       sqlEmission.validateStructure(ir);
-    }).toThrow('is missing a primary key');
+    }).not.toThrow();
   });
 
   it('validates structure with model field referencing non-existent column', () => {

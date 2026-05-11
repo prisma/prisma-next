@@ -16,8 +16,19 @@ export function validateInvariantId(invariantId: string): boolean {
 /**
  * Walk a migration's operations and produce its `providedInvariants`
  * aggregate: the sorted, deduplicated list of `invariantId`s declared
- * by data-transform ops. Ops without `operationClass === 'data'` are
- * skipped; data ops without an `invariantId` are skipped.
+ * by ops in the migration. Ops without an `invariantId` are skipped.
+ *
+ * Both `data`-class ops (data-transforms, e.g. backfills) and
+ * `additive`-class opaque DDL (e.g. cipherstash's vendored EQL bundle
+ * via `installEqlBundleOp`) may declare invariantIds: the
+ * `operationClass` axis classifies *policy gating* (which kinds of ops
+ * a `db init` / `db update` policy permits), while `invariantId`
+ * classifies *marker bookkeeping* (which named bundles of work a
+ * future regeneration knows to skip). The two concerns are
+ * intentionally orthogonal — an extension can ship additive
+ * non-IR-derivable DDL (the only way the planner can know the bundle
+ * is already applied is via the invariantId on the marker) without
+ * needing to mis-classify it as `data`-class.
  *
  * Throws `MIGRATION.INVALID_INVARIANT_ID` on a malformed id and
  * `MIGRATION.DUPLICATE_INVARIANT_IN_EDGE` on duplicates.
@@ -39,7 +50,7 @@ export function deriveProvidedInvariants(ops: MigrationOps): readonly string[] {
 }
 
 function readInvariantId(op: MigrationPlanOperation): string | undefined {
-  if (op.operationClass !== 'data') return undefined;
+  if (!Object.hasOwn(op, 'invariantId')) return undefined;
   const candidate = (op as { invariantId?: unknown }).invariantId;
   return typeof candidate === 'string' ? candidate : undefined;
 }

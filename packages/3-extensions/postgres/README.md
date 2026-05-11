@@ -2,11 +2,18 @@
 
 One-package Postgres setup for Prisma Next. Install this single package to get config, runtime, and all transitive type dependencies.
 
+Two runtime facades ship under different entrypoints:
+
+- `@prisma-next/postgres/runtime` — long-lived Node process facade with closure-cached `runtime()`, `orm`, and `transaction()`.
+- `@prisma-next/postgres/serverless` — per-request facade for serverless / edge runtimes (Cloudflare Workers + Hyperdrive, AWS Lambda, Vercel, Deno Deploy, Bun edge). Each `connect()` returns a fresh `Runtime & AsyncDisposable`.
+
+Pick the facade that matches your deployment lifecycle. The asymmetry is intentional: closure caching is unsafe across `fetch` invocations (stale connections after isolate idle, concurrent-query races, no clean shutdown), so the serverless facade deliberately omits `orm`, `runtime()`, and `transaction()`. See `docs/architecture docs/subsystems/4. Runtime & Middleware Framework.md` and the deployment guide for the rationale.
+
 ## Package Classification
 
 - **Domain**: extensions
 - **Layer**: adapters
-- **Planes**: shared (config), runtime (runtime)
+- **Planes**: shared (config), runtime (runtime, serverless)
 
 ## Quick Start
 
@@ -20,6 +27,8 @@ export default defineConfig({
 });
 ```
 
+### Node (long-lived process)
+
 ```typescript
 // db.ts
 import postgres from '@prisma-next/postgres/runtime';
@@ -28,6 +37,28 @@ import contractJson from './contract.json' with { type: 'json' };
 
 export const db = postgres<Contract>({ contractJson });
 ```
+
+### Serverless / per-request runtimes
+
+```typescript
+// db.ts — module scope: only the static authoring surface is built here.
+import postgresServerless from '@prisma-next/postgres/serverless';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
+
+export const db = postgresServerless<Contract>({ contractJson });
+
+// worker.ts — per-request: acquire a fresh Runtime, dispose with `await using`.
+export default {
+  async fetch(_req: Request, env: Env): Promise<Response> {
+    await using runtime = await db.connect({ url: env.HYPERDRIVE.connectionString });
+    const rows = await runtime.execute(db.sql.from(/* ... */).build());
+    return Response.json(rows);
+  },
+};
+```
+
+The returned client exposes `sql`, `context`, `stack`, `contract`, and `connect()` — and intentionally nothing else. Construct ORM clients (or invoke `withTransaction` from `@prisma-next/sql-runtime`) against the runtime returned by `connect()` instead of caching one on the closure.
 
 ## Exports
 
@@ -40,13 +71,9 @@ Simplified `defineConfig` that pre-wires all Postgres internals (family, target,
 `@prisma-next/postgres/runtime` exposes a single `postgres(...)` helper that composes the Postgres execution stack and returns query/runtime roots:
 
 - `db.sql`
-- `db.kysely` (lane-owned build-only authoring surface: `build(query)` + `whereExpr(query)`)
-- `db.schema`
 - `db.orm`
 - `db.context`
 - `db.stack`
-
-`db.kysely` is produced by `@prisma-next/sql-kysely-lane` and intentionally exposes lane behavior, not raw Kysely execution APIs. `build(query)` infers plan row type from `query.compile()`, and `whereExpr(query)` produces `ToWhereExpr` payloads for ORM `.where(...)` interop.
 
 Runtime resources are deferred until `db.runtime()` or `db.connect(...)` is called.
 Connection binding can be provided up front (`url`, `pg`, `binding`) or deferred via `db.connect(...)`.
@@ -56,11 +83,23 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - `poolOptions.connectionTimeoutMillis` (default `20_000`)
 - `poolOptions.idleTimeoutMillis` (default `30_000`)
 
+### `@prisma-next/postgres/serverless`
+
+`@prisma-next/postgres/serverless` exposes `postgresServerless(...)` for per-request runtimes. The returned client exposes only:
+
+- `db.sql`
+- `db.context`
+- `db.stack`
+- `db.contract`
+- `db.connect({ url })` — returns `Promise<Runtime & AsyncDisposable>`
+
+Each `connect()` call constructs a fresh `pg.Client` and a fresh `Runtime`. No `pg.Pool` is allocated. `[Symbol.asyncDispose]` calls `runtime.close()`, which closes the underlying client. `pg-cursor` is enabled by default; opt out via `cursor: { disabled: true }`.
+
 ## Responsibilities
 
 - Build a static Postgres execution stack from target, adapter, and driver descriptors
-- Build typed SQL and a build-only Kysely authoring surface from the same execution context
-- Build static schema and ORM roots from the execution context
+- Build a typed SQL authoring surface from the execution context
+- Build a static ORM root from the execution context
 - Normalize runtime binding input (`binding`, `url`, `pg`)
 - Lazily instantiate runtime resources on first `db.runtime()` or `db.connect(...)` call
 - Connect the internal Postgres driver through `db.connect(...)` or from initial binding options
@@ -73,19 +112,17 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 - `@prisma-next/target-postgres` for target descriptor
 - `@prisma-next/adapter-postgres` for adapter descriptor
 - `@prisma-next/driver-postgres` for driver descriptor
-- `@prisma-next/sql-lane` for `sql(...)`
-- `@prisma-next/sql-kysely-lane` for contract-to-Kysely typing and build-only Kysely plan assembly
-- `@prisma-next/sql-relational-core` for `schema(...)`
+- `@prisma-next/sql-builder` for `sql(...)`
 - `@prisma-next/sql-orm-client` for `orm(...)`
 - `@prisma-next/sql-contract` for `validateContract(...)` and contract types
-- `pg` for lazy `Pool` construction when using URL binding
+- `pg` for `Pool` construction (URL / `pgPool` binding on the Node factory) and `Client` construction (`pgClient` binding on the Node factory; per-`connect()` on the serverless facade)
 
 ## Architecture
 
 ```mermaid
 flowchart TD
     App[App Code] --> Client[postgres(...)]
-    Client --> Static[Roots: sql kysely(build-only) schema orm context stack]
+    Client --> Static[Roots: sql orm context stack]
     Client --> Lazy[runtime()]
 
     Lazy --> Instantiate[instantiateExecutionStack]

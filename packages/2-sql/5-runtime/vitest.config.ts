@@ -29,10 +29,10 @@ export default defineConfig({
         'src/middleware/sql-middleware.ts', // SqlMiddleware interface declarations only - no executable statements to cover
       ],
       thresholds: {
-        lines: 84,
-        branches: 50,
-        functions: 85,
-        statements: 84,
+        lines: 90,
+        branches: 80,
+        functions: 92,
+        statements: 90,
       },
     },
   },

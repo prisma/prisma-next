@@ -166,7 +166,7 @@ async function migrationApply(ctx: JourneyCtx, args: readonly string[] = []): Pr
 }
 
 function getLatestMigrationDir(ctx: JourneyCtx): string {
-  const migrationsDir = join(ctx.testDir, 'migrations');
+  const migrationsDir = join(ctx.testDir, 'migrations', 'app');
   const dirs = readdirSync(migrationsDir).filter((d) => !d.startsWith('.'));
   if (dirs.length === 0) throw new Error('No migration directory found');
   let newest = dirs[0]!;
@@ -195,14 +195,15 @@ function buildMongoUri(baseUri: string, dbName: string): string {
 }
 
 function findMigrationDirBySlug(ctx: JourneyCtx, slugFragment: string): string {
-  const dirs = readdirSync(join(ctx.testDir, 'migrations'))
+  const migrationsDir = join(ctx.testDir, 'migrations', 'app');
+  const dirs = readdirSync(migrationsDir)
     .filter((d) => !d.startsWith('.') && d.includes(slugFragment))
     .sort();
   const match = dirs[dirs.length - 1];
   if (!match) {
     throw new Error(`No migration directory found containing '${slugFragment}'`);
   }
-  return join(ctx.testDir, 'migrations', match);
+  return join(migrationsDir, match);
 }
 
 // Journey tests shell out to the CLI binary, which easily exceeds the
@@ -248,7 +249,7 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
 
     // Plan leaves a draft migration; self-emit via `tsx migration.ts` to
     // produce `ops.json` and the attested `migration.json`.
-    const emit = await migrationEmit(ctx, ['--dir', `migrations/${basename(migrationDir)}`]);
+    const emit = await migrationEmit(ctx, ['--dir', `migrations/app/${basename(migrationDir)}`]);
     expect(emit.exitCode, `migration emit: ${emit.stdout}\n${emit.stderr}`).toBe(0);
 
     const ops = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8')) as ReadonlyArray<{
@@ -368,7 +369,7 @@ describe(
 
       const emitInit = await migrationEmit(ctx, [
         '--dir',
-        `migrations/${basename(getLatestMigrationDir(ctx))}`,
+        `migrations/app/${basename(getLatestMigrationDir(ctx))}`,
       ]);
       expect(
         emitInit.exitCode,

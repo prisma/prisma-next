@@ -119,15 +119,36 @@ function applyCreateDefaults(
   tableName: string,
   rows: Record<string, unknown>[],
 ): void {
+  // Per-operation cache for generators with `stability: 'query'` (e.g.
+  // `timestampNow` for `temporal.updatedAt()`): one generated value
+  // shared across every row in this insert. Per-field generators
+  // (e.g. `cuid`) ignore the cache and vary per row.
+  const defaultValueCache = rows.length > 1 ? new Map<string, unknown>() : undefined;
   for (const row of rows) {
     const applied = ctx.context.applyMutationDefaults({
       op: 'create',
       table: tableName,
       values: row,
+      ...(defaultValueCache ? { defaultValueCache } : {}),
     });
     for (const def of applied) {
       row[def.column] = def.value;
     }
+  }
+}
+
+function applyUpdateDefaults(
+  ctx: CollectionContext<Contract<SqlStorage>>,
+  tableName: string,
+  values: Record<string, unknown>,
+): void {
+  const applied = ctx.context.applyMutationDefaults({
+    op: 'update',
+    table: tableName,
+    values,
+  });
+  for (const def of applied) {
+    values[def.column] = def.value;
   }
 }
 
@@ -965,6 +986,9 @@ export class Collection<
     applyCreateDefaults(this.ctx, this.tableName, [createValues]);
     const updateValues = mapModelDataToStorageRow(this.contract, this.modelName, input.update);
     const hasUpdateValues = Object.keys(updateValues).length > 0;
+    if (hasUpdateValues) {
+      applyUpdateDefaults(this.ctx, this.tableName, updateValues);
+    }
     const conflictColumns = resolveUpsertConflictColumns(
       this.contract,
       this.modelName,
@@ -1057,6 +1081,8 @@ export class Collection<
       return new AsyncIterableResult(generator());
     }
 
+    applyUpdateDefaults(this.ctx, this.tableName, mappedData);
+
     const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
     const { selectedForQuery: selectedForUpdate, hiddenColumns } = augmentSelectionForJoinColumns(
       this.state.selectedFields,
@@ -1087,6 +1113,8 @@ export class Collection<
     if (Object.keys(mappedData).length === 0) {
       return 0;
     }
+
+    applyUpdateDefaults(this.ctx, this.tableName, mappedData);
 
     const primaryKeyColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
     const countState: CollectionState = {

@@ -1,6 +1,7 @@
 import type { OperationPreview } from '@prisma-next/framework-components/control';
-import { green, yellow } from 'colorette';
+import { cyan, green, yellow } from 'colorette';
 
+import type { AggregatePerSpaceExecutionEntry } from '../../control-api/types';
 import type { GlobalFlags } from '../global-flags';
 import { createColorFormatter, formatDim, isVerbose } from './helpers';
 
@@ -72,10 +73,65 @@ export interface MigrationCommandResult {
     readonly storageHash: string;
     readonly profileHash?: string;
   };
+  /**
+   * Per-space execution breakdown in canonical schedule order
+   * (extensions alphabetically, then app). Surfaces per-space markers
+   * + ops grouped by space; closes F1 / F4 / F7 from the M6
+   * verification doc. See {@link AggregatePerSpaceExecutionEntry}.
+   */
+  readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
   readonly summary: string;
   readonly timings: {
     readonly total: number;
   };
+}
+
+/**
+ * Render the shared per-space execution block consumed by the `db init`
+ * / `db update` / `migration apply` summaries (M6 sub-spec § Output
+ * shape contract). Always shows: space label (`Extension space: <id>`
+ * or `App space`) → per-op lines under each space → per-space marker
+ * hash (when known).
+ *
+ * `mode` controls the marker label phrasing — `'apply'` shows
+ * `marker → <hash>` (post-apply), `'plan'` omits the marker line
+ * entirely (no marker has been written yet).
+ */
+export function formatPerSpaceBlock(
+  perSpace: ReadonlyArray<AggregatePerSpaceExecutionEntry>,
+  mode: 'plan' | 'apply',
+  useColor: boolean,
+): readonly string[] {
+  const formatYellow = createColorFormatter(useColor, yellow);
+  const formatCyan = createColorFormatter(useColor, cyan);
+  const formatDimText = (text: string) => formatDim(useColor, text);
+
+  const lines: string[] = [];
+  for (let s = 0; s < perSpace.length; s++) {
+    const space = perSpace[s]!;
+    if (s > 0) lines.push('');
+    const header =
+      space.kind === 'app'
+        ? formatCyan('App space')
+        : formatCyan(`Extension space: ${space.spaceId}`);
+    lines.push(header);
+    if (space.operations.length === 0) {
+      lines.push(`  ${formatDimText('(no operations)')}`);
+    } else {
+      for (let i = 0; i < space.operations.length; i++) {
+        const op = space.operations[i]!;
+        const isLast = i === space.operations.length - 1;
+        const treeChar = isLast ? '└' : '├';
+        const destructiveMarker =
+          op.operationClass === 'destructive' ? ` ${formatYellow('(destructive)')}` : '';
+        lines.push(`  ${formatDimText(treeChar)}─ ${op.label}${destructiveMarker}`);
+      }
+    }
+    if (mode === 'apply' && space.marker) {
+      lines.push(`  ${formatDimText(`marker: ${space.marker.storageHash}`)}`);
+    }
+  }
+  return lines;
 }
 
 /**
@@ -97,22 +153,43 @@ export function formatMigrationPlanOutput(
 
   // Plan summary
   const operationCount = result.plan?.operations.length ?? 0;
-  lines.push(`${formatGreen('✔')} Planned ${operationCount} operation(s)`);
+  const spaceCount = result.perSpace?.length ?? 0;
+  if (spaceCount > 0) {
+    lines.push(
+      `${formatGreen('✔')} Planned ${operationCount} operation(s) across ${spaceCount} contract space${spaceCount === 1 ? '' : 's'}`,
+    );
+  } else {
+    lines.push(`${formatGreen('✔')} Planned ${operationCount} operation(s)`);
+  }
 
-  // Show operations tree
-  if (result.plan?.operations && result.plan.operations.length > 0) {
-    const formatYellow = createColorFormatter(useColor, yellow);
+  const formatYellow = createColorFormatter(useColor, yellow);
+
+  // Per-space breakdown takes precedence over the flat ops tree when
+  // the aggregate flow surfaced one (M6 sub-spec § Output shape contract).
+  if (result.perSpace && result.perSpace.length > 0) {
+    lines.push('');
+    lines.push(...formatPerSpaceBlock(result.perSpace, 'plan', useColor));
+    const hasDestructive = result.perSpace.some((s) =>
+      s.operations.some((op) => op.operationClass === 'destructive'),
+    );
+    if (hasDestructive) {
+      lines.push('');
+      lines.push(
+        `${formatYellow('⚠')} This migration contains destructive operations that may cause data loss.`,
+      );
+    }
+  } else if (result.plan?.operations && result.plan.operations.length > 0) {
+    // Single-space fallback (no aggregate breakdown). Same flat tree
+    // we've always rendered.
     lines.push(`${formatDimText('│')}`);
     for (let i = 0; i < result.plan.operations.length; i++) {
       const op = result.plan.operations[i];
       if (!op) continue;
       const isLast = i === result.plan.operations.length - 1;
       const treeChar = isLast ? '└' : '├';
-      const opClassLabel =
-        op.operationClass === 'destructive'
-          ? formatYellow(`[${op.operationClass}]`)
-          : formatDimText(`[${op.operationClass}]`);
-      lines.push(`${formatDimText(treeChar)}─ ${op.label} ${opClassLabel}`);
+      const destructiveMarker =
+        op.operationClass === 'destructive' ? ` ${formatYellow('(destructive)')}` : '';
+      lines.push(`${formatDimText(treeChar)}─ ${op.label}${destructiveMarker}`);
     }
 
     const hasDestructive = result.plan.operations.some((op) => op.operationClass === 'destructive');
@@ -165,10 +242,20 @@ export interface MigrationApplyCommandOutputResult {
   readonly migrationsApplied: number;
   readonly markerHash: string;
   readonly applied: readonly {
-    readonly dirName: string;
+    readonly spaceId: string;
+    readonly dirName?: string;
+    readonly migrationHash?: string;
+    readonly from?: string;
+    readonly to?: string;
     readonly operationsExecuted: number;
   }[];
   readonly summary: string;
+  /**
+   * Per-space breakdown in canonical schedule order (extensions
+   * alphabetically, then app). Always present for the aggregate-walking
+   * `migration apply` command.
+   */
+  readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
   readonly timings?: {
     readonly total: number;
   };
@@ -187,26 +274,17 @@ export function formatMigrationApplyCommandOutput(
   const formatGreen = createColorFormatter(useColor, green);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  if (result.migrationsApplied === 0) {
-    lines.push(`${formatGreen('✔')} ${result.summary}`);
-    lines.push(formatDimText(`  marker: ${result.markerHash}`));
-    return lines.join('\n');
-  }
-
   lines.push(`${formatGreen('✔')} ${result.summary}`);
-  lines.push('');
 
-  for (let i = 0; i < result.applied.length; i++) {
-    const migration = result.applied[i]!;
-    const isLast = i === result.applied.length - 1;
-    const treeChar = isLast ? '└' : '├';
-    lines.push(
-      `${formatDimText(treeChar)}─ ${migration.dirName} ${formatDimText(`[${migration.operationsExecuted} op(s)]`)}`,
-    );
+  if (result.perSpace.length > 0) {
+    lines.push('');
+    for (const line of formatPerSpaceBlock(result.perSpace, 'apply', useColor)) {
+      lines.push(line);
+    }
   }
 
   lines.push('');
-  lines.push(formatDimText(`marker: ${result.markerHash}`));
+  lines.push(formatDimText('Next: prisma-next migration status'));
 
   if (isVerbose(flags, 1) && result.timings) {
     lines.push('');
@@ -259,11 +337,9 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
       const op = result.operations[i]!;
       const isLast = i === result.operations.length - 1;
       const treeChar = isLast ? '└' : '├';
-      const opClassLabel =
-        op.operationClass === 'destructive'
-          ? formatYellow(`[${op.operationClass}]`)
-          : formatDimText(`[${op.operationClass}]`);
-      lines.push(`${formatDimText(treeChar)}─ ${op.label} ${opClassLabel}`);
+      const destructiveMarker =
+        op.operationClass === 'destructive' ? ` ${formatYellow('(destructive)')}` : '';
+      lines.push(`${formatDimText(treeChar)}─ ${op.label}${destructiveMarker}`);
     }
 
     const hasDestructive = result.operations.some((op) => op.operationClass === 'destructive');
@@ -310,15 +386,39 @@ export function formatMigrationApplyOutput(
   if (result.ok) {
     // Success summary
     const executed = result.execution?.operationsExecuted ?? 0;
+    const spaceCount = result.perSpace?.length ?? 0;
+
     if (executed === 0) {
-      lines.push(`${formatGreen('✔')} Database already matches contract`);
+      const acrossClause =
+        spaceCount > 0 ? ` across ${spaceCount} contract space${spaceCount === 1 ? '' : 's'}` : '';
+      lines.push(`${formatGreen('✔')} Database already matches contract${acrossClause}`);
+    } else if (spaceCount > 0) {
+      lines.push(
+        `${formatGreen('✔')} Applied ${executed} operation(s) across ${spaceCount} contract space${spaceCount === 1 ? '' : 's'}`,
+      );
     } else {
       lines.push(`${formatGreen('✔')} Applied ${executed} operation(s)`);
     }
 
-    // Marker info
-    if (result.marker) {
-      lines.push(`${formatDimText(`  Signature: ${result.marker.storageHash}`)}`);
+    // Per-space breakdown — replaces the single ambiguous `Signature:`
+    // line per M6 sub-spec § Output shape contract / AC4 / AC5.
+    if (result.perSpace && result.perSpace.length > 0) {
+      lines.push('');
+      lines.push(...formatPerSpaceBlock(result.perSpace, 'apply', useColor));
+      lines.push('');
+      lines.push(
+        formatDimText(
+          `Run 'prisma-next migration status' to confirm ${
+            spaceCount === 1 ? 'the space is' : 'all spaces are'
+          } up to date.`,
+        ),
+      );
+    } else if (result.marker) {
+      // Single-space fallback (no aggregate breakdown surfaced — e.g.
+      // older callers / non-aggregate code paths). Renamed from
+      // `Signature` to `App-space marker` per AC4 — when only one
+      // marker is observable, name what it covers explicitly.
+      lines.push(`${formatDimText(`  App-space marker: ${result.marker.storageHash}`)}`);
       if (result.marker.profileHash) {
         lines.push(`${formatDimText(`  Profile hash: ${result.marker.profileHash}`)}`);
       }

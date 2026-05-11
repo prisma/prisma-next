@@ -297,7 +297,7 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
       target: 'postgres',
       targetFamily: 'sql',
       capabilities: {},
-      codecs: createCodecRegistry(),
+      codecs: emptyCodecRegistry(),
     },
     lower: () => ({ sql: '', params: [] }),
   };
@@ -330,10 +330,7 @@ Low-level helper tests (for IR builders, planners, CLI glue, etc.) should prove 
 
 ### File Organization
 
-**Unit tests:** `src/**/*.test.ts` (alongside source code)
-**Integration tests:** `test/**/*.integration.test.ts` or `src/**/*.integration.test.ts`
-**Type tests:** `src/**/*.test-d.ts` (type-level tests using `expectTypeOf`)
-**E2E tests:** `test/e2e/framework/test/**/*.test.ts`
+**Unit tests:** `src/**/*.test.ts` (alongside source code) **Integration tests:** `test/**/*.integration.test.ts` or `src/**/*.integration.test.ts` **Type tests:** `src/**/*.test-d.ts` (type-level tests using `expectTypeOf`) **E2E tests:** `test/e2e/framework/test/**/*.test.ts`
 
 ### Test File Structure
 
@@ -969,9 +966,7 @@ it('reads user', async () => {
 
 ### 6. Use Appropriate Test Level
 
-**Unit test:** Test a single function in isolation
-**Integration test:** Test multiple components working together
-**E2E test:** Test complete execution path to database and back
+**Unit test:** Test a single function in isolation **Integration test:** Test multiple components working together **E2E test:** Test complete execution path to database and back
 
 **When in doubt:** Start with a unit test. If you need to test interactions, create an integration test. If you need to test the complete flow, create an E2E test.
 

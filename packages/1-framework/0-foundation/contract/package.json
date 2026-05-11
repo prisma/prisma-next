@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/contract",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "Data contract type definitions and JSON schema for Prisma Next",
@@ -16,6 +17,7 @@
   },
   "dependencies": {
     "@prisma-next/utils": "workspace:*",
+    "@standard-schema/spec": "^1.1.0",
     "arktype": "catalog:"
   },
   "devDependencies": {

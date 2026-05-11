@@ -2,7 +2,8 @@
   "extends": ["@prisma-next/tsconfig/base"],
   "compilerOptions": {
     "rootDir": ".",
-    "outDir": "dist"
+    "outDir": "dist",
+    "lib": ["ES2022", "ESNext.Disposable"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts"],
   "exclude": ["dist"]

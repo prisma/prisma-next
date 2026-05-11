@@ -4,41 +4,66 @@ import { formatMigrationApplyCommandOutput } from '../src/utils/formatters/migra
 import { parseGlobalFlags } from '../src/utils/global-flags';
 
 describe('formatMigrationApplyCommandOutput', () => {
-  it('formats no-op apply output', () => {
+  it('formats no-op apply (no spaces had pending operations)', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationApplyCommandOutput(
       {
         migrationsApplied: 0,
         markerHash: 'sha256:marker',
         applied: [],
-        summary: 'Already up to date',
-      },
-      flags,
-    );
-
-    expect(stripAnsi(output)).toContain('Already up to date');
-    expect(stripAnsi(output)).toContain('marker: sha256:marker');
-  });
-
-  it('formats applied migrations as a tree', () => {
-    const flags = parseGlobalFlags({ 'no-color': true });
-    const output = formatMigrationApplyCommandOutput(
-      {
-        migrationsApplied: 2,
-        markerHash: 'sha256:marker',
-        applied: [
-          { dirName: '20260101T1200_first', operationsExecuted: 1 },
-          { dirName: '20260102T1200_second', operationsExecuted: 2 },
-        ],
-        summary: 'Applied 2 migration(s)',
+        summary: 'Already up to date across 1 space(s)',
+        perSpace: [],
       },
       flags,
     );
 
     const stripped = stripAnsi(output);
-    expect(stripped).toContain('Applied 2 migration(s)');
-    expect(stripped).toContain('├─ 20260101T1200_first [1 op(s)]');
-    expect(stripped).toContain('└─ 20260102T1200_second [2 op(s)]');
+    expect(stripped).toContain('Already up to date');
+    // No-op apply still mentions the canonical next-step hint so the
+    // user knows where to verify state. M6 sub-spec § Output shape § footer.
+    expect(stripped).toContain('Next: prisma-next migration status');
+  });
+
+  it('renders the per-space block with markers in canonical schedule order', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationApplyCommandOutput(
+      {
+        migrationsApplied: 2,
+        markerHash: 'sha256:app-marker',
+        applied: [
+          { spaceId: 'pgvector', operationsExecuted: 1 },
+          { spaceId: 'app', operationsExecuted: 1 },
+        ],
+        summary: 'Applied 2 operation(s) across 2 contract space(s)',
+        perSpace: [
+          {
+            spaceId: 'pgvector',
+            kind: 'extension',
+            operations: [{ id: 'op-vec', label: 'Install vector ext', operationClass: 'additive' }],
+            marker: { storageHash: 'sha256:ext' },
+          },
+          {
+            spaceId: 'app',
+            kind: 'app',
+            operations: [{ id: 'op-user', label: 'Create user', operationClass: 'additive' }],
+            marker: { storageHash: 'sha256:app-marker' },
+          },
+        ],
+      },
+      flags,
+    );
+
+    const stripped = stripAnsi(output);
+    // Top line names the cross-space totals (M6 AC1 / AC4 / AC5).
+    expect(stripped).toContain('Applied 2 operation(s) across 2 contract space(s)');
+    // Both spaces are observable, in canonical order (extension first).
+    const extensionIdx = stripped.indexOf('pgvector');
+    const appIdx = stripped.indexOf('App space');
+    expect(extensionIdx).toBeGreaterThanOrEqual(0);
+    expect(appIdx).toBeGreaterThan(extensionIdx);
+    // Per-space markers are observable (M6 AC4).
+    expect(stripped).toContain('sha256:ext');
+    expect(stripped).toContain('sha256:app-marker');
   });
 
   it('includes total timing in verbose mode', () => {
@@ -47,8 +72,16 @@ describe('formatMigrationApplyCommandOutput', () => {
       {
         migrationsApplied: 1,
         markerHash: 'sha256:marker',
-        applied: [{ dirName: '20260101T1200_first', operationsExecuted: 3 }],
-        summary: 'Applied 1 migration(s)',
+        applied: [{ spaceId: 'app', operationsExecuted: 1 }],
+        summary: 'Applied 1 operation(s) across 1 contract space(s)',
+        perSpace: [
+          {
+            spaceId: 'app',
+            kind: 'app',
+            operations: [{ id: 'op-user', label: 'Create user', operationClass: 'additive' }],
+            marker: { storageHash: 'sha256:marker' },
+          },
+        ],
         timings: { total: 42 },
       },
       flags,

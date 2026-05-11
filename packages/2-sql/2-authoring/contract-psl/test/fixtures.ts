@@ -79,6 +79,15 @@ export const postgresTarget: TargetPackRef<'sql', 'postgres'> = {
   capabilities: {},
 };
 
+export const sqliteTarget: TargetPackRef<'sql', 'sqlite'> = {
+  kind: 'target',
+  familyId: 'sql',
+  targetId: 'sqlite',
+  id: 'sqlite',
+  version: '0.0.1',
+  capabilities: {},
+};
+
 export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
   kind: 'extension',
   familyId: 'sql',
@@ -87,10 +96,9 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
   version: '1.2.3-test',
 };
 
-/** Controlled test-only descriptor — intentionally uses pg/vector@1 with maximum: 2000 rather
- *  than importing the real pgvector pack, so interpreter unit tests stay layer-isolated.
- *  Real-pack parity is covered by
- *  `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`. */
+/**
+ * Controlled test-only descriptor — intentionally uses pg/vector@1 with maximum: 2000 rather than importing the real pgvector pack, so interpreter unit tests stay layer-isolated. Real-pack parity is covered by `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`.
+ */
 export const pgvectorAuthoringContributions = {
   field: {},
   type: {
@@ -120,6 +128,18 @@ export const postgresScalarTypeDescriptors = new Map([
   ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
   ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
   ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
+] as const);
+
+export const sqliteScalarTypeDescriptors = new Map([
+  ['String', { codecId: 'sqlite/text@1', nativeType: 'text' }],
+  ['Boolean', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
+  ['Int', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
+  ['BigInt', { codecId: 'sqlite/bigint@1', nativeType: 'integer' }],
+  ['Float', { codecId: 'sqlite/real@1', nativeType: 'real' }],
+  ['Decimal', { codecId: 'sqlite/text@1', nativeType: 'text' }],
+  ['DateTime', { codecId: 'sqlite/datetime@1', nativeType: 'text' }],
+  ['Json', { codecId: 'sqlite/json@1', nativeType: 'text' }],
+  ['Bytes', { codecId: 'sqlite/blob@1', nativeType: 'blob' }],
 ] as const);
 
 export const postgresCodecIdOnlyDescriptors = new Map<string, string>([
@@ -157,10 +177,12 @@ const targetTypesByCodecId: Record<string, readonly string[]> = {
 
 export const postgresCodecLookup: CodecLookup = {
   get: (id: string) => {
-    const targetTypes = targetTypesByCodecId[id];
-    if (!targetTypes) return undefined;
-    return { id, targetTypes } as ReturnType<CodecLookup['get']>;
+    if (!targetTypesByCodecId[id]) return undefined;
+    return { id } as ReturnType<CodecLookup['get']>;
   },
+  targetTypesFor: (id: string) => targetTypesByCodecId[id],
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
 };
 
 export function createPostgresTestContext(
@@ -404,6 +426,14 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
               : 21;
           return { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length } };
         },
+      },
+      {
+        id: 'timestampNow',
+        applicableCodecIds: ['pg/timestamp@1', 'pg/timestamptz@1', 'sqlite/datetime@1'],
+        buildPhases: () => ({
+          onCreate: { kind: 'generator', id: 'timestampNow' },
+          onUpdate: { kind: 'generator', id: 'timestampNow' },
+        }),
       },
     ],
   };

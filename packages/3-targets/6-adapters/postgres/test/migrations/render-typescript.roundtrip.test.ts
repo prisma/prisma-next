@@ -16,6 +16,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import {
   AddColumnCall,
   CreateExtensionCall,
@@ -133,7 +134,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
         new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
         new DropTableCall('public', 'stale'),
       ];
-      const migration = new TypeScriptRenderablePostgresMigration(calls, META);
+      const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
 
       const tsSource = rewriteImports(migration.renderTypeScript());
       await writeFile(join(tmpDir, 'migration.ts'), tsSource);
@@ -156,7 +157,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
     'renders an empty calls list whose executed scaffold emits []',
     { timeout: timeouts.typeScriptCompilation },
     async () => {
-      const migration = new TypeScriptRenderablePostgresMigration([], META);
+      const migration = new TypeScriptRenderablePostgresMigration([], META, APP_SPACE_ID);
 
       const tsSource = rewriteImports(migration.renderTypeScript());
       await writeFile(join(tmpDir, 'migration.ts'), tsSource);
@@ -186,7 +187,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
         meta: { note: 'preserved' },
       };
       const calls = [new RawSqlCall(op)];
-      const migration = new TypeScriptRenderablePostgresMigration(calls, META);
+      const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
 
       const tsSource = rewriteImports(migration.renderTypeScript());
       await writeFile(join(tmpDir, 'migration.ts'), tsSource);

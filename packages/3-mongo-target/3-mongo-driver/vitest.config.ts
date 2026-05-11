@@ -8,6 +8,7 @@ export default defineConfig({
     testTimeout: timeouts.spinUpMongoMemoryServer,
     hookTimeout: timeouts.spinUpMongoMemoryServer,
     fileParallelism: false,
+    sequence: { groupOrder: 5 },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -21,10 +22,10 @@ export default defineConfig({
         '**/exports/**',
       ],
       thresholds: {
-        statements: 90,
-        branches: 85,
+        statements: 95,
+        branches: 91,
         functions: 100,
-        lines: 90,
+        lines: 95,
       },
     },
   },

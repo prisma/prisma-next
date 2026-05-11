@@ -11,3 +11,4 @@ alwaysApply: false
 - If you need to describe sequencing (order of operations), keep it **short** and place it near the responsibilities/decision; avoid long procedural sections that read out-of-place
 - Use fenced code blocks for SQL (` ```sql `) and TS (` ```ts `); avoid nested backticks inside inline code
 - Worked examples should be end-to-end and make it obvious which layer owns each step (lane, adapter, codec, driver, runtime)
+- If the decision instantiates a structural pattern recorded in [`docs/architecture docs/patterns/`](../../docs/architecture%20docs/patterns/README.md), link forward to the pattern entry from the ADR (existing ADRs are not retroactively edited)

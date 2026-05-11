@@ -2,25 +2,27 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
+  ControlExtensionDescriptor,
   ControlFamilyInstance,
-  MigrationPlannerResult,
-  MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
-import { hasOperationPreview } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { notOk, ok } from '@prisma-next/utils/result';
-import type { DbUpdateResult, DbUpdateSuccess, OnControlProgress } from '../types';
-import { createOperationCallbacks, stripOperations } from './migration-helpers';
+import { notOk } from '@prisma-next/utils/result';
+import type { DbUpdateResult, OnControlProgress } from '../types';
+import { executeAggregateApply } from './db-apply-aggregate';
 
-// F12: db update allows additive, widening, and destructive operations.
 const DB_UPDATE_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 } as const;
 
 /**
- * Options for the executeDbUpdate operation.
- * Config-agnostic: receives pre-resolved driver, family, contract, and migrations capability.
+ * Options for the `db update` operation.
+ *
+ * Same loader → planner → runner pipeline as `db init`, but with the
+ * widened operation policy (additive + widening + destructive). The
+ * destructive-change confirmation gate runs at this layer: when
+ * `mode === 'apply'` and `acceptDataLoss` is `false`, the operation
+ * pre-plans, surfaces destructive ops to the caller, and aborts.
  */
 export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
@@ -34,194 +36,71 @@ export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId exte
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly acceptDataLoss?: boolean;
-  /** Optional progress callback for observing operation progress. */
+  readonly migrationsDir: string;
+  readonly targetId: TTargetId;
+  readonly extensionPacks?: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
   readonly onProgress?: OnControlProgress;
 }
 
 /**
- * Executes the db update operation: introspect → plan → (optionally) apply → marker.
+ * Execute `db update` against the configured contract.
  *
- * db update is a pure reconciliation command: it introspects the live schema, plans the diff
- * to the destination contract, and applies operations. The marker is bookkeeping only — written
- * after apply so that `verify` and `db init` can reference it, but never read or validated
- * by db update itself. The runner creates the marker table if it does not exist.
+ * Routes through the loader → planner → runner pipeline. Destructive
+ * operations require either `acceptDataLoss: true` or a prior
+ * `mode: 'plan'` invocation that surfaces the destructive ops; the
+ * confirmation gate is implemented here so the lower-level applier
+ * remains policy-agnostic.
  */
 export async function executeDbUpdate<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbUpdateOptions<TFamilyId, TTargetId>,
 ): Promise<DbUpdateResult> {
-  const { driver, familyInstance, contract, mode, migrations, frameworkComponents, onProgress } =
-    options;
-
-  const planner = migrations.createPlanner(familyInstance);
-  const runner = migrations.createRunner(familyInstance);
-
-  const introspectSpanId = 'introspect';
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanStart',
-    spanId: introspectSpanId,
-    label: 'Introspecting database schema',
-  });
-  const schemaIR = await familyInstance.introspect({ driver });
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanEnd',
-    spanId: introspectSpanId,
-    outcome: 'ok',
-  });
-
-  const policy = DB_UPDATE_POLICY;
-
-  const planSpanId = 'plan';
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanStart',
-    spanId: planSpanId,
-    label: 'Planning migration',
-  });
-  const plannerResult: MigrationPlannerResult = await planner.plan({
-    contract,
-    schema: schemaIR,
-    policy,
-    // `db update` reconciles against the live introspected schema; there is
-    // no prior contract to derive a "from" identity from. The required
-    // `fromContract: null` makes that structural fact visible at the call
-    // site (vs. silently letting the planner default to a baseline plan).
-    fromContract: null,
-    frameworkComponents,
-  });
-  if (plannerResult.kind === 'failure') {
-    onProgress?.({
-      action: 'dbUpdate',
-      kind: 'spanEnd',
-      spanId: planSpanId,
-      outcome: 'error',
-    });
-    return notOk({
-      code: 'PLANNING_FAILED',
-      summary: 'Migration planning failed due to conflicts',
-      conflicts: plannerResult.conflicts,
-      why: undefined,
-      meta: undefined,
-    });
-  }
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanEnd',
-    spanId: planSpanId,
-    outcome: 'ok',
-  });
-
-  const migrationPlan = plannerResult.plan;
-
-  if (mode === 'plan') {
-    const preview = hasOperationPreview(familyInstance)
-      ? familyInstance.toOperationPreview(migrationPlan.operations)
-      : undefined;
-    const result: DbUpdateSuccess = {
-      mode: 'plan',
-      plan: {
-        operations: stripOperations(migrationPlan.operations),
-        ...ifDefined('preview', preview),
-      },
-      destination: {
-        storageHash: migrationPlan.destination.storageHash,
-        ...ifDefined('profileHash', migrationPlan.destination.profileHash),
-      },
-      summary: `Planned ${migrationPlan.operations.length} operation(s)`,
-    };
-    return ok(result);
-  }
-
-  // When applying, require explicit acceptance for destructive operations
-  if (!options.acceptDataLoss) {
-    const destructiveOps = migrationPlan.operations
-      .filter((op) => op.operationClass === 'destructive')
-      .map((op) => ({ id: op.id, label: op.label }));
-    if (destructiveOps.length > 0) {
-      return notOk({
-        code: 'DESTRUCTIVE_CHANGES',
-        summary: `Planned ${destructiveOps.length} destructive operation(s) that require confirmation`,
-        why: 'Destructive operations require confirmation — re-run with -y to accept',
-        conflicts: undefined,
-        meta: { destructiveOperations: destructiveOps },
-      });
-    }
-  }
-
-  const applySpanId = 'apply';
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanStart',
-    spanId: applySpanId,
-    label: 'Applying migration plan',
-  });
-
-  const callbacks = createOperationCallbacks(onProgress, 'dbUpdate', applySpanId);
-
-  const runnerResult: MigrationRunnerResult = await runner.execute({
-    plan: migrationPlan,
-    driver,
-    destinationContract: contract,
-    policy,
-    ...(callbacks ? { callbacks } : {}),
-    // db update plans and applies from a single introspection pass, so per-operation pre/postchecks
-    // and idempotency probes are intentionally disabled to avoid redundant roundtrips.
-    executionChecks: {
-      prechecks: false,
-      postchecks: false,
-      idempotencyChecks: false,
-    },
-    frameworkComponents,
-  });
-
-  if (!runnerResult.ok) {
-    onProgress?.({
-      action: 'dbUpdate',
-      kind: 'spanEnd',
-      spanId: applySpanId,
-      outcome: 'error',
-    });
-    return notOk({
-      code: 'RUNNER_FAILED',
-      summary: runnerResult.failure.summary,
-      why: runnerResult.failure.why,
-      meta: runnerResult.failure.meta,
-      conflicts: undefined,
-    });
-  }
-
-  const execution = runnerResult.value;
-  onProgress?.({
-    action: 'dbUpdate',
-    kind: 'spanEnd',
-    spanId: applySpanId,
-    outcome: 'ok',
-  });
-
-  const result: DbUpdateSuccess = {
-    mode: 'apply',
-    plan: {
-      operations: stripOperations(migrationPlan.operations),
-    },
-    destination: {
-      storageHash: migrationPlan.destination.storageHash,
-      ...ifDefined('profileHash', migrationPlan.destination.profileHash),
-    },
-    execution: {
-      operationsPlanned: execution.operationsPlanned,
-      operationsExecuted: execution.operationsExecuted,
-    },
-    marker: migrationPlan.destination.profileHash
-      ? {
-          storageHash: migrationPlan.destination.storageHash,
-          profileHash: migrationPlan.destination.profileHash,
-        }
-      : { storageHash: migrationPlan.destination.storageHash },
-    summary:
-      execution.operationsExecuted === 0
-        ? 'Database already matches contract, signature updated'
-        : `Applied ${execution.operationsExecuted} operation(s), signature updated`,
+  const sharedInputs = {
+    driver: options.driver,
+    familyInstance: options.familyInstance,
+    contract: options.contract,
+    migrations: options.migrations,
+    frameworkComponents: options.frameworkComponents,
+    migrationsDir: options.migrationsDir,
+    targetId: options.targetId,
+    extensionPacks: options.extensionPacks ?? [],
+    policy: DB_UPDATE_POLICY,
+    action: 'dbUpdate' as const,
+    ...ifDefined('onProgress', options.onProgress),
   };
-  return ok(result);
+  if (options.mode === 'apply' && !options.acceptDataLoss) {
+    const gate = await guardDestructiveChanges<TFamilyId, TTargetId>(sharedInputs);
+    if (gate !== null) return gate;
+  }
+  return (await executeAggregateApply<TFamilyId, TTargetId>({
+    ...sharedInputs,
+    mode: options.mode,
+  })) as DbUpdateResult;
+}
+
+/**
+ * Pre-plan once when running `db update apply` without `acceptDataLoss`.
+ * Surfaces destructive operations across every space; if any are
+ * planned, returns a `DESTRUCTIVE_CHANGES` failure that the CLI shows
+ * as a confirmation prompt. Returns `null` when the apply is safe to
+ * run.
+ */
+async function guardDestructiveChanges<TFamilyId extends string, TTargetId extends string>(
+  sharedInputs: Omit<Parameters<typeof executeAggregateApply<TFamilyId, TTargetId>>[0], 'mode'>,
+): Promise<DbUpdateResult | null> {
+  const planResult = (await executeAggregateApply<TFamilyId, TTargetId>({
+    ...sharedInputs,
+    mode: 'plan',
+  })) as DbUpdateResult;
+  if (!planResult.ok) return planResult;
+  const destructiveOps = planResult.value.plan.operations
+    .filter((op) => op.operationClass === 'destructive')
+    .map((op) => ({ id: op.id, label: op.label }));
+  if (destructiveOps.length === 0) return null;
+  return notOk({
+    code: 'DESTRUCTIVE_CHANGES',
+    summary: `Planned ${destructiveOps.length} destructive operation(s) that require confirmation`,
+    why: 'Destructive operations require confirmation — re-run with -y to accept',
+    conflicts: undefined,
+    meta: { destructiveOperations: destructiveOps },
+  });
 }

@@ -12,8 +12,11 @@ import sqlFamilyDescriptor, {
 } from '@prisma-next/family-sql/control';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
-import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import {
+  APP_SPACE_ID,
+  createControlStack,
+  type MigrationOperationPolicy,
+} from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { field } from '@prisma-next/sql-contract-ts/contract-builder';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -128,6 +131,7 @@ export async function applyMigration(
         policy: INIT_ADDITIVE_POLICY,
         fromContract: null,
         frameworkComponents: fw,
+        spaceId: APP_SPACE_ID,
       });
       if (r.kind !== 'success') throw new Error('Origin planner failed');
       const run = await runner.execute({
@@ -149,6 +153,7 @@ export async function applyMigration(
       policy,
       fromContract: options.origin ?? null,
       frameworkComponents: fw,
+      spaceId: APP_SPACE_ID,
     });
     if (planResult.kind !== 'success') {
       throw new Error(

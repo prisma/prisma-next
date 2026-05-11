@@ -197,7 +197,8 @@ The SQL runtime uses stable error codes for programmatic error handling:
 - `RUNTIME.MISSING_EXTENSION_PACK` — Contract requires an extension pack not provided in stack
 - `RUNTIME.DUPLICATE_PARAMETERIZED_CODEC` — Multiple extensions registered same parameterized codec
 - `RUNTIME.DUPLICATE_MUTATION_DEFAULT_GENERATOR` — Multiple components registered the same mutation default generator id (details include `existingOwner` and `incomingOwner`)
-- `RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING` — Contract references a generator id that no composed runtime component provides
+- `RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR` — Contract references mutation default generator id(s) the assembled stack does not provide; surfaced at `createExecutionContext` time (details include `ids`)
+- `RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING` — Defense-in-depth lazy fallback raised by `applyMutationDefaults` when a generator becomes unavailable after context creation
 - `RUNTIME.TYPE_PARAMS_INVALID` — Type parameters fail codec schema validation
 - `RUNTIME.CODEC_MISSING` — Required codec not found in registry
 - `RUNTIME.DECODE_FAILED` — Row decoding failed

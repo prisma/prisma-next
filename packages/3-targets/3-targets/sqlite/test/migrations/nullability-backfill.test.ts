@@ -1,4 +1,5 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -91,6 +92,7 @@ describe('nullability-tightening backfill', () => {
       policy: { allowedOperationClasses: ['additive', 'destructive'] },
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -109,6 +111,7 @@ describe('nullability-tightening backfill', () => {
       policy: { allowedOperationClasses: ['additive', 'destructive', 'data'] },
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -173,6 +176,7 @@ describe('nullability-tightening backfill', () => {
       policy: { allowedOperationClasses: ['additive', 'widening', 'data'] },
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');

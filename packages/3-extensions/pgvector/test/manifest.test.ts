@@ -52,18 +52,10 @@ describe('pgvector descriptor', () => {
     timeouts.typeScriptCompilation,
   );
 
-  // The pgvector parameterized descriptor declares
-  // `encodeIsParamsIndependent: true` so the runtime registry tolerates
-  // multiple `vector(N)` columns of different lengths sharing the same
-  // codec id without rejecting `forCodecId('pg/vector@1')` as ambiguous.
-  // The wire format `[v1,v2,...]` is dimension-independent — every
-  // resolved instance encodes equivalently. Pinning the flag here keeps
-  // the invariant load-bearing if anyone refactors `vectorFactory` to
-  // close over `params` (which would otherwise produce reference-distinct
-  // instances and trip the registry's ambiguity guard).
   it('parameterized vector descriptor declares encodeIsParamsIndependent', () => {
-    const parameterizedCodecs = pgvectorRuntimeDescriptor.parameterizedCodecs();
-    const vectorDescriptor = parameterizedCodecs.find((d) => d.codecId === VECTOR_CODEC_ID);
+    const vectorDescriptor = pgvectorRuntimeDescriptor
+      .codecs()
+      .find((descriptor) => descriptor.codecId === VECTOR_CODEC_ID);
     expect(vectorDescriptor).toBeDefined();
     expect(vectorDescriptor?.encodeIsParamsIndependent).toBe(true);
   });

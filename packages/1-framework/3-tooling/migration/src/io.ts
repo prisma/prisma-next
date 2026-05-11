@@ -1,6 +1,11 @@
-import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import type {
+  MigrationMetadata,
+  MigrationPackage,
+} from '@prisma-next/framework-components/control';
 import { type } from 'arktype';
-import { basename, dirname, join } from 'pathe';
+import { basename, dirname, join, resolve } from 'pathe';
+import { canonicalizeJson } from './canonicalize-json';
 import {
   errorDirectoryExists,
   errorInvalidDestName,
@@ -13,11 +18,10 @@ import {
 } from './errors';
 import { verifyMigrationHash } from './hash';
 import { deriveProvidedInvariants } from './invariants';
-import type { MigrationMetadata } from './metadata';
 import { MigrationOpsSchema } from './op-schema';
-import type { MigrationOps, MigrationPackage } from './package';
+import type { MigrationOps, OnDiskMigrationPackage } from './package';
 
-const MANIFEST_FILE = 'migration.json';
+export const MANIFEST_FILE = 'migration.json';
 const OPS_FILE = 'ops.json';
 const MAX_SLUG_LENGTH = 64;
 
@@ -75,6 +79,94 @@ export async function writeMigrationPackage(
 }
 
 /**
+ * Materialise an in-memory {@link MigrationPackage} to a per-space
+ * directory on disk.
+ *
+ * Writes three files under `<targetDir>/<pkg.dirName>/`:
+ *
+ * - `migration.json` — the manifest (pretty-printed, matches
+ *   {@link writeMigrationPackage}'s output for byte-for-byte parity with
+ *   app-space migrations).
+ * - `ops.json` — the operation list (pretty-printed).
+ * - `contract.json` — the canonical-JSON serialisation of
+ *   `metadata.toContract`. This is the per-package post-state contract
+ *   snapshot; the canonicalisation pass guarantees byte-determinism so
+ *   re-emitting the same package across machines / runs produces an
+ *   identical file.
+ *
+ * Distinct verb from the lower-level {@link writeMigrationPackage}
+ * (which takes constituent `(metadata, ops)`): callers reading
+ * `materialise…` know they are persisting a struct-typed package
+ * including its contract-snapshot side car.
+ *
+ * Overwrite-idempotent: the per-package directory is cleared before
+ * each emit, so re-running against the same `targetDir` produces
+ * byte-identical contents and never leaves stale files behind. The
+ * spec's "re-emitting the same package across runs / machines produces
+ * byte-identical files" guarantee (§ 3) covers both same-dir and
+ * fresh-dir re-emits. The lower-level {@link writeMigrationPackage}
+ * stays strict because the CLI authoring path (`migration plan` /
+ * `migration new`) deliberately refuses to clobber an existing
+ * authored migration; this helper is the re-emit path that is
+ * supposed to converge on a single canonical on-disk shape.
+ *
+ * @see specs/framework-mechanism.spec.md § 3 — Emission helper (T1.7).
+ */
+export async function materialiseMigrationPackage(
+  targetDir: string,
+  pkg: MigrationPackage,
+): Promise<void> {
+  const dir = join(targetDir, pkg.dirName);
+  await rm(dir, { recursive: true, force: true });
+  await writeMigrationPackage(dir, pkg.metadata, pkg.ops);
+  await writeFile(join(dir, 'contract.json'), `${canonicalizeJson(pkg.metadata.toContract)}\n`, {
+    flag: 'wx',
+  });
+}
+
+/**
+ * Idempotent variant of {@link materialiseMigrationPackage}: writes the
+ * package only if `<targetDir>/<pkg.dirName>/` does not already exist on
+ * disk as a directory; returns `{ written: false }` when the package
+ * directory is present (no rewrite, no comparison — by-existence skip).
+ *
+ * Concretely:
+ *   - existing directory → skip silently, return `{ written: false }`.
+ *   - missing path → write three files via {@link materialiseMigrationPackage},
+ *     return `{ written: true }`.
+ *   - path exists but is not a directory (file/symlink) → treated as
+ *     missing; {@link materialiseMigrationPackage} will attempt creation
+ *     and fail with an appropriate OS error.
+ *   - any other I/O error from `stat` → propagated unchanged.
+ *
+ * Used by the CLI's `runContractSpaceExtensionMigrationsPass` to
+ * materialise extension migration packages into a project's
+ * `migrations/<spaceId>/` directory, and by extension-package tests
+ * that mirror the same idempotent-rematerialise property locally
+ * without taking a CLI dependency.
+ */
+export async function materialiseExtensionMigrationPackageIfMissing(
+  targetDir: string,
+  pkg: MigrationPackage,
+): Promise<{ readonly written: boolean }> {
+  const pkgDir = join(targetDir, pkg.dirName);
+  if (await directoryExists(pkgDir)) {
+    return { written: false };
+  }
+  await materialiseMigrationPackage(targetDir, pkg);
+  return { written: true };
+}
+
+async function directoryExists(p: string): Promise<boolean> {
+  try {
+    return (await stat(p)).isDirectory();
+  } catch (error) {
+    if (hasErrnoCode(error, 'ENOENT')) return false;
+    throw error;
+  }
+}
+
+/**
  * Copy a list of files into `destDir`, optionally renaming each one.
  *
  * The destination directory is created (with `recursive: true`) if it
@@ -109,16 +201,17 @@ export async function writeMigrationOps(dir: string, ops: MigrationOps): Promise
   await writeFile(join(dir, OPS_FILE), `${JSON.stringify(ops, null, 2)}\n`);
 }
 
-export async function readMigrationPackage(dir: string): Promise<MigrationPackage> {
-  const manifestPath = join(dir, MANIFEST_FILE);
-  const opsPath = join(dir, OPS_FILE);
+export async function readMigrationPackage(dir: string): Promise<OnDiskMigrationPackage> {
+  const absoluteDir = resolve(dir);
+  const manifestPath = join(absoluteDir, MANIFEST_FILE);
+  const opsPath = join(absoluteDir, OPS_FILE);
 
   let manifestRaw: string;
   try {
     manifestRaw = await readFile(manifestPath, 'utf-8');
   } catch (error) {
     if (hasErrnoCode(error, 'ENOENT')) {
-      throw errorMissingFile(MANIFEST_FILE, dir);
+      throw errorMissingFile(MANIFEST_FILE, absoluteDir);
     }
     throw error;
   }
@@ -128,7 +221,7 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
     opsRaw = await readFile(opsPath, 'utf-8');
   } catch (error) {
     if (hasErrnoCode(error, 'ENOENT')) {
-      throw errorMissingFile(OPS_FILE, dir);
+      throw errorMissingFile(OPS_FILE, absoluteDir);
     }
     throw error;
   }
@@ -161,16 +254,20 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
     );
   }
 
-  const pkg: MigrationPackage = {
-    dirName: basename(dir),
-    dirPath: dir,
+  const pkg: OnDiskMigrationPackage = {
+    dirName: basename(absoluteDir),
+    dirPath: absoluteDir,
     metadata,
     ops,
   };
 
   const verification = verifyMigrationHash(pkg);
   if (!verification.ok) {
-    throw errorMigrationHashMismatch(dir, verification.storedHash, verification.computedHash);
+    throw errorMigrationHashMismatch(
+      absoluteDir,
+      verification.storedHash,
+      verification.computedHash,
+    );
   }
 
   return pkg;
@@ -203,7 +300,7 @@ function validateOps(ops: unknown, filePath: string): asserts ops is MigrationOp
 
 export async function readMigrationsDir(
   migrationsRoot: string,
-): Promise<readonly MigrationPackage[]> {
+): Promise<readonly OnDiskMigrationPackage[]> {
   let entries: string[];
   try {
     entries = await readdir(migrationsRoot);
@@ -214,7 +311,7 @@ export async function readMigrationsDir(
     throw error;
   }
 
-  const packages: MigrationPackage[] = [];
+  const packages: OnDiskMigrationPackage[] = [];
 
   for (const entry of entries.sort()) {
     const entryPath = join(migrationsRoot, entry);

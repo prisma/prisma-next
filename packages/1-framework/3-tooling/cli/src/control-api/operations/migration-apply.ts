@@ -1,49 +1,116 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
+  ControlExtensionDescriptor,
   ControlFamilyInstance,
-  MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
+import {
+  type AggregatePerSpacePlan,
+  type ContractMarkerRecordLike,
+  type ContractSpaceAggregate,
+  type ContractSpaceMember,
+  graphWalkStrategy,
+} from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import { errorNoInvariantPath } from '@prisma-next/migration-tools/errors';
+import { findPathWithDecision } from '@prisma-next/migration-tools/migration-graph';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
+import {
+  type BuildAggregateInputs,
+  buildContractSpaceAggregate,
+} from '../../utils/contract-space-aggregate-loader';
 import type {
-  MigrationApplyAppliedEntry,
+  AggregatePerSpaceExecutionEntry,
+  MigrationApplyFailure,
+  MigrationApplyPathDecision,
   MigrationApplyResult,
-  MigrationApplyStep,
+  MigrationApplySuccess,
   OnControlProgress,
 } from '../types';
+import { applyAggregate, buildPerSpaceBreakdown } from './apply-aggregate';
 
+/**
+ * Inputs for the aggregate-walking `migration apply` control-api
+ * operation.
+ *
+ * The CLI command resolves the descriptor surface (config, refs,
+ * contract envelope) and hands a flat input through. The operation
+ * is the single descriptor-free seam between the CLI and the
+ * aggregate runtime.
+ */
 export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetId extends string> {
   readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
   readonly familyInstance: ControlFamilyInstance<TFamilyId, unknown>;
-  readonly originHash: string;
-  readonly destinationHash: string;
-  readonly pendingMigrations: readonly MigrationApplyStep[];
+  /** Already-validated app contract (the canonical "where we are heading" hash). */
+  readonly contract: Contract;
   readonly migrations: TargetMigrationsCapability<
     TFamilyId,
     TTargetId,
     ControlFamilyInstance<TFamilyId, unknown>
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
-  readonly targetId: string;
+  readonly migrationsDir: string;
+  readonly extensionPacks: ReadonlyArray<ControlExtensionDescriptor<TFamilyId, TTargetId>>;
+  readonly targetId: TTargetId;
+  /**
+   * Already-loaded app-space migration packages. The CLI command
+   * loads these via `loadMigrationPackages(appMigrationsDir)`; the
+   * operation hydrates the app member's graph with them. Required
+   * because the framework-neutral aggregate loader doesn't know how
+   * to read the user's `migrations/` directory layout (it's family-
+   * aware: ops.json shape, manifest keys, etc.).
+   */
+  readonly appMigrationPackages: ReadonlyArray<OnDiskMigrationPackage>;
+  /**
+   * Optional app-space ref override. When provided, the app member's
+   * graph-walk targets this hash instead of `member.headRef.hash`.
+   * Extensions are unaffected — they always walk to their own head.
+   *
+   * Sub-spec § `--ref <hash>` semantics under multi-space.
+   */
+  readonly refHash?: string;
+  /**
+   * Required invariants attached to the user-supplied app-space ref.
+   * Threaded into the graph-walk's `required` calculation so the
+   * planner picks an invariant-bearing path and surfaces the
+   * required/satisfied set on the success envelope. When `refHash`
+   * is absent the file's `member.headRef.invariants` are used.
+   */
+  readonly refInvariants?: readonly string[];
+  /**
+   * Resolved name of the user-supplied app-space ref. Surfaces in
+   * `pathDecision.refName` and in `MIGRATION.NO_INVARIANT_PATH`
+   * error envelopes so diagnostics name what the user actually
+   * passed (`--ref prod`) instead of a synthetic placeholder.
+   * Ignored when `refHash` is absent.
+   */
+  readonly refName?: string;
   readonly onProgress?: OnControlProgress;
 }
 
 /**
- * Apply a sequence of migration packages against the configured driver.
+ * Apply pending migrations across every contract space (app +
+ * extensions). Replay-only: graph-walk against the on-disk graph for
+ * every member; no synth, no introspection.
  *
- * Validates the path's continuity (origin → ... → destination, no gaps),
- * then drives the family/target's migration runner over each package's
- * operations in order, surfacing per-migration progress through `onProgress`.
+ * Pipeline:
  *
- * The `pendingMigrations` parameter is trusted input. Callers are responsible
- * for upstream verification of the originating migration packages — typically
- * by loading them via `readMigrationPackage` from
- * `@prisma-next/migration-tools/io`, which performs hash-integrity checks at
- * the load boundary. This operation does not re-verify the packages and
- * assumes the `(metadata, ops)` pairs on disk have not been tampered with
- * since emit.
+ * 1. Load aggregate from disk (loader hydrates extension graphs;
+ *    caller provides app-space packages).
+ * 2. Read live marker rows per space (`familyInstance.readAllMarkers`).
+ * 3. Per member: `graphWalkStrategy` plots the path from the live
+ *    marker to `member.headRef.hash` (or `refHash` for the app
+ *    member when provided). Empty-graph members fail loudly — a
+ *    "never planned" space is a user-error condition for replay.
+ * 4. Hand off to {@link applyAggregate} (the runner-driving tail
+ *    shared with `db init` / `db update`). Marker advancement is
+ *    inside the per-space transaction.
+ *
+ * Sub-spec § `migration apply` semantics + § Required changes 1.
  */
 export async function executeMigrationApply<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteMigrationApplyOptions<TFamilyId, TTargetId>,
@@ -51,162 +118,367 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
   const {
     driver,
     familyInstance,
-    originHash,
-    destinationHash,
-    pendingMigrations,
+    contract,
     migrations,
     frameworkComponents,
+    migrationsDir,
+    extensionPacks,
     targetId,
+    appMigrationPackages,
+    refHash,
+    refInvariants,
+    refName,
     onProgress,
   } = options;
 
-  if (pendingMigrations.length === 0) {
-    if (originHash !== destinationHash) {
-      return notOk({
-        code: 'MIGRATION_PATH_NOT_FOUND' as const,
-        summary: 'No migrations provided for requested origin and destination',
-        why: `Requested ${originHash} -> ${destinationHash} but pendingMigrations is empty`,
-        meta: { originHash, destinationHash },
-      });
+  const loadInputs: BuildAggregateInputs<TFamilyId, TTargetId> = {
+    targetId,
+    migrationsDir,
+    appContract: contract,
+    extensionPacks,
+    validateContract: (json) => familyInstance.validateContract(json),
+    appMigrationPackages,
+  };
+  const loaded = await buildContractSpaceAggregate(loadInputs);
+  if (!loaded.ok) {
+    throw loaded.failure;
+  }
+  const aggregate = loaded.value;
+
+  const markerRows = await familyInstance.readAllMarkers({ driver });
+
+  // Plan every member via graph-walk. App member targets `refHash`
+  // when provided, otherwise its own head; extensions always walk
+  // to their own head ref.
+  const allMembers: ReadonlyArray<ContractSpaceMember> = [aggregate.app, ...aggregate.extensions];
+  const perSpacePlans = new Map<string, AggregatePerSpacePlan>();
+  // Already-at-head empty-graph members (typically extensions whose
+  // head ref is the empty sentinel, or whose live marker already
+  // matches the target). Kept out of the runner schedule so we don't
+  // write spurious markers for greenfield extensions, but merged back
+  // into the success envelope so every loaded member is represented.
+  const atHeadResolutions = new Map<string, AggregatePerSpacePlan>();
+  for (const member of allMembers) {
+    const isAppMember = member.spaceId === aggregate.app.spaceId;
+    const targetHash = isAppMember && refHash !== undefined ? refHash : member.headRef.hash;
+    const liveMarker = markerRows.get(member.spaceId) ?? null;
+
+    // Empty-graph members fail loudly: replay needs an on-disk path
+    // and an empty graph means the user has never planned this space.
+    if (member.migrations.graph.nodes.size === 0) {
+      // Edge case: target == EMPTY (greenfield, nothing to do) or
+      // the live marker already matches the target. Loader integrity
+      // allows this for extensions whose head ref is the empty
+      // sentinel. Record a zero-op resolution so the aggregate result
+      // still surfaces the member in `perSpace[]` as already-at-head;
+      // the runner is not invoked for these members because they have
+      // no authored ops and (for greenfield extensions) no marker to
+      // advance.
+      const liveHash = liveMarker?.storageHash;
+      if (
+        targetHash === liveHash ||
+        (liveHash === undefined && targetHash === EMPTY_CONTRACT_HASH)
+      ) {
+        atHeadResolutions.set(
+          member.spaceId,
+          buildAtHeadResolution({
+            aggregateTargetId: aggregate.targetId,
+            member,
+            targetHash,
+            liveMarker,
+          }),
+        );
+        continue;
+      }
+      return notOk(buildNeverPlannedFailure(member.spaceId, targetHash));
     }
-    return ok({
-      migrationsApplied: 0,
-      markerHash: originHash,
-      applied: [],
-      summary: 'Already up to date',
-    });
-  }
 
-  const firstMigration = pendingMigrations[0]!;
-  const lastMigration = pendingMigrations[pendingMigrations.length - 1]!;
-  // Manifest `from` is `string | null` (null = baseline). The live-marker
-  // layer encodes "no prior state" as EMPTY_CONTRACT_HASH; bridge here so the
-  // string comparisons below work uniformly.
-  const firstFromMarker = firstMigration.from ?? EMPTY_CONTRACT_HASH;
-  if (firstFromMarker !== originHash || lastMigration.to !== destinationHash) {
-    return notOk({
-      code: 'MIGRATION_PATH_NOT_FOUND' as const,
-      summary: 'Migration apply path does not match requested origin and destination',
-      why: `Path resolved as ${firstFromMarker} -> ${lastMigration.to}, but requested ${originHash} -> ${destinationHash}`,
-      meta: {
-        originHash,
-        destinationHash,
-        pathOrigin: firstFromMarker,
-        pathDestination: lastMigration.to,
-      },
-    });
-  }
+    const targetInvariants =
+      isAppMember && refHash !== undefined && refInvariants !== undefined
+        ? refInvariants
+        : member.headRef.invariants;
+    const targetMember: ContractSpaceMember =
+      targetHash === member.headRef.hash && targetInvariants === member.headRef.invariants
+        ? member
+        : { ...member, headRef: { hash: targetHash, invariants: targetInvariants } };
 
-  for (let i = 1; i < pendingMigrations.length; i++) {
-    const previous = pendingMigrations[i - 1]!;
-    const current = pendingMigrations[i]!;
-    const currentFromMarker = current.from ?? EMPTY_CONTRACT_HASH;
-    if (previous.to !== currentFromMarker) {
-      return notOk({
-        code: 'MIGRATION_PATH_NOT_FOUND' as const,
-        summary: 'Migration apply path contains a discontinuity between adjacent migrations',
-        why: `Migration "${previous.dirName}" ends at ${previous.to}, but next migration "${current.dirName}" starts at ${currentFromMarker}`,
-        meta: {
-          originHash,
-          destinationHash,
-          previousDirName: previous.dirName,
-          previousTo: previous.to,
-          currentDirName: current.dirName,
-          currentFrom: currentFromMarker,
-          discontinuityIndex: i,
-        },
-      });
+    const walked = graphWalkStrategy({
+      aggregateTargetId: aggregate.targetId,
+      member: targetMember,
+      currentMarker: liveMarker,
+      ...(isAppMember && refName !== undefined ? { refName } : {}),
+    });
+    if (walked.kind === 'unreachable') {
+      return notOk(buildPathNotFoundFailure(member.spaceId, liveMarker, targetHash));
     }
-  }
-
-  const runner = migrations.createRunner(familyInstance);
-  const applied: MigrationApplyAppliedEntry[] = [];
-
-  for (const migration of pendingMigrations) {
-    const migrationSpanId = `migration:${migration.dirName}`;
-    onProgress?.({
-      action: 'migrationApply',
-      kind: 'spanStart',
-      spanId: migrationSpanId,
-      label: `Applying ${migration.dirName}`,
-    });
-
-    const { operations } = migration;
-
-    // Allow all operation classes. The policy gate belongs at plan time, not
-    // apply time — the planner already decided what to emit. Restricting here
-    // would be a tautology (the allowed set would just mirror what's in ops).
-    const policy = {
-      allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] as const,
-    };
-
-    // Manifest `from === null` means "no prior state" — the runner expects
-    // `origin: null` for a fresh database (no marker present).
-    const plan = {
-      targetId,
-      origin: migration.from === null ? null : { storageHash: migration.from },
-      destination: { storageHash: migration.to },
-      operations,
-      providedInvariants: migration.providedInvariants,
-    };
-
-    const destinationContract = familyInstance.validateContract(migration.toContract);
-
-    const runnerResult: MigrationRunnerResult = await runner.execute({
-      plan,
-      driver,
-      destinationContract,
-      policy,
-      executionChecks: {
-        prechecks: true,
-        postchecks: true,
-        idempotencyChecks: true,
-      },
-      frameworkComponents,
-    });
-
-    if (!runnerResult.ok) {
-      onProgress?.({
-        action: 'migrationApply',
-        kind: 'spanEnd',
-        spanId: migrationSpanId,
-        outcome: 'error',
+    if (walked.kind === 'unsatisfiable') {
+      // Surface the canonical MIGRATION.NO_INVARIANT_PATH envelope
+      // (the error rendering pipeline maps it to meta.code +
+      // meta.required + meta.missing + meta.structuralPath that the
+      // cli-journeys invariant suite asserts on).
+      const fromHash = liveMarker?.storageHash ?? '';
+      const structural = findPathWithDecision(targetMember.migrations.graph, fromHash, targetHash, {
+        required: new Set<string>(),
       });
-      return notOk({
-        code: 'RUNNER_FAILED' as const,
-        summary: runnerResult.failure.summary,
-        why: runnerResult.failure.why,
-        meta: {
-          migration: migration.dirName,
-          from: migration.from,
-          to: migration.to,
-          ...(runnerResult.failure.meta ?? {}),
-        },
+      const structuralPath =
+        structural.kind === 'ok'
+          ? structural.decision.selectedPath.map((edge) => ({
+              dirName: edge.dirName,
+              migrationHash: edge.migrationHash,
+              from: edge.from,
+              to: edge.to,
+              invariants: edge.invariants,
+            }))
+          : [];
+      throw errorNoInvariantPath({
+        ...(isAppMember && refName !== undefined ? { refName } : {}),
+        required: targetInvariants,
+        missing: walked.missing,
+        structuralPath,
       });
     }
 
-    onProgress?.({
-      action: 'migrationApply',
-      kind: 'spanEnd',
-      spanId: migrationSpanId,
-      outcome: 'ok',
-    });
-
-    applied.push({
-      dirName: migration.dirName,
-      from: migration.from,
-      to: migration.to,
-      operationsExecuted: runnerResult.value.operationsExecuted,
-    });
+    perSpacePlans.set(member.spaceId, walked.result);
   }
 
-  const finalHash = pendingMigrations[pendingMigrations.length - 1]!.to;
-  const totalOps = applied.reduce((sum, a) => sum + a.operationsExecuted, 0);
+  const canonicalOrder = [...aggregate.extensions.map((m) => m.spaceId), aggregate.app.spaceId];
+  const applyOrder = canonicalOrder.filter((spaceId) => perSpacePlans.has(spaceId));
 
-  return ok({
-    migrationsApplied: applied.length,
-    markerHash: finalHash,
-    applied,
-    summary: `Applied ${applied.length} migration(s) (${totalOps} operation(s)), marker at ${finalHash}`,
+  // Short-circuit: nothing pending across any space (no runner-bound
+  // plans). Surfaces every loaded member — including at-head empty-
+  // graph extensions — in `perSpace[]` so the result reflects the
+  // full aggregate, not just the spaces the runner would have touched.
+  const totalPlannedOps = sumPlannedOps(applyOrder, perSpacePlans);
+  if (totalPlannedOps === 0) {
+    const ordered = canonicalOrder
+      .filter((spaceId) => perSpacePlans.has(spaceId) || atHeadResolutions.has(spaceId))
+      .map((spaceId) => {
+        const entry = perSpacePlans.get(spaceId) ?? atHeadResolutions.get(spaceId);
+        if (entry === undefined) {
+          throw new Error(`Unreachable: missing per-space plan for "${spaceId}"`);
+        }
+        return { spaceId, entry };
+      });
+    const perSpace = buildPerSpaceBreakdown(ordered, aggregate.app.spaceId, {
+      includeMarkers: true,
+    });
+    const totalSpaces = ordered.length;
+    return ok(
+      buildSuccess({
+        aggregate,
+        orderedResolutions: ordered,
+        perSpace,
+        totalOpsExecuted: 0,
+        summary:
+          totalSpaces === 0
+            ? 'Already up to date — no contract spaces are loaded'
+            : totalSpaces === 1
+              ? 'Already up to date'
+              : `Already up to date across ${totalSpaces} space(s)`,
+      }),
+    );
+  }
+
+  const applied = await applyAggregate({
+    aggregate,
+    perSpacePlans,
+    applyOrder,
+    driver,
+    familyInstance,
+    migrations,
+    frameworkComponents,
+    policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+    action: 'migrationApply',
+    ...ifDefined('onProgress', onProgress),
   });
+
+  if (!applied.ok) {
+    const failure: MigrationApplyFailure = {
+      code: 'RUNNER_FAILED',
+      summary: applied.failure.summary,
+      why: applied.failure.why,
+      meta: applied.failure.meta,
+    };
+    return notOk(failure);
+  }
+
+  // Merge at-head zero-op resolutions back into the canonical order
+  // so the success envelope surfaces every loaded member, not just
+  // those the runner executed.
+  const orderedAll = canonicalOrder
+    .filter((spaceId) => perSpacePlans.has(spaceId) || atHeadResolutions.has(spaceId))
+    .map((spaceId) => {
+      if (perSpacePlans.has(spaceId)) {
+        const fromRunner = applied.value.orderedResolutions.find((r) => r.spaceId === spaceId);
+        if (fromRunner !== undefined) return fromRunner;
+      }
+      const entry = atHeadResolutions.get(spaceId);
+      if (entry === undefined) {
+        throw new Error(`Unreachable: missing per-space plan for "${spaceId}"`);
+      }
+      return { spaceId, entry };
+    });
+  const perSpaceAll = buildPerSpaceBreakdown(orderedAll, aggregate.app.spaceId, {
+    includeMarkers: true,
+  });
+  const totalMigrationsApplied = applied.value.orderedResolutions.reduce(
+    (sum, r) => sum + (r.entry.migrationEdges?.length ?? 0),
+    0,
+  );
+  const summary = `Applied ${totalMigrationsApplied} migration(s) (${applied.value.totalOpsExecuted} operation(s)) across ${orderedAll.length} contract space(s)`;
+
+  return ok(
+    buildSuccess({
+      aggregate,
+      orderedResolutions: orderedAll,
+      perSpace: perSpaceAll,
+      totalOpsExecuted: applied.value.totalOpsExecuted,
+      summary,
+    }),
+  );
+}
+
+/**
+ * Build a zero-op {@link AggregatePerSpacePlan} for an empty-graph
+ * member whose live marker already matches the target. Lets the apply
+ * pipeline thread the member through `perSpacePlans` -> `applyOrder`
+ * -> the success envelope's `perSpace[]` block so the result reflects
+ * every loaded space, even when there is nothing to execute.
+ */
+function buildAtHeadResolution(args: {
+  readonly aggregateTargetId: string;
+  readonly member: ContractSpaceMember;
+  readonly targetHash: string;
+  readonly liveMarker: ContractMarkerRecordLike | null;
+}): AggregatePerSpacePlan {
+  const { aggregateTargetId, member, targetHash, liveMarker } = args;
+  return {
+    plan: {
+      targetId: aggregateTargetId,
+      spaceId: member.spaceId,
+      origin: liveMarker === null ? null : { storageHash: liveMarker.storageHash },
+      destination: { storageHash: targetHash },
+      operations: [],
+      providedInvariants: [],
+    },
+    displayOps: [],
+    destinationContract: member.contract,
+    strategy: 'graph-walk',
+    migrationEdges: [],
+  };
+}
+
+function sumPlannedOps(
+  applyOrder: readonly string[],
+  perSpacePlans: ReadonlyMap<string, AggregatePerSpacePlan>,
+): number {
+  let total = 0;
+  for (const spaceId of applyOrder) {
+    const entry = perSpacePlans.get(spaceId);
+    if (!entry) continue;
+    total += entry.plan.operations.length;
+  }
+  return total;
+}
+
+interface BuildSuccessArgs {
+  readonly aggregate: ContractSpaceAggregate;
+  readonly orderedResolutions: ReadonlyArray<{
+    readonly spaceId: string;
+    readonly entry: AggregatePerSpacePlan;
+  }>;
+  readonly perSpace: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  readonly totalOpsExecuted: number;
+  readonly summary: string;
+}
+
+function buildSuccess(args: BuildSuccessArgs): MigrationApplySuccess {
+  // The marker hash surfaced at the top level is the **app member's**
+  // post-apply marker (today's single-space `markerHash` field).
+  // Per-space markers live on `perSpace[].marker.storageHash`.
+  const appResolution = args.orderedResolutions.find(
+    (r) => r.spaceId === args.aggregate.app.spaceId,
+  );
+  const appMarkerHash =
+    appResolution?.entry.plan.destination.storageHash ?? args.aggregate.app.headRef.hash;
+
+  // Per-migration entries (one per authored edge) preserve the
+  // single-space `migrationsApplied` count semantics for back-compat
+  // with existing JSON-shape consumers (e.g. `parsed.applied.length`
+  // in integration tests). The aggregate per-space breakdown lives on
+  // `perSpace[]`.
+  const applied = args.orderedResolutions.flatMap((r) => {
+    const edges = r.entry.migrationEdges ?? [];
+    return edges.map((edge) => ({
+      spaceId: r.spaceId,
+      dirName: edge.dirName,
+      migrationHash: edge.migrationHash,
+      from: edge.from,
+      to: edge.to,
+      operationsExecuted: edge.operationCount,
+    }));
+  });
+
+  const appPlan = appResolution?.entry;
+  const pathDecision: MigrationApplyPathDecision | undefined = appPlan?.pathDecision
+    ? {
+        fromHash: appPlan.pathDecision.fromHash,
+        toHash: appPlan.pathDecision.toHash,
+        alternativeCount: appPlan.pathDecision.alternativeCount,
+        tieBreakReasons: appPlan.pathDecision.tieBreakReasons,
+        ...(appPlan.pathDecision.refName !== undefined
+          ? { refName: appPlan.pathDecision.refName }
+          : {}),
+        requiredInvariants: appPlan.pathDecision.requiredInvariants ?? [],
+        satisfiedInvariants: appPlan.pathDecision.satisfiedInvariants ?? [],
+        selectedPath: appPlan.pathDecision.selectedPath.map((entry) => ({
+          dirName: entry.dirName,
+          migrationHash: entry.migrationHash,
+          from: entry.from,
+          to: entry.to,
+          invariants: entry.invariants,
+        })),
+      }
+    : undefined;
+
+  return {
+    migrationsApplied: applied.length,
+    markerHash: appMarkerHash,
+    applied,
+    summary: args.summary,
+    perSpace: args.perSpace,
+    ...(pathDecision !== undefined ? { pathDecision } : {}),
+  };
+}
+
+function buildNeverPlannedFailure(spaceId: string, targetHash: string): MigrationApplyFailure {
+  return {
+    code: 'MIGRATION_PATH_NOT_FOUND',
+    summary: `No on-disk migrations for contract space "${spaceId}"`,
+    why: `migration apply is replay-only: every contract space must have an authored migration graph on disk. Space "${spaceId}" has no migrations under \`migrations/${spaceId}/\` but its head ref targets "${targetHash}". Run \`prisma-next migration plan\` first to materialise the path.`,
+    meta: { spaceId, target: targetHash, kind: 'neverPlanned' },
+  };
+}
+
+function buildPathNotFoundFailure(
+  spaceId: string,
+  marker: ContractMarkerRecordLike | null,
+  targetHash: string,
+): MigrationApplyFailure {
+  const fromHash = marker?.storageHash ?? '<empty>';
+  // The single-space-degenerate phrasing names the user-visible
+  // condition (a contract has been emitted that no on-disk
+  // migration reaches) so the error reads naturally for the
+  // single-space app case. Multi-space callers see the same
+  // condition expressed against the offending space.
+  const summary =
+    spaceId === 'app'
+      ? 'Current contract has no planned migration path'
+      : `Current contract has no planned migration path for contract space "${spaceId}"`;
+  return {
+    code: 'MIGRATION_PATH_NOT_FOUND',
+    summary,
+    why: `Cannot reach target "${targetHash}" from current marker "${fromHash}" in space "${spaceId}". The on-disk migration graph for this space does not connect the two states. Run \`prisma-next migration plan\` to materialise the path.`,
+    meta: { spaceId, fromHash, targetHash, kind: 'pathUnreachable' },
+  };
 }

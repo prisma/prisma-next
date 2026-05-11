@@ -77,7 +77,7 @@ withTempDir(({ createTempDir }) => {
         // B.04: migration emit --dir <planned-dir>
         const migDir = getLatestMigrationDir(ctx);
         expect(migDir, 'B.04: migration dir exists').toBeDefined();
-        const emitMig = await runMigrationEmit(ctx, ['--dir', `migrations/${migDir}`]);
+        const emitMig = await runMigrationEmit(ctx, ['--dir', `migrations/app/${migDir}`]);
         expect(emitMig.exitCode, 'B.04: migration emit').toBe(0);
 
         // B.05: migration status (pre-apply — shows pending migration)
@@ -133,11 +133,11 @@ withTempDir(({ createTempDir }) => {
         expect(showLatest.exitCode, 'X.01: show latest').toBe(0);
 
         // X.02: migration show by path (first migration dir)
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const migrationDirs = readdirSync(migrationsDir).sort();
         if (migrationDirs.length > 0) {
           const firstDir = migrationDirs[0]!;
-          const showByPath = await runMigrationShow(ctx, [join('migrations', firstDir)]);
+          const showByPath = await runMigrationShow(ctx, [join('migrations', 'app', firstDir)]);
           expect(showByPath.exitCode, 'X.02: show by path').toBe(0);
         }
 

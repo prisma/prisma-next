@@ -35,11 +35,13 @@ import {
   type ForeignKeyNode,
   type IndexNode,
   type ModelNode,
+  type PrimaryKeyNode,
   type UniqueConstraintNode,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import {
+  findDuplicateFieldName,
   getAttribute,
   getPositionalArgument,
   mapFieldNamesToColumns,
@@ -77,19 +79,19 @@ import {
 
 export interface InterpretPslDocumentToSqlContractInput {
   readonly document: ParsePslDocumentResult;
-  readonly target: TargetPackRef<'sql', 'postgres'>;
+  readonly target: TargetPackRef<'sql', string>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly composedExtensionPacks?: readonly string[];
-  readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', 'postgres'>[];
+  readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
   readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly authoringContributions?: AuthoringContributions;
 }
 
 function buildComposedExtensionPackRefs(
-  target: TargetPackRef<'sql', 'postgres'>,
+  target: TargetPackRef<'sql', string>,
   extensionIds: readonly string[],
-  extensionPackRefs: readonly ExtensionPackRef<'sql', 'postgres'>[] = [],
-): Record<string, ExtensionPackRef<'sql', 'postgres'>> | undefined {
+  extensionPackRefs: readonly ExtensionPackRef<'sql', string>[] = [],
+): Record<string, ExtensionPackRef<'sql', string>> | undefined {
   if (extensionIds.length === 0) {
     return undefined;
   }
@@ -106,7 +108,7 @@ function buildComposedExtensionPackRefs(
           familyId: target.familyId,
           targetId: target.targetId,
           version: '0.0.1',
-        } satisfies ExtensionPackRef<'sql', 'postgres'>),
+        } satisfies ExtensionPackRef<'sql', string>),
     ]),
   );
 }
@@ -219,6 +221,7 @@ function validateNamedTypeAttributes(input: {
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly composedExtensions: ReadonlySet<string>;
+  readonly authoringContributions: AuthoringContributions | undefined;
   readonly allowDbNativeType: boolean;
   readonly familyId: string;
   readonly targetId: string;
@@ -250,6 +253,7 @@ function validateNamedTypeAttributes(input: {
     const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions, {
       familyId: input.familyId,
       targetId: input.targetId,
+      authoringContributions: input.authoringContributions,
     });
     if (uncomposedNamespace) {
       reportUncomposedNamespace({
@@ -289,6 +293,7 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
         sourceId: input.sourceId,
         diagnostics: input.diagnostics,
         composedExtensions: input.composedExtensions,
+        authoringContributions: input.authoringContributions,
         allowDbNativeType: false,
         familyId: input.familyId,
         targetId: input.targetId,
@@ -367,6 +372,7 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
         sourceId: input.sourceId,
         diagnostics: input.diagnostics,
         composedExtensions: input.composedExtensions,
+        authoringContributions: input.authoringContributions,
         allowDbNativeType: true,
         familyId: input.familyId,
         targetId: input.targetId,
@@ -460,18 +466,24 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     scalarTypeDescriptors: input.scalarTypeDescriptors,
   });
 
-  const primaryKeyFields = resolvedFields.filter((field) => field.isId);
-  const primaryKeyColumns = primaryKeyFields.map((field) => field.columnName);
-  const primaryKeyName = primaryKeyFields.length === 1 ? primaryKeyFields[0]?.idName : undefined;
-  const isVariantModel = model.attributes.some((attr) => attr.name === 'base');
-  if (primaryKeyColumns.length === 0 && !isVariantModel) {
+  const inlineIdFields = resolvedFields.filter((field) => field.isId);
+  if (inlineIdFields.length > 1) {
     diagnostics.push({
-      code: 'PSL_MISSING_PRIMARY_KEY',
-      message: `Model "${model.name}" must declare at least one @id field for SQL provider`,
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `Model "${model.name}" cannot declare inline @id on multiple fields; use model-level @@id([...]) for composite identity`,
       sourceId,
       span: model.span,
     });
   }
+  const singleInlineIdField = inlineIdFields.length === 1 ? inlineIdFields[0] : undefined;
+  let primaryKey: PrimaryKeyNode | undefined = singleInlineIdField
+    ? {
+        columns: [singleInlineIdField.columnName],
+        ...ifDefined('name', singleInlineIdField.idName),
+      }
+    : undefined;
+  const hasInlinePrimaryKey = primaryKey !== undefined;
+  let blockPrimaryKeyDeclared = false;
 
   const resultBackrelationCandidates: ModelBackrelationCandidate[] = [];
   for (const field of model.fields) {
@@ -483,6 +495,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       field,
       sourceId,
       composedExtensions: input.composedExtensions,
+      authoringContributions: input.authoringContributions,
       diagnostics,
       familyId: input.familyId,
       targetId: input.targetId,
@@ -557,15 +570,57 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     if (modelAttribute.name === 'discriminator' || modelAttribute.name === 'base') {
       continue;
     }
-    if (modelAttribute.name === 'unique' || modelAttribute.name === 'index') {
+    const attributeLabel = `Model "${model.name}" @@${modelAttribute.name}`;
+    if (modelAttribute.name === 'id') {
+      if (blockPrimaryKeyDeclared) {
+        diagnostics.push({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: `Model "${model.name}" declares @@id more than once`,
+          sourceId,
+          span: modelAttribute.span,
+        });
+        continue;
+      }
+      if (hasInlinePrimaryKey) {
+        diagnostics.push({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: `Model "${model.name}" cannot declare both field-level @id and model-level @@id`,
+          sourceId,
+          span: modelAttribute.span,
+        });
+        blockPrimaryKeyDeclared = true;
+        continue;
+      }
       const fieldNames = parseAttributeFieldList({
         attribute: modelAttribute,
         sourceId,
         diagnostics,
         code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        messagePrefix: `Model "${model.name}" @@${modelAttribute.name}`,
+        entityLabel: attributeLabel,
       });
       if (!fieldNames) {
+        continue;
+      }
+      const duplicateFieldName = findDuplicateFieldName(fieldNames);
+      if (duplicateFieldName !== undefined) {
+        diagnostics.push({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: `${attributeLabel} list contains duplicate field "${duplicateFieldName}"`,
+          sourceId,
+          span: modelAttribute.span,
+        });
+        continue;
+      }
+      const nullableFieldName = fieldNames.find(
+        (name) => model.fields.find((f) => f.name === name)?.optional === true,
+      );
+      if (nullableFieldName !== undefined) {
+        diagnostics.push({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: `${attributeLabel} cannot include optional field "${nullableFieldName}"; primary key columns must be NOT NULL`,
+          sourceId,
+          span: modelAttribute.span,
+        });
         continue;
       }
       const columnNames = mapFieldNamesToColumns({
@@ -575,7 +630,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         sourceId,
         diagnostics,
         span: modelAttribute.span,
-        contextLabel: `Model "${model.name}" @@${modelAttribute.name}`,
+        entityLabel: attributeLabel,
       });
       if (!columnNames) {
         continue;
@@ -584,7 +639,55 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         attribute: modelAttribute,
         sourceId,
         diagnostics,
-        entityLabel: `Model "${model.name}" @@${modelAttribute.name}`,
+        entityLabel: attributeLabel,
+        span: modelAttribute.span,
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      });
+      primaryKey = {
+        columns: columnNames,
+        ...ifDefined('name', constraintName),
+      };
+      blockPrimaryKeyDeclared = true;
+      continue;
+    }
+    if (modelAttribute.name === 'unique' || modelAttribute.name === 'index') {
+      const fieldNames = parseAttributeFieldList({
+        attribute: modelAttribute,
+        sourceId,
+        diagnostics,
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+        entityLabel: attributeLabel,
+      });
+      if (!fieldNames) {
+        continue;
+      }
+      const duplicateFieldName = findDuplicateFieldName(fieldNames);
+      if (duplicateFieldName !== undefined) {
+        diagnostics.push({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: `${attributeLabel} list contains duplicate field "${duplicateFieldName}"`,
+          sourceId,
+          span: modelAttribute.span,
+        });
+        continue;
+      }
+      const columnNames = mapFieldNamesToColumns({
+        modelName: model.name,
+        fieldNames,
+        mapping,
+        sourceId,
+        diagnostics,
+        span: modelAttribute.span,
+        entityLabel: attributeLabel,
+      });
+      if (!columnNames) {
+        continue;
+      }
+      const constraintName = parseConstraintMapArgument({
+        attribute: modelAttribute,
+        sourceId,
+        diagnostics,
+        entityLabel: attributeLabel,
         span: modelAttribute.span,
         code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
       });
@@ -604,7 +707,11 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     const uncomposedNamespace = checkUncomposedNamespace(
       modelAttribute.name,
       input.composedExtensions,
-      { familyId: input.familyId, targetId: input.targetId },
+      {
+        familyId: input.familyId,
+        targetId: input.targetId,
+        authoringContributions: input.authoringContributions,
+      },
     );
     if (uncomposedNamespace) {
       reportUncomposedNamespace({
@@ -678,7 +785,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       sourceId,
       diagnostics,
       span: relationAttribute.relation.span,
-      contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+      entityLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
     });
     if (!localColumns) {
       continue;
@@ -690,7 +797,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       sourceId,
       diagnostics,
       span: relationAttribute.relation.span,
-      contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+      entityLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
     });
     if (!referencedColumns) {
       continue;
@@ -762,16 +869,9 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         descriptor: resolvedField.descriptor,
         nullable: resolvedField.field.optional,
         ...ifDefined('default', resolvedField.defaultValue),
-        ...ifDefined('executionDefault', resolvedField.executionDefault),
+        ...ifDefined('executionDefaults', resolvedField.executionDefaults),
       })),
-      ...(primaryKeyColumns.length > 0
-        ? {
-            id: {
-              columns: primaryKeyColumns,
-              ...ifDefined('name', primaryKeyName),
-            },
-          }
-        : {}),
+      ...ifDefined('id', primaryKey),
       ...(uniqueConstraints.length > 0 ? { uniques: uniqueConstraints } : {}),
       ...(indexNodes.length > 0 ? { indexes: indexNodes } : {}),
       ...(foreignKeyNodes.length > 0 ? { foreignKeys: foreignKeyNodes } : {}),

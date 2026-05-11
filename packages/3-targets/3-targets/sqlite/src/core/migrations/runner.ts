@@ -1,6 +1,7 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
+  MultiSpaceRunnerResult,
   SqlControlFamilyInstance,
   SqlMigrationPlanContractInfo,
   SqlMigrationPlanOperation,
@@ -9,13 +10,16 @@ import type {
   SqlMigrationRunnerExecuteOptions,
   SqlMigrationRunnerFailure,
   SqlMigrationRunnerResult,
+  SqlMigrationRunnerSuccessValue,
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import { type ContractMarkerRow, parseContractMarkerRow } from '@prisma-next/family-sql/verify';
+import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
-import { ok, okVoid } from '@prisma-next/utils/result';
+import { notOk, ok, okVoid } from '@prisma-next/utils/result';
 import { parseSqliteDefault } from '../default-normalizer';
 import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
@@ -24,6 +28,7 @@ import {
   buildWriteMarkerStatements,
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
+  MARKER_TABLE_NAME,
   readMarkerStatement,
   type SqlStatement,
 } from './statement-builders';
@@ -46,14 +51,10 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       options.plan.destination,
       options.destinationContract,
     );
-    if (!destinationCheck.ok) {
-      return destinationCheck;
-    }
+    if (!destinationCheck.ok) return destinationCheck;
 
     const policyCheck = this.enforcePolicyCompatibility(options.policy, options.plan.operations);
-    if (!policyCheck.ok) {
-      return policyCheck;
-    }
+    if (!policyCheck.ok) return policyCheck;
 
     // SQLite recreate-table drops and rebuilds the table. If foreign_keys is ON,
     // dropping a referenced parent cascade-deletes child rows; we must disable FK
@@ -69,89 +70,180 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       await this.beginExclusiveTransaction(driver);
       let committed = false;
       try {
-        await this.ensureControlTables(driver);
-        const existingMarker = await this.readMarker(driver);
+        const result = await this.executeOnConnection(options);
+        if (!result.ok) return result;
 
-        const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
-        if (!markerCheck.ok) {
-          return markerCheck;
+        if (fkWasEnabled) {
+          const fkIntegrityCheck = await this.verifyForeignKeyIntegrity(driver);
+          if (!fkIntegrityCheck.ok) return fkIntegrityCheck;
         }
 
-        const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
-        const isSelfEdge =
-          options.plan.origin?.storageHash === options.plan.destination.storageHash;
-        const skipOperations = markerAtDestination && options.plan.origin != null && !isSelfEdge;
+        await this.commitTransaction(driver);
+        committed = true;
+        return result;
+      } finally {
+        if (!committed) {
+          await this.rollbackTransaction(driver);
+        }
+      }
+    } finally {
+      if (fkWasEnabled) {
+        await driver.query('PRAGMA foreign_keys = ON');
+      }
+    }
+  }
 
-        let operationsExecuted: number;
-        let executedOperations: readonly SqlMigrationPlanOperation<SqlitePlanTargetDetails>[];
+  /**
+   * Apply the plan against an already-open connection without managing
+   * the transaction lifecycle. The caller owns BEGIN/COMMIT/ROLLBACK
+   * and any connection-level setup (FK pragma toggle, FK integrity
+   * check). Used by the per-space runner orchestration to fan out
+   * across contract spaces inside one outer transaction.
+   */
+  async executeOnConnection(
+    options: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>,
+  ): Promise<SqlMigrationRunnerResult> {
+    const driver = options.driver;
+    if (options.space !== undefined && options.space !== options.plan.spaceId) {
+      throw new Error(
+        `SqlMigrationRunner: options.space (${options.space}) does not match plan.spaceId (${options.plan.spaceId})`,
+      );
+    }
+    const space = options.plan.spaceId;
 
-        if (skipOperations) {
-          operationsExecuted = 0;
-          executedOperations = [];
-        } else {
-          const applyResult = await this.applyPlan(driver, options);
-          if (!applyResult.ok) {
-            return applyResult;
+    const destinationCheck = this.ensurePlanMatchesDestinationContract(
+      options.plan.destination,
+      options.destinationContract,
+    );
+    if (!destinationCheck.ok) return destinationCheck;
+
+    const policyCheck = this.enforcePolicyCompatibility(options.policy, options.plan.operations);
+    if (!policyCheck.ok) return policyCheck;
+
+    const ensureResult = await this.ensureControlTables(driver);
+    if (!ensureResult.ok) return ensureResult;
+    const existingMarker = await this.readMarker(driver, space);
+
+    const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
+    if (!markerCheck.ok) return markerCheck;
+
+    const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
+    const isSelfEdge = options.plan.origin?.storageHash === options.plan.destination.storageHash;
+    const skipOperations = markerAtDestination && options.plan.origin != null && !isSelfEdge;
+
+    let operationsExecuted: number;
+    let executedOperations: readonly SqlMigrationPlanOperation<SqlitePlanTargetDetails>[];
+
+    if (skipOperations) {
+      operationsExecuted = 0;
+      executedOperations = [];
+    } else {
+      const applyResult = await this.applyPlan(driver, options);
+      if (!applyResult.ok) return applyResult;
+      operationsExecuted = applyResult.value.operationsExecuted;
+      executedOperations = applyResult.value.executedOperations;
+    }
+
+    if (space === APP_SPACE_ID) {
+      const schemaIR = await this.family.introspect({
+        driver,
+        contract: options.destinationContract,
+      });
+
+      const schemaVerifyResult = verifySqlSchema({
+        contract: options.destinationContract,
+        schema: schemaIR,
+        strict: options.strictVerification ?? true,
+        context: options.context ?? {},
+        typeMetadataRegistry: this.family.typeMetadataRegistry,
+        frameworkComponents: options.frameworkComponents,
+        normalizeDefault: parseSqliteDefault,
+        normalizeNativeType: normalizeSqliteNativeType,
+      });
+      if (!schemaVerifyResult.ok) {
+        return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
+          why: 'The resulting database schema does not satisfy the destination contract.',
+          meta: { issues: schemaVerifyResult.schema.issues },
+        });
+      }
+    }
+
+    // Self-edge no-op detection: see Postgres runner for the rationale
+    // (kept symmetric across both targets).
+    const incomingInvariants = options.plan.providedInvariants;
+    const existingInvariants = new Set(existingMarker?.invariants ?? []);
+    const incomingIsSubsetOfExisting = incomingInvariants.every((id) => existingInvariants.has(id));
+    const isSelfEdgeNoOp = isSelfEdge && operationsExecuted === 0 && incomingIsSubsetOfExisting;
+
+    if (!isSelfEdgeNoOp) {
+      await this.upsertMarker(driver, options, existingMarker, space);
+      await this.recordLedgerEntry(driver, options, existingMarker, executedOperations);
+    }
+
+    return runnerSuccess({
+      operationsPlanned: options.plan.operations.length,
+      operationsExecuted,
+    });
+  }
+
+  async executeAcrossSpaces(options: {
+    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly perSpaceOptions: ReadonlyArray<
+      SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>
+    >;
+  }): Promise<MultiSpaceRunnerResult> {
+    const driver = options.driver;
+    const perSpaceOptions = options.perSpaceOptions;
+
+    if (perSpaceOptions.length === 0) {
+      return ok({ perSpaceResults: [] });
+    }
+
+    // FK pragma toggle and the FK integrity check both span the outer
+    // transaction — see `execute(...)` for the full rationale.
+    const fkWasEnabled = await this.readForeignKeysEnabled(driver);
+    if (fkWasEnabled) {
+      await driver.query('PRAGMA foreign_keys = OFF');
+    }
+
+    try {
+      await this.beginExclusiveTransaction(driver);
+      let committed = false;
+      try {
+        const perSpaceResults: Array<{
+          space: string;
+          value: SqlMigrationRunnerSuccessValue;
+        }> = [];
+        let lastProcessedSpace: string | undefined;
+        for (const spaceOptions of perSpaceOptions) {
+          const space = spaceOptions.space ?? spaceOptions.plan.spaceId;
+          const result = await this.executeOnConnection({ ...spaceOptions, driver, space });
+          if (!result.ok) {
+            return notOk({ ...result.failure, failingSpace: space });
           }
-          operationsExecuted = applyResult.value.operationsExecuted;
-          executedOperations = applyResult.value.executedOperations;
-        }
-
-        const schemaIR = await this.family.introspect({
-          driver,
-          contract: options.destinationContract,
-        });
-
-        const schemaVerifyResult = verifySqlSchema({
-          contract: options.destinationContract,
-          schema: schemaIR,
-          strict: options.strictVerification ?? true,
-          context: options.context ?? {},
-          typeMetadataRegistry: this.family.typeMetadataRegistry,
-          frameworkComponents: options.frameworkComponents,
-          normalizeDefault: parseSqliteDefault,
-          normalizeNativeType: normalizeSqliteNativeType,
-        });
-        if (!schemaVerifyResult.ok) {
-          return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {
-            why: 'The resulting database schema does not satisfy the destination contract.',
-            meta: {
-              issues: schemaVerifyResult.schema.issues,
-            },
-          });
-        }
-
-        // Self-edge no-op detection: a self-edge migration whose ops had no
-        // ops to begin with and brings no new invariants produced no
-        // observable change. Skip the marker + ledger writes so an idempotent
-        // re-apply of a self-edge data transform doesn't churn updatedAt or
-        // pile up empty ledger entries. db update no-ops still write a
-        // ledger entry as audit trail.
-        const incomingInvariants = options.plan.providedInvariants;
-        const existingInvariants = new Set(existingMarker?.invariants ?? []);
-        const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
-          existingInvariants.has(id),
-        );
-        const isSelfEdgeNoOp = isSelfEdge && operationsExecuted === 0 && incomingIsSubsetOfExisting;
-
-        if (!isSelfEdgeNoOp) {
-          await this.upsertMarker(driver, options, existingMarker);
-          await this.recordLedgerEntry(driver, options, existingMarker, executedOperations);
+          perSpaceResults.push({ space, value: result.value });
+          lastProcessedSpace = space;
         }
 
         if (fkWasEnabled) {
           const fkIntegrityCheck = await this.verifyForeignKeyIntegrity(driver);
           if (!fkIntegrityCheck.ok) {
-            return fkIntegrityCheck;
+            // Post-loop integrity violations cannot be attributed to a
+            // single per-space step (the cumulative effect of all
+            // applied plans was needed to reveal the broken
+            // reference). Surface the last successfully-applied space
+            // so operators can investigate from the most recent
+            // migration first.
+            return notOk({
+              ...fkIntegrityCheck.failure,
+              failingSpace: lastProcessedSpace ?? APP_SPACE_ID,
+            });
           }
         }
 
         await this.commitTransaction(driver);
         committed = true;
-        return runnerSuccess({
-          operationsPlanned: options.plan.operations.length,
-          operationsExecuted,
-        });
+        return ok({ perSpaceResults });
       } finally {
         if (!committed) {
           await this.rollbackTransaction(driver);
@@ -263,15 +355,52 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
 
   private async ensureControlTables(
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
-  ): Promise<void> {
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
+    // Pre-1.0 zero-range guardrail: detect a pre-cleanup single-row
+    // marker table (no `space` column) and surface a structured failure
+    // rather than silently rebuilding the table into the per-space
+    // shape. See `specs/framework-mechanism.spec.md § 2`.
+    const legacyDetection = await this.detectLegacyMarkerShape(driver);
+    if (!legacyDetection.ok) {
+      return legacyDetection;
+    }
     await this.executeStatement(driver, ensureMarkerTableStatement);
     await this.executeStatement(driver, ensureLedgerTableStatement);
+    return okVoid();
+  }
+
+  private async detectLegacyMarkerShape(
+    driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
+  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
+    const tableInfo = await driver.query<{ name: string }>(
+      `PRAGMA table_info("${MARKER_TABLE_NAME}")`,
+    );
+    if (tableInfo.rows.length === 0) {
+      return okVoid();
+    }
+    const columns = new Set(tableInfo.rows.map((row) => row.name));
+    if (columns.has('space')) {
+      return okVoid();
+    }
+    return runnerFailure(
+      'LEGACY_MARKER_SHAPE',
+      `Legacy marker-table shape detected on ${MARKER_TABLE_NAME} (no \`space\` column). ` +
+        'Prisma Next is in pre-1.0; the previous transitional auto-migration to the per-space-row schema has been removed. ' +
+        `Drop \`${MARKER_TABLE_NAME}\` and re-run \`dbInit\` to reinitialise from a clean baseline.`,
+      {
+        meta: {
+          table: MARKER_TABLE_NAME,
+          columns: [...columns].sort(),
+        },
+      },
+    );
   }
 
   private async readMarker(
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
+    space: string,
   ): Promise<ContractMarkerRecord | null> {
-    const stmt = readMarkerStatement();
+    const stmt = readMarkerStatement(space);
     try {
       const result = await driver.query<ContractMarkerRow>(stmt.sql, stmt.params);
       const row = result.rows[0];
@@ -300,7 +429,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     phase: 'precheck' | 'postcheck',
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     for (const step of steps) {
-      const result = await driver.query(step.sql);
+      const result = await driver.query(step.sql, step.params ?? []);
       if (!this.stepResultIsTrue(result.rows)) {
         const code = phase === 'precheck' ? 'PRECHECK_FAILED' : 'POSTCHECK_FAILED';
         return runnerFailure(
@@ -326,7 +455,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     for (const step of steps) {
       try {
-        await driver.query(step.sql);
+        await driver.query(step.sql, step.params ?? []);
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         return runnerFailure(
@@ -375,7 +504,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       return false;
     }
     for (const step of steps) {
-      const result = await driver.query(step.sql);
+      const result = await driver.query(step.sql, step.params ?? []);
       if (!this.stepResultIsTrue(result.rows)) {
         return false;
       }
@@ -519,6 +648,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
     options: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
+    space: string,
   ): Promise<void> {
     // SQLite has no native array type, so we can't merge invariants in SQL
     // the way Postgres does. Merge client-side under the runner's
@@ -527,6 +657,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     for (const inv of options.plan.providedInvariants) merged.add(inv);
     const invariants = Array.from(merged).sort();
     const writeStatements = buildWriteMarkerStatements({
+      space,
       storageHash: options.plan.destination.storageHash,
       profileHash:
         options.plan.destination.profileHash ??

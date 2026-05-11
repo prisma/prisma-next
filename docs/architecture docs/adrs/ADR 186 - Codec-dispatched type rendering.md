@@ -1,5 +1,7 @@
 # ADR 186 — Codec-dispatched type rendering
 
+> **Retrospective note.** This ADR introduced the `renderOutputType` slot on the codec record (and shows `defineCodec({...})` examples). Both the codec authoring shape and the home of `renderOutputType` have since moved on: [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) relocated `renderOutputType` to the unified `CodecDescriptor`, and the `defineCodec({...})` factory was retired in favor of class-based descriptors (`CodecDescriptorImpl`) and codecs (`CodecImpl`). The decision this ADR records — that the codec is the dispatch authority for type rendering — is unchanged; only the slot's home and the authoring syntax have moved. See [Codec authoring guide](../../reference/codec-authoring-guide.md).
+
 ## At a glance
 
 A `vector(1536)` column should produce `Vector<1536>` as its output type. A `jsonb(schema)` column should produce `{ name: string }`. Today, resolving a field's output type requires dispatching through `CodecTypes[codecId]['output']` or `parameterizedOutput` — a hoop that varies depending on whether the codec is parameterized. After this change, every field's output type is resolved once and stamped into a dedicated map in `contract.d.ts`:
@@ -124,7 +126,7 @@ Non-parameterized codecs don't need to implement it. The common case is zero cod
 Here's what the JSONB codec looks like with `renderOutputType`:
 
 ```ts
-const pgJsonbCodec = codec({
+const pgJsonbCodec = defineCodec({
   typeId: 'pg/jsonb@1',
   targetTypes: ['jsonb'],
   encode: (value): string => JSON.stringify(value),
@@ -210,7 +212,7 @@ Rejected because phantom types are gross, and mixing type-only metadata into the
 
 ### Make `renderOutputType` required with a default
 
-Like `encodeJson`/`decodeJson` on [ADR 184](ADR%20184%20-%20Codec-owned%20value%20serialization.md), make it required with a default provided by the `codec()` factory.
+Like `encodeJson`/`decodeJson` on [ADR 184](ADR%20184%20-%20Codec-owned%20value%20serialization.md), make it required with a default provided by the `defineCodec()` factory.
 
 Deferred. Most codecs don't parameterize their output type — the default (`CodecTypes[codecId]['output']`) handles them. Optional with a well-defined fallback is cleaner for now.
 

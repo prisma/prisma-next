@@ -1,26 +1,14 @@
 /**
  * End-to-end ORM-client coverage for the async-codec read/write boundary.
  *
- * `Post.embedding` flows through the `pg/vector@1` codec from
- * `@prisma-next/extension-pgvector`. The pgvector codec's `encode` and
- * `decode` are authored synchronously, but the `codec()` factory in
- * `relational-core` lifts them to Promise-returning at the boundary, so this
- * column exercises the runtime's async dispatch path on every read and write.
+ * `Post.embedding` flows through the `pg/vector@1` codec from `@prisma-next/extension-pgvector`. The pgvector codec's `encode` and `decode` are authored synchronously, but the codec base in `framework-components` lifts them to Promise-returning at the boundary, so this column exercises the runtime's async dispatch path on every read and write.
  *
- * `User.address` flows through `pg/jsonb@1` (a built-in `adapter-postgres`
- * codec, also lifted to async by the same factory) backed by the `Address`
- * value object. Adding a second codec with a different wire shape gives us
- * "mixed sync/async codec columns" in a single integration run.
+ * `User.address` flows through `pg/jsonb@1` (a built-in `adapter-postgres` codec, also lifted to async by the same boundary) backed by the `Address` value object. Adding a second codec with a different wire shape gives us "mixed sync/async codec columns" in a single integration run.
  *
  * The tests below verify:
  *
- * - **Read paths**: `.first()` and `for await (const row of c.all())` yield
- *   rows whose codec-decoded fields are plain `T` (not `Promise<T>`) and
- *   whose values round-trip through the runtime decode boundary.
- * - **Write paths**: `create()` and `update()` accept plain `T` for
- *   async-codec columns, run the value through the runtime's async encode
- *   path, and persist the wire format the codec produced (not a stringified
- *   Promise).
+ * - **Read paths**: `.first()` and `for await (const row of c.all())` yield rows whose codec-decoded fields are plain `T` (not `Promise<T>`) and whose values round-trip through the runtime decode boundary.
+ * - **Write paths**: `create()` and `update()` accept plain `T` for async-codec columns, run the value through the runtime's async encode path, and persist the wire format the codec produced (not a stringified Promise).
  */
 
 import { describe, expect, it } from 'vitest';

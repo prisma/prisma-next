@@ -1,5 +1,7 @@
 # ADR 202 — Codec trait system
 
+> **Retrospective note.** This ADR's examples show codec definitions via `defineCodec({...})`. That factory was retired in favor of class-based descriptors (`CodecDescriptorImpl`); traits are now declared as `override readonly traits = [...] as const` on the descriptor class. The `'json-validator'` trait this ADR introduced was also retired — JSON-Schema validation now lives uniformly inside the resolved codec's `decode` body rather than behind a parallel `JsonSchemaValidatorRegistry`. The trait system itself, the operator-gating semantics, and the canonical traits set are all unchanged. See [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) and the [Codec authoring guide](../../reference/codec-authoring-guide.md).
+
 ## Context
 
 Data types in the system are identified by codec IDs (e.g., `pg/int4@1`, `pg/text@1`, `pg/vector@1`). Query surfaces need to know which operators and functions are valid for a given data type — for example, ordering a `jsonb` column with `lt` or applying `sum` to a `text` column are not meaningful SQL. Today there is no generic mechanism to express these semantic constraints.
@@ -63,7 +65,7 @@ Traits are declared at codec registration time. Core SQL codecs and adapter code
 
 ```ts
 // sql-codecs.ts
-const sqlIntCodec = codec({
+const sqlIntCodec = defineCodec({
   typeId: SQL_INT_CODEC_ID,
   targetTypes: ['int'],
   traits: ['equality', 'order', 'numeric'],
@@ -74,7 +76,7 @@ const sqlIntCodec = codec({
 
 ```ts
 // postgres adapter codecs
-const pgTextCodec = codec({
+const pgTextCodec = defineCodec({
   typeId: 'pg/text@1',
   targetTypes: ['text'],
   traits: ['equality', 'order', 'textual'],
@@ -82,7 +84,7 @@ const pgTextCodec = codec({
   decode: (wire) => wire,
 });
 
-const pgBoolCodec = codec({
+const pgBoolCodec = defineCodec({
   typeId: 'pg/bool@1',
   targetTypes: ['bool'],
   traits: ['equality', 'boolean'],
@@ -90,7 +92,7 @@ const pgBoolCodec = codec({
   decode: (wire) => wire,
 });
 
-const pgJsonbCodec = codec({
+const pgJsonbCodec = defineCodec({
   typeId: 'pg/jsonb@1',
   targetTypes: ['jsonb'],
   traits: ['equality'],  // equality only; not order-comparable
@@ -103,7 +105,7 @@ Extension codecs declare traits the same way:
 
 ```ts
 // pgvector codec — vectors have equality but are not order-comparable or numeric
-const pgVectorCodec = codec({
+const pgVectorCodec = defineCodec({
   typeId: 'pg/vector@1',
   targetTypes: ['vector'],
   traits: ['equality'],

@@ -27,6 +27,7 @@ function createMiddlewareContext(): SqlMiddlewareContext {
       warn: vi.fn(),
       error: vi.fn(),
     },
+    contentHash: async () => 'mock-hash',
   };
 }
 
@@ -153,6 +154,122 @@ describe('lints middleware', () => {
 
       await mw.beforeExecute?.(selectPlan, ctx);
       await mw.beforeExecute?.(updatePlan, ctx);
+      expect(ctx.log.warn).not.toHaveBeenCalled();
+    },
+    timeouts.default,
+  );
+
+  it(
+    'honors configured severity overrides for every AST-level lint code',
+    async () => {
+      const cases = [
+        {
+          code: 'LINT.DELETE_WITHOUT_WHERE',
+          plan: () => createPlan({ ast: DeleteAst.from(userTable) }),
+          severities: { deleteWithoutWhere: 'warn' as const },
+        },
+        {
+          code: 'LINT.UPDATE_WITHOUT_WHERE',
+          plan: () =>
+            createPlan({
+              ast: UpdateAst.table(userTable).withSet({
+                email: ParamRef.of('x', { name: 'email', codecId: 'pg/text@1' }),
+              }),
+            }),
+          severities: { updateWithoutWhere: 'warn' as const },
+        },
+        {
+          code: 'LINT.NO_LIMIT',
+          plan: () =>
+            createPlan({
+              ast: SelectAst.from(userTable).withProjection([ProjectionItem.of('id', idCol)]),
+            }),
+          severities: { noLimit: 'error' as const },
+        },
+        {
+          code: 'LINT.SELECT_STAR',
+          plan: () =>
+            createPlan({
+              ast: SelectAst.from(userTable)
+                .withProjection([ProjectionItem.of('id', idCol)])
+                .withLimit(1)
+                .withSelectAllIntent({ table: 'user' }),
+            }),
+          severities: { selectStar: 'error' as const },
+        },
+      ];
+
+      for (const { code, plan, severities } of cases) {
+        const mw = lints({ severities });
+        const ctx = createMiddlewareContext();
+        const wantsError = Object.values(severities)[0] === 'error';
+        const promise = mw.beforeExecute?.(plan(), ctx);
+        if (wantsError) {
+          await expect(promise).rejects.toMatchObject({ code });
+        } else {
+          await promise;
+          expect(ctx.log.warn).toHaveBeenCalledWith(expect.objectContaining({ code }));
+        }
+      }
+    },
+    timeouts.default,
+  );
+
+  it(
+    'returns undefined severity for codes outside the configured map',
+    async () => {
+      const ast = SelectAst.from(userTable)
+        .withProjection([ProjectionItem.of('id', idCol)])
+        .withLimit(1)
+        .withSelectAllIntent({ table: 'user' });
+      const mw = lints({ severities: { deleteWithoutWhere: 'warn' } });
+      const ctx = createMiddlewareContext();
+
+      await mw.beforeExecute?.(createPlan({ ast }), ctx);
+      expect(ctx.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'LINT.SELECT_STAR' }),
+      );
+    },
+    timeouts.default,
+  );
+
+  it(
+    'falls back to raw guardrail evaluation when ast is missing (default fallback: raw)',
+    async () => {
+      const plan = createPlan({ sql: 'SELECT * FROM "user"' });
+      const mw = lints();
+      const ctx = createMiddlewareContext();
+
+      await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+        code: 'LINT.SELECT_STAR',
+      });
+    },
+    timeouts.default,
+  );
+
+  it(
+    'warns from raw fallback when severity override downgrades a default-error code',
+    async () => {
+      const plan = createPlan({ sql: 'SELECT * FROM "user"' });
+      const mw = lints({ severities: { selectStar: 'warn' } });
+      const ctx = createMiddlewareContext();
+
+      await mw.beforeExecute?.(plan, ctx);
+      expect(ctx.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'LINT.SELECT_STAR' }),
+      );
+    },
+    timeouts.default,
+  );
+
+  it(
+    'skips raw fallback evaluation when fallbackWhenAstMissing is set to skip',
+    async () => {
+      const plan = createPlan({ sql: 'SELECT * FROM "user"' });
+      const mw = lints({ fallbackWhenAstMissing: 'skip' });
+      const ctx = createMiddlewareContext();
+
+      await mw.beforeExecute?.(plan, ctx);
       expect(ctx.log.warn).not.toHaveBeenCalled();
     },
     timeouts.default,

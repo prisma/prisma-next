@@ -1,5 +1,8 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
+import {
+  APP_SPACE_ID,
+  type MigrationOperationPolicy,
+} from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
@@ -54,6 +57,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
       policy: RECONCILIATION_POLICY,
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -107,6 +111,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
       policy: WIDENING_POLICY,
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -159,6 +164,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
       policy: WIDENING_POLICY,
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result).toMatchObject({

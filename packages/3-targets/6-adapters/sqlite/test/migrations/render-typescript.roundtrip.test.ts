@@ -14,11 +14,13 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import {
   AddColumnCall,
   CreateIndexCall,
   CreateTableCall,
   DropTableCall,
+  RawSqlCall,
   RecreateTableCall,
 } from '@prisma-next/target-sqlite/op-factory-call';
 import { TypeScriptRenderableSqliteMigration } from '@prisma-next/target-sqlite/planner-produced-sqlite-migration';
@@ -139,7 +141,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
         new CreateIndexCall('user', 'user_email_idx', ['email']),
         new DropTableCall('stale'),
       ];
-      const migration = new TypeScriptRenderableSqliteMigration(calls, META);
+      const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
 
       const tsSource = rewriteImports(migration.renderTypeScript());
       await writeFile(join(tmpDir, 'migration.ts'), tsSource);
@@ -162,7 +164,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
     'renders an empty calls list whose executed scaffold emits []',
     { timeout: timeouts.coldTransformImport },
     async () => {
-      const migration = new TypeScriptRenderableSqliteMigration([], META);
+      const migration = new TypeScriptRenderableSqliteMigration([], META, APP_SPACE_ID);
 
       const tsSource = rewriteImports(migration.renderTypeScript());
       await writeFile(join(tmpDir, 'migration.ts'), tsSource);
@@ -174,6 +176,37 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
 
       const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
       expect(ops).toEqual([]);
+    },
+  );
+
+  it(
+    'preserves RawSqlCall ops byte-for-byte through the render → execute round-trip',
+    { timeout: timeouts.coldTransformImport },
+    async () => {
+      const op = {
+        id: 'raw.custom.1',
+        label: 'raw custom 1',
+        operationClass: 'additive' as const,
+        target: { id: 'sqlite' as const },
+        precheck: [],
+        execute: [{ description: 'do thing', sql: 'SELECT 1' }],
+        postcheck: [],
+        meta: { note: 'preserved' },
+      };
+      const calls = [new RawSqlCall(op)];
+      const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
+
+      const tsSource = rewriteImports(migration.renderTypeScript());
+      await writeFile(join(tmpDir, 'migration.ts'), tsSource);
+
+      await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
+        cwd: tmpDir,
+      });
+
+      const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
+
+      expect(ops).toHaveLength(1);
+      expect(ops[0]).toEqual(JSON.parse(JSON.stringify(op)));
     },
   );
 
@@ -205,7 +238,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
           operationClass: 'widening',
         }),
       ];
-      const migration = new TypeScriptRenderableSqliteMigration(calls, META);
+      const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
 
       const tsSource = rewriteImports(migration.renderTypeScript());
       await writeFile(join(tmpDir, 'migration.ts'), tsSource);

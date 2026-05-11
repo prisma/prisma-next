@@ -9,7 +9,7 @@ import {
 } from './errors';
 import type { MigrationEdge, MigrationGraph } from './graph';
 import { bfs } from './graph-ops';
-import type { MigrationPackage } from './package';
+import type { OnDiskMigrationPackage } from './package';
 
 /** Forward-edge neighbours: edge `e` from `n` visits `e.to` next. */
 function forwardNeighbours(graph: MigrationGraph, node: string) {
@@ -36,7 +36,7 @@ function appendEdge(map: Map<string, MigrationEdge[]>, key: string, entry: Migra
   else map.set(key, [entry]);
 }
 
-export function reconstructGraph(packages: readonly MigrationPackage[]): MigrationGraph {
+export function reconstructGraph(packages: readonly OnDiskMigrationPackage[]): MigrationGraph {
   const nodes = new Set<string>();
   const forwardChain = new Map<string, MigrationEdge[]>();
   const reverseChain = new Map<string, MigrationEdge[]>();

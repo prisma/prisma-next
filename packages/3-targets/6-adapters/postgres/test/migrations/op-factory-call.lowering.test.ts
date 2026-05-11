@@ -14,6 +14,7 @@
  * aggregator are covered in op-factory-call.rendering.test.ts.
  */
 
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import {
   AddColumnCall,
   AddEnumValuesCall,
@@ -248,7 +249,7 @@ describe('renderOps', () => {
 describe('TypeScriptRenderablePostgresMigration', () => {
   it('identifies as postgres, derives destination from meta.to, and materializes operations via renderOps', () => {
     const calls = [new DropTableCall('public', 'stale')];
-    const migration = new TypeScriptRenderablePostgresMigration(calls, META);
+    const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
 
     expect(migration.targetId).toBe('postgres');
     expect(migration.destination).toEqual({ storageHash: 'sha256:to' });
@@ -261,7 +262,7 @@ describe('TypeScriptRenderablePostgresMigration', () => {
 
   it('renders TypeScript source mirroring renderCallsToTypeScript output', () => {
     const calls = [new DropTableCall('public', 'stale')];
-    const migration = new TypeScriptRenderablePostgresMigration(calls, META);
+    const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
 
     const source = migration.renderTypeScript();
     expect(source).toContain(

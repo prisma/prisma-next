@@ -73,7 +73,11 @@ function extractExtensionPackMeta(
   }
   if (types) {
     if (types.codecTypes) {
-      const { controlPlaneHooks: _, codecInstances: _ci, ...cleanedCodecTypes } = types.codecTypes;
+      const {
+        controlPlaneHooks: _,
+        codecDescriptors: _cd,
+        ...cleanedCodecTypes
+      } = types.codecTypes;
       base['types'] = { ...types, codecTypes: cleanedCodecTypes };
     } else {
       base['types'] = types;
@@ -83,9 +87,7 @@ function extractExtensionPackMeta(
 }
 
 /**
- * Enriches a raw contract with framework-derived metadata:
- * capabilities from all component descriptors and extension pack metadata
- * from extension descriptors. Produces deterministically sorted output.
+ * Enriches a raw contract with framework-derived metadata: capabilities from all component descriptors and extension pack metadata from extension descriptors. Produces deterministically sorted output.
  */
 export function enrichContract(
   ir: Contract,

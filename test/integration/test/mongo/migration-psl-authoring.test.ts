@@ -45,13 +45,18 @@ const mongoCodecLookup: CodecLookup = {
     if (!bsonType) return undefined;
     return {
       id,
-      targetTypes: [bsonType],
       encode: async (v: unknown) => v,
       decode: async (v: unknown) => v,
       encodeJson: (v: unknown) => v as JsonValue,
       decodeJson: (v: JsonValue) => v,
     };
   },
+  targetTypesFor(id: string) {
+    const bsonType = bsonTypesByCodecId[id];
+    return bsonType ? [bsonType] : undefined;
+  },
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
 };
 
 function pslToContract(schema: string): MongoContract {

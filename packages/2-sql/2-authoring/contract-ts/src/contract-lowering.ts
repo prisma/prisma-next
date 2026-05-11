@@ -1,4 +1,4 @@
-import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
+import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type {
   ContractDefinition,
@@ -562,7 +562,7 @@ function resolveModelNode(
       descriptor,
       nullable: fieldState.nullable,
       ...(fieldState.default ? { default: fieldState.default } : {}),
-      ...(fieldState.executionDefault ? { executionDefault: fieldState.executionDefault } : {}),
+      ...(fieldState.executionDefaults ? { executionDefaults: fieldState.executionDefaults } : {}),
     });
   }
 

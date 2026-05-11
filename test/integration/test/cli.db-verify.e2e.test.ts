@@ -3,6 +3,7 @@ import { access } from 'node:fs/promises';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import type { Contract } from '@prisma-next/contract/types';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import {
@@ -86,6 +87,7 @@ async function writeMatchingMarker(
     await executeStatement(client, ensureTableStatement);
 
     const write = writeContractMarker({
+      space: APP_SPACE_ID,
       storageHash: contract.storage.storageHash,
       profileHash: contract.profileHash ?? contract.storage.storageHash,
       contractJson: contract,
@@ -951,6 +953,7 @@ withTempDir(({ createTempDir }) => {
 
             // Write marker matching contract
             const write = writeContractMarker({
+              space: APP_SPACE_ID,
               storageHash: contract.storage.storageHash,
               profileHash: contract.profileHash ?? contract.storage.storageHash,
               contractJson: contract,

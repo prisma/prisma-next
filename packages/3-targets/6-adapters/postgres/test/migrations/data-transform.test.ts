@@ -39,10 +39,10 @@ describe('dataTransform factory', () => {
     lowerMock.mockReset();
   });
 
-  it('returns a DataTransformOperation with a single run entry and no check', () => {
-    lowerMock.mockImplementation((_ast, _ctx) => ({
+  it('lowers a single run with no check into execute-only steps', () => {
+    lowerMock.mockImplementation(() => ({
       sql: 'UPDATE users SET email = $1',
-      params: [1, 'x'],
+      params: ['n/a'],
     }));
     const op = dataTransform(
       makeContract(),
@@ -54,10 +54,16 @@ describe('dataTransform factory', () => {
       id: 'data_migration.backfill-emails',
       label: 'Data transform: backfill-emails',
       operationClass: 'data',
-      name: 'backfill-emails',
-      source: 'migration.ts',
-      check: null,
-      run: [{ sql: 'UPDATE users SET email = $1', params: [1, 'x'] }],
+      target: { id: 'postgres' },
+      precheck: [],
+      execute: [
+        {
+          description: 'Run backfill-emails',
+          sql: 'UPDATE users SET email = $1',
+          params: ['n/a'],
+        },
+      ],
+      postcheck: [],
     });
   });
 
@@ -73,25 +79,43 @@ describe('dataTransform factory', () => {
       { run: [() => makePlan(), () => makePlan()] },
       makeAdapter(),
     );
-    expect(op.run).toHaveLength(2);
-    expect(op.run).toEqual([
-      { sql: 'STMT_0', params: [1, 'x'] },
-      { sql: 'STMT_1', params: [1, 'x'] },
+    expect(op.execute).toHaveLength(2);
+    expect(op.execute).toEqual([
+      { description: 'Run multi', sql: 'STMT_0', params: [1, 'x'] },
+      { description: 'Run multi', sql: 'STMT_1', params: [1, 'x'] },
     ]);
   });
 
-  it('invokes and lowers the check closure when provided', () => {
-    lowerMock.mockImplementation(() => ({
-      sql: 'SELECT count(*)',
-      params: [1, 'x'],
-    }));
+  it('wraps the check closure into precheck/postcheck with EXISTS / NOT EXISTS', () => {
+    lowerMock
+      .mockImplementationOnce(() => ({
+        sql: 'SELECT 1 FROM users WHERE email IS NULL',
+        params: [],
+      }))
+      .mockImplementation(() => ({
+        sql: 'UPDATE users SET email = $1',
+        params: ['n/a'],
+      }));
     const op = dataTransform(
       makeContract(),
       'with-check',
       { check: () => makePlan(), run: () => makePlan() },
       makeAdapter(),
     );
-    expect(op.check).toEqual({ sql: 'SELECT count(*)', params: [1, 'x'] });
+    expect(op.precheck).toEqual([
+      {
+        description: 'Check with-check has work to do',
+        sql: 'SELECT EXISTS (SELECT 1 FROM users WHERE email IS NULL) AS ok',
+        params: [],
+      },
+    ]);
+    expect(op.postcheck).toEqual([
+      {
+        description: 'Verify with-check resolved all violations',
+        sql: 'SELECT NOT EXISTS (SELECT 1 FROM users WHERE email IS NULL) AS ok',
+        params: [],
+      },
+    ]);
   });
 
   it('propagates PN-MIG-2001 when a closure is a placeholder (never reaches the adapter)', () => {
@@ -152,7 +176,7 @@ describe('dataTransform factory', () => {
       makeAdapter(),
     );
     expect(build).toHaveBeenCalledTimes(1);
-    expect(op.run).toHaveLength(1);
+    expect(op.execute).toHaveLength(1);
   });
 
   it('forwards the contract via LowererContext on every adapter.lower call', () => {

@@ -1,15 +1,14 @@
 import type {
   ColumnDefault,
   ColumnDefaultLiteralInputValue,
+  ExecutionMutationDefaultPhases,
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
-import type {
-  ColumnTypeDescriptor,
-  ForeignKeyDefaultsState,
-} from '@prisma-next/contract-authoring';
+import { isColumnDefault } from '@prisma-next/contract/types';
+import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
 import type { AuthoringFieldPresetDescriptor } from '@prisma-next/framework-components/authoring';
 import { instantiateAuthoringFieldPreset } from '@prisma-next/framework-components/authoring';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { CodecLookup, ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type {
   ExtensionPackRef,
   FamilyPackRef,
@@ -46,7 +45,7 @@ export type ScalarFieldState<
   readonly nullable: Nullable;
   readonly columnName?: ColumnName | undefined;
   readonly default?: ColumnDefault | undefined;
-  readonly executionDefault?: ExecutionMutationDefaultValue | undefined;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases | undefined;
 } & (IdSpec extends NamedConstraintSpec ? { readonly id: IdSpec } : { readonly id?: undefined }) &
   (UniqueSpec extends NamedConstraintSpec
     ? { readonly unique: UniqueSpec }
@@ -59,7 +58,7 @@ type AnyScalarFieldState = {
   readonly nullable: boolean;
   readonly columnName?: string | undefined;
   readonly default?: ColumnDefault | undefined;
-  readonly executionDefault?: ExecutionMutationDefaultValue | undefined;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases | undefined;
   readonly id?: NamedConstraintSpec | undefined;
   readonly unique?: NamedConstraintSpec | undefined;
 };
@@ -136,12 +135,6 @@ export type GeneratedFieldSpec = {
   readonly generated: ExecutionMutationDefaultValue;
 };
 
-function isColumnDefault(value: unknown): value is ColumnDefault {
-  if (typeof value !== 'object' || value === null) return false;
-  const kind = (value as { kind?: unknown }).kind;
-  return kind === 'literal' || kind === 'function';
-}
-
 function toColumnDefault(value: ColumnDefaultLiteralInputValue | ColumnDefault): ColumnDefault {
   if (isColumnDefault(value)) {
     return value;
@@ -149,10 +142,7 @@ function toColumnDefault(value: ColumnDefaultLiteralInputValue | ColumnDefault):
   return { kind: 'literal', value };
 }
 
-// Chaining methods use `as unknown as <ConditionalType>` because TypeScript cannot
-// narrow generic conditional return types through object spread. The runtime values
-// are correct — the casts bridge the gap between the spread result and the
-// compile-time conditional type that encodes the state transition.
+// Chaining methods use `as unknown as <ConditionalType>` because TypeScript cannot narrow generic conditional return types through object spread. The runtime values are correct — the casts bridge the gap between the spread result and the compile-time conditional type that encodes the state transition.
 export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFieldState> {
   declare readonly __state: State;
 
@@ -348,7 +338,7 @@ function generatedField<Descriptor extends ColumnTypeDescriptor>(
       ...(spec.typeParams ? { typeParams: spec.typeParams } : {}),
     },
     nullable: false,
-    executionDefault: spec.generated,
+    executionDefaults: { onCreate: spec.generated },
   });
 }
 
@@ -379,11 +369,8 @@ export function buildFieldPreset(
     kind: 'scalar',
     descriptor: preset.descriptor,
     nullable: preset.nullable,
-    ...ifDefined('default', preset.default as ColumnDefault | undefined),
-    ...ifDefined(
-      'executionDefault',
-      preset.executionDefault as ExecutionMutationDefaultValue | undefined,
-    ),
+    ...ifDefined('default', preset.default),
+    ...ifDefined('executionDefaults', preset.executionDefaults),
     ...(preset.id
       ? {
           id: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},
@@ -1037,9 +1024,7 @@ export class ContractModelBuilder<
   ): [ValidateSqlStageSpec<Fields, AttributesSpec, NextSqlSpec>] extends [never]
     ? ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, never>
     : ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, NextSqlSpec> {
-    // Conditional return type cannot be verified by the implementation; the
-    // runtime value is always a valid ContractModelBuilder regardless of the
-    // validation outcome (validation is type-level only).
+    // Conditional return type cannot be verified by the implementation; the runtime value is always a valid ContractModelBuilder regardless of the validation outcome (validation is type-level only).
     return new ContractModelBuilder(this.stageOne, this.attributesFactory, specOrFactory) as never;
   }
 

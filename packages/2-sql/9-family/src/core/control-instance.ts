@@ -20,6 +20,7 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
+  APP_SPACE_ID,
   SchemaTreeNode,
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
@@ -27,6 +28,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
+import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as sqlValidateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -204,6 +206,22 @@ export interface SqlControlFamilyInstance
 
   schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult>;
 
+  /**
+   * Verify a contract against an already-introspected schema slice.
+   *
+   * Used by the aggregate verifier to invoke per-member verification
+   * with the live schema pre-projected to the member's claimed slice
+   * via `projectSchemaToSpace`. Closes F23 — without per-member
+   * pre-projection, single-contract verifiers see other-space tables
+   * as `extras`.
+   */
+  schemaVerifyAgainstSchema(options: {
+    readonly contract: unknown;
+    readonly schema: SqlSchemaIR;
+    readonly strict: boolean;
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  }): VerifyDatabaseSchemaResult;
+
   sign(options: {
     readonly driver: ControlDriverInstance<'sql', string>;
     readonly contract: unknown;
@@ -232,7 +250,9 @@ function isSqlControlAdapter<TTargetId extends string>(
     'introspect' in value &&
     typeof (value as { introspect: unknown }).introspect === 'function' &&
     'readMarker' in value &&
-    typeof (value as { readMarker: unknown }).readMarker === 'function'
+    typeof (value as { readMarker: unknown }).readMarker === 'function' &&
+    'readAllMarkers' in value &&
+    typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function'
   );
 }
 
@@ -300,6 +320,29 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     stack.extensionPacks as unknown as readonly (SqlControlExtensionDescriptor<TTargetId> &
       DescriptorWithStorageTypes)[];
 
+  // Descriptor self-consistency check.
+  // Each extension that exposes a `contractSpace` must publish a
+  // `headRef.hash` that matches the canonical hash recomputed from its
+  // `contractJson`. A stale value would silently corrupt every downstream
+  // boundary that trusts `headRef.hash` as the canonical identity (drift
+  // detection, on-disk artefact emission, runner marker writes). Failing
+  // fast at descriptor-load time turns "extension author shipped an
+  // inconsistent descriptor" into an explicit, actionable error
+  // (`MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH`) rather than a confusing
+  // mismatch surfacing several layers downstream.
+  for (const extension of extensions) {
+    if (extension.contractSpace) {
+      const { contractJson, headRef } = extension.contractSpace;
+      assertDescriptorSelfConsistency({
+        extensionId: extension.id,
+        target: contractJson.target,
+        targetFamily: contractJson.targetFamily,
+        storage: contractJson.storage,
+        headRefHash: headRef.hash,
+      });
+    }
+  }
+
   const { codecTypeImports, operationTypeImports, extensionIds } = stack;
 
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
@@ -316,7 +359,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     const controlAdapter = adapter.create(stack);
     if (!isSqlControlAdapter(controlAdapter)) {
       throw new Error(
-        'Adapter does not implement SqlControlAdapter (missing introspect or readMarker)',
+        'Adapter does not implement SqlControlAdapter (missing introspect, readMarker, or readAllMarkers)',
       );
     }
     return controlAdapter;
@@ -355,7 +398,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const contractProfileHash = contract.profileHash;
       const contractTarget = contract.target;
 
-      const marker = await getControlAdapter().readMarker(driver);
+      const marker = await getControlAdapter().readMarker(driver, APP_SPACE_ID);
 
       let missingCodecs: readonly string[] | undefined;
       let codecCoverageSkipped = false;
@@ -479,6 +522,27 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
       });
     },
+    schemaVerifyAgainstSchema(options: {
+      readonly contract: unknown;
+      readonly schema: SqlSchemaIR;
+      readonly strict: boolean;
+      readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+    }): VerifyDatabaseSchemaResult {
+      const contract = sqlValidateContract<Contract<SqlStorage>>(
+        options.contract,
+        emptyCodecLookup,
+      );
+      const controlAdapter = getControlAdapter();
+      return verifySqlSchema({
+        contract,
+        schema: options.schema,
+        strict: options.strict,
+        typeMetadataRegistry,
+        frameworkComponents: options.frameworkComponents,
+        ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
+        ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
+      });
+    },
     async sign(options: {
       readonly driver: ControlDriverInstance<'sql', string>;
       readonly contract: unknown;
@@ -500,7 +564,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       await driver.query(ensureSchemaStatement.sql, ensureSchemaStatement.params);
       await driver.query(ensureTableStatement.sql, ensureTableStatement.params);
 
-      const existingMarker = await getControlAdapter().readMarker(driver);
+      const existingMarker = await getControlAdapter().readMarker(driver, APP_SPACE_ID);
 
       let markerCreated = false;
       let markerUpdated = false;
@@ -508,6 +572,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
       if (!existingMarker) {
         const write = writeContractMarker({
+          space: APP_SPACE_ID,
           storageHash: contractStorageHash,
           profileHash: contractProfileHash,
           contractJson: contractInput,
@@ -528,6 +593,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
             profileHash: existingProfileHash,
           };
           const write = writeContractMarker({
+            space: APP_SPACE_ID,
             storageHash: contractStorageHash,
             profileHash: contractProfileHash,
             contractJson: contractInput,
@@ -576,8 +642,14 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     },
     async readMarker(options: {
       readonly driver: ControlDriverInstance<'sql', string>;
+      readonly space: string;
     }): Promise<ContractMarkerRecord | null> {
-      return getControlAdapter().readMarker(options.driver);
+      return getControlAdapter().readMarker(options.driver, options.space);
+    },
+    async readAllMarkers(options: {
+      readonly driver: ControlDriverInstance<'sql', string>;
+    }): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
+      return getControlAdapter().readAllMarkers(options.driver);
     },
     async introspect(options: {
       readonly driver: ControlDriverInstance<'sql', string>;

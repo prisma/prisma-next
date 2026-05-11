@@ -10,8 +10,8 @@ import type { ColumnDescriptor } from './psl-column-resolution';
 
 export interface PrismaContractOptions {
   readonly output?: string;
-  readonly target: TargetPackRef<'sql', 'postgres'>;
-  readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', 'postgres'>[];
+  readonly target: TargetPackRef<'sql', string>;
+  readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
 }
 
 function buildColumnDescriptorMap(
@@ -20,9 +20,7 @@ function buildColumnDescriptorMap(
 ): ReadonlyMap<string, ColumnDescriptor> {
   const result = new Map<string, ColumnDescriptor>();
   for (const [typeName, codecId] of scalarTypeDescriptors) {
-    const codec = codecLookup.get(codecId);
-    if (!codec) continue;
-    const nativeType = codec.targetTypes[0];
+    const nativeType = codecLookup.targetTypesFor(codecId)?.[0];
     if (nativeType === undefined) continue;
     result.set(typeName, { codecId, nativeType });
   }

@@ -1,11 +1,15 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
+  AuthoringFieldPresetDescriptor,
   AuthoringTypeConstructorDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import {
+  hasRegisteredFieldNamespace,
+  instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
+  isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
   validateAuthoringHelperArguments,
 } from '@prisma-next/framework-components/authoring';
@@ -37,7 +41,7 @@ export type ColumnDescriptor = {
   readonly codecId: string;
   readonly nativeType: string;
   readonly typeRef?: string;
-  readonly typeParams?: Record<string, unknown>;
+  readonly typeParams?: Record<string, unknown> | undefined;
 };
 
 export function toNamedTypeFieldDescriptor(
@@ -68,23 +72,45 @@ export function getAuthoringTypeConstructor(
 }
 
 /**
- * Returns the namespace prefix of `attributeName` if it references an
- * unrecognized extension namespace, otherwise `undefined`. A namespace is
- * considered recognized when it is:
+ * Walks `authoringContributions.field` segment-by-segment and returns the field-preset descriptor at the resolved path, or `undefined` if no descriptor is registered.
+ *
+ * Symmetric with `getAuthoringTypeConstructor`. Field presets are strictly richer than type constructors — they can contribute `default` / `executionDefaults` / `id` / `unique` / `nullable` in addition to the `codecId` / `nativeType` / `typeParams` triple. PSL resolution tries field presets first, then falls back to type constructors on miss (see `resolveFieldTypeDescriptor`).
+ */
+export function getAuthoringFieldPreset(
+  contributions: AuthoringContributions | undefined,
+  path: readonly string[],
+): AuthoringFieldPresetDescriptor | undefined {
+  let current: unknown = contributions?.field;
+
+  for (const segment of path) {
+    if (typeof current !== 'object' || current === null || Array.isArray(current)) {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+
+  return isAuthoringFieldPresetDescriptor(current) ? current : undefined;
+}
+
+/**
+ * Returns the namespace prefix of `attributeName` if it references an unrecognized extension namespace, otherwise `undefined`. A namespace is considered recognized when it is:
  *
  * - `db` (native-type spec, always allowed),
  * - the active family id (e.g. `sql`),
  * - the active target id (e.g. `postgres`),
+ * - a registered field-preset namespace (e.g. `temporal`),
  * - present in `composedExtensions`.
  *
- * Family/target namespaces are exempted so that e.g. `@sql.foo` surfaces as
- * PSL_UNSUPPORTED_*_ATTRIBUTE (the attribute isn't defined) rather than
- * PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (the namespace is already composed).
+ * Family/target/field-preset namespaces are exempted so that e.g. `@sql.foo` surfaces as PSL_UNSUPPORTED_*_ATTRIBUTE (the attribute isn't defined) rather than PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (the namespace is already composed).
  */
 export function checkUncomposedNamespace(
   attributeName: string,
   composedExtensions: ReadonlySet<string>,
-  context?: { readonly familyId?: string; readonly targetId?: string },
+  context?: {
+    readonly familyId?: string;
+    readonly targetId?: string;
+    readonly authoringContributions?: AuthoringContributions | undefined;
+  },
 ): string | undefined {
   const dotIndex = attributeName.indexOf('.');
   if (dotIndex <= 0 || dotIndex === attributeName.length - 1) {
@@ -95,6 +121,7 @@ export function checkUncomposedNamespace(
     namespace === 'db' ||
     namespace === context?.familyId ||
     namespace === context?.targetId ||
+    hasRegisteredFieldNamespace(context?.authoringContributions, namespace) ||
     composedExtensions.has(namespace)
   ) {
     return undefined;
@@ -103,12 +130,9 @@ export function checkUncomposedNamespace(
 }
 
 /**
- * Pushes the canonical `PSL_EXTENSION_NAMESPACE_NOT_COMPOSED` diagnostic for a
- * subject (attribute, model attribute, or type constructor) that references an
- * extension namespace which is not composed in the current contract.
+ * Pushes the canonical `PSL_EXTENSION_NAMESPACE_NOT_COMPOSED` diagnostic for a subject (attribute, model attribute, or type constructor) that references an extension namespace which is not composed in the current contract.
  *
- * The `data` payload carries the missing namespace so machine consumers
- * (agents, IDE extensions, CLI auto-fix) don't have to parse the prose.
+ * The `data` payload carries the missing namespace so machine consumers (agents, IDE extensions, CLI auto-fix) don't have to parse the prose.
  */
 export function reportUncomposedNamespace(input: {
   readonly subjectLabel: string;
@@ -123,6 +147,26 @@ export function reportUncomposedNamespace(input: {
     sourceId: input.sourceId,
     span: input.span,
     data: { namespace: input.namespace, suggestedPack: input.namespace },
+  });
+}
+
+/**
+ * Pushes the canonical `PSL_UNKNOWN_FIELD_PRESET` diagnostic when a typoed preset name is referenced inside a registered field-preset namespace. The `data` payload exposes the namespace and full helper path so machine consumers (agents, IDE extensions) don't have to parse the prose.
+ */
+export function reportUnknownFieldPreset(input: {
+  readonly entityLabel: string;
+  readonly namespace: string;
+  readonly helperPath: string;
+  readonly sourceId: string;
+  readonly span: PslSpan;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): void {
+  input.diagnostics.push({
+    code: 'PSL_UNKNOWN_FIELD_PRESET',
+    message: `${input.entityLabel} references unknown field preset "${input.helperPath}". Check the spelling against the available presets in the "${input.namespace}" namespace.`,
+    sourceId: input.sourceId,
+    span: input.span,
+    data: { namespace: input.namespace, helperPath: input.helperPath },
   });
 }
 
@@ -200,17 +244,19 @@ export function resolvePslTypeConstructorDescriptor(input: {
     return descriptor;
   }
 
-  const namespace = input.call.path.length > 1 ? input.call.path[0] : undefined;
-  if (
-    namespace &&
-    namespace !== 'db' &&
-    namespace !== input.familyId &&
-    namespace !== input.targetId &&
-    !input.composedExtensions.has(namespace)
-  ) {
+  const uncomposedNamespace = checkUncomposedNamespace(
+    input.call.path.join('.'),
+    input.composedExtensions,
+    {
+      familyId: input.familyId,
+      targetId: input.targetId,
+      authoringContributions: input.authoringContributions,
+    },
+  );
+  if (uncomposedNamespace) {
     reportUncomposedNamespace({
       subjectLabel: `Type constructor "${input.call.path.join('.')}"`,
-      namespace,
+      namespace: uncomposedNamespace,
       sourceId: input.sourceId,
       span: input.call.span,
       diagnostics: input.diagnostics,
@@ -227,8 +273,89 @@ export function resolvePslTypeConstructorDescriptor(input: {
   });
 }
 
+/**
+ * Instantiates a field-preset call against its descriptor, coercing PSL AST arguments into the descriptor's typed argument shape and returning the preset's full set of contract contributions.
+ *
+ * Symmetric with `instantiatePslTypeConstructor` but richer: a field preset can contribute `default`, `executionDefaults`, `id`, `unique`, and `nullable` in addition to the storage-type triple. PSL → typed-args coercion happens here (via `mapPslHelperArgs`) so that `instantiateAuthoringFieldPreset` itself stays typed-input-only and TS keeps its zero-runtime-validation cost.
+ */
+export function instantiatePslFieldPreset(input: {
+  readonly call: PslTypeConstructorCall;
+  readonly descriptor: AuthoringFieldPresetDescriptor;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly entityLabel: string;
+}):
+  | {
+      readonly descriptor: ColumnDescriptor;
+      readonly nullable: boolean;
+      readonly default?: ColumnDefault;
+      readonly executionDefaults?: ExecutionMutationDefaultPhases;
+      readonly id: boolean;
+      readonly unique: boolean;
+    }
+  | undefined {
+  const helperPath = input.call.path.join('.');
+  const args = mapPslHelperArgs({
+    args: input.call.args,
+    descriptors: input.descriptor.args ?? [],
+    helperLabel: `preset "${helperPath}"`,
+    span: input.call.span,
+    diagnostics: input.diagnostics,
+    sourceId: input.sourceId,
+    entityLabel: input.entityLabel,
+  });
+  if (!args) {
+    return undefined;
+  }
+
+  try {
+    validateAuthoringHelperArguments(helperPath, input.descriptor.args, args);
+    const instantiated = instantiateAuthoringFieldPreset(input.descriptor, args);
+    return {
+      descriptor: {
+        codecId: instantiated.descriptor.codecId,
+        nativeType: instantiated.descriptor.nativeType,
+        ...(instantiated.descriptor.typeParams !== undefined
+          ? { typeParams: instantiated.descriptor.typeParams }
+          : {}),
+      },
+      nullable: instantiated.nullable,
+      ...(instantiated.default !== undefined ? { default: instantiated.default } : {}),
+      ...(instantiated.executionDefaults !== undefined
+        ? { executionDefaults: instantiated.executionDefaults }
+        : {}),
+      id: instantiated.id,
+      unique: instantiated.unique,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `${input.entityLabel} preset "${helperPath}" ${message}`,
+      sourceId: input.sourceId,
+      span: input.call.span,
+    });
+    return undefined;
+  }
+}
+
+/**
+ * Contract contributions a field preset adds beyond the bare storage-type triple. Set when a field is resolved through the field-preset dispatch path; absent when resolved through the type-constructor path or as a scalar/enum/named-type lookup.
+ */
+export type FieldPresetContributions = {
+  readonly nullable: boolean;
+  readonly id: boolean;
+  readonly unique: boolean;
+  readonly default?: ColumnDefault;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases;
+};
+
 export type ResolveFieldTypeResult =
-  | { readonly ok: true; readonly descriptor: ColumnDescriptor }
+  | {
+      readonly ok: true;
+      readonly descriptor: ColumnDescriptor;
+      readonly presetContributions?: FieldPresetContributions;
+    }
   | { readonly ok: false; readonly alreadyReported: boolean };
 
 export function resolveFieldTypeDescriptor(input: {
@@ -245,18 +372,71 @@ export function resolveFieldTypeDescriptor(input: {
   readonly entityLabel: string;
 }): ResolveFieldTypeResult {
   if (input.field.typeConstructor) {
+    // Field presets carry richer semantics than type constructors, so a field preset match is the complete answer. Shared composition rejects exact cross-registry collisions before PSL resolution can observe them.
+    const presetDescriptor = getAuthoringFieldPreset(
+      input.authoringContributions,
+      input.field.typeConstructor.path,
+    );
+    if (presetDescriptor) {
+      const instantiated = instantiatePslFieldPreset({
+        call: input.field.typeConstructor,
+        descriptor: presetDescriptor,
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        entityLabel: input.entityLabel,
+      });
+      if (!instantiated) {
+        return { ok: false, alreadyReported: true };
+      }
+      const presetContributions: FieldPresetContributions = {
+        nullable: instantiated.nullable,
+        id: instantiated.id,
+        unique: instantiated.unique,
+        ...(instantiated.default !== undefined ? { default: instantiated.default } : {}),
+        ...(instantiated.executionDefaults !== undefined
+          ? { executionDefaults: instantiated.executionDefaults }
+          : {}),
+      };
+      return { ok: true, descriptor: instantiated.descriptor, presetContributions };
+    }
+
     const helperPath = input.field.typeConstructor.path.join('.');
-    const descriptor = resolvePslTypeConstructorDescriptor({
-      call: input.field.typeConstructor,
-      authoringContributions: input.authoringContributions,
-      composedExtensions: input.composedExtensions,
-      familyId: input.familyId,
-      targetId: input.targetId,
-      diagnostics: input.diagnostics,
-      sourceId: input.sourceId,
-      unsupportedCode: 'PSL_UNSUPPORTED_FIELD_TYPE',
-      unsupportedMessage: `${input.entityLabel} type constructor "${helperPath}" is not supported in SQL PSL provider v1`,
-    });
+    const namespacePrefix =
+      input.field.typeConstructor.path.length > 1 ? input.field.typeConstructor.path[0] : undefined;
+    const typeDescriptor = getAuthoringTypeConstructor(
+      input.authoringContributions,
+      input.field.typeConstructor.path,
+    );
+
+    if (
+      !typeDescriptor &&
+      namespacePrefix &&
+      hasRegisteredFieldNamespace(input.authoringContributions, namespacePrefix)
+    ) {
+      reportUnknownFieldPreset({
+        entityLabel: input.entityLabel,
+        namespace: namespacePrefix,
+        helperPath,
+        sourceId: input.sourceId,
+        span: input.field.typeConstructor.span,
+        diagnostics: input.diagnostics,
+      });
+      return { ok: false, alreadyReported: true };
+    }
+
+    const descriptor =
+      typeDescriptor ??
+      resolvePslTypeConstructorDescriptor({
+        call: input.field.typeConstructor,
+        authoringContributions: input.authoringContributions,
+        composedExtensions: input.composedExtensions,
+        familyId: input.familyId,
+        targetId: input.targetId,
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        unsupportedCode: 'PSL_UNSUPPORTED_FIELD_TYPE',
+        unsupportedMessage: `${input.entityLabel} type constructor "${helperPath}" is not supported in SQL PSL provider v1`,
+      });
     if (!descriptor) {
       return { ok: false, alreadyReported: true };
     }
@@ -495,7 +675,7 @@ export function lowerDefaultForField(input: {
   readonly diagnostics: ContractSourceDiagnostic[];
 }): {
   readonly defaultValue?: ColumnDefault;
-  readonly executionDefault?: ExecutionMutationDefaultValue;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases;
 } {
   const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'positional');
   const namedEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'named');
@@ -568,6 +748,17 @@ export function lowerDefaultForField(input: {
     return {};
   }
 
+  // Preset-only generators (e.g. `timestampNow`) co-register their codec through the preset descriptor, so they don't carry an `applicableCodecIds` list. Such a generator surfacing on the `@default(...)` lowering path is itself the bug — emit a diagnostic pointing the user at the correct authoring surface.
+  if (generatorDescriptor.applicableCodecIds === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+      message: `Default generator "${generatorDescriptor.id}" is not applicable to "@default(...)" lowering. Use the corresponding field preset (e.g. \`temporal.${generatorDescriptor.id === 'timestampNow' ? 'updatedAt' : generatorDescriptor.id}()\`) instead.`,
+      sourceId: input.sourceId,
+      span: expressionEntry.span,
+    });
+    return {};
+  }
+
   if (!generatorDescriptor.applicableCodecIds.includes(input.columnDescriptor.codecId)) {
     input.diagnostics.push({
       code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
@@ -578,7 +769,7 @@ export function lowerDefaultForField(input: {
     return {};
   }
 
-  return { executionDefault: lowered.value.generated };
+  return { executionDefaults: { onCreate: lowered.value.generated } };
 }
 
 export function resolveColumnDescriptor(

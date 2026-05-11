@@ -1,37 +1,36 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { codecDefinitions } from '../src/core/codecs';
+import { pgVectorColumn, pgVectorDescriptor } from '../src/core/codecs';
+import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from '../src/core/constants';
 
-// The pgvector codec authors `encode`/`decode` synchronously, but the
-// `codec()` factory in `relational-core` lifts both methods to
-// `Promise`-returning at the boundary. The tests below cast through the
-// Promise-returning shape and `await` every call so unit-level coverage
-// stays aligned with the codec contract:
-//   `Codec<Id, TTraits, TWire, TInput>` — encode/decode return Promise.
+// The pgvector codec authors `encode`/`decode` synchronously; codecs route through `Promise`-returning methods at the boundary. The tests below cast through the Promise-returning shape and `await` every call so unit-level coverage stays aligned with the codec contract: `Codec<Id, TTraits, TWire, TInput>` — encode/decode return Promise.
 type AsyncVectorCodec = {
   readonly encode: (value: number[]) => Promise<string>;
   readonly decode: (wire: string) => Promise<number[]>;
+  readonly encodeJson: (value: number[]) => JsonValue;
+  readonly decodeJson: (json: JsonValue) => number[];
 };
 
-function asAsyncCodec(): AsyncVectorCodec {
-  return codecDefinitions.vector.codec as unknown as AsyncVectorCodec;
+function asAsyncCodec(length: number): AsyncVectorCodec {
+  // pgvector's runtime codec enforces the declared dimension; tests instantiate the codec at the dimension matching their value array.
+  return pgVectorDescriptor.factory({ length })({
+    name: 'test',
+  }) as unknown as AsyncVectorCodec;
 }
 
 describe('pgvector codecs', () => {
   it(
     'has vector codec registered',
     () => {
-      const vectorDef = codecDefinitions.vector;
-      expect(vectorDef).toBeDefined();
-      expect(vectorDef.typeId).toBe('pg/vector@1');
-      expect(vectorDef.codec.targetTypes).toEqual(['vector']);
+      expect(pgVectorDescriptor.codecId).toBe('pg/vector@1');
+      expect(pgVectorDescriptor.targetTypes).toEqual(['vector']);
     },
     timeouts.default,
   );
 
   it('encodes number array to PostgreSQL vector format', async () => {
-    const vectorCodec = asAsyncCodec();
-
+    const vectorCodec = asAsyncCodec(4);
     const value = [0.1, 0.2, 0.3, 0.4];
     const encoded = await vectorCodec.encode(value);
     expect(encoded).toBe('[0.1,0.2,0.3,0.4]');
@@ -39,16 +38,14 @@ describe('pgvector codecs', () => {
   });
 
   it('decodes PostgreSQL vector format string', async () => {
-    const vectorCodec = asAsyncCodec();
-
+    const vectorCodec = asAsyncCodec(4);
     const wire = '[0.1,0.2,0.3,0.4]';
     const decoded = await vectorCodec.decode(wire);
     expect(decoded).toEqual([0.1, 0.2, 0.3, 0.4]);
   });
 
   it('round-trip encode/decode preserves values', async () => {
-    const vectorCodec = asAsyncCodec();
-
+    const vectorCodec = asAsyncCodec(5);
     const original = [0.1, 0.2, 0.3, 0.4, 0.5];
     const encoded = await vectorCodec.encode(original);
     expect(typeof encoded).toBe('string');
@@ -58,8 +55,7 @@ describe('pgvector codecs', () => {
   });
 
   it('handles empty vector', async () => {
-    const vectorCodec = asAsyncCodec();
-
+    const vectorCodec = asAsyncCodec(0);
     const original: number[] = [];
     const encoded = await vectorCodec.encode(original);
     expect(encoded).toBe('[]');
@@ -68,34 +64,144 @@ describe('pgvector codecs', () => {
   });
 
   it('rejects when encoding non-array', async () => {
-    const vectorCodec = asAsyncCodec();
-
+    const vectorCodec = asAsyncCodec(4);
     await expect(vectorCodec.encode('not an array' as unknown as number[])).rejects.toThrow(
       'Vector value must be an array of numbers',
     );
   });
 
   it('rejects when encoding array with non-numbers', async () => {
-    const vectorCodec = asAsyncCodec();
-
+    const vectorCodec = asAsyncCodec(3);
     await expect(vectorCodec.encode([1, 2, 'three'] as unknown as number[])).rejects.toThrow(
       'Vector value must contain only numbers',
     );
   });
 
   it('rejects when decoding invalid string format', async () => {
-    const vectorCodec = asAsyncCodec();
-
+    const vectorCodec = asAsyncCodec(4);
     await expect(vectorCodec.decode('not a vector format')).rejects.toThrow(
       'Invalid vector format: expected "[...]", got "not a vector format"',
     );
   });
 
   it('rejects when decoding non-string', async () => {
-    const vectorCodec = asAsyncCodec();
-
+    const vectorCodec = asAsyncCodec(4);
     await expect(vectorCodec.decode(123 as unknown as string)).rejects.toThrow(
       'Vector wire value must be a string',
     );
+  });
+
+  it('rejects encoding when value length mismatches declared dimension', async () => {
+    const vectorCodec = asAsyncCodec(3);
+    await expect(vectorCodec.encode([1, 2])).rejects.toThrow(
+      'Vector length mismatch: expected 3, got 2',
+    );
+    await expect(vectorCodec.encode([1, 2, 3, 4])).rejects.toThrow(
+      'Vector length mismatch: expected 3, got 4',
+    );
+  });
+
+  it('rejects decoding when wire length mismatches declared dimension', async () => {
+    const vectorCodec = asAsyncCodec(3);
+    await expect(vectorCodec.decode('[1,2]')).rejects.toThrow(
+      'Vector length mismatch: expected 3, got 2',
+    );
+  });
+
+  // The runtime materializes a representative codec for parameterized descriptors
+  // via `factory(undefined)(ctx)` so undimensioned `vectorColumn` columns (no
+  // `typeParams.length`) still resolve through codec encode/decode. This guards
+  // against silently regressing back to passing arrays through node-postgres,
+  // which formats them as PG array literals (`{"0.1","0.2"}`) rejected by the
+  // `vector` type.
+  it('factory(undefined) yields a length-agnostic codec (representative for undimensioned columns)', async () => {
+    const factory = pgVectorDescriptor.factory as unknown as (
+      params: undefined,
+    ) => (ctx: { name: string }) => AsyncVectorCodec;
+    const codec = factory(undefined)({ name: 'representative' });
+    expect(await codec.encode([0.1, 0.2, 0.3])).toBe('[0.1,0.2,0.3]');
+    expect(await codec.encode([1, 2, 3, 4, 5])).toBe('[1,2,3,4,5]');
+    expect(await codec.decode('[0.4,0.5]')).toEqual([0.4, 0.5]);
+  });
+
+  it('rejects decoding when the wire payload contains a non-number token', async () => {
+    const vectorCodec = asAsyncCodec(3);
+    await expect(vectorCodec.decode('[1,foo,3]')).rejects.toThrow(
+      /Invalid vector value: "foo" is not a number/,
+    );
+  });
+
+  describe('encodeJson / decodeJson', () => {
+    it('returns the value array unchanged on encodeJson when length matches', () => {
+      const codec = asAsyncCodec(3);
+      const value = [0.1, 0.2, 0.3];
+      const encoded = codec.encodeJson(value);
+      expect(encoded).toEqual(value);
+    });
+
+    it('round-trips through decodeJson back to the same array', () => {
+      const codec = asAsyncCodec(3);
+      const json = codec.encodeJson([0.1, 0.2, 0.3]);
+      expect(codec.decodeJson(json)).toEqual([0.1, 0.2, 0.3]);
+    });
+
+    it('rejects encodeJson when the value is not an array', () => {
+      const codec = asAsyncCodec(3);
+      expect(() => codec.encodeJson('nope' as unknown as number[])).toThrow(
+        'Vector value must be an array of numbers',
+      );
+    });
+
+    it('rejects decodeJson when the JSON payload is not a number array of the declared length', () => {
+      const codec = asAsyncCodec(3);
+      expect(() => codec.decodeJson([1, 2] as unknown as JsonValue)).toThrow(
+        /Vector length mismatch/,
+      );
+      expect(() => codec.decodeJson([1, 'two', 3] as unknown as JsonValue)).toThrow(
+        'Vector value must contain only numbers',
+      );
+    });
+  });
+
+  describe('pgVectorColumn helper', () => {
+    it('produces a ColumnSpec with the codec id, vector nativeType, and length typeParams', () => {
+      const spec = pgVectorColumn(1536);
+      expect(spec.codecId).toBe(VECTOR_CODEC_ID);
+      expect(spec.nativeType).toBe('vector');
+      expect(spec.typeParams).toEqual({ length: 1536 });
+    });
+
+    it('produces a codec factory that materializes a working PgVectorCodec', async () => {
+      const spec = pgVectorColumn(3);
+      const codec = spec.codecFactory({
+        name: 'embedding',
+      }) as unknown as AsyncVectorCodec;
+      expect(await codec.encode([0.1, 0.2, 0.3])).toBe('[0.1,0.2,0.3]');
+    });
+  });
+
+  describe('paramsSchema', () => {
+    const validate = (params: unknown) =>
+      pgVectorDescriptor.paramsSchema['~standard'].validate(params);
+
+    it('accepts a positive integer length within the allowed range', () => {
+      const result = validate({ length: 1536 });
+      expect('issues' in result ? result.issues : null).toBeFalsy();
+    });
+
+    it('rejects non-integer length values', () => {
+      const result = validate({ length: 1.5 });
+      expect('issues' in result && result.issues).toBeTruthy();
+    });
+
+    it('rejects length values below 1', () => {
+      const result = validate({ length: 0 });
+      expect('issues' in result && result.issues).toBeTruthy();
+    });
+
+    it('rejects length values above VECTOR_MAX_DIM', () => {
+      const result = validate({ length: VECTOR_MAX_DIM + 1 });
+      expect('issues' in result && result.issues).toBeTruthy();
+    });
   });
 });

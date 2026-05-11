@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/sql-orm-client",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "ORM client for Prisma Next — fluent, type-safe model collections",

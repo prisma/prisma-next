@@ -1,5 +1,5 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import { createMongoCodecRegistry, type MongoCodecRegistry } from '@prisma-next/mongo-codec';
+import { type MongoCodecRegistry, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it, vi } from 'vitest';
@@ -14,7 +14,7 @@ import type { MongoMiddleware } from '../src/mongo-middleware';
 import { createMongoRuntime } from '../src/mongo-runtime';
 
 function makeContext(adapter: MongoAdapter): MongoExecutionContext {
-  const codecs: MongoCodecRegistry = createMongoCodecRegistry();
+  const codecs: MongoCodecRegistry = newMongoCodecRegistry();
   const adapterInstance: MongoRuntimeAdapterInstance<'mongo'> = {
     familyId: 'mongo',
     targetId: 'mongo',
@@ -26,7 +26,7 @@ function makeContext(adapter: MongoAdapter): MongoExecutionContext {
     familyId: 'mongo',
     targetId: 'mongo',
     version: '0.0.1',
-    codecs: () => createMongoCodecRegistry(),
+    codecs: () => newMongoCodecRegistry(),
     create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
   };
   const adapterDescriptor: MongoRuntimeAdapterDescriptor<'mongo'> = {
@@ -35,7 +35,7 @@ function makeContext(adapter: MongoAdapter): MongoExecutionContext {
     familyId: 'mongo',
     targetId: 'mongo',
     version: '0.0.1',
-    codecs: () => createMongoCodecRegistry(),
+    codecs: () => newMongoCodecRegistry(),
     create: () => adapterInstance,
   };
   const stack: MongoExecutionStack<'mongo'> = {
@@ -324,6 +324,34 @@ describe('MongoRuntime middleware lifecycle', () => {
 
     expect(logWorks).toBe(true);
   });
+
+  it('exposes a working contentHash on the middleware context', async () => {
+    const observedKeys: string[] = [];
+    const middleware: MongoMiddleware = {
+      name: 'content-hash-tester',
+      async beforeExecute(plan, ctx) {
+        observedKeys.push(await ctx.contentHash(plan));
+      },
+    };
+
+    const adapter = createMockAdapter();
+    const runtime = createMongoRuntime({
+      context: makeContext(adapter),
+      driver: createMockDriver([{ _id: '1' }, { _id: '2' }, { _id: '3' }]),
+      middleware: [middleware],
+    });
+
+    for await (const _row of runtime.execute(createPlan())) {
+      void _row;
+    }
+    for await (const _row of runtime.execute(createPlan())) {
+      void _row;
+    }
+
+    expect(observedKeys).toHaveLength(2);
+    expect(observedKeys[0]).toMatch(/^sha512:[0-9a-f]{128}$/);
+    expect(observedKeys[0]).toBe(observedKeys[1]);
+  });
 });
 
 describe('MongoRuntime middleware compatibility validation', () => {
@@ -350,9 +378,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
   });
 
   it('rejects a SQL middleware with a clear error', () => {
-    // Intentionally misconfigured to verify the runtime rejects mismatched familyId.
-    // The static type narrows familyId to 'mongo' | undefined, so we cast to bypass
-    // the type check and exercise the runtime path.
+    // Intentionally misconfigured to verify the runtime rejects mismatched familyId. The static type narrows familyId to 'mongo' | undefined, so we cast to bypass the type check and exercise the runtime path.
     const middleware = {
       name: 'sql-lints',
       familyId: 'sql' as const,

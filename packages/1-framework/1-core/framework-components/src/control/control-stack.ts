@@ -1,10 +1,15 @@
-import type { CodecLookup } from '../shared/codec-types';
+import type { Codec } from '../shared/codec';
+import type { CodecLookup, CodecMeta } from '../shared/codec-types';
 import type {
   AuthoringContributions,
   AuthoringFieldNamespace,
-  AuthoringFieldPresetDescriptor,
-  AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
+} from '../shared/framework-authoring';
+import {
+  assertNoCrossRegistryCollisions,
+  isAuthoringFieldPresetDescriptor,
+  isAuthoringTypeConstructorDescriptor,
+  mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
 import type { ComponentMetadata } from '../shared/framework-components';
 import type {
@@ -153,70 +158,6 @@ export function extractComponentIds(
   return ids;
 }
 
-function isTypeConstructorDescriptor(value: unknown): value is AuthoringTypeConstructorDescriptor {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { kind?: unknown }).kind === 'typeConstructor'
-  );
-}
-
-function isFieldPresetDescriptor(value: unknown): value is AuthoringFieldPresetDescriptor {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { kind?: unknown }).kind === 'fieldPreset'
-  );
-}
-
-function mergeAuthoringNamespaces(
-  target: Record<string, unknown>,
-  source: Record<string, unknown>,
-  path: readonly string[],
-  leafGuard: (value: unknown) => boolean,
-  label: string,
-): void {
-  const assertSafePath = (currentPath: readonly string[]) => {
-    const blockedSegment = currentPath.find(
-      (segment) => segment === '__proto__' || segment === 'constructor' || segment === 'prototype',
-    );
-    if (blockedSegment) {
-      throw new Error(
-        `Invalid authoring ${label} helper "${currentPath.join('.')}". Helper path segments must not use "${blockedSegment}".`,
-      );
-    }
-  };
-
-  for (const [key, sourceValue] of Object.entries(source)) {
-    const currentPath = [...path, key];
-    assertSafePath(currentPath);
-    const hasExistingValue = Object.hasOwn(target, key);
-    const existingValue = hasExistingValue ? target[key] : undefined;
-
-    if (!hasExistingValue) {
-      target[key] = sourceValue;
-      continue;
-    }
-
-    const existingIsLeaf = leafGuard(existingValue);
-    const sourceIsLeaf = leafGuard(sourceValue);
-
-    if (existingIsLeaf || sourceIsLeaf) {
-      throw new Error(
-        `Duplicate authoring ${label} helper "${currentPath.join('.')}". Descriptor contributions must be unique across composed components.`,
-      );
-    }
-
-    mergeAuthoringNamespaces(
-      existingValue as Record<string, unknown>,
-      sourceValue as Record<string, unknown>,
-      currentPath,
-      leafGuard,
-      label,
-    );
-  }
-}
-
 export function assembleAuthoringContributions(
   descriptors: ReadonlyArray<{ readonly authoring?: AuthoringContributions }>,
 ): AssembledAuthoringContributions {
@@ -229,7 +170,7 @@ export function assembleAuthoringContributions(
         field,
         descriptor.authoring.field,
         [],
-        isFieldPresetDescriptor,
+        isAuthoringFieldPresetDescriptor,
         'field',
       );
     }
@@ -240,14 +181,18 @@ export function assembleAuthoringContributions(
       type,
       descriptor.authoring.type,
       [],
-      isTypeConstructorDescriptor,
+      isAuthoringTypeConstructorDescriptor,
       'type',
     );
   }
 
+  const fieldNamespace = field as AuthoringFieldNamespace;
+  const typeNamespace = type as AuthoringTypeNamespace;
+  assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace);
+
   return {
-    field: field as AuthoringFieldNamespace,
-    type: type as AuthoringTypeNamespace,
+    field: fieldNamespace,
+    type: typeNamespace,
   };
 }
 
@@ -326,27 +271,65 @@ export function assembleControlMutationDefaults(
 }
 
 export function extractCodecLookup(
-  descriptors: ReadonlyArray<Pick<ComponentMetadata & { id?: string }, 'types' | 'id'>>,
+  descriptors: ReadonlyArray<Pick<ComponentMetadata & { id: string }, 'types' | 'id'>>,
 ): CodecLookup {
-  const byId = new Map<string, import('../shared/codec-types').Codec>();
+  const byId = new Map<string, Codec>();
+  const targetTypesById = new Map<string, readonly string[]>();
+  const metaById = new Map<string, CodecMeta>();
+  const renderersById = new Map<string, (params: Record<string, unknown>) => string | undefined>();
   const owners = new Map<string, string>();
   for (const descriptor of descriptors) {
-    const codecInstances = descriptor.types?.codecTypes?.codecInstances;
-    if (!codecInstances) continue;
-    const descriptorId = descriptor.id ?? '<unknown>';
-    for (const codec of codecInstances) {
+    const codecTypes = descriptor.types?.codecTypes;
+    const descriptorId = descriptor.id;
+    // Descriptor-side metadata is the single source of truth for `targetTypes` / `meta` / `renderOutputType`. Every contributor ships a `codecDescriptors` list on `types.codecTypes`.
+    for (const codecDescriptor of codecTypes?.codecDescriptors ?? []) {
       assertUniqueCodecOwner({
-        codecId: codec.id,
+        codecId: codecDescriptor.codecId,
         owners,
         descriptorId,
-        entityLabel: 'codec instance',
-        entityOwnershipLabel: 'codec instance provider',
+        entityLabel: 'codec descriptor',
+        entityOwnershipLabel: 'codec descriptor provider',
       });
-      owners.set(codec.id, descriptorId);
-      byId.set(codec.id, codec);
+      owners.set(codecDescriptor.codecId, descriptorId);
+      if (Array.isArray(codecDescriptor.targetTypes)) {
+        targetTypesById.set(codecDescriptor.codecId, codecDescriptor.targetTypes);
+      }
+      if (codecDescriptor.meta !== undefined) {
+        metaById.set(codecDescriptor.codecId, codecDescriptor.meta);
+      }
+      if (typeof codecDescriptor.renderOutputType === 'function') {
+        renderersById.set(codecDescriptor.codecId, codecDescriptor.renderOutputType);
+      }
+      // Materialize a representative `Codec` instance for `byId.get()` so consumers reading the lookup's instance side (e.g. SQL renderer's cast-policy lookup, or the contract emitter's literal-default `encodeJson` resolver) keep finding the codec.
+      //
+      // Two cohorts:
+      // - Non-parameterized descriptors: factory must succeed; any throw is a real bug and we let it propagate (no silent try/catch).
+      // - Parameterized descriptors: try with empty params. Many parameterized codecs treat params as advisory (e.g. `pg/timestamptz@1` whose precision is rendered into the `nativeType` only and never read by the runtime codec), so an empty-params construction yields a usable representative for id-keyed lookups (e.g. emit-time literal-default encoding). Codecs whose factory genuinely requires params (e.g. `pg/vector@1` threading `length` into the runtime codec) will throw; for those, per-column instances are materialized at runtime by `buildContractCodecRegistry` and the id-keyed lookup miss is correct (the column-aware path resolves them).
+      if (!byId.has(codecDescriptor.codecId)) {
+        if (codecDescriptor.isParameterized) {
+          try {
+            const representative = codecDescriptor.factory({} as never)({
+              name: `<lookup:${codecDescriptor.codecId}>`,
+            } as Parameters<ReturnType<typeof codecDescriptor.factory>>[0]);
+            byId.set(codecDescriptor.codecId, representative);
+          } catch {
+            // Factory requires concrete params; skip representative materialization. Per-column instances are built at runtime; id-keyed lookup miss is the correct outcome here.
+          }
+        } else {
+          const representative = codecDescriptor.factory(undefined as never)({
+            name: `<lookup:${codecDescriptor.codecId}>`,
+          } as Parameters<ReturnType<typeof codecDescriptor.factory>>[0]);
+          byId.set(codecDescriptor.codecId, representative);
+        }
+      }
     }
   }
-  return { get: (id) => byId.get(id) };
+  return {
+    get: (id) => byId.get(id),
+    targetTypesFor: (id) => targetTypesById.get(id),
+    metaFor: (id) => metaById.get(id),
+    renderOutputTypeFor: (id, params) => renderersById.get(id)?.(params),
+  };
 }
 
 export function validateScalarTypeCodecIds(

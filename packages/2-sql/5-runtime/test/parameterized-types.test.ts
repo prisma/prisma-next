@@ -1,9 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
+import type {
+  CodecDescriptor,
+  CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
@@ -12,25 +14,22 @@ import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeExtensionDescriptor,
 } from '../src/sql-context';
+import { defineTestCodec } from './test-codec';
 import { createStubAdapter, createTestContext } from './utils';
 
 function vectorCodecInstance(meta?: Record<string, unknown>): Codec {
-  const baseCodec = codec({
+  const baseCodec = defineTestCodec({
     typeId: 'pg/vector@1',
-    targetTypes: ['vector'],
     encode: (v: number[]) => v,
     decode: (w: number[]) => w,
   });
   if (!meta) return baseCodec;
-  // Attach SQL-side `meta` on the resolved codec; the SQL `Codec` shape
-  // declares `meta?: CodecMeta` so spreading the optional onto the base
-  // requires conditional inclusion under `exactOptionalPropertyTypes`.
-  return { ...baseCodec, meta: meta as NonNullable<Codec['meta']> };
+  // The narrow `Codec` shape is conversion-only (TML-2357). The `meta` here is a test-side sentinel attached to the codec object so a downstream assertion can verify that the runtime materialization path threads the *exact same instance* the factory returned (via `toBe(taggedCodec)`); it is intentionally not part of the codec's declared shape. Cast through `unknown` to keep the augmentation visible to the assertion
+  // without re-introducing a `meta` slot.
+  return { ...baseCodec, meta } as unknown as Codec;
 }
 
-// =============================================================================
-// Test helpers
-// =============================================================================
+// ============================================================================= Test helpers =============================================================================
 
 function createParamTypesTestContract(
   options?: Partial<{
@@ -74,9 +73,7 @@ function createParamTypesTestContract(
   };
 }
 
-// =============================================================================
-// Tests: Parameterized type validation
-// =============================================================================
+// ============================================================================= Tests: Parameterized type validation =============================================================================
 
 describe('parameterized types', () => {
   describe('storage.types validation', () => {
@@ -121,18 +118,16 @@ describe('parameterized types', () => {
       paramsSchema?: Type<{ length: number }>;
     }): SqlRuntimeExtensionDescriptor<'postgres'> {
       const sharedCodec = vectorCodecInstance();
-      const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
+      const parameterizedDescriptors: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
         {
           codecId: 'pg/vector@1',
           traits: [],
           targetTypes: ['vector'],
           paramsSchema: options?.paramsSchema ?? vectorParamsSchema,
+          isParameterized: true,
           factory: (_params) => (_ctx) => sharedCodec,
         },
       ];
-
-      const registry = createCodecRegistry();
-      registry.register(sharedCodec);
 
       return {
         kind: 'extension' as const,
@@ -140,8 +135,7 @@ describe('parameterized types', () => {
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => registry,
-        parameterizedCodecs: () => parameterizedCodecs,
+        codecs: () => parameterizedDescriptors as unknown as ReadonlyArray<CodecDescriptor>,
         create() {
           return {
             familyId: 'sql' as const,
@@ -230,12 +224,7 @@ describe('parameterized types', () => {
     });
   });
 
-  // Phase B note: `init` was the predecessor hook returning a helper. The
-  // unified descriptor uses `factory: (P) => (CodecInstanceContext) => Codec`; per-instance
-  // state lives in the resolved codec returned by the factory. The
-  // `TypeHelperRegistry` (`context.types`) carries the resolved codec for
-  // every typed instance — or, for codec ids without a parameterized
-  // descriptor, the raw `StorageTypeInstance` for typeParams metadata.
+  // The unified descriptor uses `factory: (P) => (CodecInstanceContext) => Codec`; per-instance state lives in the resolved codec returned by the factory. The `TypeHelperRegistry` (`context.types`) carries the resolved codec for every typed instance — or, for codec ids without a parameterized descriptor, the raw `StorageTypeInstance` for typeParams metadata.
   describe('factory for type helpers', () => {
     function createPgVectorExt(opts?: {
       paramsSchema?: Type<{ length: number }>;
@@ -248,25 +237,23 @@ describe('parameterized types', () => {
           length: 'number',
         });
       const factory = opts?.factory ?? ((_params: { length: number }) => () => sharedCodec);
-      const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
+      const parameterizedDescriptors: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
         {
           codecId: 'pg/vector@1',
           traits: [],
           targetTypes: ['vector'],
           paramsSchema,
+          isParameterized: true,
           factory,
         },
       ];
-      const registry = createCodecRegistry();
-      registry.register(sharedCodec);
       return {
         kind: 'extension' as const,
         id: 'pgvector',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => registry,
-        parameterizedCodecs: () => parameterizedCodecs,
+        codecs: () => parameterizedDescriptors as unknown as ReadonlyArray<CodecDescriptor>,
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },
@@ -293,18 +280,20 @@ describe('parameterized types', () => {
       });
 
       expect(context.types['Vector1536']).toBe(taggedCodec);
+      // The factory returned the `taggedCodec` instance with its test-side `meta` sentinel; the runtime materialization path preserves the exact instance, so the sentinel is still there.
       expect(
-        (context.types['Vector1536'] as Codec & { meta: { dimensions: number } }).meta?.dimensions,
+        (
+          context.types['Vector1536'] as unknown as {
+            meta?: { dimensions?: number };
+          }
+        ).meta?.dimensions,
       ).toBe(1536);
     });
 
     it('threads ctx (name + usedAt) through to the factory', () => {
       const observedCtxs: SqlCodecInstanceContext[] = [];
       const sharedCodec = vectorCodecInstance();
-      // SQL extensions that read `usedAt` author against the SQL-extended
-      // ctx; the descriptor's factory slot is family-agnostic, so we cast
-      // through the base. This mirrors what production SQL extensions do
-      // (see `pgvector/src/exports/runtime.ts`'s family-agnostic cast).
+      // SQL extensions that read `usedAt` author against the SQL-extended ctx; the descriptor's factory slot is family-agnostic, so we cast through the base. This mirrors what production SQL extensions do (see `pgvector/src/exports/runtime.ts`'s family-agnostic cast).
       const sqlFactory = (_params: { length: number }) => (ctx: SqlCodecInstanceContext) => {
         observedCtxs.push(ctx);
         return sharedCodec;
@@ -337,15 +326,14 @@ describe('parameterized types', () => {
         extensionPacks: [extensionDescriptor],
       });
 
-      expect(observedCtxs[0]?.name).toBe('Vector1536');
-      expect(observedCtxs[0]?.usedAt).toEqual([{ table: 'test', column: 'embedding' }]);
+      // Skip the representative-materialization call sql-context.ts makes per descriptor for the legacy `forCodecId` fallback (named `<shared:pg/vector@1>` with empty `usedAt`); locate the per-column factory call by the type-instance ctx the test contract declares.
+      const perColumnCtx = observedCtxs.find((ctx) => ctx.name === 'Vector1536');
+      expect(perColumnCtx?.name).toBe('Vector1536');
+      expect(perColumnCtx?.usedAt).toEqual([{ table: 'test', column: 'embedding' }]);
     });
 
     it('stores full type instance for codec ids without a parameterized descriptor', () => {
-      // No extension contributes a parameterized descriptor for
-      // `pg/vector@1`. The named instance can't be materialized; the
-      // helper falls back to the raw type instance for callers that need
-      // typeParams metadata.
+      // No extension contributes a parameterized descriptor for `pg/vector@1`. The named instance can't be materialized; the helper falls back to the raw type instance for callers that need typeParams metadata.
       const contract = createParamTypesTestContract({
         types: {
           Vector1536: {
@@ -369,25 +357,23 @@ describe('parameterized types', () => {
   describe('column typeParams validation', () => {
     function createBasicVectorExt(): SqlRuntimeExtensionDescriptor<'postgres'> {
       const sharedCodec = vectorCodecInstance();
-      const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
+      const parameterizedDescriptors: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
         {
           codecId: 'pg/vector@1',
           traits: [],
           targetTypes: ['vector'],
           paramsSchema: arktype({ length: 'number' }),
+          isParameterized: true,
           factory: (_params) => () => sharedCodec,
         },
       ];
-      const registry = createCodecRegistry();
-      registry.register(sharedCodec);
       return {
         kind: 'extension' as const,
         id: 'pgvector',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => registry,
-        parameterizedCodecs: () => parameterizedCodecs,
+        codecs: () => parameterizedDescriptors as unknown as ReadonlyArray<CodecDescriptor>,
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },
@@ -450,22 +436,24 @@ describe('parameterized types', () => {
   });
 
   describe('duplicate codec descriptor detection', () => {
-    it('throws RUNTIME.DUPLICATE_PARAMETERIZED_CODEC when multiple extensions provide same codecId', () => {
+    it('throws RUNTIME.DUPLICATE_CODEC when multiple extensions provide same codecId', () => {
       const vectorParamsSchema = arktype({
         length: 'number',
       });
 
       function createVectorExtension(id: string): SqlRuntimeExtensionDescriptor<'postgres'> {
         const sharedCodec = vectorCodecInstance();
-        const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
-          {
-            codecId: 'pg/vector@1',
-            traits: [],
-            targetTypes: ['vector'],
-            paramsSchema: vectorParamsSchema,
-            factory: (_params) => () => sharedCodec,
-          },
-        ];
+        const parameterizedDescriptors: RuntimeParameterizedCodecDescriptor<{ length: number }>[] =
+          [
+            {
+              codecId: 'pg/vector@1',
+              traits: [],
+              targetTypes: ['vector'],
+              paramsSchema: vectorParamsSchema,
+              isParameterized: true,
+              factory: (_params) => () => sharedCodec,
+            },
+          ];
 
         return {
           kind: 'extension' as const,
@@ -473,8 +461,7 @@ describe('parameterized types', () => {
           version: '0.0.1',
           familyId: 'sql' as const,
           targetId: 'postgres' as const,
-          codecs: () => createCodecRegistry(),
-          parameterizedCodecs: () => parameterizedCodecs,
+          codecs: () => parameterizedDescriptors as unknown as ReadonlyArray<CodecDescriptor>,
           create() {
             return {
               familyId: 'sql' as const,
@@ -492,7 +479,7 @@ describe('parameterized types', () => {
         }),
       ).toThrow(
         expect.objectContaining({
-          code: 'RUNTIME.DUPLICATE_PARAMETERIZED_CODEC',
+          code: 'RUNTIME.DUPLICATE_CODEC',
           category: 'RUNTIME',
           severity: 'error',
           details: {

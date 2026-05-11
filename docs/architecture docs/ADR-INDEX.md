@@ -70,6 +70,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 203 | Trait-targeted operation arguments | Extends operation argument specs with `traits` to accept any codec carrying the required capability, alongside exact `codecId` targeting | [ADR 203 - Trait-targeted operation arguments.md](adrs/ADR%20203%20-%20Trait-targeted%20operation%20arguments.md) |
 | 204 | Single-tier runtime | Collapses `runtime-executor` into `framework-components`; family runtimes (`@prisma-next/sql-runtime`, `@prisma-next/mongo-runtime`) extend `RuntimeCore` directly via the `/runtime` subpath. Partially supersedes ADR 140's "Runtime Separation" two-tier model. | [ADR 204 - Single-tier runtime.md](adrs/ADR%20204%20-%20Single-tier%20runtime.md) |
 | 206 | Operations as TypeScript functions | Operations are authored as real TS functions — signature is the type surface, body builds the AST — with a minimal `self` dispatch hint for ORM column-helper reachability | [ADR 206 - Operations as TypeScript functions.md](adrs/ADR%20206%20-%20Operations%20as%20TypeScript%20functions.md) |
+| 210 | Prepared Statements: Author Surface and Driver SPI | Adds `runtime.prepare(declaration, callback)` (re-exposed on each DB facade as `db.prepare(...)`) and an `executePrepared(req)` driver SPI; lazy driver-allocated opaque handle, no global cache, cache lifetime bounded by user reference and connection. Family-level: per-driver caching strategies are out of scope here. | [ADR 210 - Prepared Statements - Author Surface and Driver SPI.md](adrs/ADR%20210%20-%20Prepared%20Statements%20-%20Author%20Surface%20and%20Driver%20SPI.md) |
 
 ## Migration System
 
@@ -122,6 +123,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 |-----|-------|-------------|------|
 | 065 | Adapter capability schema & negotiation v1 | Defines adapter capability schema and negotiation protocol | [ADR 065 - Adapter capability schema & negotiation v1.md](adrs/ADR%20065%20-%20Adapter%20capability%20schema%20&%20negotiation%20v1.md) |
 | 068 | Error mapping to RuntimeError | Establishes stable mapping from engine/driver errors to RuntimeError envelope | [ADR 068 - Error mapping to RuntimeError.md](adrs/ADR%20068%20-%20Error%20mapping%20to%20RuntimeError.md) |
+| 207 | Per-environment facade asymmetry | Records why `postgres()` (long-lived) and `postgresServerless()` (per-request) ship asymmetric runtime-bound surfaces — same authoring surface, different lifecycle ergonomics — and rejects AsyncLocalStorage / single-facade / per-product alternatives | [ADR 207 - Per-environment facade asymmetry.md](adrs/ADR%20207%20-%20Per-environment%20facade%20asymmetry.md) |
 
 ## Development & Tooling
 

@@ -176,7 +176,8 @@ See `docs/architecture docs/subsystems/`:
 Setup, config, and snapshot management live in [Cursor Cloud Agents](docs/onboarding/Cursor-Cloud-Agents.md). When running as a cloud agent, follow these operational reminders in addition to the rest of this file:
 
 - **Sanity check first**: run `pnpm test:packages` before broader suites. It's the cheapest end-to-end signal that the workspace is healthy.
-- **Heavier suites need infra**: `pnpm test:integration` and `pnpm test:e2e` require outside resources (Postgres, etc.). Confirm credentials are present via dashboard secrets before invoking.
+- **Heavier suites are self-contained**: `pnpm test:integration` and `pnpm test:e2e` use PGlite (embedded Postgres via `@prisma/dev`) and `mongodb-memory-server` — no external database required. They run out of the box after `pnpm install && pnpm build`.
+- **Corepack interactive prompt**: Corepack may prompt for confirmation when downloading pnpm for the first time. Set `COREPACK_ENABLE_AUTO_PIN=0` to avoid interactive prompts in non-interactive environments.
 - **Don't put secrets in the repo**: configure them in the Cursor dashboard (Cloud Agents → Secrets) and mark sensitive ones Redacted.
 - **Lockfile discipline**: if you run `pnpm add`/`pnpm update`, commit `pnpm-lock.yaml` alongside the `package.json` change or the next boot fails with `ERR_PNPM_OUTDATED_LOCKFILE`.
 - **Layering**: treat `pnpm lint:deps` failures as errors to fix, never to bypass.

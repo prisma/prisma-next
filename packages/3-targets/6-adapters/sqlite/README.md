@@ -187,7 +187,7 @@ DELETE FROM "user" WHERE "user"."id" = ? RETURNING "user"."id", "user"."email"
 
 ## Exports
 
-- `./codec-types`: SQLite codec types (`CodecTypes`, `JsonValue`, `dataTypes`)
+- `./codec-types`: SQLite codec types (`CodecTypes`, `JsonValue`)
 - `./column-types`: Column type descriptors (`textColumn`, `integerColumn`, `realColumn`, `blobColumn`, `datetimeColumn`, `jsonColumn`, `bigintColumn`)
 - `./types`: SQLite-specific types
 - `./control`: Control-plane entry point (stubbed for future migration support)

@@ -1,10 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
+  ContractSpace,
   ControlAdapterDescriptor,
   ControlDriverInstance,
   ControlExtensionDescriptor,
-  DataTransformOperation,
   MigratableTargetDescriptor,
   MigrationOperationPolicy,
   MigrationPlan,
@@ -18,7 +18,12 @@ import type {
   OperationContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
-import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type {
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
@@ -83,6 +88,41 @@ export interface ResolveIdentityValueInput {
   readonly typeParams?: Record<string, unknown>;
 }
 
+/**
+ * Per-field lifecycle event a codec hook can react to.
+ *
+ * Fired during app-space migration emission as the SQL family diffs the
+ * prior contract against the new contract.
+ *
+ * - `'added'`     — the field is present in the new contract but not the prior.
+ * - `'dropped'`   — the field is present in the prior contract but not the new.
+ * - `'altered'`   — the field is present in both and any property other than
+ *                   `codecId` differs. Codec-id changes are a v1 non-goal:
+ *                   when only `codecId` differs, no `'altered'` event fires.
+ */
+export type FieldEvent = 'added' | 'dropped' | 'altered';
+
+/**
+ * Context passed to {@link CodecControlHooks.onFieldEvent}.
+ *
+ * `tableName` and `fieldName` are always populated; `priorTable` /
+ * `priorField` carry the prior contract's view of the table and column
+ * (present for `'dropped'` and `'altered'`); `newTable` / `newField`
+ * carry the new contract's view (present for `'added'` and `'altered'`).
+ *
+ * The hook only ever receives app-space contract IR — extension-space
+ * fields are scoped out by the API: the hook is wired at the
+ * application emitter only.
+ */
+export interface FieldEventContext {
+  readonly tableName: string;
+  readonly fieldName: string;
+  readonly priorTable?: StorageTable;
+  readonly newTable?: StorageTable;
+  readonly priorField?: StorageColumn;
+  readonly newField?: StorageColumn;
+}
+
 export interface CodecControlHooks<TTargetDetails = unknown> {
   planTypeOperations?: (options: {
     readonly typeName: string;
@@ -123,12 +163,41 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
    * - undefined: no opinion; planner may use built-in fallbacks
    */
   resolveIdentityValue?: (input: ResolveIdentityValueInput) => string | null | undefined;
+  /**
+   * Reacts to per-field added / dropped / altered events as the app-space
+   * emitter diffs the prior contract against the new contract. Returned
+   * ops are inlined into the app-space migration's `ops.json` alongside
+   * the user's structural ops.
+   *
+   * Synchronous. Each returned op must carry its own `invariantId`. Hooks
+   * are dispatched per `(table, field)` based on the field's `codecId`
+   * (the new field's codec for `'added'` / `'altered'`; the prior field's
+   * codec for `'dropped'`).
+   */
+  onFieldEvent?: (
+    event: FieldEvent,
+    ctx: FieldEventContext,
+  ) => readonly SqlMigrationPlanOperation<TTargetDetails>[];
 }
 
 export interface SqlControlExtensionDescriptor<TTargetId extends string>
   extends ControlExtensionDescriptor<'sql', TTargetId> {
   readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
   readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
+  /**
+   * Schema-contributing extensions opt into the per-space planner / runner /
+   * verifier by setting this field. Extensions without it are codec-only or
+   * query-ops-only — today's behaviour preserved.
+   *
+   * The shape comes from `@prisma-next/framework-components/control`
+   * (`ContractSpace`) — contract-space identity is a framework concept,
+   * not a SQL-specific one. The SQL family specialises the generic to
+   * `Contract<SqlStorage>` so descriptor authors continue to see a
+   * typed contract value.
+   *
+   * @see specs/framework-mechanism.spec.md § 1.
+   */
+  readonly contractSpace?: ContractSpace<Contract<SqlStorage>>;
 }
 
 export interface SqlControlAdapterDescriptor<TTargetId extends string>
@@ -139,6 +208,15 @@ export interface SqlControlAdapterDescriptor<TTargetId extends string>
 export interface SqlMigrationPlanOperationStep {
   readonly description: string;
   readonly sql: string;
+  /**
+   * Optional parameter values bound at execution time. The runner forwards
+   * these to `driver.query(sql, params ?? [])`, so step authors can use
+   * placeholder syntax (`$1`, `$2`, …) instead of inlining literals into
+   * the SQL string. Reuses the driver's parameter binder rather than
+   * rolling per-target literal serialization for every type the planner
+   * may emit.
+   */
+  readonly params?: readonly unknown[];
   readonly meta?: AnyRecord;
 }
 
@@ -168,25 +246,27 @@ export interface SqlMigrationPlanOperation<TTargetDetails> extends MigrationPlan
   readonly meta?: AnyRecord;
 }
 
-/**
- * Union of all operation shapes a SQL-family migration may emit: schema-facing
- * `SqlMigrationPlanOperation`s and family-agnostic `DataTransformOperation`s.
- *
- * Mirrors `AnyMongoMigrationOperation` in shape — the runner already handles
- * both branches via `isDataTransformOperation`, and authored `migration.ts`
- * files must be able to intermix `dataTransform(endContract, …)` calls with
- * DDL factory calls (e.g. `setNotNull(…)`) in a single `operations` array.
- */
-export type AnySqlMigrationOperation<TTargetDetails> =
-  | SqlMigrationPlanOperation<TTargetDetails>
-  | DataTransformOperation;
-
 export interface SqlMigrationPlanContractInfo {
   readonly storageHash: string;
   readonly profileHash?: string;
 }
 
 export interface SqlMigrationPlan<TTargetDetails> extends MigrationPlan {
+  /**
+   * Contract space this plan applies to. The runner uses this to key the
+   * `prisma_contract.marker` row it writes/reads (`space = <spaceId>`),
+   * so per-extension plans hit per-extension marker rows instead of all
+   * collapsing onto the app's row.
+   *
+   * App-plan callers pass `APP_SPACE_ID` (`'app'`); per-extension plans
+   * pass the extension's space id. Required at every call site so the
+   * type system surfaces every place that needs to thread the value
+   * (rather than letting an `?? APP_SPACE_ID` fall-through silently
+   * collapse multi-space markers onto the `'app'` row).
+   *
+   * @see specs/framework-mechanism.spec.md § 2.
+   */
+  readonly spaceId: string;
   /**
    * Origin contract identity that the plan expects the database to currently be at.
    * If omitted or null, the runner skips origin validation entirely.
@@ -252,6 +332,14 @@ export interface SqlMigrationPlannerPlanOptions {
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
   /**
+   * Contract space the plan applies to. The planner stamps this onto
+   * the produced {@link SqlMigrationPlan.spaceId} so the runner keys
+   * the marker row by the right space. App-plan callers pass
+   * `APP_SPACE_ID`; per-extension callers pass the extension's space
+   * id.
+   */
+  readonly spaceId: string;
+  /**
    * The "from" contract (state the planner assumes the database starts at),
    * or `null` for reconciliation flows that have no prior contract.
    *
@@ -288,6 +376,14 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
   readonly plan: SqlMigrationPlan<TTargetDetails>;
   readonly driver: ControlDriverInstance<'sql', string>;
   /**
+   * Logical contract space this plan applies to. When omitted the
+   * runner derives the space from {@link SqlMigrationPlan.spaceId};
+   * when supplied, the runner asserts it matches `plan.spaceId` so a
+   * caller cannot accidentally write the marker row for a different
+   * space than the plan was produced for.
+   */
+  readonly space?: string;
+  /**
    * Destination contract IR.
    * Must correspond to `plan.destination` and is used for schema verification and marker/ledger writes.
    */
@@ -316,6 +412,7 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
 
 export type SqlMigrationRunnerErrorCode =
   | 'DESTINATION_CONTRACT_MISMATCH'
+  | 'LEGACY_MARKER_SHAPE'
   | 'MARKER_ORIGIN_MISMATCH'
   | 'POLICY_VIOLATION'
   | 'PRECHECK_FAILED'
@@ -337,10 +434,63 @@ export type SqlMigrationRunnerResult = Result<
 >;
 
 export interface SqlMigrationRunner<TTargetDetails> {
+  /**
+   * Apply a single migration plan, opening and managing its own
+   * transaction (and any target-specific connection-level setup, e.g.
+   * SQLite's `PRAGMA foreign_keys` toggle). Existing single-space
+   * callers route through here.
+   */
   execute(
     options: SqlMigrationRunnerExecuteOptions<TTargetDetails>,
   ): Promise<SqlMigrationRunnerResult>;
+
+  /**
+   * Apply a single migration plan against an already-open connection
+   * **without** opening a transaction. The caller is responsible for
+   * wrapping the call (and any siblings) in `BEGIN` / `COMMIT` /
+   * `ROLLBACK`. Used by the per-space runner wiring to fan out across
+   * contract spaces inside one outer transaction so a mid-apply
+   * failure rolls back every space's writes.
+   *
+   * Idempotent control-table setup (`prisma_contract.*`) and marker
+   * writes use `options.space` to address the per-space marker row.
+   */
+  executeOnConnection(
+    options: SqlMigrationRunnerExecuteOptions<TTargetDetails>,
+  ): Promise<SqlMigrationRunnerResult>;
+
+  /**
+   * Apply per-space plans across multiple contract spaces inside a
+   * single outer transaction. The caller orders the input list
+   * (typically via the aggregate planner's `applyOrder`: extensions
+   * alphabetical, then app); the runner is responsible for opening
+   * / committing the outer
+   * transaction (and any target-specific connection-level setup such
+   * as the SQLite FK pragma toggle). A failure on any space rolls
+   * back every space's writes.
+   *
+   * Each space's `SqlMigrationRunnerExecuteOptions` must reference the
+   * same `driver` (the connection the outer transaction is open on).
+   * Per-space marker writes use `options.space` to address the row.
+   */
+  executeAcrossSpaces(options: {
+    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly perSpaceOptions: ReadonlyArray<SqlMigrationRunnerExecuteOptions<TTargetDetails>>;
+  }): Promise<MultiSpaceRunnerResult>;
 }
+
+export interface MultiSpaceRunnerSuccessValue {
+  readonly perSpaceResults: ReadonlyArray<{
+    readonly space: string;
+    readonly value: SqlMigrationRunnerSuccessValue;
+  }>;
+}
+
+export interface MultiSpaceRunnerFailure extends SqlMigrationRunnerFailure {
+  readonly failingSpace: string;
+}
+
+export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiSpaceRunnerFailure>;
 
 export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDetails>
   extends MigratableTargetDescriptor<'sql', TTargetId, SqlControlFamilyInstance> {
@@ -351,6 +501,10 @@ export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDet
 
 export interface CreateSqlMigrationPlanOptions<TTargetDetails> {
   readonly targetId: string;
+  /**
+   * Contract space this plan applies to. Mirrors {@link SqlMigrationPlan.spaceId}.
+   */
+  readonly spaceId: string;
   readonly origin?: SqlMigrationPlanContractInfo | null;
   readonly destination: SqlMigrationPlanContractInfo;
   readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];

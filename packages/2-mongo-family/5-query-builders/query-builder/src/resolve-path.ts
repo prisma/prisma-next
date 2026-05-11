@@ -24,6 +24,60 @@ export interface ObjectField<N extends NestedDocShape> extends DocField {
 }
 
 /**
+ * Marker `DocField` variant representing "an array of foreign-model rows"
+ * — the result of a `$lookup` whose foreign side was selected via the
+ * typed `col` accessor. `ModelName` is the literal foreign model name
+ * (e.g. `'User'`), preserved in the type so `ResolveRow` can resolve the
+ * field to `ResolveRow<ModelToDocShape<TC, ModelName>, …>[]` rather than
+ * the opaque `unknown[]` produced by the legacy `mongo/array@1` sentinel.
+ *
+ * Like `ObjectField`, the codec id is a purely type-level sentinel —
+ * there is no runtime codec entry for `'prisma/modelArray@1'`. The
+ * surrounding pipeline emits the standard `MongoLookupStage` whose
+ * runtime shape is unchanged; the marker exists solely to thread the
+ * foreign element type through the result-row resolver.
+ */
+export interface ModelArrayField<ModelName extends string> extends DocField {
+  readonly codecId: 'prisma/modelArray@1';
+  readonly nullable: false;
+  readonly model: ModelName;
+}
+
+/**
+ * Phantom-symbol brand placed on `ModelToDocShape`'s output (and inherited
+ * through shape-extending stages like `addFields`, `match`, `lookup`) so
+ * `ResolveRow` can route value-object resolution through `InferModelRow`
+ * — which walks the contract's `valueObjects` registry and resolves
+ * nested types — instead of falling through the codec-lookup branch to
+ * `unknown`.
+ *
+ * The brand is keyed on a `unique symbol` rather than a string so it is
+ * invisible to every `keyof Shape & string` walk in the package
+ * (`SortSpec`, `ProjectedShape`, `GroupedDocShape`, the field accessor's
+ * `Object.keys` iteration, etc.). Field accessors do not surface a
+ * `__modelOrigin` autocomplete entry; sorts cannot key on it; projections
+ * cannot reference it.
+ *
+ * Shape-extending stages preserve the brand because intersection types
+ * (`Shape & NewFields`) carry through symbol-keyed properties. Shape-
+ * replacing stages (`replaceRoot`, `group`, `project`) construct fresh
+ * `DocShape`s from scratch, naturally dropping the brand — which is the
+ * intended behaviour, since those stages legitimately leave model
+ * territory.
+ */
+export declare const ModelOriginBrand: unique symbol;
+export type ModelOriginBrand = typeof ModelOriginBrand;
+
+/**
+ * Brand carrier — a Shape whose row type should be resolved via
+ * `InferModelRow<TContract, ModelName>` rather than the per-field codec
+ * walk. Use as `ModelToDocShape<TC, ModelName> & ModelOriginBranded<ModelName>`.
+ */
+export type ModelOriginBranded<ModelName extends string> = {
+  readonly [ModelOriginBrand]?: ModelName;
+};
+
+/**
  * Document shape that carries nested value-object sub-shapes.
  *
  * Structurally identical to a flat `DocShape` (`Record<string, DocField>`),

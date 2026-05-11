@@ -4,8 +4,6 @@ import {
   AndExpr,
   BinaryExpr,
   ColumnRef,
-  codec,
-  createCodecRegistry,
   LiteralExpr,
   ParamRef,
   ProjectionItem,
@@ -21,6 +19,8 @@ import type {
   SqlMiddleware,
   SqlMiddlewareContext,
 } from '../src/middleware/sql-middleware';
+import { defineTestCodec } from './test-codec';
+import { buildTestContractCodecs } from './utils';
 
 function createContext(): SqlMiddlewareContext & {
   log: { debug: ReturnType<typeof vi.fn> };
@@ -36,6 +36,7 @@ function createContext(): SqlMiddlewareContext & {
       error: vi.fn(),
       debug,
     },
+    contentHash: async () => 'mock-hash',
   };
 }
 
@@ -341,15 +342,14 @@ describe('runBeforeCompileChain', () => {
   it(
     'beforeCompile alias-swap rewrites the AST and the decoder reads from it',
     async () => {
-      const decoderRegistry = createCodecRegistry();
-      decoderRegistry.register(
-        codec({
+      const decoderRegistry = [
+        defineTestCodec({
           typeId: 'pg/int4@1',
           targetTypes: ['int4'],
           encode: (v: number) => v,
           decode: (w: number) => w + 100,
         }),
-      );
+      ];
 
       const initialAst = SelectAst.from(TableSource.named('users')).withProjection([
         ProjectionItem.of('id', ColumnRef.of('users', 'id'), 'pg/int4@1'),
@@ -383,7 +383,12 @@ describe('runBeforeCompileChain', () => {
         ast: result.ast,
         meta: result.meta,
       };
-      const row = await decodeRow({ user_id: 7 }, plan, decoderRegistry, undefined, {});
+      const row = await decodeRow(
+        { user_id: 7 },
+        plan,
+        {},
+        buildTestContractCodecs(decoderRegistry),
+      );
       expect(row).toEqual({ user_id: 107 });
     },
     timeouts.default,
@@ -394,15 +399,14 @@ describe('runBeforeCompileChain', () => {
     async () => {
       const { InsertAst } = await import('@prisma-next/sql-relational-core/ast');
 
-      const decoderRegistry = createCodecRegistry();
-      decoderRegistry.register(
-        codec({
+      const decoderRegistry = [
+        defineTestCodec({
           typeId: 'pg/int4@1',
           targetTypes: ['int4'],
           encode: (v: number) => v,
           decode: (w: number) => w + 100,
         }),
-      );
+      ];
 
       const insert = InsertAst.into(TableSource.named('users'))
         .withRows([{ id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }) }])
@@ -415,7 +419,7 @@ describe('runBeforeCompileChain', () => {
         ast: insert,
         meta,
       };
-      const row = await decodeRow({ id: 7 }, plan, decoderRegistry, undefined, {});
+      const row = await decodeRow({ id: 7 }, plan, {}, buildTestContractCodecs(decoderRegistry));
       expect(row).toEqual({ id: 107 });
     },
     timeouts.default,

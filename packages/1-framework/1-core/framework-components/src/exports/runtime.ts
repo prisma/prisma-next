@@ -13,6 +13,7 @@ export {
 } from '../execution/runtime-error';
 export type {
   AfterExecuteResult,
+  InterceptResult,
   RuntimeExecuteOptions,
   RuntimeExecutor,
   RuntimeLog,

@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/adapter-postgres",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -32,13 +33,14 @@
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/utils": "workspace:*",
-    "arktype": "^2.0.0"
+    "arktype": "^2.1.29"
   },
   "devDependencies": {
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/errors": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
+    "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",

@@ -1,4 +1,11 @@
-import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import {
+  createControlStack,
+  type MigrationPlanOperation,
+} from '@prisma-next/framework-components/control';
+import {
+  type ContractMarkerRecordLike,
+  graphWalkStrategy,
+} from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import {
   errorNoInvariantPath,
@@ -11,7 +18,7 @@ import {
   findPathWithDecision,
   findReachableLeaves,
 } from '@prisma-next/migration-tools/migration-graph';
-import type { MigrationPackage } from '@prisma-next/migration-tools/package';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -39,6 +46,10 @@ import {
   toPathDecisionResult,
   toStructuralEdge,
 } from '../utils/command-helpers';
+import {
+  type BuildAggregateInputs,
+  buildContractSpaceAggregate,
+} from '../utils/contract-space-aggregate-loader';
 import {
   type EdgeStatus,
   type EdgeStatusKind,
@@ -74,6 +85,53 @@ export interface MigrationStatusEntry {
   readonly operationSummary: string;
   readonly hasDestructive: boolean;
   readonly status: EdgeStatusKind | 'unknown';
+}
+
+/**
+ * Per-space status row in the aggregate-shaped status output.
+ *
+ * Surfaces, for each contract space:
+ *
+ * - `headHash`: the on-disk head ref's hash (where the space is going).
+ * - `markerHash`: the live marker hash for the space, or null if no
+ *    marker has been written yet (greenfield, or pre-`migration apply`).
+ * - `pendingCount`: number of migration edges between marker and head.
+ *    Computed via {@link graphWalkStrategy}; 0 means the space is
+ *    already at head.
+ * - `status`: convenience tag the formatter uses to pick a glyph.
+ *    `'never-planned'` is reserved for spaces with non-empty head but
+ *    no on-disk migrations — which shouldn't happen if the loader's
+ *    integrity check passes.
+ *
+ * Online-only fields (`markerHash`, `status`) are absent when the
+ * command runs without a database connection.
+ */
+export interface MigrationStatusSpaceEntry {
+  readonly spaceId: string;
+  readonly kind: 'app' | 'extension';
+  readonly headHash: string;
+  readonly markerHash?: string | null;
+  readonly pendingCount?: number;
+  readonly status?: 'up-to-date' | 'pending' | 'no-marker' | 'never-planned' | 'unreachable';
+}
+
+/**
+ * Sum per-space `pendingCount` into a cross-space total, but only when
+ * every loaded space reports a defined `pendingCount`. Returns
+ * `undefined` if any space is on the marker-unknown / offline path
+ * (where `pendingCount` is intentionally absent), so JSON consumers can
+ * distinguish "no pending" from "unknown".
+ */
+export function computeTotalPendingAcrossSpaces(
+  spaces: readonly MigrationStatusSpaceEntry[],
+): number | undefined {
+  if (spaces.length === 0) return undefined;
+  let total = 0;
+  for (const s of spaces) {
+    if (s.pendingCount === undefined) return undefined;
+    total += s.pendingCount;
+  }
+  return total;
 }
 
 export type { StatusDiagnostic, StatusRef } from '../utils/migration-types';
@@ -117,8 +175,24 @@ export interface MigrationStatusResult {
   };
   readonly summary: string;
   readonly diagnostics: readonly StatusDiagnostic[];
+  /**
+   * Aggregate enumeration of every on-disk contract space (app +
+   * extensions), in canonical schedule order (extensions
+   * alphabetically, then app). Present whenever the aggregate loader
+   * succeeded; absent in early-error returns (e.g. unreadable
+   * migrations directory) where the existing diagnostics already
+   * surface the failure.
+   *
+   * The legacy top-level fields (`migrations`, `markerHash`,
+   * `targetHash`, `pathDecision`, …) describe the **app member**
+   * specifically — back-compat with single-space callers. Per-space
+   * detail for extension members lives only on this list.
+   */
+  readonly spaces?: readonly MigrationStatusSpaceEntry[];
+  /** Cross-space pending-migration total (sum of `spaces[].pendingCount`). Present when `spaces` is. */
+  readonly totalPendingAcrossSpaces?: number;
   readonly graph?: MigrationGraph;
-  readonly bundles?: readonly MigrationPackage[];
+  readonly bundles?: readonly OnDiskMigrationPackage[];
   readonly edgeStatuses?: readonly EdgeStatus[];
   readonly activeRefHash?: string;
   readonly activeRefName?: string;
@@ -249,7 +323,7 @@ export function deriveEdgeStatuses(
  */
 function buildMigrationEntries(
   chain: readonly MigrationEdge[],
-  packages: readonly MigrationPackage[],
+  packages: readonly OnDiskMigrationPackage[],
   mode: 'online' | 'offline',
   markerHash: string | undefined,
   edgeStatuses?: readonly EdgeStatus[],
@@ -363,16 +437,130 @@ function determineLimit(opts: MigrationStatusOptions) {
   return parsed;
 }
 
+/**
+ * Build the aggregate enumeration of contract spaces for the status
+ * output. Loads the aggregate from disk (lossy on failure — extension
+ * spaces are simply omitted, the existing single-space app behaviour
+ * keeps working), reads per-space marker rows when online, and uses
+ * {@link graphWalkStrategy} to compute each space's pending count.
+ *
+ * Sub-spec § `migration status` semantics — the aggregate-walking
+ * version reports per-space marker + pending state alongside the
+ * cross-space totals.
+ */
+export async function loadAggregateStatusSpaces(args: {
+  readonly targetId: string;
+  readonly migrationsDir: string;
+  readonly appContractRaw: unknown;
+  readonly extensionPacks: BuildAggregateInputs<string, string>['extensionPacks'];
+  readonly validateContract: BuildAggregateInputs<string, string>['validateContract'];
+  readonly markersBySpace: ReadonlyMap<string, ContractMarkerRecordLike> | null;
+}): Promise<readonly MigrationStatusSpaceEntry[]> {
+  const loadInputs: BuildAggregateInputs<string, string> = {
+    targetId: args.targetId,
+    migrationsDir: args.migrationsDir,
+    appContract: args.validateContract(args.appContractRaw),
+    extensionPacks: args.extensionPacks,
+    validateContract: args.validateContract,
+  };
+
+  const loaded = await buildContractSpaceAggregate(loadInputs);
+  if (!loaded.ok) {
+    // Loader failure (drift, layout violation, etc.) — surfacing it
+    // as a status diagnostic would duplicate `migration plan`'s job.
+    // The single-space app pipeline still runs; extensions are simply
+    // not enumerated.
+    return [];
+  }
+  const aggregate = loaded.value;
+
+  const orderedMembers = [...aggregate.extensions, aggregate.app];
+  const rows: MigrationStatusSpaceEntry[] = [];
+  for (const member of orderedMembers) {
+    const liveMarker = args.markersBySpace?.get(member.spaceId) ?? null;
+    const isApp = member.spaceId === aggregate.app.spaceId;
+
+    if (member.migrations.graph.nodes.size === 0) {
+      rows.push({
+        spaceId: member.spaceId,
+        kind: isApp ? 'app' : 'extension',
+        headHash: member.headRef.hash,
+        ...(args.markersBySpace !== null
+          ? {
+              markerHash: liveMarker?.storageHash ?? null,
+              status: member.headRef.hash === EMPTY_CONTRACT_HASH ? 'up-to-date' : 'never-planned',
+              pendingCount: 0,
+            }
+          : {}),
+      });
+      continue;
+    }
+
+    if (args.markersBySpace === null) {
+      rows.push({
+        spaceId: member.spaceId,
+        kind: isApp ? 'app' : 'extension',
+        headHash: member.headRef.hash,
+      });
+      continue;
+    }
+
+    const walked = graphWalkStrategy({
+      aggregateTargetId: aggregate.targetId,
+      member,
+      currentMarker: liveMarker,
+    });
+    let pendingCount = 0;
+    let status: MigrationStatusSpaceEntry['status'];
+    if (walked.kind === 'ok') {
+      pendingCount = walked.result.plan.operations.length;
+      if (liveMarker === null) {
+        status = pendingCount === 0 ? 'no-marker' : 'pending';
+      } else {
+        status = pendingCount === 0 ? 'up-to-date' : 'pending';
+      }
+    } else {
+      status = 'unreachable';
+    }
+
+    rows.push({
+      spaceId: member.spaceId,
+      kind: isApp ? 'app' : 'extension',
+      headHash: member.headRef.hash,
+      markerHash: liveMarker?.storageHash ?? null,
+      pendingCount,
+      ...(status ? { status } : {}),
+    });
+  }
+  return rows;
+}
+
+/**
+ * Read the raw contract.json bytes from disk for the aggregate
+ * loader. Returns `null` if the file is missing or unparseable —
+ * the existing `readContractEnvelope` path will report the same
+ * problem via a status diagnostic, no need to double-surface.
+ */
+async function loadContractRawSafely(config: {
+  contract?: { output?: string };
+}): Promise<unknown | null> {
+  try {
+    const path = (await import('../utils/command-helpers')).resolveContractPath(config);
+    const raw = await (await import('node:fs/promises')).readFile(path, 'utf-8');
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 async function executeMigrationStatusCommand(
   options: MigrationStatusOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
 ): Promise<Result<MigrationStatusResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative, refsDir } = resolveMigrationPaths(
-    options.config,
-    config,
-  );
+  const { configPath, appMigrationsDir, appMigrationsRelative, migrationsDir, refsDir } =
+    resolveMigrationPaths(options.config, config);
 
   const dbConnection = options.db ?? config.db?.connection;
   const hasDriver = !!config.driver;
@@ -414,7 +602,7 @@ async function executeMigrationStatusCommand(
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
       { label: 'config', value: configPath },
-      { label: 'migrations', value: migrationsRelative },
+      { label: 'migrations', value: appMigrationsRelative },
     ];
     if (dbConnection && hasDriver) {
       details.push({ label: 'database', value: maskConnectionUrl(String(dbConnection)) });
@@ -451,10 +639,10 @@ async function executeMigrationStatusCommand(
     });
   }
 
-  let bundles: readonly MigrationPackage[];
+  let bundles: readonly OnDiskMigrationPackage[];
   let graph: MigrationGraph;
   try {
-    ({ bundles, graph } = await loadMigrationPackages(migrationsDir));
+    ({ bundles, graph } = await loadMigrationPackages(appMigrationsDir));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
@@ -515,6 +703,7 @@ async function executeMigrationStatusCommand(
   let markerHash: string | undefined;
   let markerInvariants: readonly string[] = [];
   let mode: 'online' | 'offline' = 'offline';
+  let allMarkers: ReadonlyMap<string, ContractMarkerRecordLike> | null = null;
 
   if (dbConnection && hasDriver) {
     const client = createControlClient({
@@ -530,6 +719,21 @@ async function executeMigrationStatusCommand(
       markerHash = marker?.storageHash;
       markerInvariants = marker?.invariants ?? [];
       mode = 'online';
+      // Read every space's marker so the aggregate enumeration can
+      // surface per-space marker state. `readAllMarkers` mirrors what
+      // `db init` / `db update` already use to drive the multi-space
+      // planner; here it powers the aggregate status output.
+      try {
+        allMarkers = await client.readAllMarkers();
+      } catch {
+        // Older family instances may not implement `readAllMarkers`.
+        // Per-space enumeration falls back to "marker unknown" rather
+        // than failing the whole status command — leaving
+        // `allMarkers` as `null` signals "unknown" to the aggregate
+        // loader (an empty `Map` would instead mean "every space has
+        // no marker", which is a different condition).
+        allMarkers = null;
+      }
     } catch {
       if (!flags.json && !flags.quiet) {
         ui.warn('Could not connect to database — showing offline status');
@@ -538,6 +742,37 @@ async function executeMigrationStatusCommand(
       await client.close();
     }
   }
+
+  // Build the aggregate enumeration of contract spaces. Lossy on
+  // failure (extensions are simply omitted) so the existing
+  // single-space app pipeline below still runs even if extensions
+  // can't be loaded — a strict failure here would degrade the
+  // load-bearing app-space output for unrelated reasons.
+  const contractRawForAggregate = await loadContractRawSafely(config);
+  let aggregateSpaces: readonly MigrationStatusSpaceEntry[] = [];
+  if (contractRawForAggregate !== null) {
+    // The aggregate loader needs a typed-Contract producer. Build a
+    // real control stack so `validateContract` runs against a fully
+    // composed family instance — descriptors that read stack members
+    // during construction (e.g. codec lookups) get a consistent view.
+    const stack = createControlStack(config);
+    const familyInstance = config.family.create(stack);
+    try {
+      aggregateSpaces = await loadAggregateStatusSpaces({
+        targetId: config.target.targetId,
+        migrationsDir,
+        appContractRaw: contractRawForAggregate,
+        extensionPacks: config.extensionPacks ?? [],
+        validateContract: (json: unknown) => familyInstance.validateContract(json),
+        markersBySpace: allMarkers,
+      });
+    } catch {
+      // Loader failure short-circuits silently — the existing
+      // single-space app pipeline below still runs.
+      aggregateSpaces = [];
+    }
+  }
+  const totalPendingAcrossSpaces = computeTotalPendingAcrossSpaces(aggregateSpaces);
 
   // Pre-check unknown invariants. Online: union the graph's declared
   // invariants with the marker's recorded set so a retired-but-applied
@@ -803,6 +1038,8 @@ async function executeMigrationStatusCommand(
     edgeStatuses,
     ...ifDefined('activeRefHash', activeRefHash),
     ...ifDefined('activeRefName', activeRefName),
+    spaces: aggregateSpaces,
+    ...ifDefined('totalPendingAcrossSpaces', totalPendingAcrossSpaces),
   };
   return ok(result);
 }
@@ -950,7 +1187,53 @@ export function formatStatusSummary(result: MigrationStatusResult, colorize: boo
     }
   }
 
+  // Per-space section. Suppressed when there's no extension space —
+  // the legacy single-space output already covers the app member.
+  // When extensions exist, render every space (including the app)
+  // for consistency, plus a cross-space pending total + apply hint.
+  if (result.spaces?.some((s) => s.kind === 'extension')) {
+    const total = result.totalPendingAcrossSpaces ?? 0;
+    lines.push('');
+    lines.push(c(dim, 'spaces'));
+    for (const space of result.spaces) {
+      lines.push(formatSpaceLine(space, c));
+    }
+    if (total > 0) {
+      lines.push('');
+      lines.push(
+        `${c(yellow, '⧗')} ${total} pending migration(s) across ${result.spaces.length} space(s) — run 'prisma-next migration apply' to apply`,
+      );
+    }
+  }
+
   return lines.join('\n');
+}
+
+function formatSpaceLine(
+  space: MigrationStatusSpaceEntry,
+  c: (fn: (s: string) => string, s: string) => string,
+): string {
+  const glyph = (() => {
+    if (space.status === 'up-to-date' || space.status === 'no-marker') return c(cyan, '✓');
+    if (space.status === 'pending') return c(yellow, '⧗');
+    if (space.status === 'unreachable' || space.status === 'never-planned') return c(magenta, '✗');
+    return ' ';
+  })();
+  const tag = space.kind === 'app' ? '[app]' : '[ext]';
+  const head = space.headHash.slice(0, 8);
+  const marker =
+    space.markerHash === undefined
+      ? '(unknown)'
+      : space.markerHash === null
+        ? '(no marker)'
+        : space.markerHash.slice(0, 8);
+  const pending =
+    space.pendingCount === undefined
+      ? ''
+      : space.pendingCount === 0
+        ? c(dim, ' (up to date)')
+        : c(yellow, ` (${space.pendingCount} pending)`);
+  return `  ${glyph} ${c(dim, tag)} ${space.spaceId} → head ${c(dim, head)}, marker ${c(dim, marker)}${pending}`;
 }
 
 function formatInvariantList(ids: readonly string[]): string {

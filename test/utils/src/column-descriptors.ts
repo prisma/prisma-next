@@ -2,11 +2,9 @@
  * Adapter-agnostic column type descriptors for test fixtures.
  *
  * These descriptors match common PostgreSQL types but don't depend on
- * @prisma-next/adapter-postgres or any target-specific packages.
- * Use these in test fixtures to avoid adapter/target dependencies.
+ * @prisma-next/adapter-postgres or any target-specific packages. Use these in test fixtures to avoid adapter/target dependencies.
  *
- * The shape matches `ColumnTypeDescriptor` from `@prisma-next/contract-authoring`
- * but is defined locally to keep test-utils dependency-free.
+ * The shape matches `ColumnTypeDescriptor` from `@prisma-next/framework-components/codec` but is defined locally to keep test-utils dependency-free (`framework-components` transitively depends on packages that devDepend on test-utils, so a runtime dep here would create a turbo build cycle).
  */
 type ColumnTypeDescriptor = {
   readonly codecId: string;

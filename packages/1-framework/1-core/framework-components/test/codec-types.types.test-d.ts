@@ -1,6 +1,7 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import { expectTypeOf, test } from 'vitest';
-import type { Codec, CodecTrait } from '../src/shared/codec-types';
+import type { Codec } from '../src/shared/codec';
+import type { CodecTrait } from '../src/shared/codec-types';
 
 test('encode is required and Promise-returning', () => {
   expectTypeOf<Codec>().toHaveProperty('encode');
@@ -31,29 +32,27 @@ test('decodeJson is required and synchronous', () => {
   expectTypeOf<DecodeJsonReturn>().not.toExtend<Promise<unknown>>();
 });
 
-test('renderOutputType is optional and synchronous', () => {
-  type Render = NonNullable<Codec['renderOutputType']>;
-  expectTypeOf<Render>().toBeFunction();
-  expectTypeOf<ReturnType<Render>>().toEqualTypeOf<string | undefined>();
-  // optional on the interface
-  type IsOptional = undefined extends Codec['renderOutputType'] ? true : false;
-  expectTypeOf<IsOptional>().toEqualTypeOf<true>();
-});
-
-test('Codec carries no async marker (no runtime/kind/TRuntime fields)', () => {
-  type CodecKeys = keyof Codec;
+test('Codec instance carries only id + the four conversion methods (plus phantom)', () => {
+  // The runtime instance is narrowed to id + behavior (TML-2357); codec-id-keyed static metadata (`traits`, `targetTypes`, `meta`, `renderOutputType`) lives on `CodecDescriptor` keyed by codecId. The `__codecTraits` slot is a type-only phantom carrier (always `undefined` at runtime) and double-underscored to signal that it is not part of the consumer-facing API surface.
+  type CodecStringKeys = Extract<keyof Codec, string>;
   const expectedKeys = [
     'id',
-    'targetTypes',
-    'traits',
     'encode',
     'decode',
     'encodeJson',
     'decodeJson',
-    'renderOutputType',
+    '__codecTraits',
   ] as const;
   type ExpectedKeys = (typeof expectedKeys)[number];
-  expectTypeOf<CodecKeys>().toEqualTypeOf<ExpectedKeys>();
+  expectTypeOf<CodecStringKeys>().toEqualTypeOf<ExpectedKeys>();
+});
+
+test('Codec instance does not carry traits / targetTypes / meta / renderOutputType', () => {
+  type C = Codec;
+  expectTypeOf<C>().not.toHaveProperty('traits');
+  expectTypeOf<C>().not.toHaveProperty('targetTypes');
+  expectTypeOf<C>().not.toHaveProperty('meta');
+  expectTypeOf<C>().not.toHaveProperty('renderOutputType');
 });
 
 test('Codec carries four generics: encode TInput → TWire, decode TWire → TInput', () => {

@@ -1,3 +1,5 @@
+// use prisma-next
+
 type Price {
   amount   Float
   currency String
@@ -56,6 +58,7 @@ model Product {
   price          Price
   image          Image
   embedding      Float[]?
+  status         String   @default("active")
   @@map("products")
   @@textIndex([name, description], weights: "{\"name\": 10, \"description\": 1}")
   @@index([brand, subCategory])

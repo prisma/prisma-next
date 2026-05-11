@@ -1,3 +1,7 @@
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+
+export { APP_SPACE_ID };
+
 export interface SqlStatement {
   readonly sql: string;
   readonly params: readonly unknown[];
@@ -15,9 +19,18 @@ export const CONTROL_TABLE_NAMES: ReadonlySet<string> = new Set([
   LEDGER_TABLE_NAME,
 ]);
 
+/**
+ * Schema for `_prisma_marker`. The `space TEXT PRIMARY KEY` shape
+ * supports one row per loaded contract space (`'app'`,
+ * `'<extension-id>'`, …); brand-new databases create this shape
+ * directly. The migration runner detects pre-1.0 single-row markers
+ * (no `space` column) at boot and fails with a structured
+ * `LEGACY_MARKER_SHAPE` error rather than auto-rebuilding the table —
+ * see `specs/framework-mechanism.spec.md § 2`.
+ */
 export const ensureMarkerTableStatement: SqlStatement = {
   sql: `CREATE TABLE IF NOT EXISTS _prisma_marker (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
+    space TEXT NOT NULL PRIMARY KEY DEFAULT '${APP_SPACE_ID}',
     core_hash TEXT NOT NULL,
     profile_hash TEXT NOT NULL,
     contract_json TEXT,
@@ -45,7 +58,7 @@ export const ensureLedgerTableStatement: SqlStatement = {
   params: [],
 };
 
-export function readMarkerStatement(): SqlStatement {
+export function readMarkerStatement(space: string): SqlStatement {
   return {
     sql: `SELECT
       core_hash,
@@ -57,12 +70,21 @@ export function readMarkerStatement(): SqlStatement {
       meta,
       invariants
     FROM _prisma_marker
-    WHERE id = ?`,
-    params: [1],
+    WHERE space = ?`,
+    params: [space],
   };
 }
 
 export interface WriteMarkerInput {
+  /**
+   * Logical space identifier for this marker row. Required at every
+   * call site so the type system surfaces every place that needs to
+   * thread the value (rather than letting an `?? APP_SPACE_ID`
+   * fall-through silently collapse multi-space markers onto the
+   * `'app'` row). App-plan callers pass {@link APP_SPACE_ID}
+   * (`'app'`); per-extension callers pass the extension's space id.
+   */
+  readonly space: string;
   readonly storageHash: string;
   readonly profileHash: string;
   readonly contractJson?: unknown;
@@ -84,7 +106,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
   readonly update: SqlStatement;
 } {
   const params: readonly unknown[] = [
-    1,
+    input.space,
     input.storageHash,
     input.profileHash,
     jsonParam(input.contractJson),
@@ -97,7 +119,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
   return {
     insert: {
       sql: `INSERT INTO _prisma_marker (
-        id,
+        space,
         core_hash,
         profile_hash,
         contract_json,
@@ -129,7 +151,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         app_tag = ?,
         meta = ?,
         invariants = ?
-      WHERE id = ?`,
+      WHERE space = ?`,
       params: [
         input.storageHash,
         input.profileHash,
@@ -138,7 +160,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         input.appTag ?? null,
         jsonParam(input.meta ?? {}),
         jsonParam(input.invariants),
-        1,
+        input.space,
       ],
     },
   };

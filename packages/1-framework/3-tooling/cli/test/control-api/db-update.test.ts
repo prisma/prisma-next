@@ -1,15 +1,33 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
   MigrationPlannerResult,
-  MigrationRunnerResult,
+  MultiSpaceRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { describe, expect, it, vi } from 'vitest';
 import { executeDbUpdate } from '../../src/control-api/operations/db-update';
 import type { ControlProgressEvent } from '../../src/control-api/types';
+
+const FAKE_MIGRATIONS_DIR = '/tmp/__test-db-update-migrations';
+
+function markerRecord(fields: {
+  readonly storageHash: string;
+  readonly profileHash?: string;
+}): ContractMarkerRecord {
+  return {
+    storageHash: fields.storageHash,
+    profileHash: fields.profileHash ?? '',
+    contractJson: null,
+    canonicalVersion: null,
+    updatedAt: new Date(0),
+    appTag: null,
+    meta: {},
+    invariants: [],
+  };
+}
 
 function createMockDriver() {
   return {
@@ -18,24 +36,24 @@ function createMockDriver() {
 }
 
 function createMockFamilyInstance(overrides?: {
-  readMarker?: () => Promise<{ storageHash: string; profileHash?: string } | null>;
+  readAllMarkers?: () => Promise<ReadonlyMap<string, ContractMarkerRecord>>;
   introspect?: () => Promise<unknown>;
 }) {
   return {
     familyId: 'sql',
-    readMarker: overrides?.readMarker ?? (async () => null),
+    readAllMarkers: overrides?.readAllMarkers ?? (async () => new Map()),
     introspect: overrides?.introspect ?? (async () => ({ tables: {}, dependencies: [] })),
     validateContract: (ir: unknown) => ir as Contract,
-    // Stub `OperationPreviewCapable` so `executeDbUpdate` produces an empty
-    // preview when no operations carry SQL execute steps. Mirrors the SQL
-    // family's behaviour in the empty-input case.
+    // Stub `OperationPreviewCapable` so the plan path produces an empty
+    // preview when no operations carry SQL execute steps.
     toOperationPreview: () => ({ statements: [] }),
   } as unknown as ControlFamilyInstance<'sql', unknown>;
 }
 
 function createMockMigrations(overrides?: {
   planResult?: MigrationPlannerResult;
-  runnerResult?: MigrationRunnerResult;
+  runnerResult?: MultiSpaceRunnerResult;
+  executeAcrossSpacesSpy?: ReturnType<typeof vi.fn>;
 }) {
   const planResult: MigrationPlannerResult = overrides?.planResult ?? {
     kind: 'success',
@@ -55,15 +73,33 @@ function createMockMigrations(overrides?: {
     },
   };
 
-  const runnerResult: MigrationRunnerResult =
-    overrides?.runnerResult ?? ok({ operationsPlanned: 1, operationsExecuted: 1 });
+  const opsExecuted = overrides?.runnerResult ?? null;
+  const runnerResult: MultiSpaceRunnerResult =
+    opsExecuted ??
+    ok({
+      perSpaceResults: [
+        {
+          space: 'app',
+          value: {
+            operationsPlanned:
+              planResult.kind === 'success' ? planResult.plan.operations.length : 0,
+            operationsExecuted:
+              planResult.kind === 'success' ? planResult.plan.operations.length : 0,
+          },
+        },
+      ],
+    });
+
+  const executeAcrossSpaces =
+    overrides?.executeAcrossSpacesSpy ?? vi.fn().mockResolvedValue(runnerResult);
 
   return {
     createPlanner: () => ({
       plan: vi.fn().mockReturnValue(planResult),
     }),
     createRunner: () => ({
-      execute: vi.fn().mockResolvedValue(runnerResult),
+      execute: vi.fn(),
+      executeAcrossSpaces,
     }),
   } as unknown as TargetMigrationsCapability<
     'sql',
@@ -72,7 +108,11 @@ function createMockMigrations(overrides?: {
   >;
 }
 
-const dummyContract = { schemaVersion: '1', target: 'postgres' } as unknown as Contract;
+const dummyContract = {
+  schemaVersion: '1',
+  target: 'postgres',
+  storage: { storageHash: 'sha256:dummy', tables: {} },
+} as unknown as Contract;
 
 describe('executeDbUpdate', () => {
   it('succeeds on a fresh database without marker', async () => {
@@ -83,6 +123,8 @@ describe('executeDbUpdate', () => {
       mode: 'plan',
       migrations: createMockMigrations(),
       frameworkComponents: [],
+      migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);
@@ -96,7 +138,8 @@ describe('executeDbUpdate', () => {
     const result = await executeDbUpdate({
       driver: createMockDriver(),
       familyInstance: createMockFamilyInstance({
-        readMarker: async () => ({ storageHash: 'sha256:origin' }),
+        readAllMarkers: async () =>
+          new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
       }),
       contract: dummyContract,
       mode: 'plan',
@@ -112,6 +155,8 @@ describe('executeDbUpdate', () => {
         },
       }),
       frameworkComponents: [],
+      migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(false);
@@ -122,46 +167,49 @@ describe('executeDbUpdate', () => {
     }
   });
 
-  it('returns plan result without executing runner in plan mode', async () => {
-    const runnerExecute = vi.fn();
-    const migrations = {
-      createPlanner: () => ({
-        plan: vi.fn().mockReturnValue({
-          kind: 'success',
-          plan: {
-            targetId: 'postgres',
-            destination: { storageHash: 'sha256:dest', profileHash: 'sha256:dest-profile' },
-            operations: [
-              {
-                id: 'column.user.nickname',
-                label: 'Add column nickname on user',
-                operationClass: 'additive',
-              },
-            ],
+  it('returns plan result without invoking runner in plan mode', async () => {
+    const executeAcrossSpaces = vi.fn();
+    const migrations = createMockMigrations({
+      planResult: {
+        kind: 'success',
+        plan: {
+          targetId: 'postgres',
+          destination: { storageHash: 'sha256:dest', profileHash: 'sha256:dest-profile' },
+          operations: [
+            {
+              id: 'column.user.nickname',
+              label: 'Add column nickname on user',
+              operationClass: 'additive',
+            },
+          ],
+          renderTypeScript: () => {
+            throw new Error('not used in db update tests');
           },
-        }),
-      }),
-      createRunner: () => ({
-        execute: runnerExecute,
-      }),
-    } as unknown as TargetMigrationsCapability<
-      'sql',
-      'postgres',
-      ControlFamilyInstance<'sql', unknown>
-    >;
+        },
+      },
+      executeAcrossSpacesSpy: executeAcrossSpaces,
+    });
 
     const result = await executeDbUpdate({
       driver: createMockDriver(),
       familyInstance: createMockFamilyInstance({
-        readMarker: async () => ({
-          storageHash: 'sha256:origin',
-          profileHash: 'sha256:origin-profile',
-        }),
+        readAllMarkers: async () =>
+          new Map([
+            [
+              'app',
+              markerRecord({
+                storageHash: 'sha256:origin',
+                profileHash: 'sha256:origin-profile',
+              }),
+            ],
+          ]),
       }),
       contract: dummyContract,
       mode: 'plan',
       migrations,
       frameworkComponents: [],
+      migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);
@@ -173,26 +221,31 @@ describe('executeDbUpdate', () => {
       expect(result.value.execution).toBeUndefined();
       expect(result.value.marker).toBeUndefined();
     }
-    expect(runnerExecute).not.toHaveBeenCalled();
+    expect(executeAcrossSpaces).not.toHaveBeenCalled();
   });
 
   it('returns RUNNER_FAILED when runner rejects apply', async () => {
     const result = await executeDbUpdate({
       driver: createMockDriver(),
       familyInstance: createMockFamilyInstance({
-        readMarker: async () => ({ storageHash: 'sha256:origin' }),
+        readAllMarkers: async () =>
+          new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
       }),
       contract: dummyContract,
       mode: 'apply',
+      acceptDataLoss: true,
       migrations: createMockMigrations({
         runnerResult: notOk({
           code: 'ORIGIN_MISMATCH',
           summary: 'Origin mismatch',
           why: 'Marker drifted',
           meta: { drift: true },
+          failingSpace: 'app',
         }),
       }),
       frameworkComponents: [],
+      migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(false);
@@ -200,7 +253,7 @@ describe('executeDbUpdate', () => {
       expect(result.failure.code).toBe('RUNNER_FAILED');
       expect(result.failure.summary).toBe('Origin mismatch');
       expect(result.failure.why).toBe('Marker drifted');
-      expect(result.failure.meta).toMatchObject({ drift: true });
+      expect(result.failure.meta).toMatchObject({ drift: true, failingSpace: 'app' });
     }
   });
 
@@ -208,17 +261,30 @@ describe('executeDbUpdate', () => {
     const result = await executeDbUpdate({
       driver: createMockDriver(),
       familyInstance: createMockFamilyInstance({
-        readMarker: async () => ({
-          storageHash: 'sha256:origin',
-          profileHash: 'sha256:origin-profile',
-        }),
+        readAllMarkers: async () =>
+          new Map([
+            [
+              'app',
+              markerRecord({
+                storageHash: 'sha256:origin',
+                profileHash: 'sha256:origin-profile',
+              }),
+            ],
+          ]),
       }),
       contract: dummyContract,
       mode: 'apply',
+      acceptDataLoss: true,
       migrations: createMockMigrations({
-        runnerResult: ok({ operationsPlanned: 2, operationsExecuted: 2 }),
+        runnerResult: ok({
+          perSpaceResults: [
+            { space: 'app', value: { operationsPlanned: 2, operationsExecuted: 2 } },
+          ],
+        }),
       }),
       frameworkComponents: [],
+      migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);
@@ -238,10 +304,16 @@ describe('executeDbUpdate', () => {
     const result = await executeDbUpdate({
       driver: createMockDriver(),
       familyInstance: createMockFamilyInstance({
-        readMarker: async () => ({
-          storageHash: 'sha256:current',
-          profileHash: 'sha256:current-profile',
-        }),
+        readAllMarkers: async () =>
+          new Map([
+            [
+              'app',
+              markerRecord({
+                storageHash: 'sha256:current',
+                profileHash: 'sha256:current-profile',
+              }),
+            ],
+          ]),
       }),
       contract: dummyContract,
       mode: 'apply',
@@ -257,9 +329,15 @@ describe('executeDbUpdate', () => {
             },
           },
         },
-        runnerResult: ok({ operationsPlanned: 0, operationsExecuted: 0 }),
+        runnerResult: ok({
+          perSpaceResults: [
+            { space: 'app', value: { operationsPlanned: 0, operationsExecuted: 0 } },
+          ],
+        }),
       }),
       frameworkComponents: [],
+      migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);
@@ -276,39 +354,42 @@ describe('executeDbUpdate', () => {
   });
 
   it('returns plan with 0 operations when database already matches contract in plan mode', async () => {
-    const runnerExecute = vi.fn();
-    const migrations = {
-      createPlanner: () => ({
-        plan: vi.fn().mockReturnValue({
-          kind: 'success',
-          plan: {
-            targetId: 'postgres',
-            destination: { storageHash: 'sha256:same', profileHash: 'sha256:same-profile' },
-            operations: [],
+    const executeAcrossSpaces = vi.fn();
+    const migrations = createMockMigrations({
+      planResult: {
+        kind: 'success',
+        plan: {
+          targetId: 'postgres',
+          destination: { storageHash: 'sha256:same', profileHash: 'sha256:same-profile' },
+          operations: [],
+          renderTypeScript: () => {
+            throw new Error('not used in db update tests');
           },
-        }),
-      }),
-      createRunner: () => ({
-        execute: runnerExecute,
-      }),
-    } as unknown as TargetMigrationsCapability<
-      'sql',
-      'postgres',
-      ControlFamilyInstance<'sql', unknown>
-    >;
+        },
+      },
+      executeAcrossSpacesSpy: executeAcrossSpaces,
+    });
 
     const result = await executeDbUpdate({
       driver: createMockDriver(),
       familyInstance: createMockFamilyInstance({
-        readMarker: async () => ({
-          storageHash: 'sha256:same',
-          profileHash: 'sha256:same-profile',
-        }),
+        readAllMarkers: async () =>
+          new Map([
+            [
+              'app',
+              markerRecord({
+                storageHash: 'sha256:same',
+                profileHash: 'sha256:same-profile',
+              }),
+            ],
+          ]),
       }),
       contract: dummyContract,
       mode: 'plan',
       migrations,
       frameworkComponents: [],
+      migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);
@@ -317,7 +398,7 @@ describe('executeDbUpdate', () => {
       expect(result.value.plan.operations).toHaveLength(0);
       expect(result.value.summary).toContain('Planned 0');
     }
-    expect(runnerExecute).not.toHaveBeenCalled();
+    expect(executeAcrossSpaces).not.toHaveBeenCalled();
   });
 
   it('allows additive, widening, and destructive operation classes', async () => {
@@ -332,7 +413,16 @@ describe('executeDbUpdate', () => {
 
     const migrations = {
       createPlanner: () => ({ plan: planFn }),
-      createRunner: () => ({ execute: vi.fn() }),
+      createRunner: () => ({
+        execute: vi.fn(),
+        executeAcrossSpaces: vi.fn().mockResolvedValue(
+          ok({
+            perSpaceResults: [
+              { space: 'app', value: { operationsPlanned: 0, operationsExecuted: 0 } },
+            ],
+          }),
+        ),
+      }),
     } as unknown as TargetMigrationsCapability<
       'sql',
       'postgres',
@@ -342,12 +432,15 @@ describe('executeDbUpdate', () => {
     await executeDbUpdate({
       driver: createMockDriver(),
       familyInstance: createMockFamilyInstance({
-        readMarker: async () => ({ storageHash: 'sha256:origin' }),
+        readAllMarkers: async () =>
+          new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
       }),
       contract: dummyContract,
       mode: 'plan',
       migrations,
       frameworkComponents: [],
+      migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(planFn).toHaveBeenCalledWith(
@@ -386,6 +479,11 @@ describe('executeDbUpdate', () => {
             },
           },
         },
+        runnerResult: ok({
+          perSpaceResults: [
+            { space: 'app', value: { operationsPlanned: 2, operationsExecuted: 2 } },
+          ],
+        }),
       });
     }
 
@@ -393,12 +491,15 @@ describe('executeDbUpdate', () => {
       const result = await executeDbUpdate({
         driver: createMockDriver(),
         familyInstance: createMockFamilyInstance({
-          readMarker: async () => ({ storageHash: 'sha256:origin' }),
+          readAllMarkers: async () =>
+            new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
         }),
         contract: dummyContract,
         mode: 'apply',
         migrations: createDestructiveMigrations(),
         frameworkComponents: [],
+        migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
       });
 
       expect(result.ok).toBe(false);
@@ -417,13 +518,16 @@ describe('executeDbUpdate', () => {
       const result = await executeDbUpdate({
         driver: createMockDriver(),
         familyInstance: createMockFamilyInstance({
-          readMarker: async () => ({ storageHash: 'sha256:origin' }),
+          readAllMarkers: async () =>
+            new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
         }),
         contract: dummyContract,
         mode: 'apply',
         acceptDataLoss: true,
         migrations: createDestructiveMigrations(),
         frameworkComponents: [],
+        migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
       });
 
       expect(result.ok).toBe(true);
@@ -437,12 +541,15 @@ describe('executeDbUpdate', () => {
       const result = await executeDbUpdate({
         driver: createMockDriver(),
         familyInstance: createMockFamilyInstance({
-          readMarker: async () => ({ storageHash: 'sha256:origin' }),
+          readAllMarkers: async () =>
+            new Map([['app', markerRecord({ storageHash: 'sha256:origin' })]]),
         }),
         contract: dummyContract,
         mode: 'plan',
         migrations: createDestructiveMigrations(),
         frameworkComponents: [],
+        migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
       });
 
       expect(result.ok).toBe(true);
@@ -453,10 +560,12 @@ describe('executeDbUpdate', () => {
     });
   });
 
-  it('passes disabled execution checks to runner in apply mode', async () => {
-    const runnerExecute = vi
-      .fn()
-      .mockResolvedValue(ok({ operationsPlanned: 1, operationsExecuted: 1 }));
+  it('does not disable runner execution checks in apply mode (ADR 038 idempotent replay)', async () => {
+    const executeAcrossSpaces = vi.fn().mockResolvedValue(
+      ok({
+        perSpaceResults: [{ space: 'app', value: { operationsPlanned: 1, operationsExecuted: 1 } }],
+      }),
+    );
     const migrations = {
       createPlanner: () => ({
         plan: vi.fn().mockReturnValue({
@@ -475,7 +584,8 @@ describe('executeDbUpdate', () => {
         }),
       }),
       createRunner: () => ({
-        execute: runnerExecute,
+        execute: vi.fn(),
+        executeAcrossSpaces,
       }),
     } as unknown as TargetMigrationsCapability<
       'sql',
@@ -488,20 +598,26 @@ describe('executeDbUpdate', () => {
       familyInstance: createMockFamilyInstance(),
       contract: dummyContract,
       mode: 'apply',
+      acceptDataLoss: true,
       migrations,
       frameworkComponents: [],
+      migrationsDir: FAKE_MIGRATIONS_DIR,
+      targetId: 'postgres',
     });
 
     expect(result.ok).toBe(true);
-    expect(runnerExecute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        executionChecks: {
-          prechecks: false,
-          postchecks: false,
-          idempotencyChecks: false,
-        },
-      }),
-    );
+    expect(executeAcrossSpaces).toHaveBeenCalledTimes(1);
+    const callArg = executeAcrossSpaces.mock.calls[0]?.[0] as unknown as {
+      perSpaceOptions: ReadonlyArray<{ executionChecks?: unknown }>;
+    };
+    expect(callArg).toBeDefined();
+    expect(callArg.perSpaceOptions.length).toBeGreaterThan(0);
+    for (const opts of callArg.perSpaceOptions) {
+      // Runner default = all checks enabled (ADR 038). The aggregate apply
+      // primitive must not opt out — letting it do so would silently re-execute
+      // operations whose postconditions are already satisfied on re-apply.
+      expect(opts.executionChecks).toBeUndefined();
+    }
   });
 
   describe('progress events', () => {
@@ -515,11 +631,12 @@ describe('executeDbUpdate', () => {
         mode: 'plan',
         migrations: createMockMigrations(),
         frameworkComponents: [],
+        migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
         onProgress: (event) => events.push(event),
       });
 
       const spanIds = events.map((e) => e.spanId);
-      expect(spanIds).not.toContain('readMarker');
       expect(spanIds).toContain('introspect');
       expect(spanIds).toContain('plan');
       expect(spanIds).not.toContain('apply');
@@ -537,16 +654,24 @@ describe('executeDbUpdate', () => {
         familyInstance: createMockFamilyInstance(),
         contract: dummyContract,
         mode: 'apply',
+        acceptDataLoss: true,
         migrations: createMockMigrations(),
         frameworkComponents: [],
+        migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
         onProgress: (event) => events.push(event),
       });
 
       const spanIds = events.map((e) => e.spanId);
       expect(spanIds).toContain('apply');
-      expect(spanIds).not.toContain('readMarker');
       expect(spanIds).toContain('introspect');
       expect(spanIds).toContain('plan');
+
+      const applyStart = events.find((e) => e.kind === 'spanStart' && e.spanId === 'apply');
+      expect(applyStart).toMatchObject({
+        action: 'dbUpdate',
+        label: 'Updating database across spaces',
+      });
 
       const applyEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'apply');
       expect(applyEnd).toMatchObject({ outcome: 'ok' });
@@ -564,6 +689,8 @@ describe('executeDbUpdate', () => {
           planResult: { kind: 'failure', conflicts: [] },
         }),
         frameworkComponents: [],
+        migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
         onProgress: (event) => events.push(event),
       });
 
@@ -579,10 +706,18 @@ describe('executeDbUpdate', () => {
         familyInstance: createMockFamilyInstance(),
         contract: dummyContract,
         mode: 'apply',
+        acceptDataLoss: true,
         migrations: createMockMigrations({
-          runnerResult: notOk({ code: 'RUNNER_ERROR', summary: 'Failed', why: 'Error' }),
+          runnerResult: notOk({
+            code: 'RUNNER_ERROR',
+            summary: 'Failed',
+            why: 'Error',
+            failingSpace: 'app',
+          }),
         }),
         frameworkComponents: [],
+        migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
         onProgress: (event) => events.push(event),
       });
 
@@ -598,6 +733,8 @@ describe('executeDbUpdate', () => {
         mode: 'plan',
         migrations: createMockMigrations(),
         frameworkComponents: [],
+        migrationsDir: FAKE_MIGRATIONS_DIR,
+        targetId: 'postgres',
       });
 
       expect(result.ok).toBe(true);

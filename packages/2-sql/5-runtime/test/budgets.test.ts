@@ -5,6 +5,7 @@ import {
   AggregateExpr,
   ColumnRef,
   DeleteAst,
+  DerivedTableSource,
   ProjectionItem,
   SelectAst,
   TableSource,
@@ -28,6 +29,7 @@ function createMiddlewareContext(overrides?: Partial<SqlMiddlewareContext>): Sql
       warn: vi.fn(),
       error: vi.fn(),
     },
+    contentHash: async () => 'mock-hash',
     ...overrides,
   };
 }
@@ -107,7 +109,12 @@ describe('budgets middleware', () => {
         const mw = budgets({ maxLatencyMs: 100, severities: { latency: 'warn' } });
         const plan = createPlan({ sql: 'SELECT 1 LIMIT 1' });
         const ctx = createMiddlewareContext({ mode: 'permissive' });
-        const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
+        const result: AfterExecuteResult = {
+          rowCount: 1,
+          latencyMs: 200,
+          completed: true,
+          source: 'driver',
+        };
 
         await mw.afterExecute?.(plan, result, ctx);
         expect(ctx.log.warn).toHaveBeenCalledWith(
@@ -123,7 +130,12 @@ describe('budgets middleware', () => {
         const mw = budgets({ maxLatencyMs: 100, severities: { latency: 'error' } });
         const plan = createPlan({ sql: 'SELECT 1 LIMIT 1' });
         const ctx = createMiddlewareContext({ mode: 'strict' });
-        const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
+        const result: AfterExecuteResult = {
+          rowCount: 1,
+          latencyMs: 200,
+          completed: true,
+          source: 'driver',
+        };
 
         await expect(mw.afterExecute?.(plan, result, ctx)).rejects.toMatchObject({
           code: 'BUDGET.TIME_EXCEEDED',
@@ -139,7 +151,12 @@ describe('budgets middleware', () => {
         const mw = budgets({ maxLatencyMs: 100, severities: { latency: 'warn' } });
         const plan = createPlan({ sql: 'SELECT 1 LIMIT 1' });
         const ctx = createMiddlewareContext({ mode: 'strict' });
-        const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
+        const result: AfterExecuteResult = {
+          rowCount: 1,
+          latencyMs: 200,
+          completed: true,
+          source: 'driver',
+        };
 
         await expect(mw.afterExecute?.(plan, result, ctx)).rejects.toMatchObject({
           code: 'BUDGET.TIME_EXCEEDED',
@@ -155,7 +172,12 @@ describe('budgets middleware', () => {
         const mw = budgets({ maxLatencyMs: 1000 });
         const plan = createPlan({ sql: 'SELECT 1 LIMIT 1' });
         const ctx = createMiddlewareContext();
-        const result: AfterExecuteResult = { rowCount: 1, latencyMs: 50, completed: true };
+        const result: AfterExecuteResult = {
+          rowCount: 1,
+          latencyMs: 50,
+          completed: true,
+          source: 'driver',
+        };
 
         await mw.afterExecute?.(plan, result, ctx);
         expect(ctx.log.warn).not.toHaveBeenCalled();
@@ -288,6 +310,47 @@ describe('budgets middleware', () => {
         await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
           code: 'BUDGET.ROWS_EXCEEDED',
           details: expect.objectContaining({ source: 'ast' }),
+        });
+      },
+      timeouts.default,
+    );
+
+    it(
+      'flags unbounded SELECTs even when the estimate is below the row budget',
+      async () => {
+        const ast = SelectAst.from(userTable).withProjection([ProjectionItem.of('id', idCol)]);
+        const plan = createPlan({ ast });
+        const mw = budgets({ maxRows: 100_000, defaultTableRows: 100 });
+        const ctx = createMiddlewareContext();
+
+        await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+          code: 'BUDGET.ROWS_EXCEEDED',
+          details: { source: 'ast', maxRows: 100_000 },
+        });
+      },
+      timeouts.default,
+    );
+
+    it(
+      'reads the alias from a derived table source when estimating rows',
+      async () => {
+        const inner = SelectAst.from(userTable)
+          .withProjection([ProjectionItem.of('id', idCol)])
+          .withLimit(1);
+        const ast = SelectAst.from(DerivedTableSource.as('top_users', inner))
+          .withProjection([ProjectionItem.of('id', ColumnRef.of('top_users', 'id'))])
+          .withLimit(10);
+        const plan = createPlan({ ast });
+        const mw = budgets({
+          maxRows: 4,
+          defaultTableRows: 10_000,
+          tableRows: { top_users: 5 },
+        });
+        const ctx = createMiddlewareContext();
+
+        await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+          code: 'BUDGET.ROWS_EXCEEDED',
+          details: expect.objectContaining({ source: 'ast', estimatedRows: 5 }),
         });
       },
       timeouts.default,

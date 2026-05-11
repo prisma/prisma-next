@@ -1,159 +1,302 @@
-import type { JsonValue } from '@prisma-next/contract/types';
-import { type as arktype } from 'arktype';
-import { codec, defineCodecs } from './codec-types';
+/**
+ * The six SQL base codecs (TML-2357).
+ *
+ * Each codec ships as three artifacts:
+ *
+ * 1. A `SqlXCodec` class extending {@link CodecImpl} that wraps the module-level encode/decode constants exported from `sql-codec-helpers.ts` (the single source of truth for runtime behaviour). 2. A `SqlXDescriptor` class extending {@link CodecDescriptorImpl} declaring the codec id, traits, target types, params schema, and (where applicable) the emit-path `renderOutputType`. 3. A per-codec column helper (`sqlXColumn`)
+ * that calls `descriptor.factory(...)` directly and packages the result into a {@link ColumnSpec} via the framework {@link column} packager. The helper is tied to its descriptor with `satisfies ColumnHelperFor`.
+ *
+ * After TML-2357 this file is the canonical source of SQL base codec metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec` carriers retired with the deletion sweep.
+ */
 
-export const SQL_CHAR_CODEC_ID = 'sql/char@1' as const;
-export const SQL_VARCHAR_CODEC_ID = 'sql/varchar@1' as const;
-export const SQL_INT_CODEC_ID = 'sql/int@1' as const;
-export const SQL_FLOAT_CODEC_ID = 'sql/float@1' as const;
-export const SQL_TEXT_CODEC_ID = 'sql/text@1' as const;
-export const SQL_TIMESTAMP_CODEC_ID = 'sql/timestamp@1' as const;
+import type { JsonValue } from '@prisma-next/contract/types';
+import {
+  type CodecCallContext,
+  CodecDescriptorImpl,
+  CodecImpl,
+  type CodecInstanceContext,
+  type ColumnHelperFor,
+  type ColumnHelperForStrict,
+  column,
+  voidParamsSchema,
+} from '@prisma-next/framework-components/codec';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
+import { type as arktype } from 'arktype';
+import {
+  SQL_CHAR_CODEC_ID,
+  SQL_FLOAT_CODEC_ID,
+  SQL_INT_CODEC_ID,
+  SQL_TEXT_CODEC_ID,
+  SQL_TIMESTAMP_CODEC_ID,
+  SQL_VARCHAR_CODEC_ID,
+  sqlCharDecode,
+  sqlCharEncode,
+  sqlCharRenderOutputType,
+  sqlFloatDecode,
+  sqlFloatEncode,
+  sqlIntDecode,
+  sqlIntEncode,
+  sqlTextDecode,
+  sqlTextEncode,
+  sqlTimestampDecode,
+  sqlTimestampDecodeJson,
+  sqlTimestampEncode,
+  sqlTimestampEncodeJson,
+  sqlTimestampRenderOutputType,
+  sqlVarcharDecode,
+  sqlVarcharEncode,
+  sqlVarcharRenderOutputType,
+} from './sql-codec-helpers';
+
+type LengthParams = { readonly length?: number };
+type PrecisionParams = { readonly precision?: number };
 
 const lengthParamsSchema = arktype({
-  length: 'number.integer > 0',
-});
+  'length?': 'number.integer > 0',
+}) satisfies StandardSchemaV1<LengthParams>;
 
 const precisionParamsSchema = arktype({
   'precision?': 'number.integer >= 0 & number.integer <= 6',
-});
+}) satisfies StandardSchemaV1<PrecisionParams>;
 
-type LengthTypeHelper = {
-  readonly kind: 'fixed' | 'variable';
-  readonly maxLength: number;
-};
-
-function createLengthTypeHelper(
-  kind: LengthTypeHelper['kind'],
-): (params: Record<string, unknown>) => LengthTypeHelper {
-  return (params) => ({
-    kind,
-    maxLength: params['length'] as number,
-  });
+export class SqlTextCodec extends CodecImpl<
+  typeof SQL_TEXT_CODEC_ID,
+  readonly ['equality', 'order', 'textual'],
+  string,
+  string
+> {
+  async encode(value: string, _ctx: CodecCallContext): Promise<string> {
+    return sqlTextEncode(value);
+  }
+  async decode(wire: string, _ctx: CodecCallContext): Promise<string> {
+    return sqlTextDecode(wire);
+  }
+  encodeJson(value: string): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): string {
+    return json as string;
+  }
 }
 
-const sqlCharCodec = codec<
+export class SqlTextDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = SQL_TEXT_CODEC_ID;
+  override readonly traits = ['equality', 'order', 'textual'] as const;
+  override readonly targetTypes = ['text'] as const;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => SqlTextCodec {
+    return () => new SqlTextCodec(this);
+  }
+}
+
+export const sqlTextDescriptor = new SqlTextDescriptor();
+
+export const sqlTextColumn = () =>
+  column(sqlTextDescriptor.factory(), sqlTextDescriptor.codecId, undefined, 'text');
+
+sqlTextColumn satisfies ColumnHelperFor<SqlTextDescriptor>;
+sqlTextColumn satisfies ColumnHelperForStrict<SqlTextDescriptor>;
+
+export class SqlIntCodec extends CodecImpl<
+  typeof SQL_INT_CODEC_ID,
+  readonly ['equality', 'order', 'numeric'],
+  number,
+  number
+> {
+  async encode(value: number, _ctx: CodecCallContext): Promise<number> {
+    return sqlIntEncode(value);
+  }
+  async decode(wire: number, _ctx: CodecCallContext): Promise<number> {
+    return sqlIntDecode(wire);
+  }
+  encodeJson(value: number): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): number {
+    return json as number;
+  }
+}
+
+export class SqlIntDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = SQL_INT_CODEC_ID;
+  override readonly traits = ['equality', 'order', 'numeric'] as const;
+  override readonly targetTypes = ['int'] as const;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => SqlIntCodec {
+    return () => new SqlIntCodec(this);
+  }
+}
+
+export const sqlIntDescriptor = new SqlIntDescriptor();
+
+export const sqlIntColumn = () =>
+  column(sqlIntDescriptor.factory(), sqlIntDescriptor.codecId, undefined, 'int');
+
+sqlIntColumn satisfies ColumnHelperFor<SqlIntDescriptor>;
+sqlIntColumn satisfies ColumnHelperForStrict<SqlIntDescriptor>;
+
+export class SqlFloatCodec extends CodecImpl<
+  typeof SQL_FLOAT_CODEC_ID,
+  readonly ['equality', 'order', 'numeric'],
+  number,
+  number
+> {
+  async encode(value: number, _ctx: CodecCallContext): Promise<number> {
+    return sqlFloatEncode(value);
+  }
+  async decode(wire: number, _ctx: CodecCallContext): Promise<number> {
+    return sqlFloatDecode(wire);
+  }
+  encodeJson(value: number): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): number {
+    return json as number;
+  }
+}
+
+export class SqlFloatDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = SQL_FLOAT_CODEC_ID;
+  override readonly traits = ['equality', 'order', 'numeric'] as const;
+  override readonly targetTypes = ['float'] as const;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => SqlFloatCodec {
+    return () => new SqlFloatCodec(this);
+  }
+}
+
+export const sqlFloatDescriptor = new SqlFloatDescriptor();
+
+export const sqlFloatColumn = () =>
+  column(sqlFloatDescriptor.factory(), sqlFloatDescriptor.codecId, undefined, 'float');
+
+sqlFloatColumn satisfies ColumnHelperFor<SqlFloatDescriptor>;
+sqlFloatColumn satisfies ColumnHelperForStrict<SqlFloatDescriptor>;
+
+export class SqlCharCodec extends CodecImpl<
   typeof SQL_CHAR_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
   string
->({
-  typeId: SQL_CHAR_CODEC_ID,
-  targetTypes: ['char'],
-  traits: ['equality', 'order', 'textual'],
-  encode: (value: string): string => value,
-  decode: (wire: string): string => wire.trimEnd(),
-  paramsSchema: lengthParamsSchema,
-  init: createLengthTypeHelper('fixed'),
-  renderOutputType: (typeParams) => {
-    const length = typeParams['length'];
-    if (length === undefined) return undefined;
-    if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
-      throw new Error(
-        `renderOutputType: expected integer "length" in typeParams for Char, got ${String(length)}`,
-      );
-    }
-    return `Char<${length}>`;
-  },
-});
+> {
+  async encode(value: string, _ctx: CodecCallContext): Promise<string> {
+    return sqlCharEncode(value);
+  }
+  async decode(wire: string, _ctx: CodecCallContext): Promise<string> {
+    return sqlCharDecode(wire);
+  }
+  encodeJson(value: string): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): string {
+    return json as string;
+  }
+}
 
-const sqlVarcharCodec = codec<
+export class SqlCharDescriptor extends CodecDescriptorImpl<LengthParams> {
+  override readonly codecId = SQL_CHAR_CODEC_ID;
+  override readonly traits = ['equality', 'order', 'textual'] as const;
+  override readonly targetTypes = ['char'] as const;
+  override readonly paramsSchema: StandardSchemaV1<LengthParams> = lengthParamsSchema;
+  override renderOutputType(params: LengthParams): string | undefined {
+    return sqlCharRenderOutputType(params);
+  }
+  override factory(_params: LengthParams): (ctx: CodecInstanceContext) => SqlCharCodec {
+    return () => new SqlCharCodec(this);
+  }
+}
+
+export const sqlCharDescriptor = new SqlCharDescriptor();
+
+export const sqlCharColumn = (params: LengthParams = {}) =>
+  column(sqlCharDescriptor.factory(params), sqlCharDescriptor.codecId, params, 'char');
+
+sqlCharColumn satisfies ColumnHelperFor<SqlCharDescriptor>;
+sqlCharColumn satisfies ColumnHelperForStrict<SqlCharDescriptor>;
+
+export class SqlVarcharCodec extends CodecImpl<
   typeof SQL_VARCHAR_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
   string
->({
-  typeId: SQL_VARCHAR_CODEC_ID,
-  targetTypes: ['varchar'],
-  traits: ['equality', 'order', 'textual'],
-  encode: (value: string): string => value,
-  decode: (wire: string): string => wire,
-  paramsSchema: lengthParamsSchema,
-  init: createLengthTypeHelper('variable'),
-  renderOutputType: (typeParams) => {
-    const length = typeParams['length'];
-    if (length === undefined) return undefined;
-    if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
-      throw new Error(
-        `renderOutputType: expected integer "length" in typeParams for Varchar, got ${String(length)}`,
-      );
-    }
-    return `Varchar<${length}>`;
-  },
-});
+> {
+  async encode(value: string, _ctx: CodecCallContext): Promise<string> {
+    return sqlVarcharEncode(value);
+  }
+  async decode(wire: string, _ctx: CodecCallContext): Promise<string> {
+    return sqlVarcharDecode(wire);
+  }
+  encodeJson(value: string): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): string {
+    return json as string;
+  }
+}
 
-const sqlIntCodec = codec({
-  typeId: SQL_INT_CODEC_ID,
-  targetTypes: ['int'],
-  traits: ['equality', 'order', 'numeric'],
-  encode: (value: number): number => value,
-  decode: (wire: number): number => wire,
-});
+export class SqlVarcharDescriptor extends CodecDescriptorImpl<LengthParams> {
+  override readonly codecId = SQL_VARCHAR_CODEC_ID;
+  override readonly traits = ['equality', 'order', 'textual'] as const;
+  override readonly targetTypes = ['varchar'] as const;
+  override readonly paramsSchema: StandardSchemaV1<LengthParams> = lengthParamsSchema;
+  override renderOutputType(params: LengthParams): string | undefined {
+    return sqlVarcharRenderOutputType(params);
+  }
+  override factory(_params: LengthParams): (ctx: CodecInstanceContext) => SqlVarcharCodec {
+    return () => new SqlVarcharCodec(this);
+  }
+}
 
-const sqlFloatCodec = codec({
-  typeId: SQL_FLOAT_CODEC_ID,
-  targetTypes: ['float'],
-  traits: ['equality', 'order', 'numeric'],
-  encode: (value: number): number => value,
-  decode: (wire: number): number => wire,
-});
+export const sqlVarcharDescriptor = new SqlVarcharDescriptor();
 
-const sqlTextCodec = codec({
-  typeId: SQL_TEXT_CODEC_ID,
-  targetTypes: ['text'],
-  traits: ['equality', 'order', 'textual'],
-  encode: (value: string): string => value,
-  decode: (wire: string): string => wire,
-});
+export const sqlVarcharColumn = (params: LengthParams = {}) =>
+  column(sqlVarcharDescriptor.factory(params), sqlVarcharDescriptor.codecId, params, 'varchar');
 
-const sqlTimestampCodec = codec<
+sqlVarcharColumn satisfies ColumnHelperFor<SqlVarcharDescriptor>;
+sqlVarcharColumn satisfies ColumnHelperForStrict<SqlVarcharDescriptor>;
+
+export class SqlTimestampCodec extends CodecImpl<
   typeof SQL_TIMESTAMP_CODEC_ID,
   readonly ['equality', 'order'],
   Date,
   Date
->({
-  typeId: SQL_TIMESTAMP_CODEC_ID,
-  targetTypes: ['timestamp'],
-  traits: ['equality', 'order'],
-  encode: (value: Date): Date => value,
-  decode: (wire: Date): Date => wire,
-  encodeJson: (value: Date): JsonValue => value.toISOString(),
-  decodeJson: (json: JsonValue): Date => {
-    if (typeof json !== 'string') {
-      throw new Error(`Expected ISO date string for sql/timestamp@1, got ${typeof json}`);
-    }
-    const date = new Date(json);
-    if (Number.isNaN(date.getTime())) {
-      throw new Error(`Invalid ISO date string for sql/timestamp@1: ${json}`);
-    }
-    return date;
-  },
-  paramsSchema: precisionParamsSchema,
-  renderOutputType: (typeParams) => {
-    const precision = typeParams['precision'];
-    if (precision === undefined) {
-      return 'Timestamp';
-    }
-    if (
-      typeof precision !== 'number' ||
-      !Number.isFinite(precision) ||
-      !Number.isInteger(precision)
-    ) {
-      throw new Error(
-        `renderOutputType: expected integer "precision" in typeParams for Timestamp, got ${String(precision)}`,
-      );
-    }
-    return `Timestamp<${precision}>`;
-  },
-});
+> {
+  async encode(value: Date, _ctx: CodecCallContext): Promise<Date> {
+    return sqlTimestampEncode(value);
+  }
+  async decode(wire: Date, _ctx: CodecCallContext): Promise<Date> {
+    return sqlTimestampDecode(wire);
+  }
+  encodeJson(value: Date): JsonValue {
+    return sqlTimestampEncodeJson(value);
+  }
+  decodeJson(json: JsonValue): Date {
+    return sqlTimestampDecodeJson(json);
+  }
+}
 
-const codecs = defineCodecs()
-  .add('char', sqlCharCodec)
-  .add('varchar', sqlVarcharCodec)
-  .add('int', sqlIntCodec)
-  .add('float', sqlFloatCodec)
-  .add('text', sqlTextCodec)
-  .add('timestamp', sqlTimestampCodec);
+export class SqlTimestampDescriptor extends CodecDescriptorImpl<PrecisionParams> {
+  override readonly codecId = SQL_TIMESTAMP_CODEC_ID;
+  override readonly traits = ['equality', 'order'] as const;
+  override readonly targetTypes = ['timestamp'] as const;
+  override readonly paramsSchema: StandardSchemaV1<PrecisionParams> = precisionParamsSchema;
+  override renderOutputType(params: PrecisionParams): string | undefined {
+    return sqlTimestampRenderOutputType(params);
+  }
+  override factory(_params: PrecisionParams): (ctx: CodecInstanceContext) => SqlTimestampCodec {
+    return () => new SqlTimestampCodec(this);
+  }
+}
 
-export const sqlCodecDefinitions = codecs.codecDefinitions;
-export const sqlDataTypes = codecs.dataTypes;
-export type SqlCodecTypes = typeof codecs.CodecTypes;
+export const sqlTimestampDescriptor = new SqlTimestampDescriptor();
+
+export const sqlTimestampColumn = (params: PrecisionParams = {}) =>
+  column(
+    sqlTimestampDescriptor.factory(params),
+    sqlTimestampDescriptor.codecId,
+    params,
+    'timestamp',
+  );
+
+sqlTimestampColumn satisfies ColumnHelperFor<SqlTimestampDescriptor>;
+sqlTimestampColumn satisfies ColumnHelperForStrict<SqlTimestampDescriptor>;

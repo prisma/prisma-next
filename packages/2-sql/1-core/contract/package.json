@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/sql-contract",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "SQL contract types, validators, and IR factories for Prisma Next",
@@ -17,7 +18,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
-    "arktype": "^2.1.25"
+    "arktype": "^2.1.29"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",

@@ -24,6 +24,8 @@ export {
   contractToSchemaIR,
   detectDestructiveChanges,
 } from '../core/migrations/contract-to-schema-ir';
+export type { PlanFieldEventOperationsOptions } from '../core/migrations/field-event-planner';
+export { planFieldEventOperations } from '../core/migrations/field-event-planner';
 export {
   createMigrationPlan,
   plannerFailure,
@@ -33,12 +35,16 @@ export {
 } from '../core/migrations/plan-helpers';
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
 export type {
-  AnySqlMigrationOperation,
   CodecControlHooks,
   ComponentDatabaseDependencies,
   ComponentDatabaseDependency,
   CreateSqlMigrationPlanOptions,
   ExpandNativeTypeInput,
+  FieldEvent,
+  FieldEventContext,
+  MultiSpaceRunnerFailure,
+  MultiSpaceRunnerResult,
+  MultiSpaceRunnerSuccessValue,
   ResolveIdentityValueInput,
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
@@ -67,5 +73,9 @@ export type {
   StorageTypePlanResult,
 } from '../core/migrations/types';
 export { collectInitDependencies, isDatabaseDependencyProvider } from '../core/migrations/types';
+export {
+  temporalAuthoringPresets,
+  timestampNowControlDescriptor,
+} from '../core/timestamp-now-generator';
 
 export default new SqlFamilyDescriptor();

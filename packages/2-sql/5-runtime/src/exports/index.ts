@@ -24,6 +24,7 @@ export type {
 } from '../runtime-spi';
 export type {
   ExecutionContext,
+  GeneratorStability,
   RuntimeMutationDefaultGenerator,
   RuntimeParameterizedCodecDescriptor,
   SqlExecutionStack,
@@ -43,6 +44,7 @@ export {
 } from '../sql-context';
 export type { SqlStatement } from '../sql-marker';
 export {
+  APP_SPACE_ID,
   ensureSchemaStatement,
   ensureTableStatement,
   readContractMarker,

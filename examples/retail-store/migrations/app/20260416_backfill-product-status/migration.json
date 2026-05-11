@@ -1,0 +1,19 @@
+{
+  "from": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d",
+  "to": "sha256:4407077380e2331b356697c35153192b3bdafadb432f0d64b081d24e8af3e55a",
+  "fromContract": null,
+  "toContract": {
+    "storage": {
+      "storageHash": "sha256:4407077380e2331b356697c35153192b3bdafadb432f0d64b081d24e8af3e55a"
+    }
+  },
+  "hints": {
+    "used": [],
+    "applied": [],
+    "plannerVersion": "2.0.0"
+  },
+  "labels": ["backfill-product-status"],
+  "providedInvariants": [],
+  "createdAt": "2026-04-16T07:26:17.265Z",
+  "migrationHash": "sha256:3b5da6e635d99d8fd06cc41c2f3f8fb9e4a6d73c88e1429767eb3ff11ae4f263"
+}

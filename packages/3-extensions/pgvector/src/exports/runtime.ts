@@ -1,74 +1,6 @@
-import type { Codec, CodecInstanceContext } from '@prisma-next/framework-components/codec';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import type {
-  RuntimeParameterizedCodecDescriptor,
-  SqlRuntimeExtensionDescriptor,
-} from '@prisma-next/sql-runtime';
-import { type as arktype } from 'arktype';
-import { codecDefinitions } from '../core/codecs';
-import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from '../core/constants';
+import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 import { pgvectorPackMeta, pgvectorQueryOperations } from '../core/descriptor-meta';
-
-const vectorParamsSchema = arktype({
-  length: 'number',
-}).narrow((params, ctx) => {
-  const { length } = params;
-  if (!Number.isInteger(length)) {
-    return ctx.mustBe('an integer');
-  }
-  if (length < 1 || length > VECTOR_MAX_DIM) {
-    return ctx.mustBe(`in the range [1, ${VECTOR_MAX_DIM}]`);
-  }
-  return true;
-});
-
-// pgvector's encode is parameter-independent (the wire format `[v1,v2,...]`
-// doesn't care about declared length), so the resolved codec for every
-// `(length)` instance is the same shared codec object today. The factory
-// returns it directly; `ctx` is unused. When a future refactor wants per-
-// instance state (e.g. capping wire length to declared dimension), the
-// closure over `params` is the place to add it.
-//
-// The factory parameter types as the family-agnostic
-// `CodecInstanceContext` because pgvector doesn't read the SQL-specific
-// `usedAt` field. The SQL runtime materializer passes a
-// `SqlCodecInstanceContext`; family-agnostic factories are structurally
-// compatible with the SQL extended type.
-const sharedVectorCodec: Codec = codecDefinitions.vector.codec;
-const vectorFactory = (_params: { readonly length: number }) => (_ctx: CodecInstanceContext) =>
-  sharedVectorCodec;
-
-const parameterizedCodecDescriptors = [
-  {
-    codecId: VECTOR_CODEC_ID,
-    traits: ['equality'] as const,
-    targetTypes: ['vector'] as const,
-    paramsSchema: vectorParamsSchema,
-    renderOutputType: (params: { readonly length: number }) => `Vector<${params.length}>`,
-    factory: vectorFactory,
-    // pgvector's wire format `[v1,v2,...]` is dimension-independent — every
-    // resolved instance encodes equivalently regardless of declared length.
-    // Today the factory dodges the registry's reference-based ambiguity
-    // check by returning `sharedVectorCodec` for every params, so two
-    // `vector(N)` columns of different lengths happen to share one codec
-    // instance. Declare the invariant explicitly so a future refactor that
-    // closes over `params` (e.g. capping wire length to declared dimension
-    // — see comment above `vectorFactory`) keeps multi-column contracts
-    // working without surprises. Becomes vestigial when AC-5 (TML-2357)
-    // threads `ParamRef.refs` through column-bound construction sites.
-    encodeIsParamsIndependent: true,
-  },
-] as const satisfies ReadonlyArray<
-  RuntimeParameterizedCodecDescriptor<{ readonly length: number }>
->;
-
-function createPgvectorCodecRegistry() {
-  const registry = createCodecRegistry();
-  for (const def of Object.values(codecDefinitions)) {
-    registry.register(def.codec);
-  }
-  return registry;
-}
+import { pgvectorCodecRegistry } from '../core/registry';
 
 const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   kind: 'extension' as const,
@@ -76,20 +8,14 @@ const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   version: pgvectorPackMeta.version,
   familyId: 'sql' as const,
   targetId: 'postgres' as const,
-  // Mirror `pgvectorPackMeta.types.codecTypes.codecInstances` here so that
-  // runtime-plane assemblers driven by `extractCodecLookup` (which reads
-  // `descriptor.types?.codecTypes?.codecInstances`) discover `pg/vector@1`.
-  // Without this, the Postgres adapter's runtime-plane codec lookup misses
-  // the vector codec and `$N::vector` would silently disappear once the
-  // renderer switches to lookup-driven cast policy.
+  // Expose the unified descriptor list so `extractCodecLookup` reads `targetTypes` / `meta` / `renderOutputType` directly off the descriptors and materializes the representative `Codec` for the SQL renderer's cast-policy lookup.
   types: {
     codecTypes: {
-      codecInstances: Object.values(codecDefinitions).map((def) => def.codec),
+      codecDescriptors: Array.from(pgvectorCodecRegistry.values()),
     },
   },
-  codecs: createPgvectorCodecRegistry,
+  codecs: () => Array.from(pgvectorCodecRegistry.values()),
   queryOperations: () => pgvectorQueryOperations(),
-  parameterizedCodecs: () => parameterizedCodecDescriptors,
   create() {
     return {
       familyId: 'sql' as const,
@@ -98,4 +24,5 @@ const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   },
 };
 
+export { pgvectorCodecRegistry };
 export default pgvectorRuntimeDescriptor;

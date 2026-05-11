@@ -4,33 +4,56 @@
 
 Accepted. Apr 30, 2026.
 
-Codec query-time methods (`encode`, `decode`) gain an optional second argument: a per-call context object carrying `signal` (framework-level) and family-specific metadata such as SQL's `column` (family-level). The runtime's `execute(plan, { signal })` builds one context per call and threads it to every codec invocation, so codec authors can forward cancellation to their underlying SDK and identify the column at decode time. Resolves the `AbortSignal` half of [ADR 204](./ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) §"Risks & mitigations" and the decode-side column-identity gap. The concurrency-cap half of ADR 204 §"Risks" stays open, tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
+Codec query-time methods (`encode`, `decode`) gain an optional second argument: a per-call context object carrying `signal` (framework-level) and family-specific metadata such as SQL's `column` (family-level). The runtime's `execute(plan, { signal })` builds one context per call and threads it to every codec invocation, so codec authors can forward cancellation to their underlying SDK and identify the column at decode time. Resolves the `AbortSignal` half of [ADR 204](./ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) §"Risks & mitigations" and the decode-side column-identity gap. The concurrency-cap half of ADR 204 §"Risks" stays open; see [framework-gaps G4](../../reference/framework-gaps.md#g4--per-cell-promiseall-codec-dispatch-is-unbounded-for-network-backed-codecs).
 
 ## Grounding example
 
 A codec author shipping an encrypted-JSON column type with cancellation and column-aware envelopes:
 
 ```ts
-import { codec } from '@prisma-next/sql-relational-core/ast';
+import {
+  CodecDescriptorImpl,
+  CodecImpl,
+  voidParamsSchema,
+  type CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
+import type { JsonValue } from '@prisma-next/contract/types';
+import type { SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
 import { encryptClient } from './encrypt-client';
 
-const encryptedJson = codec({
-  typeId: 'encrypted/json@1',
-  targetTypes: ['jsonb'],
+class EncryptedJsonCodec extends CodecImpl<
+  'encrypted/json@1',
+  readonly [],
+  string,
+  { readonly value: JsonValue; readonly column?: { table: string; name: string } }
+> {
+  override readonly id = 'encrypted/json@1';
+  override readonly traits = [] as const;
 
-  // Single-arg authors continue to compile and run unchanged.
-  // Two-arg authors observe the per-call context.
-  encode: async (value: JsonValue, ctx) => {
-    return encryptClient.encrypt(value, { signal: ctx?.signal });
-  },
-  decode: async (wire: string, ctx) => {
-    const plain = await encryptClient.decrypt(wire, { signal: ctx?.signal });
+  override async encode(value: { value: JsonValue }, ctx: SqlCodecCallContext): Promise<string> {
+    return encryptClient.encrypt(value.value, { signal: ctx.signal });
+  }
+  override async decode(
+    wire: string,
+    ctx: SqlCodecCallContext,
+  ): Promise<{ value: JsonValue; column?: { table: string; name: string } }> {
+    const plain = await encryptClient.decrypt(wire, { signal: ctx.signal });
     // SQL family ctx: column is { table, name } when the cell resolves to
     // a single underlying column, undefined for aggregates / computed
     // expressions / include aliases.
-    return { value: plain, column: ctx?.column };
-  },
-});
+    return { value: plain, column: ctx.column };
+  }
+  encodeJson(v: { value: JsonValue }): JsonValue { return v.value; }
+  decodeJson(j: JsonValue): { value: JsonValue } { return { value: j }; }
+}
+
+class EncryptedJsonDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = 'encrypted/json@1';
+  override readonly traits = [] as const;
+  override readonly targetTypes = ['jsonb'] as const;
+  override readonly paramsSchema = voidParamsSchema;
+  override readonly factory = () => (_ctx: CodecInstanceContext) => new EncryptedJsonCodec();
+}
 ```
 
 The call site supplies the signal once; the runtime forwards the same `AbortSignal` reference to every codec call inside that one query:
@@ -176,7 +199,7 @@ export function runtimeAborted(
 - Cells that don't resolve to a single underlying column (aggregate aliases, computed projections, include-aggregate fields) get `column: undefined`. Codec authors that need column identity must handle the undefined case explicitly; the runtime never silently defaults it.
 - When the runtime cannot project `column` for a cell, the per-cell ctx **drops the field entirely** rather than passing the row-level context through unchanged — preventing a previously-populated `rowCtx.column` from leaking into unrelated cells when callers reuse a context object.
 
-Encode-side `ctx.column` is intentionally always undefined. The same encode site encodes parameters for predicates, expressions, and aggregations whose column identity is ambiguous. Encode-time column context is the middleware's domain — a middleware that walks a plan can attach richer column metadata to outbound parameters before encode begins (tracked under [TML-2359](https://linear.app/prisma-company/issue/TML-2359)).
+Encode-side `ctx.column` is intentionally always undefined. The same encode site encodes parameters for predicates, expressions, and aggregations whose column identity is ambiguous. Encode-time column context is the middleware's domain — a middleware that walks a plan can attach richer column metadata to outbound parameters before encode begins (documented as still-open encode-side enrichment under [framework-gaps G1](../../reference/framework-gaps.md#g1--codecs-receive-no-per-call-column-metadata)).
 
 ## What this enables
 
@@ -187,7 +210,7 @@ Encode-side `ctx.column` is intentionally always undefined. The same encode site
 
 ## Non-goals (deliberate)
 
-- **No concurrency cap, no rate limit, no batched dispatch.** A query that touches N rows × M codec'd cells still issues N × M concurrent codec calls. Bounding fan-out is tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330). The codec author surface is forward-compatible — a future `bulkEncode` / `bulkDecode` slot lands additively.
+- **No concurrency cap, no rate limit, no batched dispatch.** A query that touches N rows × M codec'd cells still issues N × M concurrent codec calls. Bounding fan-out is tracked under [framework-gaps G4](../../reference/framework-gaps.md#g4--per-cell-promiseall-codec-dispatch-is-unbounded-for-network-backed-codecs). The codec author surface is forward-compatible — a future `bulkEncode` / `bulkDecode` slot lands additively.
 - **No driver-level statement cancellation.** When the runtime returns `RUNTIME.ABORTED` mid-stream, the underlying database driver's in-flight statement is not cancelled at the wire level. Iterator-close cleanup runs (cursor released, connection returned to pool); the server may keep producing rows for a moment after the runtime stops consuming. Wiring `signal` into Postgres `pg_cancel_backend` / Mongo `killCursors` is separate work.
 - **No transaction-scoped abort composition.** Each `runtime.execute` builds its own per-execute context; the transaction wrapper doesn't compose deadline / cancel-on-rollback signals automatically. Callers compose their own controllers if they need transaction-scoped timeouts.
 - **No structured cancellation reason taxonomy.** `cause` carries `signal.reason` verbatim; no normalization, no enrichment.
@@ -230,7 +253,7 @@ We considered having the runtime forcibly terminate codec bodies on abort, by pa
 
 ### Encode-side `ctx.column`
 
-We considered populating `ctx.column` for encode calls too. Rejected: the same encode site encodes parameters for predicates, expressions, and aggregations whose column identity is ambiguous. Encode-time column context is the middleware's domain — a middleware can walk the plan and attach richer column metadata to outbound parameters before encode begins. Tracked under [TML-2359](https://linear.app/prisma-company/issue/TML-2359).
+We considered populating `ctx.column` for encode calls too. Rejected: the same encode site encodes parameters for predicates, expressions, and aggregations whose column identity is ambiguous. Encode-time column context is the middleware's domain — a middleware can walk the plan and attach richer column metadata to outbound parameters before encode begins. See [framework-gaps G1](../../reference/framework-gaps.md#g1--codecs-receive-no-per-call-column-metadata).
 
 ### Eager driver-level cancellation
 
@@ -258,8 +281,8 @@ The required second-arg shape on the `Codec` interface doesn't tie context to as
 
 - [ADR 204 — Single-Path Async Codec Runtime](./ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md). Establishes the always-await codec runtime model and names `AbortSignal` plumbing as a known gap; this ADR resolves that half.
 - [ADR 027 — Error Envelope Stable Codes](./ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md). Defines the envelope shape (`code`, `details`, `cause`) used by `RUNTIME.ABORTED`.
-- [TML-2330](https://linear.app/prisma-company/issue/TML-2330). Tracking ticket for this ADR's implementation; concurrency cap / bulk-codec dispatch stays open under the same ticket.
-- [TML-2359](https://linear.app/prisma-company/issue/TML-2359). Encode-side richer column metadata via middleware (out of scope for this ADR).
+- [framework-gaps G4](../../reference/framework-gaps.md#g4--per-cell-promiseall-codec-dispatch-is-unbounded-for-network-backed-codecs) — concurrency cap / bulk-codec dispatch (still open alongside this ADR's `AbortSignal` work).
+- [framework-gaps G1](../../reference/framework-gaps.md#g1--codecs-receive-no-per-call-column-metadata) — encode-side richer column metadata via middleware (out of scope for this ADR).
 - [WHATWG `AbortSignal` / `AbortController](https://dom.spec.whatwg.org/#interface-abortsignal)`. The cancellation primitive used end-to-end.
 
-Implementation lives across `framework-components` (`codec-types.ts`, `runtime-error.ts`, `race-against-abort.ts`, `runtime-core.ts`, `runtime-middleware.ts`), `relational-core/src/ast/codec-types.ts`, the SQL runtime's encode/decode/streaming paths, and the Mongo adapter / runtime threading. Behavioural and type-level test pins sit alongside each subject file under `test/`. End-to-end abort coverage against real drivers lives at `test/integration/test/sql-builder/execution-abort.test.ts` and `test/integration/test/mongo/execution-abort.test.ts`. Full implementation history is in PR [#400](https://github.com/prisma/prisma-next/pull/400) under [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
+Implementation lives across `framework-components` (`codec-types.ts`, `runtime-error.ts`, `race-against-abort.ts`, `runtime-core.ts`, `runtime-middleware.ts`), `relational-core/src/ast/codec-types.ts`, the SQL runtime's encode/decode/streaming paths, and the Mongo adapter / runtime threading. Behavioural and type-level test pins sit alongside each subject file under `test/`. End-to-end abort coverage against real drivers lives at `test/integration/test/sql-builder/execution-abort.test.ts` and `test/integration/test/mongo/execution-abort.test.ts`. Full implementation history is in PR [#400](https://github.com/prisma/prisma-next/pull/400).

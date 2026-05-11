@@ -196,7 +196,7 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
               profile: field.json().optional(),
               role: field.namedType(Role),
               embedding: field.namedType(Embedding).optional(),
-              createdAt: field.createdAt(),
+              createdAt: field.temporal.createdAt(),
             },
           }).sql({
             table: 'user',

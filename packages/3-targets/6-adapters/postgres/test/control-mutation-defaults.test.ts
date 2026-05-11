@@ -4,6 +4,7 @@ import {
   createPostgresMutationDefaultGeneratorDescriptors,
   createPostgresScalarTypeDescriptors,
 } from '../src/core/control-mutation-defaults';
+import runtimeAdapterDescriptor from '../src/exports/runtime';
 
 const stubSpan = {
   start: { offset: 0, line: 1, column: 1 },
@@ -345,8 +346,26 @@ describe('createPostgresMutationDefaultGeneratorDescriptors', () => {
   it('returns descriptors for all builtin generators', () => {
     const ids = descriptors.map((d) => d.id);
     expect(ids).toEqual(
-      expect.arrayContaining(['ulid', 'nanoid', 'uuidv7', 'uuidv4', 'cuid2', 'ksuid']),
+      expect.arrayContaining([
+        'ulid',
+        'nanoid',
+        'uuidv7',
+        'uuidv4',
+        'cuid2',
+        'ksuid',
+        'timestampNow',
+      ]),
     );
+  });
+
+  it('omits applicableCodecIds for timestampNow (preset-only generator)', () => {
+    const descriptor = descriptors.find((d) => d.id === 'timestampNow')!;
+
+    // timestampNow is reachable only via temporal.{createdAt,updatedAt}()
+    // preset descriptors that co-register the codec — the @default(...)
+    // lowering compatibility check has no role to play here, so the
+    // field is intentionally absent. F04 / spec NFR3 (corrected).
+    expect(descriptor.applicableCodecIds).toBeUndefined();
   });
 
   it('resolves column descriptor for matching generator', () => {
@@ -371,6 +390,16 @@ describe('createPostgresMutationDefaultGeneratorDescriptors', () => {
       generated: { kind: 'generator', id: 'nanoid' },
     });
     expect(result).toBeUndefined();
+  });
+});
+
+describe('postgres runtime mutation default generators', () => {
+  it('provides timestampNow as a Date generator', () => {
+    const generator = (runtimeAdapterDescriptor.mutationDefaultGenerators?.() ?? []).find(
+      (entry) => entry.id === 'timestampNow',
+    );
+
+    expect(generator?.generate()).toBeInstanceOf(Date);
   });
 });
 

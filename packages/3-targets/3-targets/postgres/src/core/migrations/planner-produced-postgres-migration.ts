@@ -41,11 +41,13 @@ export class TypeScriptRenderablePostgresMigration
 {
   readonly #calls: readonly PostgresOpFactoryCall[];
   readonly #meta: MigrationMeta;
+  readonly #spaceId: string;
 
-  constructor(calls: readonly PostgresOpFactoryCall[], meta: MigrationMeta) {
+  constructor(calls: readonly PostgresOpFactoryCall[], meta: MigrationMeta, spaceId: string) {
     super();
     this.#calls = calls;
     this.#meta = meta;
+    this.#spaceId = spaceId;
   }
 
   override get operations(): readonly Op[] {
@@ -54,6 +56,15 @@ export class TypeScriptRenderablePostgresMigration
 
   override describe(): MigrationMeta {
     return this.#meta;
+  }
+
+  /**
+   * Contract space this planner-produced plan applies to. Threaded
+   * from the planner options so the runner keys the marker row by
+   * the right space when executing the plan.
+   */
+  get spaceId(): string {
+    return this.#spaceId;
   }
 
   renderTypeScript(): string {

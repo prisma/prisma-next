@@ -13,6 +13,7 @@ import {
 } from '../utils/cli-errors';
 import type { MigrationCommandOptions } from '../utils/command-helpers';
 import {
+  resolveMigrationPaths,
   sanitizeErrorMessage,
   setCommandDescriptions,
   setCommandExamples,
@@ -111,14 +112,23 @@ async function executeDbInitCommand(
   if (!ctxResult.ok) {
     return ctxResult;
   }
-  const { client, contractJson, dbConnection, onProgress, contractPathAbsolute } = ctxResult.value;
+  const { client, config, contractJson, dbConnection, onProgress, contractPathAbsolute } =
+    ctxResult.value;
+
+  // The aggregate loader (loader → planner → runner pipeline) catches
+  // layout / drift / disjointness violations on its own; the legacy
+  // per-space precheck + marker-check helpers are no longer needed at
+  // this surface. Marker-vs-on-disk drift surfaces through the planner's
+  // graph-walk strategy.
+  const { migrationsDir } = resolveMigrationPaths(options.config, config);
 
   try {
-    // Call dbInit with connection and progress callback
+    await client.connect(dbConnection);
+
     const result = await client.dbInit({
       contract: contractJson,
       mode: options.dryRun ? 'plan' : 'apply',
-      connection: dbConnection,
+      migrationsDir,
       onProgress,
     });
 
@@ -160,6 +170,7 @@ async function executeDbInitCommand(
             },
           }
         : {}),
+      ...ifDefined('perSpace', result.value.perSpace),
       summary: result.value.summary,
       timings: { total: Date.now() - startTime },
     };

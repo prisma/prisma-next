@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { SqlCodecCallContext } from '../../src/ast/codec-types';
 import {
   SQL_CHAR_CODEC_ID,
   SQL_FLOAT_CODEC_ID,
@@ -7,267 +6,245 @@ import {
   SQL_TEXT_CODEC_ID,
   SQL_TIMESTAMP_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
-  sqlCodecDefinitions,
-  sqlDataTypes,
+} from '../../src/ast/sql-codec-helpers';
+import {
+  sqlCharColumn,
+  sqlCharDescriptor,
+  sqlFloatColumn,
+  sqlFloatDescriptor,
+  sqlIntColumn,
+  sqlIntDescriptor,
+  sqlTextColumn,
+  sqlTextDescriptor,
+  sqlTimestampColumn,
+  sqlTimestampDescriptor,
+  sqlVarcharColumn,
+  sqlVarcharDescriptor,
 } from '../../src/ast/sql-codecs';
 
+const instanceCtx = { name: '<test>' };
+const callCtx = {};
+
 describe('sql-codecs', () => {
-  it('exports expected codec IDs', () => {
-    expect({
-      char: SQL_CHAR_CODEC_ID,
-      varchar: SQL_VARCHAR_CODEC_ID,
-      int: SQL_INT_CODEC_ID,
-      float: SQL_FLOAT_CODEC_ID,
-      text: SQL_TEXT_CODEC_ID,
-      timestamp: SQL_TIMESTAMP_CODEC_ID,
-    }).toEqual({
-      char: 'sql/char@1',
-      varchar: 'sql/varchar@1',
-      int: 'sql/int@1',
-      float: 'sql/float@1',
-      text: 'sql/text@1',
-      timestamp: 'sql/timestamp@1',
+  describe('sql/text@1', () => {
+    const codec = sqlTextDescriptor.factory()(instanceCtx);
+
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(SQL_TEXT_CODEC_ID);
+    });
+
+    it('encodes and decodes string values', async () => {
+      expect(await codec.encode('hello', callCtx)).toBe('hello');
+      expect(await codec.decode('hello', callCtx)).toBe('hello');
+    });
+
+    it('round-trips through JSON identity', () => {
+      expect(codec.encodeJson('hello')).toBe('hello');
+      expect(codec.decodeJson('hello')).toBe('hello');
     });
   });
 
-  const codecDefinitionCases: ReadonlyArray<{
-    scalar: keyof typeof sqlCodecDefinitions;
-    id: string;
-    targetTypes: readonly string[];
-    hasParamsSchema: boolean;
-    hasInit: boolean;
-  }> = [
-    {
-      scalar: 'char',
-      id: SQL_CHAR_CODEC_ID,
-      targetTypes: ['char'],
-      hasParamsSchema: true,
-      hasInit: true,
-    },
-    {
-      scalar: 'varchar',
-      id: SQL_VARCHAR_CODEC_ID,
-      targetTypes: ['varchar'],
-      hasParamsSchema: true,
-      hasInit: true,
-    },
-    {
-      scalar: 'int',
-      id: SQL_INT_CODEC_ID,
-      targetTypes: ['int'],
-      hasParamsSchema: false,
-      hasInit: false,
-    },
-    {
-      scalar: 'float',
-      id: SQL_FLOAT_CODEC_ID,
-      targetTypes: ['float'],
-      hasParamsSchema: false,
-      hasInit: false,
-    },
-    {
-      scalar: 'text',
-      id: SQL_TEXT_CODEC_ID,
-      targetTypes: ['text'],
-      hasParamsSchema: false,
-      hasInit: false,
-    },
-    {
-      scalar: 'timestamp',
-      id: SQL_TIMESTAMP_CODEC_ID,
-      targetTypes: ['timestamp'],
-      hasParamsSchema: true,
-      hasInit: false,
-    },
-  ];
+  describe('sql/int@1', () => {
+    const codec = sqlIntDescriptor.factory()(instanceCtx);
 
-  it.each(codecDefinitionCases)('defines codec for $scalar', ({
-    scalar,
-    id,
-    targetTypes,
-    hasParamsSchema,
-    hasInit,
-  }) => {
-    const definition = sqlCodecDefinitions[scalar];
-    expect(definition.typeId).toBe(id);
-    expect(definition.scalar).toBe(scalar);
-    expect(definition.codec.targetTypes).toEqual(targetTypes);
-    expect(definition.codec.paramsSchema !== undefined).toBe(hasParamsSchema);
-    expect(definition.codec.init !== undefined).toBe(hasInit);
-  });
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(SQL_INT_CODEC_ID);
+    });
 
-  it('exports data types mapped to codec IDs', () => {
-    expect(sqlDataTypes).toEqual({
-      char: SQL_CHAR_CODEC_ID,
-      varchar: SQL_VARCHAR_CODEC_ID,
-      int: SQL_INT_CODEC_ID,
-      float: SQL_FLOAT_CODEC_ID,
-      text: SQL_TEXT_CODEC_ID,
-      timestamp: SQL_TIMESTAMP_CODEC_ID,
+    it('encodes and decodes number values', async () => {
+      expect(await codec.encode(42, callCtx)).toBe(42);
+      expect(await codec.decode(42, callCtx)).toBe(42);
+    });
+
+    it('round-trips through JSON identity', () => {
+      expect(codec.encodeJson(42)).toBe(42);
+      expect(codec.decodeJson(42)).toBe(42);
     });
   });
 
-  const codecRoundTripCases: ReadonlyArray<{
-    scalar: keyof typeof sqlCodecDefinitions;
-    input: string | number;
-    expectedEncoded: string | number;
-    expectedDecoded: string | number;
-  }> = [
-    {
-      scalar: 'char',
-      input: 'A',
-      expectedEncoded: 'A',
-      expectedDecoded: 'A',
-    },
-    {
-      scalar: 'varchar',
-      input: 'hello',
-      expectedEncoded: 'hello',
-      expectedDecoded: 'hello',
-    },
-    {
-      scalar: 'int',
-      input: 42,
-      expectedEncoded: 42,
-      expectedDecoded: 42,
-    },
-    {
-      scalar: 'float',
-      input: 3.14,
-      expectedEncoded: 3.14,
-      expectedDecoded: 3.14,
-    },
-    {
-      scalar: 'text',
-      input: 'portable text',
-      expectedEncoded: 'portable text',
-      expectedDecoded: 'portable text',
-    },
-  ];
+  describe('sql/float@1', () => {
+    const codec = sqlFloatDescriptor.factory()(instanceCtx);
 
-  it.each(codecRoundTripCases)('encodes and decodes $scalar values', async ({
-    scalar,
-    input,
-    expectedEncoded,
-    expectedDecoded,
-  }) => {
-    const codec = sqlCodecDefinitions[scalar].codec as {
-      encode: (value: unknown, ctx: SqlCodecCallContext) => Promise<unknown>;
-      decode: (wire: unknown, ctx: SqlCodecCallContext) => Promise<unknown>;
-    };
-
-    expect(await codec.encode(input, {})).toBe(expectedEncoded);
-    expect(await codec.decode(input, {})).toBe(expectedDecoded);
-  });
-
-  it('trims trailing spaces when decoding char values', async () => {
-    const charCodec = sqlCodecDefinitions.char.codec as {
-      decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
-    };
-
-    expect(await charCodec.decode('user_001                            ', {})).toBe('user_001');
-    expect(await charCodec.decode('user_001', {})).toBe('user_001');
-  });
-
-  it('initializes helpers for length-parameterized codecs', () => {
-    const charCodec = sqlCodecDefinitions.char.codec;
-    const varcharCodec = sqlCodecDefinitions.varchar.codec;
-
-    expect(charCodec.init?.({ length: 5 })).toEqual({
-      kind: 'fixed',
-      maxLength: 5,
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(SQL_FLOAT_CODEC_ID);
     });
-    expect(varcharCodec.init?.({ length: 255 })).toEqual({
-      kind: 'variable',
-      maxLength: 255,
+
+    it('encodes and decodes number values', async () => {
+      expect(await codec.encode(3.14, callCtx)).toBe(3.14);
+      expect(await codec.decode(3.14, callCtx)).toBe(3.14);
+    });
+
+    it('round-trips through JSON identity', () => {
+      expect(codec.encodeJson(3.14)).toBe(3.14);
+      expect(codec.decodeJson(3.14)).toBe(3.14);
     });
   });
 
-  it('round-trips Date values for timestamp codecs', async () => {
-    const timestampCodec = sqlCodecDefinitions.timestamp.codec as {
-      encode: (value: Date, ctx: SqlCodecCallContext) => Promise<Date>;
-      decode: (wire: Date, ctx: SqlCodecCallContext) => Promise<Date>;
-    };
+  describe('sql/char@1', () => {
+    const codec = sqlCharDescriptor.factory({ length: 8 })(instanceCtx);
 
-    const instant = new Date('2024-01-15T10:30:00Z');
+    it('id proxies through the descriptor (independent of params)', () => {
+      expect(codec.id).toBe(SQL_CHAR_CODEC_ID);
+    });
 
-    expect(await timestampCodec.encode(instant, {})).toBe(instant);
-    expect(await timestampCodec.decode(instant, {})).toBe(instant);
+    it('encodes string values verbatim', async () => {
+      expect(await codec.encode('user_001', callCtx)).toBe('user_001');
+    });
+
+    it('trims trailing spaces on decode', async () => {
+      expect(await codec.decode('user_001                            ', callCtx)).toBe('user_001');
+      expect(await codec.decode('user_001', callCtx)).toBe('user_001');
+    });
+
+    it('round-trips through JSON identity', () => {
+      expect(codec.encodeJson('user_001')).toBe('user_001');
+      expect(codec.decodeJson('user_001')).toBe('user_001');
+    });
+
+    it('renderOutputType returns Char<length>', () => {
+      expect(sqlCharDescriptor.renderOutputType?.({ length: 36 })).toBe('Char<36>');
+    });
+
+    it('renderOutputType returns undefined when length absent', () => {
+      expect(sqlCharDescriptor.renderOutputType?.({})).toBeUndefined();
+    });
   });
 
-  it('serializes timestamps to ISO strings for the JSON contract', () => {
-    const timestampCodec = sqlCodecDefinitions.timestamp.codec;
+  describe('sql/varchar@1', () => {
+    const codec = sqlVarcharDescriptor.factory({ length: 255 })(instanceCtx);
 
-    const instant = new Date('2024-01-15T10:30:00Z');
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(SQL_VARCHAR_CODEC_ID);
+    });
 
-    expect(timestampCodec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000Z');
-    expect(timestampCodec.decodeJson('2024-01-15T10:30:00.000Z')).toEqual(instant);
+    it('encodes and decodes string values verbatim', async () => {
+      expect(await codec.encode('hello', callCtx)).toBe('hello');
+      expect(await codec.decode('hello', callCtx)).toBe('hello');
+    });
+
+    it('round-trips through JSON identity', () => {
+      expect(codec.encodeJson('hello')).toBe('hello');
+      expect(codec.decodeJson('hello')).toBe('hello');
+    });
+
+    it('renderOutputType returns Varchar<length>', () => {
+      expect(sqlVarcharDescriptor.renderOutputType?.({ length: 255 })).toBe('Varchar<255>');
+    });
+
+    it('renderOutputType returns undefined when length absent', () => {
+      expect(sqlVarcharDescriptor.renderOutputType?.({})).toBeUndefined();
+    });
   });
 
-  it('throws on invalid JSON input for timestamp codecs', () => {
-    const timestampCodec = sqlCodecDefinitions.timestamp.codec;
+  describe('sql/timestamp@1', () => {
+    const codec = sqlTimestampDescriptor.factory({ precision: 3 })(instanceCtx);
 
-    expect(() => timestampCodec.decodeJson(42)).toThrow(/Expected ISO date string/);
-    expect(() => timestampCodec.decodeJson('not-a-date')).toThrow(/Invalid ISO date string/);
+    it('id proxies through the descriptor', () => {
+      expect(codec.id).toBe(SQL_TIMESTAMP_CODEC_ID);
+    });
+
+    it('round-trips Date values', async () => {
+      const instant = new Date('2024-01-15T10:30:00Z');
+      expect(await codec.encode(instant, callCtx)).toBe(instant);
+      expect(await codec.decode(instant, callCtx)).toBe(instant);
+    });
+
+    it('serializes Date to ISO 8601 string for JSON', () => {
+      const instant = new Date('2024-01-15T10:30:00Z');
+      expect(codec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000Z');
+      expect(codec.decodeJson('2024-01-15T10:30:00.000Z')).toEqual(instant);
+    });
+
+    it('throws on invalid JSON input', () => {
+      expect(() => codec.decodeJson(42)).toThrow(/Expected ISO date string/);
+      expect(() => codec.decodeJson('not-a-date')).toThrow(/Invalid ISO date string/);
+    });
+
+    it('renderOutputType returns Timestamp<precision>', () => {
+      expect(sqlTimestampDescriptor.renderOutputType?.({ precision: 3 })).toBe('Timestamp<3>');
+    });
+
+    it('renderOutputType returns bare Timestamp when precision absent', () => {
+      expect(sqlTimestampDescriptor.renderOutputType?.({})).toBe('Timestamp');
+    });
   });
 
-  describe('renderOutputType', () => {
-    it('sql/char@1 renders Char<length>', () => {
-      expect(sqlCodecDefinitions.char.codec.renderOutputType!({ length: 36 })).toBe('Char<36>');
+  describe('column helpers', () => {
+    it('sqlTextColumn produces a ColumnSpec with text nativeType and no typeParams', () => {
+      const spec = sqlTextColumn();
+      expect(spec.codecId).toBe(SQL_TEXT_CODEC_ID);
+      expect(spec.nativeType).toBe('text');
+      expect(spec.typeParams).toBeUndefined();
     });
 
-    it('sql/char@1 returns undefined when length absent', () => {
-      expect(sqlCodecDefinitions.char.codec.renderOutputType!({})).toBeUndefined();
+    it('sqlIntColumn produces a ColumnSpec with int nativeType', () => {
+      const spec = sqlIntColumn();
+      expect(spec.codecId).toBe(SQL_INT_CODEC_ID);
+      expect(spec.nativeType).toBe('int');
     });
 
-    it('sql/char@1 throws on invalid length type', () => {
-      expect(() => sqlCodecDefinitions.char.codec.renderOutputType!({ length: 'bad' })).toThrow(
-        /expected integer "length"/,
-      );
+    it('sqlFloatColumn produces a ColumnSpec with float nativeType', () => {
+      const spec = sqlFloatColumn();
+      expect(spec.codecId).toBe(SQL_FLOAT_CODEC_ID);
+      expect(spec.nativeType).toBe('float');
     });
 
-    it('sql/varchar@1 renders Varchar<length>', () => {
-      expect(sqlCodecDefinitions.varchar.codec.renderOutputType!({ length: 255 })).toBe(
-        'Varchar<255>',
-      );
+    it('sqlCharColumn defaults typeParams to {} when invoked without arguments', () => {
+      const spec = sqlCharColumn();
+      expect(spec.codecId).toBe(SQL_CHAR_CODEC_ID);
+      expect(spec.nativeType).toBe('char');
+      expect(spec.typeParams).toEqual({});
     });
 
-    it('sql/varchar@1 returns undefined when length absent', () => {
-      expect(sqlCodecDefinitions.varchar.codec.renderOutputType!({})).toBeUndefined();
+    it('sqlCharColumn carries the explicit length param', () => {
+      const spec = sqlCharColumn({ length: 16 });
+      expect(spec.typeParams).toEqual({ length: 16 });
     });
 
-    it('sql/varchar@1 throws on invalid length type', () => {
-      expect(() => sqlCodecDefinitions.varchar.codec.renderOutputType!({ length: 'bad' })).toThrow(
-        /expected integer "length"/,
-      );
+    it('sqlVarcharColumn defaults typeParams to {} when invoked without arguments', () => {
+      const spec = sqlVarcharColumn();
+      expect(spec.typeParams).toEqual({});
     });
 
-    it('sql/timestamp@1 renders Timestamp<P> with precision', () => {
-      expect(sqlCodecDefinitions.timestamp.codec.renderOutputType!({ precision: 3 })).toBe(
-        'Timestamp<3>',
-      );
+    it('sqlVarcharColumn carries the explicit length param', () => {
+      const spec = sqlVarcharColumn({ length: 64 });
+      expect(spec.typeParams).toEqual({ length: 64 });
     });
 
-    it('sql/timestamp@1 renders bare Timestamp when precision absent', () => {
-      expect(sqlCodecDefinitions.timestamp.codec.renderOutputType!({})).toBe('Timestamp');
+    it('sqlTimestampColumn defaults typeParams to {} when invoked without arguments', () => {
+      const spec = sqlTimestampColumn();
+      expect(spec.typeParams).toEqual({});
     });
 
-    it('sql/timestamp@1 throws on invalid precision type', () => {
-      expect(() =>
-        sqlCodecDefinitions.timestamp.codec.renderOutputType!({ precision: 'bad' }),
-      ).toThrow(/expected integer "precision"/);
+    it('sqlTimestampColumn carries the explicit precision param', () => {
+      const spec = sqlTimestampColumn({ precision: 6 });
+      expect(spec.typeParams).toEqual({ precision: 6 });
+    });
+  });
+
+  describe('descriptor metadata', () => {
+    it('codec ids match the SQL_*_CODEC_ID constants', () => {
+      expect(sqlTextDescriptor.codecId).toBe(SQL_TEXT_CODEC_ID);
+      expect(sqlIntDescriptor.codecId).toBe(SQL_INT_CODEC_ID);
+      expect(sqlFloatDescriptor.codecId).toBe(SQL_FLOAT_CODEC_ID);
+      expect(sqlCharDescriptor.codecId).toBe(SQL_CHAR_CODEC_ID);
+      expect(sqlVarcharDescriptor.codecId).toBe(SQL_VARCHAR_CODEC_ID);
+      expect(sqlTimestampDescriptor.codecId).toBe(SQL_TIMESTAMP_CODEC_ID);
     });
 
-    it('sql/int@1 has no renderOutputType', () => {
-      expect(sqlCodecDefinitions.int.codec.renderOutputType).toBeUndefined();
-    });
+    it('exposes traits and targetTypes for each codec', () => {
+      expect(sqlTextDescriptor.traits).toEqual(['equality', 'order', 'textual']);
+      expect(sqlTextDescriptor.targetTypes).toEqual(['text']);
 
-    it('sql/float@1 has no renderOutputType', () => {
-      expect(sqlCodecDefinitions.float.codec.renderOutputType).toBeUndefined();
-    });
+      expect(sqlIntDescriptor.traits).toEqual(['equality', 'order', 'numeric']);
+      expect(sqlIntDescriptor.targetTypes).toEqual(['int']);
 
-    it('sql/text@1 has no renderOutputType', () => {
-      expect(sqlCodecDefinitions.text.codec.renderOutputType).toBeUndefined();
+      expect(sqlFloatDescriptor.traits).toEqual(['equality', 'order', 'numeric']);
+      expect(sqlFloatDescriptor.targetTypes).toEqual(['float']);
+
+      expect(sqlCharDescriptor.targetTypes).toEqual(['char']);
+      expect(sqlVarcharDescriptor.targetTypes).toEqual(['varchar']);
+      expect(sqlTimestampDescriptor.targetTypes).toEqual(['timestamp']);
     });
   });
 });

@@ -546,7 +546,11 @@ export class FilteredCollection<
     ) => UpdaterResult,
     opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
   ): MongoQueryPlan<
-    ResolveRow<ModelToDocShape<TContract, ModelName>, ExtractMongoCodecTypes<TContract>> | null,
+    ResolveRow<
+      ModelToDocShape<TContract, ModelName>,
+      ExtractMongoCodecTypes<TContract>,
+      TContract
+    > | null,
     FindOneAndUpdateCommand
   > {
     const update = resolveUpdaterCallback<
@@ -573,7 +577,11 @@ export class FilteredCollection<
    * document via the row stream.
    */
   override findOneAndDelete(): MongoQueryPlan<
-    ResolveRow<ModelToDocShape<TContract, ModelName>, ExtractMongoCodecTypes<TContract>> | null,
+    ResolveRow<
+      ModelToDocShape<TContract, ModelName>,
+      ExtractMongoCodecTypes<TContract>,
+      TContract
+    > | null,
     FindOneAndDeleteCommand
   > {
     const command = new FindOneAndDeleteCommand(this.#ctx.collection, this.#foldedFilter());

@@ -3,26 +3,30 @@ import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
 import { deriveJsonSchema, derivePolymorphicJsonSchema } from '../src/derive-json-schema';
 
+const mongoTargetTypes: Record<string, readonly string[]> = {
+  'mongo/string@1': ['string'],
+  'mongo/int32@1': ['int'],
+  'mongo/bool@1': ['bool'],
+  'mongo/date@1': ['date'],
+  'mongo/objectId@1': ['objectId'],
+  'mongo/double@1': ['double'],
+};
+
 const mongoCodecLookup: CodecLookup = {
   get(id: string) {
-    const codecs: Record<string, { id: string; targetTypes: readonly string[] }> = {
-      'mongo/string@1': { id: 'mongo/string@1', targetTypes: ['string'] },
-      'mongo/int32@1': { id: 'mongo/int32@1', targetTypes: ['int'] },
-      'mongo/bool@1': { id: 'mongo/bool@1', targetTypes: ['bool'] },
-      'mongo/date@1': { id: 'mongo/date@1', targetTypes: ['date'] },
-      'mongo/objectId@1': { id: 'mongo/objectId@1', targetTypes: ['objectId'] },
-      'mongo/double@1': { id: 'mongo/double@1', targetTypes: ['double'] },
-    };
-    const entry = codecs[id];
-    if (!entry) return undefined;
+    const targetTypes = mongoTargetTypes[id];
+    if (!targetTypes) return undefined;
     return {
-      ...entry,
+      id,
       encode: async (v: unknown) => v,
       decode: async (w: unknown) => w,
       encodeJson: (v: unknown) => v,
       decodeJson: (j: unknown) => j,
     } as ReturnType<CodecLookup['get']>;
   },
+  targetTypesFor: (id: string) => mongoTargetTypes[id],
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
 };
 
 function scalarField(codecId: string, nullable = false): ContractField {

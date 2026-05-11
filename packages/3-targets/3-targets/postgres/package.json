@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/target-postgres",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "Postgres target pack for Prisma Next",
@@ -28,7 +29,8 @@
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/utils": "workspace:*",
-    "arktype": "^2.0.0",
+    "@standard-schema/spec": "^1.1.0",
+    "arktype": "^2.1.29",
     "pathe": "^2.0.3"
   },
   "devDependencies": {

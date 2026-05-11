@@ -18,7 +18,9 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import type { Result } from '@prisma-next/utils/result';
+import type { ExecuteDbVerifyResult } from './operations/db-verify';
 
 // ============================================================================
 // Client Options
@@ -65,6 +67,7 @@ export interface ControlClientOptions {
 export type ControlActionName =
   | 'dbInit'
   | 'dbUpdate'
+  | 'dbVerify'
   | 'migrationApply'
   | 'verify'
   | 'schemaVerify'
@@ -191,6 +194,13 @@ export interface DbInitOptions {
    * The type is driver-specific (e.g., string URL for Postgres).
    */
   readonly connection?: unknown;
+  /**
+   * On-disk migrations directory. Always required — every `db init`
+   * routes through the per-space flow, which reads on-disk
+   * `refs/head.json` and extension destination contracts from this
+   * root.
+   */
+  readonly migrationsDir: string;
   /** Optional progress callback for observing operation progress */
   readonly onProgress?: OnControlProgress;
 }
@@ -221,7 +231,32 @@ export interface DbUpdateOptions {
    * or re-run with -y/--yes.
    */
   readonly acceptDataLoss?: boolean;
+  /**
+   * On-disk migrations directory. Always required — every `db update`
+   * routes through the per-space flow, which reads on-disk
+   * `refs/head.json` and extension destination contracts from this
+   * root.
+   */
+  readonly migrationsDir: string;
   /** Optional progress callback for observing operation progress */
+  readonly onProgress?: OnControlProgress;
+}
+
+/**
+ * Options for the dbVerify operation.
+ *
+ * Drives the loader → aggregate-verifier pipeline. `strict` maps to
+ * `verifyAggregate({ mode: 'strict' | 'lenient' })`; `skipSchema`
+ * mirrors the `--marker-only` CLI flag and short-circuits the schema
+ * portion of the verifier.
+ */
+export interface DbVerifyOptions {
+  readonly contract: unknown;
+  readonly migrationsDir: string;
+  readonly strict: boolean;
+  readonly skipSchema: boolean;
+  readonly skipMarker: boolean;
+  readonly connection?: unknown;
   readonly onProgress?: OnControlProgress;
 }
 
@@ -275,6 +310,42 @@ export interface EmitOptions {
 // ============================================================================
 
 /**
+ * Per-space breakdown of an aggregate plan / apply.
+ *
+ * Surfaces the canonical schedule shape — extensions alphabetically,
+ * then app — together with the operations attributed to each space and,
+ * when the run was applied, the resulting per-space marker hash.
+ *
+ * M6 sub-spec § Output shape contract — every space involved in a run
+ * is observable in the success summary, including its post-apply
+ * marker, so the per-space invariant is visible to the user (closing
+ * F4 / F7 from `e2e-verification.md`).
+ */
+export interface AggregatePerSpaceExecutionEntry {
+  readonly spaceId: string;
+  /** `'app'` for the application's contract space; `'extension'` for any extension space. */
+  readonly kind: 'app' | 'extension';
+  /**
+   * Operations attributed to this space (display ops). In `mode: 'plan'`
+   * this is the planned set; in `mode: 'apply'` it is the same set
+   * (every op was executed in order, the runner does not skip).
+   */
+  readonly operations: ReadonlyArray<{
+    readonly id: string;
+    readonly label: string;
+    readonly operationClass: string;
+  }>;
+  /**
+   * Post-apply marker hash for this space. Present only when the run
+   * was applied (i.e. `mode: 'apply'` and the runner returned ok).
+   * Equals the per-space plan's `destination.storageHash`.
+   */
+  readonly marker?: {
+    readonly storageHash: string;
+  };
+}
+
+/**
  * Successful dbInit result.
  */
 export interface DbInitSuccess {
@@ -306,6 +377,14 @@ export interface DbInitSuccess {
     readonly storageHash: string;
     readonly profileHash?: string;
   };
+  /**
+   * Per-space breakdown in canonical schedule order (extensions
+   * alphabetically, then app). Present whenever the aggregate flow
+   * produced one — both `mode: 'plan'` and `mode: 'apply'`.
+   *
+   * See {@link AggregatePerSpaceExecutionEntry}.
+   */
+  readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
   readonly summary: string;
 }
 
@@ -371,6 +450,11 @@ export interface DbUpdateSuccess {
     readonly storageHash: string;
     readonly profileHash?: string;
   };
+  /**
+   * Per-space breakdown in canonical schedule order (extensions
+   * alphabetically, then app). See {@link AggregatePerSpaceExecutionEntry}.
+   */
+  readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
   readonly summary: string;
 }
 
@@ -443,44 +527,48 @@ export type EmitResult = Result<EmitSuccess, EmitFailure>;
 // ============================================================================
 
 /**
- * A pre-planned migration step ready for execution.
- * Contains the manifest metadata and the serialized operations from ops.json.
- */
-export interface MigrationApplyStep {
-  readonly dirName: string;
-  readonly from: string | null;
-  readonly to: string;
-  readonly toContract: Contract;
-  readonly operations: readonly MigrationPlanOperation[];
-  /**
-   * Sorted, deduplicated invariant ids from `migration.json.providedInvariants`.
-   * Verified at load time by `readMigrationPackage` (manifest copy must equal
-   * the value derived from `ops.json`). The control-api passes this through
-   * to the runner via `MigrationPlan.providedInvariants` so target runners
-   * read the canonical set instead of re-deriving from `operations`.
-   */
-  readonly providedInvariants: readonly string[];
-}
-
-/**
- * Options for the migrationApply operation.
+ * Options for the aggregate-walking `migrationApply` operation.
+ *
+ * The control-api operation is responsible for: loading the
+ * contract-space aggregate, reading per-space marker rows from the
+ * live database, plotting per-space paths via `graphWalkStrategy`
+ * (replay-only — no synth, no introspection), and dispatching
+ * through the shared `applyAggregate` primitive. The CLI command
+ * just resolves the descriptor surface (config, refs, contract
+ * envelope, app-space migration packages) and hands the inputs in.
+ *
+ * Sub-spec § `migration apply` semantics + § Required changes 1.
  */
 export interface MigrationApplyOptions {
+  /** Already-validated app contract (the canonical "where we are heading" hash). */
+  readonly contract: unknown;
+  /** Migrations root directory (`migrations/` under the project). */
+  readonly migrationsDir: string;
   /**
-   * Hash of the database state this apply path starts from.
-   * This is resolved by the caller (typically the CLI orchestration layer).
+   * Already-loaded app-space migration packages. The CLI loads these
+   * via `loadMigrationPackages(appMigrationsDir)` before invoking
+   * `migrationApply`.
    */
-  readonly originHash: string;
+  readonly appMigrationPackages: ReadonlyArray<OnDiskMigrationPackage>;
   /**
-   * Hash of the target contract this apply path must reach.
-   * This is resolved by the caller (typically the CLI orchestration layer).
+   * Optional app-space ref override. When provided, the app member's
+   * graph-walk targets this hash instead of `contract.storage.storageHash`.
+   * Extension members always walk to their own `headRef.hash`.
    */
-  readonly destinationHash: string;
+  readonly refHash?: string;
   /**
-   * Ordered list of migrations to execute from originHash to destinationHash.
-   * The execution layer does not choose defaults; it only executes this explicit path.
+   * Required invariants on the user-supplied app-space ref. Threaded
+   * into the graph-walk's `required` calculation so the planner picks
+   * an invariant-bearing path. Ignored when `refHash` is absent.
    */
-  readonly pendingMigrations: readonly MigrationApplyStep[];
+  readonly refInvariants?: readonly string[];
+  /**
+   * Resolved name of the user-supplied app-space ref (the literal the
+   * user passed to `--ref`). Decorates `pathDecision.refName` and any
+   * `MIGRATION.NO_INVARIANT_PATH` envelope raised during graph-walk.
+   * Ignored when `refHash` is absent.
+   */
+  readonly refName?: string;
   /**
    * Database connection. If provided, migrationApply will connect before executing.
    * If omitted, the client must already be connected.
@@ -491,23 +579,102 @@ export interface MigrationApplyOptions {
 }
 
 /**
- * Record of a successfully applied migration.
+ * A single on-disk migration package surfaced to the operation. The
+ * SQL family already produces this shape via `loadMigrationPackages`;
+ * the operation hands it through to the framework-neutral aggregate
+ * loader's `appMigrationPackages` slot.
+ *
+ * (Originally named `MigrationApplyStep` for the legacy single-space
+ * apply path; the name is kept for compatibility with existing CLI
+ * callers and tests.)
  */
-export interface MigrationApplyAppliedEntry {
+export interface MigrationApplyStep {
   readonly dirName: string;
   readonly from: string | null;
+  readonly to: string;
+  readonly toContract: Contract;
+  readonly operations: readonly MigrationPlanOperation[];
+  /**
+   * Sorted, deduplicated invariant ids from `migration.json.providedInvariants`.
+   * Verified at load time by `readMigrationPackage` (manifest copy must equal
+   * the value derived from `ops.json`).
+   */
+  readonly providedInvariants: readonly string[];
+}
+
+/**
+ * Record of a successfully applied per-space migration. One entry per
+ * contract space that had pending migrations — empty `applied` means
+ * every space was already at its head.
+ */
+/**
+ * One entry per authored migration package applied. Preserves the
+ * single-space `migrationsApplied` count semantics (each entry is
+ * one migration directory) so `applied.length === migrationsApplied`.
+ *
+ * Per-space aggregate detail (markers, ops grouped by space) lives
+ * on `perSpace[]`; this list is the per-edge view.
+ */
+export interface MigrationApplyAppliedEntry {
+  readonly spaceId: string;
+  readonly dirName: string;
+  readonly migrationHash: string;
+  readonly from: string;
   readonly to: string;
   readonly operationsExecuted: number;
 }
 
 /**
- * Successful migrationApply result.
+ * Successful migrationApply result. Carries both the legacy
+ * single-space fields (`markerHash` is the **app member's** post-apply
+ * marker, surfaced for back-compat with single-space callers) and the
+ * per-space breakdown (`perSpace` — markers / operations / canonical
+ * order, per M6 sub-spec § Output shape).
  */
+/**
+ * Path-decision summary for the **app member** post-apply. Surfaced
+ * for back-compat with single-space callers (and the cli-journeys
+ * suite, which inspects `requiredInvariants`/`satisfiedInvariants`/
+ * `selectedPath` to validate invariant routing).
+ *
+ * Per-space path decisions for extension members are not surfaced —
+ * extensions own their own ref/invariant control.
+ */
+export interface MigrationApplyPathDecision {
+  readonly fromHash: string;
+  readonly toHash: string;
+  readonly alternativeCount: number;
+  readonly tieBreakReasons: readonly string[];
+  readonly refName?: string;
+  readonly requiredInvariants: readonly string[];
+  readonly satisfiedInvariants: readonly string[];
+  readonly selectedPath: readonly {
+    readonly dirName: string;
+    readonly migrationHash: string;
+    readonly from: string;
+    readonly to: string;
+    readonly invariants: readonly string[];
+  }[];
+}
+
 export interface MigrationApplySuccess {
   readonly migrationsApplied: number;
   readonly markerHash: string;
   readonly applied: readonly MigrationApplyAppliedEntry[];
   readonly summary: string;
+  /**
+   * Per-space breakdown in canonical schedule order (extensions
+   * alphabetically, then app). See {@link AggregatePerSpaceExecutionEntry}.
+   * Always present for the aggregate-walking operation.
+   */
+  readonly perSpace: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
+  /**
+   * Path-decision data for the app member. Present whenever the
+   * graph-walk strategy ran for the app (i.e. always for the
+   * aggregate-walking apply path). Absent only for the no-op
+   * "Already up to date" early return when the app has no plan.
+   */
+  readonly pathDecision?: MigrationApplyPathDecision;
 }
 
 /**
@@ -678,12 +845,34 @@ export interface ControlClient {
   dbUpdate(options: DbUpdateOptions): Promise<DbUpdateResult>;
 
   /**
+   * Verifies the database against every contract space (app + extensions).
+   *
+   * Loader → aggregate-verifier pipeline:
+   * - The loader catches layout / drift / disjointness violations.
+   * - The aggregate verifier surfaces marker-vs-on-disk drift and orphan
+   *   markers, and (unless `skipSchema` is true) per-space schema
+   *   verification with pre-projection (closes F23).
+   *
+   * @returns Result pattern: per-space schema results on success;
+   *          structured CLI error on marker / loader failure.
+   * @throws If not connected or infrastructure failure
+   */
+  dbVerify(options: DbVerifyOptions): Promise<ExecuteDbVerifyResult>;
+
+  /**
    * Reads the contract marker from the database.
    * Returns null if no marker exists (fresh database).
    *
    * @throws If not connected or infrastructure failure
    */
   readMarker(): Promise<ContractMarkerRecord | null>;
+
+  /**
+   * Reads every marker row (one per contract space). Used by the
+   * per-space verifier to detect orphan marker rows and marker-vs-on-disk
+   * drift after a database connection has been established.
+   */
+  readAllMarkers(): Promise<ReadonlyMap<string, ContractMarkerRecord>>;
 
   /**
    * Applies pre-planned on-disk migrations to the database.

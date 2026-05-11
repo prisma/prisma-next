@@ -229,6 +229,7 @@ describe('control-api', () => {
               const result = await client.dbInit({
                 contract: contractJson,
                 mode: 'plan',
+                migrationsDir: resolve(testDir, 'migrations'),
               });
 
               expect(result.ok).toBe(true);
@@ -265,6 +266,7 @@ describe('control-api', () => {
               const result = await client.dbInit({
                 contract: contractJson,
                 mode: 'apply',
+                migrationsDir: resolve(testDir, 'migrations'),
               });
 
               expect(result).toMatchObject({
@@ -308,23 +310,29 @@ describe('control-api', () => {
             try {
               await client.connect(connectionString);
 
+              const migrationsDir = resolve(testDir, 'migrations');
+
               // Apply first time
               const result1 = await client.dbInit({
                 contract: contractJson,
                 mode: 'apply',
+                migrationsDir,
               });
               expect(result1.ok).toBe(true);
 
-              // Apply second time - should be idempotent
+              // Apply second time - should be idempotent. The per-space
+              // flow achieves idempotency by the planner returning an
+              // empty plan and the runner being a no-op on empty plans.
               const result2 = await client.dbInit({
                 contract: contractJson,
                 mode: 'apply',
+                migrationsDir,
               });
 
               expect(result2.ok).toBe(true);
               if (result2.ok) {
                 expect(result2.value.plan.operations).toHaveLength(0);
-                expect(result2.value.summary).toContain('already at target');
+                expect(result2.value.execution?.operationsExecuted).toBe(0);
               }
             } finally {
               await client.close();
@@ -362,6 +370,7 @@ describe('control-api', () => {
               const initResult = await client.dbInit({
                 contract: contractJson,
                 mode: 'apply',
+                migrationsDir: resolve(testDir, 'migrations'),
               });
               expect(initResult.ok).toBe(true);
 
@@ -408,6 +417,7 @@ describe('control-api', () => {
               const initResult = await client.dbInit({
                 contract: contractJson,
                 mode: 'apply',
+                migrationsDir: resolve(testDir, 'migrations'),
               });
               expect(initResult.ok).toBe(true);
 

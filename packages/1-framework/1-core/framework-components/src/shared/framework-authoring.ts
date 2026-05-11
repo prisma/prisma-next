@@ -1,3 +1,12 @@
+import type {
+  ColumnDefault,
+  ExecutionMutationDefaultPhases,
+  ExecutionMutationDefaultValue,
+} from '@prisma-next/contract/types';
+import {
+  isColumnDefaultLiteralInputValue,
+  isExecutionMutationDefaultValue,
+} from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 export type AuthoringArgRef = {
@@ -63,10 +72,15 @@ export type AuthoringColumnDefaultTemplate =
   | AuthoringColumnDefaultTemplateLiteral
   | AuthoringColumnDefaultTemplateFunction;
 
+export interface AuthoringExecutionDefaultsTemplate {
+  readonly onCreate?: AuthoringTemplateValue;
+  readonly onUpdate?: AuthoringTemplateValue;
+}
+
 export interface AuthoringFieldPresetOutput extends AuthoringStorageTypeTemplate {
   readonly nullable?: boolean;
   readonly default?: AuthoringColumnDefaultTemplate;
-  readonly executionDefault?: AuthoringTemplateValue;
+  readonly executionDefaults?: AuthoringExecutionDefaultsTemplate;
   readonly id?: boolean;
   readonly unique?: boolean;
 }
@@ -130,6 +144,148 @@ export function isAuthoringFieldPresetDescriptor(
     typeof (value as { output?: unknown }).output === 'object' &&
     (value as { output?: unknown }).output !== null
   );
+}
+
+/**
+ * Returns true when `namespace` is a non-leaf key in `contributions.field`.
+ *
+ * `AuthoringFieldNamespace` permits a leaf descriptor at any depth — including
+ * the root — so a top-level `field: { Foo: { kind: 'fieldPreset', ... } }`
+ * registration must NOT be treated as a "namespace" with sub-paths. Callers
+ * use this predicate to gate dot-namespaced lookups (e.g. PSL `@Foo.bar`).
+ */
+export function hasRegisteredFieldNamespace(
+  contributions: AuthoringContributions | undefined,
+  namespace: string,
+): boolean {
+  if (contributions?.field === undefined || !Object.hasOwn(contributions.field, namespace)) {
+    return false;
+  }
+  return !isAuthoringFieldPresetDescriptor(contributions.field[namespace]);
+}
+
+function isPlainNamespaceObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Merges `source` into `target` recursively at the descriptor-namespace
+ * level. `leafGuard` decides which values are descriptors (terminal
+ * merge points; same-path registrations across components are reported
+ * as duplicates) versus sub-namespaces (recursion targets).
+ *
+ * Path segments are validated against prototype-pollution names
+ * (`__proto__`, `constructor`, `prototype`). A value that is neither a
+ * recognized leaf nor a plain object — e.g. a malformed descriptor
+ * where the canonical leaf guard rejected it for missing `output` —
+ * is reported as an invalid contribution rather than recursed into,
+ * which would either silently mangle state or infinite-loop on
+ * primitive properties.
+ *
+ * Within-registry duplicate detection is this walker's job;
+ * cross-registry detection runs separately via
+ * `assertNoCrossRegistryCollisions` after merging completes.
+ */
+export function mergeAuthoringNamespaces(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+  path: readonly string[],
+  leafGuard: (value: unknown) => boolean,
+  label: string,
+): void {
+  const assertSafePath = (currentPath: readonly string[]) => {
+    const blockedSegment = currentPath.find(
+      (segment) => segment === '__proto__' || segment === 'constructor' || segment === 'prototype',
+    );
+    if (blockedSegment) {
+      throw new Error(
+        `Invalid authoring ${label} helper "${currentPath.join('.')}". Helper path segments must not use "${blockedSegment}".`,
+      );
+    }
+  };
+
+  for (const [key, sourceValue] of Object.entries(source)) {
+    const currentPath = [...path, key];
+    assertSafePath(currentPath);
+    const hasExistingValue = Object.hasOwn(target, key);
+    const existingValue = hasExistingValue ? target[key] : undefined;
+
+    if (!hasExistingValue) {
+      target[key] = sourceValue;
+      continue;
+    }
+
+    const existingIsLeaf = leafGuard(existingValue);
+    const sourceIsLeaf = leafGuard(sourceValue);
+
+    if (existingIsLeaf || sourceIsLeaf) {
+      throw new Error(
+        `Duplicate authoring ${label} helper "${currentPath.join('.')}". Helper names must be unique across composed packs.`,
+      );
+    }
+
+    if (!isPlainNamespaceObject(existingValue) || !isPlainNamespaceObject(sourceValue)) {
+      throw new Error(
+        `Invalid authoring ${label} helper "${currentPath.join('.')}". Expected a sub-namespace object or a recognized descriptor; received a malformed value.`,
+      );
+    }
+
+    mergeAuthoringNamespaces(existingValue, sourceValue, currentPath, leafGuard, label);
+  }
+}
+
+function collectAuthoringLeafPaths(
+  namespace: Readonly<Record<string, unknown>>,
+  isLeaf: (value: unknown) => boolean,
+  path: readonly string[] = [],
+): string[] {
+  const paths: string[] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isLeaf(value)) {
+      paths.push(currentPath.join('.'));
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      paths.push(
+        ...collectAuthoringLeafPaths(
+          value as Readonly<Record<string, unknown>>,
+          isLeaf,
+          currentPath,
+        ),
+      );
+    }
+  }
+  return paths;
+}
+
+export function assertNoCrossRegistryCollisions(
+  typeNamespace: AuthoringTypeNamespace,
+  fieldNamespace: AuthoringFieldNamespace,
+): void {
+  const typePaths = new Set(
+    collectAuthoringLeafPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
+  );
+  // Within-registry duplicate detection is handled upstream by the merge
+  // walker (`mergeAuthoringNamespaces` in control-stack.ts and
+  // `mergeHelperNamespaces` in composed-authoring-helpers.ts), which throws
+  // on same-path registrations within either registry before this check
+  // runs. This function only handles the cross-registry case — and an
+  // empty type namespace makes a cross-registry collision structurally
+  // impossible, so the early-out is sound.
+  if (typePaths.size === 0) {
+    return;
+  }
+  for (const fieldPath of collectAuthoringLeafPaths(
+    fieldNamespace,
+    isAuthoringFieldPresetDescriptor,
+  )) {
+    if (typePaths.has(fieldPath)) {
+      throw new Error(
+        `Ambiguous authoring registry path "${fieldPath}". The same path is registered as both a type constructor and a field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type.`,
+      );
+    }
+  }
 }
 
 export function resolveAuthoringTemplateValue(
@@ -295,19 +451,16 @@ function resolveAuthoringStorageTypeTemplate(
 function resolveAuthoringColumnDefaultTemplate(
   template: AuthoringColumnDefaultTemplate,
   args: readonly unknown[],
-):
-  | {
-      readonly kind: 'literal';
-      readonly value: unknown;
-    }
-  | {
-      readonly kind: 'function';
-      readonly expression: string;
-    } {
+): ColumnDefault {
   if (template.kind === 'literal') {
     const value = resolveAuthoringTemplateValue(template.value, args);
     if (value === undefined) {
       throw new Error('Resolved authoring literal default must not be undefined');
+    }
+    if (!isColumnDefaultLiteralInputValue(value)) {
+      throw new Error(
+        `Resolved authoring literal default must be a JSON-serializable value or Date, received ${String(value)}`,
+      );
     }
     return {
       kind: 'literal',
@@ -324,6 +477,40 @@ function resolveAuthoringColumnDefaultTemplate(
   return {
     kind: 'function',
     expression: String(expression),
+  };
+}
+
+function resolveExecutionMutationDefaultPhase(
+  phase: 'onCreate' | 'onUpdate',
+  template: AuthoringTemplateValue,
+  args: readonly unknown[],
+): ExecutionMutationDefaultValue {
+  const value = resolveAuthoringTemplateValue(template, args);
+  if (!isExecutionMutationDefaultValue(value)) {
+    throw new Error(
+      `Authoring preset executionDefaults.${phase} did not resolve to a valid generator descriptor (kind: 'generator', id: string).`,
+    );
+  }
+  return value;
+}
+
+function resolveAuthoringExecutionDefaultsTemplate(
+  template: AuthoringExecutionDefaultsTemplate,
+  args: readonly unknown[],
+): ExecutionMutationDefaultPhases {
+  return {
+    ...ifDefined(
+      'onCreate',
+      template.onCreate !== undefined
+        ? resolveExecutionMutationDefaultPhase('onCreate', template.onCreate, args)
+        : undefined,
+    ),
+    ...ifDefined(
+      'onUpdate',
+      template.onUpdate !== undefined
+        ? resolveExecutionMutationDefaultPhase('onUpdate', template.onUpdate, args)
+        : undefined,
+    ),
   };
 }
 
@@ -348,16 +535,8 @@ export function instantiateAuthoringFieldPreset(
     readonly typeParams?: Record<string, unknown>;
   };
   readonly nullable: boolean;
-  readonly default?:
-    | {
-        readonly kind: 'literal';
-        readonly value: unknown;
-      }
-    | {
-        readonly kind: 'function';
-        readonly expression: string;
-      };
-  readonly executionDefault?: unknown;
+  readonly default?: ColumnDefault;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly id: boolean;
   readonly unique: boolean;
 } {
@@ -371,9 +550,9 @@ export function instantiateAuthoringFieldPreset(
         : undefined,
     ),
     ...ifDefined(
-      'executionDefault',
-      descriptor.output.executionDefault !== undefined
-        ? resolveAuthoringTemplateValue(descriptor.output.executionDefault, args)
+      'executionDefaults',
+      descriptor.output.executionDefaults !== undefined
+        ? resolveAuthoringExecutionDefaultsTemplate(descriptor.output.executionDefaults, args)
         : undefined,
     ),
     id: descriptor.output.id ?? false,

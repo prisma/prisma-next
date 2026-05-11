@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/emitter",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -22,8 +23,8 @@
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/utils": "workspace:*",
-    "arktype": "^2.0.0",
-    "prettier": "^3.3.3"
+    "arktype": "^2.1.29",
+    "prettier": "^3.8.3"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",

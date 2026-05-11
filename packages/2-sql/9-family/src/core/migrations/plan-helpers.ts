@@ -35,6 +35,7 @@ function freezeSteps(
       Object.freeze({
         description: step.description,
         sql: step.sql,
+        ...(step.params ? { params: Object.freeze([...step.params]) } : {}),
         ...(step.meta ? { meta: cloneRecord(step.meta) } : {}),
       }),
     ),
@@ -74,6 +75,7 @@ function freezeOperation<TTargetDetails>(
     label: operation.label,
     ...(operation.summary ? { summary: operation.summary } : {}),
     operationClass: operation.operationClass,
+    ...(operation.invariantId ? { invariantId: operation.invariantId } : {}),
     target: freezeTargetDetails(operation.target),
     precheck: freezeSteps(operation.precheck),
     execute: freezeSteps(operation.execute),
@@ -96,6 +98,7 @@ export function createMigrationPlan<TTargetDetails>(
 ): SqlMigrationPlan<TTargetDetails> {
   return Object.freeze({
     targetId: options.targetId,
+    spaceId: options.spaceId,
     ...(options.origin !== undefined
       ? { origin: options.origin ? Object.freeze({ ...options.origin }) : null }
       : {}),

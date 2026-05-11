@@ -318,6 +318,42 @@ export class DataTransformCall extends SqliteOpFactoryCallNode {
 }
 
 // ============================================================================
+// Raw SQL
+// ============================================================================
+
+/**
+ * Laundered pre-built operation. Mirrors Postgres's `RawSqlCall`: wraps an
+ * already-materialized `SqlMigrationPlanOperation` (typically produced by a
+ * SQL-family helper or a codec lifecycle hook) so the planner can carry it
+ * alongside structured call IR. `toOp()` returns the stored op unchanged;
+ * `renderTypeScript()` emits `rawSql({...})` with the op serialized as a
+ * JSON literal — round-tripping requires every field on the op to be
+ * JSON-serializable (no closures).
+ */
+export class RawSqlCall extends SqliteOpFactoryCallNode {
+  readonly factoryName = 'rawSql' as const;
+  readonly operationClass: MigrationOperationClass;
+  readonly label: string;
+  readonly op: Op;
+
+  constructor(op: Op) {
+    super();
+    this.op = op;
+    this.label = op.label;
+    this.operationClass = op.operationClass;
+    this.freeze();
+  }
+
+  toOp(): Op {
+    return this.op;
+  }
+
+  renderTypeScript(): string {
+    return `rawSql(${jsonToTsSource(this.op)})`;
+  }
+}
+
+// ============================================================================
 // Union
 // ============================================================================
 
@@ -329,4 +365,5 @@ export type SqliteOpFactoryCall =
   | DropColumnCall
   | CreateIndexCall
   | DropIndexCall
-  | DataTransformCall;
+  | DataTransformCall
+  | RawSqlCall;
