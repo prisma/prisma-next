@@ -23,7 +23,9 @@ vi.mock('../../src/utils/contract-space-aggregate-loader', async () => {
   };
 });
 
-const { loadAggregateStatusSpaces } = await import('../../src/commands/migration-status');
+const { loadAggregateStatusSpaces, computeTotalPendingAcrossSpaces } = await import(
+  '../../src/commands/migration-status'
+);
 
 const APP_HASH = `sha256:${'a'.repeat(64)}`;
 
@@ -139,5 +141,29 @@ describe('loadAggregateStatusSpaces', () => {
       markerHash: null,
       pendingCount: 0,
     });
+  });
+});
+
+describe('computeTotalPendingAcrossSpaces', () => {
+  it('returns undefined when no spaces are loaded', () => {
+    expect(computeTotalPendingAcrossSpaces([])).toBeUndefined();
+  });
+
+  it('returns undefined when any per-space pendingCount is undefined (marker-unknown / offline)', () => {
+    expect(
+      computeTotalPendingAcrossSpaces([
+        { spaceId: 'app', kind: 'app', headHash: APP_HASH, pendingCount: 2 },
+        { spaceId: 'ext-a', kind: 'extension', headHash: 'sha256:ext-a' },
+      ]),
+    ).toBeUndefined();
+  });
+
+  it('sums per-space pendingCount when every space reports a defined count', () => {
+    expect(
+      computeTotalPendingAcrossSpaces([
+        { spaceId: 'app', kind: 'app', headHash: APP_HASH, pendingCount: 2 },
+        { spaceId: 'ext-a', kind: 'extension', headHash: 'sha256:ext-a', pendingCount: 3 },
+      ]),
+    ).toBe(5);
   });
 });

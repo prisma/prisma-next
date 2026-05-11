@@ -118,6 +118,25 @@ export interface MigrationStatusSpaceEntry {
   readonly status?: 'up-to-date' | 'pending' | 'no-marker' | 'never-planned' | 'unreachable';
 }
 
+/**
+ * Sum per-space `pendingCount` into a cross-space total, but only when
+ * every loaded space reports a defined `pendingCount`. Returns
+ * `undefined` if any space is on the marker-unknown / offline path
+ * (where `pendingCount` is intentionally absent), so JSON consumers can
+ * distinguish "no pending" from "unknown".
+ */
+export function computeTotalPendingAcrossSpaces(
+  spaces: readonly MigrationStatusSpaceEntry[],
+): number | undefined {
+  if (spaces.length === 0) return undefined;
+  let total = 0;
+  for (const s of spaces) {
+    if (s.pendingCount === undefined) return undefined;
+    total += s.pendingCount;
+  }
+  return total;
+}
+
 export type { StatusDiagnostic, StatusRef } from '../utils/migration-types';
 
 export interface MigrationStatusResult {
@@ -756,10 +775,7 @@ async function executeMigrationStatusCommand(
       aggregateSpaces = [];
     }
   }
-  const totalPendingAcrossSpaces = aggregateSpaces.reduce(
-    (sum, s) => sum + (s.pendingCount ?? 0),
-    0,
-  );
+  const totalPendingAcrossSpaces = computeTotalPendingAcrossSpaces(aggregateSpaces);
 
   // Pre-check unknown invariants. Online: union the graph's declared
   // invariants with the marker's recorded set so a retired-but-applied
@@ -1026,7 +1042,7 @@ async function executeMigrationStatusCommand(
     ...ifDefined('activeRefHash', activeRefHash),
     ...ifDefined('activeRefName', activeRefName),
     spaces: aggregateSpaces,
-    totalPendingAcrossSpaces,
+    ...ifDefined('totalPendingAcrossSpaces', totalPendingAcrossSpaces),
   };
   return ok(result);
 }
