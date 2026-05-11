@@ -10,7 +10,7 @@ import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggrega
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { CliStructuredError } from './cli-errors';
-import { toDeclaredExtensions, toExtensionInputs } from './extension-pack-inputs';
+import { toDeclaredExtensionsFromRaw } from './extension-pack-inputs';
 
 /**
  * Render a {@link LoadAggregateError} into a CLI structured-error
@@ -156,7 +156,9 @@ export async function buildContractSpaceAggregate<
 >(
   inputs: BuildAggregateInputs<TFamilyId, TTargetId>,
 ): Promise<Result<ContractSpaceAggregate, CliStructuredError>> {
-  const declaredExtensions = toDeclaredExtensions(toExtensionInputs(inputs.extensionPacks));
+  const declaredExtensions = toDeclaredExtensionsFromRaw(
+    inputs.extensionPacks as ReadonlyArray<unknown>,
+  );
 
   const loadInput: LoadAggregateInput = {
     targetId: inputs.targetId,
