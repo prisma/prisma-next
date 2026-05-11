@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
 import type { ProvidedContext } from 'vitest';
+import { HYPERDRIVE_VAR, loadLocalEnv } from '../scripts/env';
 
 interface GlobalSetupContext {
   provide<K extends keyof ProvidedContext & string>(key: K, value: ProvidedContext[K]): void;
@@ -16,7 +16,6 @@ declare module 'vitest' {
   }
 }
 
-const HYPERDRIVE_VAR = 'WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE';
 const exampleRoot = fileURLToPath(new URL('..', import.meta.url));
 
 function normalize(connectionString: string): string {
@@ -27,25 +26,9 @@ function normalize(connectionString: string): string {
   return url.toString();
 }
 
-function loadDotEnv(filename: string): Record<string, string> {
-  const path = `${exampleRoot}/${filename}`;
-  if (!existsSync(path)) return {};
-  const out: Record<string, string> = {};
-  for (const line of readFileSync(path, 'utf8').split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const raw = trimmed.slice(eq + 1).trim();
-    out[key] = raw.replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
-  }
-  return out;
-}
-
 function resolveDatabaseUrl(): string {
-  const fileVars = loadDotEnv('.env');
-  const url = fileVars[HYPERDRIVE_VAR] ?? process.env[HYPERDRIVE_VAR];
+  loadLocalEnv(exampleRoot);
+  const url = process.env[HYPERDRIVE_VAR];
   if (!url) {
     throw new Error(
       `[global-setup] ${HYPERDRIVE_VAR} not set. Run \`pnpm db:up\` and copy \`.env.example\` to \`.env\`.`,

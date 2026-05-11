@@ -28,6 +28,7 @@ import {
   type MongoTypeMaps,
   validateMongoContract,
 } from '@prisma-next/mongo-contract';
+import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 
 type VariantSpec = {
   readonly value: string;
@@ -1180,21 +1181,6 @@ function normalizeRoots(roots: Record<string, ModelNameInput> | undefined): Reco
   return normalizedRoots;
 }
 
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(stableStringify).join(',')}]`;
-  }
-
-  if (value && typeof value === 'object') {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
-      .join(',')}}`;
-  }
-
-  return JSON.stringify(value);
-}
-
 function toStorageIndex(index: MongoIndex): MongoStorageIndex {
   const keys = Object.entries(index.fields).map(([field, direction]) => ({
     field,
@@ -1261,7 +1247,7 @@ function scopeVariantIndex(
 ): MongoStorageIndex {
   const result = applyPolymorphicScopeToMongoIndex(storageIndex, scope);
   if (result.kind === 'conflict') {
-    const indexLabel = authoredIndex ? stableStringify(authoredIndex) : '<unknown>';
+    const indexLabel = authoredIndex ? canonicalStringify(authoredIndex) : '<unknown>';
     throw new Error(
       `Variant model "${variantName}" index ${indexLabel} conflicts with discriminator scope: ${result.reason}`,
     );
@@ -1309,7 +1295,7 @@ function buildCollections(
     for (const collectionIndex of modelBuilder.__indexes ?? []) {
       const missingField = findMissingIndexField(collectionIndex, modelBuilder.__fields);
       if (missingField !== undefined) {
-        const indexSignature = stableStringify(collectionIndex);
+        const indexSignature = canonicalStringify(collectionIndex);
         throw new Error(
           `Model "${modelBuilder.__name}" index ${indexSignature} references unknown field "${missingField}".`,
         );
@@ -1336,12 +1322,14 @@ function buildCollections(
     for (let i = 0; i < storageIndexes.length; i++) {
       const storageIndex = storageIndexes[i];
       if (storageIndex === undefined) continue;
-      const indexSignature = stableStringify(storageIndex);
+      const indexSignature = canonicalStringify(storageIndex);
       const collectionIndexKey = `${modelBuilder.__collection}:${indexSignature}`;
       const firstOwner = declaredIndexOwners.get(collectionIndexKey);
       if (firstOwner) {
         const authoredIndex = modelBuilder.__indexes?.[i];
-        const reportedSignature = authoredIndex ? stableStringify(authoredIndex) : indexSignature;
+        const reportedSignature = authoredIndex
+          ? canonicalStringify(authoredIndex)
+          : indexSignature;
         throw new Error(
           `Collection "${modelBuilder.__collection}" defines duplicate index ${reportedSignature}. First declared on model "${firstOwner}" and duplicated on model "${modelBuilder.__name}".`,
         );

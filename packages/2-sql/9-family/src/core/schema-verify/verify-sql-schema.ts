@@ -20,6 +20,7 @@ import type {
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
 import { type CodecControlHooks, collectInitDependencies } from '../migrations/types';
@@ -1083,39 +1084,21 @@ function normalizeLiteralValue(value: unknown, nativeType?: string): unknown {
   return value;
 }
 
-/**
- * Recursively sorts object keys for deterministic JSON comparison.
- * Postgres jsonb may canonicalize key order, so two semantically equal
- * objects can have different key insertion order.
- */
-function stableStringify(value: unknown): string {
-  return JSON.stringify(value, (_key, val) => {
-    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
-      const sorted: Record<string, unknown> = {};
-      for (const k of Object.keys(val as Record<string, unknown>).sort()) {
-        sorted[k] = (val as Record<string, unknown>)[k];
-      }
-      return sorted;
-    }
-    return val;
-  });
-}
-
 function literalValuesEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
-    return stableStringify(a) === stableStringify(b);
+    return canonicalStringify(a) === canonicalStringify(b);
   }
   if (typeof a === 'object' && a !== null && typeof b === 'string') {
     try {
-      return stableStringify(a) === stableStringify(JSON.parse(b));
+      return canonicalStringify(a) === canonicalStringify(JSON.parse(b));
     } catch {
       return false;
     }
   }
   if (typeof a === 'string' && typeof b === 'object' && b !== null) {
     try {
-      return stableStringify(JSON.parse(a)) === stableStringify(b);
+      return canonicalStringify(JSON.parse(a)) === canonicalStringify(b);
     } catch {
       return false;
     }

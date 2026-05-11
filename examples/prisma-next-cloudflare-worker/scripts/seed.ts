@@ -4,32 +4,13 @@
  * Mirrors examples/prisma-next-demo/scripts/seed.ts minus the pgvector
  * embeddings (this example exercises the per-request facade, not vectors).
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+
 import { db } from '../src/prisma/db';
-
-function loadDotEnv(filename: string): Record<string, string> {
-  const path = resolve(process.cwd(), filename);
-  if (!existsSync(path)) return {};
-  const out: Record<string, string> = {};
-  for (const line of readFileSync(path, 'utf8').split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const raw = trimmed.slice(eq + 1).trim();
-    out[key] = raw.replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
-  }
-  return out;
-}
-
-const HYPERDRIVE_VAR = 'WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE';
+import { HYPERDRIVE_VAR, loadLocalEnv } from './env';
 
 async function main() {
-  const fileVars = loadDotEnv('.env');
-  const url =
-    fileVars[HYPERDRIVE_VAR] ?? process.env[HYPERDRIVE_VAR] ?? process.env['DATABASE_URL'];
+  loadLocalEnv();
+  const url = process.env[HYPERDRIVE_VAR] ?? process.env['DATABASE_URL'];
 
   if (!url) {
     throw new Error(`Set ${HYPERDRIVE_VAR} in .env (or DATABASE_URL) before running pnpm seed.`);

@@ -1,9 +1,8 @@
-import 'dotenv/config';
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
+import { CLOUDFLARE_HYPERDRIVE_VAR, HYPERDRIVE_VAR, loadLocalEnv } from './scripts/env';
 
-const WRANGLER_HYPERDRIVE_VAR = 'WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE';
-const CLOUDFLARE_HYPERDRIVE_VAR = 'CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE';
+loadLocalEnv();
 
 // vitest-pool-workers' parseCustomPoolOptions calls wrangler's
 // `unstable_getMiniflareWorkerOptions` BEFORE the `cloudflareTest` callback
@@ -14,7 +13,7 @@ const CLOUDFLARE_HYPERDRIVE_VAR = 'CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING
 // here would crash any tooling that imports the config (e.g. `vitest list`,
 // IDE integrations, `pnpm test:examples` filter passes that don't actually
 // need the binding).
-const databaseUrl = process.env[WRANGLER_HYPERDRIVE_VAR] ?? process.env[CLOUDFLARE_HYPERDRIVE_VAR];
+const databaseUrl = process.env[HYPERDRIVE_VAR] ?? process.env[CLOUDFLARE_HYPERDRIVE_VAR];
 if (databaseUrl) {
   process.env[CLOUDFLARE_HYPERDRIVE_VAR] ??= databaseUrl;
 }
