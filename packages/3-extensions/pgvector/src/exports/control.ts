@@ -1,7 +1,7 @@
 /**
  * Control-plane descriptor for the pgvector extension.
  *
- * **On-disk-in-package authoring (M3.5 R3).** The extension's contract
+ * **On-disk-in-package authoring.** The extension's contract
  * + migrations are emitted by the same pipeline application authors use:
  *
  *   `prisma-next contract emit` → `<package>/contract.{json,d.ts}`
@@ -29,7 +29,7 @@
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  *   (on-disk-in-package authoring convention).
  * @see packages/3-extensions/test-contract-space/src/exports/control.ts
- *   (R1 reference model).
+ *   (reference model).
  */
 
 import type { Contract } from '@prisma-next/contract/types';

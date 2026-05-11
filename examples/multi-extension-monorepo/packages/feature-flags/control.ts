@@ -3,7 +3,7 @@
  * contract-space package. Same shape as the `audit` descriptor — the
  * point of this example is that the framework treats the two uniformly.
  *
- * **On-disk-in-package authoring (M3.5 R3).** See
+ * **On-disk-in-package authoring.** See
  * `../audit/control.ts` for the convention; this file is the same
  * pattern applied to the feature-flags package.
  */
