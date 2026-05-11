@@ -13,14 +13,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { EncryptedString, setHandleRoutingKey } from '../src/execution/envelope';
 import type { CipherstashSdk } from '../src/execution/sdk';
 
-function emptySdk(): CipherstashSdk {
-  return {
-    decrypt: vi.fn(),
-    bulkEncrypt: vi.fn(),
-    bulkDecrypt: vi.fn(),
-  };
-}
-
 describe('EncryptedString.from(plaintext)', () => {
   it('returns an EncryptedString instance', () => {
     const envelope = EncryptedString.from('alice@example.com');
@@ -33,10 +25,11 @@ describe('EncryptedString.from(plaintext)', () => {
   });
 
   it('decrypt() does not consult an SDK on the write-side handle', async () => {
-    const sdk = emptySdk();
+    // Write-side envelopes built via `from(plaintext)` carry no SDK
+    // reference: `decrypt()` resolves directly from the cached
+    // plaintext slot without dispatching to any external service.
     const envelope = EncryptedString.from('hello');
-    await envelope.decrypt();
-    expect(sdk.decrypt).not.toHaveBeenCalled();
+    await expect(envelope.decrypt()).resolves.toBe('hello');
   });
 });
 
