@@ -210,6 +210,7 @@ export type ContractVariant = keyof typeof contractFixtures;
 export const pslContractFixtures = {
   'contract-base': join(JOURNEY_FIXTURES_DIR, 'contract-base.prisma'),
   'contract-additive': join(JOURNEY_FIXTURES_DIR, 'contract-additive.prisma'),
+  'contract-composite-pk': join(JOURNEY_FIXTURES_DIR, 'contract-composite-pk.prisma'),
 } as const;
 
 export type PslContractVariant = keyof typeof pslContractFixtures;
