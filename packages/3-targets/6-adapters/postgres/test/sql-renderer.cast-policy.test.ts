@@ -63,6 +63,7 @@ const baseContract = validateContract<PostgresContract>(
             score: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
             note: { codecId: 'pg/enum@1', nativeType: 'tag', nullable: false },
             geo: { codecId: 'app/geography@1', nativeType: 'geography', nullable: false },
+            profile: { codecId: 'arktype/json@1', nativeType: 'jsonb', nullable: false },
           },
           uniques: [],
           indexes: [],
@@ -147,6 +148,25 @@ describe('renderLoweredSql cast policy', () => {
     const lowered = renderLoweredSql(ast, baseContract, lookup);
 
     expect(lowered.sql).toBe('SELECT "user"."id" AS "id" FROM "user" WHERE "user"."note" = $1');
+  });
+
+  it('uses descriptor metadata when a parameterized codec has no id-keyed representative', () => {
+    const lookup: CodecLookup = {
+      get: () => undefined,
+      targetTypesFor: (id) => (id === 'arktype/json@1' ? ['jsonb'] : undefined),
+      metaFor: (id) =>
+        id === 'arktype/json@1'
+          ? { db: { sql: { postgres: { nativeType: 'jsonb' } } } }
+          : undefined,
+      renderOutputTypeFor: () => undefined,
+    };
+
+    const ast = selectWithParam('profile', 'arktype/json@1', { name: 'Ada' });
+    const lowered = renderLoweredSql(ast, baseContract, lookup);
+
+    expect(lowered.sql).toBe(
+      'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."profile" = $1::jsonb',
+    );
   });
 
   it('throws a clear error when the codec lookup has no entry for the codecId', () => {

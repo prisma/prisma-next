@@ -69,7 +69,12 @@ function renderTypedParam(
   if (codecId === undefined) {
     return `$${index}`;
   }
-  if (codecLookup.get(codecId) === undefined) {
+  const meta = codecLookup.metaFor(codecId);
+  const isRegistered =
+    codecLookup.get(codecId) !== undefined ||
+    meta !== undefined ||
+    codecLookup.targetTypesFor(codecId) !== undefined;
+  if (!isRegistered) {
     throw new Error(
       `Postgres lowering: ParamRef carries codecId "${codecId}" but the ` +
         'assembled codec lookup has no entry for it. This usually indicates ' +
@@ -80,7 +85,6 @@ function renderTypedParam(
     );
   }
   // The framework `CodecLookup.metaFor` returns the family-agnostic `CodecMeta` whose `db` is `Record<string, unknown>`. The SQL family populates a narrower shape with `db.sql.<dialect>.nativeType: string`; navigate that path defensively and string-check the leaf.
-  const meta = codecLookup.metaFor(codecId);
   const dbRecord = meta?.db;
   const sqlBlock = isRecord(dbRecord) ? dbRecord['sql'] : undefined;
   const dialectBlock = isRecord(sqlBlock) ? sqlBlock['postgres'] : undefined;
