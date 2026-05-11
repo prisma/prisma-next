@@ -171,7 +171,7 @@ Once that hack retires (this AC), an undimensioned `vectorColumn` produces `Code
 - The `vectorColumn (static)` test block in `packages/3-extensions/pgvector/test/column-types.test.ts` deletes.
 - The `factory(undefined)` representative-codec test in `packages/3-extensions/pgvector/test/codecs.test.ts` deletes (the behavior under test is gone).
 - The internal consumer in `packages/3-extensions/sql-orm-client/test/fixtures/contract.ts:25` migrates from `field.column(vectorColumn)` to `field.column(vector(1536))`.
-- A user-facing changelog entry under the next release notes calls out the removal and the migration path: replace `vectorColumn` with `vector(N)` for an explicit dimension.
+- The breaking change is communicated via the conventional-commit `!` marker in the M3a commit subject (e.g. `feat(pgvector)!: ...`) and a complete migration paragraph in the commit body. The repo does not maintain a `CHANGELOG.md` today; the project close-out PR description serves as the breaking-change rollup for the project. No new CHANGELOG file is introduced as part of TML-2456.
 
 This is acceptable scope for TML-2456 because the only usable wire shape is dimension-known (the codec needs `length` to validate `assertVector`); the undimensioned form was a workaround for the representative-codec hack that this project deletes. No other column shape (parameterized-codec-without-params) is shipped in this codebase.
 
