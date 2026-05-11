@@ -411,10 +411,7 @@ function buildContractCodecRegistry(
             name: `<col:${tableName}.${columnName}>`,
             usedAt: [{ table: tableName, column: columnName }],
           };
-          const voidFactory = descriptor.factory.bind(descriptor) as unknown as (
-            params: undefined,
-          ) => (ctx: SqlCodecInstanceContext) => Codec;
-          resolvedCodec = voidFactory(undefined)(ctx);
+          resolvedCodec = descriptor.factory(undefined)(ctx);
         }
       }
 
