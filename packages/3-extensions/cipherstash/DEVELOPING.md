@@ -7,7 +7,7 @@ package.
 
 ## Source layout
 
-```
+```text
 packages/3-extensions/cipherstash/
 └── src/
     ├── core/

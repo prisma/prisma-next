@@ -64,7 +64,7 @@ pnpm start
 
 Expected output (against a real database with a real SDK):
 
-```
+```text
 --- Insert ---
 Inserted 4 rows.
 
@@ -90,4 +90,4 @@ Both pieces share the same SDK binding so per-tenant key material doesn't cross 
 
 ## Type-visibility for the search operators
 
-The cipherstash extension exposes `cipherstashEq` / `cipherstashIlike` to TypeScript via the [`@prisma-next/extension-cipherstash/operation-types`](../../packages/3-extensions/cipherstash/src/exports/operation-types.ts) subpath, mirroring [`@prisma-next/extension-pgvector/operation-types`](../../packages/3-extensions/pgvector/src/exports/operation-types.ts). The contract emitter wires this through automatically (the cipherstash pack-meta declares the import in `types.queryOperationTypes`), so `src/index.ts` calls the operators directly on the column accessor (`u.email.cipherstashEq(...)`) without any cast wrapper. The accompanying `src/cipherstash-operators.types.ts` typecheck-only file pins the positive + negative AC-2 invariants (`cipherstashEq` reachable on `cipherstash/string@1` columns, unreachable on `pg/text@1` columns, and the cipherstash codec`s missing `equality` trait keeps the framework`s built-in `eq` off `email`).
+The cipherstash extension exposes `cipherstashEq` / `cipherstashIlike` to TypeScript via the [`@prisma-next/extension-cipherstash/operation-types`](../../packages/3-extensions/cipherstash/src/exports/operation-types.ts) subpath, mirroring [`@prisma-next/extension-pgvector/operation-types`](../../packages/3-extensions/pgvector/src/exports/operation-types.ts). The contract emitter wires this through automatically (the cipherstash pack-meta declares the import in `types.queryOperationTypes`), so `src/index.ts` calls the operators directly on the column accessor (`u.email.cipherstashEq(...)`) without any cast wrapper. The accompanying `src/cipherstash-operators.types.ts` typecheck-only file pins the positive + negative invariants (`cipherstashEq` reachable on `cipherstash/string@1` columns, unreachable on `pg/text@1` columns, and the cipherstash codec's missing `equality` trait keeps the framework's built-in `eq` off `email`).
