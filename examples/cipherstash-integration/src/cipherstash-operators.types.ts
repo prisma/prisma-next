@@ -1,10 +1,11 @@
 /**
- * Type-only acceptance test for CR-5 — operator type-visibility.
+ * Type-only acceptance test for the cipherstash operator type-visibility
+ * surface.
  *
  * This file is a typecheck-only artifact (the example app's
  * `pnpm typecheck` runs `tsc --project tsconfig.json --noEmit` over
- * `src/**`, so any failure here surfaces in the gate). It encodes the
- * AC-2 surface contract for `cipherstashEq` / `cipherstashIlike`:
+ * `src/**`, so any failure here surfaces in the gate). It pins the
+ * surface contract for `cipherstashEq` / `cipherstashIlike`:
  *
  *   - Positive: both operators are reachable on the ORM model
  *     accessor for `cipherstash/string@1`-typed fields (`User.email`).
@@ -66,19 +67,19 @@ void db.sql.users
 // `cipherstash/string@1`, so any non-cipherstash codec must reject.
 
 void db.orm.User.where((u) =>
-  // @ts-expect-error AC-2 negative: cipherstashEq is not on pg/text@1 columns.
+  // @ts-expect-error cipherstashEq is not on pg/text@1 columns.
   u.id.cipherstashEq('alice@example.com'),
 );
 
 void db.orm.User.where((u) =>
-  // @ts-expect-error AC-2 negative: cipherstashIlike is not on pg/text@1 columns.
+  // @ts-expect-error cipherstashIlike is not on pg/text@1 columns.
   u.id.cipherstashIlike('%alice%'),
 );
 
 void db.sql.users
   .select('id')
   .where((f, fns) =>
-    // @ts-expect-error AC-2 negative: cipherstashEq rejects pg/text@1 self.
+    // @ts-expect-error cipherstashEq rejects pg/text@1 self.
     fns.cipherstashEq(f.id, 'alice@example.com'),
   )
   .build();
@@ -86,7 +87,7 @@ void db.sql.users
 void db.sql.users
   .select('id')
   .where((f, fns) =>
-    // @ts-expect-error AC-2 negative: cipherstashIlike rejects pg/text@1 self.
+    // @ts-expect-error cipherstashIlike rejects pg/text@1 self.
     fns.cipherstashIlike(f.id, '%alice%'),
   )
   .build();
@@ -98,6 +99,6 @@ void db.sql.users
 // columns even after the cipherstash-namespaced operators land.
 
 void db.orm.User.where((u) =>
-  // @ts-expect-error AC-2 negative (regression-pinned): cipherstash columns expose no built-in `eq` (no equality trait).
+  // @ts-expect-error regression-pinned: cipherstash columns expose no built-in `eq` (no equality trait).
   u.email.eq('alice@example.com'),
 );
