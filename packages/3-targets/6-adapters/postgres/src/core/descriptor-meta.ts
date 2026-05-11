@@ -1,8 +1,5 @@
 import type { CodecControlHooks, ExpandNativeTypeInput } from '@prisma-next/family-sql/control';
-import { buildOperation,
-  refsOf,
-  toExpr,
-} from '@prisma-next/sql-relational-core/expression';
+import { buildOperation, refsOf, toExpr } from '@prisma-next/sql-relational-core/expression';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,

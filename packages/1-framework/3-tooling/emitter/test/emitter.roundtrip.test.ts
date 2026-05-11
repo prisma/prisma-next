@@ -193,7 +193,7 @@ describe('emitter round-trip', () => {
       });
 
       const codecTypeImports: TypesImportSpec[] = [];
-    const extensionIds = ['postgres', 'pg'];
+      const extensionIds = ['postgres', 'pg'];
       const options: EmitStackInput = {
         codecTypeImports,
         extensionIds,
