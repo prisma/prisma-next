@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=24"
   },
-  "description": "Worked example: monorepo with two internal contract-space packages and an aggregating app. Exercises the framework's per-space planner/runner/verifier with multiple extensions in one application (project: extension-contract-spaces, M4 / TC-8 / spec AC4).",
+  "description": "Worked example: monorepo with two internal contract-space packages and an aggregating app. Exercises the framework's per-space planner/runner/verifier with multiple extensions in one application.",
   "scripts": {
     "build:contract-spaces": "cd packages/audit && prisma-next contract emit && cd ../feature-flags && prisma-next contract emit",
     "test": "vitest run --config vitest.config.ts",
