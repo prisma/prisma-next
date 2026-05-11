@@ -13,6 +13,7 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
+  APP_SPACE_ID,
   createControlStack,
   hasMigrations,
   hasOperationPreview,
@@ -27,7 +28,9 @@ import { enrichContract } from './contract-enrichment';
 import { ContractValidationError } from './errors';
 import { executeDbInit } from './operations/db-init';
 import { executeDbUpdate } from './operations/db-update';
+import { type ExecuteDbVerifyResult, executeDbVerify } from './operations/db-verify';
 import { executeMigrationApply } from './operations/migration-apply';
+
 import type {
   ControlActionName,
   ControlClient,
@@ -36,6 +39,7 @@ import type {
   DbInitResult,
   DbUpdateOptions,
   DbUpdateResult,
+  DbVerifyOptions,
   EmitOptions,
   EmitResult,
   IntrospectOptions,
@@ -367,6 +371,9 @@ class ControlClientImpl implements ControlClient {
       mode: options.mode,
       migrations: this.options.target.migrations,
       frameworkComponents,
+      migrationsDir: options.migrationsDir,
+      targetId: this.options.target.targetId,
+      extensionPacks: this.options.extensionPacks ?? [],
       ...ifDefined('onProgress', onProgress),
     });
   }
@@ -395,14 +402,54 @@ class ControlClientImpl implements ControlClient {
       mode: options.mode,
       migrations: this.options.target.migrations,
       frameworkComponents,
+      migrationsDir: options.migrationsDir,
+      targetId: this.options.target.targetId,
+      extensionPacks: this.options.extensionPacks ?? [],
       ...ifDefined('acceptDataLoss', options.acceptDataLoss),
+      ...ifDefined('onProgress', onProgress),
+    });
+  }
+
+  async dbVerify(options: DbVerifyOptions): Promise<ExecuteDbVerifyResult> {
+    const { onProgress } = options;
+    await this.connectWithProgress(options.connection, 'dbVerify', onProgress);
+    const { driver, familyInstance, frameworkComponents } = await this.ensureConnected();
+
+    let contract: Contract;
+    try {
+      contract = familyInstance.validateContract(options.contract);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContractValidationError(message, error);
+    }
+
+    return executeDbVerify({
+      driver,
+      familyInstance,
+      contract,
+      migrationsDir: options.migrationsDir,
+      targetId: this.options.target.targetId,
+      extensionPacks: this.options.extensionPacks ?? [],
+      frameworkComponents,
+      mode: options.strict ? 'strict' : 'lenient',
+      skipSchema: options.skipSchema,
+      skipMarker: options.skipMarker,
       ...ifDefined('onProgress', onProgress),
     });
   }
 
   async readMarker(): Promise<ContractMarkerRecord | null> {
     const { driver, familyInstance } = await this.ensureConnected();
-    return familyInstance.readMarker({ driver });
+    // The CLI client's readMarker reads the app's marker. Per-extension
+    // readers go through the orchestrator's per-space planner / runner
+    // boundary, which threads the extension's space id through the
+    // family interface explicitly.
+    return familyInstance.readMarker({ driver, space: APP_SPACE_ID });
+  }
+
+  async readAllMarkers(): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
+    const { driver, familyInstance } = await this.ensureConnected();
+    return familyInstance.readAllMarkers({ driver });
   }
 
   async migrationApply(options: MigrationApplyOptions): Promise<MigrationApplyResult> {
@@ -414,16 +461,28 @@ class ControlClientImpl implements ControlClient {
       throw new Error(`Target "${this.options.target.targetId}" does not support migrations`);
     }
 
+    let contract: Contract;
+    try {
+      contract = familyInstance.validateContract(options.contract);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContractValidationError(message, error);
+    }
+
     return executeMigrationApply({
       driver,
       familyInstance,
-      originHash: options.originHash,
-      destinationHash: options.destinationHash,
-      pendingMigrations: options.pendingMigrations,
+      contract,
       migrations: this.options.target.migrations,
       frameworkComponents,
+      migrationsDir: options.migrationsDir,
+      extensionPacks: this.options.extensionPacks ?? [],
       targetId: this.options.target.targetId,
-      ...(onProgress ? { onProgress } : {}),
+      appMigrationPackages: options.appMigrationPackages,
+      ...ifDefined('refHash', options.refHash),
+      ...ifDefined('refInvariants', options.refInvariants),
+      ...ifDefined('refName', options.refName),
+      ...ifDefined('onProgress', onProgress),
     });
   }
 

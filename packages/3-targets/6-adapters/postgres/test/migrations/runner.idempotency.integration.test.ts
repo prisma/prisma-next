@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -55,6 +56,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
         const planWithPreSatisfiedPostcheck = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -110,8 +112,8 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         }
 
         const markerCount = await driver!.query<{ count: string }>(
-          'select count(*)::text as count from prisma_contract.marker where id = $1',
-          [1],
+          'select count(*)::text as count from prisma_contract.marker where space = $1',
+          ['app'],
         );
         expect(markerCount.rows[0]?.count).toBe('1');
 
@@ -177,6 +179,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
 
         const planWithPreSatisfiedPostcheck = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [mutableOperation],
@@ -246,6 +249,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           policy: INIT_ADDITIVE_POLICY,
           fromContract: null,
           frameworkComponents,
+          spaceId: APP_SPACE_ID,
         });
         if (initialPlan.kind !== 'success') {
           throw new Error('expected initial planner success');
@@ -263,13 +267,14 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           'select count(*)::text as count from prisma_contract.ledger',
         );
         const initialUpdatedAt = await driver!.query<{ updated_at: Date }>(
-          'select updated_at from prisma_contract.marker where id = 1',
+          `select updated_at from prisma_contract.marker where space = 'app'`,
         );
 
         // Self-edge plan with no operations and no new invariants. This is a
         // true no-op: nothing should be written.
         const noOpSelfEdgePlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: toPlanContractInfo(contract),
           destination: toPlanContractInfo(contract),
           operations: [],
@@ -299,7 +304,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
 
         // Marker updated_at unchanged: no churn from the no-op.
         const updatedAtAfter = await driver!.query<{ updated_at: Date }>(
-          'select updated_at from prisma_contract.marker where id = 1',
+          `select updated_at from prisma_contract.marker where space = 'app'`,
         );
         expect(updatedAtAfter.rows[0]?.updated_at?.toISOString()).toBe(
           initialUpdatedAt.rows[0]?.updated_at?.toISOString(),
@@ -320,6 +325,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           policy: INIT_ADDITIVE_POLICY,
           fromContract: null,
           frameworkComponents,
+          spaceId: APP_SPACE_ID,
         });
         if (initialPlan.kind !== 'success') {
           throw new Error('expected initial planner success');
@@ -339,6 +345,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
 
         const selfEdgePlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: toPlanContractInfo(contract),
           destination: toPlanContractInfo(contract),
           operations: [

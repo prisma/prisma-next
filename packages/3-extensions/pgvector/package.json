@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/extension-pgvector",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "scripts": {
@@ -18,15 +19,17 @@
     "@prisma-next/contract-authoring": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/migration-tools": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-operations": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
-    "arktype": "^2.0.0"
+    "@standard-schema/spec": "^1.1.0",
+    "arktype": "^2.1.29"
   },
   "devDependencies": {
     "@prisma-next/operations": "workspace:*",
-    "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",

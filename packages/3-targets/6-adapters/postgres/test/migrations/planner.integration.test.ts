@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -51,6 +52,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
     if (initialPlan.kind !== 'success') {
       throw new Error('expected initial plan success');
@@ -76,6 +78,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
     expect(supersetResult).toMatchObject({
       kind: 'success',
@@ -95,6 +98,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
 
     expect(subsetResult.kind).toBe('success');
@@ -127,6 +131,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
         policy: INIT_ADDITIVE_POLICY,
         fromContract: null,
         frameworkComponents,
+        spaceId: APP_SPACE_ID,
       });
 
       expect(planResult.kind).toBe('success');
@@ -163,6 +168,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
 
     expect(conflictResult).toMatchObject({

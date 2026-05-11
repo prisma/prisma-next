@@ -1,3 +1,7 @@
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+
+export { APP_SPACE_ID };
+
 export interface SqlStatement {
   readonly sql: string;
   readonly params: readonly unknown[];
@@ -8,9 +12,18 @@ export const ensurePrismaContractSchemaStatement: SqlStatement = {
   params: [],
 };
 
+/**
+ * Schema for `prisma_contract.marker`. The `space text` primary key
+ * supports one row per loaded contract space (`'app'`,
+ * `'<extension-id>'`, …); on a brand-new database `CREATE TABLE IF NOT
+ * EXISTS` produces this shape directly. The migration runner detects
+ * pre-1.0 single-row markers (no `space` column) at boot and fails with
+ * a structured `LEGACY_MARKER_SHAPE` error rather than auto-migrating —
+ * see `specs/framework-mechanism.spec.md § 2`.
+ */
 export const ensureMarkerTableStatement: SqlStatement = {
   sql: `create table if not exists prisma_contract.marker (
-    id smallint primary key default 1,
+    space text not null primary key default '${APP_SPACE_ID}',
     core_hash text not null,
     profile_hash text not null,
     contract_json jsonb,
@@ -39,6 +52,16 @@ export const ensureLedgerTableStatement: SqlStatement = {
 };
 
 export interface MergeMarkerInput {
+  /**
+   * Logical space identifier for this marker row. Required at every
+   * call site so the type system surfaces every place that needs to
+   * thread the value (rather than letting an `?? APP_SPACE_ID`
+   * fall-through silently collapse multi-space markers onto the
+   * `'app'` row). App-plan callers pass {@link APP_SPACE_ID}
+   * (`'app'`); per-extension callers (planner / runner / verifier
+   * extensions over contract spaces) pass the extension's space id.
+   */
+  readonly space: string;
   readonly storageHash: string;
   readonly profileHash: string;
   readonly contractJson?: unknown;
@@ -59,7 +82,7 @@ export function buildMergeMarkerStatements(input: MergeMarkerInput): {
   readonly update: SqlStatement;
 } {
   const params: readonly unknown[] = [
-    1,
+    input.space,
     input.storageHash,
     input.profileHash,
     jsonParam(input.contractJson),
@@ -72,7 +95,7 @@ export function buildMergeMarkerStatements(input: MergeMarkerInput): {
   return {
     insert: {
       sql: `insert into prisma_contract.marker (
-        id,
+        space,
         core_hash,
         profile_hash,
         contract_json,
@@ -108,7 +131,7 @@ export function buildMergeMarkerStatements(input: MergeMarkerInput): {
         app_tag = $6,
         meta = $7::jsonb,
         invariants = array(select distinct unnest(invariants || $8::text[]) order by 1)
-      where id = $1`,
+      where space = $1`,
       params,
     },
   };

@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/family-mongo",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "Mongo family descriptor for Prisma Next",
@@ -45,8 +46,6 @@
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/2-mongo-family/9-family"
   },
-  "main": "./dist/control.mjs",
-  "module": "./dist/control.mjs",
   "types": "./dist/control.d.mts",
   "exports": {
     "./control": "./dist/control.mjs",

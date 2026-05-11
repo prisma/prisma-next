@@ -80,7 +80,7 @@ withTempDir(({ createTempDir }) => {
         const planResult = await runMigrationPlan(ctx, ['--name', 'shrink-status-enum']);
         expect(planResult.exitCode, `plan: ${planResult.stdout}\n${planResult.stderr}`).toBe(0);
 
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const migrationDirs = readdirSync(migrationsDir)
           .filter((d) => d.includes('shrink_status_enum'))
           .sort();

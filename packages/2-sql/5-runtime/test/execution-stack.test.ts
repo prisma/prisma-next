@@ -1,5 +1,5 @@
 import { createExecutionStack } from '@prisma-next/framework-components/execution';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createExecutionContext, createSqlExecutionStack } from '../src/exports';
 import type {
@@ -8,18 +8,18 @@ import type {
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
-import { createTestContract } from './utils';
+import { defineTestCodec } from './test-codec';
+import { createTestContract, descriptorsFromCodecs } from './utils';
 
 function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> {
-  const registry = createCodecRegistry();
-  registry.register(
-    codec({
+  const registry: ReadonlyArray<Codec<string>> = [
+    defineTestCodec({
       typeId: 'pg/text@1',
       targetTypes: ['text'],
       encode: (value: string) => value,
       decode: (wire: string) => wire,
     }),
-  );
+  ];
 
   return {
     kind: 'adapter',
@@ -27,8 +27,7 @@ function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> 
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => registry,
-    parameterizedCodecs: () => [],
+    codecs: () => descriptorsFromCodecs(registry),
     create() {
       return Object.assign(
         { familyId: 'sql' as const, targetId: 'postgres' as const },
@@ -37,7 +36,6 @@ function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> 
             id: 'test-profile',
             target: 'postgres',
             capabilities: {},
-            codecs: () => registry,
             readMarkerStatement: () => ({ sql: '', params: [] }),
             parseMarkerRow: () => {
               throw new Error('stub adapter does not implement parseMarkerRow');
@@ -59,8 +57,7 @@ function createStubTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => createCodecRegistry(),
-    parameterizedCodecs: () => [],
+    codecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -68,15 +65,14 @@ function createStubTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
 }
 
 function createStubExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgres'> {
-  const registry = createCodecRegistry();
-  registry.register(
-    codec({
+  const registry: ReadonlyArray<Codec<string>> = [
+    defineTestCodec({
       typeId: 'pg/uuid@1',
       targetTypes: ['uuid'],
       encode: (value: string) => value,
       decode: (wire: string) => wire,
     }),
-  );
+  ];
 
   const operations = [
     {
@@ -91,9 +87,8 @@ function createStubExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgre
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => registry,
+    codecs: () => descriptorsFromCodecs(registry),
     queryOperations: () => operations,
-    parameterizedCodecs: () => [],
     create() {
       return {
         familyId: 'sql' as const,
@@ -129,8 +124,8 @@ describe('createExecutionStack', () => {
     }) as ExecutionContext<typeof contract>;
 
     expect(context.contract).toBe(contract);
-    expect(context.codecs.get('pg/text@1')).toBeDefined();
-    expect(context.codecs.get('pg/uuid@1')).toBeDefined();
+    expect(context.codecDescriptors.descriptorFor('pg/text@1')).toBeDefined();
+    expect(context.codecDescriptors.descriptorFor('pg/uuid@1')).toBeDefined();
     expect(context.queryOperations.entries()['example']).toBeDefined();
     expect(context.types).toEqual({});
   });

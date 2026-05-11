@@ -3,7 +3,7 @@ import { EMPTY_CONTRACT_HASH } from '../src/constants';
 import type { MigrationEdge } from '../src/graph';
 import { computeMigrationHash } from '../src/hash';
 import { findPath, findPathWithInvariants, reconstructGraph } from '../src/migration-graph';
-import type { MigrationPackage } from '../src/package';
+import type { OnDiskMigrationPackage } from '../src/package';
 import { createTestMetadata, createTestOps } from './fixtures';
 
 let migrationCounter = 0;
@@ -14,7 +14,12 @@ interface PkgOpts {
   readonly labels?: readonly string[];
 }
 
-function pkg(from: string, to: string, dirName: string, opts: PkgOpts = {}): MigrationPackage {
+function pkg(
+  from: string,
+  to: string,
+  dirName: string,
+  opts: PkgOpts = {},
+): OnDiskMigrationPackage {
   const baseCreatedAt = opts.createdAt ?? '2026-02-25T14:00:00.000Z';
   const uniqueCreatedAt = `${baseCreatedAt}-${migrationCounter++}`;
   const metadata = createTestMetadata({
@@ -377,7 +382,7 @@ describe('findPathWithInvariants — pathological shapes', () => {
     // bottom edge provides nothing. Only the all-top path covers all 8
     // invariants. Asserts: returns the all-top path.
     const k = 8;
-    const packages: MigrationPackage[] = [];
+    const packages: OnDiskMigrationPackage[] = [];
     for (let i = 0; i < k; i++) {
       const open = i === 0 ? E : `S${i}`;
       const close = `S${i + 1}`;

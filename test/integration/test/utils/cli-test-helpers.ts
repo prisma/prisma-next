@@ -312,6 +312,7 @@ export async function setupDbTestFixture(
 export {
   executeCommand,
   getExitCode,
+  parseJsonObjectFromCliCapture,
   resetExitCode,
   setupCommandMocks,
 } from '../../../../packages/1-framework/3-tooling/cli/test/utils/test-helpers';

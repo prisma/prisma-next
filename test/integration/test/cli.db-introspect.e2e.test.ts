@@ -7,6 +7,7 @@ import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
+  parseJsonObjectFromCliCapture,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
@@ -36,6 +37,10 @@ function normalizeOutput(stripped: string): string {
       if (/^[◒◐◓◑]/.test(trimmed)) return false;
       if (/^◇/.test(trimmed)) return false;
       if (trimmed === '│') return false;
+      if (/^\(node:\d+\)/.test(trimmed)) return false;
+      if (/^\(Use `node --trace-warnings/.test(trimmed)) return false;
+      if (trimmed.includes('ExperimentalWarning:')) return false;
+      if (/^\[\d{4}-\d{2}-\d{2}T/.test(trimmed) && trimmed.includes('[ERROR]')) return false;
       return true;
     })
     .join('\n')
@@ -145,8 +150,9 @@ withTempDir(({ createTempDir }) => {
 
             expect(existsSync(join(testSetup.testDir, 'output/contract.prisma'))).toBe(false);
 
-            const output = stdoutOnly(consoleOutput, consoleErrors).join('\n');
-            const jsonOutput = JSON.parse(output);
+            const jsonOutput = parseJsonObjectFromCliCapture(
+              stdoutOnly(consoleOutput, consoleErrors),
+            ) as { ok: boolean; summary: string; schema: unknown };
             expect(jsonOutput).toMatchObject({
               ok: true,
               summary: 'Schema read successfully',
@@ -234,8 +240,9 @@ withTempDir(({ createTempDir }) => {
               process.chdir(originalCwd);
             }
 
-            const output = stdoutOnly(consoleOutput, consoleErrors).join('\n');
-            const jsonOutput = JSON.parse(output);
+            const jsonOutput = parseJsonObjectFromCliCapture(
+              stdoutOnly(consoleOutput, consoleErrors),
+            ) as { ok: boolean; summary: string; psl: { path: string } };
             expect(jsonOutput).toMatchObject({
               ok: true,
               summary: 'Contract inferred successfully',

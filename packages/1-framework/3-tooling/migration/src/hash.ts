@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { canonicalizeJson } from './canonicalize-json';
 import type { MigrationMetadata } from './metadata';
-import type { MigrationOps, MigrationPackage } from './package';
+import type { MigrationOps, OnDiskMigrationPackage } from './package';
 
 export interface VerifyResult {
   readonly ok: boolean;
@@ -71,7 +71,7 @@ export function computeMigrationHash(
  * not — typically a sign of FS corruption, partial writes, or a post-emit
  * hand edit.
  */
-export function verifyMigrationHash(pkg: MigrationPackage): VerifyResult {
+export function verifyMigrationHash(pkg: OnDiskMigrationPackage): VerifyResult {
   const computed = computeMigrationHash(pkg.metadata, pkg.ops);
 
   if (pkg.metadata.migrationHash === computed) {

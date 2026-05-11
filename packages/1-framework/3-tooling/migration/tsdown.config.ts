@@ -14,6 +14,8 @@ export default defineConfig({
     'exports/constants': 'src/exports/constants.ts',
     'exports/migration-ts': 'src/exports/migration-ts.ts',
     'exports/migration': 'src/exports/migration.ts',
+    'exports/spaces': 'src/exports/spaces.ts',
+    'exports/aggregate': 'src/exports/aggregate.ts',
   },
   exports: { enabled: false },
 });

@@ -15,6 +15,61 @@ import type { TargetBoundComponentDescriptor } from '../shared/framework-compone
 import type { ControlDriverInstance, ControlFamilyInstance } from './control-instances';
 
 // ============================================================================
+// Migration Package Metadata
+// ============================================================================
+
+/**
+ * Planner provenance recorded inside {@link MigrationMetadata}.
+ *
+ * `used` / `applied` track which migration hints the planner consulted
+ * vs. which it actually applied during emission; `plannerVersion`
+ * pins the planner build that produced the migration so future
+ * verification passes can recognise plans authored against an older
+ * planner.
+ */
+export interface MigrationHints {
+  readonly used: readonly string[];
+  readonly applied: readonly string[];
+  readonly plannerVersion: string;
+}
+
+/**
+ * In-memory migration metadata envelope. Every migration is
+ * content-addressed: the `migrationHash` is a hash over the metadata
+ * envelope plus the operations list, computed at write time. There is no
+ * draft state — a migration directory either exists with fully attested
+ * metadata or it does not.
+ *
+ * When the planner cannot lower an operation because of an unfilled
+ * `placeholder(...)` slot, the migration is still written with
+ * `migrationHash` hashed over `ops: []`. Re-running self-emit after the
+ * user fills the placeholder produces a *different* `migrationHash`
+ * (committed to the real ops); this is intentional.
+ *
+ * The on-disk JSON shape in `migration.json` matches this type
+ * field-for-field — `JSON.stringify(metadata, null, 2)` is the canonical
+ * writer output (defined in `@prisma-next/migration-tools/io`).
+ */
+export interface MigrationMetadata {
+  readonly migrationHash: string;
+  readonly from: string | null;
+  readonly to: string;
+  readonly fromContract: Contract | null;
+  readonly toContract: Contract;
+  readonly hints: MigrationHints;
+  readonly labels: readonly string[];
+  /**
+   * Sorted, deduplicated list of `invariantId`s declared by the
+   * migration's data-transform ops. Always present; an empty array
+   * means the migration has no routing-visible data transforms.
+   */
+  readonly providedInvariants: readonly string[];
+  readonly authorship?: { readonly author?: string; readonly email?: string };
+  readonly signature?: { readonly keyId: string; readonly value: string } | null;
+  readonly createdAt: string;
+}
+
+// ============================================================================
 // Operation Classes and Policy
 // ============================================================================
 
@@ -109,6 +164,16 @@ export interface OpFactoryCall {
 export interface MigrationPlan {
   /** The target ID this plan is for (e.g., 'postgres'). */
   readonly targetId: string;
+  /**
+   * Contract space this plan applies to. Runners cross-check
+   * `options.space` against `plan.spaceId` so the marker row gets keyed
+   * by the right space when applying via `executeAcrossSpaces`.
+   *
+   * Optional for backward compatibility with single-space callers that
+   * pre-date the contract-space aggregate; when present, runners
+   * enforce that it matches `options.space`.
+   */
+  readonly spaceId?: string;
   /**
    * Origin contract identity that the plan expects the database to currently be at.
    * If omitted or null, the runner skips origin validation entirely.
@@ -298,6 +363,13 @@ export interface MigrationPlanner<
     readonly frameworkComponents: ReadonlyArray<
       TargetBoundComponentDescriptor<TFamilyId, TTargetId>
     >;
+    /**
+     * Contract space this plan applies to. Stamped onto the produced
+     * plan so the runner keys the marker row by the right space when
+     * executing. App-plan callers pass `APP_SPACE_ID` (`'app'`);
+     * per-extension callers pass the extension's space id.
+     */
+    readonly spaceId: string;
   }): MigrationPlannerResult;
 
   /**
@@ -306,8 +378,15 @@ export interface MigrationPlanner<
    * Used by `migration new` to scaffold a fresh `migration.ts`. The
    * returned plan has no operations; its `renderTypeScript()` yields a
    * stub the user can edit.
+   *
+   * `spaceId` is stamped onto the produced plan; reconciliation flows
+   * (`db init`, `db update`) and authoring flows (`migration new`) all
+   * pass it explicitly.
    */
-  emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface;
+  emptyMigration(
+    context: MigrationScaffoldContext,
+    spaceId: string,
+  ): MigrationPlanWithAuthoringSurface;
 }
 
 /**
@@ -354,6 +433,73 @@ export interface MigrationRunner<
       TargetBoundComponentDescriptor<TFamilyId, TTargetId>
     >;
   }): Promise<MigrationRunnerResult>;
+}
+
+// ============================================================================
+// Multi-space runner protocol (extension contract spaces, TML-2397)
+// ============================================================================
+
+/**
+ * Per-space input for {@link MultiSpaceCapableRunner.executeAcrossSpaces}.
+ *
+ * Mirrors the single-space `MigrationRunner.execute` options, extended with a
+ * required `space` identifier. Each entry's `driver` must reference the same
+ * connection the outer transaction is opened on (typically the same value as
+ * the top-level `driver` on `executeAcrossSpaces`).
+ *
+ * Family-specific runners (e.g. the SQL family's `SqlMigrationRunner`) define
+ * a richer per-space option shape that is structurally compatible with this
+ * one — additional optional fields (e.g. SQL's `strictVerification`,
+ * `schemaName`, `callbacks`) are tolerated by the underlying runner without
+ * affecting cross-target wiring.
+ */
+export interface MultiSpaceRunnerPerSpaceOptions<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
+  readonly space: string;
+  readonly plan: MigrationPlan;
+  readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
+  readonly destinationContract: unknown;
+  readonly policy: MigrationOperationPolicy;
+  readonly executionChecks?: MigrationRunnerExecutionChecks;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
+}
+
+export interface MultiSpaceRunnerSuccessValue {
+  readonly perSpaceResults: ReadonlyArray<{
+    readonly space: string;
+    readonly value: MigrationRunnerSuccessValue;
+  }>;
+}
+
+export interface MultiSpaceRunnerFailure extends MigrationRunnerFailure {
+  /** Identifier of the space whose plan caused the rollback. */
+  readonly failingSpace: string;
+}
+
+export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiSpaceRunnerFailure>;
+
+/**
+ * Optional capability for runners that can apply a list of per-space plans
+ * inside a single outer transaction. A failure on any space rolls back every
+ * space's writes.
+ *
+ * The SQL family (`SqlMigrationRunner`) implements this with a true outer
+ * transaction across every space. The Mongo family implements a degenerate
+ * single-space shim (per-space is a non-goal per the extension-contract-spaces
+ * project spec — Mongo aggregates are always single-member). The capability
+ * is declared at the framework layer so CLI utilities can route through it
+ * without importing any specific family directly.
+ */
+export interface MultiSpaceCapableRunner<
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> {
+  executeAcrossSpaces(options: {
+    readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
+    readonly perSpaceOptions: ReadonlyArray<MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>>;
+  }): Promise<MultiSpaceRunnerResult>;
 }
 
 // ============================================================================

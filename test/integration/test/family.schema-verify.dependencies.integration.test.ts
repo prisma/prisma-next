@@ -15,6 +15,7 @@ import postgres from '@prisma-next/target-postgres/control';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { legacyDatabaseDependencyExtension } from './family.schema-verify.extensions';
 
 describe('family instance schemaVerify', () => {
   let connectionString: string | undefined;
@@ -50,11 +51,15 @@ describe('family instance schemaVerify', () => {
           throw new Error('Connection string not set');
         }
 
-        // Build contract with extension pack declared
+        // Build contract with extension pack declared. We use a synthetic
+        // legacy `databaseDependencies` extension here because pgvector itself
+        // moved to the contract-space mechanism (see TML-2397); the
+        // databaseDependencies dependency_missing path still exists and this
+        // test exercises that path with a stand-in extension.
         const contract = defineContract({
           family: sqlFamily,
           target: postgresPack,
-          extensionPacks: { pgvector },
+          extensionPacks: { 'legacy-vector': legacyDatabaseDependencyExtension },
           models: {
             User: model('User', {
               fields: {
@@ -67,14 +72,13 @@ describe('family instance schemaVerify', () => {
 
         const driver = await postgresDriver.create(connectionString);
         try {
-          // Create family instance with the pgvector extension
           const familyInstance = sql.create(
             createControlStack({
               family: sql,
               target: postgres,
               adapter: postgresAdapter,
               driver: postgresDriver,
-              extensionPacks: [pgvector],
+              extensionPacks: [legacyDatabaseDependencyExtension],
             }),
           );
 
@@ -82,10 +86,11 @@ describe('family instance schemaVerify', () => {
             contract,
             emptyCodecLookup,
           );
-          // Include pgvector in frameworkComponents so its verifyDatabaseDependencies hook is called
+          // Include the synthetic extension in frameworkComponents so its
+          // verifyDatabaseDependencies hook is invoked.
           const frameworkComponents: ReadonlyArray<
             TargetBoundComponentDescriptor<'sql', 'postgres'>
-          > = [postgres, postgresAdapter, pgvector];
+          > = [postgres, postgresAdapter, legacyDatabaseDependencyExtension];
           const result = await familyInstance.schemaVerify({
             driver,
             contract: validatedContract,

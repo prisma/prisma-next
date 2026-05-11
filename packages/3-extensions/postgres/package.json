@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/postgres",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "One-liner lazy Postgres client composition for Prisma Next",
@@ -60,7 +61,5 @@
     "./serverless": "./dist/serverless.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/runtime.mjs",
-  "module": "./dist/runtime.mjs",
   "types": "./dist/runtime.d.mts"
 }

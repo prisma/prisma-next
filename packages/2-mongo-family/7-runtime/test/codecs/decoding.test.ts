@@ -1,8 +1,8 @@
 import { isRuntimeError } from '@prisma-next/framework-components/runtime';
 import {
-  createMongoCodecRegistry,
   type MongoCodecRegistry,
   mongoCodec,
+  newMongoCodecRegistry,
 } from '@prisma-next/mongo-codec';
 import type { MongoFieldShape, MongoResultShape } from '@prisma-next/mongo-query-ast/execution';
 import { ObjectId } from 'mongodb';
@@ -24,11 +24,10 @@ function deferred<T>(): {
 }
 
 function registryWithDefaults(): MongoCodecRegistry {
-  const registry = createMongoCodecRegistry();
+  const registry = newMongoCodecRegistry();
   registry.register(
     mongoCodec({
       typeId: 'mongo/string@1',
-      targetTypes: ['string'],
       encode: (v: string) => v,
       decode: (w: string) => w,
     }),
@@ -36,7 +35,6 @@ function registryWithDefaults(): MongoCodecRegistry {
   registry.register(
     mongoCodec({
       typeId: 'mongo/objectId@1',
-      targetTypes: ['objectId'],
       encode: (v: string) => new ObjectId(v),
       decode: (w: { toHexString: () => string }) => w.toHexString(),
     }),
@@ -68,7 +66,6 @@ describe('decodeMongoRow', () => {
     registry.register(
       mongoCodec({
         typeId: 'test/spy@1',
-        targetTypes: ['x'],
         encode: (v: string) => v,
         decode: decodeSpy,
       }),
@@ -128,7 +125,6 @@ describe('decodeMongoRow', () => {
     registry.register(
       mongoCodec({
         typeId: 'throws-on-b@1',
-        targetTypes: ['string'],
         encode: (v: string) => v,
         decode: (w: string) => {
           if (w === 'bad') throw new Error('boom');
@@ -183,8 +179,7 @@ describe('decodeMongoRow', () => {
         },
       },
     };
-    // A driver row where `addr` came back as an array (e.g. an unexpanded
-    // `$lookup` pre-`$unwind`) is yielded verbatim rather than walked into.
+    // A driver row where `addr` came back as an array (e.g. an unexpanded `$lookup` pre-`$unwind`) is yielded verbatim rather than walked into.
     const arrayRow = { addr: [{ city: 'X' }] };
     const arrayOut = await decodeMongoRow(arrayRow, shape, registry, 'c');
     expect(arrayOut).toEqual({ addr: [{ city: 'X' }] });
@@ -250,17 +245,13 @@ describe('decodeMongoRow', () => {
   });
 
   it('coerces non-Error throw values into the wrapper message', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'throws-string@1',
-        targetTypes: ['x'],
         encode: (v: string) => v,
         decode: () => {
-          // Codec authors throwing a non-Error happens — the wrapper has
-          // to render something for the message. The cast is a deliberate
-          // exercise of `wrapDecodeFailure`'s `error instanceof Error`
-          // false-branch (pure type-system: `throw` accepts `unknown`).
+          // Codec authors throwing a non-Error happens — the wrapper has to render something for the message. The cast is a deliberate exercise of `wrapDecodeFailure`'s `error instanceof Error` false-branch (pure type-system: `throw` accepts `unknown`).
           throw 'string-error' as unknown as Error;
         },
       }),
@@ -282,11 +273,10 @@ describe('decodeMongoRow', () => {
   });
 
   it('serialises non-string wire values for wirePreview when decode throws', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'throws@1',
-        targetTypes: ['x'],
         encode: (v: string) => v,
         decode: () => {
           throw new Error('boom');
@@ -311,11 +301,10 @@ describe('decodeMongoRow', () => {
   });
 
   it('truncates long string wirePreviews to 100 chars with an ellipsis', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'throws@1',
-        targetTypes: ['x'],
         encode: (v: string) => v,
         decode: () => {
           throw new Error('boom');
@@ -341,9 +330,7 @@ describe('decodeMongoRow', () => {
   });
 
   it('passes through row fields the shape does not describe', async () => {
-    // Polymorphic variants and sidecar fields the contract does not enumerate
-    // round-trip verbatim. The shape is a partial lane-vouched description;
-    // drop semantics belongs to projection, not to structural decode.
+    // Polymorphic variants and sidecar fields the contract does not enumerate round-trip verbatim. The shape is a partial lane-vouched description; drop semantics belongs to projection, not to structural decode.
     const registry = registryWithDefaults();
     const shape: MongoResultShape = {
       kind: 'document',
@@ -363,11 +350,7 @@ describe('decodeMongoRow', () => {
   });
 
   it('passes through subdocument keys the nested document shape does not describe', async () => {
-    // The pass-through invariant is structurally additive at every depth, not
-    // just the top level. A nested `kind: 'document'` slot decodes the keys
-    // its `fields` enumerates and round-trips the rest. ADR 209 promises
-    // future lane work threading concrete value-object subtrees is purely
-    // additive, which requires this.
+    // The pass-through invariant is structurally additive at every depth, not just the top level. A nested `kind: 'document'` slot decodes the keys its `fields` enumerates and round-trips the rest. ADR 209 promises future lane work threading concrete value-object subtrees is purely additive, which requires this.
     const registry = registryWithDefaults();
     const shape: MongoResultShape = {
       kind: 'document',
@@ -407,7 +390,7 @@ describe('decodeMongoRow', () => {
   });
 
   it('passes through when registry has no entry for codecId', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     const shape: MongoResultShape = {
       kind: 'document',
       fields: {
@@ -420,11 +403,10 @@ describe('decodeMongoRow', () => {
   });
 
   it('wraps codec errors in RUNTIME.DECODE_FAILED with details and cause', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'throws@1',
-        targetTypes: ['x'],
         encode: (v: string) => v,
         decode: () => {
           throw new Error('inner');
@@ -461,11 +443,10 @@ describe('decodeMongoRow', () => {
     const dA = deferred<string>();
     const dB = deferred<string>();
     const callOrder: string[] = [];
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'slow-a@1',
-        targetTypes: ['x'],
         encode: (v: string) => v,
         decode: (w: string) => {
           callOrder.push('a-start');
@@ -476,7 +457,6 @@ describe('decodeMongoRow', () => {
     registry.register(
       mongoCodec({
         typeId: 'slow-b@1',
-        targetTypes: ['x'],
         encode: (v: string) => v,
         decode: (w: string) => {
           callOrder.push('b-start');

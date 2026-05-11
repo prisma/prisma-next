@@ -9,6 +9,7 @@
 import { execFile } from 'node:child_process';
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -448,7 +449,7 @@ export async function runMigrationPlanAndEmit(
   if (planResult.exitCode !== 0) return planResult;
   const latest = getLatestMigrationDir(ctx);
   if (!latest) return planResult;
-  const emitResult = await runMigrationEmit(ctx, ['--dir', `migrations/${latest}`]);
+  const emitResult = await runMigrationEmit(ctx, ['--dir', `migrations/app/${latest}`]);
   if (emitResult.exitCode !== 0) {
     return {
       ...planResult,
@@ -530,10 +531,20 @@ export function parseJsonOutput<T = Record<string, unknown>>(result: CommandResu
 // ---------------------------------------------------------------------------
 
 /**
- * Returns sorted list of migration directory names in the journey's migrations/ dir.
+ * Path of the app subspace's migrations directory under the journey
+ * test root (`migrations/app/`).
+ */
+function appMigrationsDir(ctx: JourneyContext): string {
+  return join(ctx.testDir, 'migrations', 'app');
+}
+
+/**
+ * Returns sorted list of migration directory names in the journey's
+ * `migrations/app/` dir (the app subspace).
  */
 export function getMigrationDirs(ctx: JourneyContext): string[] {
-  const migrationsDir = join(ctx.testDir, 'migrations');
+  const migrationsDir = appMigrationsDir(ctx);
+  if (!existsSync(migrationsDir)) return [];
   return readdirSync(migrationsDir)
     .filter((d) => !d.startsWith('.'))
     .sort();
@@ -552,7 +563,7 @@ export function getMigrationDirs(ctx: JourneyContext): string[] {
 export function getLatestMigrationDir(ctx: JourneyContext): string | undefined {
   const dirs = getMigrationDirs(ctx);
   if (dirs.length === 0) return undefined;
-  const migrationsDir = join(ctx.testDir, 'migrations');
+  const migrationsDir = appMigrationsDir(ctx);
   let newest = dirs[0]!;
   let newestMtime = statSync(join(migrationsDir, newest)).mtimeMs;
   for (let i = 1; i < dirs.length; i++) {

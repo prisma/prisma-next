@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/psl-parser",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "Reusable parser for Prisma Schema Language (PSL)",
@@ -35,8 +36,6 @@
     "./tokenizer": "./dist/tokenizer.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "repository": {
     "type": "git",

@@ -13,7 +13,7 @@ import {
   findReachableLeaves,
   reconstructGraph,
 } from '../src/migration-graph';
-import type { MigrationPackage } from '../src/package';
+import type { OnDiskMigrationPackage } from '../src/package';
 import { createTestMetadata, createTestOps } from './fixtures';
 
 let migrationCounter = 0;
@@ -24,7 +24,7 @@ function pkg(
   dirName: string,
   createdAt = '2026-02-25T14:00:00.000Z',
   labels: readonly string[] = [],
-): MigrationPackage {
+): OnDiskMigrationPackage {
   // Bake a per-pkg counter into createdAt so distinct packages get distinct
   // hashes — and use the same metadata for both hashing and the returned
   // package, so each fixture is internally consistent (round-trips through
@@ -41,7 +41,7 @@ function pkg(
   };
 }
 
-function chain(...specs: Array<[string, string, string]>): MigrationPackage[] {
+function chain(...specs: Array<[string, string, string]>): OnDiskMigrationPackage[] {
   return specs.map(([from, to, dirName]) => pkg(from!, to!, dirName!));
 }
 
@@ -56,7 +56,7 @@ function pkgWithInvariants(
   to: string,
   dirName: string,
   opts: PkgWithInvariantsOpts = {},
-): MigrationPackage {
+): OnDiskMigrationPackage {
   const uniqueCreatedAt = opts.createdAt ?? `2026-02-25T14:00:00.000Z-${migrationCounter++}`;
   const metadata = createTestMetadata({
     from,
@@ -79,7 +79,7 @@ function pkgSelfEdge(
   hash: string,
   dirName: string,
   opts: { readonly invariants?: readonly string[] } = {},
-): MigrationPackage {
+): OnDiskMigrationPackage {
   const uniqueCreatedAt = `2026-02-25T14:00:00.000Z-${migrationCounter++}`;
   const ops = [
     {
@@ -144,7 +144,7 @@ describe('reconstructGraph', () => {
       ops,
     );
     const migrationHash = computeMigrationHash(metadata, ops);
-    const packages: MigrationPackage[] = [
+    const packages: OnDiskMigrationPackage[] = [
       {
         dirName: 'm1',
         dirPath: '/migrations/m1',
@@ -384,7 +384,7 @@ describe('detectCycles', () => {
   });
 
   it('detects cycle in node graph', () => {
-    const packages: MigrationPackage[] = [
+    const packages: OnDiskMigrationPackage[] = [
       pkg('A', 'B', 'm1'),
       pkg('B', 'C', 'm2'),
       pkg('C', 'A', 'm3'),

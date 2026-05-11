@@ -10,7 +10,7 @@ import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { resolve } from 'pathe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import AddPostsAuthorIndex from '../migrations/20260415_add-posts-author-index/migration';
+import AddPostsAuthorIndex from '../migrations/app/20260415_add-posts-author-index/migration';
 
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
@@ -23,7 +23,10 @@ function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
   );
 }
 
-const migrationDir = resolve(import.meta.dirname, '../migrations/20260415_add-posts-author-index');
+const migrationDir = resolve(
+  import.meta.dirname,
+  '../migrations/app/20260415_add-posts-author-index',
+);
 
 describe(
   'hand-authored migration (20260415_add-posts-author-index)',

@@ -1,7 +1,7 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
   createExecutionContext,
@@ -9,10 +9,12 @@ import {
   type SqlRuntimeExtensionDescriptor,
   type SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
+import { defineTestCodec } from './test-codec';
 import {
   createStubAdapter,
   createTestAdapterDescriptor,
   createTestTargetDescriptor,
+  descriptorsFromCodecs,
 } from './utils';
 
 const testContract: Contract<SqlStorage> = {
@@ -33,20 +35,16 @@ function createTestExtensionDescriptor(options?: {
 }): SqlRuntimeExtensionDescriptor<'postgres'> {
   const { hasCodecs = false, hasOperations = false } = options ?? {};
 
-  const codecRegistry = hasCodecs
-    ? (() => {
-        const registry = createCodecRegistry();
-        registry.register(
-          codec({
-            typeId: 'test/ext@1',
-            targetTypes: ['ext'],
-            encode: (v: string) => v,
-            decode: (w: string) => w,
-          }),
-        );
-        return registry;
-      })()
-    : createCodecRegistry();
+  const codecRegistry: ReadonlyArray<Codec<string>> = hasCodecs
+    ? [
+        defineTestCodec({
+          typeId: 'test/ext@1',
+          targetTypes: ['ext'],
+          encode: (v: string) => v,
+          decode: (w: string) => w,
+        }),
+      ]
+    : [];
 
   const operationsArray: ReadonlyArray<SqlOperationDescriptor> = hasOperations
     ? [
@@ -64,9 +62,8 @@ function createTestExtensionDescriptor(options?: {
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => codecRegistry,
+    codecs: () => descriptorsFromCodecs(codecRegistry),
     queryOperations: () => operationsArray,
-    parameterizedCodecs: () => [],
     create() {
       return {
         familyId: 'sql' as const,
@@ -94,7 +91,7 @@ describe('createExecutionContext', () => {
     });
 
     expect(context.contract).toBe(testContract);
-    expect(context.codecs.has('pg/int4@1')).toBe(true);
+    expect(context.codecDescriptors.descriptorFor('pg/int4@1')).toBeDefined();
     expect(context.queryOperations).toBeDefined();
   });
 
@@ -104,8 +101,8 @@ describe('createExecutionContext', () => {
       stack: createStack({ extensionPacks: [] }),
     });
 
-    expect(context.codecs.has('pg/int4@1')).toBe(true);
-    expect(context.codecs.has('test/ext@1')).toBe(false);
+    expect(context.codecDescriptors.descriptorFor('pg/int4@1')).toBeDefined();
+    expect(context.codecDescriptors.descriptorFor('test/ext@1')).toBeUndefined();
   });
 
   it('registers extension codecs from descriptors', () => {
@@ -116,8 +113,8 @@ describe('createExecutionContext', () => {
       }),
     });
 
-    expect(context.codecs.has('pg/int4@1')).toBe(true);
-    expect(context.codecs.has('test/ext@1')).toBe(true);
+    expect(context.codecDescriptors.descriptorFor('pg/int4@1')).toBeDefined();
+    expect(context.codecDescriptors.descriptorFor('test/ext@1')).toBeDefined();
   });
 
   it('registers extension operations from descriptors', () => {
@@ -140,22 +137,21 @@ describe('createExecutionContext', () => {
       }),
     });
 
-    expect(context.codecs.has('pg/int4@1')).toBe(true);
-    expect(context.codecs.has('test/ext@1')).toBe(false);
+    expect(context.codecDescriptors.descriptorFor('pg/int4@1')).toBeDefined();
+    expect(context.codecDescriptors.descriptorFor('test/ext@1')).toBeUndefined();
   });
 });
 
 describe('comprehensive descriptor-based derivation', () => {
   it('includes all expected codec IDs and operations from target, adapter, and extensions', () => {
-    const targetCodecRegistry = createCodecRegistry();
-    targetCodecRegistry.register(
-      codec({
+    const targetCodecRegistry: ReadonlyArray<Codec<string>> = [
+      defineTestCodec({
         typeId: 'target/special@1',
         targetTypes: ['special'],
         encode: (v: string) => v,
         decode: (w: string) => w,
       }),
-    );
+    ];
 
     const targetOps: SqlOperationDescriptor[] = [
       {
@@ -171,9 +167,8 @@ describe('comprehensive descriptor-based derivation', () => {
       version: '0.0.1',
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
-      codecs: () => targetCodecRegistry,
+      codecs: () => descriptorsFromCodecs(targetCodecRegistry),
       queryOperations: () => targetOps,
-      parameterizedCodecs: () => [],
       create() {
         return { familyId: 'sql' as const, targetId: 'postgres' as const };
       },
@@ -187,9 +182,9 @@ describe('comprehensive descriptor-based derivation', () => {
 
     const context = createExecutionContext({ contract: testContract, stack });
 
-    expect(context.codecs.has('target/special@1')).toBe(true);
-    expect(context.codecs.has('pg/int4@1')).toBe(true);
-    expect(context.codecs.has('test/ext@1')).toBe(true);
+    expect(context.codecDescriptors.descriptorFor('target/special@1')).toBeDefined();
+    expect(context.codecDescriptors.descriptorFor('pg/int4@1')).toBeDefined();
+    expect(context.codecDescriptors.descriptorFor('test/ext@1')).toBeDefined();
 
     const entries = context.queryOperations.entries();
     expect(entries['targetOp']).toBeDefined();
@@ -519,8 +514,7 @@ describe('applyMutationDefaults', () => {
       version: '0.0.1',
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
-      codecs: () => createCodecRegistry(),
-      parameterizedCodecs: () => [],
+      codecs: () => [],
       mutationDefaultGenerators: () => [
         {
           id: 'counter',
@@ -610,8 +604,7 @@ describe('applyMutationDefaults', () => {
       version: '0.0.1',
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
-      codecs: () => createCodecRegistry(),
-      parameterizedCodecs: () => [],
+      codecs: () => [],
       mutationDefaultGenerators: () => [
         {
           id: 'correlationId',
@@ -693,8 +686,7 @@ describe('applyMutationDefaults', () => {
       version: '0.0.1',
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
-      codecs: () => createCodecRegistry(),
-      parameterizedCodecs: () => [],
+      codecs: () => [],
       mutationDefaultGenerators: () => [
         {
           id: 'perFieldCounter',

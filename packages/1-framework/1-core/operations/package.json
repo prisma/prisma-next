@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/operations",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "Target-neutral operation registry and capability helpers for Prisma Next",
@@ -34,8 +35,6 @@
     ".": "./dist/index.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "repository": {
     "type": "git",

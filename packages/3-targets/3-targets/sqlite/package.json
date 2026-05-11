@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/target-sqlite",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "scripts": {
@@ -64,5 +65,8 @@
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/3-targets/3-targets/sqlite"
+  },
+  "inlinedDependencies": {
+    "@standard-schema/spec": "1.1.0"
   }
 }

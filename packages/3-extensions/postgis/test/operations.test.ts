@@ -1,5 +1,5 @@
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
-import { createCodecRegistry, OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
+import { OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import postgisDescriptor from '../src/exports/runtime';
 
@@ -12,12 +12,13 @@ describe('postgis operations', () => {
     expect(postgisDescriptor.version).toBe('0.0.1');
   });
 
-  it('descriptor provides codec registry with geometry codec', () => {
-    const codecs = postgisDescriptor.codecs();
-    expect(codecs).toBeDefined();
-    const geometryCodec = codecs.get('pg/geometry@1');
-    expect(geometryCodec).toBeDefined();
-    expect(geometryCodec?.id).toBe('pg/geometry@1');
+  it('descriptor contributes the pg/geometry@1 codec descriptor', () => {
+    const descriptors = postgisDescriptor.codecs();
+    expect(descriptors).toBeDefined();
+    expect(descriptors.length).toBe(1);
+    const geometryDescriptor = descriptors.find((d) => d.codecId === 'pg/geometry@1');
+    expect(geometryDescriptor).toBeDefined();
+    expect(geometryDescriptor?.codecId).toBe('pg/geometry@1');
   });
 
   it('exposes the seven geospatial operations', () => {
@@ -92,11 +93,13 @@ describe('postgis operations', () => {
     expect(entries['intersectsBbox']).toBeDefined();
   });
 
-  it('codecs register into a CodecRegistry', () => {
-    const descriptorCodecs = postgisDescriptor.codecs();
-    const registry = createCodecRegistry();
-    for (const codec of descriptorCodecs.values()) registry.register(codec);
-    expect(registry.get('pg/geometry@1')).toBeDefined();
+  it('descriptor materializes a runtime codec when its factory is called', () => {
+    const descriptors = postgisDescriptor.codecs();
+    const geometryDescriptor = descriptors.find((d) => d.codecId === 'pg/geometry@1');
+    expect(geometryDescriptor).toBeDefined();
+
+    const codec = geometryDescriptor!.factory({ srid: 4326 })({ name: '<test>' });
+    expect(codec.id).toBe('pg/geometry@1');
   });
 
   it('instance is minimal (identity only)', () => {

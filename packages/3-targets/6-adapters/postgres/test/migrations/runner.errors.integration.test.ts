@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import {
   buildMergeMarkerStatements,
@@ -59,6 +60,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [],
@@ -108,6 +110,72 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
     );
   });
 
+  describe('when a legacy single-row marker table exists (pre-1.0 transitional shape)', () => {
+    it(
+      'fails with LEGACY_MARKER_SHAPE error and points the operator at re-running dbInit',
+      { timeout: testTimeout },
+      async () => {
+        // Reproduce the pre-cleanup shape that `migrateMarkerSchemaStatements`
+        // used to auto-promote: `id smallint primary key` with no `space`
+        // column. The detection step at boot must surface this rather than
+        // silently rebuilding the table.
+        await executeStatement(driver!, ensurePrismaContractSchemaStatement);
+        await driver!.query(`create table prisma_contract.marker (
+          id smallint primary key default 1,
+          core_hash text not null,
+          profile_hash text not null,
+          contract_json jsonb,
+          canonical_version int,
+          updated_at timestamptz not null default now(),
+          app_tag text,
+          meta jsonb not null default '{}',
+          invariants text[] not null default '{}'
+        )`);
+
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+        const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
+          origin: null,
+          destination: toPlanContractInfo(contract),
+          operations: [],
+          providedInvariants: [],
+        });
+
+        const result = await runner.execute({
+          plan: emptyPlan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+
+        expect(result.ok).toBe(false);
+        const failure = result.assertNotOk();
+        expect(failure.code).toBe('LEGACY_MARKER_SHAPE');
+        expect(failure.summary).toMatch(/legacy marker-table shape/i);
+        expect(failure.summary).toMatch(/dbInit/);
+        expect(failure.summary).toMatch(/prisma_contract\.marker/);
+        expect(failure.meta).toMatchObject({ table: 'prisma_contract.marker' });
+
+        // The legacy table is left untouched — operator dropping it is the
+        // explicit remediation; the runner doesn't mutate state on failure.
+        const pkColumns = await driver!.query<{ column_name: string }>(
+          `select kcu.column_name
+             from information_schema.table_constraints tc
+             join information_schema.key_column_usage kcu
+               on tc.constraint_name = kcu.constraint_name
+              and tc.table_schema = kcu.table_schema
+              and tc.table_name = kcu.table_name
+            where tc.table_schema = 'prisma_contract'
+              and tc.table_name = 'marker'
+              and tc.constraint_type = 'PRIMARY KEY'`,
+        );
+        expect(pkColumns.rows.map((r) => r.column_name)).toEqual(['id']);
+      },
+    );
+  });
+
   describe('when an existing marker does not match the origin contract', () => {
     it(
       'fails with MARKER_ORIGIN_MISMATCH error and does not modify marker or append ledger',
@@ -118,6 +186,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         await executeStatement(driver!, ensureLedgerTableStatement);
 
         const mismatchedMarker = buildMergeMarkerStatements({
+          space: APP_SPACE_ID,
           storageHash: 'sha256:other-contract',
           profileHash: 'sha256:other-profile',
           contractJson: { storageHash: 'sha256:other-contract' },
@@ -130,6 +199,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         const runner = postgresTargetDescriptor.createRunner(familyInstance);
         const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: {
             storageHash: 'sha256:expected-origin',
             profileHash: 'sha256:expected-profile',
@@ -153,8 +223,8 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         expect(failure.summary).toMatch(/does not match plan origin/i);
 
         const markerRow = await driver!.query<{ core_hash: string; profile_hash: string }>(
-          'select core_hash, profile_hash from prisma_contract.marker where id = $1',
-          [1],
+          'select core_hash, profile_hash from prisma_contract.marker where space = $1',
+          ['app'],
         );
         expect(markerRow.rows[0]).toMatchObject({
           core_hash: 'sha256:other-contract',
@@ -183,6 +253,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
         const invalidPlan = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -244,6 +315,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
 
         const planWithFailingPostcheck = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -314,6 +386,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         // Create a plan with SQL that will fail (syntax error)
         const planWithInvalidSql = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [
@@ -394,6 +467,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         // Create a plan that tries to insert duplicate email (will fail with constraint violation)
         const planWithConstraintViolation = createMigrationPlan<PostgresPlanTargetDetails>({
           targetId: 'postgres',
+          spaceId: APP_SPACE_ID,
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [

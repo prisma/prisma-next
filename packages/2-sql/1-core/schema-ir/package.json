@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/sql-schema-ir",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "SQL Schema IR types for schema introspection and verification",
@@ -38,8 +39,6 @@
     "./types": "./dist/exports/types.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "repository": {
     "type": "git",

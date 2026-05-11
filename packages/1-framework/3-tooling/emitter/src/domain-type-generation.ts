@@ -226,16 +226,9 @@ function applyModifiers(base: string, field: ContractField): string {
 }
 
 /**
- * Per-family resolver for typeParams that don't live inline on the
- * framework-domain `ContractField`. SQL columns authored via a named
- * `storage.types` entry carry their `typeRef` on the storage column
- * (family-specific) rather than on the framework's domain field; the
- * per-family emitter walks `storage.types[ref].typeParams` here so the
- * framework emit path can render the parameterized output type.
+ * Per-family resolver for typeParams that don't live inline on the framework-domain `ContractField`. SQL columns authored via a named `storage.types` entry carry their `typeRef` on the storage column (family-specific) rather than on the framework's domain field; the per-family emitter walks `storage.types[ref].typeParams` here so the framework emit path can render the parameterized output type.
  *
- * Returns `undefined` when the field has no resolvable typeParams (i.e.
- * the column isn't parameterized, isn't a `typeRef`, or the family
- * doesn't support named storage types).
+ * Returns `undefined` when the field has no resolvable typeParams (i.e. the column isn't parameterized, isn't a `typeRef`, or the family doesn't support named storage types).
  */
 export type FieldTypeParamsResolver = (
   modelName: string,
@@ -256,12 +249,9 @@ export function resolveFieldType(
         type.typeParams && Object.keys(type.typeParams).length > 0 ? type.typeParams : undefined;
       const effectiveTypeParams = inlineTypeParams ?? resolvedTypeParams;
       if (codecLookup && effectiveTypeParams && Object.keys(effectiveTypeParams).length > 0) {
-        const codec = codecLookup.get(type.codecId);
-        if (codec?.renderOutputType) {
-          const rendered = codec.renderOutputType(effectiveTypeParams);
-          if (rendered && isSafeTypeExpression(rendered)) {
-            outputResolved = rendered;
-          }
+        const rendered = codecLookup.renderOutputTypeFor(type.codecId, effectiveTypeParams);
+        if (rendered && isSafeTypeExpression(rendered)) {
+          outputResolved = rendered;
         }
       }
       const codecAccessor = `CodecTypes[${serializeValue(type.codecId)}]`;

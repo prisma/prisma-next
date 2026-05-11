@@ -157,8 +157,12 @@ async function migrationEmit(ctx: JourneyCtx, args: readonly string[] = []): Pro
 }
 
 function getLatestMigrationDir(ctx: JourneyCtx): string {
-  const migrationsDir = join(ctx.testDir, 'migrations');
-  const dirs = readdirSync(migrationsDir).filter((d) => !d.startsWith('.'));
+  const migrationsDir = join(ctx.testDir, 'migrations', 'app');
+  const dirs = readdirSync(migrationsDir).filter((d) => {
+    if (d.startsWith('.')) return false;
+    if (d === 'refs') return false;
+    return statSync(join(migrationsDir, d)).isDirectory();
+  });
   if (dirs.length === 0) throw new Error('No migration directory found');
   let newest = dirs[0]!;
   let newestMtime = statSync(join(migrationsDir, newest)).mtimeMs;
@@ -174,14 +178,15 @@ function getLatestMigrationDir(ctx: JourneyCtx): string {
 }
 
 function findMigrationDirBySlug(ctx: JourneyCtx, slugFragment: string): string {
-  const dirs = readdirSync(join(ctx.testDir, 'migrations'))
+  const migrationsDir = join(ctx.testDir, 'migrations', 'app');
+  const dirs = readdirSync(migrationsDir)
     .filter((d) => !d.startsWith('.') && d.includes(slugFragment))
     .sort();
   const match = dirs[dirs.length - 1];
   if (!match) {
     throw new Error(`No migration directory found containing '${slugFragment}'`);
   }
-  return join(ctx.testDir, 'migrations', match);
+  return join(migrationsDir, match);
 }
 
 function buildMongoUri(baseUri: string, dbName: string): string {
@@ -196,7 +201,7 @@ function writeRefFile(
   hash: string,
   invariants: readonly string[],
 ): void {
-  const refsDir = join(ctx.testDir, 'migrations', 'refs');
+  const refsDir = join(ctx.testDir, 'migrations', 'app', 'refs');
   mkdirSync(refsDir, { recursive: true });
   const file = join(refsDir, `${name}.json`);
   writeFileSync(file, `${JSON.stringify({ hash, invariants }, null, 2)}\n`, 'utf-8');
@@ -365,8 +370,12 @@ describe(
         0,
       );
       expect(
-        (await migrationEmit(ctx, ['--dir', `migrations/${basename(getLatestMigrationDir(ctx))}`]))
-          .exitCode,
+        (
+          await migrationEmit(ctx, [
+            '--dir',
+            `migrations/app/${basename(getLatestMigrationDir(ctx))}`,
+          ])
+        ).exitCode,
         'Mongo-O.01: emit init',
       ).toBe(0);
       expect((await migrationApply(ctx)).exitCode, 'Mongo-O.01: apply init').toBe(0);
@@ -499,7 +508,7 @@ describe(
       );
       const initDir = getLatestMigrationDir(ctx);
       expect(
-        (await migrationEmit(ctx, ['--dir', `migrations/${basename(initDir)}`])).exitCode,
+        (await migrationEmit(ctx, ['--dir', `migrations/app/${basename(initDir)}`])).exitCode,
         'Mongo-P.01: emit init',
       ).toBe(0);
       expect((await migrationApply(ctx)).exitCode, 'Mongo-P.01: apply init').toBe(0);
@@ -569,7 +578,7 @@ describe(
       );
       const initDir = getLatestMigrationDir(ctx);
       expect(
-        (await migrationEmit(ctx, ['--dir', `migrations/${basename(initDir)}`])).exitCode,
+        (await migrationEmit(ctx, ['--dir', `migrations/app/${basename(initDir)}`])).exitCode,
         'Mongo-Q.01: emit init',
       ).toBe(0);
       expect((await migrationApply(ctx)).exitCode, 'Mongo-Q.01: apply init').toBe(0);

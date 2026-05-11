@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/ids",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "ID generator helpers for Prisma Next contracts",
@@ -16,7 +17,7 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/contract-authoring": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "uniku": "^0.0.12"
   },
@@ -36,8 +37,6 @@
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "repository": {
     "type": "git",

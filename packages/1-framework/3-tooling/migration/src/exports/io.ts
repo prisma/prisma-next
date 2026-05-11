@@ -1,6 +1,8 @@
 export {
   copyFilesWithRename,
   formatMigrationDirName,
+  materialiseExtensionMigrationPackageIfMissing,
+  materialiseMigrationPackage,
   readMigrationPackage,
   readMigrationsDir,
   writeMigrationMetadata,

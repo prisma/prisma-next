@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/sql-orm-client",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "ORM client for Prisma Next — fluent, type-safe model collections",
@@ -55,8 +56,6 @@
     ".": "./dist/index.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "repository": {
     "type": "git",

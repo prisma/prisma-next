@@ -22,15 +22,18 @@ export class TypeScriptRenderableSqliteMigration
   readonly #calls: readonly SqliteOpFactoryCall[];
   readonly #meta: MigrationMeta;
   readonly #destination: SqliteMigrationDestinationInfo;
+  readonly #spaceId: string;
 
   constructor(
     calls: readonly SqliteOpFactoryCall[],
     meta: MigrationMeta,
+    spaceId: string,
     destination?: SqliteMigrationDestinationInfo,
   ) {
     super();
     this.#calls = calls;
     this.#meta = meta;
+    this.#spaceId = spaceId;
     this.#destination = destination ?? { storageHash: meta.to };
   }
 
@@ -44,6 +47,15 @@ export class TypeScriptRenderableSqliteMigration
 
   override get destination(): SqliteMigrationDestinationInfo {
     return this.#destination;
+  }
+
+  /**
+   * Contract space this planner-produced plan applies to. Threaded
+   * from {@link SqlMigrationPlannerPlanOptions.spaceId} so the runner
+   * keys the marker row by the right space when executing the plan.
+   */
+  get spaceId(): string {
+    return this.#spaceId;
   }
 
   renderTypeScript(): string {

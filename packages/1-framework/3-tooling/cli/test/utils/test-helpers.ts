@@ -138,3 +138,15 @@ export function setupCommandMocks(options?: { isTTY?: boolean | undefined }): {
 
   return { consoleOutput, consoleErrors, cleanup };
 }
+
+export function parseJsonObjectFromCliCapture(lines: readonly string[]): unknown {
+  const joined = lines.join('\n');
+  const start = joined.indexOf('{');
+  const end = joined.lastIndexOf('}');
+  if (start === -1 || end === -1 || end < start) {
+    throw new SyntaxError(
+      `No JSON object in CLI capture (first 800 chars):\n${joined.slice(0, 800)}`,
+    );
+  }
+  return JSON.parse(joined.slice(start, end + 1));
+}

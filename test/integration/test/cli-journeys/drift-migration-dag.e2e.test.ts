@@ -65,7 +65,7 @@ withTempDir(({ createTempDir }) => {
         // Delete the add-posts migration directory (additive→v3 edge)
         // Note: can't use alphabetical sort — 'initial' sorts after 'add-*'.
         // Find by name suffix instead.
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const migrationDirs = readdirSync(migrationsDir);
         const addPostsDir = migrationDirs.find((d) => d.endsWith('_add_posts'));
         expect(addPostsDir, 'P3.pre: add-posts dir exists').toBeDefined();

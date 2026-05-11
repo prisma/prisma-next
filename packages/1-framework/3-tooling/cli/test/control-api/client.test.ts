@@ -1,5 +1,4 @@
 import type { ContractSourceProvider } from '@prisma-next/config/config-types';
-import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { EmitResult } from '@prisma-next/emitter';
 import type {
@@ -676,6 +675,7 @@ describe('ControlClient progress emission', () => {
         introspect: async () => ({ tables: {}, dependencies: [] }),
         validateContract: (ir: unknown) => ir as Contract,
         readMarker: async () => ({ storageHash: 'sha256:origin' }),
+        readAllMarkers: async () => new Map(),
       } as unknown as ControlFamilyInstance<string, unknown>;
 
       const mockFamilyWithMarker = {
@@ -689,6 +689,7 @@ describe('ControlClient progress emission', () => {
           plan: () => ({
             kind: 'success',
             plan: {
+              targetId: 'postgres',
               destination: { storageHash: 'sha256:dest' },
               operations: [
                 {
@@ -707,6 +708,14 @@ describe('ControlClient progress emission', () => {
           execute: async () => ({
             ok: true,
             value: { operationsPlanned: 1, operationsExecuted: 1 },
+          }),
+          executeAcrossSpaces: async () => ({
+            ok: true,
+            value: {
+              perSpaceResults: [
+                { space: 'app', value: { operationsPlanned: 1, operationsExecuted: 1 } },
+              ],
+            },
           }),
         }),
       };
@@ -742,9 +751,11 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.dbUpdate({
-        contract: {},
+        contract: { target: 'postgres', storage: { storageHash: 'sha256:fixture', tables: {} } },
         mode: 'apply',
         connection: 'postgres://test',
+        migrationsDir: '/tmp/__test-client-migrations',
+        acceptDataLoss: true,
         onProgress: (event) => events.push(event),
       });
 
@@ -782,6 +793,7 @@ describe('ControlClient progress emission', () => {
         introspect: async () => ({ tables: {}, dependencies: [] }),
         validateContract: (ir: unknown) => ir as Contract,
         readMarker: async () => null,
+        readAllMarkers: async () => new Map(),
       } as unknown as ControlFamilyInstance<string, unknown>;
 
       const noMarkerFamily = {
@@ -798,9 +810,10 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.dbUpdate({
-        contract: {},
+        contract: { target: 'postgres', storage: { storageHash: 'sha256:fixture', tables: {} } },
         mode: 'plan',
         connection: 'postgres://test',
+        migrationsDir: '/tmp/__test-client-migrations',
       });
 
       expect(result.ok).toBe(true);
@@ -820,9 +833,10 @@ describe('ControlClient progress emission', () => {
       });
 
       const result = await client.dbUpdate({
-        contract: {},
+        contract: { target: 'postgres', storage: { storageHash: 'sha256:fixture', tables: {} } },
         mode: 'plan',
         connection: 'postgres://test',
+        migrationsDir: '/tmp/__test-client-migrations',
       });
 
       await client.close();
@@ -877,247 +891,6 @@ describe('ControlClient progress emission', () => {
       await client.close();
 
       expect(marker).toEqual(expectedMarker);
-    });
-  });
-
-  describe('migrationApply()', () => {
-    it('emits connect and migration spans when connection provided', async () => {
-      const events: ControlProgressEvent[] = [];
-      let executedPlan: { readonly providedInvariants?: readonly string[] } | undefined;
-
-      const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor, mockFamilyInstance } =
-        createMockComponents();
-
-      const mockTargetWithMigrations = {
-        ...mockTarget,
-        migrations: {
-          createPlanner: () => ({
-            plan: () => ({
-              kind: 'success',
-              plan: { targetId: 'postgres', destination: { storageHash: 'x' }, operations: [] },
-            }),
-          }),
-          createRunner: () => ({
-            execute: async ({
-              plan,
-            }: {
-              readonly plan: { readonly providedInvariants?: readonly string[] };
-            }) => {
-              executedPlan = plan;
-              return {
-                ok: true,
-                value: { operationsPlanned: 1, operationsExecuted: 1 },
-              };
-            },
-          }),
-          contractToSchema: () => ({}),
-        },
-      } as unknown as typeof mockTarget;
-
-      mockFamilyInstance.validateContract = (ir: unknown) => ir as Contract;
-
-      const client = createControlClient({
-        family: mockFamily,
-        target: mockTargetWithMigrations,
-        adapter: mockAdapter,
-        driver: mockDriverDescriptor,
-      });
-
-      const result = await client.migrationApply({
-        originHash: 'sha256:empty',
-        destinationHash: 'sha256:abc',
-        pendingMigrations: [
-          {
-            dirName: '001_init',
-            from: null,
-            to: 'sha256:abc',
-            toContract: createContract(),
-            operations: [{ id: 'op1', label: 'CREATE TABLE', operationClass: 'additive' }],
-            providedInvariants: [],
-          },
-        ],
-        connection: 'postgres://test',
-        onProgress: (event) => events.push(event),
-      });
-
-      await client.close();
-
-      expect(result.ok).toBe(true);
-      expect(executedPlan?.providedInvariants).toEqual([]);
-      if (result.ok) {
-        expect(result.value.migrationsApplied).toBe(1);
-        expect(result.value.markerHash).toBe('sha256:abc');
-      }
-
-      const connectStart = events.find((e) => e.kind === 'spanStart' && e.spanId === 'connect');
-      const connectEnd = events.find((e) => e.kind === 'spanEnd' && e.spanId === 'connect');
-      expect(connectStart).toBeDefined();
-      expect(connectEnd).toMatchObject({ outcome: 'ok' });
-
-      const migrationStart = events.find(
-        (e) => e.kind === 'spanStart' && e.spanId === 'migration:001_init',
-      );
-      const migrationEnd = events.find(
-        (e) => e.kind === 'spanEnd' && e.spanId === 'migration:001_init',
-      );
-      expect(migrationStart).toBeDefined();
-      expect(migrationEnd).toMatchObject({ outcome: 'ok' });
-
-      for (const event of events) {
-        expect(event.action).toBe('migrationApply');
-      }
-    });
-
-    it('returns failure when runner fails', async () => {
-      const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor, mockFamilyInstance } =
-        createMockComponents();
-
-      const mockTargetWithMigrations = {
-        ...mockTarget,
-        migrations: {
-          createPlanner: () => ({
-            plan: () => ({
-              kind: 'success',
-              plan: { targetId: 'postgres', destination: { storageHash: 'x' }, operations: [] },
-            }),
-          }),
-          createRunner: () => ({
-            execute: async () => ({
-              ok: false,
-              failure: {
-                code: 'RUNNER_FAILED',
-                summary: 'Schema mismatch',
-                why: 'Column type conflict',
-                meta: {},
-              },
-            }),
-          }),
-          contractToSchema: () => ({}),
-        },
-      } as unknown as typeof mockTarget;
-
-      mockFamilyInstance.validateContract = (ir: unknown) => ir as Contract;
-
-      const client = createControlClient({
-        family: mockFamily,
-        target: mockTargetWithMigrations,
-        adapter: mockAdapter,
-        driver: mockDriverDescriptor,
-      });
-
-      const result = await client.migrationApply({
-        originHash: 'sha256:empty',
-        destinationHash: 'sha256:abc',
-        pendingMigrations: [
-          {
-            dirName: '001_init',
-            from: null,
-            to: 'sha256:abc',
-            toContract: createContract(),
-            operations: [{ id: 'op1', label: 'CREATE TABLE', operationClass: 'additive' }],
-            providedInvariants: [],
-          },
-        ],
-        connection: 'postgres://test',
-      });
-
-      await client.close();
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.failure.code).toBe('RUNNER_FAILED');
-      }
-    });
-
-    it('returns MIGRATION_PATH_NOT_FOUND when pending migrations are discontinuous', async () => {
-      const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor, mockFamilyInstance } =
-        createMockComponents();
-      let executeCalls = 0;
-
-      const mockTargetWithMigrations = {
-        ...mockTarget,
-        migrations: {
-          createPlanner: () => ({
-            plan: () => ({
-              kind: 'success',
-              plan: { targetId: 'postgres', destination: { storageHash: 'x' }, operations: [] },
-            }),
-          }),
-          createRunner: () => ({
-            execute: async () => {
-              executeCalls++;
-              return {
-                ok: true,
-                value: { operationsPlanned: 1, operationsExecuted: 1 },
-              };
-            },
-          }),
-          contractToSchema: () => ({}),
-        },
-      } as unknown as typeof mockTarget;
-
-      mockFamilyInstance.validateContract = (ir: unknown) => ir as Contract;
-
-      const client = createControlClient({
-        family: mockFamily,
-        target: mockTargetWithMigrations,
-        adapter: mockAdapter,
-        driver: mockDriverDescriptor,
-      });
-
-      const result = await client.migrationApply({
-        originHash: 'sha256:empty',
-        destinationHash: 'sha256:ccc',
-        pendingMigrations: [
-          {
-            dirName: '001_init',
-            from: null,
-            to: 'sha256:aaa',
-            toContract: createContract(),
-            operations: [{ id: 'op1', label: 'CREATE TABLE', operationClass: 'additive' }],
-            providedInvariants: [],
-          },
-          {
-            dirName: '002_gap',
-            from: 'sha256:bbb',
-            to: 'sha256:ccc',
-            toContract: createContract(),
-            operations: [{ id: 'op2', label: 'ALTER TABLE', operationClass: 'additive' }],
-            providedInvariants: [],
-          },
-        ],
-        connection: 'postgres://test',
-      });
-
-      await client.close();
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.failure.code).toBe('MIGRATION_PATH_NOT_FOUND');
-      }
-      expect(executeCalls).toBe(0);
-    });
-
-    it('throws when target does not support migrations', async () => {
-      const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor } = createMockComponents();
-
-      const client = createControlClient({
-        family: mockFamily,
-        target: mockTarget,
-        adapter: mockAdapter,
-        driver: mockDriverDescriptor,
-      });
-
-      await expect(
-        client.migrationApply({
-          originHash: 'sha256:empty',
-          destinationHash: 'sha256:empty',
-          pendingMigrations: [],
-          connection: 'postgres://test',
-        }),
-      ).rejects.toThrow('does not support migrations');
-
-      await client.close();
     });
   });
 

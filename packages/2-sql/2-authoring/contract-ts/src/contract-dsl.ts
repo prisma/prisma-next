@@ -5,13 +5,10 @@ import type {
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
 import { isColumnDefault } from '@prisma-next/contract/types';
-import type {
-  ColumnTypeDescriptor,
-  ForeignKeyDefaultsState,
-} from '@prisma-next/contract-authoring';
+import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
 import type { AuthoringFieldPresetDescriptor } from '@prisma-next/framework-components/authoring';
 import { instantiateAuthoringFieldPreset } from '@prisma-next/framework-components/authoring';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { CodecLookup, ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type {
   ExtensionPackRef,
   FamilyPackRef,
@@ -145,10 +142,7 @@ function toColumnDefault(value: ColumnDefaultLiteralInputValue | ColumnDefault):
   return { kind: 'literal', value };
 }
 
-// Chaining methods use `as unknown as <ConditionalType>` because TypeScript cannot
-// narrow generic conditional return types through object spread. The runtime values
-// are correct — the casts bridge the gap between the spread result and the
-// compile-time conditional type that encodes the state transition.
+// Chaining methods use `as unknown as <ConditionalType>` because TypeScript cannot narrow generic conditional return types through object spread. The runtime values are correct — the casts bridge the gap between the spread result and the compile-time conditional type that encodes the state transition.
 export class ScalarFieldBuilder<State extends AnyScalarFieldState = AnyScalarFieldState> {
   declare readonly __state: State;
 
@@ -1030,9 +1024,7 @@ export class ContractModelBuilder<
   ): [ValidateSqlStageSpec<Fields, AttributesSpec, NextSqlSpec>] extends [never]
     ? ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, never>
     : ContractModelBuilder<ModelName, Fields, Relations, AttributesSpec, NextSqlSpec> {
-    // Conditional return type cannot be verified by the implementation; the
-    // runtime value is always a valid ContractModelBuilder regardless of the
-    // validation outcome (validation is type-level only).
+    // Conditional return type cannot be verified by the implementation; the runtime value is always a valid ContractModelBuilder regardless of the validation outcome (validation is type-level only).
     return new ContractModelBuilder(this.stageOne, this.attributesFactory, specOrFactory) as never;
   }
 

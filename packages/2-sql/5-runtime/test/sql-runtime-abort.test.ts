@@ -9,15 +9,12 @@ import {
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Codec,
-  CodecRegistry,
   SqlCodecCallContext,
   SqlDriver,
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import {
   ColumnRef,
-  codec,
-  createCodecRegistry,
   ProjectionItem,
   SelectAst,
   TableSource,
@@ -32,6 +29,8 @@ import type {
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
+import { defineTestCodec } from './test-codec';
+import { descriptorsFromCodecs } from './utils';
 
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
@@ -59,10 +58,8 @@ function deferred<T>(): {
   return { promise, resolve, reject };
 }
 
-function createStubCodecs(extras: readonly Codec<string>[] = []): CodecRegistry {
-  const registry = createCodecRegistry();
-  for (const c of extras) registry.register(c);
-  return registry;
+function createStubCodecs(extras: readonly Codec<string>[] = []): ReadonlyArray<Codec<string>> {
+  return [...extras];
 }
 
 interface DriverOptions {
@@ -105,13 +102,11 @@ function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
   return {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
+    __codecs: codecs,
     profile: {
       id: 'test-profile',
       target: 'postgres',
       capabilities: {},
-      codecs() {
-        return codecs;
-      },
       readMarkerStatement() {
         return { sql: 'select 1', params: [] };
       },
@@ -133,22 +128,20 @@ function createTestSetup(extras: readonly Codec<string>[] = [], driverOptions?: 
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => createCodecRegistry(),
-    parameterizedCodecs: () => [],
+    codecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
   };
 
-  const codecRegistry = adapter.profile.codecs();
+  const codecRegistry = adapter.__codecs;
   const adapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres'> = {
     kind: 'adapter',
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => codecRegistry,
-    parameterizedCodecs: () => [],
+    codecs: () => descriptorsFromCodecs(codecRegistry),
     create() {
       return Object.assign(
         { familyId: 'sql' as const, targetId: 'postgres' as const },
@@ -308,14 +301,12 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
     const blockingDecodeStarted = deferred<void>();
     const codecAbortObserved = deferred<void>();
 
-    const observingCodec = codec({
+    const observingCodec = defineTestCodec({
       typeId: 'test/observe-signal@1',
       targetTypes: ['text'],
       encode: (v: string) => v,
       decode: async (w: string, ctx?: SqlCodecCallContext) => {
-        // Mimic an SDK that registers an abort listener on the supplied
-        // signal. The runtime threads the same AbortSignal into every codec
-        // call; codec authors who forward it observe true cancellation.
+        // Mimic an SDK that registers an abort listener on the supplied signal. The runtime threads the same AbortSignal into every codec call; codec authors who forward it observe true cancellation.
         await new Promise<string>((_resolve, reject) => {
           if (ctx?.signal) {
             ctx.signal.addEventListener('abort', () => {
@@ -362,7 +353,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
   it('codec ignoring ctx.signal does not block runtime — RUNTIME.ABORTED still surfaces (cooperative cancellation)', async () => {
     const decodeStarted = deferred<void>();
     const release = deferred<string>();
-    const ignoringCodec = codec({
+    const ignoringCodec = defineTestCodec({
       typeId: 'test/ignore-signal@1',
       targetTypes: ['text'],
       encode: (v: string) => v,
@@ -391,10 +382,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
     const reason = new Error('runtime aborted while codec body still running');
     const collector = runtime.execute(plan, { signal: controller.signal }).toArray();
 
-    // Wait until the decode body has actually started (we're now mid-decode);
-    // then abort. The race in raceAgainstAbort surfaces RUNTIME.ABORTED with
-    // phase: 'decode', even though the codec body is still running and does
-    // not honour the signal.
+    // Wait until the decode body has actually started (we're now mid-decode); then abort. The race in raceAgainstAbort surfaces RUNTIME.ABORTED with phase: 'decode', even though the codec body is still running and does not honour the signal.
     await decodeStarted.promise;
     controller.abort(reason);
 

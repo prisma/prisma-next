@@ -11,11 +11,18 @@ export default defineConfig({
     maxWorkers: 1,
     isolate: false,
     fileParallelism: false,
+    sequence: { groupOrder: 1 },
     testTimeout: timeouts.vitestPackageDefault,
     hookTimeout: timeouts.vitestPackageDefault,
     setupFiles: ['./test/setup.ts'],
     env: {
       CI: 'true',
+      // Disable ANSI colors so snapshot tests in test/utils/formatters/ stay
+      // stable regardless of how vitest is invoked (per-package vs. root
+      // projects, where TTY/FORCE_COLOR detection differs). Some renderer
+      // call sites in src/utils/formatters/graph-render.ts bypass the
+      // explicit `colorize: false` wrapper and call colorette directly.
+      NO_COLOR: '1',
     },
     coverage: {
       provider: 'v8',
@@ -79,6 +86,11 @@ export default defineConfig({
         'src/load-ts-contract.ts',
         // Control API — tested via integration tests (test/integration/test/control-api.test.ts)
         'src/control-api/**',
+        // Aggregate loader CLI wrapper — translates loader failures into CLI
+        // error envelopes. Exercised end-to-end via the contract-space verifier
+        // suites (test/integration/test/cli.db-init.contract-space-verifier.test.ts,
+        // cli.db-update.contract-space-verifier.test.ts, cli.db-verify.aggregate-schema.test.ts).
+        'src/utils/contract-space-aggregate-loader.ts',
       ],
       thresholds: {
         lines: 95,

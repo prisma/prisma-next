@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { codec } from '../../src/ast/codec-types';
+import { defineTestCodec } from './test-codec';
 
-describe('codec() factory — query-time methods are Promise-returning', () => {
+describe('defineTestCodec — query-time methods are Promise-returning', () => {
   it('lifts a sync encode into a Promise-returning method', async () => {
-    const c = codec({
+    const c = defineTestCodec({
       typeId: 'demo/sync-encode@1',
-      targetTypes: ['text'],
       encode: (value: string) => value.toUpperCase(),
       decode: (wire: string) => wire,
     });
@@ -16,9 +15,8 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
   });
 
   it('lifts a sync decode into a Promise-returning method', async () => {
-    const c = codec({
+    const c = defineTestCodec({
       typeId: 'demo/sync-decode@1',
-      targetTypes: ['text'],
       encode: (value: string) => value,
       decode: (wire: string) => wire.toLowerCase(),
     });
@@ -29,9 +27,8 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
   });
 
   it('accepts an async encode and produces a Promise-returning method', async () => {
-    const c = codec({
+    const c = defineTestCodec({
       typeId: 'demo/async-encode@1',
-      targetTypes: ['text'],
       encode: async (value: string) => value.toUpperCase(),
       decode: (wire: string) => wire,
     });
@@ -42,9 +39,8 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
   });
 
   it('accepts an async decode and produces a Promise-returning method', async () => {
-    const c = codec({
+    const c = defineTestCodec({
       typeId: 'demo/async-decode@1',
-      targetTypes: ['text'],
       encode: (value: string) => value,
       decode: async (wire: string) => wire.toLowerCase(),
     });
@@ -55,9 +51,8 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
   });
 
   it('accepts a mix of sync encode + async decode', async () => {
-    const c = codec({
+    const c = defineTestCodec({
       typeId: 'demo/mixed-a@1',
-      targetTypes: ['text'],
       encode: (value: string) => value,
       decode: async (wire: string) => wire.toUpperCase(),
     });
@@ -69,9 +64,8 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
   });
 
   it('accepts a mix of async encode + sync decode', async () => {
-    const c = codec({
+    const c = defineTestCodec({
       typeId: 'demo/mixed-b@1',
-      targetTypes: ['text'],
       encode: async (value: string) => value.toUpperCase(),
       decode: (wire: string) => wire,
     });
@@ -83,9 +77,8 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
   });
 
   it('passes encodeJson and decodeJson through as synchronous methods', () => {
-    const c = codec({
+    const c = defineTestCodec({
       typeId: 'demo/json-passthrough@1',
-      targetTypes: ['text'],
       encode: (value: string) => value,
       decode: (wire: string) => wire,
       encodeJson: (value: string) => value.toUpperCase(),
@@ -100,29 +93,5 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
     expect(decodedJson).not.toBeInstanceOf(Promise);
   });
 
-  it('preserves renderOutputType as synchronous when provided', () => {
-    const c = codec({
-      typeId: 'demo/render@1',
-      targetTypes: ['text'],
-      encode: (value: string) => value,
-      decode: (wire: string) => wire,
-      renderOutputType: (params) => `Demo<${String(params['size'] ?? 'unknown')}>`,
-    });
-
-    expect(c.renderOutputType).toBeDefined();
-    const rendered = c.renderOutputType!({ size: 8 });
-    expect(rendered).toBe('Demo<8>');
-    expect(rendered).not.toBeInstanceOf(Promise);
-  });
-
-  it('omits renderOutputType when not provided', () => {
-    const c = codec({
-      typeId: 'demo/no-render@1',
-      targetTypes: ['text'],
-      encode: (value: string) => value,
-      decode: (wire: string) => wire,
-    });
-
-    expect(c.renderOutputType).toBeUndefined();
-  });
+  // `renderOutputType` is a `CodecDescriptor`-side concern (TML-2357) — the legacy `defineTestCodec()` factory accepts the field for back-compat with existing call sites but the produced codec instance no longer carries it. The descriptor side is exercised by `sql-codecs.test.ts`.
 });

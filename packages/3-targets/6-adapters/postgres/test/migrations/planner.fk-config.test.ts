@@ -1,5 +1,6 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
@@ -71,6 +72,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -89,6 +91,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -108,6 +111,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -126,6 +130,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -150,6 +155,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');
@@ -174,6 +180,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents: [],
+      spaceId: APP_SPACE_ID,
     });
 
     expect(result.kind).toBe('success');

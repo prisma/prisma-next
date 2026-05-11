@@ -111,13 +111,7 @@ describe('emit command', () => {
 
         try {
           process.chdir(customTestDir);
-          await executeCommand(command, [
-            'node',
-            'cli.js',
-            'emit',
-            '--config',
-            'prisma-next.config.ts',
-          ]);
+          await executeCommand(command, ['--config', 'prisma-next.config.ts']);
 
           expect(existsSync(newOutputDir)).toBe(true);
           expect(existsSync(join(newOutputDir, 'contract.json'))).toBe(true);
@@ -188,13 +182,7 @@ describe('emit command', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDirDefaults);
-          const exitCode = await executeCommand(command, [
-            'node',
-            'cli.js',
-            'emit',
-            '--config',
-            'prisma-next.config.ts',
-          ]);
+          const exitCode = await executeCommand(command, ['--config', 'prisma-next.config.ts']);
           expect(exitCode).toBe(0);
         } finally {
           process.chdir(originalCwd);
@@ -271,13 +259,7 @@ describe('emit command', () => {
     const originalCwd = process.cwd();
     try {
       process.chdir(testDir);
-      const exitCode = await executeCommand(command, [
-        'node',
-        'cli.js',
-        'emit',
-        '--config',
-        'prisma-next.config.ts',
-      ]);
+      const exitCode = await executeCommand(command, ['--config', 'prisma-next.config.ts']);
       expect(exitCode).toBe(0);
 
       const contractJsonPath = join(outputDir, 'contract.json');
@@ -296,13 +278,7 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDir);
-        const exitCode = await executeCommand(command, [
-          'node',
-          'cli.js',
-          'emit',
-          '--config',
-          'prisma-next.config.ts',
-        ]);
+        const exitCode = await executeCommand(command, ['--config', 'prisma-next.config.ts']);
         expect(exitCode).toBe(0);
 
         const contractJsonPath = join(outputDir, 'contract.json');
@@ -319,13 +295,7 @@ describe('emit command', () => {
     const originalCwd = process.cwd();
     try {
       process.chdir(testDir);
-      const exitCode = await executeCommand(command, [
-        'node',
-        'cli.js',
-        'emit',
-        '--config',
-        'prisma-next.config.ts',
-      ]);
+      const exitCode = await executeCommand(command, ['--config', 'prisma-next.config.ts']);
       expect(exitCode).toBe(0);
 
       const contractJsonPath = join(outputDir, 'contract.json');
@@ -391,13 +361,7 @@ describe('emit command', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDirAsync);
-          await executeCommand(command, [
-            'node',
-            'cli.js',
-            'emit',
-            '--config',
-            'prisma-next.config.ts',
-          ]);
+          await executeCommand(command, ['--config', 'prisma-next.config.ts']);
         } finally {
           process.chdir(originalCwd);
         }
@@ -424,13 +388,7 @@ describe('emit command', () => {
       const originalCwd = process.cwd();
       try {
         process.chdir(testDirSync);
-        await executeCommand(command, [
-          'node',
-          'cli.js',
-          'emit',
-          '--config',
-          'prisma-next.config.ts',
-        ]);
+        await executeCommand(command, ['--config', 'prisma-next.config.ts']);
       } finally {
         process.chdir(originalCwd);
       }

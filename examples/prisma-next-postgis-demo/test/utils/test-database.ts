@@ -13,6 +13,9 @@ import { instantiateExecutionStack } from '@prisma-next/framework-components/exe
 import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
 import { type CreateRuntimeOptions, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import pg from 'pg';
 
 export const TEST_DATABASE_URL =
@@ -68,8 +71,9 @@ export async function resetTestDatabase(contract: unknown): Promise<void> {
   }
 
   const controlClient = createPostgisControlClient(TEST_DATABASE_URL);
+  const migrationsDir = mkdtempSync(join(tmpdir(), 'postgis-demo-migrations-'));
   try {
-    const result = await controlClient.dbInit({ contract, mode: 'apply' });
+    const result = await controlClient.dbInit({ contract, mode: 'apply', migrationsDir });
     if (!result.ok) {
       throw new Error(
         `dbInit failed: ${result.failure.summary}\n\n${JSON.stringify(result.failure, null, 2)}`,
@@ -77,6 +81,7 @@ export async function resetTestDatabase(contract: unknown): Promise<void> {
     }
   } finally {
     await controlClient.close();
+    rmSync(migrationsDir, { recursive: true, force: true });
   }
 }
 

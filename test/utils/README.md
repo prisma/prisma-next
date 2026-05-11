@@ -108,7 +108,7 @@ const contract = defineContract({
 });
 ```
 
-**Note**: These descriptors are dependency-free and match the `ColumnTypeDescriptor` shape from `@prisma-next/contract-authoring`, but are defined locally to keep test-utils dependency-free.
+**Note**: The descriptor shape mirrors `ColumnTypeDescriptor` from `@prisma-next/framework-components/codec` but is defined locally to keep `test-utils` dependency-free (avoids a turbo build cycle through packages that devDepend on it).
 
 ### Operation Descriptors
 

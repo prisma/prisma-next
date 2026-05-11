@@ -55,7 +55,7 @@ withTempDir(({ createTempDir }) => {
         expect(apply1.exitCode, 'P4.pre: apply add-name').toBe(0);
 
         // Delete the FIRST migration (root edge: empty → base)
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const migrationDirs = readdirSync(migrationsDir).sort();
         const initDir = migrationDirs.find((d) => d.endsWith('_initial'));
         expect(initDir, 'P4.pre: initial dir exists').toBeDefined();

@@ -122,7 +122,10 @@ function createParamRef(
   if (!codecId) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
   }
-  return ParamRef.of(value, { codecId });
+  return ParamRef.of(value, {
+    codecId,
+    refs: { table: columnRef.table, column: columnRef.column },
+  });
 }
 
 function createExpressionBinder(contract: Contract<SqlStorage>): ExpressionRewriter {
@@ -174,6 +177,7 @@ function bindSelectAst(contract: Contract<SqlStorage>, ast: SelectAst): SelectAs
           projection.alias,
           bindProjectionExpr(contract, projection.expr),
           projection.codecId,
+          projection.refs,
         ),
     ),
     where: ast.where ? bindWhereExprNode(contract, ast.where) : undefined,

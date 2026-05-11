@@ -4,6 +4,7 @@ import {
   buildOperation,
   type CodecExpression,
   type Expression,
+  refsOf,
   type TraitExpression,
   toExpr,
 } from '@prisma-next/sql-relational-core/expression';
@@ -38,12 +39,10 @@ import {
   SQL_TIMESTAMP_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
 } from '@prisma-next/target-postgres/codec-ids';
-import { codecDefinitions } from '@prisma-next/target-postgres/codecs';
+import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 import { pgEnumControlHooks } from './enum-control-hooks';
 
-// ============================================================================
-// Helper functions for reducing boilerplate
-// ============================================================================
+// ============================================================================ Helper functions for reducing boilerplate ============================================================================
 
 /** Creates a type import spec for codec types */
 const codecTypeImport = (named: string) =>
@@ -132,9 +131,7 @@ const precisionHooks: CodecControlHooks = { expandNativeType: expandPrecision };
 const numericHooks: CodecControlHooks = { expandNativeType: expandNumeric };
 const identityHooks: CodecControlHooks = { expandNativeType: ({ nativeType }) => nativeType };
 
-// ============================================================================
-// Descriptor metadata
-// ============================================================================
+// ============================================================================ Descriptor metadata ============================================================================
 
 type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
 
@@ -148,13 +145,15 @@ export function postgresQueryOperations<
       impl: (
         self: TraitExpression<readonly ['textual'], false, CT>,
         pattern: CodecExpression<'pg/text@1', false, CT>,
-      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> =>
-        buildOperation({
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        const selfRefs = refsOf(self);
+        return buildOperation({
           method: 'ilike',
-          args: [toExpr(self), toExpr(pattern, PG_TEXT_CODEC_ID)],
+          args: [toExpr(self), toExpr(pattern, PG_TEXT_CODEC_ID, selfRefs)],
           returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
           lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} ILIKE {{arg0}}' },
-        }),
+        });
+      },
     },
   ];
 }
@@ -181,7 +180,7 @@ export const postgresAdapterDescriptorMeta = {
   },
   types: {
     codecTypes: {
-      codecInstances: Object.values(codecDefinitions).map((def) => def.codec),
+      codecDescriptors: Array.from(postgresCodecRegistry.values()),
       import: {
         package: '@prisma-next/target-postgres/codec-types',
         named: 'CodecTypes',

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
   getExitCode,
+  parseJsonObjectFromCliCapture,
   setupCommandMocks,
   setupDbTestFixture,
   setupTestDirectoryFromFixtures,
@@ -108,8 +109,8 @@ withTempDir(({ createTempDir }) => {
           // Verify marker was created in database
           await withClient(connectionString, async (client) => {
             const result = await client.query(
-              'select core_hash, profile_hash from prisma_contract.marker where id = $1',
-              [1],
+              'select core_hash, profile_hash from prisma_contract.marker where space = $1',
+              ['app'],
             );
             expect(result.rows.length).toBe(1);
             expect(result.rows[0]?.core_hash).toBeDefined();
@@ -153,7 +154,7 @@ withTempDir(({ createTempDir }) => {
               `);
             await client.query(`
                 CREATE TABLE IF NOT EXISTS prisma_contract.marker (
-                  id smallint primary key default 1,
+                  space text not null primary key default 'app',
                   core_hash text not null,
                   profile_hash text not null,
                   contract_json jsonb,
@@ -165,8 +166,8 @@ withTempDir(({ createTempDir }) => {
                 )
               `);
             const result = await client.query(
-              'select count(*) as count from prisma_contract.marker where id = $1',
-              [1],
+              'select count(*) as count from prisma_contract.marker where space = $1',
+              ['app'],
             );
             // Marker should not exist (sign should have failed before writing)
             expect(Number.parseInt(result.rows[0]?.count ?? '0', 10)).toBe(0);
@@ -192,9 +193,9 @@ withTempDir(({ createTempDir }) => {
 
           await runDbSign(testSetup, configPath, ['--config', configPath, '--json', '--no-color']);
 
-          // Get output and parse JSON (only from this command)
-          const output = consoleOutput.slice(outputStartIndex).join('\n').trim();
-          const jsonOutput = JSON.parse(output) as Record<string, unknown>;
+          const jsonOutput = parseJsonObjectFromCliCapture(
+            consoleOutput.slice(outputStartIndex),
+          ) as Record<string, unknown>;
 
           // Normalize non-deterministic values (timing, contractPath) for snapshot
           const meta = jsonOutput['meta'] as Record<string, unknown> | undefined;
@@ -413,8 +414,7 @@ withTempDir(({ createTempDir }) => {
           expect(getExitCode()).toBe(1);
 
           // Verify that JSON output was printed (not human-readable output)
-          const output = consoleOutput.slice(outputStartIndex).join('\n');
-          const jsonOutput = JSON.parse(output);
+          const jsonOutput = parseJsonObjectFromCliCapture(consoleOutput.slice(outputStartIndex));
           expect(jsonOutput).toMatchObject({
             ok: false,
             summary: expect.stringContaining('does not satisfy contract'),

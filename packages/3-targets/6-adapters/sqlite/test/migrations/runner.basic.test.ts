@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -34,6 +35,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') throw new Error('expected planner success');
@@ -60,8 +62,8 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
     expect(tableRow.rows[0]!.cnt).toBe(1);
 
     const markerRow = await driver.query<{ core_hash: string; profile_hash: string }>(
-      'SELECT core_hash, profile_hash FROM _prisma_marker WHERE id = ?',
-      [1],
+      'SELECT core_hash, profile_hash FROM _prisma_marker WHERE space = ?',
+      ['app'],
     );
     expect(markerRow.rows[0]).toMatchObject({
       core_hash: contract.storage.storageHash,
@@ -89,6 +91,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
       policy: INIT_ADDITIVE_POLICY,
       fromContract: null,
       frameworkComponents,
+      spaceId: APP_SPACE_ID,
     });
     if (initialPlan.kind !== 'success') throw new Error('expected initial planner success');
     const firstResult = await runner.execute({
@@ -103,6 +106,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
 
     const emptyPlan = createMigrationPlan<SqlitePlanTargetDetails>({
       targetId: 'sqlite',
+      spaceId: APP_SPACE_ID,
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [],
@@ -124,8 +128,8 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
     });
 
     const markerCount = await driver.query<{ cnt: number }>(
-      'SELECT COUNT(*) as cnt FROM _prisma_marker WHERE id = ?',
-      [1],
+      'SELECT COUNT(*) as cnt FROM _prisma_marker WHERE space = ?',
+      ['app'],
     );
     expect(markerCount.rows[0]!.cnt).toBe(1);
 

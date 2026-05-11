@@ -15,6 +15,7 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
+  APP_SPACE_ID,
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
   VERIFY_CODE_TARGET_MISMATCH,
@@ -169,6 +170,21 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     });
   }
 
+  schemaVerifyAgainstSchema(options: {
+    readonly contract: unknown;
+    readonly schema: MongoSchemaIR;
+    readonly strict: boolean;
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', string>>;
+  }): VerifyDatabaseSchemaResult {
+    const validated = validateMongoContract<MongoContract>(options.contract);
+    return verifyMongoSchema({
+      contract: validated.contract,
+      schema: options.schema,
+      strict: options.strict,
+      frameworkComponents: options.frameworkComponents,
+    });
+  }
+
   async sign(options: {
     readonly driver: ControlDriverInstance<'mongo', string>;
     readonly contract: unknown;
@@ -255,9 +271,30 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
 
   async readMarker(options: {
     readonly driver: ControlDriverInstance<'mongo', string>;
+    readonly space: string;
   }): Promise<ContractMarkerRecord | null> {
+    if (options.space !== APP_SPACE_ID) {
+      throw new Error(
+        'Mongo target does not yet support per-space contract markers. ' +
+          `readMarker was called with space="${options.space}", but only "${APP_SPACE_ID}" is supported. ` +
+          'Per-space marker support is tracked separately for Mongo and is not part of the SQL-family contract-spaces work.',
+      );
+    }
     const db = extractDb(options.driver);
     return readMarker(db);
+  }
+
+  // Mongo does not yet participate in the per-space mechanism — the
+  // `space` column was introduced in the SQL family's marker only.
+  // The bridge: surface the single app marker keyed by APP_SPACE_ID so
+  // the per-space verifier sees a coherent input shape; per-space mongo
+  // support is a future extension.
+  async readAllMarkers(options: {
+    readonly driver: ControlDriverInstance<'mongo', string>;
+  }): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
+    const appMarker = await this.readMarker({ ...options, space: APP_SPACE_ID });
+    if (appMarker === null) return new Map();
+    return new Map([[APP_SPACE_ID, appMarker]]);
   }
 
   async introspect(options: {

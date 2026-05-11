@@ -72,7 +72,7 @@ The JSDoc on `createEncryptionBinding` calls this out explicitly:
 1. Pass `(table, column, typeParams)` (or a richer `EncodeContext` object) to `codec.encode` / `codec.decode`. **Drawback**: hot-path overhead on every encode for a need most codecs don't have; the column-aware codec class is narrow.
 2. **(Recommended)** Allow extensions to register one codec instance per `StorageTypeInstance` — parameterized codec instantiation. The codec graph already knows which column it serves at construction time; `encode` stays pure. Keeps the codec interface unchanged for the codecs that don't need column identity.
 
-(2) is the natural fit for the existing `parameterizedCodecs` slot (`[reference/cipherstash/stack/packages/stack/src/prisma/exports/runtime.ts (L78–L83)](../../../reference/cipherstash/stack/packages/stack/src/prisma/exports/runtime.ts)` — the integration already declares a `paramsSchema` for the storage codec but the runtime never actually instantiates per-instance codecs from it). The slot exists; honoring it closes the gap.
+(2) is the natural fit for the unified `CodecDescriptor` factory (`[reference/cipherstash/stack/packages/stack/src/prisma/exports/runtime.ts (L78–L83)](../../../reference/cipherstash/stack/packages/stack/src/prisma/exports/runtime.ts)` — the integration already declares a `paramsSchema` for the storage codec but the runtime never actually instantiates per-instance codecs from it). The descriptor's curried `factory(params)(ctx)` signature exists for exactly this use case; honoring it closes the gap.
 
 Tracked upstream as part of [TML-2330](https://linear.app/prisma-company/issue/TML-2330) (column-context plumbing).
 

@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
@@ -12,6 +14,8 @@ import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import sql from '@prisma-next/family-sql/control';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
+import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
+import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -100,21 +104,69 @@ export async function emitAndVerifyContract(
   return validateContract<Contract<SqlStorage>>(emittedContract, emptyCodecLookup);
 }
 
+/**
+ * Materialise pgvector's pinned contract-space artefacts under
+ * `<migrationsDir>/pgvector/...`. The e2e contracts declare pgvector
+ * in their extension packs, so the per-space `db init` flow requires
+ * its head ref + baseline migration to be present on disk.
+ */
+async function materialisePgvectorPinnedArtefacts(migrationsDir: string): Promise<void> {
+  const space = pgvector.contractSpace;
+  if (!space) {
+    throw new Error('pgvector descriptor must declare a contractSpace');
+  }
+  const baseline = space.migrations[0];
+  if (!baseline) {
+    throw new Error('pgvector contract-space must ship at least one baseline migration');
+  }
+  await emitContractSpaceArtefacts(migrationsDir, 'pgvector', {
+    contract: space.contractJson,
+    contractDts: '// rendered .d.ts for pgvector contract space\nexport interface Contract {}\n',
+    headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },
+  });
+  await materialiseMigrationPackage(join(migrationsDir, 'pgvector'), baseline);
+}
+
+async function withE2eMigrationsDir<T>(
+  callback: (migrationsDir: string) => Promise<T>,
+): Promise<T> {
+  const migrationsDir = await mkdtemp(join(tmpdir(), 'prisma-next-e2e-migrations-'));
+  try {
+    await materialisePgvectorPinnedArtefacts(migrationsDir);
+    return await callback(migrationsDir);
+  } finally {
+    await rm(migrationsDir, { recursive: true, force: true });
+  }
+}
+
 export async function runDbInit(options: {
   readonly connectionString: string;
   readonly contractJsonPath: string;
+  readonly migrationsDir?: string;
 }): Promise<void> {
   const { connectionString, contractJsonPath } = options;
   const contractJson = await loadRawContractFromDisk(contractJsonPath);
   const controlClient = createControlClientForTests(connectionString);
 
-  try {
-    const result = await controlClient.dbInit({ contract: contractJson, mode: 'apply' });
+  const invoke = async (migrationsDir: string): Promise<void> => {
+    const result = await controlClient.dbInit({
+      contract: contractJson,
+      mode: 'apply',
+      migrationsDir,
+    });
     if (!result.ok) {
       throw new Error(
         `dbInit failed: ${result.failure.summary}\n${JSON.stringify(result.failure, null, 2)}`,
       );
     }
+  };
+
+  try {
+    if (options.migrationsDir !== undefined) {
+      await invoke(options.migrationsDir);
+      return;
+    }
+    await withE2eMigrationsDir(invoke);
   } finally {
     await controlClient.close();
   }
@@ -123,15 +175,17 @@ export async function runDbInit(options: {
 async function getPlannedDdlSql(options: {
   readonly connectionString: string;
   readonly contract: Record<string, unknown>;
+  readonly migrationsDir?: string;
 }): Promise<string> {
   const { connectionString, contract } = options;
   const controlClient = createControlClientForTests(connectionString);
 
-  try {
+  const invoke = async (migrationsDir: string): Promise<string> => {
     const result = await controlClient.dbInit({
       contract,
       mode: 'plan',
       connection: connectionString,
+      migrationsDir,
     });
     if (!result.ok) {
       throw new Error(`dbInit plan failed: ${result.failure.summary}`);
@@ -142,6 +196,13 @@ async function getPlannedDdlSql(options: {
         .filter((s) => s.language === 'sql')
         .map((s) => s.text) ?? [];
     return sqlStatements.join(';\n\n');
+  };
+
+  try {
+    if (options.migrationsDir !== undefined) {
+      return await invoke(options.migrationsDir);
+    }
+    return await withE2eMigrationsDir(invoke);
   } finally {
     await controlClient.close();
   }
@@ -194,24 +255,30 @@ export async function withTestRuntime<TContract extends Contract<SqlStorage>>(
   const contract = validateContract<TContract>(contractJson, emptyCodecLookup);
 
   await withDevDatabase(async ({ connectionString }) => {
-    const sql = await getPlannedDdlSql({ connectionString, contract: contractJson });
-    await runDbInit({ connectionString, contractJsonPath });
-
-    await withClient(connectionString, async (client: Client) => {
-      const adapter = createStubAdapter();
-      const context = createTestContext(contract, adapter, {
-        extensionPacks: [pgvectorRuntime, arktypeJsonRuntime],
+    await withE2eMigrationsDir(async (migrationsDir) => {
+      const sql = await getPlannedDdlSql({
+        connectionString,
+        contract: contractJson,
+        migrationsDir,
       });
-      const runtime = await createTestRuntimeFromClient(contract, client, {
-        extensionPacks: [pgvectorRuntime, arktypeJsonRuntime],
-      });
+      await runDbInit({ connectionString, contractJsonPath, migrationsDir });
 
-      try {
-        const db = sqlBuilder<TContract>({ context });
-        await callback({ contract, context, runtime, db, client, sql });
-      } finally {
-        await runtime.close();
-      }
+      await withClient(connectionString, async (client: Client) => {
+        const adapter = createStubAdapter();
+        const context = createTestContext(contract, adapter, {
+          extensionPacks: [pgvectorRuntime, arktypeJsonRuntime],
+        });
+        const runtime = await createTestRuntimeFromClient(contract, client, {
+          extensionPacks: [pgvectorRuntime, arktypeJsonRuntime],
+        });
+
+        try {
+          const db = sqlBuilder<TContract>({ context });
+          await callback({ contract, context, runtime, db, client, sql });
+        } finally {
+          await runtime.close();
+        }
+      });
     });
   });
 }

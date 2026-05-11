@@ -7,7 +7,7 @@ import {
 } from '@prisma-next/sql-relational-core/expression';
 import type { CodecTypes } from '../types/codec-types';
 import { postgisAuthoringTypes } from './authoring';
-import { codecDefinitions } from './codecs';
+import { postgisCodecRegistry } from './registry';
 
 const postgisTypeId = 'pg/geometry@1' as const;
 
@@ -159,7 +159,7 @@ const postgisPackMetaBase = {
   },
   types: {
     codecTypes: {
-      codecInstances: Object.values(codecDefinitions).map((def) => def.codec),
+      codecDescriptors: Array.from(postgisCodecRegistry.values()),
       import: {
         package: '@prisma-next/extension-postgis/codec-types',
         named: 'CodecTypes',

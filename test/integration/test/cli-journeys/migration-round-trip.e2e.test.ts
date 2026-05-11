@@ -104,7 +104,7 @@ withTempDir(({ createTempDir }) => {
         const newResult = await runMigrationNew(ctx, ['--name', 'add-required-name']);
         expect(newResult.exitCode, `migration new: ${newResult.stderr}`).toBe(0);
 
-        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
         const migrationDirs = readdirSync(migrationsDir)
           .filter((d) => d.includes('add_required_name'))
           .sort();

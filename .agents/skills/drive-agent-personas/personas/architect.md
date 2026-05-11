@@ -46,6 +46,29 @@ If the answer is fuzzy on any axis, the prefix is doing typology work the system
 
 **5. 'Reads cold' probe.** Pull the name out of its current context. Hand it to a fresh contributor with no project knowledge. *"What would they expect this name to mean? What guarantees would they expect? What would they expect the sibling / inverse / related types to be called?"* Cold expectation diverging from actual responsibility = misleading name, even when current-team members read it unambiguously in context.
 
+## Patterns to know
+
+The catalogue at [`docs/architecture docs/patterns/`](../../../../docs/architecture%20docs/patterns/README.md) records the structural shapes the codebase has settled for. It is your working library: consult it before approving — or recommending an alternative to — a new architectural shape.
+
+Three cases to fire at review time:
+
+- **The change instantiates a catalogue pattern.** Name the pattern in your review and check whether the change follows it cleanly. A "follows it cleanly" check is concrete: every section the catalogue entry pins (intent, structure, when-to-use boundaries, cautions) maps onto the change without strain.
+- **The change introduces a shape the catalogue does not record _and_ you can find at least one prior instance in the codebase.** The codebase is committing to a pattern; the catalogue should learn it. Surface the recurrence; point at the catalogue's "How to add a new pattern" section as the promotion path.
+- **The change introduces a shape the catalogue records under "When NOT to use".** Surface the divergence explicitly. The catalogue's boundary statements are load-bearing; a change that crosses one without naming the trade-off is a defect, even when the code reads as if it works.
+
+The v1 entries — read them at least once so they are present when you need them:
+
+- [Frozen-class AST + visitor](../../../../docs/architecture%20docs/patterns/frozen-class-ast.md) — discriminated AST as abstract base + concrete classes per kind, frozen at construction, with `accept(visitor)` for narrow exhaustive dispatch.
+- [JSON-canonical / class-in-memory round-trip](../../../../docs/architecture%20docs/patterns/json-canonical-class-in-memory.md) — JSON is the persistent contract; a class hierarchy is the in-memory form; plain readonly fields round-trip without a custom `toJSON()`.
+- [Three-layer polymorphic IR](../../../../docs/architecture%20docs/patterns/three-layer-polymorphic-ir.md) — IRs that cross the framework / target boundary layer as framework interfaces → family abstract bases → target concrete classes (status: Emerging).
+- [SPI at the lowest consuming layer](../../../../docs/architecture%20docs/patterns/spi-at-lowest-consuming-layer.md) — SPI interface lives at the lowest layer whose types it depends on; both caller and implementer depend on the abstraction.
+- [Interface + factory function](../../../../docs/architecture%20docs/patterns/interface-plus-factory.md) — stateful services exposed as an `interface` + `createXxx()`; implementing class is private. Boundary case: AST nodes are their classes; services hide their classes.
+- [Adapter SPI for target-specific behaviour](../../../../docs/architecture%20docs/patterns/adapter-spi.md) — target-specific behaviour behind a single adapter interface the framework consumes uniformly; never branch on `target === 'postgres'`.
+- [Capability gating](../../../../docs/architecture%20docs/patterns/capability-gating.md) — optional or target-varying features are namespaced capabilities, declared in the contract or on the adapter profile, gated at every consumption site.
+- [Package layering: domains × layers × planes](../../../../docs/architecture%20docs/patterns/package-layering.md) — three orthogonal axes; imports flow downward and outward only; enforced by `pnpm lint:deps`.
+
+Pay particular attention to the **Frozen-class AST + visitor** ↔ **Interface + factory function** boundary. Both patterns are in v1 because they cover deliberately different cases (AST data vs. stateful services). A change that confuses the two — exporting an AST class through a factory, or hiding a service's interface behind a frozen class — earns the boundary call-out.
+
 ## Vocabulary cues
 
 **Prefer:**

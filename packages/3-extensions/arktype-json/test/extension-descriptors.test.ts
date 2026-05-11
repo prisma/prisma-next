@@ -1,14 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { ARKTYPE_JSON_CODEC_ID, arktypeJsonCodec } from '../src/core/arktype-json-codec';
+import { ARKTYPE_JSON_CODEC_ID, arktypeJsonDescriptor } from '../src/core/arktype-json-codec';
 import { arktypeJsonExtensionDescriptor } from '../src/exports/control';
 import { arktypeJsonRuntimeDescriptor } from '../src/exports/runtime';
 
 describe('arktypeJsonRuntimeDescriptor', () => {
-  // The runtime descriptor is the SQL runtime's entry point for
-  // arktype-json. It registers `arktypeJsonCodec` through the
-  // `parameterizedCodecs:` slot and ships an empty legacy `codecs:`
-  // registry — Phase B of codec-registry-unification: arktype-json's
-  // codec metadata flows through the unified descriptor map only.
+  // The runtime descriptor is the SQL runtime's entry point for arktype-json. The contributor protocol is unified: every codec — parameterized or not — flows through the single `codecs:` slot returning a `CodecDescriptor` list. arktype-json contributes exactly one descriptor: `arktypeJsonDescriptor`.
   it('declares family, target, and version aligned with pack-meta', () => {
     expect(arktypeJsonRuntimeDescriptor.familyId).toBe('sql');
     expect(arktypeJsonRuntimeDescriptor.targetId).toBe('postgres');
@@ -16,14 +12,11 @@ describe('arktypeJsonRuntimeDescriptor', () => {
     expect(arktypeJsonRuntimeDescriptor.id).toBe('arktype-json');
   });
 
-  it('exposes the parameterized codec descriptor through parameterizedCodecs()', () => {
-    expect(arktypeJsonRuntimeDescriptor.parameterizedCodecs()).toEqual([arktypeJsonCodec]);
-  });
-
-  it('returns an empty legacy codec registry from codecs()', () => {
-    const registry = arktypeJsonRuntimeDescriptor.codecs();
-    expect(registry.has(ARKTYPE_JSON_CODEC_ID)).toBe(false);
-    expect([...registry]).toEqual([]);
+  it('contributes the arktype-json descriptor through the unified codecs slot', () => {
+    // The contributor reads from the descriptor registry. The single entry is the canonical `arktypeJsonDescriptor`.
+    const descriptors = arktypeJsonRuntimeDescriptor.codecs();
+    expect(descriptors).toEqual([arktypeJsonDescriptor]);
+    expect(descriptors[0]?.codecId).toBe(ARKTYPE_JSON_CODEC_ID);
   });
 
   it('create() returns an instance tagged with the family/target', () => {
@@ -34,10 +27,7 @@ describe('arktypeJsonRuntimeDescriptor', () => {
 });
 
 describe('arktypeJsonExtensionDescriptor (control)', () => {
-  // The control descriptor wires the migration-plane hooks into the SQL
-  // family's control stack. arktype-json's `expandNativeType` is an
-  // identity (`jsonb` is dimension-free) and there's no
-  // `databaseDependencies` (`jsonb` is built into Postgres).
+  // The control descriptor wires the migration-plane hooks into the SQL family's control stack. arktype-json's `expandNativeType` is an identity (`jsonb` is dimension-free) and there's no `databaseDependencies` (`jsonb` is built into Postgres).
   it('declares family, target, and version aligned with pack-meta', () => {
     expect(arktypeJsonExtensionDescriptor.familyId).toBe('sql');
     expect(arktypeJsonExtensionDescriptor.targetId).toBe('postgres');

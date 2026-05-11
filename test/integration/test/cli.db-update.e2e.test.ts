@@ -308,7 +308,9 @@ withTempDir(({ createTempDir }) => {
           const applyOutput = stripAnsi(consoleOutput.join('\n'));
 
           expect(applyOutput).toContain('Applied');
-          expect(applyOutput).toContain('Signature');
+          // M6 T6.5/T6.6: `Signature:` was renamed to per-space `marker:`
+          // (or `App-space marker:` in single-space fallback).
+          expect(applyOutput).toMatch(/marker:/);
 
           // Verify slug column exists in database
           await withClient(connectionString, async (client) => {

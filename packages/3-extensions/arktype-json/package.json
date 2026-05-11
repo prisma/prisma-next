@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/extension-arktype-json",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "scripts": {
@@ -20,6 +21,7 @@
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
+    "@standard-schema/spec": "^1.1.0",
     "arktype": "^2.1.29"
   },
   "devDependencies": {

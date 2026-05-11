@@ -1,72 +1,61 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
+import type {
+  CodecDescriptor,
+  CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
+import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeExtensionDescriptor,
 } from '../src/sql-context';
+import { defineTestCodec } from './test-codec';
 import { createStubAdapter, createTestContext } from './utils';
 
-// Phase B of the codec-registry-unification project introduces two
-// runtime registries:
+// The codec-registry layer exposes two runtime registries:
 //
-// - `ContractCodecRegistry` (`context.contractCodecs`): per-column
-//   resolved-codec dispatch with `forColumn(table, column)` and a codec-
-//   id-keyed fallback `forCodecId(codecId)` (the AC-5-deferred carve-out
-//   for sites without a column ref).
-// - `CodecDescriptorRegistry` (`context.codecDescriptors`): codec-id-
-//   keyed metadata read with `descriptorFor(codecId)` — non-branching for
-//   parameterized vs. non-parameterized codecs (every non-parameterized
-//   codec is auto-lifted into a synthesized `CodecDescriptor<void>`).
-//
-// See spec § Decision and AC-3, AC-4.
+// - `ContractCodecRegistry` (`context.contractCodecs`): per-column resolved-codec dispatch with `forColumn(table, column)` and a codec-id-keyed fallback `forCodecId(codecId)` for sites without a column ref.
+// - `CodecDescriptorRegistry` (`context.codecDescriptors`): codec-id-keyed metadata read with `descriptorFor(codecId)` — non-branching for parameterized vs. non-parameterized codecs (every non-parameterized codec is auto-lifted into a synthesized `CodecDescriptor<void>`).
 
 function makeVectorCodec(meta?: Record<string, unknown>): Codec {
-  const baseCodec = codec({
+  const baseCodec = defineTestCodec({
     typeId: 'pg/vector@1',
-    targetTypes: ['vector'],
     encode: (v: number[]) => v,
     decode: (w: number[]) => w,
   });
   if (!meta) return baseCodec;
-  // SQL-side `Codec` declares `meta?: CodecMeta`; cast to the
-  // non-undefined branch under `exactOptionalPropertyTypes`.
-  return { ...baseCodec, meta: meta as NonNullable<Codec['meta']> };
+  // The narrow `Codec` shape is conversion-only (TML-2357); the `meta` sentinel here is test-side bookkeeping that downstream assertions read off the exact instance handed back by the factory.
+  return { ...baseCodec, meta } as unknown as Codec;
 }
 
 function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgres'> {
-  // The factory returns a per-instance codec whose `meta.length` carries
-  // the parameter — so tests can observe per-instance differentiation.
+  // The factory returns a per-instance codec whose `meta.length` carries the parameter — so tests can observe per-instance differentiation.
   const factory: (params: { length: number }) => (ctx: CodecInstanceContext) => Codec =
     (params) => (_ctx) =>
       makeVectorCodec({ length: params.length });
 
-  const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
-    {
-      codecId: 'pg/vector@1',
-      traits: ['equality'],
-      targetTypes: ['vector'],
-      paramsSchema: {
-        '~standard': {
-          version: 1,
-          vendor: 'test',
-          validate: (value) => ({ value: value as { length: number } }),
-        },
+  const vectorDescriptor: RuntimeParameterizedCodecDescriptor<{ length: number }> = {
+    codecId: 'pg/vector@1',
+    traits: ['equality'],
+    targetTypes: ['vector'],
+    paramsSchema: {
+      '~standard': {
+        version: 1,
+        vendor: 'test',
+        validate: (value) => ({ value: value as { length: number } }),
       },
-      factory,
     },
-  ];
+    isParameterized: true,
+    factory,
+  };
 
-  // The legacy `codecs:` registration carries a representative codec used
-  // as the codec-id fallback. Production parameterized descriptors ship
-  // the same shape today.
-  const registry = createCodecRegistry();
-  registry.register(makeVectorCodec());
+  const descriptors: ReadonlyArray<CodecDescriptor> = [
+    vectorDescriptor as unknown as CodecDescriptor,
+  ];
 
   return {
     kind: 'extension' as const,
@@ -74,8 +63,7 @@ function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postg
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => registry,
-    parameterizedCodecs: () => parameterizedCodecs,
+    codecs: () => descriptors,
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -83,17 +71,22 @@ function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postg
 }
 
 function createNonParameterizedExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgres'> {
-  const registry = createCodecRegistry();
-  // Custom codec id avoids colliding with the default test target
-  // descriptor's pre-registered codecs (`pg/text@1`, etc.).
-  registry.register(
-    codec({
-      typeId: 'test/scalar@1',
-      targetTypes: ['scalar'],
-      encode: (v: string) => v,
-      decode: (w: string) => w,
-    }),
-  );
+  // Custom codec id avoids colliding with the default test target descriptor's pre-registered codecs (`pg/text@1`, etc.).
+  const scalarCodec = defineTestCodec({
+    typeId: 'test/scalar@1',
+    targetTypes: ['scalar'],
+    encode: (v: string) => v,
+    decode: (w: string) => w,
+  });
+
+  const scalarDescriptor: CodecDescriptor = {
+    codecId: 'test/scalar@1',
+    traits: [],
+    targetTypes: ['scalar'],
+    paramsSchema: voidParamsSchema,
+    isParameterized: false,
+    factory: () => () => scalarCodec,
+  };
 
   return {
     kind: 'extension' as const,
@@ -101,8 +94,7 @@ function createNonParameterizedExtensionDescriptor(): SqlRuntimeExtensionDescrip
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => registry,
-    parameterizedCodecs: () => [],
+    codecs: () => [scalarDescriptor],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -174,9 +166,7 @@ describe('ContractCodecRegistry', () => {
 
     const resolved = context.contractCodecs.forColumn('Doc', 'embedding');
     expect(resolved).toBeDefined();
-    // The per-instance codec carries the column's `length` on its meta —
-    // confirms the dispatch path resolves through `factory(typeParams)
-    // (ctx)`, not the codec-id-keyed fallback.
+    // The per-instance codec carries the column's `length` on its meta — confirms the dispatch path resolves through `factory(typeParams) (ctx)`, not the codec-id-keyed fallback.
     expect((resolved as Codec & { meta: { length: number } }).meta.length).toBe(768);
   });
 
@@ -240,8 +230,7 @@ describe('ContractCodecRegistry', () => {
 
     expect(primaryCodec).toBeDefined();
     expect(secondaryCodec).toBeDefined();
-    // Non-parameterized codec ids share one codec instance across every
-    // column with that id.
+    // Non-parameterized codec ids share one codec instance across every column with that id.
     expect(primaryCodec).toBe(secondaryCodec);
     expect(primaryCodec?.id).toBe('test/scalar@1');
   });
@@ -273,9 +262,6 @@ describe('ContractCodecRegistry', () => {
     const codecById = context.contractCodecs.forCodecId('test/scalar@1');
     expect(codecById).toBeDefined();
     expect(codecById?.id).toBe('test/scalar@1');
-    // The codec-id fallback returns the same instance the legacy
-    // CodecRegistry.get(id) returns for non-parameterized codecs.
-    expect(codecById).toBe(context.codecs.get('test/scalar@1'));
   });
 
   it('forCodecId returns undefined for an unknown codec id', () => {
@@ -331,8 +317,7 @@ describe('CodecDescriptorRegistry', () => {
   });
 
   it('descriptorFor reads use the same call shape for parameterized and non-parameterized codec ids', () => {
-    // The defining property of the unified descriptor map: callers don't
-    // need to know whether a codec id is parameterized to read its traits.
+    // The defining property of the unified descriptor map: callers don't need to know whether a codec id is parameterized to read its traits.
     const contract = createTestContract({
       Doc: {
         embedding: {
@@ -358,8 +343,7 @@ describe('CodecDescriptorRegistry', () => {
       context.codecDescriptors.descriptorFor(codecId)?.traits ?? [];
 
     expect(traitsByCodecId('pg/vector@1')).toEqual(['equality']);
-    // Synthesized descriptors carry empty traits if the codec didn't
-    // declare any.
+    // Synthesized descriptors carry empty traits if the codec didn't declare any.
     expect(traitsByCodecId('test/scalar@1')).toEqual([]);
   });
 

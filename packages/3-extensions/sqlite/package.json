@@ -1,6 +1,7 @@
 {
   "name": "@prisma-next/sqlite",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "description": "One-liner lazy SQLite client composition for Prisma Next",
@@ -47,7 +48,5 @@
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/runtime.mjs",
-  "module": "./dist/runtime.mjs",
   "types": "./dist/runtime.d.mts"
 }

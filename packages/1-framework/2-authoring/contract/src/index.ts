@@ -1,5 +1,1 @@
-export type {
-  ColumnTypeDescriptor,
-  ForeignKeyDefaultsState,
-  IndexDef,
-} from './descriptors';
+export type { ForeignKeyDefaultsState, IndexDef } from './descriptors';
