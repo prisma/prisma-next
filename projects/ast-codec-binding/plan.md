@@ -33,7 +33,13 @@ Instead: **the AST shape change and the heuristic deletion land together at M3**
 
 **Tests precede implementation.**
 
-**Acceptance.** New types/resolver compile and tests pass; no other package changes.
+**Validation gate.**
+
+- `pnpm typecheck` — workspace-wide; M1 touches `framework-components` (foundation; many consumers).
+- `pnpm test:packages` — workspace-wide for cross-package safety; M1 adds new exports from `framework-components` that downstream consumers will reference in M2.
+- `pnpm lint:deps` — validate no layering violations from `framework-components/utils/canonicalize-json` move and `migration` re-import.
+
+**Acceptance.** All gates green; new types/resolver compile and tests pass; no behavioral changes outside the new files.
 
 ### M2 — Pre-populate resolver from contract walk; introduce `codecRefForColumn`
 
