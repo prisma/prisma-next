@@ -230,9 +230,10 @@ function parseParamRef(obj: JsonObject, registry: CodecDescriptorRegistry): Para
   if (codec) {
     validateTypeParams(codec, registry);
   }
+  const name = obj['name'] as string | undefined;
   return ParamRef.of(obj['value'], {
-    name: obj['name'] as string | undefined,
-    codec,
+    ...(name !== undefined ? { name } : {}),
+    ...(codec !== undefined ? { codec } : {}),
   });
 }
 
@@ -262,12 +263,21 @@ function parseOperation(obj: JsonObject, registry: CodecDescriptorRegistry): Ope
         parseExpression(asObject(a, 'operation.arg'), registry),
       )
     : undefined;
+  const returnsObj = asObject(obj['returns'], 'operation.returns');
+  const loweringObj = asObject(obj['lowering'], 'operation.lowering');
   return new OperationExpr({
     method: obj['method'] as string,
     self: parseExpression(asObject(obj['self'], 'operation.self'), registry),
     args,
-    returns: obj['returns'] as { codecId: string; nullable: boolean },
-    lowering: obj['lowering'] as { targetFamily: string; strategy: string; template: string },
+    returns: {
+      codecId: returnsObj['codecId'] as string,
+      nullable: returnsObj['nullable'] as boolean,
+    },
+    lowering: {
+      targetFamily: loweringObj['targetFamily'] as 'sql',
+      strategy: loweringObj['strategy'] as 'infix' | 'function',
+      template: loweringObj['template'] as string,
+    },
   });
 }
 
