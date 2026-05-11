@@ -1,5 +1,5 @@
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
-import { OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
+import { ColumnRef, OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import postgisDescriptor from '../src/exports/runtime';
 
@@ -80,6 +80,55 @@ describe('postgis operations', () => {
       strategy: 'function',
       template: 'ST_DWithin({{self}}, {{arg0}}, {{arg1}})',
     });
+  });
+
+  it('binary impls thread column refs from self onto the user-value ParamRef', () => {
+    const operations = postgisDescriptor.queryOperations!();
+    const columnSelf = {
+      buildAst: () => ColumnRef.of('cafe', 'location'),
+    };
+    const binaryMethods = [
+      'distance',
+      'distanceSphere',
+      'contains',
+      'within',
+      'intersects',
+      'intersectsBbox',
+    ] as const;
+    for (const method of binaryMethods) {
+      const op = operations.find((o) => o.method === method);
+      expect(op, method).toBeDefined();
+      const expr = op?.impl(
+        columnSelf as never,
+        { type: 'Point', coordinates: [1, 1] } as never,
+      ) as unknown as { buildAst(): OperationExpr };
+      const ast = expr.buildAst();
+      const otherArg = ast.args?.[0];
+      expect(otherArg, `${method} arg0`).toBeInstanceOf(ParamRef);
+      expect((otherArg as ParamRef).refs, `${method} refs`).toEqual({
+        table: 'cafe',
+        column: 'location',
+      });
+      expect((otherArg as ParamRef).codecId).toBe('pg/geometry@1');
+    }
+  });
+
+  it('dwithin threads refs onto its geometry arg', () => {
+    const op = postgisDescriptor.queryOperations!().find((o) => o.method === 'dwithin');
+    expect(op).toBeDefined();
+    const columnSelf = {
+      buildAst: () => ColumnRef.of('cafe', 'location'),
+    };
+    const expr = op?.impl(
+      columnSelf as never,
+      { type: 'Point', coordinates: [1, 1] } as never,
+      1000 as never,
+    ) as unknown as { buildAst(): OperationExpr };
+    const ast = expr.buildAst();
+    const otherArg = ast.args?.[0];
+    expect(otherArg).toBeInstanceOf(ParamRef);
+    expect((otherArg as ParamRef).refs).toEqual({ table: 'cafe', column: 'location' });
+    expect((otherArg as ParamRef).codecId).toBe('pg/geometry@1');
   });
 
   it('operations register into a SqlOperationRegistry', () => {
