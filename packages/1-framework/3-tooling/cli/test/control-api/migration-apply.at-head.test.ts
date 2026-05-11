@@ -11,7 +11,7 @@ import type {
 } from '@prisma-next/migration-tools/aggregate';
 import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { ok } from '@prisma-next/utils/result';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   buildContractSpaceAggregate: vi.fn(),
@@ -27,7 +27,15 @@ vi.mock('../../src/utils/contract-space-aggregate-loader', async () => {
   };
 });
 
-const { executeMigrationApply } = await import('../../src/control-api/operations/migration-apply');
+// The cli package runs with `isolate: false` (see vitest.config.ts), so
+// other test files in this worker may have already evaluated
+// `migration-apply` with the real loader bound. Reset the module graph
+// before importing so this file's `vi.mock` is the active binding.
+let executeMigrationApply: typeof import('../../src/control-api/operations/migration-apply').executeMigrationApply;
+beforeEach(async () => {
+  vi.resetModules();
+  ({ executeMigrationApply } = await import('../../src/control-api/operations/migration-apply'));
+});
 
 const APP_HASH = `sha256:${'a'.repeat(64)}`;
 
