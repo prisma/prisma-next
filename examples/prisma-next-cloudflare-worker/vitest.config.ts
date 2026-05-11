@@ -1,8 +1,13 @@
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
-import { CLOUDFLARE_HYPERDRIVE_VAR, HYPERDRIVE_VAR, loadLocalEnv } from './scripts/env';
+import {
+  CLOUDFLARE_HYPERDRIVE_VAR,
+  EXAMPLE_ROOT,
+  HYPERDRIVE_VAR,
+  loadLocalEnv,
+} from './scripts/env';
 
-loadLocalEnv();
+loadLocalEnv(EXAMPLE_ROOT);
 
 // vitest-pool-workers' parseCustomPoolOptions calls wrangler's
 // `unstable_getMiniflareWorkerOptions` BEFORE the `cloudflareTest` callback

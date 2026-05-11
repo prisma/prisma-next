@@ -6,9 +6,9 @@
  * falling back to `DATABASE_URL`. Idempotent: safe to re-run.
  */
 import { spawnSync } from 'node:child_process';
-import { HYPERDRIVE_VAR, loadLocalEnv } from './env';
+import { EXAMPLE_ROOT, HYPERDRIVE_VAR, loadLocalEnv } from './env';
 
-loadLocalEnv();
+loadLocalEnv(EXAMPLE_ROOT);
 const url = process.env[HYPERDRIVE_VAR] ?? process.env['DATABASE_URL'];
 
 if (!url) {

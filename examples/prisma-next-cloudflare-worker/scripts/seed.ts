@@ -6,10 +6,10 @@
  */
 
 import { db } from '../src/prisma/db';
-import { HYPERDRIVE_VAR, loadLocalEnv } from './env';
+import { EXAMPLE_ROOT, HYPERDRIVE_VAR, loadLocalEnv } from './env';
 
 async function main() {
-  loadLocalEnv();
+  loadLocalEnv(EXAMPLE_ROOT);
   const url = process.env[HYPERDRIVE_VAR] ?? process.env['DATABASE_URL'];
 
   if (!url) {

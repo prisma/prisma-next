@@ -1,8 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
 import type { ProvidedContext } from 'vitest';
-import { HYPERDRIVE_VAR, loadLocalEnv } from '../scripts/env';
+import { EXAMPLE_ROOT, HYPERDRIVE_VAR, loadLocalEnv } from '../scripts/env';
 
 interface GlobalSetupContext {
   provide<K extends keyof ProvidedContext & string>(key: K, value: ProvidedContext[K]): void;
@@ -16,8 +15,6 @@ declare module 'vitest' {
   }
 }
 
-const exampleRoot = fileURLToPath(new URL('..', import.meta.url));
-
 function normalize(connectionString: string): string {
   const url = new URL(connectionString);
   if (url.hostname === 'localhost' || url.hostname === '::1') {
@@ -27,7 +24,7 @@ function normalize(connectionString: string): string {
 }
 
 function resolveDatabaseUrl(): string {
-  loadLocalEnv(exampleRoot);
+  loadLocalEnv(EXAMPLE_ROOT);
   const url = process.env[HYPERDRIVE_VAR];
   if (!url) {
     throw new Error(
@@ -66,7 +63,7 @@ async function applySchema(databaseUrl: string): Promise<void> {
   const result = spawnSync(
     'pnpm',
     ['exec', 'prisma-next', 'db', 'init', '--db', databaseUrl, '--yes', '--no-color'],
-    { cwd: exampleRoot, stdio: 'inherit' },
+    { cwd: EXAMPLE_ROOT, stdio: 'inherit' },
   );
   if (result.status !== 0) {
     throw new Error(`prisma-next db init failed with status ${result.status ?? 'unknown'}`);
