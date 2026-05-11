@@ -420,9 +420,12 @@ function assertColumnCodecIntegrity(
  *
  * - typeRef-shared columns use the `storage.types[name]` name.
  * - inline-`typeParams` columns use `<col:Table.column>` (the first column observed at that key; additional columns sharing the key extend `usedAt`).
- * - non-parameterized codec ids use `<shared:codecId>`, aggregating every column on that codec id into one `usedAt` set.
+ * - non-parameterized codec ids use `<codec:codecId>`, aggregating every column on that codec id into one `usedAt` set.
+ * - ad-hoc refs the contract walk did not pre-populate (e.g. AST-supplied refs from deserialised migration ops) fall back to the canonical cache key `${codecId}:${canonicalizeJson(typeParams)}` — the only structurally honest identity for an ad-hoc ref, distinct per `(codecId, typeParams)`.
  *
- * `forColumn(t, c)` is a thin delegate over `forCodecRef(codecRefForColumn(t, c))`; encode/decode hot paths read the resolver directly via `forCodecRef`.
+ * Contract integrity is enforced upstream by {@link assertColumnCodecIntegrity}: every column must reference a registered `codecId` whose `descriptor.isParameterized` flag matches the presence of `typeParams` (via `codecRefForColumn`). The pre-population walk and `forColumn` therefore make no defensive checks — malformed columns fail fast at `createExecutionContext` construction with `RUNTIME.CODEC_DESCRIPTOR_MISSING` or `RUNTIME.CODEC_PARAMETERIZATION_MISMATCH` rather than being silently skipped here.
+ *
+ * `forColumn(t, c)` is a thin delegate over `forCodecRef(codecRefForColumn(t, c))`; encode/decode hot paths read the resolver directly via `forCodecRef`. The only `undefined` `forColumn` returns is the legitimate "no such column in the contract" case.
  */
 function buildContractCodecRegistry(
   contract: Contract<SqlStorage>,
