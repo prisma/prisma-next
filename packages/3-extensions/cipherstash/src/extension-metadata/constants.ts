@@ -98,6 +98,86 @@ export const CIPHERSTASH_CODEC_IDS = [
  */
 export const CIPHERSTASH_CODEC_ID_SET: ReadonlySet<string> = new Set(CIPHERSTASH_CODEC_IDS);
 
+/**
+ * Cipherstash-namespaced codec traits. Used as the dispatch key for
+ * the multi-codec predicate operators in `src/execution/operators.ts`
+ * — operators register with `self: { traits: ['cipherstash:<x>'] }`
+ * and the model accessor (`packages/3-extensions/sql-orm-client/src/
+ * model-accessor.ts`) attaches the operator to every codec descriptor
+ * whose `traits` list contains the same trait identifier.
+ *
+ * The `cipherstash:` prefix is load-bearing — it isolates these
+ * traits from the framework's built-in trait surface (`'equality'`,
+ * `'orderable'`, `'numeric'`, `'boolean'`, ...) so adding them to a
+ * cipherstash codec does not silently re-enable a built-in operator
+ * (e.g. `equality` would re-attach the framework's `eq` which lowers
+ * to standard SQL `=` — wrong for EQL ciphers, see
+ * `equality-trait-removal.test.ts`). The cipherstash extension owns
+ * its namespace; collisions with a future framework trait are not
+ * possible.
+ *
+ * Per spec D7, codec ↔ trait mapping:
+ *
+ *   - `cipherstash:equality`         — string, double, bigint, date, boolean
+ *   - `cipherstash:order-and-range`  — string, double, bigint, date
+ *   - `cipherstash:free-text-search` — string
+ *   - `cipherstash:searchable-json`  — json
+ *
+ * Each predicate operator registers under exactly one of these
+ * traits; the codec ↔ operator visibility surface follows from the
+ * trait set declared on each codec descriptor.
+ */
+export const CIPHERSTASH_TRAIT_EQUALITY = 'cipherstash:equality' as const;
+export const CIPHERSTASH_TRAIT_ORDER_AND_RANGE = 'cipherstash:order-and-range' as const;
+export const CIPHERSTASH_TRAIT_FREE_TEXT_SEARCH = 'cipherstash:free-text-search' as const;
+export const CIPHERSTASH_TRAIT_SEARCHABLE_JSON = 'cipherstash:searchable-json' as const;
+
+/**
+ * Per-codec trait sets keyed by codec id. Each codec descriptor in
+ * `parameterized.ts` / `codec-runtime.ts` / `codec-metadata.ts` reads
+ * the traits for its codec id from this map; the
+ * `equality-trait-removal.test.ts` regression also reads from here so
+ * the three trait declarations (runtime / parameterized / pack-meta)
+ * stay agreement-by-construction.
+ */
+// Local re-alias of the framework's `CodecTrait` union, used solely as
+// the cast target below. Type-only import — adds no runtime
+// dependency.
+type FrameworkCodecTrait = import('@prisma-next/framework-components/codec').CodecTrait;
+
+const CIPHERSTASH_CODEC_TRAITS_RAW: Readonly<Record<string, readonly string[]>> = {
+  [CIPHERSTASH_STRING_CODEC_ID]: [
+    CIPHERSTASH_TRAIT_EQUALITY,
+    CIPHERSTASH_TRAIT_FREE_TEXT_SEARCH,
+    CIPHERSTASH_TRAIT_ORDER_AND_RANGE,
+  ],
+  [CIPHERSTASH_DOUBLE_CODEC_ID]: [CIPHERSTASH_TRAIT_EQUALITY, CIPHERSTASH_TRAIT_ORDER_AND_RANGE],
+  [CIPHERSTASH_BIGINT_CODEC_ID]: [CIPHERSTASH_TRAIT_EQUALITY, CIPHERSTASH_TRAIT_ORDER_AND_RANGE],
+  [CIPHERSTASH_DATE_CODEC_ID]: [CIPHERSTASH_TRAIT_EQUALITY, CIPHERSTASH_TRAIT_ORDER_AND_RANGE],
+  [CIPHERSTASH_BOOLEAN_CODEC_ID]: [CIPHERSTASH_TRAIT_EQUALITY],
+  [CIPHERSTASH_JSON_CODEC_ID]: [CIPHERSTASH_TRAIT_SEARCHABLE_JSON],
+};
+
+// `CodecDescriptor.traits` is typed `readonly CodecTrait[]` where
+// `CodecTrait` is a closed union of framework built-ins
+// (`'equality' | 'order' | 'boolean' | 'numeric' | 'textual'`). The
+// cipherstash trait strings live in the extension-private
+// `cipherstash:` namespace and are intentionally not part of that
+// union — they sit in their own namespace so adding them here cannot
+// silently re-attach a framework built-in (e.g. `'equality'` would
+// re-attach the wrong-SQL `eq` footgun, see
+// `equality-trait-removal.test.ts`). The model-accessor's trait
+// dispatch widens `descriptor.traits` to `readonly string[]` before
+// the membership check (`packages/3-extensions/sql-orm-client/src/
+// model-accessor.ts:74-80`), so the extension-namespaced strings
+// round-trip through the registry unchanged at runtime; the cast
+// here is purely a type-level adapter from an extension namespace
+// into the framework union. AGENTS.md requires the rationale comment
+// alongside any `as unknown as` cast.
+export const CIPHERSTASH_CODEC_TRAITS = CIPHERSTASH_CODEC_TRAITS_RAW as unknown as Readonly<
+  Record<string, readonly FrameworkCodecTrait[]>
+>;
+
 /** Schema CipherStash installs its functions/operators/casts/types into. */
 export const EQL_V2_SCHEMA = 'eql_v2';
 

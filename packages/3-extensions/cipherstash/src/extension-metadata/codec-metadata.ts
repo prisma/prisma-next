@@ -27,6 +27,7 @@ import { type AnyCodecDescriptor, CodecImpl } from '@prisma-next/framework-compo
 import {
   CIPHERSTASH_BIGINT_CODEC_ID,
   CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_CODEC_TRAITS,
   CIPHERSTASH_DATE_CODEC_ID,
   CIPHERSTASH_DOUBLE_CODEC_ID,
   CIPHERSTASH_JSON_CODEC_ID,
@@ -37,7 +38,7 @@ import {
 function makeMetadataDescriptor(codecId: string, typeName: string): AnyCodecDescriptor {
   return {
     codecId,
-    traits: [],
+    traits: CIPHERSTASH_CODEC_TRAITS[codecId] ?? [],
     targetTypes: [EQL_V2_ENCRYPTED_TYPE],
     meta: { db: { sql: { postgres: { nativeType: EQL_V2_ENCRYPTED_TYPE } } } },
     paramsSchema: {

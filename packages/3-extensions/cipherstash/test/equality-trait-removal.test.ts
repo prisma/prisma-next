@@ -46,24 +46,30 @@ function emptySdk(): CipherstashSdk {
 }
 
 describe('cipherstash codec: no `equality` trait', () => {
-  it('runtime codec declares an empty traits list', () => {
+  it('runtime codec never advertises the framework `equality` trait', () => {
     const codec = createCipherstashStringCodec(emptySdk());
-    expect(codec.descriptor.traits).toEqual([]);
-    expect(codec.descriptor.traits ?? []).not.toContain('equality');
+    const traits: ReadonlyArray<string> = codec.descriptor.traits ?? [];
+    expect(traits).not.toContain('equality');
+    // Cipherstash-namespaced traits (load-bearing for the multi-codec
+    // operator dispatch) ARE expected — they're isolated from
+    // framework built-ins by the `cipherstash:` prefix.
+    expect(traits.some((t) => t.startsWith('cipherstash:'))).toBe(true);
   });
 
-  it('parameterized codec descriptors (the ones the runtime consumes for dispatch) declare an empty traits list', () => {
+  it('parameterized codec descriptors (the ones the runtime consumes for dispatch) never advertise `equality`', () => {
     const descriptors = createParameterizedCodecDescriptors(emptySdk());
     expect(descriptors.length).toBeGreaterThan(0);
     for (const descriptor of descriptors) {
-      expect(descriptor.traits).toEqual([]);
-      expect(descriptor.traits ?? []).not.toContain('equality');
+      const traits: ReadonlyArray<string> = descriptor.traits ?? [];
+      expect(traits).not.toContain('equality');
+      expect(traits.some((t) => t.startsWith('cipherstash:'))).toBe(true);
     }
   });
 
-  it('SDK-free pack-meta codec metadata declares an empty traits list', () => {
-    expect(cipherstashStringCodecMetadata.descriptor.traits).toEqual([]);
-    expect(cipherstashStringCodecMetadata.descriptor.traits ?? []).not.toContain('equality');
+  it('SDK-free pack-meta codec metadata never advertises `equality`', () => {
+    const traits: ReadonlyArray<string> = cipherstashStringCodecMetadata.descriptor.traits ?? [];
+    expect(traits).not.toContain('equality');
+    expect(traits.some((t) => t.startsWith('cipherstash:'))).toBe(true);
   });
 
   it('the three trait declarations agree (runtime / parameterized / pack-meta) for the string codec', () => {

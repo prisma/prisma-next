@@ -42,6 +42,7 @@ import { type as arktype } from 'arktype';
 import {
   CIPHERSTASH_BIGINT_CODEC_ID,
   CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_CODEC_TRAITS,
   CIPHERSTASH_DATE_CODEC_ID,
   CIPHERSTASH_DOUBLE_CODEC_ID,
   CIPHERSTASH_JSON_CODEC_ID,
@@ -136,11 +137,13 @@ export function renderEncryptedJsonOutputType(_params: CipherstashJsonParams): s
 
 const ENCRYPTED_TARGET_TYPES = ['eql_v2_encrypted'] as const;
 const ENCRYPTED_META = { db: { sql: { postgres: { nativeType: 'eql_v2_encrypted' } } } } as const;
-// Empty traits — equality search on cipherstash columns goes through
-// the cipherstash-namespaced operator (`cipherstashEq`), not the
-// framework's trait-gated built-in `eq`. See
-// `./cell-codec-factory.ts` for the full rationale.
-const ENCRYPTED_TRAITS = [] as const;
+// Per-codec traits live in `CIPHERSTASH_CODEC_TRAITS` and use the
+// `cipherstash:*` namespace so the cipherstash-namespaced operators
+// (`cipherstashEq`, `cipherstashGt`, etc.) can register against
+// multiple codec ids at once via trait-based dispatch. The traits
+// are intentionally namespaced to avoid colliding with framework
+// built-ins like `'equality'` — see `equality-trait-removal.test.ts`
+// for the regression rationale.
 
 export type CipherstashAnyParams =
   | CipherstashStringParams
@@ -161,7 +164,7 @@ export function createParameterizedCodecDescriptors(
 
   const stringDescriptor: RuntimeParameterizedCodecDescriptor<CipherstashStringParams> = {
     codecId: CIPHERSTASH_STRING_CODEC_ID,
-    traits: ENCRYPTED_TRAITS,
+    traits: CIPHERSTASH_CODEC_TRAITS[CIPHERSTASH_STRING_CODEC_ID] ?? [],
     targetTypes: ENCRYPTED_TARGET_TYPES,
     meta: ENCRYPTED_META,
     paramsSchema: encryptedStringParamsSchema,
@@ -172,7 +175,7 @@ export function createParameterizedCodecDescriptors(
 
   const doubleDescriptor: RuntimeParameterizedCodecDescriptor<CipherstashNumericParams> = {
     codecId: CIPHERSTASH_DOUBLE_CODEC_ID,
-    traits: ENCRYPTED_TRAITS,
+    traits: CIPHERSTASH_CODEC_TRAITS[CIPHERSTASH_DOUBLE_CODEC_ID] ?? [],
     targetTypes: ENCRYPTED_TARGET_TYPES,
     meta: ENCRYPTED_META,
     paramsSchema: encryptedDoubleParamsSchema,
@@ -183,7 +186,7 @@ export function createParameterizedCodecDescriptors(
 
   const bigIntDescriptor: RuntimeParameterizedCodecDescriptor<CipherstashNumericParams> = {
     codecId: CIPHERSTASH_BIGINT_CODEC_ID,
-    traits: ENCRYPTED_TRAITS,
+    traits: CIPHERSTASH_CODEC_TRAITS[CIPHERSTASH_BIGINT_CODEC_ID] ?? [],
     targetTypes: ENCRYPTED_TARGET_TYPES,
     meta: ENCRYPTED_META,
     paramsSchema: encryptedBigIntParamsSchema,
@@ -194,7 +197,7 @@ export function createParameterizedCodecDescriptors(
 
   const dateDescriptor: RuntimeParameterizedCodecDescriptor<CipherstashDateParams> = {
     codecId: CIPHERSTASH_DATE_CODEC_ID,
-    traits: ENCRYPTED_TRAITS,
+    traits: CIPHERSTASH_CODEC_TRAITS[CIPHERSTASH_DATE_CODEC_ID] ?? [],
     targetTypes: ENCRYPTED_TARGET_TYPES,
     meta: ENCRYPTED_META,
     paramsSchema: encryptedDateParamsSchema,
@@ -205,7 +208,7 @@ export function createParameterizedCodecDescriptors(
 
   const booleanDescriptor: RuntimeParameterizedCodecDescriptor<CipherstashBooleanParams> = {
     codecId: CIPHERSTASH_BOOLEAN_CODEC_ID,
-    traits: ENCRYPTED_TRAITS,
+    traits: CIPHERSTASH_CODEC_TRAITS[CIPHERSTASH_BOOLEAN_CODEC_ID] ?? [],
     targetTypes: ENCRYPTED_TARGET_TYPES,
     meta: ENCRYPTED_META,
     paramsSchema: encryptedBooleanParamsSchema,
@@ -216,7 +219,7 @@ export function createParameterizedCodecDescriptors(
 
   const jsonDescriptor: RuntimeParameterizedCodecDescriptor<CipherstashJsonParams> = {
     codecId: CIPHERSTASH_JSON_CODEC_ID,
-    traits: ENCRYPTED_TRAITS,
+    traits: CIPHERSTASH_CODEC_TRAITS[CIPHERSTASH_JSON_CODEC_ID] ?? [],
     targetTypes: ENCRYPTED_TARGET_TYPES,
     meta: ENCRYPTED_META,
     paramsSchema: encryptedJsonParamsSchema,

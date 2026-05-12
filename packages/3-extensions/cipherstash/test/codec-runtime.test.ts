@@ -73,18 +73,27 @@ describe('createCipherstashStringCodec — registration shape', () => {
     expect(dbMeta?.sql?.postgres?.nativeType).toBe('eql_v2_encrypted');
   });
 
-  it('declares no codec traits — equality search routes through cipherstashEq', () => {
+  it('declares cipherstash-namespaced traits but never the framework `equality` trait', () => {
     // Regression test: cipherstash columns do NOT advertise the
-    // framework`s `equality` trait at the
-    // codec level. The framework`s built-in `eq` is gated on
-    // `equality` and lowers to standard SQL `=`, which is wrong for
-    // EQL ciphers (randomized nonces). Equality search on cipherstash
-    // columns is delivered exclusively via the cipherstash-namespaced
-    // `cipherstashEq` operator (see `src/execution/operators.ts`). Re-adding
-    // a trait here without re-routing through the namespaced operator
-    // would silently re-introduce the wrong-SQL footgun.
+    // framework`s `equality` trait at the codec level — the
+    // framework`s built-in `eq` is gated on `equality` and lowers to
+    // standard SQL `=`, which is wrong for EQL ciphers (randomized
+    // nonces). Equality search on cipherstash columns is delivered
+    // exclusively via the cipherstash-namespaced `cipherstashEq`
+    // operator (see `src/execution/operators.ts`).
+    //
+    // The cipherstash-namespaced traits (`cipherstash:equality`,
+    // `cipherstash:order-and-range`, etc.) ARE expected — they are the
+    // dispatch keys for the cipherstash-namespaced operator surface
+    // (multi-codec dispatch via `self: { traits: [...] }` in the
+    // model accessor). They are isolated from framework built-ins by
+    // the `cipherstash:` prefix.
     const codec = createCipherstashStringCodec(emptySdk());
-    expect(codec.descriptor.traits).toEqual([]);
+    const traits: ReadonlyArray<string> = codec.descriptor.traits ?? [];
+    expect(traits.includes('equality')).toBe(false);
+    expect(traits.includes('cipherstash:equality')).toBe(true);
+    expect(traits.includes('cipherstash:free-text-search')).toBe(true);
+    expect(traits.includes('cipherstash:order-and-range')).toBe(true);
   });
 });
 
@@ -203,9 +212,17 @@ describe('createParameterizedCodecDescriptors', () => {
     ]);
     for (const descriptor of descriptors) {
       expect(descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
-      // No codec traits — see the `declares no codec traits` test
-      // above for the rationale.
-      expect(descriptor.traits).toEqual([]);
+      // Per-codec `cipherstash:*` traits drive the multi-codec
+      // operator dispatch (see `extension-metadata/constants.ts`); the
+      // framework `'equality'` trait is intentionally absent across
+      // every cipherstash codec to keep the wrong-SQL `eq` footgun
+      // closed (see `equality-trait-removal.test.ts`).
+      const traits: ReadonlyArray<string> = descriptor.traits ?? [];
+      expect(traits.includes('equality')).toBe(false);
+      expect(traits.length).toBeGreaterThan(0);
+      for (const trait of traits) {
+        expect(trait.startsWith('cipherstash:')).toBe(true);
+      }
     }
   });
 
@@ -296,7 +313,10 @@ describe('createCipherstashDoubleCodec — registration shape', () => {
     const codec = createCipherstashDoubleCodec(emptySdk());
     expect(codec.id).toBe(CIPHERSTASH_DOUBLE_CODEC_ID);
     expect(codec.descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
-    expect(codec.descriptor.traits).toEqual([]);
+    expect(codec.descriptor.traits).toEqual([
+      'cipherstash:equality',
+      'cipherstash:order-and-range',
+    ]);
     expect(codec.descriptor.renderOutputType?.({})).toBe('EncryptedDouble');
   });
 
@@ -323,7 +343,10 @@ describe('createCipherstashBigIntCodec — registration shape', () => {
     const codec = createCipherstashBigIntCodec(emptySdk());
     expect(codec.id).toBe(CIPHERSTASH_BIGINT_CODEC_ID);
     expect(codec.descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
-    expect(codec.descriptor.traits).toEqual([]);
+    expect(codec.descriptor.traits).toEqual([
+      'cipherstash:equality',
+      'cipherstash:order-and-range',
+    ]);
     expect(codec.descriptor.renderOutputType?.({})).toBe('EncryptedBigInt');
   });
 
@@ -345,7 +368,10 @@ describe('createCipherstashDateCodec — registration shape + round-trip', () =>
     const codec = createCipherstashDateCodec(emptySdk());
     expect(codec.id).toBe(CIPHERSTASH_DATE_CODEC_ID);
     expect(codec.descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
-    expect(codec.descriptor.traits).toEqual([]);
+    expect(codec.descriptor.traits).toEqual([
+      'cipherstash:equality',
+      'cipherstash:order-and-range',
+    ]);
     expect(codec.descriptor.renderOutputType?.({})).toBe('EncryptedDate');
   });
 
@@ -367,7 +393,7 @@ describe('createCipherstashBooleanCodec — registration shape + round-trip', ()
     const codec = createCipherstashBooleanCodec(emptySdk());
     expect(codec.id).toBe(CIPHERSTASH_BOOLEAN_CODEC_ID);
     expect(codec.descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
-    expect(codec.descriptor.traits).toEqual([]);
+    expect(codec.descriptor.traits).toEqual(['cipherstash:equality']);
     expect(codec.descriptor.renderOutputType?.({})).toBe('EncryptedBoolean');
   });
 
@@ -389,7 +415,7 @@ describe('createCipherstashJsonCodec — registration shape + round-trip', () =>
     const codec = createCipherstashJsonCodec(emptySdk());
     expect(codec.id).toBe(CIPHERSTASH_JSON_CODEC_ID);
     expect(codec.descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
-    expect(codec.descriptor.traits).toEqual([]);
+    expect(codec.descriptor.traits).toEqual(['cipherstash:searchable-json']);
     expect(codec.descriptor.renderOutputType?.({})).toBe('EncryptedJson');
   });
 

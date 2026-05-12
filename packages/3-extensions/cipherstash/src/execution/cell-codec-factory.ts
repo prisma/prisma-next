@@ -26,14 +26,17 @@
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
-import { type AnyCodecDescriptor, CodecImpl } from '@prisma-next/framework-components/codec';
+import {
+  type AnyCodecDescriptor,
+  CodecImpl,
+  type CodecTrait,
+} from '@prisma-next/framework-components/codec';
 import type { Codec, SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
-import { EQL_V2_ENCRYPTED_TYPE } from '../extension-metadata/constants';
+import { CIPHERSTASH_CODEC_TRAITS, EQL_V2_ENCRYPTED_TYPE } from '../extension-metadata/constants';
 import type { EncryptedEnvelopeBase } from './envelope-base';
 import type { CipherstashSdk } from './sdk';
 
 const CIPHERSTASH_TARGET_TYPES = [EQL_V2_ENCRYPTED_TYPE] as const;
-const CIPHERSTASH_TRAITS = [] as const;
 
 /**
  * Encode the SDK ciphertext payload as a Postgres composite literal
@@ -99,7 +102,7 @@ export interface CipherstashCellCodecOptions<E extends EncryptedEnvelopeBase<unk
 
 export class CipherstashCellCodec<E extends EncryptedEnvelopeBase<unknown>> extends CodecImpl<
   string,
-  typeof CIPHERSTASH_TRAITS,
+  readonly CodecTrait[],
   unknown,
   E
 > {
@@ -175,7 +178,7 @@ function makeFallbackDescriptor<E extends EncryptedEnvelopeBase<unknown>>(
 ): AnyCodecDescriptor {
   return {
     codecId: options.codecId,
-    traits: CIPHERSTASH_TRAITS,
+    traits: CIPHERSTASH_CODEC_TRAITS[options.codecId] ?? [],
     targetTypes: CIPHERSTASH_TARGET_TYPES,
     meta: {
       db: { sql: { postgres: { nativeType: EQL_V2_ENCRYPTED_TYPE } } },
@@ -203,6 +206,6 @@ function makeFallbackDescriptor<E extends EncryptedEnvelopeBase<unknown>>(
 export function makeCipherstashCellCodec<E extends EncryptedEnvelopeBase<unknown>>(
   sdk: CipherstashSdk,
   options: CipherstashCellCodecOptions<E>,
-): CipherstashCellCodec<E> & Codec<string, typeof CIPHERSTASH_TRAITS, unknown, E> {
+): CipherstashCellCodec<E> & Codec<string, readonly CodecTrait[], unknown, E> {
   return new CipherstashCellCodec(makeFallbackDescriptor(options), sdk, options);
 }

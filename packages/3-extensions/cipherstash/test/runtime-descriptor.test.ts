@@ -74,10 +74,19 @@ describe('createCipherstashRuntimeDescriptor — codecs()', () => {
     ]);
     for (const c of codecs) {
       expect(c.targetTypes).toEqual(['eql_v2_encrypted']);
-      // Empty traits — equality search routes through the cipherstash-
-      // namespaced `cipherstashEq` operator (see codec-runtime.test.ts
-      // for the regression assertion + rationale).
-      expect(c.traits).toEqual([]);
+      // Per-codec `cipherstash:*` namespaced traits drive the
+      // multi-codec operator dispatch (see
+      // `extension-metadata/constants.ts` →
+      // `CIPHERSTASH_CODEC_TRAITS`); the framework `'equality'` trait
+      // is intentionally absent across every cipherstash codec so the
+      // built-in `eq` does not silently re-attach (see
+      // `equality-trait-removal.test.ts`).
+      const traits: ReadonlyArray<string> = c.traits ?? [];
+      expect(traits.includes('equality')).toBe(false);
+      expect(traits.length).toBeGreaterThan(0);
+      for (const trait of traits) {
+        expect(trait.startsWith('cipherstash:')).toBe(true);
+      }
     }
   });
 });
