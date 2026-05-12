@@ -323,17 +323,26 @@ describe('cross-family middleware proof', () => {
     expect(sqlRuntime.driverSpy).not.toHaveBeenCalled();
     expect(mongoDriver.execute).not.toHaveBeenCalled();
 
-    // Telemetry observed only afterExecute for each run (beforeExecute is
-    // suppressed on the intercepted hit path) and saw source: 'middleware'
-    // in both cases.
-    expect(events).toHaveLength(2);
+    // Telemetry observed both beforeExecute and afterExecute for each run
+    // (beforeExecute fires pre-encode regardless of whether intercept
+    // short-circuits the driver path) and saw source: 'middleware' on the
+    // afterExecute events.
+    expect(events).toHaveLength(4);
     expect(events[0]).toMatchObject({
+      phase: 'beforeExecute',
+      target: 'postgres',
+    });
+    expect(events[1]).toMatchObject({
       phase: 'afterExecute',
       target: 'postgres',
       completed: true,
       source: 'middleware',
     });
-    expect(events[1]).toMatchObject({
+    expect(events[2]).toMatchObject({
+      phase: 'beforeExecute',
+      target: 'mongo',
+    });
+    expect(events[3]).toMatchObject({
       phase: 'afterExecute',
       target: 'mongo',
       completed: true,
