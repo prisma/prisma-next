@@ -8,7 +8,7 @@
 |-----|-------|
 | [`overview.md`](overview.md) | The end-to-end user story. What a Supabase-using Prisma Next app looks like; what the six deliverables are; how they fit together. Start here. |
 | [`posture.md`](posture.md) | The `modeled / tolerated / externally-managed / drift` posture as a generic IR property. How the verifier and planner dispatch on it. |
-| [`cross-contract-refs.md`](cross-contract-refs.md) | `refIn(otherContract, 'ModelName', 'fieldName')` — cross-contract-space FK references. Authoring DSL in PSL + TS, IR shape, resolution against loaded aggregate, extension publish pipeline. |
+| [`cross-contract-refs.md`](cross-contract-refs.md) | Cross-contract-space FK references. TS: unified surface — model handles from extension contracts (e.g. `supabaseContract.models.AuthUser.refs.id`) work with existing `constraints.foreignKey` / `rel.belongsTo` call sites. PSL: colon-prefixed dot-qualified type refs (`supabase:auth.User`). Implicit resolution via `extensionPacks`. Ownership rules, dependency graph, `__unspecified__` × cross-contract DDL. |
 | [`rls.md`](rls.md) | RLS policies as first-class Postgres IR. `PostgresRlsPolicy` node, inline `m.constraints.rlsPolicy({...})` DSL, migration ops, verifier against `pg_policies`. |
 | [`extension-package.md`](extension-package.md) | The `@prisma-next/extension-supabase` package shape. Hand-authored `contract.json`, single `supabase()` runtime facade composing Postgres internally, `asUser` / `asAnon` / `asServiceRole` role helpers, RLS session-state injection, typed role constants. |
 | [`developer-experience.md`](developer-experience.md) | Scaffold (`prisma-next init --supabase` or equivalent), getting-started docs, working example app (must-have). |
