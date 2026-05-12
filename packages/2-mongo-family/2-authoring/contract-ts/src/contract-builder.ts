@@ -20,7 +20,7 @@ import {
   type MongoContractWithTypeMaps,
   type MongoIndex,
   type MongoIndexFields,
-  type MongoIndexOptions,
+  type MongoIndexOptionsInput,
   type MongoStorage,
   type MongoStorageCollection,
   type MongoStorageCollectionOptions,
@@ -667,17 +667,17 @@ export function index<const Fields extends MongoIndexFields>(
 };
 export function index<const Fields extends MongoIndexFields, const Options>(
   fields: Fields,
-  options: StrictShape<Options, MongoIndexOptions>,
+  options: StrictShape<Options, MongoIndexOptionsInput>,
 ): {
   readonly fields: Fields;
-  readonly options: Options & MongoIndexOptions;
+  readonly options: Options & MongoIndexOptionsInput;
 };
 export function index(
   fields: MongoIndexFields,
-  options?: MongoIndexOptions,
+  options?: MongoIndexOptionsInput,
 ): {
   readonly fields: MongoIndexFields;
-  readonly options?: MongoIndexOptions;
+  readonly options?: MongoIndexOptionsInput;
 } {
   return {
     fields,

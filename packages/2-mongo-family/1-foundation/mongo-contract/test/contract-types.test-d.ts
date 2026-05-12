@@ -6,9 +6,9 @@ import type {
   InferModelRow,
   MongoCollectionOptions,
   MongoContractWithTypeMaps,
-  MongoIndexOptions,
   MongoTypeMaps,
 } from '../src/contract-types';
+import type { MongoIndexOptionsInput } from '../src/ir/mongo-index-options';
 
 type TestCodecTypes = {
   readonly 'mongo/objectId@1': { readonly input: string; readonly output: string };
@@ -185,8 +185,8 @@ test('MongoTypeMaps with single param compiles', () => {
   expectTypeOf<TM['fieldInputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();
 });
 
-test('Mongo index and collection option types stay specific', () => {
-  const typedIndexOptions: MongoIndexOptions = {
+test('Mongo index and collection option input types stay specific', () => {
+  const typedIndexOptions: MongoIndexOptionsInput = {
     unique: true,
     collation: { locale: 'en', strength: 2 },
     wildcardProjection: { internal: 0, title: 1 },
@@ -198,17 +198,19 @@ test('Mongo index and collection option types stay specific', () => {
     changeStreamPreAndPostImages: { enabled: true },
   };
 
-  expectTypeOf(typedIndexOptions.collation?.strength).toEqualTypeOf<
-    1 | 2 | 3 | 4 | 5 | undefined
+  expectTypeOf(typedIndexOptions.collation).toEqualTypeOf<
+    | import('../src/ir/mongo-collation-options').MongoCollationOptions
+    | import('../src/ir/mongo-collation-options').MongoCollationOptionsInput
+    | undefined
   >();
   expectTypeOf(typedCollectionOptions.timeseries?.granularity).toEqualTypeOf<
     'seconds' | 'minutes' | 'hours' | undefined
   >();
 });
 
-test('Mongo option types reject unsupported keys', () => {
+test('Mongo option input types reject unsupported keys', () => {
   // @ts-expect-error unknown Mongo index option
-  const _invalidIndexOptions: MongoIndexOptions = { unsupported: true };
+  const _invalidIndexOptions: MongoIndexOptionsInput = { unsupported: true };
   _invalidIndexOptions;
 
   // @ts-expect-error unknown Mongo collection option

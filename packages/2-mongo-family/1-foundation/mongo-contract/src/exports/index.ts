@@ -12,7 +12,6 @@ export type {
   MongoIndexFieldValue,
   MongoIndexKey,
   MongoIndexKeyDirection,
-  MongoIndexOptions,
   MongoJsonObject,
   MongoJsonPrimitive,
   MongoJsonValue,
@@ -44,6 +43,8 @@ export type {
 export { MongoCollationOptions } from '../ir/mongo-collation-options';
 export type { MongoIndexOptionDefaultsInput } from '../ir/mongo-index-option-defaults';
 export { MongoIndexOptionDefaults } from '../ir/mongo-index-option-defaults';
+export type { MongoIndexOptionsInput } from '../ir/mongo-index-options';
+export { MongoIndexOptions } from '../ir/mongo-index-options';
 export type {
   MongoTimeSeriesCollectionOptionsInput,
   MongoTimeSeriesGranularity,

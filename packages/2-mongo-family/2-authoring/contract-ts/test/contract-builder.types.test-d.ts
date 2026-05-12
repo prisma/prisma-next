@@ -2,7 +2,7 @@ import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-compon
 import type {
   InferModelRow,
   MongoCollectionOptions,
-  MongoIndexOptions,
+  MongoIndexOptionsInput,
 } from '@prisma-next/mongo-contract';
 import { expectTypeOf, test } from 'vitest';
 import { defineContract, field, index, model, valueObject } from '../src/contract-builder';
@@ -181,11 +181,11 @@ test('model authoring accepts typed Mongo collection options', () => {
 
 test('Mongo option types reject unsupported authoring shapes', () => {
   // @ts-expect-error unknown Mongo index option
-  const _invalidIndexOptions = { unsupported: true } satisfies MongoIndexOptions;
+  const _invalidIndexOptions = { unsupported: true } satisfies MongoIndexOptionsInput;
   _invalidIndexOptions;
 
   // @ts-expect-error expireAfterSeconds must be a number
-  const _invalidTtlIndexOptions = { expireAfterSeconds: '3600' } satisfies MongoIndexOptions;
+  const _invalidTtlIndexOptions = { expireAfterSeconds: '3600' } satisfies MongoIndexOptionsInput;
   _invalidTtlIndexOptions;
 
   // @ts-expect-error unknown Mongo collection option

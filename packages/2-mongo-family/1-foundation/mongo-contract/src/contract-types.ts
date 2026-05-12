@@ -9,6 +9,7 @@ import type { MongoChangeStreamPreAndPostImagesOptionsInput } from './ir/mongo-c
 import type { MongoClusteredCollectionOptionsInput } from './ir/mongo-clustered-collection-options';
 import type { MongoCollationOptionsInput } from './ir/mongo-collation-options';
 import type { MongoIndexOptionDefaultsInput } from './ir/mongo-index-option-defaults';
+import type { MongoIndexOptionsInput } from './ir/mongo-index-options';
 import type { MongoTimeSeriesCollectionOptionsInput } from './ir/mongo-time-series-collection-options';
 
 export type MongoIndexFieldValue = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
@@ -25,29 +26,9 @@ export type MongoJsonObject = {
 
 export type MongoWildcardProjection = Readonly<Record<string, 0 | 1>>;
 
-export type MongoIndexOptions = {
-  readonly unique?: boolean;
-  readonly name?: string;
-  readonly partialFilterExpression?: MongoJsonObject;
-  readonly sparse?: boolean;
-  readonly expireAfterSeconds?: number;
-  readonly weights?: Readonly<Record<string, number>>;
-  readonly default_language?: string;
-  readonly language_override?: string;
-  readonly textIndexVersion?: number;
-  readonly '2dsphereIndexVersion'?: number;
-  readonly bits?: number;
-  readonly min?: number;
-  readonly max?: number;
-  readonly bucketSize?: number;
-  readonly hidden?: boolean;
-  readonly collation?: MongoCollationOptionsInput;
-  readonly wildcardProjection?: MongoWildcardProjection;
-};
-
 export type MongoIndex = {
   readonly fields: MongoIndexFields;
-  readonly options?: MongoIndexOptions;
+  readonly options?: MongoIndexOptionsInput;
 };
 
 export type MongoCollectionOptions = {
