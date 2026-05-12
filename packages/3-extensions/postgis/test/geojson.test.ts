@@ -92,5 +92,13 @@ describe('postgis geojson constructors', () => {
         srid: 4326,
       });
     });
+
+    it('rejects an inverted bbox (minX > maxX)', () => {
+      expect(() => bboxPolygon([10, 0, 0, 10])).toThrow('inverted bbox');
+    });
+
+    it('rejects an inverted bbox (minY > maxY)', () => {
+      expect(() => bboxPolygon([0, 10, 10, 0])).toThrow('inverted bbox');
+    });
   });
 });

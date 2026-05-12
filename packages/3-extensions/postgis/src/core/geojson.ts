@@ -97,6 +97,11 @@ export function bboxPolygon(
   srid?: number,
 ): GeometryPolygon {
   const [minX, minY, maxX, maxY] = bbox;
+  if (minX > maxX || minY > maxY) {
+    throw new Error(
+      `bboxPolygon: inverted bbox [${minX}, ${minY}, ${maxX}, ${maxY}] (expected minX <= maxX and minY <= maxY)`,
+    );
+  }
   return polygon(
     [
       [minX, minY],
