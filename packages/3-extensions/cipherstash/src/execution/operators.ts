@@ -73,9 +73,11 @@
 
 import type { CodecTrait } from '@prisma-next/framework-components/codec';
 import type { SqlOperationDescriptor, SqlOperationDescriptors } from '@prisma-next/sql-operations';
+import type { CodecRef } from '@prisma-next/sql-relational-core/ast';
 import { type AnyExpression, type ColumnRef, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import {
   buildOperation,
+  codecOf,
   type Expression,
   type ScopeField,
   toExpr,
@@ -116,7 +118,7 @@ type PgBoolReturn = { readonly codecId: typeof PG_BOOL_CODEC_ID; readonly nullab
 /**
  * Convert a user-supplied value (raw plaintext or an existing
  * `Encrypted*` envelope) into a `ParamRef` carrying an envelope
- * tagged with the column's cipherstash storage codec id. The
+ * tagged with the column's cipherstash storage codec ref. The
  * envelope's handle is stamped with the column's `(table, column)`
  * routing context so the bulk-encrypt middleware can group it for
  * SELECT-side bulk encryption (the middleware's AST walk only stamps
@@ -125,20 +127,44 @@ type PgBoolReturn = { readonly codecId: typeof PG_BOOL_CODEC_ID; readonly nullab
  * Already-stamped envelopes are preserved write-once-wins per
  * `setHandleRoutingKey`'s contract.
  *
- * The `columnCodecId` argument is the column's cipherstash codec id
- * (e.g. `cipherstash/string@1`). The operator implementation reads
- * it off `self.returnType.codecId` at impl time; this is the same
- * codec id the resulting `ParamRef` is tagged with so the
- * bulk-encrypt middleware's per-codec-id filter and routing-key
- * grouping continue to apply.
+ * The `selfCodec` argument is the full {@link CodecRef} (codecId +
+ * typeParams) derived from the `self` expression via {@link codecOf}.
+ * Forwarding the complete ref — not just the codecId — keeps the
+ * resulting `ParamRef` aligned with the AST-bound codec resolution
+ * model introduced in TML-2456: `forCodecRef` validates `typeParams`
+ * against the codec's `paramsSchema`, and parameterized cipherstash
+ * codecs (`cipherstash/string@1`, `cipherstash/double@1`, ...)
+ * require their search-index `typeParams` (`equality`,
+ * `freeTextSearch`, `orderAndRange`) to be present.
  */
-function asEncryptedParam(selfAst: AnyExpression, columnCodecId: string, value: unknown): ParamRef {
-  const envelope = coerceToEnvelope(columnCodecId, value);
+function asEncryptedParam(selfAst: AnyExpression, selfCodec: CodecRef, value: unknown): ParamRef {
+  const envelope = coerceToEnvelope(selfCodec.codecId, value);
   const columnRef = extractColumnRef(selfAst);
   if (columnRef !== undefined) {
     setHandleRoutingKey(envelope, columnRef.table, columnRef.column);
   }
-  return ParamRef.of(envelope, { codec: { codecId: columnCodecId } });
+  return ParamRef.of(envelope, { codec: selfCodec });
+}
+
+/**
+ * Read the column-bound {@link CodecRef} off the `self` expression.
+ * Cipherstash predicate operators are reachable only via the ORM's
+ * model-accessor path, which stamps the column's full CodecRef onto
+ * the field-proxy's `codec` slot at synthesis time. If the ref is
+ * missing the operator was reached without a column binding (likely
+ * a programming error in a custom builder); throw with a stable
+ * runtime envelope so the failure mode is loud.
+ */
+function requireSelfCodec(self: Expression<ScopeField>, publicMethod: string): CodecRef {
+  const codec = codecOf(self);
+  if (codec === undefined) {
+    throw new TypeError(
+      `cipherstash ${publicMethod}: self expression is missing a CodecRef. ` +
+        'Cipherstash predicate operators require a column-bound self argument; ' +
+        'reach the operator through the ORM model-accessor (e.g. `model.users.where((u) => u.email.cipherstashEq(...))`).',
+    );
+  }
+  return codec;
 }
 
 /**
@@ -254,10 +280,11 @@ function eqlOperator(publicMethod: string, eqlFunction: 'eq' | 'ilike'): SqlOper
   return {
     self: { codecId: CIPHERSTASH_STRING_CODEC_ID },
     impl: (self: Expression<ScopeField>, value: unknown): Expression<PgBoolReturn> => {
-      const selfAst = toExpr(self);
+      const selfCodec = requireSelfCodec(self, publicMethod);
+      const selfAst = toExpr(self, selfCodec);
       return buildOperation({
         method: publicMethod,
-        args: [selfAst, asEncryptedParam(selfAst, self.returnType.codecId, value)],
+        args: [selfAst, asEncryptedParam(selfAst, selfCodec, value)],
         returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
         lowering: {
           targetFamily: 'sql',
@@ -317,9 +344,9 @@ function envelopeOperator(
           `cipherstash ${publicMethod}: expected ${arity} argument${arity === 1 ? '' : 's'}, got ${userArgs.length}.`,
         );
       }
-      const selfAst = toExpr(self);
-      const columnCodecId = self.returnType.codecId;
-      const argRefs = userArgs.map((value) => asEncryptedParam(selfAst, columnCodecId, value));
+      const selfCodec = requireSelfCodec(self, publicMethod);
+      const selfAst = toExpr(self, selfCodec);
+      const argRefs = userArgs.map((value) => asEncryptedParam(selfAst, selfCodec, value));
       return buildOperation({
         method: publicMethod,
         args: [selfAst, ...argRefs],
@@ -381,9 +408,9 @@ function variableArityEnvelopeOperator(
             '`WHERE FALSE` directly if you want to match no rows.',
         );
       }
-      const selfAst = toExpr(self);
-      const columnCodecId = self.returnType.codecId;
-      const argRefs = values.map((value) => asEncryptedParam(selfAst, columnCodecId, value));
+      const selfCodec = requireSelfCodec(self, publicMethod);
+      const selfAst = toExpr(self, selfCodec);
+      const argRefs = values.map((value) => asEncryptedParam(selfAst, selfCodec, value));
       return buildOperation({
         method: publicMethod,
         args: [selfAst, ...argRefs],
