@@ -177,7 +177,7 @@ export function descriptorsFromCodecs(
     '~standard': {
       version: 1 as const,
       vendor: 'sql-runtime/test-utils',
-      validate: (_value: unknown) => ({ value: undefined as void }),
+      validate: (_value: unknown) => ({ value: undefined }),
     },
   };
   const descriptors: CodecDescriptor[] = [];
