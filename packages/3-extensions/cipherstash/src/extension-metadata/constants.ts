@@ -60,11 +60,28 @@ export const CIPHERSTASH_BASELINE_MIGRATION_NAME = '20260601T0000_install_eql_bu
  * consumers (other extensions, the marker table) reference them by
  * literal string match.
  *
- * Today the baseline emits a single op (`installBundle`); the bundle
- * SQL is the source of truth for every typed object it creates inside
- * the `eql_v2` schema. New bundle versions or additional structural
- * ops will mint new `cipherstash:*` ids alongside this entry.
+ * The baseline emits one substantive op (`installBundle`, carrying the
+ * vendored EQL bundle SQL) plus a structural verification op per typed
+ * object the bundle creates inside the `eql_v2` schema. The structural
+ * ops carry a postcheck that probes `pg_type` / `pg_class` for the
+ * corresponding object and an empty `execute` step — the bundle SQL
+ * already created the object, so the structural op exists purely to
+ * (a) verify the bundle did so and (b) register the structural
+ * invariantId on the marker. This keeps `applied_invariants` on the
+ * marker structurally aligned with the typed objects the IR will
+ * eventually represent directly once the vocabulary expands to
+ * first-class composite types, standalone enums, and domains.
  */
 export const CIPHERSTASH_INVARIANTS = {
   installBundle: 'cipherstash:install-eql-bundle-v1',
+  createBlake3: 'cipherstash:create-eql_v2_blake3-v1',
+  createBloomFilter: 'cipherstash:create-eql_v2_bloom_filter-v1',
+  createConfiguration: 'cipherstash:create-eql_v2_configuration-v1',
+  createConfigurationState: 'cipherstash:create-eql_v2_configuration_state-v1',
+  createEncrypted: 'cipherstash:create-eql_v2_encrypted-v1',
+  createHmac256: 'cipherstash:create-eql_v2_hmac_256-v1',
+  createOreBlockU64_8_256: 'cipherstash:create-eql_v2_ore_block_u64_8_256-v1',
+  createOreBlockU64_8_256Term: 'cipherstash:create-eql_v2_ore_block_u64_8_256_term-v1',
+  createOreCllwU64_8: 'cipherstash:create-eql_v2_ore_cllw_u64_8-v1',
+  createOreCllwVar8: 'cipherstash:create-eql_v2_ore_cllw_var_8-v1',
 } as const;

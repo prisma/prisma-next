@@ -62,7 +62,7 @@ describe('cipherstash extension descriptor (contract-space package layout)', () 
     const space = cipherstashExtensionDescriptor.contractSpace!;
     const baseline = space.migrations[0]!;
     const opIds = baseline.ops.map((op) => op.invariantId).filter(Boolean);
-    expect(opIds).toEqual([CIPHERSTASH_INVARIANTS.installBundle]);
+    expect([...opIds].sort()).toEqual(Object.values(CIPHERSTASH_INVARIANTS).slice().sort());
   });
 
   it('namespaces every baseline op invariantId under cipherstash:*', () => {
