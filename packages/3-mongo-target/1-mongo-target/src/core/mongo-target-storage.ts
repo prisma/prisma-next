@@ -34,15 +34,31 @@ export interface MongoTargetStorageCtor {
 export class MongoTargetStorage extends MongoStorageBase {
   readonly storageHash: StorageHashBase<string>;
   readonly collections: Readonly<Record<string, MongoStorageCollection>>;
-  readonly namespaces: Readonly<Record<string, Namespace>>;
+
+  // `namespaces` is part of the class API (every IR carries namespaces —
+  // see Storage / MongoStorageBase) but is intentionally NOT part of the
+  // on-disk JSON envelope. Holding it through a non-enumerable property
+  // keeps `JSON.stringify(storage)` and `Object.entries(storage)` (the
+  // path `canonicalizeContractToObject` walks during emission) free of
+  // the runtime-only field, while preserving direct property access.
+  // The IR-node class flip in M2 R2 will keep this same convention for
+  // class-internal hooks.
+  readonly namespaces!: Readonly<Record<string, Namespace>>;
 
   constructor(options: MongoTargetStorageCtor) {
     super();
     this.storageHash = options.storageHash;
     this.collections = options.collections;
-    this.namespaces = options.namespaces ?? {
-      __unspecified__: MongoTargetUnspecifiedDatabase.instance,
-    };
+    Object.defineProperty(this, 'namespaces', {
+      value:
+        options.namespaces ??
+        ({
+          __unspecified__: MongoTargetUnspecifiedDatabase.instance,
+        } as const),
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
     Object.freeze(this);
   }
 }
