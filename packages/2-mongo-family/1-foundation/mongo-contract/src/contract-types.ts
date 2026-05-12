@@ -5,7 +5,11 @@ import type {
   ContractValueObject,
   StorageBase,
 } from '@prisma-next/contract/types';
+import type { MongoChangeStreamPreAndPostImagesOptionsInput } from './ir/mongo-change-stream-pre-and-post-images-options';
+import type { MongoClusteredCollectionOptionsInput } from './ir/mongo-clustered-collection-options';
 import type { MongoCollationOptionsInput } from './ir/mongo-collation-options';
+import type { MongoIndexOptionDefaultsInput } from './ir/mongo-index-option-defaults';
+import type { MongoTimeSeriesCollectionOptionsInput } from './ir/mongo-time-series-collection-options';
 
 export type MongoIndexFieldValue = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
 
@@ -46,43 +50,17 @@ export type MongoIndex = {
   readonly options?: MongoIndexOptions;
 };
 
-export type MongoIndexOptionDefaults = {
-  readonly storageEngine?: MongoJsonObject;
-};
-
-export type MongoTimeSeriesGranularity = 'seconds' | 'minutes' | 'hours';
-
-export type MongoTimeSeriesCollectionOptions = {
-  readonly timeField: string;
-  readonly metaField?: string;
-  readonly granularity?: MongoTimeSeriesGranularity;
-  readonly bucketMaxSpanSeconds?: number;
-  readonly bucketRoundingSeconds?: number;
-};
-
-export type MongoClusteredCollectionKey = Readonly<Record<string, 1>>;
-
-export type MongoClusteredCollectionOptions = {
-  readonly name?: string;
-  readonly key: MongoClusteredCollectionKey;
-  readonly unique: boolean;
-};
-
-export type MongoChangeStreamPreAndPostImagesOptions = {
-  readonly enabled: boolean;
-};
-
 export type MongoCollectionOptions = {
   readonly capped?: boolean;
   readonly size?: number;
   readonly max?: number;
   readonly storageEngine?: MongoJsonObject;
-  readonly indexOptionDefaults?: MongoIndexOptionDefaults;
+  readonly indexOptionDefaults?: MongoIndexOptionDefaultsInput;
   readonly collation?: MongoCollationOptionsInput;
-  readonly timeseries?: MongoTimeSeriesCollectionOptions;
-  readonly clusteredIndex?: MongoClusteredCollectionOptions;
+  readonly timeseries?: MongoTimeSeriesCollectionOptionsInput;
+  readonly clusteredIndex?: MongoClusteredCollectionOptionsInput;
   readonly expireAfterSeconds?: number;
-  readonly changeStreamPreAndPostImages?: MongoChangeStreamPreAndPostImagesOptions;
+  readonly changeStreamPreAndPostImages?: MongoChangeStreamPreAndPostImagesOptionsInput;
 };
 
 export type MongoIndexKeyDirection = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';

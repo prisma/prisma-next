@@ -4,9 +4,6 @@ export type {
   ExtractMongoFieldOutputTypes,
   ExtractMongoTypeMaps,
   InferModelRow,
-  MongoChangeStreamPreAndPostImagesOptions,
-  MongoClusteredCollectionKey,
-  MongoClusteredCollectionOptions,
   MongoCollectionOptions,
   MongoContract,
   MongoContractWithTypeMaps,
@@ -15,7 +12,6 @@ export type {
   MongoIndexFieldValue,
   MongoIndexKey,
   MongoIndexKeyDirection,
-  MongoIndexOptionDefaults,
   MongoIndexOptions,
   MongoJsonObject,
   MongoJsonPrimitive,
@@ -27,12 +23,17 @@ export type {
   MongoStorageCollectionOptions,
   MongoStorageIndex,
   MongoStorageValidator,
-  MongoTimeSeriesCollectionOptions,
-  MongoTimeSeriesGranularity,
   MongoTypeMaps,
   MongoTypeMapsPhantomKey,
   MongoWildcardProjection,
 } from '../contract-types';
+export type { MongoChangeStreamPreAndPostImagesOptionsInput } from '../ir/mongo-change-stream-pre-and-post-images-options';
+export { MongoChangeStreamPreAndPostImagesOptions } from '../ir/mongo-change-stream-pre-and-post-images-options';
+export type {
+  MongoClusteredCollectionKey,
+  MongoClusteredCollectionOptionsInput,
+} from '../ir/mongo-clustered-collection-options';
+export { MongoClusteredCollectionOptions } from '../ir/mongo-clustered-collection-options';
 export type {
   MongoCollationAlternate,
   MongoCollationCaseFirst,
@@ -41,6 +42,13 @@ export type {
   MongoCollationStrength,
 } from '../ir/mongo-collation-options';
 export { MongoCollationOptions } from '../ir/mongo-collation-options';
+export type { MongoIndexOptionDefaultsInput } from '../ir/mongo-index-option-defaults';
+export { MongoIndexOptionDefaults } from '../ir/mongo-index-option-defaults';
+export type {
+  MongoTimeSeriesCollectionOptionsInput,
+  MongoTimeSeriesGranularity,
+} from '../ir/mongo-time-series-collection-options';
+export { MongoTimeSeriesCollectionOptions } from '../ir/mongo-time-series-collection-options';
 export type {
   ApplyScopeResult,
   PolymorphicIndexScope,
