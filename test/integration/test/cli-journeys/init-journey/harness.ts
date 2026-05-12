@@ -138,31 +138,40 @@ export async function createJourneyProject(
   const { install = true } = options;
 
   const dir = mkdtempSync(join(tmpdir(), `pn-journey-${cell.target}-${cell.authoring}-`));
-  writeMinimalPackageJson(dir);
+  // Once the tmpdir exists, any thrown setup step (package.json
+  // rewrite, tarball prep, install) would otherwise leak `dir` because
+  // no caller ever receives the `cleanup()` handle. Wrap the rest of
+  // setup in try/catch and remove `dir` before rethrowing.
+  try {
+    writeMinimalPackageJson(dir);
 
-  const target = cell.target === 'mongo' ? 'mongodb' : 'postgres';
-  const initResult = await runNode(
-    [CLI_BIN, 'init', '--target', target, '--authoring', cell.authoring, '--yes', '--no-install'],
-    dir,
-  );
+    const target = cell.target === 'mongo' ? 'mongodb' : 'postgres';
+    const initResult = await runNode(
+      [CLI_BIN, 'init', '--target', target, '--authoring', cell.authoring, '--yes', '--no-install'],
+      dir,
+    );
 
-  let installResult: CommandRun | null = null;
-  if (install && initResult.exitCode === 0) {
-    const tarballs = await prepareWorkspaceTarballs();
-    rewritePackageJsonForTarballs(dir, cell, tarballs);
-    writeIsolatedNpmrc(dir);
-    installResult = await runPnpm(['install', '--no-frozen-lockfile'], dir);
+    let installResult: CommandRun | null = null;
+    if (install && initResult.exitCode === 0) {
+      const tarballs = await prepareWorkspaceTarballs();
+      rewritePackageJsonForTarballs(dir, cell, tarballs);
+      writeIsolatedNpmrc(dir);
+      installResult = await runPnpm(['install', '--no-frozen-lockfile'], dir);
+    }
+
+    return {
+      dir,
+      cell,
+      initResult,
+      installResult,
+      cleanup() {
+        rmSync(dir, { recursive: true, force: true });
+      },
+    };
+  } catch (error) {
+    rmSync(dir, { recursive: true, force: true });
+    throw error;
   }
-
-  return {
-    dir,
-    cell,
-    initResult,
-    installResult,
-    cleanup() {
-      rmSync(dir, { recursive: true, force: true });
-    },
-  };
 }
 
 /** Minimal `package.json` that satisfies init's precondition: a project root must already exist before init can attach to it. */
