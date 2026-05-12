@@ -248,6 +248,13 @@ function validateTypeParams(codec: CodecRef, registry: CodecDescriptorRegistry):
   if (!descriptor) return;
   if (!descriptor.paramsSchema) return;
   const result = descriptor.paramsSchema['~standard'].validate(codec.typeParams);
+  if (typeof (result as { then?: unknown }).then === 'function' || result instanceof Promise) {
+    throw runtimeError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
+      `Async typeParams validator is not supported at parse time for codec '${codec.codecId}'`,
+      { codecId: codec.codecId, typeParams: codec.typeParams },
+    );
+  }
   if ('issues' in result && result.issues) {
     throw runtimeError(
       'RUNTIME.TYPE_PARAMS_INVALID',

@@ -312,6 +312,36 @@ describe('parseAnyQueryAst', () => {
 
       expect(() => roundTrip(ast, registry)).not.toThrow();
     });
+
+    it('throws RUNTIME.TYPE_PARAMS_INVALID when validator returns a Promise', () => {
+      const asyncSchema: StandardSchemaV1 = {
+        '~standard': {
+          version: 1,
+          vendor: 'test',
+          validate() {
+            return Promise.resolve({ value: undefined });
+          },
+        },
+      };
+      const registry = makeRegistry({
+        'pg/text@1': {
+          isParameterized: false,
+          paramsSchema: asyncSchema,
+        },
+      });
+
+      const ast = UpdateAst.table(TableSource.named('user')).withSet({
+        name: ParamRef.of('x', { codec: { codecId: 'pg/text@1', typeParams: {} } }),
+      });
+
+      try {
+        roundTrip(ast, registry);
+        expect.fail('expected RUNTIME.TYPE_PARAMS_INVALID');
+      } catch (e) {
+        expect(isRuntimeError(e)).toBe(true);
+        expect((e as { code: string }).code).toBe('RUNTIME.TYPE_PARAMS_INVALID');
+      }
+    });
   });
 
   describe('complex expressions', () => {
