@@ -94,17 +94,15 @@ A few things to note about this picture:
 
 **Goal.** Expanded type/operator surface (`EncryptedNumber`, `EncryptedDate`, `EncryptedBoolean`, `EncryptedJson`; `orderAndRange`, `searchableJson`).
 
-**Status.** Stub spec only. Not yet shaped.
+**Status.** Spec drafted ([`project-2/spec.md`](project-2/spec.md)). Plan not yet drafted.
+
+**Scope.** Five new codecs (`cipherstash/double@1`, `cipherstash/bigint@1`, `cipherstash/date@1`, `cipherstash/boolean@1`, `cipherstash/json@1`); ~13 new operators (predicates as column methods, sort + JSON SELECT-expressions as free-standing helpers); the existing `EncryptedString` constructor gains `orderAndRange`. Single PR, single validation gate against live Postgres + EQL.
 
 **Gating.**
 
 - Hard dep on Project 1 shipping (codec + PSL/TS authoring + operator-lowering pattern). Each new type/operator family in Project 2 instantiates the same pattern.
 
 The original gating on framework prerequisites (`planTypeOperations` accepting `(table, column)`; prior-state contract for destructive DDL) is dissolved: TML-2397's codec lifecycle hook is the framework-wide planner-integration mechanism, and each new type wires its own `onFieldEvent` arm. No framework work blocks Project 2.
-
-**Recommended cadence.** Wait until Project 1 ships before shaping Project 2 in detail, since each new type rides on patterns Project 1 establishes (envelope, codec, PSL constructor, TS factory, operator lowering, parity test). Stub remains a placeholder and a forward-reference target until then.
-
-Within Project 2, types ship in customer-demand order. Suggested default: `EncryptedNumber` first (simplest after string; exercises `orderAndRange`), `EncryptedDate` (similar shape), `EncryptedBoolean` (smallest), `EncryptedJson` last (carries the biggest design open question on `searchableJson`). Reorder freely as customer signals dictate.
 
 # Status
 
@@ -113,11 +111,11 @@ Within Project 2, types ship in customer-demand order. Suggested default: `Encry
 | Umbrella | — | [drafted](spec.md) | [drafted](plan.md) (this doc) | — | Rebased onto `tml-2397-cipherstash-contract-space` |
 | Project 1 | [TML-2373](https://linear.app/prisma-company/issue/TML-2373) | [drafted](project-1/spec.md) (4 active task specs; migration-factories obsoleted by TML-2397) | [drafted](project-1/plan.md) | M0 + M1 done; M2 next | All framework PRs merged; TML-2397 satisfied as foundation |
 | `sql-raw-factory` | [TML-2374](https://linear.app/prisma-company/issue/TML-2374) | [drafted](sql-raw-factory/spec.md) | [drafted](sql-raw-factory/plan.md) | not started | Mergeable after Project 1's M1 lands (`raw-sql-ast-node` already cherry-picked onto Project 1's branch); three milestones (factory + param() → identifier(...) → integration + close-out) |
-| Project 2 | [TML-2375](https://linear.app/prisma-company/issue/TML-2375) | [stub](project-2/spec.md) | not started | not started | Gated on Project 1 only; framework prerequisites dissolved by TML-2397 |
+| Project 2 | [TML-2375](https://linear.app/prisma-company/issue/TML-2375) | [drafted](project-2/spec.md) | not started | not started | Five new codecs (`double`, `bigint`, `date`, `boolean`, `json`) + ~13 new operators. Single PR, single validation gate. Gated on Project 1 only; framework prerequisites dissolved by TML-2397 |
 
 # Open questions at the umbrella level
 
-1. **Project 2 shaping trigger.** Confirmed: shape Project 2 after Project 1 ships, since each new type rides on patterns Project 1 establishes.
+None outstanding. Project 2 spec drafted; plan pending.
 
 # References
 
