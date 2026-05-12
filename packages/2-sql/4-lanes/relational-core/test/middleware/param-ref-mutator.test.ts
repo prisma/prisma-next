@@ -50,7 +50,8 @@ describe('createSqlParamRefMutator entries()', () => {
 
     const [entry] = [...mutator.entries()];
 
-    expect(entry?.codecId).toBeUndefined();
+    expect(entry).toBeDefined();
+    expect(entry!.codecId).toBeUndefined();
   });
 
   it('returns originalParams by reference identity when no mutation happens', () => {
