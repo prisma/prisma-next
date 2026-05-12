@@ -513,7 +513,10 @@ export async function loadAggregateStatusSpaces(args: {
     let pendingCount = 0;
     let status: MigrationStatusSpaceEntry['status'];
     if (walked.kind === 'ok') {
-      pendingCount = walked.result.plan.operations.length;
+      // Count pending *migrations* (graph edges), not operations: a
+      // single authored migration that lowers to N ops or zero ops
+      // both count as exactly one pending unit of work for the user.
+      pendingCount = walked.result.migrationEdges?.length ?? 0;
       if (liveMarker === null) {
         status = pendingCount === 0 ? 'no-marker' : 'pending';
       } else {
@@ -723,15 +726,20 @@ async function executeMigrationStatusCommand(
       // surface per-space marker state. `readAllMarkers` mirrors what
       // `db init` / `db update` already use to drive the multi-space
       // planner; here it powers the aggregate status output.
-      try {
+      //
+      // Probe for the method first so we only swallow the
+      // unsupported-method case: older family instances may not
+      // implement `readAllMarkers` (per-space enumeration then falls
+      // back to "marker unknown"). Real query / runtime errors from
+      // an instance that *does* expose the method must propagate up
+      // — otherwise transient DB failures would silently degrade
+      // status to "markers unknown".
+      if (typeof client.readAllMarkers === 'function') {
         allMarkers = await client.readAllMarkers();
-      } catch {
-        // Older family instances may not implement `readAllMarkers`.
-        // Per-space enumeration falls back to "marker unknown" rather
-        // than failing the whole status command — leaving
-        // `allMarkers` as `null` signals "unknown" to the aggregate
-        // loader (an empty `Map` would instead mean "every space has
-        // no marker", which is a different condition).
+      } else {
+        // Leaving `allMarkers` as `null` signals "unknown" to the
+        // aggregate loader (an empty `Map` would instead mean "every
+        // space has no marker", which is a different condition).
         allMarkers = null;
       }
     } catch {
