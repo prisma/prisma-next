@@ -5,10 +5,7 @@ import type {
   DescriptorMigrationPackage,
   ExtensionPackInput,
 } from '../../src/utils/extension-pack-inputs';
-import {
-  toDeclaredExtensions,
-  toExtensionInputs,
-} from '../../src/utils/extension-pack-inputs';
+import { toDeclaredExtensions, toExtensionInputs } from '../../src/utils/extension-pack-inputs';
 
 const contractJsonA = { kind: 'sql-contract', tables: { a: {} } } as const;
 const contractJsonB = { kind: 'sql-contract', tables: { b: {} } } as const;
