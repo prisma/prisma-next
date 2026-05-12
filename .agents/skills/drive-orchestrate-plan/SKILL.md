@@ -17,7 +17,7 @@ Run the local implement-review iteration loop on a project plan: **delegate one 
 This skill is an **orchestrator**. It delegates:
 
 - implementation to `./agents/implementer.md`
-- review to `./agents/reviewer.md`
+- review to `./agents/reviewer.md` (full) **or** `../drive-review-fast/SKILL.md` (lightweight — single artifact, terse round entry, no SDR / walkthrough refresh). The orchestrator picks per project based on whether the user wants a written architectural narrative for asynchronous review (full) or a fast iteration loop with the user reading at PR-open time (fast). See `drive-review-fast` § When to use for the trade-off.
 
 The orchestrator owns sequencing, escalation, plan/spec amendment in response to user decisions, and loop control. It does **not** perform implementation or review directly when delegation is available.
 
