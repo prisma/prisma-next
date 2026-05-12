@@ -11,6 +11,7 @@ import type { ContractSpaceMember } from './types';
 
 export type {
   AggregateCurrentDBState,
+  AggregateMigrationEdgeRef,
   AggregatePerSpacePlan,
   AggregatePlannerError,
   AggregatePlannerInput,

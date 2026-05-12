@@ -180,20 +180,20 @@ export async function runContractSpaceSeedPhase(
  * Rendering a fully-typed `.d.ts` for an extension contract requires
  * the SQL-family renderer with the codec / typemap registry threaded
  * through; until that integration ships, the on-disk `.d.ts` is a
- * `@ts-nocheck` stub that documents how consumers should validate the
- * sibling `contract.json`.
+ * stub `export {};` module that documents how consumers should
+ * validate the sibling `contract.json`. The stub typechecks on its
+ * own and does not need any TypeScript suppressions.
  */
 function buildPlaceholderContractDts(spaceId: string): string {
   return [
-    '// @ts-nocheck',
     '/**',
     ` * Placeholder \`.d.ts\` for extension space "${spaceId}".`,
     ' *',
     ' * The framework re-emits this file on every `migration plan` run',
     ' * alongside `contract.json` and `refs/head.json`. A typed `.d.ts`',
-    " * rendering pass for extension contracts is tracked under the project's",
-    ' * open questions; until that ships, consumers should import',
-    ' * `contract.json` directly with `validateContract<…>(…)`.',
+    ' * rendering pass for extension contracts is tracked separately;',
+    ' * until that ships, consumers should import `contract.json`',
+    ' * directly with `validateContract<…>(…)`.',
     ' */',
     'export {};',
     '',

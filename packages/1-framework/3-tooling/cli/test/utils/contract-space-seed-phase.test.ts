@@ -137,7 +137,10 @@ describe('runContractSpaceSeedPhase', () => {
     });
 
     const dts = await readFile(join(migrationsDir, 'cipherstash', 'contract.d.ts'), 'utf-8');
-    expect(dts).toContain('@ts-nocheck');
+    // Placeholder dts is a self-contained `export {};` module — no
+    // TypeScript suppressions (repo bans `@ts-nocheck`).
+    expect(dts).not.toContain('@ts-nocheck');
+    expect(dts).toContain('export {};');
     expect(dts).not.toContain('stale placeholder');
   });
 

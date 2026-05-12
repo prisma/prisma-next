@@ -130,8 +130,11 @@ export function toDeclaredExtensions(
 /**
  * Minimal aggregate-loader projection that extracts `id` + `targetId`
  * from raw extension pack descriptors **without reading any nested
- * `contractSpace` property**. Uses `'contractSpace' in pack` to check
- * presence, which does not invoke the property accessor.
+ * `contractSpace` property**. Uses `Object.hasOwn(pack, 'contractSpace')`
+ * to check presence — does not invoke the property accessor and does
+ * not match prototype getters, so a descriptor that synthesises
+ * `contractSpace` only on access (or inherits one via the prototype
+ * chain) is correctly skipped here.
  *
  * This variant must be used by `buildContractSpaceAggregate` so that the
  * aggregate path (including `db verify`) never reads
@@ -143,7 +146,7 @@ export function toDeclaredExtensionsFromRaw(
 ): readonly DeclaredExtensionEntry[] {
   const entries: DeclaredExtensionEntry[] = [];
   for (const raw of extensionPacks) {
-    if ('contractSpace' in (raw as object)) {
+    if (typeof raw === 'object' && raw !== null && Object.hasOwn(raw, 'contractSpace')) {
       const pack = raw as { readonly id: string; readonly targetId: string };
       entries.push({ id: pack.id, targetId: pack.targetId });
     }
