@@ -34,6 +34,16 @@ import {
   seamExpectation,
 } from './init-journey/harness';
 
+/**
+ * User-code steps spawn a child Node process running `node
+ * --experimental-strip-types` against a freshly installed project. The
+ * default integration `testTimeout` is short (100ms) so that lifecycle-
+ * focused tests fail fast; that is too aggressive for these subprocess-
+ * heavy steps. Bump to 30s so the journey passes under both the focused
+ * `vitest.journeys.config.ts` runner and the broad integration runner.
+ */
+const USER_CODE_TIMEOUT_MS = 30_000;
+
 /** Per-cell journey runtime artefacts, populated once in `beforeAll`. */
 interface JourneyContext {
   readonly project: JourneyProject;
@@ -102,35 +112,43 @@ describe.each(
     TML_2486_seam(cell, ctx.project, result);
   });
 
-  it('step 5 (user code: ObjectId import) (TML-2487 seam)', async () => {
-    if (cell.target !== 'mongo') return;
-    const run = await runUserCode(
-      ctx.project,
-      'check-objectid.ts',
-      [
-        "import { ObjectId } from '@prisma-next/mongo';",
-        'const id = new ObjectId();',
-        'console.log(id.toHexString().length);',
-        '',
-      ].join('\n'),
-    );
-    TML_2487_seam(run);
-  });
+  it(
+    'step 5 (user code: ObjectId import) (TML-2487 seam)',
+    async () => {
+      if (cell.target !== 'mongo') return;
+      const run = await runUserCode(
+        ctx.project,
+        'check-objectid.ts',
+        [
+          "import { ObjectId } from '@prisma-next/mongo';",
+          'const id = new ObjectId();',
+          'console.log(id.toHexString().length);',
+          '',
+        ].join('\n'),
+      );
+      TML_2487_seam(run);
+    },
+    USER_CODE_TIMEOUT_MS,
+  );
 
-  it('step 6 (user code: control import) (TML-2314 seam)', async () => {
-    if (cell.target !== 'postgres') return;
-    const run = await runUserCode(
-      ctx.project,
-      'check-control.ts',
-      [
-        "import { createPostgresControlClient } from '@prisma-next/postgres/control';",
-        'const client = createPostgresControlClient();',
-        "console.log(typeof client === 'object' ? 'ok' : 'unexpected');",
-        '',
-      ].join('\n'),
-    );
-    TML_2314_seam(run);
-  });
+  it(
+    'step 6 (user code: control import) (TML-2314 seam)',
+    async () => {
+      if (cell.target !== 'postgres') return;
+      const run = await runUserCode(
+        ctx.project,
+        'check-control.ts',
+        [
+          "import { createPostgresControlClient } from '@prisma-next/postgres/control';",
+          'const client = createPostgresControlClient();',
+          "console.log(typeof client === 'object' ? 'ok' : 'unexpected');",
+          '',
+        ].join('\n'),
+      );
+      TML_2314_seam(run);
+    },
+    USER_CODE_TIMEOUT_MS,
+  );
 });
 
 async function runFullJourney(cell: CellId): Promise<JourneyContext> {
