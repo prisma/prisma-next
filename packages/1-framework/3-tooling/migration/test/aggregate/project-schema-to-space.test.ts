@@ -1,7 +1,10 @@
 import { createContract } from '@prisma-next/contract/testing';
+import type { StorageBase } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { projectSchemaToSpace } from '../../src/aggregate/project-schema-to-space';
 import type { ContractSpaceMember } from '../../src/aggregate/types';
+
+type MongoStorageLike = StorageBase & { readonly collections: Record<string, unknown> };
 
 /**
  * Unit tests for the duck-typed schema projector used by the aggregate
@@ -40,6 +43,28 @@ describe('projectSchemaToSpace', () => {
     return {
       spaceId,
       contract: createContract({ storage: { tables } }),
+      headRef: { hash: 'sha256:test', invariants: [] },
+      migrations: emptyMigrations(),
+    };
+  }
+
+  /**
+   * Build a synthetic member whose contract storage is Mongo-shaped
+   * (`collections: Record<string, _>`). The projector duck-types both
+   * SQL (`tables`) and Mongo (`collections`) record-shaped storage on
+   * the *other-member* side; this helper exercises the Mongo branch.
+   */
+  function memberWithCollections(
+    spaceId: string,
+    collections: Record<string, unknown>,
+  ): ContractSpaceMember {
+    return {
+      spaceId,
+      contract: createContract<MongoStorageLike>({
+        target: 'mongo',
+        targetFamily: 'mongo',
+        storage: { collections },
+      }),
       headRef: { hash: 'sha256:test', invariants: [] },
       migrations: emptyMigrations(),
     };
@@ -178,6 +203,64 @@ describe('projectSchemaToSpace', () => {
       expect(Object.keys(projected.tables)).toEqual(['app_user']);
       expect(projected.views).toBe(schema.views);
       expect(projected.meta).toBe(schema.meta);
+    });
+
+    it('removes other-member collections from a Mongo-shaped introspected schema (array form)', () => {
+      // Mongo's introspected `MongoSchemaIR` exposes
+      // `collections: ReadonlyArray<{name, ...}>` rather than a record.
+      // The projector duck-types the array shape on the schema side;
+      // other-members supply record-shaped Mongo contract storage.
+      const appColl = { name: 'users', indexes: [] };
+      const extColl = { name: 'cipherstash_state', indexes: [] };
+      const orphanColl = { name: 'legacy_audit', indexes: [] };
+      const schema = { collections: [appColl, extColl, orphanColl] };
+
+      const member = memberWithCollections('app', { users: {} });
+      const others = [memberWithCollections('cipherstash', { cipherstash_state: {} })];
+
+      const projected = projectSchemaToSpace(schema, member, others) as {
+        readonly collections: ReadonlyArray<{ readonly name: string }>;
+      };
+
+      expect(projected.collections.map((c) => c.name).sort()).toEqual(['legacy_audit', 'users']);
+      expect(projected.collections).not.toBe(schema.collections);
+      expect(projected.collections.find((c) => c.name === 'users')).toBe(appColl);
+      expect(projected.collections.find((c) => c.name === 'legacy_audit')).toBe(orphanColl);
+    });
+
+    it('returns the schema verbatim when no other-member collections are claimed', () => {
+      const schema = { collections: [{ name: 'users' }] };
+      const member = memberWithCollections('app', { users: {} });
+      expect(projectSchemaToSpace(schema, member, [member])).toBe(schema);
+    });
+
+    it('preserves non-`collections` fields on a Mongo-shaped schema object', () => {
+      const schema = {
+        collections: [{ name: 'app_users' }, { name: 'ext_owned' }],
+        meta: { driverVersion: '6.0' },
+      };
+      const member = memberWithCollections('app', { app_users: {} });
+      const others = [memberWithCollections('ext', { ext_owned: {} })];
+
+      const projected = projectSchemaToSpace(schema, member, others) as {
+        readonly collections: ReadonlyArray<{ readonly name: string }>;
+        readonly meta: { readonly driverVersion: string };
+      };
+
+      expect(projected.collections.map((c) => c.name)).toEqual(['app_users']);
+      expect(projected.meta).toBe(schema.meta);
+    });
+
+    it('cross-shape: SQL-shaped schema with a Mongo-shaped other-member is returned unchanged', () => {
+      // The SQL schema only exposes `.tables`; a Mongo other-member only
+      // claims `.collections`. The projector must not strip SQL tables
+      // because of a Mongo claim, and there are no Mongo collections in
+      // the SQL schema to strip — net effect: identity.
+      const schema = { tables: { users: {}, posts: {} } };
+      const member = memberWithTables('app', { users: {}, posts: {} });
+      const others = [memberWithCollections('mongo-ext', { audit_log: {} })];
+
+      expect(projectSchemaToSpace(schema, member, others)).toBe(schema);
     });
 
     it('does not include the projection target itself when it appears in `otherMembers` (defensive)', () => {

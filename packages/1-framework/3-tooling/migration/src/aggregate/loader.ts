@@ -337,11 +337,11 @@ export async function loadContractSpaceAggregate(
   // 7. Disjointness: no two members claim the same storage element.
   const elementClaimedBy = new Map<string, string[]>();
   for (const member of [appMember, ...extensionMembers]) {
-    const tables = extractTableNames(member.contract);
-    for (const tableName of tables) {
-      const claimers = elementClaimedBy.get(tableName);
+    const elements = extractStorageElementNames(member.contract);
+    for (const elementName of elements) {
+      const claimers = elementClaimedBy.get(elementName);
       if (claimers) claimers.push(member.spaceId);
-      else elementClaimedBy.set(tableName, [member.spaceId]);
+      else elementClaimedBy.set(elementName, [member.spaceId]);
     }
   }
   for (const [element, claimedBy] of elementClaimedBy) {
@@ -364,16 +364,29 @@ export async function loadContractSpaceAggregate(
 }
 
 /**
- * Extract the set of top-level storage table names from a contract.
- * Duck-typed: returns `[]` if the contract's storage shape doesn't
- * match the canonical `storage.tables: Record<string, ...>` form. A
- * future family with a different storage shape gets disjointness
- * effectively disabled (not enforced) rather than a hard failure.
+ * Extract the set of top-level storage element names a contract claims.
+ *
+ * Duck-typed across the storage shapes used in this codebase today:
+ *
+ * - SQL families: `storage.tables: Record<string, ...>` → table names.
+ * - Mongo: `storage.collections: Record<string, ...>` → collection names.
+ *
+ * Both shapes are unioned: a contract that exposed both (a hypothetical
+ * cross-family shape) would contribute both sets. Returns `[]` for any
+ * other shape, so a future family with a different storage layout gets
+ * disjointness effectively disabled (not enforced) rather than a hard
+ * failure — the same fall-through guarantee as `projectSchemaToSpace`.
  */
-function extractTableNames(contract: Contract): readonly string[] {
+function extractStorageElementNames(contract: Contract): readonly string[] {
   const storage = (contract as { readonly storage?: unknown }).storage;
   if (typeof storage !== 'object' || storage === null) return [];
-  const tables = (storage as { readonly tables?: unknown }).tables;
-  if (typeof tables !== 'object' || tables === null) return [];
-  return Object.keys(tables as Record<string, unknown>);
+  const storageObj = storage as { readonly tables?: unknown; readonly collections?: unknown };
+  const names: string[] = [];
+  if (typeof storageObj.tables === 'object' && storageObj.tables !== null) {
+    names.push(...Object.keys(storageObj.tables as Record<string, unknown>));
+  }
+  if (typeof storageObj.collections === 'object' && storageObj.collections !== null) {
+    names.push(...Object.keys(storageObj.collections as Record<string, unknown>));
+  }
+  return names;
 }

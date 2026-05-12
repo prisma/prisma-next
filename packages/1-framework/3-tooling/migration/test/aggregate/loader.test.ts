@@ -1,7 +1,10 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { createSqlContract } from '@prisma-next/contract/testing';
-import type { Contract } from '@prisma-next/contract/types';
+import { createContract, createSqlContract } from '@prisma-next/contract/testing';
+import type { Contract, StorageBase } from '@prisma-next/contract/types';
+
+type MongoStorageLike = StorageBase & { readonly collections: Record<string, unknown> };
+
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -323,6 +326,55 @@ describe('loadContractSpaceAggregate', () => {
               targetId: 'postgres',
             },
           ],
+        }),
+      );
+
+      expect(result.ok).toBe(false);
+      const failure = result.assertNotOk();
+      expect(failure.kind).toBe('disjointnessViolation');
+      if (failure.kind !== 'disjointnessViolation') return;
+      expect(failure.element).toBe('users');
+      expect([...failure.claimedBy].sort()).toEqual(['app', 'cipherstash']);
+    });
+
+    it('reports disjointnessViolation for Mongo-shaped contracts where two members claim the same collection', async () => {
+      // Storage extractor must also handle Mongo's `collections` record:
+      // an aggregate of two Mongo members both claiming a collection
+      // named `users` should be rejected at the disjointness phase, not
+      // silently allowed (which is what would happen if the extractor
+      // only knew about `tables`).
+      const appContract = createContract<MongoStorageLike>({
+        target: 'mongo',
+        targetFamily: 'mongo',
+        storage: { collections: { users: {} } },
+      });
+      const extContract = createContract<MongoStorageLike>({
+        target: 'mongo',
+        targetFamily: 'mongo',
+        storage: { collections: { users: {} } },
+      });
+
+      const cipherJson = { id: 'cipher-mongo-collides' };
+      const cipherHeadHash = 'sha256:cipher-mongo-collides-head';
+      await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
+        contract: cipherJson,
+        contractDts: '\n',
+        headRef: { hash: cipherHeadHash, invariants: [] },
+      });
+      await writeTestPackage(
+        join(spaceMigrationDirectory(migrationsDir, 'cipherstash'), '20260101T0000_init'),
+        { from: null, to: cipherHeadHash },
+      );
+
+      const validator = makeIdentityValidator(new Map([[JSON.stringify(cipherJson), extContract]]));
+
+      const result = await loadContractSpaceAggregate(
+        buildInput({
+          migrationsDir,
+          targetId: 'mongo',
+          appContract,
+          validateContract: validator,
+          declaredExtensions: [{ id: 'cipherstash', targetId: 'mongo' }],
         }),
       );
 
