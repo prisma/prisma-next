@@ -319,25 +319,23 @@ Not exercised in the example (Profile.hasMany(Post) is within `public`). But the
 
 ## Runtime initialization (`src/prisma/db.ts`)
 
-### 🔴 #7 — `middleware` on `SupabaseRuntimeOptions`
+### ✅ #7 — `middleware` on `SupabaseRuntimeOptions` — DECIDED: add it; forward to base
 
-The example passes `middleware: [...]` to `supabase({...})`. The current `extension-package.md` `SupabaseRuntimeOptions` interface doesn't have it.
+**Resolution:** add `middleware?: readonly SqlMiddleware[]` to `SupabaseRuntimeOptions`; the `SupabaseRuntime` subclass forwards it to the `super(...)` constructor unchanged. Middleware composes against the base Postgres runtime exactly as if the user had called `postgres({...})` directly. See [`decisions.md` C12](../decisions.md) and [`extension-package.md`](../extension-package.md) §"Runtime facade".
 
-**Recommendation: add `middleware?: Middleware[]` to `SupabaseRuntimeOptions`.** Forward to the internally-composed `postgres({...})` call.
+### ✅ #8 — Middleware ordering relative to role-binding — DECIDED: `SET LOCAL` is below the middleware chain
 
-Touches: [`extension-package.md`](../extension-package.md) §"Runtime facade" — add the option.
+**Resolution:** `SET LOCAL` is **not** middleware. The `SupabaseRuntime` subclass issues it inside its `execute()` override, against the raw `RuntimeConnection` returned by the base runtime's `connection()` — below the user-middleware chain entirely. User middleware never sees `BEGIN` / `SET LOCAL` / `COMMIT`; it only sees the user-issued logical query plans.
 
-### 🔴 #8 — Middleware ordering relative to role-binding
+This is security-by-architecture, not policy:
 
-The Supabase facade installs its own middleware to issue `SET LOCAL role = '...'` and `SET LOCAL request.jwt.claims = '...'` on each scoped session. Where does user-supplied middleware land?
+- A user cannot configure away their RLS enforcement by reordering middleware.
+- A misbehaved middleware that swallows or rewrites queries cannot affect the role binding.
+- Telemetry / lint / budget middleware reads the user's logical query, not the plumbing.
 
-**Recommendation: user middleware wraps the role-binding middleware** (outermost = user middleware, innermost = role binding → DB). This means:
+The only way to bypass `SET LOCAL` is to subclass `SupabaseRuntime` itself — a code-review-visible action, not an accident.
 
-- Telemetry sees the user-issued logical query, not the SET LOCAL plumbing.
-- Lints / budgets evaluate against the logical query.
-- The SET LOCAL is invisible to user middleware (correct — it's an implementation detail of role binding).
-
-Document this in [`extension-package.md`](../extension-package.md).
+See [`decisions.md` C12](../decisions.md), [`extension-package.md`](../extension-package.md) §"Why `SET LOCAL` is below the middleware chain".
 
 ### 🟡 #9 — `TypeMaps` generation
 
@@ -353,15 +351,11 @@ Is `db.asAnon()` cheap (memoized handle, no IO) or expensive (acquires a connect
 
 **Recommendation: cheap — `db.asXxx()` returns a stateless role-bound `Db` handle.** Connection acquisition and transaction opening happen on `.runtime().execute(plan)` (or on entering the `.transaction()` callback, see #11). Users don't have to hoist; doing so is purely stylistic.
 
-### 🔴 #11 — Multi-statement transactions on a role-bound `Db`
+### ✅ #11 — Multi-statement transactions on a role-bound `Db` — DECIDED: `.transaction()` on each role-bound Db
 
-`createPost` reads the profile then inserts a post. Both must share a transaction (and the same SET LOCAL state). The current `db.asUser(jwt)` API has no obvious way to scope multiple statements.
+**Resolution:** `db.asUser(jwt).transaction(async (tx) => { ... })` where `tx: RoleBoundDb` is pinned to a single connection across the closure. The `SupabaseRuntime` subclass opens the transaction on the underlying connection and issues `SET LOCAL role = ...; SET LOCAL request.jwt.claims = ...;` once at transaction open. The closure runs against `tx`; on exit, COMMIT (or ROLLBACK on throw) resets the SET LOCAL state before the connection returns to the pool.
 
-**Recommendation: add `db.asUser(jwt).transaction(async (tx) => { ... })`** where `tx` is itself a role-bound `Db` pinned to a single connection across the closure. The `SET LOCAL role` and `SET LOCAL request.jwt.claims` are issued once when the transaction opens. On closure exit, COMMIT (or ROLLBACK on throw); the pool checkout returns to clean state.
-
-Same shape for `asAnon().transaction()` and `asServiceRole().transaction()`.
-
-Touches: [`extension-package.md`](../extension-package.md) §"Runtime facade" — add `.transaction()` to the `SupabaseDb` interface.
+Implementation reuses the base SQL runtime's `withTransaction` — the subclass override threads `SET LOCAL` into the transaction-open path. Same shape for `asAnon().transaction()` and `asServiceRole().transaction()`. See [`decisions.md` C12](../decisions.md), [`extension-package.md`](../extension-package.md) §"Implicit transaction".
 
 ### 🟡 #12 — `asUser(jwt).runtime()` lifecycle
 
@@ -369,25 +363,24 @@ Per-call construction or one-runtime-per-Db? Affects observability (where do you
 
 **Recommendation: one runtime per role-bound Db handle, lazily constructed on first `.runtime()` call.** Same shape as the base `postgres()` runtime. The role binding is at the connection-acquisition layer (driven by middleware), not at the runtime construction layer.
 
-### 🔴 #13 — JWT validation timing
+### ✅ #13 — JWT validation timing — DECIDED: eager, with async factory
 
-Eager (on `db.asUser(jwt)`) or lazy (on first query)?
+**Resolution:** JWT validation is **eager**. `db.asUser(jwt)` synchronously parses + validates the JWT (signature, expiry, audience if configured) and throws a typed `InvalidJwtError` if validation fails — before any connection is acquired. Lazy validation would defer errors to query time, where they get tangled with other query failures.
 
-**Recommendation: eager.** `db.asUser(jwt)` synchronously parses + validates the JWT (signature, expiry, audience if configured) and throws a typed `InvalidJwtError` if validation fails. Lazy validation defers errors to query time, where they get mixed up with other query failures. Eager is fail-fast and gives the application a single, narrow exception type to catch in HTTP middleware.
+To accommodate the `jwksUrl` warmup path (HTTP fetch on init), `supabase({...})` is **uniformly async**: it returns `Promise<SupabaseDb>` regardless of whether `jwtSecret` or `jwksUrl` is configured. The signing key is in hand before any `asUser(jwt)` call, so `asUser` stays sync. The alternative (sync-when-`jwtSecret` / async-when-`jwksUrl` API split) was rejected — minor ergonomic gain, real API churn.
 
-Caveat: if `jwksUrl` is configured, key fetching is async. Document the trade-off; recommend that long-running services cache the JWKS at startup.
+See [`decisions.md` C12](../decisions.md), [`extension-package.md`](../extension-package.md) §"Why the factory is async".
 
-Touches: [`extension-package.md`](../extension-package.md) §"Runtime facade" — `asUser` is sync, can throw `InvalidJwtError`.
+### ✅ #14 — Implicit transaction for `SET LOCAL` — DECIDED: every role-bound execute is in a transaction
 
-### 🔴 #14 — Implicit transaction for `SET LOCAL`
+**Resolution:** the `SupabaseRuntime.execute()` override wraps every role-bound call in a transaction:
 
-`SET LOCAL` requires an open transaction. A single-statement `asUser(jwt).runtime().execute(plan)` call must therefore open a transaction implicitly.
+- **Single-statement** (`db.asUser(jwt).sql.from(...)...build()`): `BEGIN; SET LOCAL role; SET LOCAL request.jwt.claims; <query>; COMMIT;` — one implicit transaction per execute.
+- **Multi-statement** (`db.asUser(jwt).transaction(...)`, design hole #11): one `BEGIN; SET LOCAL …;` at open, COMMIT/ROLLBACK at close.
 
-**Recommendation: every role-bound query path opens its own transaction.** For single-statement calls (no `.transaction()`), the supabase middleware wraps the execute in `BEGIN; SET LOCAL …; <query>; COMMIT;`. For multi-statement `.transaction(async (tx) => …)`, the transaction wraps the whole closure with one `BEGIN` / `SET LOCAL` / `COMMIT` cycle.
+`SET LOCAL` never outlives its transaction. Transaction commit/rollback resets it before the connection returns to the pool — the RLS-bypass-footgun is eliminated structurally, not by documentation.
 
-This is also the RLS-bypass-footgun mitigation: by never leaving SET LOCAL state outside a transaction, the next pool checkout always sees clean state. Document loudly.
-
-Touches: [`extension-package.md`](../extension-package.md) §"Pool considerations" — already mentions this; needs the "always-in-a-txn" rule made explicit.
+See [`decisions.md` C12](../decisions.md), [`extension-package.md`](../extension-package.md) §"Implicit transaction".
 
 ## Pinned mirror (`migrations/supabase/contract.json`, `contract.d.ts`)
 
@@ -464,11 +457,11 @@ Touches: [`extension-package.md`](../extension-package.md) — remove the `supab
 | 3 | `onDelete` on cross-contract FKs | ✅ Decided | Permit; no diagnostic (see `.agents/rules/explicit-opt-in-over-diagnostics.mdc`) |
 | 4 | Composite/named uniques | ✅ Resolved | DSL already covers via `.attributes(...)`; example app was wrong |
 | 5 | RLS predicate qualified-table semantics | ✅ Decided | TS gets `ref()`; PSL stays verbatim in v0.1 |
-| 7 | `middleware` on SupabaseRuntimeOptions | 🔴 Open | Add it |
-| 8 | Middleware ordering vs role-binding | 🔴 Open | User middleware outermost |
-| 11 | Multi-statement transactions | 🔴 Open | `.transaction(async tx => …)` on each role-bound Db |
-| 13 | JWT validation timing | 🔴 Open | Eager on `asUser(jwt)` |
-| 14 | Implicit transaction for SET LOCAL | 🔴 Open | Every role-bound execute is in a txn |
+| 7 | `middleware` on SupabaseRuntimeOptions | ✅ Decided | Add it; subclass forwards to base runtime (C12) |
+| 8 | Middleware ordering vs role-binding | ✅ Decided | `SET LOCAL` is below the middleware chain — structural, not policy (C12) |
+| 11 | Multi-statement transactions | ✅ Decided | `.transaction(async tx => …)` on each role-bound Db; subclass override reuses `withTransaction` (C12) |
+| 13 | JWT validation timing | ✅ Decided | Eager `asUser(jwt)`; factory is uniformly `Promise<SupabaseDb>` to cover JWKS warmup (C12) |
+| 14 | Implicit transaction for SET LOCAL | ✅ Decided | Subclass `execute()` override always wraps in a transaction (C12) |
 | 15 | Function IR shape | ✅ Closed | Out of scope for v0.1; functions not contract elements (see decisions C4) |
 | 17 | `TypedContract<T>` accessor shape | ✅ Closed | Superseded by C5+C6+C7; extensions ship pre-built `/contract` with concrete typed handles |
 | 19 | RLS verifier check semantics | ✅ Decided | Content-addressed wire names (decisions C9 + C10); rename + tamper + equivalence all dissolve into name diff |
