@@ -16,10 +16,11 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'pathe';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   ALL_CELLS,
   type CellId,
+  type CommandRun,
   cellLabel,
   createJourneyProject,
   type JourneyProject,
@@ -30,11 +31,11 @@ describe.each(
 )('init-journey · $label', ({ cell }) => {
   let project: JourneyProject;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     project = await createJourneyProject(cell);
-  });
+  }, 240_000);
 
-  afterEach(() => {
+  afterAll(() => {
     project?.cleanup();
   });
 
@@ -44,6 +45,15 @@ describe.each(
     expectScaffoldedFiles(project);
     expectSchemaFile(project, cell);
     expectConfigFile(project, cell);
+  });
+
+  it('step 2 (install): pnpm install succeeds with isolated linker', () => {
+    const install = project.installResult;
+    expect(install, 'install was skipped — harness option mismatch').not.toBeNull();
+    if (install === null) return;
+    expect(install.exitCode, formatInstallDiagnostic(project, install)).toBe(0);
+
+    expectFacadeIsResolvable(project);
   });
 });
 
@@ -93,6 +103,13 @@ function schemaPath(cell: CellId): string {
   return cell.authoring === 'typescript' ? 'prisma/contract.ts' : 'prisma/contract.prisma';
 }
 
+function expectFacadeIsResolvable(project: JourneyProject): void {
+  const facadeName =
+    project.cell.target === 'mongo' ? '@prisma-next/mongo' : '@prisma-next/postgres';
+  const facadePath = join(project.dir, 'node_modules', facadeName, 'package.json');
+  expect(existsSync(facadePath), `facade package not installed at ${facadePath}`).toBe(true);
+}
+
 function formatInitDiagnostic(project: JourneyProject): string {
   return [
     `prisma-next init failed for ${cellLabel(project.cell)}`,
@@ -101,6 +118,18 @@ function formatInitDiagnostic(project: JourneyProject): string {
     indent(project.initResult.stdout, '    '),
     '  stderr:',
     indent(project.initResult.stderr, '    '),
+  ].join('\n');
+}
+
+function formatInstallDiagnostic(project: JourneyProject, install: CommandRun): string {
+  return [
+    `pnpm install failed for ${cellLabel(project.cell)}`,
+    `  exit code: ${install.exitCode}`,
+    `  cwd: ${project.dir}`,
+    '  stdout:',
+    indent(install.stdout, '    '),
+    '  stderr:',
+    indent(install.stderr, '    '),
   ].join('\n');
 }
 

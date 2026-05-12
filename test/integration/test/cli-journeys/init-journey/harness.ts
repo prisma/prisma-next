@@ -15,8 +15,17 @@
  */
 
 import { execFile } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { join, resolve } from 'pathe';
 
@@ -29,6 +38,26 @@ const execFileAsync = promisify(execFile);
  */
 const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../../../..');
 const CLI_BIN = join(WORKSPACE_ROOT, 'packages/1-framework/3-tooling/cli/dist/cli.js');
+
+/**
+ * Shared cache root for the journey runs. Lives outside the repo (under
+ * `~/.cache/pn-journey/`) for two reasons:
+ *
+ *  1. Path length. pnpm's content-addressable store encodes the **absolute**
+ *     tarball path into the cached index filenames (using `+` as separator).
+ *     A cache dir deep inside a long worktree path (e.g.
+ *     `…/prisma-next-ws/worktrees/tml-2486-…/`) overflows the OS filename
+ *     limit (`ENAMETOOLONG`). A short, stable prefix keeps things under
+ *     the 255-char limit.
+ *  2. Cross-run reuse. Repeated test runs hit the cache instead of repacking
+ *     every workspace package.
+ *
+ * The tarball cache and the dedicated pnpm store sit side-by-side under
+ * the same parent so their relative path encoding stays short.
+ */
+const JOURNEY_CACHE_ROOT = join(homedir(), '.cache', 'pn-journey');
+const TARBALL_CACHE_DIR = join(JOURNEY_CACHE_ROOT, 'tarballs');
+const PNPM_STORE_DIR = join(JOURNEY_CACHE_ROOT, 'pnpm-store');
 
 export type Target = 'postgres' | 'mongo';
 export type Authoring = 'psl' | 'typescript';
@@ -66,47 +95,64 @@ export interface JourneyProject {
   readonly cell: CellId;
   /** Result of the `prisma-next init` invocation that materialised the project. */
   readonly initResult: CommandRun;
+  /** Result of the `pnpm install` invocation, or `null` when install was skipped. */
+  readonly installResult: CommandRun | null;
   /** Tear down the tmpdir (idempotent). */
   cleanup(): void;
 }
 
 interface CreateJourneyProjectOptions {
   /**
-   * Skip `pnpm install` + contract emission inside `init` (i.e. `--no-install`).
-   * The journey owns the install + emit phases separately so each can be asserted
-   * independently. Defaults to `true`.
+   * Whether to run `pnpm install` after the scaffold lands. The install
+   * resolves every `@prisma-next/*` dep against the workspace tarballs at
+   * {@link TARBALL_CACHE_DIR} and uses `node-linker=isolated` so transitive
+   * workspace packages are not hoisted into the tmpdir's top-level
+   * `node_modules` — the exact pnpm layout that TML-2485 broke under.
+   * Defaults to `true`.
    */
-  readonly skipInstall?: boolean;
+  readonly install?: boolean;
 }
 
 /**
  * Materialises a fresh project tmpdir, writes a minimal `package.json` (init
- * requires one to attach to), and runs `prisma-next init --target <t>
- * --authoring <a> --yes` via the workspace-built CLI binary as a real
- * subprocess. Returns a handle for the caller to drive subsequent journey
- * steps and a `cleanup()` for the test's `afterEach`/`afterAll`.
+ * requires one to attach to), runs `prisma-next init --target <t> --authoring
+ * <a> --yes --no-install` via the workspace-built CLI binary as a real
+ * subprocess, then optionally runs `pnpm install` against the workspace's
+ * pre-packed tarballs with `node-linker=isolated`.
+ *
+ * The install step is what keeps TML-2485-class bugs (pnpm's isolated linker
+ * hiding transitive workspace packages from the user's top-level
+ * `node_modules`) in the failure surface. A shortcut using the workspace's
+ * hoisted `node_modules` would silently mask them.
  */
 export async function createJourneyProject(
   cell: CellId,
   options: CreateJourneyProjectOptions = {},
 ): Promise<JourneyProject> {
-  const { skipInstall = true } = options;
+  const { install = true } = options;
 
   const dir = mkdtempSync(join(tmpdir(), `pn-journey-${cell.target}-${cell.authoring}-`));
   writeMinimalPackageJson(dir);
 
   const target = cell.target === 'mongo' ? 'mongodb' : 'postgres';
-  const args = [CLI_BIN, 'init', '--target', target, '--authoring', cell.authoring, '--yes'];
-  if (skipInstall) {
-    args.push('--no-install');
-  }
+  const initResult = await runNode(
+    [CLI_BIN, 'init', '--target', target, '--authoring', cell.authoring, '--yes', '--no-install'],
+    dir,
+  );
 
-  const initResult = await runNode(args, dir);
+  let installResult: CommandRun | null = null;
+  if (install && initResult.exitCode === 0) {
+    const tarballs = await prepareWorkspaceTarballs();
+    rewritePackageJsonForTarballs(dir, cell, tarballs);
+    writeIsolatedNpmrc(dir);
+    installResult = await runPnpm(['install', '--no-frozen-lockfile'], dir);
+  }
 
   return {
     dir,
     cell,
     initResult,
+    installResult,
     cleanup() {
       rmSync(dir, { recursive: true, force: true });
     },
@@ -130,14 +176,271 @@ function writeMinimalPackageJson(dir: string): void {
  * rejection — we normalise both shapes into `CommandRun`.
  */
 async function runNode(args: readonly string[], cwd: string): Promise<CommandRun> {
+  return runExec('node', args, cwd);
+}
+
+async function runPnpm(args: readonly string[], cwd: string): Promise<CommandRun> {
+  return runExec('pnpm', args, cwd, { maxBufferMb: 64 });
+}
+
+interface RunExecOptions {
+  readonly maxBufferMb?: number;
+}
+
+async function runExec(
+  bin: string,
+  args: readonly string[],
+  cwd: string,
+  options: RunExecOptions = {},
+): Promise<CommandRun> {
+  const maxBuffer = (options.maxBufferMb ?? 16) * 1024 * 1024;
   try {
-    const { stdout, stderr } = await execFileAsync('node', args as string[], { cwd });
+    const { stdout, stderr } = await execFileAsync(bin, args as string[], { cwd, maxBuffer });
     return { exitCode: 0, stdout, stderr };
   } catch (error) {
     const e = error as { code?: number; stdout?: string; stderr?: string; message?: string };
     const exitCode = typeof e.code === 'number' ? e.code : 1;
     return { exitCode, stdout: e.stdout ?? '', stderr: e.stderr ?? e.message ?? '' };
   }
+}
+
+// --- Workspace tarball preparation -----------------------------------------
+//
+// Section drives the Phase A.2 strategy: rather than installing
+// `@prisma-next/*` packages from npm (where workspace versions are unpublished)
+// or symlinking workspace source dirs (which would leak the workspace's
+// hoisted `node_modules`), we pack each workspace package into a tarball once
+// per test session and have the tmpdir install against those tarballs.
+//
+// This preserves the exact pnpm layout a real user gets (isolated linker,
+// only declared deps visible at top level) — the layout where TML-2485 and
+// its siblings live.
+
+interface WorkspacePackage {
+  readonly name: string;
+  readonly version: string;
+  readonly dir: string;
+}
+
+interface PackedTarballs {
+  readonly byName: ReadonlyMap<string, string>;
+}
+
+let workspaceTarballPromise: Promise<PackedTarballs> | null = null;
+
+async function prepareWorkspaceTarballs(): Promise<PackedTarballs> {
+  if (workspaceTarballPromise === null) {
+    workspaceTarballPromise = packAllWorkspacePackages();
+  }
+  return workspaceTarballPromise;
+}
+
+async function packAllWorkspacePackages(): Promise<PackedTarballs> {
+  mkdirSync(TARBALL_CACHE_DIR, { recursive: true });
+  mkdirSync(PNPM_STORE_DIR, { recursive: true });
+  const packages = discoverWorkspacePackages();
+
+  const byName = new Map<string, string>();
+  const concurrency = 6;
+  let cursor = 0;
+  const workers: Promise<void>[] = [];
+  for (let i = 0; i < concurrency; i++) {
+    workers.push(
+      (async () => {
+        while (true) {
+          const idx = cursor++;
+          if (idx >= packages.length) return;
+          const pkg = packages[idx];
+          if (pkg === undefined) return;
+          const tarball = await packIfStale(pkg);
+          byName.set(pkg.name, tarball);
+        }
+      })(),
+    );
+  }
+  await Promise.all(workers);
+  return { byName };
+}
+
+function discoverWorkspacePackages(): WorkspacePackage[] {
+  const packagesRoot = join(WORKSPACE_ROOT, 'packages');
+  const found: WorkspacePackage[] = [];
+  walkForPackageJsons(packagesRoot, found, 0);
+  return found;
+}
+
+function walkForPackageJsons(dir: string, found: WorkspacePackage[], depth: number): void {
+  if (depth > 6) return;
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return;
+  }
+  if (entries.includes('package.json')) {
+    const pkgJsonPath = join(dir, 'package.json');
+    try {
+      const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8')) as {
+        name?: string;
+        version?: string;
+        private?: boolean;
+      };
+      if (typeof pkg.name === 'string' && pkg.name.startsWith('@prisma-next/')) {
+        found.push({ name: pkg.name, version: pkg.version ?? '0.0.0', dir });
+      } else if (pkg.name === 'prisma-next') {
+        found.push({ name: pkg.name, version: pkg.version ?? '0.0.0', dir });
+      }
+    } catch {
+      // Ignore malformed package.json files; we only care about ours.
+    }
+    return;
+  }
+  for (const entry of entries) {
+    if (entry === 'node_modules' || entry.startsWith('dist-') || entry === 'dist') continue;
+    const child = join(dir, entry);
+    let stat: ReturnType<typeof statSync>;
+    try {
+      stat = statSync(child);
+    } catch {
+      continue;
+    }
+    if (stat.isDirectory()) {
+      walkForPackageJsons(child, found, depth + 1);
+    }
+  }
+}
+
+async function packIfStale(pkg: WorkspacePackage): Promise<string> {
+  const stableName = pkg.name.replace(/^@/, '').replace(/\//g, '-');
+  const tarballPath = join(TARBALL_CACHE_DIR, `${stableName}.tgz`);
+
+  if (existsSync(tarballPath) && !isStale(pkg, tarballPath)) {
+    return tarballPath;
+  }
+
+  // `pnpm pack` rewrites the source `package.json` in place to drop fields
+  // that are redundant when `exports` is present (e.g. `main`, `module`).
+  // That is fine for the published tarball but a non-starter inside a git
+  // worktree — it would leave the workspace dirty after every test run.
+  // Snapshot the raw bytes, restore them after pack.
+  const pkgJsonPath = join(pkg.dir, 'package.json');
+  const original = readFileSync(pkgJsonPath);
+  try {
+    await runExec('pnpm', ['pack', '--pack-destination', TARBALL_CACHE_DIR], pkg.dir);
+  } finally {
+    writeFileSync(pkgJsonPath, original);
+  }
+
+  // pnpm pack uses its own filename convention (`<scope>-<name>-<version>.tgz`);
+  // rename to our stable name so the lookup-by-name above stays trivial.
+  const expectedPnpmName = `${pkg.name.replace(/^@/, '').replace(/\//g, '-')}-${pkg.version}.tgz`;
+  const expectedPath = join(TARBALL_CACHE_DIR, expectedPnpmName);
+  if (existsSync(expectedPath) && expectedPath !== tarballPath) {
+    rmSync(tarballPath, { force: true });
+    writeFileSync(tarballPath, readFileSync(expectedPath));
+    rmSync(expectedPath, { force: true });
+  }
+  return tarballPath;
+}
+
+function isStale(pkg: WorkspacePackage, tarballPath: string): boolean {
+  const tarballMtime = statSync(tarballPath).mtimeMs;
+  return newestMtime(pkg.dir) > tarballMtime;
+}
+
+function newestMtime(dir: string): number {
+  let newest = 0;
+  const stack: string[] = [dir];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === undefined) break;
+    let entries: string[];
+    try {
+      entries = readdirSync(current);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry === 'node_modules' || entry.startsWith('dist-') || entry === '.turbo') continue;
+      const child = join(current, entry);
+      let stat: ReturnType<typeof statSync>;
+      try {
+        stat = statSync(child);
+      } catch {
+        continue;
+      }
+      if (stat.isDirectory()) {
+        stack.push(child);
+      } else if (stat.mtimeMs > newest) {
+        newest = stat.mtimeMs;
+      }
+    }
+  }
+  return newest;
+}
+
+function rewritePackageJsonForTarballs(dir: string, cell: CellId, tarballs: PackedTarballs): void {
+  const pkgJsonPath = join(dir, 'package.json');
+  const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8')) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+    pnpm?: { overrides?: Record<string, string> };
+  };
+
+  const facade = cell.target === 'mongo' ? '@prisma-next/mongo' : '@prisma-next/postgres';
+  const facadeTarball = requireTarball(tarballs, facade);
+  const prismaNextTarball = requireTarball(tarballs, 'prisma-next');
+
+  pkg.dependencies = {
+    ...(pkg.dependencies ?? {}),
+    [facade]: `file:${facadeTarball}`,
+    dotenv: '^16.4.5',
+  };
+  pkg.devDependencies = {
+    ...(pkg.devDependencies ?? {}),
+    'prisma-next': `file:${prismaNextTarball}`,
+    '@types/node': '^24.10.4',
+    typescript: '^5.9.3',
+  };
+
+  // Every workspace `@prisma-next/*` package becomes a pnpm override pointing
+  // at its tarball so transitive resolution stays within the cache, never
+  // reaching the public registry. The presence of this block does not mean
+  // every package is installed — only ones reached from the dep graph are
+  // unpacked into `node_modules`. Isolated linker still hides them from the
+  // user's top-level `node_modules` unless they're a direct dep.
+  const overrides: Record<string, string> = {};
+  for (const [name, tarball] of tarballs.byName) {
+    overrides[name] = `file:${tarball}`;
+  }
+  pkg.pnpm = { ...(pkg.pnpm ?? {}), overrides };
+
+  writeFileSync(pkgJsonPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
+}
+
+function requireTarball(tarballs: PackedTarballs, name: string): string {
+  const path = tarballs.byName.get(name);
+  if (path === undefined) {
+    throw new Error(
+      `prepareWorkspaceTarballs() missing required tarball for "${name}". ` +
+        'Did the workspace stop publishing it?',
+    );
+  }
+  return path;
+}
+
+function writeIsolatedNpmrc(dir: string): void {
+  const contents = [
+    'node-linker=isolated',
+    'auto-install-peers=true',
+    'strict-peer-dependencies=false',
+    'prefer-workspace-packages=false',
+    // Side-load the pnpm store next to the tarball cache so the encoded
+    // relative path stays short (avoids ENAMETOOLONG under deep worktrees).
+    `store-dir=${PNPM_STORE_DIR}`,
+    '',
+  ].join('\n');
+  writeFileSync(join(dir, '.npmrc'), contents, 'utf-8');
 }
 
 /**
