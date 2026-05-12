@@ -5,7 +5,7 @@ import {
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
-import { arktypeJsonRuntime } from '@prisma-next/extension-arktype-json/runtime';
+import arktypeJsonRuntime from '@prisma-next/extension-arktype-json/runtime';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
