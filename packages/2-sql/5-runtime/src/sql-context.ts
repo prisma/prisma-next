@@ -452,8 +452,15 @@ function buildContractCodecRegistry(
       typeParams: typeInstance.typeParams as JsonValue,
     };
     const key = refKeyOf(ref);
-    usedAtByKey.set(key, [...(typeRefSites.get(typeName) ?? [])]);
-    nameByKey.set(key, typeName);
+    const sites = typeRefSites.get(typeName) ?? [];
+    const existing = usedAtByKey.get(key);
+    // Two `storage.types` aliases that canonicalize to the same (codecId, typeParams) share a single codec instance via the resolver. Append sites instead of replacing so a stateful codec reading the aggregated site list sees every column behind every alias rather than just the last one.
+    if (existing) {
+      existing.push(...sites);
+    } else {
+      usedAtByKey.set(key, [...sites]);
+      nameByKey.set(key, typeName);
+    }
   }
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {

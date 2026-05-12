@@ -9,7 +9,7 @@ import type { SqlRuntimeExtensionDescriptor } from '../src/sql-context';
 import { createStubAdapter, createTestContext } from './utils';
 
 /**
- * `forColumn(table, column)` dispatch must materialize a fresh codec instance with a column-specific `SqlCodecInstanceContext`.
+ * `forColumn(table, column)` dispatch materializes a shared codec instance keyed by `(codecId, typeParams)` and exposes it through a `SqlCodecInstanceContext` whose `name` carries the shared marker (`<codec:codecId>`, `<col:Table.column>`, or the `storage.types` alias). Multiple columns whose `CodecRef`s canonicalize to the same key share that single instance and aggregate their sites into `usedAt`.
  */
 describe('buildContractCodecRegistry — per-column codec instance context', () => {
   function createCtxCapturingExtension(captures: SqlCodecInstanceContext[]): {
@@ -315,6 +315,35 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
     expect(codec).toBeDefined();
     // Pre-population uses the typeRef ctx — the cached codec's meta.ctxName carries the `storage.types` name.
     expect((codec as Codec & { meta: { ctxName: string } }).meta.ctxName).toBe('V1536');
+
+    // The shared-per-codec invariant: forColumn lookups on either typeRef-sharing column resolve to the very same instance returned by forCodecRef. A regression that re-materialised per-column instances would still pass the existence/name asserts above; identity is what guards against that.
+    const fromDoc = context.contractCodecs.forColumn('Doc', 'embedding');
+    const fromPage = context.contractCodecs.forColumn('Page', 'embedding');
+    expect(fromDoc).toBe(codec);
+    expect(fromPage).toBe(codec);
+  });
+
+  it('storage.types aliases that canonicalize to the same CodecRef merge their usedAt sites', () => {
+    const { descriptor } = createCountingVectorExtension();
+    // V1536A and V1536B both resolve to (pgvector/vector@1, { length: 1536 }) — i.e. one shared codec instance.
+    const contract = contractWithVector(
+      { Doc: { typeRef: 'V1536A' }, Page: { typeRef: 'V1536B' } },
+      { V1536A: { length: 1536 }, V1536B: { length: 1536 } },
+    );
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [descriptor],
+    });
+
+    const codec = context.contractCodecs.forCodecRef({
+      codecId: 'pgvector/vector@1',
+      typeParams: { length: 1536 },
+    });
+
+    expect(codec).toBeDefined();
+    // forColumn on both columns should reach the same instance.
+    expect(context.contractCodecs.forColumn('Doc', 'embedding')).toBe(codec);
+    expect(context.contractCodecs.forColumn('Page', 'embedding')).toBe(codec);
   });
 
   it('throws RUNTIME.CODEC_DESCRIPTOR_MISSING when the codecId is unknown to the resolver', () => {
