@@ -223,12 +223,14 @@
                 "field": "summary"
               }
             ],
+            "kind": "mongo-index",
             "partialFilterExpression": {
               "kind": "article"
             },
             "unique": true
           }
         ],
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -299,11 +301,13 @@
               "title"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
       },
       "users": {
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -362,12 +366,13 @@
               "name"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
       }
     },
-    "storageHash": "sha256:cea978351276ff06d725c817bb9b6405efa78c6b2d108f72d43628bee6f74821"
+    "storageHash": "sha256:0d192ffb03dfdd08ebb65ca08f11df81b67258fb422de3019a66f27c80efc64b"
   },
   "capabilities": {},
   "extensionPacks": {},

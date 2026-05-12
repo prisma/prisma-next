@@ -13,13 +13,12 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:cca946d0df0e9e671b53c8ce52aa12192538ae44776c4c5e3f76fefa08f4fc08'>;
+  StorageHashBase<'sha256:3a71ce514d0a786db06aa4b7d616dc1a0fbb682e2c637c59700a997054deeccb'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
 
 export type CodecTypes = MongoCodecTypes;
-export type OperationTypes = Record<string, never>;
 
 export type AddressOutput = {
   readonly street: CodecTypes['mongo/string@1']['output'];
@@ -77,13 +76,15 @@ export type FieldInputTypes = {
     readonly address: AddressInput | null;
   };
 };
-export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes, FieldInputTypes>;
+export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;
 
 type ContractBase = ContractType<
   {
     readonly collections: {
       readonly users: {
+        readonly kind: 'mongo-collection';
         readonly validator: {
+          readonly kind: 'mongo-validator';
           readonly jsonSchema: {
             readonly bsonType: 'object';
             readonly properties: {
@@ -114,11 +115,19 @@ type ContractBase = ContractType<
         };
       };
       readonly posts: {
+        readonly kind: 'mongo-collection';
         readonly indexes: readonly [
-          { readonly keys: readonly [{ readonly field: 'authorId'; readonly direction: 1 }] },
-          { readonly keys: readonly [{ readonly field: 'createdAt'; readonly direction: -1 }] },
+          {
+            readonly kind: 'mongo-index';
+            readonly keys: readonly [{ readonly field: 'authorId'; readonly direction: 1 }];
+          },
+          {
+            readonly kind: 'mongo-index';
+            readonly keys: readonly [{ readonly field: 'createdAt'; readonly direction: -1 }];
+          },
         ];
         readonly validator: {
+          readonly kind: 'mongo-validator';
           readonly jsonSchema: {
             readonly bsonType: 'object';
             readonly properties: {
