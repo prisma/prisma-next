@@ -30,13 +30,9 @@ describe('postgis descriptor', () => {
     });
   });
 
-  it('declares postgis as a database init dependency', () => {
-    const init = postgisExtensionDescriptor.databaseDependencies?.init;
-    expect(init).toBeDefined();
-    expect(init?.[0]?.id).toBe('postgres.extension.postgis');
-    expect(init?.[0]?.install?.[0]?.execute?.[0]?.sql).toContain(
-      'CREATE EXTENSION IF NOT EXISTS postgis',
-    );
+  it('exposes the postgis baseline contract space with the install-postgis invariant', () => {
+    const headRef = postgisExtensionDescriptor.contractSpace?.headRef;
+    expect(headRef?.invariants).toContain('postgis:install-postgis-v1');
   });
 
   it(

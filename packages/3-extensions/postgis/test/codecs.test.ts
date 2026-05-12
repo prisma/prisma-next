@@ -1,30 +1,32 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { codecDefinitions } from '../src/core/codecs';
+import { pgGeometryColumn, postgisGeometryDescriptor } from '../src/core/codecs';
 import type { Geometry } from '../src/core/geojson';
 
-// The geometry codec authors `encode`/`decode` synchronously, but the
-// `codec()` factory in `relational-core` lifts both methods to
-// `Promise`-returning at the boundary. The tests below cast through the
-// Promise-returning shape and `await` every call so unit-level coverage
-// stays aligned with the codec contract.
+// The postgis codec authors `encode`/`decode` synchronously; codecs
+// route through `Promise`-returning methods at the boundary. The tests
+// below cast through the Promise-returning shape and `await` every
+// call so unit-level coverage stays aligned with the codec contract.
 type AsyncGeometryCodec = {
   readonly encode: (value: Geometry) => Promise<string>;
   readonly decode: (wire: string) => Promise<Geometry>;
+  readonly encodeJson: (value: Geometry) => JsonValue;
+  readonly decodeJson: (json: JsonValue) => Geometry;
 };
 
-function asAsyncCodec(): AsyncGeometryCodec {
-  return codecDefinitions.geometry.codec as unknown as AsyncGeometryCodec;
+function asAsyncCodec(srid = 4326): AsyncGeometryCodec {
+  return postgisGeometryDescriptor.factory({ srid })({
+    name: 'test',
+  }) as unknown as AsyncGeometryCodec;
 }
 
 describe('postgis codecs', () => {
   it(
-    'has geometry codec registered',
+    'has geometry descriptor registered',
     () => {
-      const def = codecDefinitions.geometry;
-      expect(def).toBeDefined();
-      expect(def.typeId).toBe('pg/geometry@1');
-      expect(def.codec.targetTypes).toEqual(['geometry']);
+      expect(postgisGeometryDescriptor.codecId).toBe('pg/geometry@1');
+      expect(postgisGeometryDescriptor.targetTypes).toEqual(['geometry']);
     },
     timeouts.default,
   );
@@ -121,14 +123,12 @@ describe('postgis codecs', () => {
   describe('decode (EWKB hex → Geometry)', () => {
     it('decodes a Point without SRID (LE)', async () => {
       const c = asAsyncCodec();
-      // LE byte order, type=Point (1), x=1.0, y=2.0
       const hex = '0101000000000000000000F03F0000000000000040';
       expect(await c.decode(hex)).toEqual({ type: 'Point', coordinates: [1, 2] });
     });
 
     it('decodes a Point with SRID 4326 (LE)', async () => {
       const c = asAsyncCodec();
-      // LE byte order, type=Point|SRID flag (0x20000001), srid=4326, x=1.0, y=2.0
       const hex = '0101000020E6100000000000000000F03F0000000000000040';
       expect(await c.decode(hex)).toEqual({
         type: 'Point',
@@ -152,6 +152,43 @@ describe('postgis codecs', () => {
     it('rejects malformed hex bytes', async () => {
       const c = asAsyncCodec();
       await expect(c.decode('ZZ')).rejects.toThrow('invalid hex byte');
+    });
+  });
+
+  describe('pgGeometryColumn helper', () => {
+    it('produces a ColumnSpec with the codec id, geometry nativeType, and srid typeParams', () => {
+      const spec = pgGeometryColumn({ srid: 4326 });
+      expect(spec.codecId).toBe('pg/geometry@1');
+      expect(spec.nativeType).toBe('geometry');
+      expect(spec.typeParams).toEqual({ srid: 4326 });
+    });
+
+    it('throws RangeError on non-integer srid', () => {
+      expect(() => pgGeometryColumn({ srid: 1.5 })).toThrow(RangeError);
+    });
+
+    it('throws RangeError on negative srid', () => {
+      expect(() => pgGeometryColumn({ srid: -1 })).toThrow(RangeError);
+    });
+  });
+
+  describe('paramsSchema', () => {
+    const validate = (params: unknown) =>
+      postgisGeometryDescriptor.paramsSchema['~standard'].validate(params);
+
+    it('accepts a non-negative integer srid', () => {
+      const result = validate({ srid: 4326 });
+      expect('issues' in result ? result.issues : null).toBeFalsy();
+    });
+
+    it('rejects non-integer srid', () => {
+      const result = validate({ srid: 1.5 });
+      expect('issues' in result && result.issues).toBeTruthy();
+    });
+
+    it('rejects negative srid', () => {
+      const result = validate({ srid: -1 });
+      expect('issues' in result && result.issues).toBeTruthy();
     });
   });
 });

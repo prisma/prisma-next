@@ -1,5 +1,5 @@
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
-import { ColumnRef, createCodecRegistry, OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
+import { ColumnRef, OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import postgisDescriptor from '../src/exports/runtime';
 
@@ -12,18 +12,15 @@ describe('postgis operations', () => {
     expect(postgisDescriptor.version).toBe('0.0.1');
   });
 
-  it('descriptor provides codec registry with geometry codec', () => {
-    const codecs = postgisDescriptor.codecs();
+  it('descriptor exposes a geometry codec descriptor', () => {
+    const codecs = postgisDescriptor.codecs!();
     expect(codecs).toBeDefined();
-    const geometryCodec = codecs.get('pg/geometry@1');
-    expect(geometryCodec).toBeDefined();
-    expect(geometryCodec?.id).toBe('pg/geometry@1');
+    expect(codecs.some((c) => c.codecId === 'pg/geometry@1')).toBe(true);
   });
 
   it('exposes the seven geospatial operations', () => {
     const operations = postgisDescriptor.queryOperations!();
-    const methodNames = operations.map((op) => op.method).sort();
-    expect(methodNames).toEqual(
+    expect(Object.keys(operations).sort()).toEqual(
       [
         'contains',
         'distance',
@@ -49,7 +46,7 @@ describe('postgis operations', () => {
     ];
 
     for (const [method, template] of cases) {
-      const op = operations.find((o) => o.method === method);
+      const op = operations[method];
       expect(op, method).toBeDefined();
       const expr = op?.impl(
         ParamRef.of({ type: 'Point', coordinates: [0, 0] }, { codecId: 'pg/geometry@1' }) as never,
@@ -95,7 +92,7 @@ describe('postgis operations', () => {
       'intersectsBbox',
     ] as const;
     for (const method of binaryMethods) {
-      const op = operations.find((o) => o.method === method);
+      const op = operations[method];
       expect(op, method).toBeDefined();
       const expr = op?.impl(
         columnSelf as never,
@@ -133,24 +130,13 @@ describe('postgis operations', () => {
   it('operations register into a SqlOperationRegistry', () => {
     const operations = postgisDescriptor.queryOperations!();
     const registry = createSqlOperationRegistry();
-    for (const op of operations) registry.register(op);
+    for (const [method, entry] of Object.entries(operations)) {
+      registry.register(method, entry);
+    }
 
     const entries = registry.entries();
     expect(entries['distance']).toBeDefined();
     expect(entries['dwithin']).toBeDefined();
     expect(entries['intersectsBbox']).toBeDefined();
-  });
-
-  it('codecs register into a CodecRegistry', () => {
-    const descriptorCodecs = postgisDescriptor.codecs();
-    const registry = createCodecRegistry();
-    for (const codec of descriptorCodecs.values()) registry.register(codec);
-    expect(registry.get('pg/geometry@1')).toBeDefined();
-  });
-
-  it('instance is minimal (identity only)', () => {
-    const instance = postgisDescriptor.create();
-    expect(instance.familyId).toBe('sql');
-    expect(instance.targetId).toBe('postgres');
   });
 });
