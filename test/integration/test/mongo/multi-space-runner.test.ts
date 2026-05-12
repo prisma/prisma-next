@@ -7,6 +7,7 @@ import {
 import {
   APP_SPACE_ID,
   hasMigrations,
+  hasMultiSpaceRunner,
   type MultiSpaceRunnerPerSpaceOptions,
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
@@ -41,7 +42,9 @@ function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
 
 function makeRunner() {
   if (!hasMigrations(mongoTargetDescriptor)) throw new Error('expected migrations');
-  return mongoTargetDescriptor.migrations.createRunner(makeFamily());
+  const runner = mongoTargetDescriptor.migrations.createRunner(makeFamily());
+  if (!hasMultiSpaceRunner(runner)) throw new Error('expected multi-space-capable runner');
+  return runner;
 }
 
 function buildAppContract(): MongoContract {
