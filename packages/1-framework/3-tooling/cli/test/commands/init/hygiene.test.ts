@@ -8,6 +8,7 @@ import {
   REQUIRED_GITIGNORE_ENTRIES,
 } from '../../../src/commands/init/hygiene-gitignore';
 import {
+  ensureEsmModuleType,
   mergePackageScripts,
   REQUIRED_SCRIPTS,
 } from '../../../src/commands/init/hygiene-package-scripts';
@@ -221,5 +222,62 @@ describe('mergePackageScripts (FR3.5)', () => {
     const pkg = JSON.stringify({ name: 'app' }, null, 2);
     const { content } = mergePackageScripts(pkg, REQUIRED_SCRIPTS);
     expect(content?.endsWith('\n')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `"type": "module"` enforcement — TML-2494
+//
+// The scaffolded `prisma/db.ts` uses the ESM-only `with { type: 'json' }`
+// import attribute. Without `"type": "module"` in package.json Node either
+// emits a MODULE_TYPELESS_PACKAGE_JSON warning (Node 22+ with strip-types)
+// or hard-fails on older setups. `init` must align the manifest with the
+// code it scaffolds.
+// ---------------------------------------------------------------------------
+
+describe('ensureEsmModuleType (TML-2494)', () => {
+  it('adds "type": "module" when the field is missing', () => {
+    const pkg = JSON.stringify({ name: 'app' }, null, 2);
+    const { content, warning } = ensureEsmModuleType(pkg);
+    expect(warning).toBeNull();
+    expect(content).not.toBeNull();
+    const parsed = JSON.parse(content ?? '');
+    expect(parsed.type).toBe('module');
+  });
+
+  it('returns null content when "type": "module" is already set (idempotent)', () => {
+    const pkg = JSON.stringify({ name: 'app', type: 'module' }, null, 2);
+    const { content, warning } = ensureEsmModuleType(pkg);
+    expect(content).toBeNull();
+    expect(warning).toBeNull();
+  });
+
+  it('warns and skips when the user explicitly set "type": "commonjs"', () => {
+    const pkg = JSON.stringify({ name: 'app', type: 'commonjs' }, null, 2);
+    const { content, warning } = ensureEsmModuleType(pkg);
+    expect(content).toBeNull();
+    expect(warning).not.toBeNull();
+    expect(warning).toContain('"type": "commonjs"');
+    expect(warning).toContain('module');
+  });
+
+  it('preserves the trailing newline if the input had one', () => {
+    const pkg = `${JSON.stringify({ name: 'app' }, null, 2)}\n`;
+    const { content } = ensureEsmModuleType(pkg);
+    expect(content?.endsWith('\n')).toBe(true);
+  });
+
+  it('does not add a trailing newline if the input lacked one', () => {
+    const pkg = JSON.stringify({ name: 'app' }, null, 2);
+    const { content } = ensureEsmModuleType(pkg);
+    expect(content?.endsWith('\n')).toBe(false);
+  });
+
+  it('places "type" right after "name" for readable diffs when name is present', () => {
+    const pkg = JSON.stringify({ name: 'app', version: '1.0.0', dependencies: {} }, null, 2);
+    const { content } = ensureEsmModuleType(pkg);
+    expect(content).not.toBeNull();
+    const keys = Object.keys(JSON.parse(content ?? ''));
+    expect(keys).toEqual(['name', 'type', 'version', 'dependencies']);
   });
 });
