@@ -3,7 +3,7 @@ import type {
   MongoStorageCollection,
   MongoStorageCollectionOptions,
   MongoStorageIndex,
-  MongoStorageValidator,
+  MongoValidator,
 } from '@prisma-next/mongo-contract';
 import {
   MongoSchemaCollection,
@@ -28,7 +28,7 @@ function convertIndex(index: MongoStorageIndex): MongoSchemaIndex {
   });
 }
 
-function convertValidator(v: MongoStorageValidator): MongoSchemaValidator {
+function convertValidator(v: MongoValidator): MongoSchemaValidator {
   return new MongoSchemaValidator({
     jsonSchema: v.jsonSchema,
     validationLevel: v.validationLevel,

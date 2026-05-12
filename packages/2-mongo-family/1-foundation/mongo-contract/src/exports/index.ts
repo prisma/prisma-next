@@ -21,7 +21,6 @@ export type {
   MongoStorageCollection,
   MongoStorageCollectionOptions,
   MongoStorageIndex,
-  MongoStorageValidator,
   MongoTypeMaps,
   MongoTypeMapsPhantomKey,
   MongoWildcardProjection,
@@ -50,6 +49,12 @@ export type {
   MongoTimeSeriesGranularity,
 } from '../ir/mongo-time-series-collection-options';
 export { MongoTimeSeriesCollectionOptions } from '../ir/mongo-time-series-collection-options';
+export type {
+  MongoValidatorInput,
+  MongoValidatorValidationAction,
+  MongoValidatorValidationLevel,
+} from '../ir/mongo-validator';
+export { MongoValidator } from '../ir/mongo-validator';
 export type {
   ApplyScopeResult,
   PolymorphicIndexScope,

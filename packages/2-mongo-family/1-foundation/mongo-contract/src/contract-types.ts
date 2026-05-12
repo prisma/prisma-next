@@ -11,6 +11,7 @@ import type { MongoCollationOptionsInput } from './ir/mongo-collation-options';
 import type { MongoIndexOptionDefaultsInput } from './ir/mongo-index-option-defaults';
 import type { MongoIndexOptionsInput } from './ir/mongo-index-options';
 import type { MongoTimeSeriesCollectionOptionsInput } from './ir/mongo-time-series-collection-options';
+import type { MongoValidator } from './ir/mongo-validator';
 
 export type MongoIndexFieldValue = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
 
@@ -64,12 +65,6 @@ export interface MongoStorageIndex {
   readonly language_override?: string;
 }
 
-export interface MongoStorageValidator {
-  readonly jsonSchema: Record<string, unknown>;
-  readonly validationLevel: 'strict' | 'moderate';
-  readonly validationAction: 'error' | 'warn';
-}
-
 export interface MongoStorageCollectionOptions {
   readonly capped?: { size: number; max?: number };
   readonly timeseries?: {
@@ -84,7 +79,7 @@ export interface MongoStorageCollectionOptions {
 
 export interface MongoStorageCollection {
   readonly indexes?: ReadonlyArray<MongoStorageIndex>;
-  readonly validator?: MongoStorageValidator;
+  readonly validator?: MongoValidator;
   readonly options?: MongoStorageCollectionOptions;
 }
 

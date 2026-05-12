@@ -262,6 +262,7 @@ const MongoStorageIndexSchema = type({
 
 const MongoStorageValidatorSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-validator'",
   jsonSchema: 'Record<string, unknown>',
   validationLevel: "'strict' | 'moderate'",
   validationAction: "'error' | 'warn'",
