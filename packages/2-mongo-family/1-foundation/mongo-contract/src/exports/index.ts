@@ -7,11 +7,6 @@ export type {
   MongoChangeStreamPreAndPostImagesOptions,
   MongoClusteredCollectionKey,
   MongoClusteredCollectionOptions,
-  MongoCollationAlternate,
-  MongoCollationCaseFirst,
-  MongoCollationMaxVariable,
-  MongoCollationOptions,
-  MongoCollationStrength,
   MongoCollectionOptions,
   MongoContract,
   MongoContractWithTypeMaps,
@@ -38,6 +33,14 @@ export type {
   MongoTypeMapsPhantomKey,
   MongoWildcardProjection,
 } from '../contract-types';
+export type {
+  MongoCollationAlternate,
+  MongoCollationCaseFirst,
+  MongoCollationMaxVariable,
+  MongoCollationOptionsInput,
+  MongoCollationStrength,
+} from '../ir/mongo-collation-options';
+export { MongoCollationOptions } from '../ir/mongo-collation-options';
 export type {
   ApplyScopeResult,
   PolymorphicIndexScope,

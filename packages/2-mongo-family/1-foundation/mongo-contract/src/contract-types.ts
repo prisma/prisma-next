@@ -5,6 +5,7 @@ import type {
   ContractValueObject,
   StorageBase,
 } from '@prisma-next/contract/types';
+import type { MongoCollationOptionsInput } from './ir/mongo-collation-options';
 
 export type MongoIndexFieldValue = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
 
@@ -16,26 +17,6 @@ export type MongoJsonValue = MongoJsonPrimitive | readonly MongoJsonValue[] | Mo
 
 export type MongoJsonObject = {
   readonly [key: string]: MongoJsonValue;
-};
-
-export type MongoCollationCaseFirst = 'off' | 'upper' | 'lower';
-
-export type MongoCollationStrength = 1 | 2 | 3 | 4 | 5;
-
-export type MongoCollationAlternate = 'non-ignorable' | 'shifted';
-
-export type MongoCollationMaxVariable = 'punct' | 'space';
-
-export type MongoCollationOptions = {
-  readonly locale: string;
-  readonly caseLevel?: boolean;
-  readonly caseFirst?: MongoCollationCaseFirst;
-  readonly strength?: MongoCollationStrength;
-  readonly numericOrdering?: boolean;
-  readonly alternate?: MongoCollationAlternate;
-  readonly maxVariable?: MongoCollationMaxVariable;
-  readonly backwards?: boolean;
-  readonly normalization?: boolean;
 };
 
 export type MongoWildcardProjection = Readonly<Record<string, 0 | 1>>;
@@ -56,7 +37,7 @@ export type MongoIndexOptions = {
   readonly max?: number;
   readonly bucketSize?: number;
   readonly hidden?: boolean;
-  readonly collation?: MongoCollationOptions;
+  readonly collation?: MongoCollationOptionsInput;
   readonly wildcardProjection?: MongoWildcardProjection;
 };
 
@@ -97,7 +78,7 @@ export type MongoCollectionOptions = {
   readonly max?: number;
   readonly storageEngine?: MongoJsonObject;
   readonly indexOptionDefaults?: MongoIndexOptionDefaults;
-  readonly collation?: MongoCollationOptions;
+  readonly collation?: MongoCollationOptionsInput;
   readonly timeseries?: MongoTimeSeriesCollectionOptions;
   readonly clusteredIndex?: MongoClusteredCollectionOptions;
   readonly expireAfterSeconds?: number;
