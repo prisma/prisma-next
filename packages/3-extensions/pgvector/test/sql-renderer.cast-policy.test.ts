@@ -21,7 +21,7 @@ const emptyLookup: CodecLookup = {
 
 describe('pgvector cast policy', () => {
   it('emits $1::vector when pgvector is installed via stack.extensionPacks', async () => {
-    // Smoke test for the M2 wiring fix: `pgvectorRuntimeDescriptor` exposes its codecs via `types.codecTypes.codecDescriptors`, so the adapter's runtime-plane lookup picks up `pg/vector@1` and the renderer emits the cast. Without the wiring fix this regresses to `$1`.
+    // Regression: `pgvectorRuntimeDescriptor` must expose its codecs via `types.codecTypes.codecDescriptors` so the adapter's runtime-plane codec lookup resolves `pg/vector@1` and the renderer emits the `::vector` cast. If the descriptor stops surfacing those codecs, the rendered SQL silently regresses to bare `$1`.
     const pgvectorRuntime = (await import('../src/exports/runtime')).default;
 
     const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
