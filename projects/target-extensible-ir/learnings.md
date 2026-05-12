@@ -38,6 +38,18 @@ The user runs the orchestrator at Opus 4.7 Medium by default for quick execution
 - Reading reviewer/implementer reports for routing decisions.
 - Confirming narrative-artifact refresh (verifying `system-design-review.md` and `walkthrough.md` reflect HEAD).
 
+## Pattern: single-target families collapse the abstract-family bar
+
+**Shape.** The 3-layer polymorphic IR convention (framework interface → family abstract base → target concrete class) is the recipe when a family has **two or more** target consumers. When a family has exactly one target today (Mongo: `target-mongo`), per-node IR classes collapse the family-base+target-concrete split into a single concrete-class family form (`class MongoCollection extends SchemaNodeBase` — no abstract; no `MongoTargetCollection extends MongoCollection`).
+
+**Why it matters.** The abstract base earns its existence by having ≥2 consumers that share behavior. For SQL the abstract earns it (Postgres + SQLite share `SqlTable` etc.); for Mongo today the abstract is empty and the target concrete is the only implementation — pure ceremony. The collapse mirrors the Mongo Schema IR precedent (already concrete-class) and prevents within-Mongo asymmetry (Schema IR concrete + Contract IR abstract+target would confuse readers walking the Mongo family).
+
+**Atlas lift recipe.** When a second Mongo target lands (Atlas/DocumentDB/etc.), the collapse-undo is mechanical and consumer-transparent: `class MongoCollection extends SchemaNodeBase { ... }` → `abstract class MongoCollection extends SchemaNodeBase { ... }` + `class MongoTargetCollection extends MongoCollection { /* inherits */ }`. Consumers keep importing `MongoCollection`. No behavior change.
+
+**Action.** During milestone planning for any IR class flip in a single-target family, plan for concrete-class per-node IR matching the family's existing Schema IR shape — not abstract+target. Multi-target families plan for abstract+target per-node IR. The convention is "the abstract base earns its existence by having ≥2 consumers." Spec line 387 (the "AST-class pattern Mongo Schema IR already uses") is the more specific instruction for Mongo; spec line 419's mapping table is a generic illustration of the multi-target shape.
+
+Decision recorded at `wip/unattended-decisions.md § 10`.
+
 ## Pattern: cross-target consistency check is part of intent-validation
 
 **Shape.** When a foundation milestone introduces SPI bases / family abstract bases / shared interfaces, the orchestrator's intent-validation pass MUST include a per-target reachability check: for each (target, family-base) pair the foundation introduces, can the target's package actually `extends <FamilyBase>` without producing a circular workspace dependency?
