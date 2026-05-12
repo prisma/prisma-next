@@ -287,16 +287,14 @@ async function executeMigrationPlanCommand(
   // state that phase 1 just seeded. The seed phase guarantees every
   // declared extension has its head ref pinned, so the loader's
   // declaredButUnmigrated precheck always passes here.
-  // biome-ignore lint/suspicious/noExplicitAny: factory accepts a stack-shaped object
-  const familyInstanceForValidate = config.family.create({} as any);
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
   const aggregateResult = await buildContractSpaceAggregate({
     targetId: config.target.targetId,
     migrationsDir,
     appContract: toContractJson,
-    // biome-ignore lint/suspicious/noExplicitAny: extension descriptors carry family-bound generics
-    extensionPacks: (config.extensionPacks ?? []) as ReadonlyArray<any>,
-    // biome-ignore lint/suspicious/noExplicitAny: stand-in for typed Contract
-    validateContract: (json: unknown) => familyInstanceForValidate.validateContract(json) as any,
+    extensionPacks: config.extensionPacks ?? [],
+    validateContract: (json: unknown) => familyInstance.validateContract(json),
   });
   if (!aggregateResult.ok) {
     return notOk(aggregateResult.failure);
@@ -330,8 +328,6 @@ async function executeMigrationPlanCommand(
   };
 
   try {
-    const stack = createControlStack(config);
-    const familyInstance = config.family.create(stack);
     const planner = migrations.createPlanner(familyInstance);
     const fromSchema = migrations.contractToSchema(fromContract, frameworkComponents);
     const plannerResult = planner.plan({

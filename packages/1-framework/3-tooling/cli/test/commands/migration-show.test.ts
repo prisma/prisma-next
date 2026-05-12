@@ -287,6 +287,7 @@ describe('formatMigrationShowOutput', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
       singleSpace({
+        kind: 'present',
         spaceId: 'app',
         dirName: '20260101_100000_add_user',
         dirPath: 'migrations/20260101_100000_add_user',
@@ -317,6 +318,7 @@ describe('formatMigrationShowOutput', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
       singleSpace({
+        kind: 'present',
         spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
@@ -354,6 +356,7 @@ describe('formatMigrationShowOutput', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
       singleSpace({
+        kind: 'present',
         spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
@@ -386,6 +389,7 @@ describe('formatMigrationShowOutput', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
       singleSpace({
+        kind: 'present',
         spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
@@ -413,6 +417,7 @@ describe('formatMigrationShowOutput', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
       singleSpace({
+        kind: 'present',
         spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
@@ -440,6 +445,7 @@ describe('formatMigrationShowOutput', () => {
     const flags = parseGlobalFlags({ quiet: true });
     const output = formatMigrationShowOutput(
       singleSpace({
+        kind: 'present',
         spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
@@ -463,6 +469,7 @@ describe('formatMigrationShowOutput', () => {
       {
         spaces: [
           {
+            kind: 'present',
             spaceId: 'app',
             dirName: '20260101_100000_app_init',
             dirPath: 'migrations/app/20260101_100000_app_init',
@@ -475,6 +482,7 @@ describe('formatMigrationShowOutput', () => {
             summary: '0 operation(s)',
           },
           {
+            kind: 'present',
             spaceId: 'cipherstash',
             dirName: '0000000001-init',
             dirPath: 'migrations/cipherstash/0000000001-init',
@@ -496,5 +504,48 @@ describe('formatMigrationShowOutput', () => {
     expect(stripped).toContain('── cipherstash ──');
     expect(stripped).toContain('20260101_100000_app_init');
     expect(stripped).toContain('0000000001-init');
+
+    // Ordering matters: the app section must precede the extension section
+    // in the rendered output so reordering the spaces array (or accidentally
+    // alphabetising) is caught.
+    const appHeadingIdx = stripped.indexOf('── app ──');
+    const cipherstashHeadingIdx = stripped.indexOf('── cipherstash ──');
+    expect(appHeadingIdx).toBeLessThan(cipherstashHeadingIdx);
+    expect(stripped.indexOf('20260101_100000_app_init')).toBeLessThan(
+      stripped.indexOf('0000000001-init'),
+    );
+  });
+
+  it('renders a placeholder block for an extension space with no on-disk package', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationShowOutput(
+      {
+        spaces: [
+          {
+            kind: 'present',
+            spaceId: 'app',
+            dirName: '20260101_100000_app_init',
+            dirPath: 'migrations/app/20260101_100000_app_init',
+            from: null,
+            to: 'sha256:hash-app',
+            migrationHash: 'sha256:mhash-app',
+            createdAt: '2026-01-01T10:00:00.000Z',
+            operations: [],
+            preview: { statements: [] },
+            summary: '0 operation(s)',
+          },
+          {
+            kind: 'missing',
+            spaceId: 'cipherstash',
+            summary: 'No on-disk migration package for this space',
+          },
+        ],
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('── cipherstash ──');
+    expect(stripped).toContain('No on-disk migration package for this space');
   });
 });

@@ -294,7 +294,8 @@ export function formatMigrationApplyCommandOutput(
   return lines.join('\n');
 }
 
-interface MigrationShowSpaceResult {
+interface MigrationShowSpacePresent {
+  readonly kind: 'present';
   readonly spaceId: string;
   readonly dirName: string;
   readonly dirPath: string;
@@ -311,12 +312,20 @@ interface MigrationShowSpaceResult {
   readonly summary: string;
 }
 
+interface MigrationShowSpaceMissing {
+  readonly kind: 'missing';
+  readonly spaceId: string;
+  readonly summary: string;
+}
+
+type MigrationShowSpaceResult = MigrationShowSpacePresent | MigrationShowSpaceMissing;
+
 interface MigrationShowResult {
   readonly spaces: readonly MigrationShowSpaceResult[];
 }
 
 function formatSpaceShowBlock(
-  space: MigrationShowSpaceResult,
+  space: MigrationShowSpacePresent,
   useColor: boolean,
 ): readonly string[] {
   const formatGreen = createColorFormatter(useColor, green);
@@ -383,8 +392,12 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
     if (multipleSpaces) {
       lines.push(formatDimText(`── ${space.spaceId} ──`));
     }
-    for (const line of formatSpaceShowBlock(space, useColor)) {
-      lines.push(line);
+    if (space.kind === 'missing') {
+      lines.push(formatDimText(`  ${space.summary}`));
+    } else {
+      for (const line of formatSpaceShowBlock(space, useColor)) {
+        lines.push(line);
+      }
     }
     if (i < result.spaces.length - 1) {
       lines.push('');
