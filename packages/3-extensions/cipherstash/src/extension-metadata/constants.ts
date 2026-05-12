@@ -68,6 +68,36 @@ export const CIPHERSTASH_BOOLEAN_CODEC_ID = 'cipherstash/boolean@1';
  */
 export const CIPHERSTASH_JSON_CODEC_ID = 'cipherstash/json@1';
 
+/**
+ * The closed set of every codec id this package owns. Single source of
+ * truth for the bulk-encrypt middleware filter and any other call site
+ * that needs "is this a cipherstash codec id?" — using a closed set
+ * (rather than a `cipherstash/` prefix match) means the middleware
+ * never accidentally claims jurisdiction over a future cipherstash
+ * codec that hasn't been wired through the rest of the package yet
+ * (envelope subclass, codec hook, runtime descriptor, etc.). When a
+ * new codec is introduced its id lands here in the same diff that
+ * wires the rest of its surface; out-of-package consumers (e.g. tests
+ * pinning the closed set) catch a missed wiring with one assertion.
+ *
+ * Order mirrors `createParameterizedCodecDescriptors`'s descriptor
+ * list so an iteration here matches the iteration there cell-for-cell.
+ */
+export const CIPHERSTASH_CODEC_IDS = [
+  CIPHERSTASH_STRING_CODEC_ID,
+  CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_DATE_CODEC_ID,
+  CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_JSON_CODEC_ID,
+] as const;
+
+/**
+ * Set form of {@link CIPHERSTASH_CODEC_IDS} for `O(1)` membership
+ * tests (the bulk-encrypt middleware's hot per-`ParamRef` filter).
+ */
+export const CIPHERSTASH_CODEC_ID_SET: ReadonlySet<string> = new Set(CIPHERSTASH_CODEC_IDS);
+
 /** Schema CipherStash installs its functions/operators/casts/types into. */
 export const EQL_V2_SCHEMA = 'eql_v2';
 

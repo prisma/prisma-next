@@ -2,9 +2,10 @@
  * `decryptAll` — read-side bulk-decrypt walker.
  *
  * Public utility users invoke after `findMany` (or any other read
- * surface) to materialize the plaintext for every `EncryptedString`
- * envelope reachable from the result set in a fixed number of bulk SDK
- * round-trips:
+ * surface) to materialize the plaintext for every cipherstash envelope
+ * (any `EncryptedEnvelopeBase` subclass — string / double / bigint /
+ * date / boolean / json) reachable from the result set in a fixed
+ * number of bulk SDK round-trips:
  *
  *     const rows = await db.select(...).from(User).execute();
  *     await decryptAll(rows);
@@ -61,7 +62,7 @@
 
 import { ifDefined } from '@prisma-next/utils/defined';
 import { checkCipherstashAborted, raceCipherstashAbort } from './abort';
-import { EncryptedString, isHandleDecrypted, setHandlePlaintextCache } from './envelope';
+import { applyDecryptedSdkResult, EncryptedEnvelopeBase, isHandleDecrypted } from './envelope-base';
 import type { CipherstashRoutingKey, CipherstashSdk } from './sdk';
 
 export interface DecryptAllOptions {
@@ -69,17 +70,23 @@ export interface DecryptAllOptions {
 }
 
 interface BulkDecryptTarget {
-  readonly envelope: EncryptedString;
+  readonly envelope: EncryptedEnvelopeBase<unknown>;
   readonly ciphertext: unknown;
   readonly sdk: CipherstashSdk;
   readonly routingKey: CipherstashRoutingKey;
 }
 
 /**
- * Walk a result set and bulk-decrypt every `EncryptedString` envelope
- * reachable from it. After the returned promise resolves, every touched
- * envelope's `decrypt()` returns the cached plaintext synchronously
- * without consulting the SDK.
+ * Walk a result set and bulk-decrypt every cipherstash envelope (any
+ * `EncryptedEnvelopeBase` subclass) reachable from it. After the
+ * returned promise resolves, every touched envelope's `decrypt()`
+ * returns the cached plaintext synchronously without consulting the
+ * SDK. Heterogeneous result sets are supported — envelopes of
+ * different concrete types (e.g. `EncryptedString` and
+ * `EncryptedDate` reachable from the same row) are grouped by
+ * `(sdk, table, column)` and the SDK's polymorphic `bulkDecrypt`
+ * return is narrowed per envelope through each subclass's
+ * {@link EncryptedEnvelopeBase.parseDecryptedValue} hook.
  *
  * The walker is a no-op when no envelopes are reachable (returns
  * without making any SDK call), so it is cheap to call defensively
@@ -116,12 +123,17 @@ export async function decryptAll(rows: unknown, opts?: DecryptAllOptions): Promi
       const target = group[i];
       const plaintext = plaintexts[i];
       if (!target || plaintext === undefined) continue;
-      // The SDK's `bulkDecrypt` returns `ReadonlyArray<unknown>` because
-      // each codec narrows to its own plaintext type. `EncryptedString` is
-      // the only envelope today; its plaintext slot is `string`. The
-      // per-subclass narrowing hook lands with the polymorphic envelope
-      // hierarchy.
-      setHandlePlaintextCache(target.envelope, plaintext as string);
+      // The SDK's `bulkDecrypt` returns `ReadonlyArray<unknown>` per
+      // spec D1 — narrowing to each envelope's `T` is the per-subclass
+      // responsibility. `applyDecryptedSdkResult` dispatches through
+      // the envelope's own `parseDecryptedValue` hook (e.g.
+      // `EncryptedDate` coerces strings/numbers/Date instances to
+      // a `Date`), then writes the narrowed plaintext into the
+      // handle's cache slot. Heterogeneous groups are not possible —
+      // every cell in a `(sdk, table, column)` group has the same
+      // codec id, hence the same envelope subclass — but dynamic
+      // dispatch still keeps the call site agnostic.
+      applyDecryptedSdkResult(target.envelope, plaintext);
     }
   }
 }
@@ -129,7 +141,7 @@ export async function decryptAll(rows: unknown, opts?: DecryptAllOptions): Promi
 function collectTargets(root: unknown): BulkDecryptTarget[] {
   const targets: BulkDecryptTarget[] = [];
   const seenObjects = new WeakSet<object>();
-  const seenEnvelopes = new WeakSet<EncryptedString>();
+  const seenEnvelopes = new WeakSet<EncryptedEnvelopeBase<unknown>>();
   visit(root, seenObjects, (envelope) => {
     if (seenEnvelopes.has(envelope)) return;
     seenEnvelopes.add(envelope);
@@ -162,10 +174,10 @@ function collectTargets(root: unknown): BulkDecryptTarget[] {
 function visit(
   value: unknown,
   seen: WeakSet<object>,
-  found: (envelope: EncryptedString) => void,
+  found: (envelope: EncryptedEnvelopeBase<unknown>) => void,
 ): void {
   if (value === null || value === undefined) return;
-  if (value instanceof EncryptedString) {
+  if (value instanceof EncryptedEnvelopeBase) {
     found(value);
     return;
   }

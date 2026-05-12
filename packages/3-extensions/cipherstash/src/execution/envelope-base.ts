@@ -118,8 +118,16 @@ export abstract class EncryptedEnvelopeBase<T> {
    * single-cell `decrypt` returns `Promise<string>`). Subclasses whose
    * `T` requires runtime narrowing (e.g. `EncryptedDate` constructing
    * a `Date` from an ISO string) override this hook.
+   *
+   * Public rather than `protected` because `decryptAll` reaches the
+   * narrowing hook from outside the class hierarchy: it issues the
+   * bulk-decrypt round-trip itself and then needs to apply each
+   * envelope's per-type narrowing to the SDK's polymorphic return
+   * shape before populating the plaintext cache. The friend function
+   * {@link applyDecryptedSdkResult} below wraps "narrow + cache" into
+   * the conventional setter shape used by the other handle mutators.
    */
-  protected parseDecryptedValue(sdkResult: unknown): T {
+  parseDecryptedValue(sdkResult: unknown): T {
     return sdkResult as T;
   }
 
@@ -273,4 +281,25 @@ export function setHandleRoutingKey<T>(
  */
 export function isHandleDecrypted<T>(envelope: EncryptedEnvelopeBase<T>): boolean {
   return envelope.expose().plaintext !== undefined;
+}
+
+/**
+ * Apply an SDK bulk-decrypt result to an envelope: narrow the
+ * polymorphic SDK return through the subclass's
+ * {@link EncryptedEnvelopeBase.parseDecryptedValue} hook and cache the
+ * narrowed plaintext on the handle. Returns the narrowed plaintext for
+ * callers that want to observe it.
+ *
+ * Mirrors the conventional `setHandle*` mutator shape used elsewhere in
+ * this module — call sites stay symmetric across the encrypt path
+ * (`setHandleCiphertext`) and the decrypt path
+ * (`applyDecryptedSdkResult`).
+ */
+export function applyDecryptedSdkResult<T>(
+  envelope: EncryptedEnvelopeBase<T>,
+  sdkResult: unknown,
+): T {
+  const plaintext = envelope.parseDecryptedValue(sdkResult);
+  envelope.expose().plaintext = plaintext;
+  return plaintext;
 }
