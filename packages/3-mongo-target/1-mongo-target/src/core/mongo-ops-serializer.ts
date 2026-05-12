@@ -252,13 +252,45 @@ const DataTransformOperationJson = type({
 
 function validate<T>(schema: { assert: (data: unknown) => T }, data: unknown, context: string): T {
   try {
-    return schema.assert(data);
+    return schema.assert(stripUndefinedDeep(data));
   } catch (error) {
     /* v8 ignore start -- assertion libraries always throw Error instances */
     const message = error instanceof Error ? error.message : String(error);
     /* v8 ignore stop */
     throw new Error(`Invalid ${context}: ${message}`);
   }
+}
+
+/**
+ * Strip `undefined`-valued properties before they reach arktype's optional-key
+ * assertions.
+ *
+ * Op IRs (e.g. `CreateCollectionCommand`) assign every optional field on
+ * every instance — fields the caller did not provide land as
+ * `undefined`-valued properties. arktype treats `{ foo?: 'boolean' }` as
+ * "key may be absent, but if present must be boolean", so the bare instance
+ * fails validation when it crosses the deserialize boundary in-process
+ * (no JSON round-trip happens between planner → runner). This helper
+ * recovers the JSON-round-tripped shape (undefined keys absent) without
+ * forcing every caller to round-trip.
+ *
+ * Class instances are normalised to plain objects with the same enumerable
+ * own properties: the deserializers only read field values off the result,
+ * so prototype identity is irrelevant.
+ */
+function stripUndefinedDeep(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(stripUndefinedDeep);
+  }
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+    if (val === undefined) continue;
+    out[key] = stripUndefinedDeep(val);
+  }
+  return out;
 }
 
 function deserializeFilterExpr(json: unknown): MongoFilterExpr {

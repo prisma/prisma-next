@@ -162,16 +162,10 @@ const TML_2486_seam = (cell: CellId, project: JourneyProject, result: StepResult
   seamExpectation<StepResult>({
     ticket: 'TML-2486',
     description: 'mongo db init successfully creates the contract collections',
-    status: 'broken',
+    status: 'fixed',
     whenBroken: (r) => {
       expect(r.exitCode, 'TML-2486 still broken: mongo db init must currently fail').not.toBe(0);
       const combined = `${r.stdout}\n${r.stderr}`;
-      // The original bug report quotes `createCollection` rejecting `undefined`
-      // fields with `PN-CLI-4999`. On this branch the bug has partially shifted
-      // surface to `PN-RUN-3020` ("missing_table") — the failure mode still
-      // resolves to "db init left the database empty". Match both so the seam
-      // assertion stays meaningful while the underlying surface is being
-      // squashed.
       expect(
         combined,
         'TML-2486 still broken: mongo error must mention undefined fields or missing collections',
