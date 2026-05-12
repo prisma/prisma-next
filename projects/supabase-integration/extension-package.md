@@ -2,9 +2,9 @@
 
 ## Problem
 
-The capabilities in the other notes (posture, cross-contract refs, RLS) are mostly framework-domain. The Supabase extension is where they all land — the one place that ships:
+The capabilities in the other notes ([control policy](../control-policy/spec.md), cross-contract refs, RLS) are mostly framework-domain. The Supabase extension is where they all land — the one place that ships:
 
-- A `contract.json` describing Supabase's `auth`, `storage`, etc. schemas as externally-managed.
+- A `contract.json` describing Supabase's `auth`, `storage`, etc. schemas with `defaultControl: 'external'`.
 - A runtime factory that knows how to bind a Supabase JWT to a Postgres session for RLS enforcement.
 - Typed constants (role names, common claim accessors).
 - An extension-pack descriptor for `prisma-next.config.ts`.
@@ -39,7 +39,7 @@ For v0.1, hand-authored. Sketch (abbreviated):
   "$schema": "https://prisma-next.io/contract.schema.json",
   "spaceId": "supabase",
   "target": "postgres",
-  "defaultPosture": "externally-managed",
+  "defaultControl": "external",
   "namespaces": ["auth", "storage", "realtime", "extensions"],
   "models": {
     "AuthUser": {
@@ -62,8 +62,8 @@ For v0.1, hand-authored. Sketch (abbreviated):
 
 Notes:
 - `spaceId: 'supabase'` is the contract-space identifier the aggregate uses for resolution.
-- `defaultPosture: 'externally-managed'` is the contract-level default; each model inherits it. Per-model overrides allowed (we likely won't need any in v0.1).
-- We don't model every column of `auth.users` — only the columns app code is likely to reference (`id`, `email`, timestamps). The verifier under `externally-managed` posture tolerates extra columns, so we can ship a minimal slice and grow it as user needs surface.
+- `defaultControl: 'external'` is the contract-level default; each model inherits it. Per-model overrides allowed (we likely won't need any in v0.1). See [`projects/control-policy/spec.md`](../control-policy/spec.md) for the framework primitive.
+- We don't model every column of `auth.users` — only the columns app code is likely to reference (`id`, `email`, timestamps). The verifier under `control: 'external'` tolerates extra columns, so we can ship a minimal slice and grow it as user needs surface.
 - `contract.d.ts` is emitted from `contract.json` via the same pipeline used for app contracts (no special path for extensions).
 
 ### Public API surface
@@ -168,15 +168,15 @@ The `ExtensionPack` interface (defined by `@prisma-next/config` — likely alrea
 
 - The extension's contract source (a contract.json bundled with the package).
 - The extension's `spaceId`.
-- Optional: target-specific behaviour the framework should install (planner hooks, verifier hooks, etc.). For Supabase v0.1, none of these are needed — the framework's posture + RLS support handles everything.
+- Optional: target-specific behaviour the framework should install (planner hooks, verifier hooks, etc.). For Supabase v0.1, none of these are needed — the framework's control-policy dispatch + RLS support handles everything.
 
 Loading happens at `prisma-next` CLI invocation time. The pack contributes its contract to the aggregate; the aggregate is what verifier/planner/runtime see.
 
 ## Open questions
 
 - **Where does the JWT validation happen?** Two options: (a) the Supabase runtime validates the JWT signature itself (using the Supabase project's JWK or shared secret); (b) the app validates upstream and we trust the claims. Working assumption: **(a) — validate the JWT signature in the runtime, parameterised by JWT secret or JWKS URL in `SupabaseRuntimeOptions`.** It's safer by default and most apps will appreciate not having to wire this themselves.
-- **JWT claim mapping into `auth.uid()` etc.** Postgres-side `auth.uid()` is a function defined in Supabase's `auth` schema that reads from the `request.jwt.claims` session var. We rely on Supabase's standard SQL functions; we don't reimplement them. They are not declared in the Supabase contract — predicate strings are opaque to the framework, and a missing function surfaces as a Postgres error at migration / query time. See [`posture.md`](posture.md) § "Functions are not contract elements in v0.1."
-- **What about Supabase storage?** The `storage.*` tables exist but app code rarely references them directly. We declare them in the shipped contract under `externally-managed` posture and don't add any custom DSL for them. If user feedback pushes towards "ergonomic storage uploads," that's a future iteration.
+- **JWT claim mapping into `auth.uid()` etc.** Postgres-side `auth.uid()` is a function defined in Supabase's `auth` schema that reads from the `request.jwt.claims` session var. We rely on Supabase's standard SQL functions; we don't reimplement them. They are not declared in the Supabase contract — predicate strings are opaque to the framework, and a missing function surfaces as a Postgres error at migration / query time. See [`decisions.md` C4](decisions.md).
+- **What about Supabase storage?** The `storage.*` tables exist but app code rarely references them directly. We declare them in the shipped contract with `control: 'external'` and don't add any custom DSL for them. If user feedback pushes towards "ergonomic storage uploads," that's a future iteration.
 - **Migration path for a user already running Supabase migrations.** They probably have hand-rolled `auth.*` modifications, custom roles, custom policies. The "adopt existing schema" workflow is broader than this project; cross-link to [`developer-experience.md`](developer-experience.md).
 - **Custom auth schemas.** Some Supabase users extend `auth.*` with extra columns or tables. `contractOverride` is the v0.1 escape hatch; an introspection-based emit is the future polish.
 - **Multi-extension composition.** The `supabase()` facade composes one Postgres runtime with one extension middleware stack. Apps that need to stack additional Postgres extensions (Supabase + observability + caching, say) currently fall back to the lower-level `postgres()` factory from `@prisma-next/postgres/runtime`, which accepts an explicit extension list. Whether to grow `supabase()` to accept extra middleware, or whether the lower-level fallback is the documented escape hatch, is unresolved. Working assumption: **document the lower-level fallback for v0.1; don't grow `supabase()`'s surface.** The risk is users who actually need the composed shape have to construct it themselves and lose the `asUser`/`asAnon`/`asServiceRole` ergonomics — acceptable v0.1 trade.

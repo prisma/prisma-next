@@ -47,7 +47,7 @@ Lives in `docs/` (canonical) or in the package's `README.md` (entry-point friend
 
 1. **At a glance.** The same canonical code sample from [`overview.md`](overview.md), so users see the surface immediately.
 2. **Setup.** `prisma-next init --supabase`; what env vars to populate; one paragraph on how the Supabase project's database connection URL maps to `DATABASE_URL`.
-3. **Your first model.** Walk through the scaffolded `Profile` model. Explain the cross-contract FK (model handle from `supabaseContract.models.AuthUser`), `posture` (implicit via Supabase contract), `c.rlsPolicy`.
+3. **Your first model.** Walk through the scaffolded `Profile` model. Explain the cross-contract FK (model handle from `supabaseContract.models.AuthUser`), `control` (implicit via Supabase contract; see [`projects/control-policy/spec.md`](../control-policy/spec.md)), `c.rlsPolicy`.
 4. **Your first migration.** Run the planner; show the generated DDL; explain what's *not* in it (no `CREATE TABLE auth.users` because it's externally-managed).
 5. **Your first query.** Show `db.asUser(jwt).sql.from(Profile)...`. Show what RLS enforcement looks like (a query that would return another user's row returns empty).
 6. **What's next.** Link to ref docs (Postgres target, contract authoring, RLS, etc.).
@@ -65,14 +65,14 @@ We need an "adopt existing schema" workflow. Sketch:
    - Tables → `model(...)` declarations with `namespace: '<schema>'`.
    - FKs → `constraints.foreignKey(cols.x, OtherModel.refs.y, …)` — local model handle for in-contract refs, extension contract model handle (e.g. `supabaseContract.models.AuthUser`) for cross-contract refs. Same call shape either way.
    - RLS policies → `c.rlsPolicy({ ... })` with predicates copied verbatim as strings.
-   - Posture → `tolerated` for all introspected objects by default (let extras through; don't generate ALTER ops).
+   - `control` → `tolerated` for all introspected objects by default (let extras through; don't generate `ALTER` ops).
 2. The user reviews the emitted `contract.ts`, deletes or moves what they don't want, commits it.
 3. Going forward, the planner can produce additive migrations from this baseline.
 
 `adopt` is a Real Project — it's a Postgres-introspection emitter, which doesn't exist today. Probably out of v0.1 scope; document the manual workflow as a fallback:
 
 - "Until `adopt` ships, here's how to hand-write your contract for an existing Supabase app: …"
-- The manual workflow is: declare all your existing tables as `tolerated` posture, paste your RLS policies as strings, run the verifier — if it's green, you're aligned with the live schema.
+- The manual workflow is: declare all your existing tables with `control: 'tolerated'`, paste your RLS policies as strings, run the verifier — if it's green, you're aligned with the live schema.
 
 ### Authoring ergonomics
 
@@ -90,7 +90,7 @@ For v0.1 (specifics to settle when this becomes a real spec):
 - **`@prisma-next/extension-supabase` package README** with quick reference.
 - **RLS reference page** (the policy DSL, predicate string conventions, common patterns).
 - **Cross-contract refs reference page** (typed extension-contract handles, PSL colon-prefix syntax, troubleshooting).
-- **Posture reference page** (the four postures, when each applies, the user-author defaults).
+- **Control policy reference page** (the four policies, when each applies, the user-author defaults). Lives with the control-policy project's docs.
 - **Migration guide from `@supabase/supabase-js`** (link to scaffold; manual workflow; pointers).
 
 The example app from the scaffold becomes a referenceable artifact in the docs site.

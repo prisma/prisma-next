@@ -2,7 +2,7 @@
   "$schema": "https://prisma-next.io/contract.schema.json",
   "spaceId": "supabase",
   "target": "postgres",
-  "defaultPosture": "externally-managed",
+  "defaultControl": "external",
   "namespaces": ["auth", "storage"],
   "models": {
     "AuthUser": {
@@ -27,26 +27,6 @@
         "createdAt": { "type": "timestamptz", "columnName": "created_at" },
         "updatedAt": { "type": "timestamptz", "columnName": "updated_at" }
       }
-    }
-  },
-  "functions": {
-    "uid": {
-      "namespace": "auth",
-      "posture": "externally-managed",
-      "returns": { "type": "uuid" },
-      "args": []
-    },
-    "jwt": {
-      "namespace": "auth",
-      "posture": "externally-managed",
-      "returns": { "type": "jsonb" },
-      "args": []
-    },
-    "role": {
-      "namespace": "auth",
-      "posture": "externally-managed",
-      "returns": { "type": "text" },
-      "args": []
     }
   }
 }

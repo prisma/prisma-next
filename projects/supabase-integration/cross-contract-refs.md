@@ -141,7 +141,7 @@ Multiple contracts can contribute models to the same namespace:
 
 - The Supabase contract owns `auth.User`, `auth.Identity`, `storage.Bucket`, etc.
 - An app contract that adds `auth.MyExtraThing` does so by declaring `model MyExtraThing { … }` inside `namespace auth { … }` — the namespace is shared.
-- The app contract becomes the **owner** of `auth.MyExtraThing` — it is responsible for migrating that table. The Supabase contract is the owner of `auth.User` and is the one whose contract loaders mark it externally-managed.
+- The app contract becomes the **owner** of `auth.MyExtraThing` — it is responsible for migrating that table. The Supabase contract is the owner of `auth.User` and is the one whose contract loaders mark it with `control: 'external'`.
 
 **Cross-contract name collisions are fail-fast load errors.** If the app declares `model Session { … }` inside `namespace auth { … }` and the Supabase contract already declares `auth.Session`, the contract aggregate fails to load with a diagnostic naming both contributors. This mirrors the database-level reality: in a real Supabase project, the database permissions on the `auth` schema will reject the app's attempt to `CREATE TABLE auth.session` anyway. The contract-level check surfaces the same conflict at authoring time rather than at migration time.
 
@@ -212,7 +212,7 @@ The lowering pass:
 The verifier walks the loaded aggregate and compares against the introspected schema. For cross-space FKs:
 
 - The FK constraint itself is verified against `pg_constraint` exactly the same way local FKs are.
-- The *target* table is verified by its own posture (externally-managed for `auth.users`, so it's verified to exist with compatible shape but no DDL is emitted for it).
+- The *target* table is verified by its own control policy (`external` for `auth.users`, so it's verified to exist with compatible shape but no DDL is emitted for it — see [`projects/control-policy/spec.md`](../control-policy/spec.md)).
 - These are two independent checks that happen to chain through the same FK.
 
 ### Planner / DDL emission
@@ -235,7 +235,7 @@ ALTER TABLE "public"."profiles"
 
 Postgres FK syntax supports cross-schema references natively; the planner just renders the right qualifier.
 
-The planner does *not* emit any DDL for the target table itself (it's externally-managed in the Supabase contract). The combination "FK is `modeled` (we own this FK), target table is `externally-managed` (we don't own that table)" is the normal case for cross-contract refs and works without special-casing.
+The planner does *not* emit any DDL for the target table itself (it's `control: 'external'` in the Supabase contract). The combination "FK is `managed` (we own this FK), target table is `external` (we don't own that table)" is the normal case for cross-contract refs and works without special-casing.
 
 ### Extension publish pipeline
 
@@ -253,6 +253,6 @@ This is the same publish/consume shape TML-2459 sets up for the IR refactor, so 
 ## Open questions
 
 - **What's the canonical path for the pinned mirror?** `migrations/<spaceName>/contract.json` is the working assumption (matches the app's own contract location). Some teams may want `node_modules/.cache/...` or a configurable location. Defer until we have user feedback.
-- **Cascading actions across spaces.** PostgreSQL supports `ON DELETE CASCADE` etc. across schemas. Do we permit them across contract spaces? Probably yes — the DDL is fine, it's just the verifier that needs to be a little more careful (a cross-space `ON DELETE CASCADE` from a `modeled` table to an `externally-managed` table makes the externally-managed table's lifecycle leak into our planner's awareness). Working assumption: **permit, document the implication.**
+- **Cascading actions across spaces.** PostgreSQL supports `ON DELETE CASCADE` etc. across schemas. Do we permit them across contract spaces? Probably yes — the DDL is fine, it's just the verifier that needs to be a little more careful (a cross-space `ON DELETE CASCADE` from a `managed` table to an `external` table makes the externally-managed table's lifecycle leak into our planner's awareness). Working assumption: **permit, document the implication.**
 - **What's the typed handle returned by `supabase.contract<SupabaseContract>(json)`?** Is it the same shape as `validateContract`'s replacement (the SPI-based `target.contractSerializer.deserializeContract`)? Probably yes — same machinery, with the extension package providing a thin convenience wrapper that ties the contract type to its `spaceId` and exposes `.models.<Name>.refs.<field>` accessors. Specifics to settle when implementing.
 - **Should the extension package's typed handle be auto-bound at install time, removing the user's manual `supabase.contract<SupabaseContract>(json)` call?** The pinned-mirror story today requires the user to import the JSON and instantiate the handle. We could have the install step emit a thin wrapper module (`migrations/supabase/contract-handle.ts`) that does this once. Cleaner DX, slightly more codegen surface. Defer to user feedback.

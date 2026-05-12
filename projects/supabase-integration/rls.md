@@ -236,18 +236,18 @@ RLS policy lifecycle ops, modeled as `OpFactoryCall`s (consistent with ADR 195):
 The diff algorithm compares declared policies (by name) against introspected policies (from `pg_policies`):
 
 - Declared but not present → CREATE.
-- Present but not declared → DROP (under `modeled` posture).
+- Present but not declared → DROP (under `control: 'managed'`).
 - Present and declared with differences → ALTER (or DROP + CREATE if ALTER can't represent the change).
 
 ### Verifier behaviour
 
-The Postgres schema verifier queries `pg_policies` for each table in scope, builds an IR-shape representation of the existing policies, and diffs against the declared policies. Diff outcomes feed the same posture dispatch table from [`posture.md`](posture.md):
+The Postgres schema verifier queries `pg_policies` for each table in scope, builds an IR-shape representation of the existing policies, and diffs against the declared policies. Diff outcomes feed the framework's control-policy dispatch (see [`projects/control-policy/spec.md`](../control-policy/spec.md)):
 
-- `modeled` policies must exactly match.
+- `managed` policies must exactly match.
 - `tolerated` policies must match the declared set; extra policies on the introspected side are allowed.
-- `externally-managed` policies are checked for presence + compatible shape only.
+- `external` policies are checked for presence + compatible shape only.
 
-The Supabase extension's own contract declares the policies it ships (if any) as `externally-managed` at the contract level. App-author policies are `modeled` by default.
+The Supabase extension's own contract declares the policies it ships (if any) with `control: 'external'` at the contract level. App-author policies are `managed` by default.
 
 The detailed semantics of "exactly match" (predicate equivalence, role-list ordering, missing/extra policy responses) is captured as an open hole — see [`example/design-holes.md` #19](example/design-holes.md).
 

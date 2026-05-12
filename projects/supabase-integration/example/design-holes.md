@@ -14,7 +14,7 @@ Status legend:
 
 **Resolution:** target presence is the gate. The Postgres target carries RLS support; pack-aware typing makes the `.rls(...)` slot visible on the model builder only when the target supports it (same mechanism `IndexTypes` uses today in `SqlContext` — see [`contract-dsl.ts`](../../../packages/2-sql/2-authoring/contract-ts/src/contract-dsl.ts) `PackAwareSqlConstraints<IndexTypes>`). Non-Postgres targets simply don't expose the slot; no capability flag is required.
 
-Verifier strictness opt-out (e.g. "skip RLS checks for this table") is a *separate* concern handled by table-level posture, not a capability switch.
+Verifier strictness opt-out (e.g. "skip RLS checks for this table") is a *separate* concern handled by table-level `control` policy (see [`projects/control-policy/spec.md`](../../control-policy/spec.md)), not a capability switch.
 
 The example app should drop `capabilities.postgres['postgres.rls']: true` from its contract config.
 
@@ -393,7 +393,7 @@ Touches: [`extension-package.md`](../extension-package.md) §"Pool consideration
 
 ### ✅ #15 — Function IR shape — CLOSED (out of scope for v0.1)
 
-The example invented `functions: { <name>: { namespace, posture, returns, args } }`. Closed by [`decisions.md` C4](../decisions.md): functions are not contract elements in v0.1. The four typical Supabase flows (FK to `auth.users` with cascade, server-generated UUIDs, RLS predicates using `auth.uid()`, column-default function invocations) map to existing mechanisms — cross-contract FK refs, the framework's `DefaultFunctionRegistry`, and opaque RLS predicate strings. The verifier never introspects `pg_proc`; missing functions surface as Postgres errors at migration / query time.
+The example invented `functions: { <name>: { namespace, control, returns, args } }`. Closed by [`decisions.md` C4](../decisions.md): functions are not contract elements in v0.1. The four typical Supabase flows (FK to `auth.users` with cascade, server-generated UUIDs, RLS predicates using `auth.uid()`, column-default function invocations) map to existing mechanisms — cross-contract FK refs, the framework's `DefaultFunctionRegistry`, and opaque RLS predicate strings. The verifier never introspects `pg_proc`; missing functions surface as Postgres errors at migration / query time.
 
 The example app's contract.json should drop the `functions` block entirely. Promoting functions to first-class IR pairs with the trigger work as a stretch goal; see [`overview.md`](../overview.md) "Stretch goals."
 
@@ -427,9 +427,9 @@ The example declares 8 RLS policies across 2 tables. The verifier introspects `p
 - **Predicate equivalence:** verbatim string match? AST-normalized? Postgres-side `pg_get_expr` round-trip?
 - **Role-list ordering:** roles list order-significant?
 - **Missing policy:** error or warning?
-- **Extra policy on the table that the contract doesn't declare:** error or `drift` posture?
+- **Extra policy on the table that the contract doesn't declare:** error, warning, or silent?
 
-**Recommendation for v0.1:** identity by `(schema, table, policy_name)`; predicate compared verbatim (with a normalize-whitespace pass); roles list as a set, not a sequence; missing policy → verifier error; extra policy → diagnostic only, governed by table-level posture (`modeled` → error, `tolerated` → warn, `drift` → silent).
+**Recommendation for v0.1:** identity by `(schema, table, policy_name)`; predicate compared verbatim (with a normalize-whitespace pass); roles list as a set, not a sequence; missing policy → verifier error; extra policy → diagnostic only, governed by table-level `control` policy (`managed` → error, `tolerated` → warn, `external` → ignored, `observed` → silent). See [`projects/control-policy/spec.md`](../../control-policy/spec.md).
 
 Touches: [`rls.md`](../rls.md) §"Verifier behaviour" — needs these rules concretized.
 
