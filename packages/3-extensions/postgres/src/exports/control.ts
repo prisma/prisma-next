@@ -16,6 +16,7 @@ import {
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import postgres from '@prisma-next/target-postgres/control';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 export interface PostgresControlClientOptions {
   /**
@@ -39,8 +40,8 @@ export function createPostgresControlClient(
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    ...(options.connection !== undefined ? { connection: options.connection } : {}),
-    ...(options.extensionPacks !== undefined ? { extensionPacks: options.extensionPacks } : {}),
+    ...ifDefined('connection', options.connection),
+    ...ifDefined('extensionPacks', options.extensionPacks),
   };
   return createControlClient(clientOptions);
 }
