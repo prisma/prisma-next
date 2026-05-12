@@ -38,17 +38,8 @@ describe('raw SQL codec-required guard', () => {
     });
 
     it('includes the JS type in the error message', () => {
-      try {
-        toExpr(42);
-      } catch (e) {
-        expect((e as Error).message).toMatch(/number/);
-      }
-
-      try {
-        toExpr('hello');
-      } catch (e) {
-        expect((e as Error).message).toMatch(/string/);
-      }
+      expect(() => toExpr(42)).toThrow(/number/);
+      expect(() => toExpr('hello')).toThrow(/string/);
     });
   });
 
