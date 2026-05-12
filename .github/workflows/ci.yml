@@ -51,6 +51,10 @@ jobs:
         run: pnpm lint:docs
       - name: Validate package manifests (license declarations)
         run: pnpm lint:manifests
+      - name: Lint workflow triggers (forbid Pwn Request pattern)
+        run: pnpm lint:workflows
+      - name: Test workflow-triggers lint
+        run: pnpm test:scripts
 
   fixtures:
     name: Fixtures
