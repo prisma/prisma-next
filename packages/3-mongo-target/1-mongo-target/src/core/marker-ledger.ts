@@ -145,6 +145,34 @@ async function readAppMarker(db: Db): Promise<ContractMarkerRecord | null> {
   return null;
 }
 
+/**
+ * Reads every marker doc in the collection (one per contract space)
+ * and returns them keyed by `space`. Used by the per-space verifier
+ * to detect marker-vs-on-disk drift and orphan marker rows. Returns
+ * an empty map when no marker docs have been written yet.
+ *
+ * Marker docs are keyed by `_id: <space>` (string); ledger entries
+ * live in the same collection but use a driver-generated `ObjectId`
+ * `_id` plus `type: 'ledger'`. The filter selects string-keyed docs
+ * with a `space` field, which excludes ledger entries by construction
+ * and also defensively skips legacy pre-port docs (`{_id: 'marker'}`
+ * with no `space` field) — those are upgraded in place by the next
+ * app-space `readMarker` call.
+ */
+export async function readAllMarkers(db: Db): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
+  const cmd = new RawAggregateCommand(COLLECTION, [
+    { $match: { _id: { $type: 'string' }, space: { $type: 'string' } } },
+  ]);
+  const docs = await executeAggregate(db, cmd);
+  const out = new Map<string, ContractMarkerRecord>();
+  for (const doc of docs) {
+    const space = doc['space'];
+    if (typeof space !== 'string') continue;
+    out.set(space, parseMongoMarkerDoc(doc));
+  }
+  return out;
+}
+
 async function readNonAppMarker(db: Db, space: string): Promise<ContractMarkerRecord | null> {
   const cmd = new RawAggregateCommand(COLLECTION, [{ $match: { _id: space } }, { $limit: 1 }]);
   const docs = await executeAggregate(db, cmd);

@@ -26,6 +26,7 @@ import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import {
   formatMongoOperations,
   initMarker,
+  readAllMarkers,
   readMarker,
   updateMarker,
 } from '@prisma-next/target-mongo/control';
@@ -273,28 +274,15 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     readonly driver: ControlDriverInstance<'mongo', string>;
     readonly space: string;
   }): Promise<ContractMarkerRecord | null> {
-    if (options.space !== APP_SPACE_ID) {
-      throw new Error(
-        'Mongo target does not yet support per-space contract markers. ' +
-          `readMarker was called with space="${options.space}", but only "${APP_SPACE_ID}" is supported. ` +
-          'Per-space marker support is tracked separately for Mongo and is not part of the SQL-family contract-spaces work.',
-      );
-    }
     const db = extractDb(options.driver);
     return readMarker(db, options.space);
   }
 
-  // Mongo does not yet participate in the per-space mechanism — the
-  // `space` column was introduced in the SQL family's marker only.
-  // The bridge: surface the single app marker keyed by APP_SPACE_ID so
-  // the per-space verifier sees a coherent input shape; per-space mongo
-  // support is a future extension.
   async readAllMarkers(options: {
     readonly driver: ControlDriverInstance<'mongo', string>;
   }): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
-    const appMarker = await this.readMarker({ ...options, space: APP_SPACE_ID });
-    if (appMarker === null) return new Map();
-    return new Map([[APP_SPACE_ID, appMarker]]);
+    const db = extractDb(options.driver);
+    return readAllMarkers(db);
   }
 
   async introspect(options: {
