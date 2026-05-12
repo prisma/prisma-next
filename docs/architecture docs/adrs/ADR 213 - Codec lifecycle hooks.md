@@ -85,7 +85,7 @@ Hook-returned ops are typed `SqlMigrationPlanOperation<TTargetDetails>[]`. Each 
 
 By convention, codec-emitted invariantIds carry a `<extension>-codec:` prefix and identify the column being acted on:
 
-```
+```text
 cipherstash-codec:User.email:add-search-config@v1
 cipherstash-codec:User.email:remove-search-config@v1
 ```
