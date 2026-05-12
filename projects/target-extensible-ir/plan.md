@@ -46,7 +46,7 @@ The seven PRs below correspond to the seven milestones (M1, M2, M3, M4, M5a, M5b
 - [ ] Declare SQL family abstract bases in `2-sql/`: `SqlNode extends SchemaNodeBase`, `SqlContractSerializerBase`, `SqlSchemaVerifierBase`, plus the IR-node bases (`SqlTable`, `SqlColumn`, `SqlForeignKey`, `SqlIndex`, `SqlPrimaryKey`, `SqlUnique`) and `abstract class SqlStorage implements Storage`.
 - [ ] Declare Mongo family abstract bases in `2-mongo-family/`: `MongoContractSerializerBase`, `MongoSchemaVerifierBase`, `abstract class MongoStorage implements Storage`. Lift today's `MongoSchemaNode` to extend `SchemaNodeBase` (no behavioural change at this point).
 - [ ] Family-shared utility helpers (`verifyCommonSqlSchema`, structural-validation helpers) co-land where the abstract bases call into them.
-- [ ] Draft the 3-layer IR convention ADR under `projects/target-extensible-ir/specs/` so the architectural decision is captured against the foundation it describes; the draft gets refined throughout M2–M5b as the convention is exercised, and is promoted to `docs/architecture docs/adrs/` at close-out. (Convention is to draft ADRs at close-out at a minimum; drafting earlier here is cheap insurance against losing context.)
+- [ ] Draft the ADRs the foundation calls for under `projects/target-extensible-ir/specs/`, captured against the foundation they describe; drafts get refined throughout M2–M5b as the convention is exercised, and are promoted to `docs/architecture docs/adrs/` at close-out. AC10 names the two that must exist by close-out: (a) the **3-layer polymorphic IR convention** ADR, and (b) the **architectural principles underwriting it** ADR (FR25). M1 drafts both — and any further ADRs the implementer surfaces as load-bearing while drafting (e.g. if the SPI aggregation strategy or the `__unspecified__` model warrants its own ADR rather than living inside one of the two named drafts). (Convention is to draft ADRs at close-out at a minimum; drafting earlier here is cheap insurance against losing context.)
 - [ ] `pnpm lint:deps` passes; layering is enforced.
 
 **Validation:** the framework + family compile in isolation. No consumers exist; correctness is verified by typecheck + layering rules, not behavioural tests.
@@ -144,9 +144,15 @@ The seven PRs below correspond to the seven milestones (M1, M2, M3, M4, M5a, M5b
 - [ ] Add the AST/IR class-hierarchy section to `docs/reference/typescript-patterns.md` as a sibling to "Interface-Based Design with Factory Functions" (FR22).
 - [ ] Update `docs/Architecture Overview.md` § "Guiding Principles" to surface "framework provides affordances; targets implement specifics" and "familiar with one target, fluent in another" (FR23).
 - [ ] Update affected subsystem docs (`Data Contract`, `Contract Emitter & Types`, `Adapters & Targets`) to reflect the class-hierarchy IR shape (FR24).
-- [ ] Refine the ADR drafts started in M1 under `projects/target-extensible-ir/specs/`: (a) the 3-layer polymorphic IR convention; (b) the architectural principles underwriting it (FR25 / AC10). M6 brings them to "ready to promote" state; the close-out step moves them to `docs/architecture docs/adrs/`.
+- [ ] Refine the ADR drafts started in M1 under `projects/target-extensible-ir/specs/`. AC10 names the two that must exist by close-out — the 3-layer polymorphic IR convention and the architectural principles underwriting it (FR25) — plus any further ADRs M1 surfaced as load-bearing. M6 brings them all to "ready to promote" state; the close-out step moves them to `docs/architecture docs/adrs/`.
 
 **Validation:** docs reviewable as diffs; ADR drafts ready for promotion at close-out.
+
+## Open items
+
+> Items surfaced during execution that are out of scope for this PR but worth tracking. Reviewed at close-out.
+
+- **Pre-existing test fragility surfaced during M1 R1 review.** Running `pnpm test:packages` against the M1 HEAD surfaced ~9 files / ~12 tests / ~8 unhandled errors across `@prisma-next/adapter-postgres` (Postgres connection flakiness in integration tests) and `@prisma-next/cli` (mock-setup issues). None touch M1-modified files; failures vary across runs (different packages failing in different runs), confirming flakiness rather than regression. Out of M1's `typecheck + lint:deps` validation gate. The Postgres adapter integration-test flakiness will likely resurface and may block M3 R1 if it persists; revisit at M3 entry. No Linear tickets filed yet (per orchestrator/user decision E2 in m1 R1 triage).
 
 ## Close-out (required)
 
