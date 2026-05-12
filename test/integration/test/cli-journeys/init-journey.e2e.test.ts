@@ -276,9 +276,12 @@ const TML_2486_seam = (cell: CellId, project: JourneyProject, result: StepResult
         r.exitCode,
         'TML-2486 still broken: mongo migration apply must currently fail',
       ).not.toBe(0);
-      const combined = `${r.stdout}\n${r.stderr}`;
+      // Prisma-Next CLI journey tests treat stdout as the
+      // machine-readable channel — assert the diagnostic regex against
+      // stdout only so a regression that quietly moves the message to
+      // stderr would still flip the test red.
       expect(
-        combined,
+        r.stdout,
         'TML-2486 still broken: mongo error must mention undefined fields or missing collections',
       ).toMatch(/undefined|PN-CLI-4999|createCollection|PN-RUN-3020|missing_table/);
     },
