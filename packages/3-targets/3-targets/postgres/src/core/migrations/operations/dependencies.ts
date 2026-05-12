@@ -47,7 +47,7 @@ export function installExtension(options: {
     invariantId,
     target: {
       id: 'postgres',
-      details: { schema: 'public', objectType: 'extension', name: extensionName },
+      details: { schema: 'public', objectType: 'dependency', name: extensionName },
     },
     precheck: [
       step(
@@ -58,7 +58,7 @@ export function installExtension(options: {
     execute: [
       step(
         `create extension "${extensionName}"`,
-        `CREATE EXTENSION IF NOT EXISTS ${quoteIdentifier(extensionName)}`,
+        `CREATE EXTENSION IF NOT EXISTS ${extensionName}`,
       ),
     ],
     postcheck: [
