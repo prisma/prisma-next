@@ -88,7 +88,7 @@ Extension authors use the **same emit pipeline** application authors use: TS or 
 
 Each extension package is treated as a self-contained "project" by the CLI: it ships its own `prisma-next.config.ts` whose `migrations.dir` points at `migrations/<space-id>/`. No new CLI surface was required — `prisma-next contract emit` and `prisma-next migration plan` honour the in-package config the same way they honour an application's. (The package layout below shows the result.)
 
-```
+```text
 packages/3-extensions/<extension>/
 ├── prisma-next.config.ts            ← extension-as-project config
 ├── src/contract-source.ts           ← TS schema (input to `contract emit`)
@@ -148,7 +148,7 @@ pgvector (whose contract declares only `vector(N)` under `storage.types`) is the
 
 ### On-disk layout (the user's repo)
 
-```
+```text
 migrations/
 ├── 20260508T0942_user_init/         ← app-space migration (today's convention)
 │   ├── manifest.json
