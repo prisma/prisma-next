@@ -3,12 +3,27 @@ import type { ContractConfig } from '@prisma-next/config/config-types';
 import type { Contract } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { ok } from '@prisma-next/utils/result';
+import { extname } from 'pathe';
+
+/**
+ * Derives the emit output path from the TS contract input so artefacts land
+ * colocated with the source (e.g. `prisma/contract.ts` →
+ * `prisma/contract.json`). Mirrors the same default-derivation logic in
+ * `@prisma-next/sql-contract-psl/provider`.
+ */
+function defaultOutputFromContractPath(contractPath: string): string {
+  const ext = extname(contractPath);
+  if (ext.length === 0) return `${contractPath}.json`;
+  return `${contractPath.slice(0, -ext.length)}.json`;
+}
 
 export function typescriptContract(contract: Contract, output?: string): ContractConfig {
   return {
     source: {
       load: async () => ok(contract),
     },
+    // The in-memory variant has no input path to anchor on; fall through to
+    // the global default in `normalizeContractConfig` when caller doesn't pin it.
     ...ifDefined('output', output),
   };
 }
@@ -34,6 +49,6 @@ export function typescriptContractFromPath(contractPath: string, output?: string
         return ok(contract);
       },
     },
-    ...ifDefined('output', output),
+    output: output ?? defaultOutputFromContractPath(contractPath),
   };
 }

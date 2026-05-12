@@ -25,6 +25,26 @@ describe('prismaContract provider helper', () => {
     tempDirs.length = 0;
   });
 
+  describe('output derivation (TML-2461)', () => {
+    it('derives output colocated with schema path when output is not provided', () => {
+      const contract = prismaContract('./src/contract/schema.prisma', baseOptions);
+      expect(contract.output).toBe('./src/contract/contract.json');
+    });
+
+    it('honours an explicit output over the derived default', () => {
+      const contract = prismaContract('./src/contract/schema.prisma', {
+        ...baseOptions,
+        output: 'src/generated/contract.json',
+      });
+      expect(contract.output).toBe('src/generated/contract.json');
+    });
+
+    it('derives output for a non-"schema" filename by replacing the extension', () => {
+      const contract = prismaContract('./prisma/main.prisma', baseOptions);
+      expect(contract.output).toBe('./prisma/main.json');
+    });
+  });
+
   describe('given a valid schema', () => {
     it('returns contract config and emits SQL Contract from schema path', async () => {
       const tempDir = await mkdtemp(join(tmpdir(), 'psl-provider-'));

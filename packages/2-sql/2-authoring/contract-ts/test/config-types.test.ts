@@ -43,6 +43,21 @@ describe('typescriptContract', () => {
     expect(config.source.inputs).toBeUndefined();
   });
 
+  it('derives output colocated with input path when output is not provided (TML-2461)', () => {
+    const config = typescriptContractFromPath('./prisma/contract.ts');
+    expect(config.output).toBe('./prisma/contract.json');
+  });
+
+  it('honours an explicit output over the derived default', () => {
+    const config = typescriptContractFromPath('./prisma/contract.ts', 'custom/out.json');
+    expect(config.output).toBe('custom/out.json');
+  });
+
+  it('derives output for an extensionless input path', () => {
+    const config = typescriptContractFromPath('./prisma/contract');
+    expect(config.output).toBe('./prisma/contract.json');
+  });
+
   it(
     'loads a contract module from the resolved input path',
     async () => {

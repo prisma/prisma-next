@@ -5,6 +5,7 @@ import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-com
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
+import { extname } from 'pathe';
 import { interpretPslDocumentToSqlContract } from './interpreter';
 import type { ColumnDescriptor } from './psl-column-resolution';
 
@@ -12,6 +13,25 @@ export interface PrismaContractOptions {
   readonly output?: string;
   readonly target: TargetPackRef<'sql', string>;
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
+}
+
+/**
+ * Derives the emit output path from the schema input path so artefacts land
+ * colocated with the source (e.g. `src/contract/schema.prisma` →
+ * `src/contract/contract.json`). The provider owns this because it is the
+ * only layer that knows the input path; the upstream `normalizeContractConfig`
+ * default is a last-resort fallback for providers that don't carry one.
+ */
+function defaultOutputFromSchemaPath(schemaPath: string): string {
+  const ext = extname(schemaPath);
+  if (ext.length === 0) return `${schemaPath}.json`;
+  const base = schemaPath.slice(0, -ext.length);
+  // PSL schemas commonly use `schema.prisma`; the emitted JSON is called
+  // `contract.json` to mirror the rest of the toolchain, not `schema.json`.
+  if (base.endsWith('schema')) {
+    return `${base.slice(0, -'schema'.length)}contract.json`;
+  }
+  return `${base}.json`;
 }
 
 function buildColumnDescriptorMap(
@@ -92,6 +112,6 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         return ok(interpreted.value);
       },
     },
-    ...ifDefined('output', options.output),
+    output: options.output ?? defaultOutputFromSchemaPath(schemaPath),
   };
 }
