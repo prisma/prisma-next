@@ -7,6 +7,7 @@ The project ships in seven PRs sequenced foundation → consumers → exemplars 
 The user-facing capabilities this project delivers are: multi-schema Postgres contracts with namespace declarations in PSL (top-level `namespace { … }` blocks; namespaces do not recursively nest) and the TS builder; cross-namespace FK references within a contract space via dot-qualified type references in `@relation` (the FL-02 fix that unblocks Supabase's `auth.users` story); connection-bound multi-tenancy via `__unspecified__` + `search_path`. The IR refactor that underwrites these capabilities is invisible to users but is what makes the follow-up Supabase project (RLS policies, `supabase()` runtime facade, `auth.users` queryable surface) a series of focused feature PRs rather than another foundational reshape.
 
 **Spec:** [`projects/target-extensible-ir/spec.md`](spec.md)
+**Linear:** [TML-2459 — Target-Extensible IR](https://linear.app/prisma-company/issue/TML-2459)
 
 ## Cross-project dependencies
 
@@ -113,10 +114,11 @@ The seven PRs below correspond to the seven milestones (M1, M2, M3, M4, M5a, M5b
 
 **Tasks:**
 
-- [ ] FK reference IR carries a namespace coordinate on both sides (the table side already gains one in M5a; this milestone adds it to the *reference* side).
+- [ ] FK reference IR carries a namespace coordinate on both sides (the table side already gains one in M5a; this milestone adds it to the *reference* side). **Design discipline (FR16b extension-point note):** do not fuse `namespace.id` and `name` into a single composite key; keep them addressable separately so cross-*contract-space* refs can extend the shape additively to `(spaceId, namespace.id, name)` in a follow-up project without restructuring the IR.
 - [ ] Verifier dispatches on `(namespace.id, name)` for both ends of an FK; walks across namespaces correctly.
 - [ ] Planner-DDL builder emits qualified `REFERENCES "<schema>"."<table>"("<col>")` clauses for named namespaces and unqualified `REFERENCES "<table>"("<col>")` for `__unspecified__` (search_path resolves at migration time).
-- [ ] Authoring DSL: `m.constraints.ref(otherModel)` (TS builder) and dot-qualified type references in `@relation` (PSL: `user auth.User @relation(fields: [userId], references: [id])`) infer the cross-namespace coordinate from the target model's `namespace` field — users do not declare the namespace per-reference.
+- [ ] Authoring DSL — TS builder: existing FK call sites (`constraints.foreignKey(cols.x, OtherModel.refs.y, …)` in the SQL-block constraints DSL and `rel.belongsTo(OtherModel, …)` in the relations DSL) lower to cross-namespace IR automatically when `OtherModel`'s namespace differs from the referencing model's — the model handle carries the namespace coordinate, no new syntax (FR16b).
+- [ ] Authoring DSL — PSL: dot-qualified type references in the existing `@relation` mechanism (`user auth.User @relation(fields: [userId], references: [id])`). No new attribute; the namespace coordinate is carried by the type position.
 - [ ] Integration test (PGlite): a Postgres contract with `public.profiles.user_id REFERENCES auth.users(id)` migrates, emits, and verifies end-to-end (FL-02 scenario).
 
 **Validation:** AC4 (cross-namespace FK) passes. FL-02 acceptance demonstrated via PGlite integration test. The Supabase `auth.users` reference shape is now expressible in Prisma Next contracts.
