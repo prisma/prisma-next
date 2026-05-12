@@ -76,6 +76,12 @@ export type {
   EncryptedJsonHandle,
 } from '../execution/envelope-json';
 export { EncryptedJson } from '../execution/envelope-json';
+export {
+  cipherstashAsc,
+  cipherstashDesc,
+  cipherstashJsonbGet,
+  cipherstashJsonbPathQueryFirst,
+} from '../execution/helpers';
 export type {
   CipherstashAnyParams,
   CipherstashBooleanParams,

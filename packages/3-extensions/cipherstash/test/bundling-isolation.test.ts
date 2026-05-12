@@ -69,6 +69,10 @@ const CONTROL_FORBIDDEN = [
   'createCipherstashBooleanCodec',
   'createCipherstashJsonCodec',
   'createCipherstashRuntimeDescriptor',
+  'cipherstashAsc',
+  'cipherstashDesc',
+  'cipherstashJsonbGet',
+  'cipherstashJsonbPathQueryFirst',
 ] as const;
 
 /**
