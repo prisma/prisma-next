@@ -526,16 +526,19 @@ export interface MultiSpaceRunnerFailure extends MigrationRunnerFailure {
 export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiSpaceRunnerFailure>;
 
 /**
- * Optional capability for runners that can apply a list of per-space plans
- * inside a single outer transaction. A failure on any space rolls back every
- * space's writes.
+ * Optional capability for runners that can apply a list of per-space plans.
+ * Atomicity semantics differ by family:
  *
- * The SQL family (`SqlMigrationRunner`) implements this with a true outer
- * transaction across every space. The Mongo family implements a degenerate
- * single-space shim (per-space is a non-goal per the extension-contract-spaces
- * project spec — Mongo aggregates are always single-member). The capability
- * is declared at the framework layer so CLI utilities can route through it
- * without importing any specific family directly.
+ * - SQL (`SqlMigrationRunner`) opens one outer transaction across every
+ *   space; a failure on any space rolls back every space's writes.
+ * - Mongo (`mongoTargetDescriptor`) cannot wrap most DDL ops in a session
+ *   transaction (TML-2408), so it iterates per-space without an outer
+ *   transaction and relies on per-space-internal verify-gated marker
+ *   atomicity. Earlier-advanced markers are not rolled back when a later
+ *   space fails; re-running resumes from the failing space.
+ *
+ * The capability is declared at the framework layer so CLI utilities can
+ * route through it without importing any specific family directly.
  */
 export interface MultiSpaceCapableRunner<
   TFamilyId extends string = string,

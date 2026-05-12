@@ -4,6 +4,7 @@ import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import type {
   MigratableTargetDescriptor,
   MigrationRunner,
+  MigrationRunnerSuccessValue,
   MultiSpaceCapableRunner,
   MultiSpaceRunnerFailure,
   MultiSpaceRunnerResult,
@@ -65,39 +66,34 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
               destinationContract: runnerOptions.destinationContract as MongoContract,
             });
           },
-          // Mongo per-space is a non-goal per the extension-contract-spaces project
-          // spec (TML-2397): no Mongo extension contract spaces exist. The aggregate
-          // is always single-member for Mongo, so `executeAcrossSpaces` is a
-          // degenerate shim that asserts length === 1 and delegates to `execute`.
-          // The shim exists so `applyAggregate` (the shared CLI primitive driving
-          // `db init` / `db update` / `migration apply`) routes through Mongo
-          // identically to the SQL family.
+          // Mongo cannot wrap DDL ops in a session transaction (createCollection,
+          // createIndex, collMod, setValidation all bypass transactions even on
+          // replica sets), so the cross-space envelope is *resumable* rather than
+          // transactional. Per-space-internal verify-gated marker atomicity
+          // already lives in `runner.execute`: ops apply, schema is introspected
+          // and verified, and the marker advances only on verify-pass. This loop
+          // composes that guarantee across spaces — earlier-advanced markers are
+          // not rolled back when a later space fails. Re-running reads each
+          // marker, finds spaces 1..N−1 at-head (no-op skip), retries N onward.
+          // See `projects/contract-spaces-mongo-port/spec.md` § Approach and
+          // `docs/architecture docs/subsystems/10. MongoDB Family.md` § Contract
+          // spaces.
           async executeAcrossSpaces({ driver, perSpaceOptions }): Promise<MultiSpaceRunnerResult> {
-            if (perSpaceOptions.length !== 1) {
-              return notOk<MultiSpaceRunnerFailure>({
-                code: 'MONGO_MULTI_SPACE_UNSUPPORTED',
-                summary: `Mongo target supports a single contract space; received ${perSpaceOptions.length}`,
-                failingSpace: perSpaceOptions[0]?.space ?? '<unknown>',
-              });
+            const perSpaceResults: Array<{
+              space: string;
+              value: MigrationRunnerSuccessValue;
+            }> = [];
+            for (const spaceOptions of perSpaceOptions) {
+              const result = await runner.execute({ ...spaceOptions, driver });
+              if (!result.ok) {
+                return notOk<MultiSpaceRunnerFailure>({
+                  ...result.failure,
+                  failingSpace: spaceOptions.space,
+                });
+              }
+              perSpaceResults.push({ space: spaceOptions.space, value: result.value });
             }
-            const only = perSpaceOptions[0];
-            if (!only) {
-              return notOk<MultiSpaceRunnerFailure>({
-                code: 'MONGO_MULTI_SPACE_UNSUPPORTED',
-                summary: 'Mongo executeAcrossSpaces called with no per-space plans',
-                failingSpace: '<unknown>',
-              });
-            }
-            const result = await runner.execute({ ...only, driver });
-            if (!result.ok) {
-              return notOk<MultiSpaceRunnerFailure>({
-                ...result.failure,
-                failingSpace: only.space,
-              });
-            }
-            return ok({
-              perSpaceResults: [{ space: only.space, value: result.value }],
-            });
+            return ok({ perSpaceResults });
           },
         };
       return runner;
