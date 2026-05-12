@@ -254,6 +254,7 @@ const MongoIndexKeySchema = type({
 
 const MongoStorageIndexSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-index'",
   keys: MongoIndexKeySchema.array().atLeastLength(1),
   'unique?': 'boolean',
   'sparse?': 'boolean',

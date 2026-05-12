@@ -6,7 +6,7 @@ export type {
   InferModelRow,
   MongoContract,
   MongoContractWithTypeMaps,
-  MongoIndex,
+  MongoIndexAuthoringInput,
   MongoIndexFields,
   MongoIndexFieldValue,
   MongoIndexKey,
@@ -18,7 +18,6 @@ export type {
   MongoModelStorage,
   MongoStorage,
   MongoStorageCollection,
-  MongoStorageIndex,
   MongoTypeMaps,
   MongoTypeMapsPhantomKey,
   MongoWildcardProjection,
@@ -45,6 +44,8 @@ export type {
   MongoStorageClusteredIndexShape,
 } from '../ir/mongo-collection-options';
 export { MongoCollectionOptions } from '../ir/mongo-collection-options';
+export type { MongoIndexInput } from '../ir/mongo-index';
+export { MongoIndex } from '../ir/mongo-index';
 export type { MongoIndexOptionDefaultsInput } from '../ir/mongo-index-option-defaults';
 export { MongoIndexOptionDefaults } from '../ir/mongo-index-option-defaults';
 export type { MongoIndexOptionsInput } from '../ir/mongo-index-options';

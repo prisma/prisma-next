@@ -1,8 +1,8 @@
 import type {
   MongoCollectionOptions,
   MongoContract,
+  MongoIndex,
   MongoStorageCollection,
-  MongoStorageIndex,
   MongoValidator,
 } from '@prisma-next/mongo-contract';
 import {
@@ -18,7 +18,7 @@ function stripIrKind(node: object): Record<string, unknown> {
   return rest;
 }
 
-function convertIndex(index: MongoStorageIndex): MongoSchemaIndex {
+function convertIndex(index: MongoIndex): MongoSchemaIndex {
   return new MongoSchemaIndex({
     keys: index.keys,
     unique: index.unique,

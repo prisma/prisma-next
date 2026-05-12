@@ -12,8 +12,8 @@ import type {
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   applyPolymorphicScopeToMongoIndex,
+  MongoIndex,
   type MongoIndexKeyDirection,
-  type MongoStorageIndex,
 } from '@prisma-next/mongo-contract';
 import type { ParsePslDocumentResult, PslField, PslModel, PslSpan } from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -157,8 +157,8 @@ function resolvePolymorphism(input: {
   discriminatorDeclarations: Map<string, DiscriminatorDeclaration>;
   baseDeclarations: Map<string, BaseDeclaration>;
   modelNames: ReadonlySet<string>;
-  indexSpans: Map<MongoStorageIndex, PslSpan>;
-  modelIndexesByName: Map<string, readonly MongoStorageIndex[]>;
+  indexSpans: Map<MongoIndex, PslSpan>;
+  modelIndexesByName: Map<string, readonly MongoIndex[]>;
   sourceId: string;
 }): {
   models: Record<string, MongoModelEntry>;
@@ -300,7 +300,7 @@ function resolvePolymorphism(input: {
 
     const baseModelEntry = patched[baseDecl.baseName];
     const discriminatorField = baseModelEntry?.discriminator?.field;
-    const scopedVariantIndexes: MongoStorageIndex[] = [];
+    const scopedVariantIndexes: MongoIndex[] = [];
     if (discriminatorField) {
       for (const idx of variantOwnIndexes) {
         const result = applyPolymorphicScopeToMongoIndex(idx, {
@@ -331,7 +331,7 @@ function resolvePolymorphism(input: {
         Object.entries(collections).filter(([key]) => key !== variantCollectionName),
       );
       if (scopedVariantIndexes.length > 0 && baseColl) {
-        const baseIndexes = (baseColl['indexes'] ?? []) as MongoStorageIndex[];
+        const baseIndexes = (baseColl['indexes'] ?? []) as MongoIndex[];
         collections = {
           ...filtered,
           [baseCollection]: {
@@ -343,8 +343,8 @@ function resolvePolymorphism(input: {
         collections = filtered;
       }
     } else if (baseColl) {
-      const existingIndexes = (baseColl['indexes'] ?? []) as MongoStorageIndex[];
-      const variantIndexSet = new Set<MongoStorageIndex>(variantOwnIndexes);
+      const existingIndexes = (baseColl['indexes'] ?? []) as MongoIndex[];
+      const variantIndexSet = new Set<MongoIndex>(variantOwnIndexes);
       const withoutUnscopedVariants = existingIndexes.filter((idx) => !variantIndexSet.has(idx));
       const mergedIndexes = [...withoutUnscopedVariants];
       for (const idx of scopedVariantIndexes) {
@@ -375,7 +375,7 @@ function resolvePolymorphism(input: {
 }
 
 // Property-order-stable serialization for structural equality of plain
-// JSON-compatible values. Used for comparing MongoStorageIndex shapes in
+// JSON-compatible values. Used for comparing MongoIndex shapes in
 // the variant-merge dedup path where a future change to the spread order
 // would otherwise produce JSON-stringify mismatches even though the
 // indexes are structurally identical.
@@ -495,9 +495,9 @@ function collectIndexes(
   modelNames: ReadonlySet<string>,
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
-  indexSpans: Map<MongoStorageIndex, PslSpan>,
-): MongoStorageIndex[] {
-  const indexes: MongoStorageIndex[] = [];
+  indexSpans: Map<MongoIndex, PslSpan>,
+): MongoIndex[] {
+  const indexes: MongoIndex[] = [];
   let textIndexCount = 0;
 
   // Storage-indexable PSL field names — i.e. all declared fields except
@@ -516,10 +516,10 @@ function collectIndexes(
     const uniqueAttr = getAttribute(field.attributes, 'unique');
     if (!uniqueAttr) continue;
     const mappedName = fieldMappings.pslNameToMapped.get(field.name) ?? field.name;
-    const fieldUniqueIndex: MongoStorageIndex = {
+    const fieldUniqueIndex = new MongoIndex({
       keys: [{ field: mappedName, direction: 1 }],
       unique: true,
-    };
+    });
     indexes.push(fieldUniqueIndex);
     indexSpans.set(fieldUniqueIndex, uniqueAttr.span);
   }
@@ -725,7 +725,7 @@ function collectIndexes(
     const rawLangOverride = getNamedArgument(attr, 'languageOverride');
     const language_override = stripQuotesHelper(rawLangOverride);
 
-    const index: MongoStorageIndex = {
+    const index = new MongoIndex({
       keys,
       ...(unique != null && { unique }),
       ...(sparse != null && { sparse }),
@@ -736,7 +736,7 @@ function collectIndexes(
       ...(weights != null && { weights }),
       ...(default_language != null && { default_language }),
       ...(language_override != null && { language_override }),
-    };
+    });
 
     indexes.push(index);
     indexSpans.set(index, attr.span);
@@ -803,8 +803,8 @@ export function interpretPslDocumentToMongoContract(
   const collections: Record<string, Record<string, unknown>> = {};
   const roots: Record<string, string> = {};
   const allFkRelations: FkRelation[] = [];
-  const indexSpans = new Map<MongoStorageIndex, PslSpan>();
-  const modelIndexesByName = new Map<string, readonly MongoStorageIndex[]>();
+  const indexSpans = new Map<MongoIndex, PslSpan>();
+  const modelIndexesByName = new Map<string, readonly MongoIndex[]>();
 
   interface BackrelationCandidate {
     readonly modelName: string;
@@ -907,7 +907,7 @@ export function interpretPslDocumentToMongoContract(
     modelIndexesByName.set(pslModel.name, modelIndexes);
     const existingColl = collections[collectionName];
     if (existingColl && modelIndexes.length > 0) {
-      const existingIndexes = (existingColl['indexes'] ?? []) as MongoStorageIndex[];
+      const existingIndexes = (existingColl['indexes'] ?? []) as MongoIndex[];
       collections[collectionName] = { indexes: [...existingIndexes, ...modelIndexes] };
     } else if (!existingColl) {
       collections[collectionName] = modelIndexes.length > 0 ? { indexes: modelIndexes } : {};

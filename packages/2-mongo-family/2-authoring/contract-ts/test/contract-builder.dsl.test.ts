@@ -190,9 +190,13 @@ describe('mongo contract builder', () => {
     expect(contract.storage.collections).toEqual({
       users: {
         indexes: [
-          { keys: [{ field: 'email', direction: 1 }], unique: true },
-          { keys: [{ field: 'createdAt', direction: 1 }], expireAfterSeconds: 3600 },
-          { keys: [{ field: 'location', direction: '2dsphere' }] },
+          { kind: 'mongo-index', keys: [{ field: 'email', direction: 1 }], unique: true },
+          {
+            kind: 'mongo-index',
+            keys: [{ field: 'createdAt', direction: 1 }],
+            expireAfterSeconds: 3600,
+          },
+          { kind: 'mongo-index', keys: [{ field: 'location', direction: '2dsphere' }] },
         ],
       },
     });
@@ -254,8 +258,9 @@ describe('mongo contract builder', () => {
     expect(contract.storage.collections).toEqual({
       tasks: {
         indexes: [
-          { keys: [{ field: 'title', direction: 1 }], unique: true },
+          { kind: 'mongo-index', keys: [{ field: 'title', direction: 1 }], unique: true },
           {
+            kind: 'mongo-index',
             keys: [{ field: 'expiresAt', direction: 1 }],
             expireAfterSeconds: 3600,
             partialFilterExpression: { type: 'derived' },

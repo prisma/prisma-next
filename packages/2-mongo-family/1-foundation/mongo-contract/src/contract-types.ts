@@ -6,6 +6,7 @@ import type {
   StorageBase,
 } from '@prisma-next/contract/types';
 import type { MongoCollectionOptions } from './ir/mongo-collection-options';
+import type { MongoIndex } from './ir/mongo-index';
 import type { MongoIndexOptionsInput } from './ir/mongo-index-options';
 import type { MongoValidator } from './ir/mongo-validator';
 
@@ -23,7 +24,13 @@ export type MongoJsonObject = {
 
 export type MongoWildcardProjection = Readonly<Record<string, 0 | 1>>;
 
-export type MongoIndex = {
+/**
+ * Authoring-DSL shape for a single index entry on a model — the
+ * `indexes` array element accepted by the contract-ts builder. The
+ * builder translates these (with model context) into {@link MongoIndex}
+ * IR-class instances on `MongoStorageCollection.indexes`.
+ */
+export type MongoIndexAuthoringInput = {
   readonly fields: MongoIndexFields;
   readonly options?: MongoIndexOptionsInput;
 };
@@ -35,21 +42,8 @@ export interface MongoIndexKey {
   readonly direction: MongoIndexKeyDirection;
 }
 
-export interface MongoStorageIndex {
-  readonly keys: ReadonlyArray<MongoIndexKey>;
-  readonly unique?: boolean;
-  readonly sparse?: boolean;
-  readonly expireAfterSeconds?: number;
-  readonly partialFilterExpression?: Record<string, unknown>;
-  readonly wildcardProjection?: Record<string, 0 | 1>;
-  readonly collation?: Record<string, unknown>;
-  readonly weights?: Record<string, number>;
-  readonly default_language?: string;
-  readonly language_override?: string;
-}
-
 export interface MongoStorageCollection {
-  readonly indexes?: ReadonlyArray<MongoStorageIndex>;
+  readonly indexes?: ReadonlyArray<MongoIndex>;
   readonly validator?: MongoValidator;
   readonly options?: MongoCollectionOptions;
 }

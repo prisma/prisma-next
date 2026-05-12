@@ -20,12 +20,13 @@ import {
   type MongoCollectionOptionsInput,
   type MongoContract,
   type MongoContractWithTypeMaps,
-  type MongoIndex,
+  MongoIndex,
+  type MongoIndexAuthoringInput,
   type MongoIndexFields,
+  type MongoIndexInput,
   type MongoIndexOptionsInput,
   type MongoStorage,
   type MongoStorageCollection,
-  type MongoStorageIndex,
   type MongoTypeMaps,
   validateMongoContract,
 } from '@prisma-next/mongo-contract';
@@ -159,7 +160,7 @@ export interface ModelBuilder<
   readonly __name: Name;
   readonly __fields: Fields;
   readonly __relations: Relations;
-  readonly __indexes: readonly MongoIndex[] | undefined;
+  readonly __indexes: readonly MongoIndexAuthoringInput[] | undefined;
   readonly __collectionOptions: MongoCollectionOptionsAuthoringInput | undefined;
   readonly __collection: Collection;
   readonly __owner: Owner;
@@ -905,7 +906,7 @@ type ModelInput<
   Fields extends Record<string, AnyFieldBuilder>,
   Relations extends Record<string, AnyRelationBuilder> | undefined,
   Collection extends string | undefined,
-  Indexes extends readonly MongoIndex[] | undefined,
+  Indexes extends readonly MongoIndexAuthoringInput[] | undefined,
   CollectionOptions,
   Owner extends ModelNameInput | undefined,
   Base extends ModelNameInput | undefined,
@@ -928,7 +929,7 @@ export function model<
   const Fields extends Record<string, AnyFieldBuilder>,
   const Relations extends Record<string, AnyRelationBuilder> | undefined = undefined,
   const Collection extends string | undefined = undefined,
-  const Indexes extends readonly MongoIndex[] | undefined = undefined,
+  const Indexes extends readonly MongoIndexAuthoringInput[] | undefined = undefined,
   const CollectionOptions = undefined,
   const Owner extends ModelNameInput | undefined = undefined,
   const Base extends ModelNameInput | undefined = undefined,
@@ -1182,20 +1183,20 @@ function normalizeRoots(roots: Record<string, ModelNameInput> | undefined): Reco
   return normalizedRoots;
 }
 
-function toStorageIndex(index: MongoIndex): MongoStorageIndex {
+function toStorageIndex(index: MongoIndexAuthoringInput): MongoIndex {
   const keys = Object.entries(index.fields).map(([field, direction]) => ({
     field,
     direction,
   }));
-  const result: Record<string, unknown> = { keys };
+  const input: Record<string, unknown> = { keys };
   if (index.options) {
     for (const [key, value] of Object.entries(index.options)) {
       if (value !== undefined) {
-        result[key] = value;
+        input[key] = value;
       }
     }
   }
-  return result as unknown as MongoStorageIndex;
+  return new MongoIndex(input as unknown as MongoIndexInput);
 }
 
 function toStorageCollectionOptions(
@@ -1224,7 +1225,7 @@ function toStorageCollectionOptions(
 }
 
 function findMissingIndexField(
-  index: MongoIndex,
+  index: MongoIndexAuthoringInput,
   modelFields: Record<string, unknown>,
 ): string | undefined {
   for (const fieldName of Object.keys(index.fields)) {
@@ -1253,11 +1254,11 @@ function resolveVariantScope(
 }
 
 function scopeVariantIndex(
-  storageIndex: MongoStorageIndex,
+  storageIndex: MongoIndex,
   scope: { discriminatorField: string; discriminatorValue: string },
   variantName: string,
-  authoredIndex: MongoIndex | undefined,
-): MongoStorageIndex {
+  authoredIndex: MongoIndexAuthoringInput | undefined,
+): MongoIndex {
   const result = applyPolymorphicScopeToMongoIndex(storageIndex, scope);
   if (result.kind === 'conflict') {
     const indexLabel = authoredIndex ? canonicalStringify(authoredIndex) : '<unknown>';

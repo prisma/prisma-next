@@ -3,8 +3,9 @@ import {
   MongoCollectionOptions,
   type MongoCollectionOptionsInput,
   type MongoContract,
+  MongoIndex,
+  type MongoIndexInput,
   type MongoStorageCollection,
-  type MongoStorageIndex,
   MongoValidator,
   type MongoValidatorInput,
 } from '@prisma-next/mongo-contract';
@@ -36,14 +37,18 @@ const ADDITIVE_ONLY_POLICY: MigrationOperationPolicy = {
 };
 
 type MongoStorageCollectionData = {
-  readonly indexes?: readonly MongoStorageIndex[];
+  readonly indexes?: readonly (MongoIndex | MongoIndexInput)[];
   readonly validator?: MongoValidator | MongoValidatorInput;
   readonly options?: MongoCollectionOptions | MongoCollectionOptionsInput;
 };
 
 function makeStorageCollection(data: MongoStorageCollectionData): MongoStorageCollection {
   const collection: Record<string, unknown> = {};
-  if (data.indexes) collection['indexes'] = data.indexes;
+  if (data.indexes) {
+    collection['indexes'] = data.indexes.map((idx) =>
+      idx instanceof MongoIndex ? idx : new MongoIndex(idx),
+    );
+  }
   if (data.validator !== undefined) {
     collection['validator'] =
       data.validator instanceof MongoValidator

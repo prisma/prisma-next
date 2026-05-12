@@ -1,4 +1,5 @@
 import { coreHash } from '@prisma-next/contract/types';
+import { MongoIndex } from '@prisma-next/mongo-contract';
 import { MongoStorageBase } from '@prisma-next/mongo-contract/ir';
 import { describe, expect, it } from 'vitest';
 import {
@@ -24,9 +25,9 @@ describe('MongoTargetStorage', () => {
     expect(storage.namespaces['__unspecified__']).toBe(MongoTargetUnspecifiedDatabase.instance);
   });
 
-  it('preserves collections passed in (flat-data shape; IR-class flip is M2 R2)', () => {
+  it('preserves collections passed in (IR-class instances post M2 R2)', () => {
     const collections = {
-      events: { indexes: [{ keys: [{ field: 'ts', direction: 1 as const }] }] },
+      events: { indexes: [new MongoIndex({ keys: [{ field: 'ts', direction: 1 }] })] },
     };
     const storage = new MongoTargetStorage({ storageHash: hash, collections });
     expect(storage.collections).toBe(collections);
