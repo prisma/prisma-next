@@ -1,4 +1,4 @@
-import { buildOperation, refsOf, toExpr } from '@prisma-next/sql-relational-core/expression';
+import { buildOperation, codecOf, toExpr } from '@prisma-next/sql-relational-core/expression';
 import type { CodecTypes } from '../types/codec-types';
 import type { QueryOperationTypes } from '../types/operation-types';
 import { postgisAuthoringTypes } from './authoring';
@@ -22,10 +22,10 @@ export function postgisQueryOperations<CT extends CodecTypesBase>(): QueryOperat
     distance: {
       self: { codecId: postgisTypeId },
       impl: (self, other) => {
-        const selfRefs = refsOf(self);
+        const selfCodec = codecOf(self);
         return buildOperation({
           method: 'distance',
-          args: [toExpr(self, postgisTypeId, selfRefs), toExpr(other, postgisTypeId, selfRefs)],
+          args: [toExpr(self, selfCodec), toExpr(other, selfCodec)],
           returns: { codecId: 'pg/float8@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -38,10 +38,10 @@ export function postgisQueryOperations<CT extends CodecTypesBase>(): QueryOperat
     distanceSphere: {
       self: { codecId: postgisTypeId },
       impl: (self, other) => {
-        const selfRefs = refsOf(self);
+        const selfCodec = codecOf(self);
         return buildOperation({
           method: 'distanceSphere',
-          args: [toExpr(self, postgisTypeId, selfRefs), toExpr(other, postgisTypeId, selfRefs)],
+          args: [toExpr(self, selfCodec), toExpr(other, selfCodec)],
           returns: { codecId: 'pg/float8@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -54,13 +54,13 @@ export function postgisQueryOperations<CT extends CodecTypesBase>(): QueryOperat
     dwithin: {
       self: { codecId: postgisTypeId },
       impl: (self, other, distance) => {
-        const selfRefs = refsOf(self);
+        const selfCodec = codecOf(self);
         return buildOperation({
           method: 'dwithin',
           args: [
-            toExpr(self, postgisTypeId, selfRefs),
-            toExpr(other, postgisTypeId, selfRefs),
-            toExpr(distance, 'pg/float8@1'),
+            toExpr(self, selfCodec),
+            toExpr(other, selfCodec),
+            toExpr(distance, { codecId: 'pg/float8@1' }),
           ],
           returns: { codecId: 'pg/bool@1', nullable: false },
           lowering: {
@@ -74,10 +74,10 @@ export function postgisQueryOperations<CT extends CodecTypesBase>(): QueryOperat
     contains: {
       self: { codecId: postgisTypeId },
       impl: (self, other) => {
-        const selfRefs = refsOf(self);
+        const selfCodec = codecOf(self);
         return buildOperation({
           method: 'contains',
-          args: [toExpr(self, postgisTypeId, selfRefs), toExpr(other, postgisTypeId, selfRefs)],
+          args: [toExpr(self, selfCodec), toExpr(other, selfCodec)],
           returns: { codecId: 'pg/bool@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -90,10 +90,10 @@ export function postgisQueryOperations<CT extends CodecTypesBase>(): QueryOperat
     within: {
       self: { codecId: postgisTypeId },
       impl: (self, other) => {
-        const selfRefs = refsOf(self);
+        const selfCodec = codecOf(self);
         return buildOperation({
           method: 'within',
-          args: [toExpr(self, postgisTypeId, selfRefs), toExpr(other, postgisTypeId, selfRefs)],
+          args: [toExpr(self, selfCodec), toExpr(other, selfCodec)],
           returns: { codecId: 'pg/bool@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -106,10 +106,10 @@ export function postgisQueryOperations<CT extends CodecTypesBase>(): QueryOperat
     intersects: {
       self: { codecId: postgisTypeId },
       impl: (self, other) => {
-        const selfRefs = refsOf(self);
+        const selfCodec = codecOf(self);
         return buildOperation({
           method: 'intersects',
-          args: [toExpr(self, postgisTypeId, selfRefs), toExpr(other, postgisTypeId, selfRefs)],
+          args: [toExpr(self, selfCodec), toExpr(other, selfCodec)],
           returns: { codecId: 'pg/bool@1', nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -122,10 +122,10 @@ export function postgisQueryOperations<CT extends CodecTypesBase>(): QueryOperat
     intersectsBbox: {
       self: { codecId: postgisTypeId },
       impl: (self, other) => {
-        const selfRefs = refsOf(self);
+        const selfCodec = codecOf(self);
         return buildOperation({
           method: 'intersectsBbox',
-          args: [toExpr(self, postgisTypeId, selfRefs), toExpr(other, postgisTypeId, selfRefs)],
+          args: [toExpr(self, selfCodec), toExpr(other, selfCodec)],
           returns: { codecId: 'pg/bool@1', nullable: false },
           lowering: {
             targetFamily: 'sql',

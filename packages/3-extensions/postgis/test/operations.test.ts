@@ -1,7 +1,16 @@
+import type { CodecRef } from '@prisma-next/framework-components/codec';
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
 import { ColumnRef, OperationExpr, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import postgisDescriptor from '../src/exports/runtime';
+
+const geometryCodec: CodecRef = { codecId: 'pg/geometry@1' };
+const float8Codec: CodecRef = { codecId: 'pg/float8@1' };
+
+function geometryExpr(value: unknown, codec: CodecRef = geometryCodec) {
+  const ref = ParamRef.of(value, { codec });
+  return { returnType: { codecId: codec.codecId, nullable: false }, buildAst: () => ref, codec };
+}
 
 describe('postgis operations', () => {
   it('descriptor has correct metadata', () => {
@@ -49,7 +58,7 @@ describe('postgis operations', () => {
       const op = operations[method];
       expect(op, method).toBeDefined();
       const expr = op?.impl(
-        ParamRef.of({ type: 'Point', coordinates: [0, 0] }, { codecId: 'pg/geometry@1' }) as never,
+        geometryExpr({ type: 'Point', coordinates: [0, 0] }) as never,
         { type: 'Point', coordinates: [1, 1] } as never,
       ) as unknown as { buildAst(): OperationExpr };
       const ast = expr.buildAst();
@@ -66,9 +75,9 @@ describe('postgis operations', () => {
     const op = postgisDescriptor.queryOperations!()['dwithin'];
     expect(op).toBeDefined();
     const expr = op?.impl(
-      ParamRef.of({ type: 'Point', coordinates: [0, 0] }, { codecId: 'pg/geometry@1' }) as never,
+      geometryExpr({ type: 'Point', coordinates: [0, 0] }) as never,
       { type: 'Point', coordinates: [1, 1] } as never,
-      ParamRef.of(1000, { codecId: 'pg/float8@1' }) as never,
+      geometryExpr(1000, float8Codec) as never,
     ) as unknown as { buildAst(): OperationExpr };
     const ast = expr.buildAst();
     expect(ast.lowering).toEqual({
@@ -78,9 +87,11 @@ describe('postgis operations', () => {
     });
   });
 
-  it('binary impls thread column refs from self onto the user-value ParamRef', () => {
+  it('binary impls thread the column codec from self onto the user-value ParamRef', () => {
     const operations = postgisDescriptor.queryOperations!();
     const columnSelf = {
+      codec: geometryCodec,
+      returnType: { codecId: 'pg/geometry@1', nullable: false, codec: geometryCodec },
       buildAst: () => ColumnRef.of('cafe', 'location'),
     };
     const binaryMethods = [
@@ -101,18 +112,16 @@ describe('postgis operations', () => {
       const ast = expr.buildAst();
       const otherArg = ast.args?.[0];
       expect(otherArg, `${method} arg0`).toBeInstanceOf(ParamRef);
-      expect((otherArg as ParamRef).refs, `${method} refs`).toEqual({
-        table: 'cafe',
-        column: 'location',
-      });
-      expect((otherArg as ParamRef).codecId).toBe('pg/geometry@1');
+      expect((otherArg as ParamRef).codec, `${method} codec`).toEqual(geometryCodec);
     }
   });
 
-  it('dwithin threads refs onto its geometry arg', () => {
+  it('dwithin threads the column codec onto its geometry arg', () => {
     const op = postgisDescriptor.queryOperations!()['dwithin'];
     expect(op).toBeDefined();
     const columnSelf = {
+      codec: geometryCodec,
+      returnType: { codecId: 'pg/geometry@1', nullable: false, codec: geometryCodec },
       buildAst: () => ColumnRef.of('cafe', 'location'),
     };
     const expr = op?.impl(
@@ -123,8 +132,7 @@ describe('postgis operations', () => {
     const ast = expr.buildAst();
     const otherArg = ast.args?.[0];
     expect(otherArg).toBeInstanceOf(ParamRef);
-    expect((otherArg as ParamRef).refs).toEqual({ table: 'cafe', column: 'location' });
-    expect((otherArg as ParamRef).codecId).toBe('pg/geometry@1');
+    expect((otherArg as ParamRef).codec).toEqual(geometryCodec);
   });
 
   it('operations register into a SqlOperationRegistry', () => {
