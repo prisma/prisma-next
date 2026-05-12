@@ -5,56 +5,208 @@
  * query against a real DB, across all four `(target × authoring)` cells.
  * Asserts the contract one subsystem hands to the next at every seam.
  *
- * See `projects/init-journey-tests/spec.md` for the design and the four
- * currently-broken seams this test will end up encoding:
- * TML-2486, TML-2487, TML-2314, TML-2461.
+ * Initial state: this file lands "red-by-design". Each known seam bug
+ * (TML-2461, TML-2486, TML-2487, TML-2314) is encoded as a `seamExpectation`
+ * with `status: 'broken'`, so the test passes precisely *because* the bug
+ * is still present. Each subsequent bug-fix commit in this PR flips one
+ * status from `'broken'` to `'fixed'` alongside the implementation change,
+ * proving the seam was the thing the test was actually watching.
  *
- * Phase A scope: step 1 only — `prisma-next init` materialises the expected
- * scaffold. Subsequent phases extend the journey toward `db init` + user
- * code + migration round-trip.
+ * See `projects/init-journey-tests/spec.md` for the design.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'pathe';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { type DatabaseHandle, spinUpDatabaseForCell } from './init-journey/database-handles';
 import {
   ALL_CELLS,
+  attachDatabase,
   type CellId,
   type CommandRun,
   cellLabel,
   createJourneyProject,
+  dbInit,
+  emitContract,
   type JourneyProject,
+  runUserCode,
+  type StepResult,
+  seamExpectation,
 } from './init-journey/harness';
+
+/** Per-cell journey runtime artefacts, populated once in `beforeAll`. */
+interface JourneyContext {
+  readonly project: JourneyProject;
+  readonly database: DatabaseHandle | null;
+  readonly emit: StepResult | null;
+  readonly dbInit: StepResult | null;
+}
 
 describe.each(
   ALL_CELLS.map((cell) => ({ cell, label: cellLabel(cell) })),
 )('init-journey · $label', ({ cell }) => {
-  let project: JourneyProject;
+  let ctx: JourneyContext;
 
   beforeAll(async () => {
-    project = await createJourneyProject(cell);
+    ctx = await runFullJourney(cell);
   }, 240_000);
 
-  afterAll(() => {
-    project?.cleanup();
+  afterAll(async () => {
+    await ctx?.database?.close();
+    ctx?.project?.cleanup();
   });
 
   it('step 1 (init): scaffolds the expected project skeleton', () => {
-    expect(project.initResult.exitCode, formatInitDiagnostic(project)).toBe(0);
+    expect(ctx.project.initResult.exitCode, formatInitDiagnostic(ctx.project)).toBe(0);
 
-    expectScaffoldedFiles(project);
-    expectSchemaFile(project, cell);
-    expectConfigFile(project, cell);
+    expectScaffoldedFiles(ctx.project);
+    expectSchemaFile(ctx.project, cell);
+    expectConfigFile(ctx.project, cell);
   });
 
   it('step 2 (install): pnpm install succeeds with isolated linker', () => {
-    const install = project.installResult;
+    const install = ctx.project.installResult;
     expect(install, 'install was skipped — harness option mismatch').not.toBeNull();
     if (install === null) return;
-    expect(install.exitCode, formatInstallDiagnostic(project, install)).toBe(0);
+    expect(install.exitCode, formatInstallDiagnostic(ctx.project, install)).toBe(0);
 
-    expectFacadeIsResolvable(project);
+    expectFacadeIsResolvable(ctx.project);
   });
+
+  it('step 3 (emit): produces contract.json + contract.d.ts next to the input', () => {
+    const emit = ctx.emit;
+    expect(emit, 'emit was not run (precondition failure)').not.toBeNull();
+    if (emit === null) return;
+    expect(emit.exitCode, formatStepDiagnostic('emit', ctx.project, emit)).toBe(0);
+
+    // The init scaffold passes a single string `contract: "./prisma/contract.ts"`
+    // to the facade `defineConfig`, which derives an output path next to the
+    // input. The journey verifies that derivation actually reaches the emitter
+    // — this is the seam that breaks when init scaffold and emit output get
+    // out of sync (the symptom shape of TML-2461, even if the facade currently
+    // masks the underlying default-output bug).
+    expect(
+      existsSync(join(ctx.project.dir, 'prisma/contract.json')),
+      'contract.json must land next to the scaffolded contract source',
+    ).toBe(true);
+    expect(
+      existsSync(join(ctx.project.dir, 'prisma/contract.d.ts')),
+      'contract.d.ts must land next to the scaffolded contract source',
+    ).toBe(true);
+  });
+
+  it('step 4 (db init): provisions the schema (TML-2486 seam)', () => {
+    const result = ctx.dbInit;
+    expect(result, 'db init was not run (precondition failure)').not.toBeNull();
+    if (result === null) return;
+    TML_2486_seam(cell, ctx.project, result);
+  });
+
+  it('step 5 (user code: ObjectId import) (TML-2487 seam)', async () => {
+    if (cell.target !== 'mongo') return;
+    const run = await runUserCode(
+      ctx.project,
+      'check-objectid.ts',
+      [
+        "import { ObjectId } from '@prisma-next/mongo';",
+        'const id = new ObjectId();',
+        'console.log(id.toHexString().length);',
+        '',
+      ].join('\n'),
+    );
+    TML_2487_seam(ctx.project, run);
+  });
+
+  it('step 6 (user code: control import) (TML-2314 seam)', async () => {
+    if (cell.target !== 'postgres') return;
+    const run = await runUserCode(
+      ctx.project,
+      'check-control.ts',
+      [
+        "import { createPostgresControlClient } from '@prisma-next/postgres/control';",
+        'const client = createPostgresControlClient();',
+        "console.log(typeof client === 'object' ? 'ok' : 'unexpected');",
+        '',
+      ].join('\n'),
+    );
+    TML_2314_seam(ctx.project, run);
+  });
+});
+
+async function runFullJourney(cell: CellId): Promise<JourneyContext> {
+  const project = await createJourneyProject(cell);
+  if (project.initResult.exitCode !== 0 || project.installResult?.exitCode !== 0) {
+    return { project, database: null, emit: null, dbInit: null };
+  }
+
+  const database = await spinUpDatabaseForCell(cell);
+  attachDatabase(project, database.connectionString);
+
+  const emit = await emitContract(project);
+  const dbInitResult = await dbInit(project);
+
+  return { project, database, emit, dbInit: dbInitResult };
+}
+
+// --- Seam expectations -----------------------------------------------------
+//
+// One per known seam bug. Each is a `seamExpectation<T>` with `status:
+// 'broken'`. When the matching fix commit lands, the maintainer flips
+// `'broken'` to `'fixed'` here and the assertion follows.
+
+const TML_2486_seam = (cell: CellId, project: JourneyProject, result: StepResult): void => {
+  if (cell.target !== 'mongo') {
+    expect(result.exitCode, formatStepDiagnostic('db init', project, result)).toBe(0);
+    return;
+  }
+  seamExpectation<StepResult>({
+    ticket: 'TML-2486',
+    description: 'mongo db init successfully creates the contract collections',
+    status: 'broken',
+    whenBroken: (r) => {
+      expect(r.exitCode, 'TML-2486 still broken: mongo db init must currently fail').not.toBe(0);
+      const combined = `${r.stdout}\n${r.stderr}`;
+      // The original bug report quotes `createCollection` rejecting `undefined`
+      // fields with `PN-CLI-4999`. On this branch the bug has partially shifted
+      // surface to `PN-RUN-3020` ("missing_table") — the failure mode still
+      // resolves to "db init left the database empty". Match both so the seam
+      // assertion stays meaningful while the underlying surface is being
+      // squashed.
+      expect(
+        combined,
+        'TML-2486 still broken: mongo error must mention undefined fields or missing collections',
+      ).toMatch(/undefined|PN-CLI-4999|createCollection|PN-RUN-3020|missing_table/);
+    },
+    whenFixed: (r) => {
+      expect(r.exitCode, formatStepDiagnostic('db init', project, r)).toBe(0);
+    },
+  })(result);
+};
+
+const TML_2487_seam = seamExpectation<StepResult>({
+  ticket: 'TML-2487',
+  description: '@prisma-next/mongo re-exports ObjectId',
+  status: 'broken',
+  whenBroken: (r) => {
+    expect(r.exitCode, 'TML-2487 still broken: ObjectId import must currently fail').not.toBe(0);
+  },
+  whenFixed: (r) => {
+    expect(r.exitCode, formatStepDiagnostic('ObjectId import', null, r)).toBe(0);
+    expect(r.stdout.trim(), 'ObjectId.toHexString() should yield 24 hex chars').toBe('24');
+  },
+});
+
+const TML_2314_seam = seamExpectation<StepResult>({
+  ticket: 'TML-2314',
+  description: '@prisma-next/postgres exposes a control subpath',
+  status: 'broken',
+  whenBroken: (r) => {
+    expect(r.exitCode, 'TML-2314 still broken: control import must currently fail').not.toBe(0);
+  },
+  whenFixed: (r) => {
+    expect(r.exitCode, formatStepDiagnostic('control import', null, r)).toBe(0);
+    expect(r.stdout.trim(), 'control import should produce a control client').toBe('ok');
+  },
 });
 
 function expectScaffoldedFiles(project: JourneyProject): void {
@@ -130,6 +282,23 @@ function formatInstallDiagnostic(project: JourneyProject, install: CommandRun): 
     indent(install.stdout, '    '),
     '  stderr:',
     indent(install.stderr, '    '),
+  ].join('\n');
+}
+
+function formatStepDiagnostic(
+  step: string,
+  project: JourneyProject | null,
+  result: StepResult,
+): string {
+  return [
+    `${step} failed${project !== null ? ` for ${cellLabel(project.cell)}` : ''}`,
+    `  command: ${result.command}`,
+    `  exit code: ${result.exitCode}`,
+    ...(project !== null ? [`  cwd: ${project.dir}`] : []),
+    '  stdout:',
+    indent(result.stdout, '    '),
+    '  stderr:',
+    indent(result.stderr, '    '),
   ].join('\n');
 }
 

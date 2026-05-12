@@ -101,6 +101,12 @@ export interface JourneyProject {
   cleanup(): void;
 }
 
+/** Result of a single journey step that runs a process inside the tmpdir. */
+export interface StepResult extends CommandRun {
+  /** The command + args that produced this result, for diagnostics. */
+  readonly command: string;
+}
+
 interface CreateJourneyProjectOptions {
   /**
    * Whether to run `pnpm install` after the scaffold lands. The install
@@ -450,4 +456,98 @@ function writeIsolatedNpmrc(dir: string): void {
  */
 export function ensureTmpdir(): void {
   mkdirSync(tmpdir(), { recursive: true });
+}
+
+// --- Journey step primitives -----------------------------------------------
+//
+// Each primitive corresponds to one observable step the user takes after the
+// scaffold is in place. They all funnel through `runStep`, which spawns a
+// subprocess in the project tmpdir, with `DATABASE_URL` already injected if
+// `attachDatabase` was called.
+
+const DATABASE_URL_FILE = '.env';
+
+/**
+ * Writes a `.env` file inside the project so that the scaffolded
+ * `prisma-next.config.ts` (which uses `dotenv/config`) picks up the
+ * connection string when emit/dbInit/runtime are invoked.
+ */
+export function attachDatabase(project: JourneyProject, connectionString: string): void {
+  const contents = `DATABASE_URL=${connectionString}\n`;
+  writeFileSync(join(project.dir, DATABASE_URL_FILE), contents, 'utf-8');
+}
+
+/**
+ * Emits the contract via the locally-installed CLI. Equivalent to what a
+ * user runs as `pnpm prisma-next contract emit` after install.
+ */
+export async function emitContract(project: JourneyProject): Promise<StepResult> {
+  return runStep(project, ['pnpm', 'exec', 'prisma-next', 'contract', 'emit']);
+}
+
+/**
+ * Runs `prisma-next db init`. This is where TML-2486 lives (sends
+ * `undefined` for optional createCollection args in the Mongo path).
+ */
+export async function dbInit(project: JourneyProject): Promise<StepResult> {
+  return runStep(project, ['pnpm', 'exec', 'prisma-next', 'db', 'init']);
+}
+
+/**
+ * Writes a TypeScript file into the project and executes it via Node's
+ * native type stripping (Node 24+). This is the "bolt user code on top"
+ * step — the surface where TML-2487 (missing ObjectId re-export) and
+ * TML-2314 (missing control re-export) materialise.
+ */
+export async function runUserCode(
+  project: JourneyProject,
+  relativePath: string,
+  source: string,
+): Promise<StepResult> {
+  const target = join(project.dir, relativePath);
+  mkdirSync(join(target, '..'), { recursive: true });
+  writeFileSync(target, source, 'utf-8');
+  return runStep(project, [
+    'node',
+    '--experimental-strip-types',
+    '--no-warnings=ExperimentalWarning',
+    relativePath,
+  ]);
+}
+
+async function runStep(project: JourneyProject, args: readonly string[]): Promise<StepResult> {
+  if (args.length === 0) {
+    throw new Error('runStep requires a non-empty command');
+  }
+  const [bin, ...rest] = args;
+  if (bin === undefined) {
+    throw new Error('runStep requires a binary');
+  }
+  const result = await runExec(bin, rest, project.dir);
+  return { ...result, command: args.join(' ') };
+}
+
+/**
+ * Helper that flips one assertion based on whether a bug is currently
+ * `'broken'` or `'fixed'`. The journey test encodes one of these per known
+ * seam bug (TML-2486, TML-2487, TML-2314, TML-2461); flipping the status
+ * is how individual bug-fix commits land in the same PR without rewriting
+ * the journey test itself.
+ */
+export interface SeamExpectation<T> {
+  readonly ticket: string;
+  readonly description: string;
+  readonly status: 'broken' | 'fixed';
+  readonly whenBroken: (result: T) => void;
+  readonly whenFixed: (result: T) => void;
+}
+
+export function seamExpectation<T>(spec: SeamExpectation<T>): (result: T) => void {
+  return (result) => {
+    if (spec.status === 'broken') {
+      spec.whenBroken(result);
+    } else {
+      spec.whenFixed(result);
+    }
+  };
 }
