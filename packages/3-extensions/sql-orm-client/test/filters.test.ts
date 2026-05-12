@@ -105,6 +105,14 @@ describe('filters', () => {
     );
   });
 
+  it('eq(null) / neq(null) lower to IS NULL / IS NOT NULL', () => {
+    const post = createModelAccessor(context, 'Post');
+    const userId = post['userId']! as { eq: (v: unknown) => unknown; neq: (v: unknown) => unknown };
+
+    expect(userId.eq(null)).toEqual(NullCheckExpr.isNull(ColumnRef.of('posts', 'user_id')));
+    expect(userId.neq(null)).toEqual(NullCheckExpr.isNotNull(ColumnRef.of('posts', 'user_id')));
+  });
+
   it('wraps like in NotExpr', () => {
     const user = createModelAccessor(context, 'User');
 

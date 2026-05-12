@@ -276,8 +276,12 @@ type ComparisonMethodMeta = {
 };
 
 function scalarComparisonMethod(op: BinaryOp) {
-  return ((left, codec) => (value: unknown) =>
-    new BinaryExpr(op, left, param(codec, value))) satisfies MethodFactory;
+  return ((left, codec) => (value: unknown) => {
+    if (value === null && (op === 'eq' || op === 'neq')) {
+      return op === 'eq' ? NullCheckExpr.isNull(left) : NullCheckExpr.isNotNull(left);
+    }
+    return new BinaryExpr(op, left, param(codec, value));
+  }) satisfies MethodFactory;
 }
 
 function listComparisonMethod(op: BinaryOp) {
