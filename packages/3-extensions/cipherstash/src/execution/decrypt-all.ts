@@ -62,7 +62,7 @@
 
 import { ifDefined } from '@prisma-next/utils/defined';
 import { checkCipherstashAborted, raceCipherstashAbort } from './abort';
-import { applyDecryptedSdkResult, EncryptedEnvelopeBase, isHandleDecrypted } from './envelope-base';
+import { EncryptedEnvelopeBase, isHandleDecrypted } from './envelope-base';
 import type { CipherstashRoutingKey, CipherstashSdk } from './sdk';
 
 export interface DecryptAllOptions {
@@ -125,15 +125,16 @@ export async function decryptAll(rows: unknown, opts?: DecryptAllOptions): Promi
       if (!target || plaintext === undefined) continue;
       // The SDK's `bulkDecrypt` returns `ReadonlyArray<unknown>` per
       // spec D1 — narrowing to each envelope's `T` is the per-subclass
-      // responsibility. `applyDecryptedSdkResult` dispatches through
-      // the envelope's own `parseDecryptedValue` hook (e.g.
-      // `EncryptedDate` coerces strings/numbers/Date instances to
-      // a `Date`), then writes the narrowed plaintext into the
-      // handle's cache slot. Heterogeneous groups are not possible —
-      // every cell in a `(sdk, table, column)` group has the same
+      // responsibility. `applyDecryptedSdkResult` is a static member
+      // on the base class (TS's class-bounded-friend convention) that
+      // dispatches through the envelope's own `parseDecryptedValue`
+      // hook (e.g. `EncryptedDate` coerces strings/numbers/Date
+      // instances to a `Date`) and writes the narrowed plaintext into
+      // the handle's cache slot. Heterogeneous groups are not possible
+      // — every cell in a `(sdk, table, column)` group has the same
       // codec id, hence the same envelope subclass — but dynamic
       // dispatch still keeps the call site agnostic.
-      applyDecryptedSdkResult(target.envelope, plaintext);
+      EncryptedEnvelopeBase.applyDecryptedSdkResult(target.envelope, plaintext);
     }
   }
 }

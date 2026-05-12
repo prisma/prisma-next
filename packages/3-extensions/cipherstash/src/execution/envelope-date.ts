@@ -48,7 +48,7 @@ export class EncryptedDate extends EncryptedEnvelopeBase<Date> {
    * Throws on any other shape; an invalid `Date` (NaN time) is
    * rejected before it can leak downstream.
    */
-  override parseDecryptedValue(sdkResult: unknown): Date {
+  protected override parseDecryptedValue(sdkResult: unknown): Date {
     if (sdkResult instanceof Date) {
       if (Number.isNaN(sdkResult.getTime())) {
         throw new Error(

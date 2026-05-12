@@ -27,6 +27,11 @@ import {
   type EncryptedStringFromInternalArgs,
   isHandleDecrypted,
 } from '../src/execution/envelope';
+import { EncryptedBigInt } from '../src/execution/envelope-bigint';
+import { EncryptedBoolean } from '../src/execution/envelope-boolean';
+import { EncryptedDate } from '../src/execution/envelope-date';
+import { EncryptedDouble } from '../src/execution/envelope-double';
+import { EncryptedJson } from '../src/execution/envelope-json';
 import type {
   CipherstashBulkDecryptArgs,
   CipherstashBulkEncryptArgs,
@@ -448,12 +453,6 @@ describe('decryptAll — heterogeneous envelope subclasses', () => {
   }
 
   it('groups heterogeneous types by (table, column) — one bulkDecrypt per group, narrowed plaintexts', async () => {
-    const { EncryptedDouble } = await import('../src/execution/envelope-double');
-    const { EncryptedDate } = await import('../src/execution/envelope-date');
-    const { EncryptedBoolean } = await import('../src/execution/envelope-boolean');
-    const { EncryptedJson } = await import('../src/execution/envelope-json');
-    const { EncryptedBigInt } = await import('../src/execution/envelope-bigint');
-
     const sdk = makeMultiSdk();
     const stringEnv = EncryptedString.fromInternal({
       ciphertext: { v: 'alice@example.com' },

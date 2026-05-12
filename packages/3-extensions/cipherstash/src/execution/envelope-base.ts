@@ -119,16 +119,40 @@ export abstract class EncryptedEnvelopeBase<T> {
    * `T` requires runtime narrowing (e.g. `EncryptedDate` constructing
    * a `Date` from an ISO string) override this hook.
    *
-   * Public rather than `protected` because `decryptAll` reaches the
-   * narrowing hook from outside the class hierarchy: it issues the
-   * bulk-decrypt round-trip itself and then needs to apply each
-   * envelope's per-type narrowing to the SDK's polymorphic return
-   * shape before populating the plaintext cache. The friend function
-   * {@link applyDecryptedSdkResult} below wraps "narrow + cache" into
-   * the conventional setter shape used by the other handle mutators.
+   * Reachable from outside the class hierarchy only via the
+   * class-bounded {@link EncryptedEnvelopeBase.applyDecryptedSdkResult}
+   * static method — TS lets static members access protected instance
+   * members of the same class, so the friend access is scoped to
+   * one well-named entry point and the hook stays `protected` against
+   * arbitrary out-of-package callers.
    */
-  parseDecryptedValue(sdkResult: unknown): T {
+  protected parseDecryptedValue(sdkResult: unknown): T {
     return sdkResult as T;
+  }
+
+  /**
+   * Apply an SDK bulk-decrypt result to an envelope: narrow the
+   * polymorphic SDK return through the subclass's
+   * {@link EncryptedEnvelopeBase.parseDecryptedValue} hook and cache
+   * the narrowed plaintext on the handle. Returns the narrowed
+   * plaintext for callers that want to observe it.
+   *
+   * Lives as a `static` member rather than a free function in this
+   * module so it stays inside the class's lexical scope — TS's
+   * class-bounded-friend convention permits a static method to call a
+   * protected instance method on the same class, which is what lets
+   * `parseDecryptedValue` stay `protected` while still being reachable
+   * from {@link ../decrypt-all.ts decryptAll}.
+   *
+   * Mirrors the conventional `setHandle*` mutator shape used elsewhere
+   * in this module — call sites stay symmetric across the encrypt path
+   * (`setHandleCiphertext`) and the decrypt path
+   * (`EncryptedEnvelopeBase.applyDecryptedSdkResult`).
+   */
+  static applyDecryptedSdkResult<U>(envelope: EncryptedEnvelopeBase<U>, sdkResult: unknown): U {
+    const plaintext = envelope.parseDecryptedValue(sdkResult);
+    envelope.expose().plaintext = plaintext;
+    return plaintext;
   }
 
   /**
@@ -281,25 +305,4 @@ export function setHandleRoutingKey<T>(
  */
 export function isHandleDecrypted<T>(envelope: EncryptedEnvelopeBase<T>): boolean {
   return envelope.expose().plaintext !== undefined;
-}
-
-/**
- * Apply an SDK bulk-decrypt result to an envelope: narrow the
- * polymorphic SDK return through the subclass's
- * {@link EncryptedEnvelopeBase.parseDecryptedValue} hook and cache the
- * narrowed plaintext on the handle. Returns the narrowed plaintext for
- * callers that want to observe it.
- *
- * Mirrors the conventional `setHandle*` mutator shape used elsewhere in
- * this module — call sites stay symmetric across the encrypt path
- * (`setHandleCiphertext`) and the decrypt path
- * (`applyDecryptedSdkResult`).
- */
-export function applyDecryptedSdkResult<T>(
-  envelope: EncryptedEnvelopeBase<T>,
-  sdkResult: unknown,
-): T {
-  const plaintext = envelope.parseDecryptedValue(sdkResult);
-  envelope.expose().plaintext = plaintext;
-  return plaintext;
 }
