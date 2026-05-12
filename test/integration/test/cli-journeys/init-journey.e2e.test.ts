@@ -199,7 +199,7 @@ const TML_2487_seam = seamExpectation<StepResult>({
 const TML_2314_seam = seamExpectation<StepResult>({
   ticket: 'TML-2314',
   description: '@prisma-next/postgres exposes a control subpath',
-  status: 'broken',
+  status: 'fixed',
   whenBroken: (r) => {
     expect(r.exitCode, 'TML-2314 still broken: control import must currently fail').not.toBe(0);
   },
