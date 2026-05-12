@@ -57,6 +57,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 - `.cursor/rules/multi-plane-packages.mdc` — Packages that span multiple planes (shared, migration, runtime)
 - `.cursor/rules/multi-plane-entrypoints.mdc` — Multi-plane entrypoints in a single package
 - `.cursor/rules/directory-layout.mdc` — Directory layout (SQL family vs targets)
+- `.cursor/rules/contract-space-package-layout.mdc` — On-disk layout for packages that expose a contract space
 - `.cursor/rules/resolving-cyclic-dependencies.mdc` — How to resolve cyclic dependencies by checking for unused dependencies
 - `.cursor/rules/declarative-config.mdc` — Prefer declarative configuration over hardcoded logic
 - `architecture.config.json` — Domain/Layer/Plane map

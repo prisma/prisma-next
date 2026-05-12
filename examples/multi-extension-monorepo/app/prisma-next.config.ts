@@ -12,16 +12,16 @@ import { defineConfig } from '@prisma-next/cli/config-types';
 import sql from '@prisma-next/family-sql/control';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgres from '@prisma-next/target-postgres/control';
-import audit from '../packages/audit/control';
-import featureFlags from '../packages/feature-flags/control';
-import { contract } from './contract-source';
+import audit from '../packages/audit/src/control';
+import featureFlags from '../packages/feature-flags/src/control';
+import { contract } from './src/contract';
 
 export default defineConfig({
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
   extensionPacks: [audit, featureFlags],
-  contract: typescriptContract(contract, 'contract.json'),
+  contract: typescriptContract(contract, 'src/contract.json'),
   migrations: {
     dir: 'migrations',
   },

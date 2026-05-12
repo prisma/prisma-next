@@ -18,6 +18,8 @@ export default defineConfig({
         '**/*.test-d.ts',
         '**/*.config.ts',
         '**/exports/**',
+        // Emitted contract artefact (typecheck-only).
+        'src/contract.d.ts',
       ],
     },
   },
