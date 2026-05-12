@@ -1,4 +1,4 @@
-import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
   MultiSpaceRunnerResult,
@@ -16,15 +16,12 @@ import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlQueryError } from '@prisma-next/sql-errors';
-import { parseAnyQueryAst } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
-import { AST_BOUND_SENTINEL } from './operations/data-transform-ast';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 import {
   buildLedgerInsertStatement,
@@ -264,7 +261,6 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     const runPostchecks = checks?.postchecks !== false; // Default true
     const runIdempotency = checks?.idempotencyChecks !== false; // Default true
 
-    const contract = options.destinationContract;
     let operationsExecuted = 0;
     const executedOperations: Array<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> = [];
     for (const operation of options.plan.operations) {
@@ -275,7 +271,6 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
           const postcheckAlreadySatisfied = await this.expectationsAreSatisfied(
             driver,
             operation.postcheck,
-            contract,
           );
           if (postcheckAlreadySatisfied) {
             executedOperations.push(this.createPostcheckPreSatisfiedSkipRecord(operation));
@@ -290,19 +285,13 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
             operation.precheck,
             operation,
             'precheck',
-            contract,
           );
           if (!precheckResult.ok) {
             return precheckResult;
           }
         }
 
-        const executeResult = await this.runExecuteSteps(
-          driver,
-          operation.execute,
-          operation,
-          contract,
-        );
+        const executeResult = await this.runExecuteSteps(driver, operation.execute, operation);
         if (!executeResult.ok) {
           return executeResult;
         }
@@ -314,7 +303,6 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
             operation.postcheck,
             operation,
             'postcheck',
-            contract,
           );
           if (!postcheckResult.ok) {
             return postcheckResult;
@@ -382,11 +370,9 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     steps: readonly SqlMigrationPlanOperationStep[],
     operation: SqlMigrationPlanOperation<PostgresPlanTargetDetails>,
     phase: 'precheck' | 'postcheck',
-    contract?: Contract<SqlStorage>,
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     for (const step of steps) {
-      const { sql, params } = this.resolveStep(step, contract);
-      const result = await driver.query(sql, params);
+      const result = await driver.query(step.sql, step.params ?? []);
       if (!this.stepResultIsTrue(result.rows)) {
         const code = phase === 'precheck' ? 'PRECHECK_FAILED' : 'POSTCHECK_FAILED';
         return runnerFailure(
@@ -409,12 +395,10 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     steps: readonly SqlMigrationPlanOperationStep[],
     operation: SqlMigrationPlanOperation<PostgresPlanTargetDetails>,
-    contract?: Contract<SqlStorage>,
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     for (const step of steps) {
-      const { sql, params } = this.resolveStep(step, contract);
       try {
-        await driver.query(sql, params);
+        await driver.query(step.sql, step.params ?? []);
       } catch (error: unknown) {
         if (SqlQueryError.is(error)) {
           return runnerFailure(
@@ -425,7 +409,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
               meta: {
                 operationId: operation.id,
                 stepDescription: step.description,
-                sql,
+                sql: step.sql,
                 sqlState: error.sqlState,
                 constraint: error.constraint,
                 table: error.table,
@@ -471,36 +455,17 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   private async expectationsAreSatisfied(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
     steps: readonly SqlMigrationPlanOperationStep[],
-    contract?: Contract<SqlStorage>,
   ): Promise<boolean> {
     if (steps.length === 0) {
       return false;
     }
     for (const step of steps) {
-      const { sql, params } = this.resolveStep(step, contract);
-      const result = await driver.query(sql, params);
+      const result = await driver.query(step.sql, step.params ?? []);
       if (!this.stepResultIsTrue(result.rows)) {
         return false;
       }
     }
     return true;
-  }
-
-  private resolveStep(
-    step: SqlMigrationPlanOperationStep,
-    contract?: Contract<SqlStorage>,
-  ): { sql: string; params: readonly unknown[] } {
-    if (step.sql !== AST_BOUND_SENTINEL || !step.meta?.['ast']) {
-      return { sql: step.sql, params: step.params ?? [] };
-    }
-    if (!contract) {
-      throw new Error(
-        'AST-bound migration step requires a destination contract for apply-time lowering',
-      );
-    }
-    const ast = parseAnyQueryAst(step.meta['ast']);
-    const lowered = this.family.lowerAst(ast, { contract });
-    return { sql: lowered.sql, params: lowered.params };
   }
 
   private createPostcheckPreSatisfiedSkipRecord(

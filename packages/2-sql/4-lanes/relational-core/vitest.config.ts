@@ -24,16 +24,10 @@ export default defineConfig({
         'src/query-lane-context.ts', // Types-only file
       ],
       thresholds: {
-        // The thresholds were lowered to accommodate the AST deserializer
-        // (`src/ast/parse.ts`) added under the AST-bound codec resolution
-        // refactor. Its "unknown kind" defensive branches are exercised by
-        // migration round-trip integration tests in `@prisma-next/sql-runtime`
-        // and `@prisma-next/integration-tests`, which do not contribute to
-        // this package's unit-coverage report.
-        lines: 95,
-        branches: 87,
+        lines: 96,
+        branches: 95,
         functions: 95,
-        statements: 95,
+        statements: 96,
       },
     },
   },

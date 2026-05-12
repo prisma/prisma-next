@@ -28,11 +28,9 @@ For non-column-bound sites (raw SQL, expression-level computations), `codec` is 
 
 ### Serialization safety
 
-`CodecRef.typeParams` is `JsonValue`-safe by construction: descriptors validate params via `paramsSchema` (Standard Schema), which structurally rejects non-JSON-safe values. This guarantees AST nodes round-trip through `JSON.stringify` → `JSON.parse` without loss — a property exploited by `dataTransformAst` migrations that embed serialized ASTs in `ops.json`. See [ADR 212 — AST-bound codec resolution](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20AST-bound%20codec%20resolution.md).
+`CodecRef.typeParams` is `JsonValue`-safe by construction: descriptors validate params via `paramsSchema` (Standard Schema), which structurally rejects non-JSON-safe values. This guarantees in-memory AST nodes can round-trip through `JSON.stringify` → `JSON.parse` without loss, which is useful for diagnostic dumps and content-keyed cache keys (`canonicalizeJson`).
 
-### AST parsing (`parseAnyQueryAst`)
-
-`parseAnyQueryAst(json, registry)` reconstructs class instances from serialized JSON by walking the `kind` discriminator. When a `ParamRef` carries `codec`, the parser validates `typeParams` against the `CodecDescriptorRegistry` (if the descriptor is registered). At apply time (e.g. migration runner), a permissive registry skips validation — the AST was already validated at authoring time.
+`CodecRef` is a build-time concept: it lives on the in-memory AST and is consumed by the lowerer when rendering a query plan to its post-lowering form (for SQL, `(sql_template, params[])`). It must not appear in `ops.json` or any other apply-time artifact — see [ADR 192 §"No compilation at apply time"](../../../docs/architecture%20docs/adrs/ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md) and [ADR 212 — AST-bound codec resolution](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20AST-bound%20codec%20resolution.md).
 
 ## Key architectural references
 
