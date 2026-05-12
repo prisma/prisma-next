@@ -82,6 +82,16 @@ function frozenRecordCopy<T>(record: Readonly<Record<string, T>>): Readonly<Reco
   return Object.freeze({ ...record });
 }
 
+function frozenCodecRef(codec: CodecRef): CodecRef {
+  const typeParams =
+    codec.typeParams === undefined
+      ? undefined
+      : (structuredClone(codec.typeParams) as CodecRef['typeParams']);
+  return Object.freeze(
+    typeParams === undefined ? { codecId: codec.codecId } : { codecId: codec.codecId, typeParams },
+  );
+}
+
 function freezeRows(
   rows: ReadonlyArray<Record<string, InsertValue>>,
 ): ReadonlyArray<Readonly<Record<string, InsertValue>>> {
@@ -412,7 +422,7 @@ export class ParamRef extends Expression {
     super();
     this.value = value;
     this.name = options?.name;
-    this.codec = options?.codec ? Object.freeze({ ...options.codec }) : undefined;
+    this.codec = options?.codec ? frozenCodecRef(options.codec) : undefined;
     this.freeze();
   }
 
@@ -1083,7 +1093,7 @@ export class ProjectionItem extends AstNode {
     super();
     this.alias = alias;
     this.expr = expr;
-    this.codec = codec ? Object.freeze({ ...codec }) : undefined;
+    this.codec = codec ? frozenCodecRef(codec) : undefined;
     this.freeze();
   }
 
