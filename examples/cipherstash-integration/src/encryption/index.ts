@@ -33,12 +33,22 @@ import { encryptedColumn, encryptedTable } from '@cipherstash/stack/schema';
 // codec id. Mismatches here surface at runtime as ZeroKMS rejecting
 // the search term against a column whose stack-side index set
 // disagrees with the EQL bundle's installed configuration.
+//
+// Column names are the *physical* (Postgres-side) names, not the
+// Prisma model field names: the framework's bulk-encrypt middleware
+// addresses each ParamRef by the lowered `(table, column)` pair it
+// observed during lowering, which already collapses through
+// `@map(...)` to the physical SQL column. Keeping the stack schema
+// keyed by physical names keeps the SDK lookup in `sdk.ts` a single
+// identity map. The `@map` redirections in `prisma/schema.prisma`
+// are a workaround for an EQL bundle camelCase quoting bug
+// (see `test/e2e/README.md`).
 export const users = encryptedTable('users', {
   email: encryptedColumn('email').equality().freeTextSearch().orderAndRange(),
   salary: encryptedColumn('salary').dataType('number').equality().orderAndRange(),
-  accountId: encryptedColumn('accountId').dataType('bigint').equality().orderAndRange(),
+  accountid: encryptedColumn('accountid').dataType('bigint').equality().orderAndRange(),
   birthday: encryptedColumn('birthday').dataType('date').equality().orderAndRange(),
-  emailVerified: encryptedColumn('emailVerified').dataType('boolean').equality(),
+  emailverified: encryptedColumn('emailverified').dataType('boolean').equality(),
   preferences: encryptedColumn('preferences').dataType('json').searchableJson(),
 });
 

@@ -31,15 +31,16 @@ import type {
 } from '@prisma-next/extension-cipherstash/runtime';
 import { encryptionClient, users } from './encryption';
 
+// Routing keys are addressed by physical column name (see encryption/index.ts).
 const tableRegistry = {
   users: {
     table: users,
     columns: {
       email: users.email,
       salary: users.salary,
-      accountId: users.accountId,
+      accountid: users.accountid,
       birthday: users.birthday,
-      emailVerified: users.emailVerified,
+      emailverified: users.emailverified,
       preferences: users.preferences,
     },
   },
@@ -101,8 +102,11 @@ function ensureEncryptedEnvelope(
  * `string | number | boolean | Record<string, unknown> | JsPlaintext[]`.
  * This adapter narrows on the boundary:
  *
- *   - `bigint` → decimal string (CipherStash's bigint codec
- *     round-trips through the string representation).
+ *   - `bigint` → JS `number` (ZeroKMS's bigint cast accepts numeric
+ *     plaintexts only — values are expected to fit in a JS-safe
+ *     integer; we throw eagerly on anything larger so the caller
+ *     learns the precision boundary at the call site rather than as
+ *     a silent truncation on the wire).
  *   - `Date`   → ISO 8601 string (the date codec round-trips through
  *     ISO; both ZeroKMS and the EQL bundle accept the textual form).
  *   - everything else is asserted to satisfy `JsPlaintext`; if the
@@ -111,19 +115,40 @@ function ensureEncryptedEnvelope(
  *     bare cast would produce.
  */
 function toJsPlaintext(value: unknown): JsPlaintext {
-  if (typeof value === 'bigint') return value.toString();
+  if (typeof value === 'bigint') {
+    if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER)) {
+      throw new Error(
+        `cipherstash bigint plaintext ${value} exceeds Number.MAX_SAFE_INTEGER; ` +
+          'ZeroKMS does not accept string plaintexts for the BigInt cast type.',
+      );
+    }
+    return Number(value);
+  }
   if (value instanceof Date) return value.toISOString();
   return value as JsPlaintext;
 }
 
-function ensureString(value: unknown, kind: 'decrypt' | 'bulkDecrypt'): string {
-  if (typeof value !== 'string') {
-    throw new Error(
-      `cipherstash ${kind} returned non-string plaintext (${typeof value}); ` +
-        'the example schema only encrypts string columns.',
-    );
-  }
-  return value;
+/**
+ * The framework's `CipherstashSdk.decrypt` is typed `Promise<string>`
+ * but every concrete `Encrypted*` envelope is wired to a polymorphic
+ * `bulkDecrypt` whose entries can be `number`, `boolean`, `Date`-as-
+ * ISO-string, `bigint`-as-number, or a JSON object (per spec D1).
+ * The envelope's `parseDecryptedValue` hook narrows back to the
+ * concrete plaintext type; this adapter has nothing to validate
+ * beyond "not undefined / not error". Returning the raw value lets
+ * each envelope subclass take responsibility for its own coercion.
+ *
+ * The cast through `unknown` to `string` exists only because the
+ * framework SDK interface still types single-cell `decrypt` as
+ * `Promise<string>`; the realistic typing is `Promise<unknown>` and
+ * the example tolerates the gap rather than fork the interface.
+ */
+function asSdkPlaintext(value: unknown): string {
+  // SDK contract gap: framework types decrypt as Promise<string> but
+  // implementations are polymorphic; envelopes coerce in their own
+  // `parseDecryptedValue` hooks. Returning the raw value preserves
+  // that polymorphism through the example SDK layer.
+  return value as string;
 }
 
 export function createCipherstashSdk(): CipherstashSdk {
@@ -156,7 +181,7 @@ export function createCipherstashSdk(): CipherstashSdk {
         if (entry.error !== undefined) {
           throw new Error(`cipherstash bulkDecrypt entry failed: ${String(entry.error)}`);
         }
-        return ensureString(entry.data, 'bulkDecrypt');
+        return asSdkPlaintext(entry.data);
       });
     },
 
@@ -165,7 +190,7 @@ export function createCipherstashSdk(): CipherstashSdk {
       if (result.failure) {
         throw new Error(`cipherstash decrypt failed: ${result.failure.message}`);
       }
-      return ensureString(result.data, 'decrypt');
+      return asSdkPlaintext(result.data);
     },
   };
 }
