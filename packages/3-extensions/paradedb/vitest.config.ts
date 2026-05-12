@@ -19,9 +19,6 @@ export default defineConfig({
         '**/*.config.ts',
         '**/exports/**',
         '**/types.ts',
-        // src/contract.ts is a declarative defineContract call exercised by
-        // the emit pipeline at build time; it has no runtime branches to cover.
-        'src/contract.ts',
         // Emitted contract artefacts (typecheck-only).
         'src/contract.d.ts',
       ],

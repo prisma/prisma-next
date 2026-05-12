@@ -25,7 +25,10 @@ examples/multi-extension-monorepo/
 ├── app/                                 ← aggregate root (the "application")
 │   ├── prisma-next.config.ts            ← composes extensionPacks: [audit, featureFlags]
 │   └── src/
-│       └── contract.ts                  ← application contract (declares `User`)
+│       ├── constants.ts                  ← shared identifiers (table names, etc.)
+│       ├── contract.prisma               ← application contract (declares `User`)
+│       ├── contract.json                  ← emitted (do not edit)
+│       └── contract.d.ts                  ← emitted (do not edit)
 ├── packages/
 │   ├── audit/                           ← internal "package" #1
 │   │   ├── prisma-next.config.ts        ← `prisma-next contract emit` driver
@@ -34,7 +37,7 @@ examples/multi-extension-monorepo/
 │   │   │   └── <dir>/                   ← emitted migration package
 │   │   └── src/
 │   │       ├── constants.ts
-│   │       ├── contract.ts              ← TS authoring entry-point
+│   │       ├── contract.prisma          ← PSL authoring entry-point
 │   │       ├── contract.json            ← emitted (do not edit)
 │   │       ├── contract.d.ts            ← emitted (do not edit)
 │   │       └── control.ts               ← `auditExtensionDescriptor` (JSON-import wiring)
@@ -57,7 +60,7 @@ pnpm --filter @prisma-next/example-multi-extension-monorepo test
 
 Each internal "package" under `packages/` follows the **contract-space package layout** convention described in [ADR 212 — Contract spaces](../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md). The same pipeline application authors use is applied per-subdirectory:
 
-1. Edit `packages/<pkg>/src/contract.ts` (the TS entry-point that calls `defineContract` from `@prisma-next/sql-contract-ts/contract-builder`).
+1. Edit `packages/<pkg>/src/contract.prisma` (the PSL entry-point — see the [contract-space package layout convention](../../.cursor/rules/contract-space-package-layout.mdc) for why PSL is the preferred authoring form).
 2. Re-emit the canonical contract artefacts (`src/contract.json`, `src/contract.d.ts`) from inside the subdirectory:
 
    ```sh

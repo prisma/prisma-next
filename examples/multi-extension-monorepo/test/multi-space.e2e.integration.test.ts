@@ -70,9 +70,13 @@ import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces'
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { APP_USER_TABLE, contract as appContract } from '../app/src/contract';
+import { APP_USER_TABLE } from '../app/src/constants';
+import appContractJson from '../app/src/contract.json' with { type: 'json' };
 
-const APP_CONTRACT_HASH_VALUE = appContract.storage.storageHash;
+// The PSL-authored app contract is materialised at emit time; we JSON-import
+// it here rather than re-deriving via `defineContract(...)`.
+const appContract = appContractJson as unknown as Parameters<typeof executeDbInit>[0]['contract'];
+const APP_CONTRACT_HASH_VALUE = appContractJson.storage.storageHash;
 
 import {
   AUDIT_BASELINE_INVARIANT_ID,

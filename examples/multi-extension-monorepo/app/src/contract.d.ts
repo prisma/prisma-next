@@ -27,7 +27,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:107ce92788984cad3aff9ee860e328048f14e156869ae418ba9ec96f31d6f4df'>;
+  StorageHashBase<'sha256:4e3d7e0d1a316579eddaadc281d1d1da928b1180143fa0f8662b7fd15cf40bdd'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
@@ -40,15 +40,15 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
   : _Encoded;
 
 export type FieldOutputTypes = {
-  readonly FeatureFlag: {
-    readonly key: CodecTypes['pg/text@1']['output'];
-    readonly enabled: CodecTypes['pg/bool@1']['output'];
+  readonly User: {
+    readonly id: CodecTypes['pg/text@1']['output'];
+    readonly email: CodecTypes['pg/text@1']['output'];
   };
 };
 export type FieldInputTypes = {
-  readonly FeatureFlag: {
-    readonly key: CodecTypes['pg/text@1']['input'];
-    readonly enabled: CodecTypes['pg/bool@1']['input'];
+  readonly User: {
+    readonly id: CodecTypes['pg/text@1']['input'];
+    readonly email: CodecTypes['pg/text@1']['input'];
   };
 };
 export type TypeMaps = TypeMapsType<
@@ -61,20 +61,20 @@ export type TypeMaps = TypeMapsType<
 type ContractBase = ContractType<
   {
     readonly tables: {
-      readonly feature_flag: {
+      readonly app_user: {
         columns: {
-          readonly key: {
+          readonly id: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
-          readonly enabled: {
-            readonly nativeType: 'bool';
-            readonly codecId: 'pg/bool@1';
+          readonly email: {
+            readonly nativeType: 'text';
+            readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
         };
-        primaryKey: { readonly columns: readonly ['key'] };
+        primaryKey: { readonly columns: readonly ['id'] };
         uniques: readonly [];
         indexes: readonly [];
         foreignKeys: readonly [];
@@ -84,23 +84,23 @@ type ContractBase = ContractType<
     readonly storageHash: StorageHash;
   },
   {
-    readonly FeatureFlag: {
+    readonly User: {
       readonly fields: {
-        readonly key: {
+        readonly id: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
         };
-        readonly enabled: {
+        readonly email: {
           readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
         };
       };
       readonly relations: Record<string, never>;
       readonly storage: {
-        readonly table: 'feature_flag';
+        readonly table: 'app_user';
         readonly fields: {
-          readonly key: { readonly column: 'key' };
-          readonly enabled: { readonly column: 'enabled' };
+          readonly id: { readonly column: 'id' };
+          readonly email: { readonly column: 'email' };
         };
       };
     };
@@ -108,7 +108,7 @@ type ContractBase = ContractType<
 > & {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
-  readonly roots: { readonly feature_flag: 'FeatureFlag' };
+  readonly roots: { readonly app_user: 'User' };
   readonly capabilities: {
     readonly postgres: {
       readonly jsonAgg: true;
@@ -123,7 +123,22 @@ type ContractBase = ContractType<
       readonly returning: true;
     };
   };
-  readonly extensionPacks: {};
+  readonly extensionPacks: {
+    readonly audit: {
+      readonly familyId: 'sql';
+      readonly id: 'audit';
+      readonly kind: 'extension';
+      readonly targetId: 'postgres';
+      readonly version: '0.0.1';
+    };
+    readonly 'feature-flags': {
+      readonly familyId: 'sql';
+      readonly id: 'feature-flags';
+      readonly kind: 'extension';
+      readonly targetId: 'postgres';
+      readonly version: '0.0.1';
+    };
+  };
   readonly meta: {};
 
   readonly profileHash: ProfileHash;

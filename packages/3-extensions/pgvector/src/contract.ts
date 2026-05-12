@@ -27,6 +27,17 @@
  * pgvector's `vector` IS representable in today's IR via
  * {@link StorageTypeInstance}.
  *
+ * ## Why TS, not PSL
+ *
+ * The contract-space package layout convention prefers PSL
+ * (`src/contract.prisma`). pgvector is the narrow exception called out
+ * in the convention: PSL's `types {}` block instantiates parameterised
+ * types at app authoring time (`Vector1536 = pgvector.Vector(1536)`)
+ * but has no surface for an extension to register the parameterised
+ * BASE type itself (the `storage.types.vector` entry with empty
+ * `typeParams` shown below). Until PSL grows that surface, this
+ * extension keeps its contract source in TS.
+ *
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
 

@@ -24,7 +24,7 @@ applications) uses the **same** on-disk shape:
 │       ├── end-contract.d.ts
 │       └── migration.ts
 └── src/
-    ├── contract.ts                  ← TS source (or `contract.prisma` for PSL)
+    ├── contract.prisma              ← PSL source (preferred; TS fallback noted below)
     ├── contract.json                ← emitted (do not edit)
     ├── contract.d.ts                ← emitted (do not edit)
     └── exports/control.ts           ← descriptor; JSON-imports the artefacts
@@ -35,6 +35,18 @@ applications) uses the **same** on-disk shape:
 
 ## Rules (these are the spots where mistakes recur)
 
+- **Author contracts in PSL (`src/contract.prisma`)**, not TypeScript.
+  PSL is the canonical authoring surface — it reads as a schema (not as
+  builder calls), interoperates with brownfield Prisma schemas, and
+  keeps the contract decoupled from the workspace's TS type system.
+  Wire it with
+  `prismaContract('./src/contract.prisma', { output: 'src/contract.json', target })`.
+  The narrow exception is contracts that need to declare typed objects
+  the PSL surface doesn't yet express (e.g. parameterised
+  `storage.types` base-type registrations like pgvector's `vector` —
+  `types {}` blocks instantiate, they don't register). Such packages
+  may use `src/contract.ts` + `typescriptContract(contract, 'src/contract.json')`,
+  with a comment in the contract source naming the missing PSL surface.
 - **No `<space-id>` subdirectory inside `migrations/`.** A package owns
   exactly one contract space, so the `<space-id>` directory adds no
   information. Migration directories sit *directly* under `migrations/`,
@@ -42,8 +54,6 @@ applications) uses the **same** on-disk shape:
   `migrations.dir: 'migrations'` — not `migrations/<space-id>`.
 - **No `src/contract/` subdirectory.** The contract source and the
   emitted `contract.json` / `contract.d.ts` sit *directly* in `src/`.
-  Configure the emit output as `typescriptContract(contract, 'src/contract.json')`
-  or `prismaContract('./src/contract.prisma', { output: 'src/contract.json', target })`.
 - **`prisma-next.config.ts` lives at the package root**, not under `src/`.
 
 ## Contrast with the consuming app layout

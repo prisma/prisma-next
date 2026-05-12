@@ -98,7 +98,7 @@ Every package that exposes a contract space — published extensions (`packages/
 │       ├── end-contract.d.ts
 │       └── migration.ts             ← `Migration` subclass
 └── src/
-    ├── contract.ts                  ← TS schema source (or `contract.prisma` for PSL)
+    ├── contract.prisma              ← PSL schema source (preferred — see below)
     ├── contract.json                ← emitted (do not edit)
     ├── contract.d.ts                ← emitted (do not edit)
     └── exports/control.ts           ← descriptor; JSON-imports the artefacts
@@ -108,13 +108,14 @@ Every package that exposes a contract space — published extensions (`packages/
 
 Key rules (these are the spots where mistakes recur, so the convention spells them out explicitly):
 
+- **Author contracts in PSL (`src/contract.prisma`).** PSL is the canonical authoring surface — it reads as a schema (not as builder calls), interoperates with brownfield Prisma schemas, and keeps the contract decoupled from the workspace's TS type system. Wire it with `prismaContract('./src/contract.prisma', { output: 'src/contract.json', target })`. The narrow exception is contracts that need to declare typed objects the PSL surface doesn't yet express (e.g. parameterised `storage.types` base-type registrations like pgvector's `vector` — `types {}` blocks instantiate, they don't register a parameterised base type). Such packages may keep a `src/contract.ts` + `typescriptContract(contract, 'src/contract.json')` config, with a comment in the contract source naming the missing PSL surface.
 - **No `<space-id>` subdirectory inside `migrations/`.** A package owns exactly one contract space, so the space-id directory adds no information. Migration directories sit *directly* under `migrations/`, and `refs/` sits at `migrations/refs/`. Configure this with `migrations.dir: 'migrations'` (not `migrations/<space-id>`).
-- **No `src/contract/` subdirectory.** The contract source, emitted `contract.json`, and emitted `contract.d.ts` sit *directly* in `src/`. Configure the emit output with `typescriptContract(contract, 'src/contract.json')` / `prismaContract('./src/contract.prisma', { output: 'src/contract.json', target })`.
+- **No `src/contract/` subdirectory.** The contract source, emitted `contract.json`, and emitted `contract.d.ts` sit *directly* in `src/`.
 - **`prisma-next.config.ts` is at the package root.** The CLI treats each contract-space package as a self-contained "project"; the in-package config is the source of truth for that project's emit and migration paths.
 
 The contrast with the consuming app's on-disk layout: when an application composes multiple contract spaces, *its* `migrations/` directory ends up with one subdirectory per space (`migrations/<space-id>/`) because there are multiple spaces. That's an emergent shape from composition, not a per-package authoring convention. Inside a contract-space package, the space-id subdirectory does not belong.
 
-Extension authors use the **same emit pipeline** application authors use: TS or PSL schema → `prisma-next contract emit` → `<package>/src/contract.{json,d.ts}`; `prisma-next migration plan` → `<package>/migrations/<dirName>/{migration.json, ops.json, end-contract.{json,d.ts}, migration.ts}`. The emitted `migration.ts` extends the same `Migration` abstract class app authors extend (from `@prisma-next/<target>/migration`).
+Extension authors use the **same emit pipeline** application authors use: PSL (or TS) schema → `prisma-next contract emit` → `<package>/src/contract.{json,d.ts}`; `prisma-next migration plan` → `<package>/migrations/<dirName>/{migration.json, ops.json, end-contract.{json,d.ts}, migration.ts}`. The emitted `migration.ts` extends the same `Migration` abstract class app authors extend (from `@prisma-next/<target>/migration`).
 
 The descriptor module is the only TypeScript code that has to be hand-written:
 
