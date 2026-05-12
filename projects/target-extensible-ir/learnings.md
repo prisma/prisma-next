@@ -38,7 +38,16 @@ The user runs the orchestrator at Opus 4.7 Medium by default for quick execution
 - Reading reviewer/implementer reports for routing decisions.
 - Confirming narrative-artifact refresh (verifying `system-design-review.md` and `walkthrough.md` reflect HEAD).
 
-### Notification protocol
+## M2 R1 reviewer watch-points (from m1 R2 intent-validation)
+
+These are not findings (M1 closed clean) but design choices the M2 reviewer should hold the SPI shape to as the first real consumer exercises it. Surface in the m2 R1 reviewer delegation prompt.
+
+1. **`MongoSchemaVerifierBase.verifyCommonMongoSchema` is abstract in M1; M2 should lower it to concrete with the family-shared walk body.** The comment in M1 says "the M2 commit provides the family-shared implementation". If M2 instead leaves it abstract and provides the body in `MongoTargetSchemaVerifier`, the family base is structurally pointless. The reviewer should verify the lowering happens at the family layer, not at the target layer.
+2. **Same pattern for `MongoContractSerializerBase.parseMongoContractStructure`** — M2 provides the family-shared arktype validation; the `constructTargetContract` hook is the only abstract that survives at the family layer.
+3. **`MongoTargetStorage extends MongoStorage` should exercise the inheritance.** `MongoStorage` only commits to `namespaces`. If `MongoTargetStorage` adds `collections` and a `MongoTargetStorage`-only constructor without referencing the base meaningfully, the `extends MongoStorage` is nominal-only. Either OK (nominal typing has value) or push for the family to add a structural commitment (e.g. an abstract method that walks all storage objects across namespaces). The reviewer's call.
+4. **No call site in M2 should branch on `namespace.id === '__unspecified__'`.** The ADR + namespace.ts comments commit to the singleton-subclass pattern; the reviewer should grep for the literal string in the M2 commits and flag any branch as a `must-fix` finding.
+
+## Notification protocol
 
 - **Before performing a checkpoint:** the orchestrator says "Reaching a high-reasoning-effort checkpoint: `<checkpoint #N>` — `<one-line description>`. Recommend upgrading my configuration before I proceed." and waits for the user's confirmation before continuing.
 - **After completing a checkpoint:** the orchestrator says "Checkpoint complete. Recommend downgrading back to Medium for the next stretch." so the user can flip back.
