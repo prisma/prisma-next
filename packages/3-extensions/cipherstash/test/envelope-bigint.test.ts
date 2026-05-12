@@ -49,6 +49,86 @@ describe('EncryptedBigInt.fromInternal(...) — read-side round-trip', () => {
     await expect(envelope.decrypt()).resolves.toBe(7n);
     expect(decryptMock).toHaveBeenCalledTimes(1);
   });
+
+  it('coerces a number-shaped SDK plaintext into a bigint', async () => {
+    const ciphertext = { c: 'cipher', i: { t: 'ledger', c: 'amount' } };
+    const sdk: CipherstashSdk = {
+      decrypt: vi.fn().mockResolvedValue(42),
+      bulkEncrypt: vi.fn(),
+      bulkDecrypt: vi.fn(),
+    };
+    const envelope = EncryptedBigInt.fromInternal({
+      ciphertext,
+      table: 'ledger',
+      column: 'amount',
+      sdk,
+    });
+    await expect(envelope.decrypt()).resolves.toBe(42n);
+  });
+
+  it('coerces a decimal-string SDK plaintext into a bigint', async () => {
+    const ciphertext = { c: 'cipher', i: { t: 'ledger', c: 'amount' } };
+    const sdk: CipherstashSdk = {
+      decrypt: vi.fn().mockResolvedValue('123456789012345678'),
+      bulkEncrypt: vi.fn(),
+      bulkDecrypt: vi.fn(),
+    };
+    const envelope = EncryptedBigInt.fromInternal({
+      ciphertext,
+      table: 'ledger',
+      column: 'amount',
+      sdk,
+    });
+    await expect(envelope.decrypt()).resolves.toBe(123456789012345678n);
+  });
+
+  it('rejects non-integer numbers', async () => {
+    const ciphertext = { c: 'cipher', i: { t: 'ledger', c: 'amount' } };
+    const sdk: CipherstashSdk = {
+      decrypt: vi.fn().mockResolvedValue(3.14),
+      bulkEncrypt: vi.fn(),
+      bulkDecrypt: vi.fn(),
+    };
+    const envelope = EncryptedBigInt.fromInternal({
+      ciphertext,
+      table: 'ledger',
+      column: 'amount',
+      sdk,
+    });
+    await expect(envelope.decrypt()).rejects.toThrow(/non-integer number/);
+  });
+
+  it('rejects non-numeric string plaintexts', async () => {
+    const ciphertext = { c: 'cipher', i: { t: 'ledger', c: 'amount' } };
+    const sdk: CipherstashSdk = {
+      decrypt: vi.fn().mockResolvedValue('abc'),
+      bulkEncrypt: vi.fn(),
+      bulkDecrypt: vi.fn(),
+    };
+    const envelope = EncryptedBigInt.fromInternal({
+      ciphertext,
+      table: 'ledger',
+      column: 'amount',
+      sdk,
+    });
+    await expect(envelope.decrypt()).rejects.toThrow(/cannot construct a bigint/);
+  });
+
+  it('rejects unsupported plaintext types', async () => {
+    const ciphertext = { c: 'cipher', i: { t: 'ledger', c: 'amount' } };
+    const sdk: CipherstashSdk = {
+      decrypt: vi.fn().mockResolvedValue(true),
+      bulkEncrypt: vi.fn(),
+      bulkDecrypt: vi.fn(),
+    };
+    const envelope = EncryptedBigInt.fromInternal({
+      ciphertext,
+      table: 'ledger',
+      column: 'amount',
+      sdk,
+    });
+    await expect(envelope.decrypt()).rejects.toThrow(/unsupported SDK plaintext type/);
+  });
 });
 
 describe('EncryptedBigInt — accidental-exposure overrides', () => {
