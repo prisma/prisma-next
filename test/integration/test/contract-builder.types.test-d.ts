@@ -5,6 +5,7 @@ import {
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
+import { arktypeJsonRuntime } from '@prisma-next/extension-arktype-json/runtime';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
@@ -416,7 +417,12 @@ test('arktypeJson and jsonbColumn currently resolve to never in no-emit type pat
   });
 
   const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
-  const context = createTestContext(validated, createStubAdapter());
+  // The arktype runtime pack contributes the `arktype/json@1` codec
+  // descriptor; without it the AST-bound integrity check refuses to build a
+  // context for the `payload` column.
+  const context = createTestContext(validated, createStubAdapter(), {
+    extensionPacks: [arktypeJsonRuntime],
+  });
 
   const db = sql({ context });
   const _plan = db.event.select('payload', 'meta').build();
