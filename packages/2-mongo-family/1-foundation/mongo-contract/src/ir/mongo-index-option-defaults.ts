@@ -17,7 +17,7 @@ export interface MongoIndexOptionDefaultsInput {
  */
 export class MongoIndexOptionDefaults extends SchemaNodeBase {
   readonly kind = 'mongo-index-option-defaults' as const;
-  readonly storageEngine?: MongoJsonObject;
+  declare readonly storageEngine?: MongoJsonObject;
 
   constructor(options: MongoIndexOptionDefaultsInput = {}) {
     super();

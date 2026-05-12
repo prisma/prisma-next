@@ -41,14 +41,14 @@ export interface MongoCollationOptionsInput {
 export class MongoCollationOptions extends SchemaNodeBase {
   readonly kind = 'mongo-collation-options' as const;
   readonly locale: string;
-  readonly caseLevel?: boolean;
-  readonly caseFirst?: MongoCollationCaseFirst;
-  readonly strength?: MongoCollationStrength;
-  readonly numericOrdering?: boolean;
-  readonly alternate?: MongoCollationAlternate;
-  readonly maxVariable?: MongoCollationMaxVariable;
-  readonly backwards?: boolean;
-  readonly normalization?: boolean;
+  declare readonly caseLevel?: boolean;
+  declare readonly caseFirst?: MongoCollationCaseFirst;
+  declare readonly strength?: MongoCollationStrength;
+  declare readonly numericOrdering?: boolean;
+  declare readonly alternate?: MongoCollationAlternate;
+  declare readonly maxVariable?: MongoCollationMaxVariable;
+  declare readonly backwards?: boolean;
+  declare readonly normalization?: boolean;
 
   constructor(options: MongoCollationOptionsInput) {
     super();

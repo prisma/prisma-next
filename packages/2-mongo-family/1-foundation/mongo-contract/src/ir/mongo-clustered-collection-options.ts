@@ -18,7 +18,7 @@ export interface MongoClusteredCollectionOptionsInput {
  */
 export class MongoClusteredCollectionOptions extends SchemaNodeBase {
   readonly kind = 'mongo-clustered-collection-options' as const;
-  readonly name?: string;
+  declare readonly name?: string;
   readonly key: MongoClusteredCollectionKey;
   readonly unique: boolean;
 

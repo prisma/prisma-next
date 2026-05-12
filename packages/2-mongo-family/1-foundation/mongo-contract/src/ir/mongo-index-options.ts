@@ -40,23 +40,23 @@ export interface MongoIndexOptionsInput {
  */
 export class MongoIndexOptions extends SchemaNodeBase {
   readonly kind = 'mongo-index-options' as const;
-  readonly unique?: boolean;
-  readonly name?: string;
-  readonly partialFilterExpression?: MongoJsonObject;
-  readonly sparse?: boolean;
-  readonly expireAfterSeconds?: number;
-  readonly weights?: Readonly<Record<string, number>>;
-  readonly default_language?: string;
-  readonly language_override?: string;
-  readonly textIndexVersion?: number;
-  readonly '2dsphereIndexVersion'?: number;
-  readonly bits?: number;
-  readonly min?: number;
-  readonly max?: number;
-  readonly bucketSize?: number;
-  readonly hidden?: boolean;
-  readonly collation?: MongoCollationOptions;
-  readonly wildcardProjection?: MongoWildcardProjection;
+  declare readonly unique?: boolean;
+  declare readonly name?: string;
+  declare readonly partialFilterExpression?: MongoJsonObject;
+  declare readonly sparse?: boolean;
+  declare readonly expireAfterSeconds?: number;
+  declare readonly weights?: Readonly<Record<string, number>>;
+  declare readonly default_language?: string;
+  declare readonly language_override?: string;
+  declare readonly textIndexVersion?: number;
+  declare readonly '2dsphereIndexVersion'?: number;
+  declare readonly bits?: number;
+  declare readonly min?: number;
+  declare readonly max?: number;
+  declare readonly bucketSize?: number;
+  declare readonly hidden?: boolean;
+  declare readonly collation?: MongoCollationOptions;
+  declare readonly wildcardProjection?: MongoWildcardProjection;
 
   constructor(options: MongoIndexOptionsInput = {}) {
     super();

@@ -107,14 +107,14 @@ export interface MongoCollectionOptionsAuthoringInput {
  */
 export class MongoCollectionOptions extends SchemaNodeBase {
   readonly kind = 'mongo-collection-options' as const;
-  readonly capped?: MongoStorageCappedShape;
-  readonly storageEngine?: MongoJsonObject;
-  readonly indexOptionDefaults?: MongoIndexOptionDefaults;
-  readonly collation?: MongoCollationOptions;
-  readonly timeseries?: MongoTimeSeriesCollectionOptions;
-  readonly clusteredIndex?: MongoStorageClusteredIndexShape;
-  readonly expireAfterSeconds?: number;
-  readonly changeStreamPreAndPostImages?: MongoChangeStreamPreAndPostImagesOptions;
+  declare readonly capped?: MongoStorageCappedShape;
+  declare readonly storageEngine?: MongoJsonObject;
+  declare readonly indexOptionDefaults?: MongoIndexOptionDefaults;
+  declare readonly collation?: MongoCollationOptions;
+  declare readonly timeseries?: MongoTimeSeriesCollectionOptions;
+  declare readonly clusteredIndex?: MongoStorageClusteredIndexShape;
+  declare readonly expireAfterSeconds?: number;
+  declare readonly changeStreamPreAndPostImages?: MongoChangeStreamPreAndPostImagesOptions;
 
   constructor(input: MongoCollectionOptionsInput = {}) {
     super();

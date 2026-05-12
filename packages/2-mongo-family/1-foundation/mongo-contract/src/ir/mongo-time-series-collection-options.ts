@@ -21,10 +21,10 @@ export interface MongoTimeSeriesCollectionOptionsInput {
 export class MongoTimeSeriesCollectionOptions extends SchemaNodeBase {
   readonly kind = 'mongo-time-series-collection-options' as const;
   readonly timeField: string;
-  readonly metaField?: string;
-  readonly granularity?: MongoTimeSeriesGranularity;
-  readonly bucketMaxSpanSeconds?: number;
-  readonly bucketRoundingSeconds?: number;
+  declare readonly metaField?: string;
+  declare readonly granularity?: MongoTimeSeriesGranularity;
+  declare readonly bucketMaxSpanSeconds?: number;
+  declare readonly bucketRoundingSeconds?: number;
 
   constructor(options: MongoTimeSeriesCollectionOptionsInput) {
     super();
