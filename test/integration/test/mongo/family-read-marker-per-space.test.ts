@@ -1,0 +1,114 @@
+import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { initMarker } from '@prisma-next/target-mongo/control';
+import { timeouts } from '@prisma-next/test-utils';
+import { type Db, MongoClient } from 'mongodb';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+const EXT_SPACE = 'cipherstash';
+
+describe(
+  'MongoFamilyInstance per-space readMarker',
+  { timeout: timeouts.spinUpMongoMemoryServer },
+  () => {
+    let replSet: MongoMemoryReplSet;
+    let client: MongoClient;
+    let db: Db;
+    const dbName = 'family_per_space_readmarker_test';
+
+    beforeAll(async () => {
+      replSet = await MongoMemoryReplSet.create({
+        instanceOpts: [
+          { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+        ],
+        replSet: { count: 1, storageEngine: 'wiredTiger' },
+      });
+      client = new MongoClient(replSet.getUri());
+      await client.connect();
+      db = client.db(dbName);
+    }, timeouts.spinUpMongoMemoryServer);
+
+    afterAll(async () => {
+      try {
+        await client?.close();
+        await replSet?.stop();
+      } catch {
+        // ignore
+      }
+    }, timeouts.spinUpMongoMemoryServer);
+
+    beforeEach(async () => {
+      await db.dropDatabase();
+    });
+
+    function makeFamily() {
+      return createMongoFamilyInstance(
+        {} as unknown as Parameters<typeof createMongoFamilyInstance>[0],
+      );
+    }
+
+    it('returns the marker doc for an extension space', async () => {
+      await initMarker(db, EXT_SPACE, {
+        storageHash: 'sha256:ext-storage',
+        profileHash: 'sha256:ext-profile',
+      });
+
+      const driver = await mongoControlDriver.create(replSet.getUri(dbName));
+      try {
+        const family = makeFamily();
+        const marker = await family.readMarker({ driver, space: EXT_SPACE });
+        expect(marker).not.toBeNull();
+        expect(marker?.storageHash).toBe('sha256:ext-storage');
+        expect(marker?.profileHash).toBe('sha256:ext-profile');
+      } finally {
+        await driver.close();
+      }
+    });
+
+    it('returns null when no marker exists for the extension space', async () => {
+      const driver = await mongoControlDriver.create(replSet.getUri(dbName));
+      try {
+        const family = makeFamily();
+        const marker = await family.readMarker({ driver, space: EXT_SPACE });
+        expect(marker).toBeNull();
+      } finally {
+        await driver.close();
+      }
+    });
+
+    it('readAllMarkers returns one entry per space', async () => {
+      await initMarker(db, APP_SPACE_ID, {
+        storageHash: 'sha256:app-storage',
+        profileHash: 'sha256:app-profile',
+      });
+      await initMarker(db, EXT_SPACE, {
+        storageHash: 'sha256:ext-storage',
+        profileHash: 'sha256:ext-profile',
+      });
+
+      const driver = await mongoControlDriver.create(replSet.getUri(dbName));
+      try {
+        const family = makeFamily();
+        const markers = await family.readAllMarkers({ driver });
+        expect(markers.size).toBe(2);
+        expect(markers.get(APP_SPACE_ID)?.storageHash).toBe('sha256:app-storage');
+        expect(markers.get(EXT_SPACE)?.storageHash).toBe('sha256:ext-storage');
+      } finally {
+        await driver.close();
+      }
+    });
+
+    it('readAllMarkers returns empty map when no markers written', async () => {
+      const driver = await mongoControlDriver.create(replSet.getUri(dbName));
+      try {
+        const family = makeFamily();
+        const markers = await family.readAllMarkers({ driver });
+        expect(markers.size).toBe(0);
+      } finally {
+        await driver.close();
+      }
+    });
+  },
+);
