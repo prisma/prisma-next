@@ -5,7 +5,7 @@ import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-com
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { extname } from 'pathe';
+import { basename, extname } from 'pathe';
 import { interpretPslDocumentToSqlContract } from './interpreter';
 import type { ColumnDescriptor } from './psl-column-resolution';
 
@@ -28,7 +28,9 @@ function defaultOutputFromSchemaPath(schemaPath: string): string {
   const base = schemaPath.slice(0, -ext.length);
   // PSL schemas commonly use `schema.prisma`; the emitted JSON is called
   // `contract.json` to mirror the rest of the toolchain, not `schema.json`.
-  if (base.endsWith('schema')) {
+  // Match only the exact basename `schema` so files like `my-schema.prisma`
+  // are not silently rewritten to `my-contract.json`.
+  if (basename(base) === 'schema') {
     return `${base.slice(0, -'schema'.length)}contract.json`;
   }
   return `${base}.json`;

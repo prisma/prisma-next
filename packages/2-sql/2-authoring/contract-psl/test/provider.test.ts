@@ -43,6 +43,11 @@ describe('prismaContract provider helper', () => {
       const contract = prismaContract('./prisma/main.prisma', baseOptions);
       expect(contract.output).toBe('./prisma/main.json');
     });
+
+    it('does not rewrite filenames that merely end in "schema"', () => {
+      const contract = prismaContract('./prisma/my-schema.prisma', baseOptions);
+      expect(contract.output).toBe('./prisma/my-schema.json');
+    });
   });
 
   describe('given a valid schema', () => {
