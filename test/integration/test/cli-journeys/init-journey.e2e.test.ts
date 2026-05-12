@@ -177,7 +177,11 @@ describe.each(
           '}',
           '',
           'const db = postgres<Contract>({ contractJson, url });',
-          'const email = `journey-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;',
+          // String concatenation (not a template literal) to avoid
+          // biome's `noTemplateCurlyInString` rule in this fixture
+          // string — the generated user code is functionally
+          // equivalent.
+          "const email = 'journey-' + Date.now() + '-' + Math.floor(Math.random() * 1e6) + '@example.com';",
           'try {',
           "  const created = await db.orm.User.create({ email, name: 'Journey User' });",
           '  const found = await db.orm.User.where((u) => u.email.eq(email)).first();',
