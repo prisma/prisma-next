@@ -134,6 +134,36 @@ describe('createAstCodecResolver', () => {
     ).toThrow(/TYPE_PARAMS_INVALID|length must be a positive number/);
   });
 
+  it('throws RUNTIME.TYPE_PARAMS_INVALID when paramsSchema returns a Promise (async validator)', () => {
+    const asyncDescriptor: CodecDescriptor<VectorParams> = {
+      codecId: 'async/vector@1',
+      traits: [],
+      targetTypes: ['vector'],
+      paramsSchema: {
+        '~standard': {
+          version: 1,
+          vendor: 'test',
+          validate: () => Promise.resolve({ value: { length: 1 } }),
+        },
+      },
+      isParameterized: true,
+      factory: (_params) => (_ctx) =>
+        defineTestCodec({
+          typeId: 'async/vector@1',
+          encode: (v: number[]) => v,
+          decode: (w: number[]) => w,
+        }),
+    };
+    const resolver = createAstCodecResolver(
+      buildCodecDescriptorRegistry([asyncDescriptor as AnyCodecDescriptor]),
+      instanceContextFactory,
+    );
+
+    expect(() =>
+      resolver.forCodecRef({ codecId: 'async/vector@1', typeParams: { length: 1 } }),
+    ).toThrow(/TYPE_PARAMS_INVALID|Promise|synchronous/);
+  });
+
   it('throws RUNTIME.CODEC_DESCRIPTOR_MISSING when the codec id is unknown', () => {
     const resolver = createAstCodecResolver(buildRegistry(), instanceContextFactory);
 
