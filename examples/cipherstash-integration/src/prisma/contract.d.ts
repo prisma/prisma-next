@@ -35,7 +35,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:b2a92c54647cc15c38833a97de53e617e7f9bd8c0d9e29ddca97374cfee25c31'>;
+  StorageHashBase<'sha256:7475191ce0d78258ce5586265bcdfd12202f5daf90690b902890e58eb7508373'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
@@ -103,7 +103,7 @@ type ContractBase = ContractType<
             readonly nullable: false;
             readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
           };
-          readonly accountId: {
+          readonly accountid: {
             readonly nativeType: 'eql_v2_encrypted';
             readonly codecId: 'cipherstash/bigint@1';
             readonly nullable: false;
@@ -115,7 +115,7 @@ type ContractBase = ContractType<
             readonly nullable: false;
             readonly typeParams: { readonly equality: true; readonly orderAndRange: true };
           };
-          readonly emailVerified: {
+          readonly emailverified: {
             readonly nativeType: 'eql_v2_encrypted';
             readonly codecId: 'cipherstash/boolean@1';
             readonly nullable: false;
@@ -204,9 +204,9 @@ type ContractBase = ContractType<
           readonly id: { readonly column: 'id' };
           readonly email: { readonly column: 'email' };
           readonly salary: { readonly column: 'salary' };
-          readonly accountId: { readonly column: 'accountId' };
+          readonly accountId: { readonly column: 'accountid' };
           readonly birthday: { readonly column: 'birthday' };
-          readonly emailVerified: { readonly column: 'emailVerified' };
+          readonly emailVerified: { readonly column: 'emailverified' };
           readonly preferences: { readonly column: 'preferences' };
         };
       };

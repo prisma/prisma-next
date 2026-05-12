@@ -6,7 +6,7 @@ export default class M extends Migration {
   override describe() {
     return {
       from: null,
-      to: 'sha256:b2a92c54647cc15c38833a97de53e617e7f9bd8c0d9e29ddca97374cfee25c31',
+      to: 'sha256:7475191ce0d78258ce5586265bcdfd12202f5daf90690b902890e58eb7508373',
     };
   }
 
@@ -17,7 +17,7 @@ export default class M extends Migration {
         'users',
         [
           {
-            name: 'accountId',
+            name: 'accountid',
             typeSql: 'eql_v2_encrypted',
             defaultSql: '',
             nullable: false,
@@ -30,7 +30,7 @@ export default class M extends Migration {
           },
           { name: 'email', typeSql: 'eql_v2_encrypted', defaultSql: '', nullable: false },
           {
-            name: 'emailVerified',
+            name: 'emailverified',
             typeSql: 'eql_v2_encrypted',
             defaultSql: '',
             nullable: false,
@@ -48,13 +48,13 @@ export default class M extends Migration {
       ),
       cipherstashAddSearchConfig({
         table: 'users',
-        column: 'accountId',
+        column: 'accountid',
         index: 'unique',
         castAs: 'big_int',
       }),
       cipherstashAddSearchConfig({
         table: 'users',
-        column: 'accountId',
+        column: 'accountid',
         index: 'ore',
         castAs: 'big_int',
       }),
@@ -75,7 +75,7 @@ export default class M extends Migration {
       cipherstashAddSearchConfig({ table: 'users', column: 'email', index: 'ore' }),
       cipherstashAddSearchConfig({
         table: 'users',
-        column: 'emailVerified',
+        column: 'emailverified',
         index: 'unique',
         castAs: 'boolean',
       }),
