@@ -34,38 +34,41 @@ export const contract = defineContract(
 
     return {
       models: {
-        // Cross-contract FK to auth.User (from the Supabase extension).
-        // No new syntax — the model handle's brand tells the framework this
-        // reference targets another contract space.
         Profile: Profile.relations({
-          user: rel.belongsTo(supabaseContract.models.AuthUser, {
-            from: 'userId',
-            to: 'id',
-          }),
-        }).sql(({ cols, constraints, rlsPolicy }) => ({
-          table: 'profile',
-          foreignKeys: [
-            constraints.foreignKey(
-              cols.userId,
-              supabaseContract.models.AuthUser.refs.id,
-              { name: 'profile_userId_fkey' },
-            ),
-          ],
-          rlsPolicies: [
-            rlsPolicy({
+          // Cross-contract FK — model handle's brand tells the framework this
+          // reference targets another contract space (no new TS syntax).
+          user: rel.belongsTo(supabaseContract.models.AuthUser, { from: 'userId', to: 'id' }),
+        })
+          .attributes(({ fields, constraints }) => ({
+            uniques: [ constraints.unique(fields.userId, { name: 'profile_userId_unique' }) ],
+          }))
+          .sql(({ cols, constraints }) => ({
+            table: 'profile',
+            foreignKeys: [
+              constraints.foreignKey(cols.userId, supabaseContract.models.AuthUser.refs.id, {
+                name: 'profile_userId_fkey',
+                onDelete: 'cascade',
+              }),
+            ],
+          }))
+          // Postgres-only stage, target-gated by pack-aware typing.
+          // Each policy carries its own name + operation + roles + predicate(s).
+          // Multiple permissive policies per (target, op) are allowed (Postgres ORs them).
+          .rls([
+            {
               name: 'profiles_select_own',
-              command: 'select',
+              operation: 'select',
               roles: [supabase.roles.authenticated],
-              using: 'user_id = (auth.uid())::text',
-            }),
-            rlsPolicy({
+              using: 'user_id = (auth.uid())::uuid',
+            },
+            {
               name: 'profiles_update_own',
-              command: 'update',
+              operation: 'update',
               roles: [supabase.roles.authenticated],
-              using: 'user_id = (auth.uid())::text',
-            }),
-          ],
-        })),
+              using:     'user_id = (auth.uid())::uuid',
+              withCheck: 'user_id = (auth.uid())::uuid',
+            },
+          ]),
       },
     };
   },
@@ -80,7 +83,7 @@ import { supabase } from '@prisma-next/extension-supabase';
 
 export default defineConfig({
   contract: typescriptContract('./app/contract.ts'),
-  extensionPacks: [supabase()],
+  extensionPacks: [supabase.pack()],
 });
 ```
 
@@ -114,9 +117,9 @@ We deliver six capabilities. Each has its own design note; this list is the map.
 
 2. **Cross-contract-space FK references.** Unified authoring surface (TS: existing `constraints.foreignKey` / `rel.belongsTo` with a model handle from another contract space; PSL: colon-prefixed dot-qualified type refs, e.g. `supabase:auth.User`); FK reference IR carries the foreign contract space ID; implicit resolution against the loaded contract aggregate built from `extensionPacks`; planner emits qualified `REFERENCES "auth"."users"("id")` for named target namespaces and unqualified `REFERENCES "users"("id")` for `__unspecified__` targets. See [`cross-contract-refs.md`](cross-contract-refs.md).
 
-3. **RLS policies as first-class Postgres IR.** `PostgresRlsPolicy` as a target-only IR kind hanging off `PostgresTable`. Inline DSL: `c.rlsPolicy({ name, command, roles, using, check })`. Plain-string predicates for v0.1. Migration ops via `OpFactoryCall`. Verifier diffs against `pg_policies`. See [`rls.md`](rls.md).
+3. **RLS policies as first-class Postgres IR.** `PostgresRlsPolicy` as a target-only IR kind hanging off `PostgresTable`. TS authoring: `.rls([...])` — a fourth staged-builder method alongside `.attributes(...)` and `.sql(...)`, target-gated by pack-aware typing (no capability flag). Array of named descriptors, each carrying `{ name, operation, roles, using?, withCheck?, as? }`. PSL authoring: top-level `policy <name> { target, operation, roles, using, withCheck, ... }` named-block declarations. Both surfaces are lenient on multiplicity (Postgres ORs permissive policies for the same op). TS predicates accept `string | ((ctx) => string)` with `ref(modelHandle)` for canonical quoted identifiers; PSL predicates are verbatim strings in v0.1 (interpolation is a stretch goal). Migration ops via `OpFactoryCall`. Verifier diffs against `pg_policies`. See [`rls.md`](rls.md) and [`decisions.md`](decisions.md).
 
-4. **The `@prisma-next/extension-supabase` package.** A hand-authored `contract.json` describing the `auth`, `storage`, `realtime`, `extensions` schemas as externally-managed. A `supabase()` runtime facade that composes the Postgres runtime internally and exposes `asUser` / `asAnon` / `asServiceRole` role helpers as top-level methods. RLS session-state injection (the request user's JWT becomes a session-scoped role + claim set). Typed role constants. See [`extension-package.md`](extension-package.md).
+4. **The `@prisma-next/extension-supabase` package.** A hand-authored `contract.json` describing the `auth`, `storage`, `realtime`, `extensions` schemas as externally-managed. A `supabase()` runtime facade that composes the Postgres runtime internally and exposes `asUser` / `asAnon` / `asServiceRole` role helpers as top-level methods. RLS session-state injection (the request user's JWT becomes a session-scoped role + claim set). Typed role constants. Use `supabase.pack()` for the extension-pack ref and `supabase.contract<C>(json)` for the typed contract handle — there is no `supabase()` shorthand at the contract-side. See [`extension-package.md`](extension-package.md).
 
 5. **Authoring DSL surface from TML-2459 (assumed).** Namespace declaration in PSL/TS, per-model namespace, cross-namespace FKs within a single contract. **This is already in scope of TML-2459 and is assumed available.** We're listing it here only because the Supabase example wouldn't make sense without it.
 
@@ -128,7 +131,7 @@ We deliver six capabilities. Each has its own design note; this list is the map.
 
 These are desirable but not required for v0.1. The IR refactor from TML-2459 makes them easy to add once the foundation lands.
 
-- **Postgres triggers and functions as first-class IR.** The canonical Supabase "create a profile when a user signs up" pattern uses `CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE PROCEDURE handle_new_user()`. Being able to author this trigger + the function it calls from the contract DSL (rather than dropping to raw SQL migrations) would close the last gap in the canonical Supabase onboarding story.
+- **Postgres triggers and functions as first-class IR.** The canonical Supabase "create a profile when a user signs up" pattern uses `CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE PROCEDURE handle_new_user()`. Being able to author this trigger + the function it calls from the contract DSL (rather than dropping to raw SQL migrations) would close the last gap in the canonical Supabase onboarding story. For v0.1, functions are not contract elements at all — neither authored nor verified — because none of the four typical Supabase flows require it; see [`posture.md`](posture.md) § "Functions are not contract elements in v0.1." `auth.uid()` etc. live inside opaque RLS predicate strings, and column-default functions like `gen_random_uuid()` go through the existing `DefaultFunctionRegistry`.
 
 ## How a request flows through the stack
 

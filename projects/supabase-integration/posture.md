@@ -8,7 +8,7 @@ The framework needs to know its relationship to each database-persisted object's
 
 ## Design intent
 
-**Posture is a generic, target-agnostic property** that lives in the framework domain. It applies to any IR node that represents a database-persisted object (tables, columns, indexes, constraints, RLS policies, **functions**, …). Targets can extend the set of postures if they need to, but the four below are framework-level.
+**Posture is a generic, target-agnostic property** that lives in the framework domain. It applies to any IR node that represents a database-persisted object **declared in the contract** (tables, columns, indexes, constraints, RLS policies, …). Targets can extend the set of postures if they need to, but the four below are framework-level. Functions are not contract elements in v0.1 (see § "Functions are not contract elements in v0.1" below).
 
 | Posture | Verifier behaviour | Planner / migration behaviour |
 |---|---|---|
@@ -38,32 +38,18 @@ interface TableDeclaration {
 }
 ```
 
-Same for indexes, constraints, RLS policies, functions, etc. — posture is per-object, not per-contract, because a single contract might mix postures (rare for v0.1, but the IR shouldn't forbid it).
+Same for indexes, constraints, RLS policies, etc. — posture is per-object, not per-contract, because a single contract might mix postures (rare for v0.1, but the IR shouldn't forbid it).
 
-### Function-level posture
+### Functions are not contract elements in v0.1
 
-Posture **must** apply to functions, not just tables and constraints. The Supabase extension contract needs to declare `auth.uid()`, `auth.jwt()`, `auth.role()` as externally-managed functions so the verifier knows they exist and won't trip on RLS predicates that reference them, while the planner emits no DDL for them. Without function-level posture, the central Supabase use case (RLS policies that call `auth.uid()`) has a gap: the verifier can't resolve those function references.
+Posture is a property of **declared contract elements**. Functions (`auth.uid()`, `auth.jwt()`, `gen_random_uuid()`, etc.) are deliberately not contract elements in v0.1:
 
-The function declaration in the contract looks like:
+- **Within RLS predicates** they are opaque substrings of opaque strings — see [`rls.md`](rls.md) "Predicate language" and [`decisions.md` A5 / B5](decisions.md). The framework never parses what's inside a predicate; Postgres errors at migration time if the predicate is invalid.
+- **As column-default invocations** they go through the existing framework `DefaultFunctionRegistry` (`packages/1-framework/1-core/framework-components/src/shared/mutation-default-types.ts`) — a control-plane registry of named default-value generators with lowering handlers. Registry entries are not contract elements and are not verified against `pg_proc`.
 
-```jsonc
-{
-  "functions": {
-    "auth.uid": {
-      "namespace": "auth",
-      "posture": "externally-managed",
-      "returns": "uuid"
-    },
-    "auth.jwt": {
-      "namespace": "auth",
-      "posture": "externally-managed",
-      "returns": "jsonb"
-    }
-  }
-}
-```
+This means the Supabase extension contract declares **no functions** in v0.1. The Supabase pack may extend `DefaultFunctionRegistry` with `auth.uid()` / `auth.jwt()` / `auth.role()` *if* we decide to support them as column defaults (open; not blocking — flows that need it can fall back to the raw escape hatch). Either way, the IR is unchanged.
 
-The framework IR gains a `FunctionDeclaration` node with a `posture` property. The verifier checks function existence against `pg_proc` (Postgres) under the same posture dispatch table. The planner never emits `CREATE FUNCTION` for externally-managed functions.
+Promoting functions to first-class IR (with posture, verifier introspection of `pg_proc`, planner DDL) is captured as a stretch alongside the trigger work — see [`overview.md`](overview.md) "Stretch goals." It's not on the v0.1 critical path because none of the four typical Supabase flows actually need it (FKs to `auth.users`, UUID generation, RLS predicates, server-defaulted columns all work through existing mechanisms).
 
 ### Authoring surface
 

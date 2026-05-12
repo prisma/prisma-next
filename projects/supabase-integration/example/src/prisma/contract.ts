@@ -24,10 +24,10 @@ export const contract = defineContract(
         returning: true,
         'defaults.uuidv4': true,
         'defaults.now': true,
-        // RLS capability — gates rlsPolicy(...) authoring and the planner's
-        // CREATE POLICY emission.
-        // DESIGN HOLE #1: `'postgres.rls'` vs `'supabase.rls'`. Lean target-level.
-        'postgres.rls': true,
+        // No capability flag for RLS — target presence is the gate.
+        // The Postgres pack carries RLS support; pack-aware typing makes
+        // `.rls(...)` visible on ContractModelBuilder only for Postgres.
+        // (See design-holes #1.)
       },
     },
   },
@@ -58,7 +58,7 @@ export const contract = defineContract(
 
     return {
       models: {
-        // Profile: owns a cross-contract FK (to auth.User) and is queried with RLS.
+        // Profile: owns a cross-contract FK (to auth.User) and is guarded by RLS.
         Profile: Profile.relations({
           // Cross-contract: rel.belongsTo accepts a model handle from any
           // contract space registered in `extensionPacks`. The handle's brand
@@ -67,109 +67,119 @@ export const contract = defineContract(
             from: 'userId',
             to: 'id',
           }),
-          // Local within-namespace relation. Resolves at lowering against
+          // Local within-namespace relation; resolves at lowering against
           // the same contract.
           posts: rel.hasMany(Post, { by: 'authorId' }),
-        }).sql(({ cols, constraints, rlsPolicy }) => ({
-          table: 'profile',
-          foreignKeys: [
-            constraints.foreignKey(
-              cols.userId,
-              supabaseContract.models.AuthUser.refs.id,
-              {
-                name: 'profile_userId_fkey',
-                // DESIGN HOLE #3: onDelete on cross-contract FKs. See `cross-contract-refs.md`
-                // open question on cascading actions across spaces.
-                onDelete: 'cascade',
-              },
-            ),
-          ],
-          // DESIGN HOLE #4: uniqueConstraints inside .sql() block. Existing demo
-          // example didn't use this shape — verify against the DSL.
-          uniqueConstraints: [
-            constraints.unique([cols.userId], {
-              name: 'profile_userId_unique',
-            }),
-            constraints.unique([cols.username], {
-              name: 'profile_username_unique',
-            }),
-          ],
-          // DESIGN HOLE #2: rlsPolicy injection point. The example assumes
-          // rlsPolicy is destructured from the .sql() closure alongside cols,
-          // constraints. `rls.md` shows `c.rlsPolicy({...})` — alignment TBD.
-          rlsPolicies: [
-            // Public read: any role can see profile rows (subject to its own grants).
-            // Modeled after Supabase's typical "public profile" pattern.
-            rlsPolicy({
+        })
+          // Target-agnostic model attributes — composite / named uniques live here,
+          // following the existing DSL split between `.attributes()` and `.sql()`.
+          .attributes(({ fields, constraints }) => ({
+            uniques: [
+              constraints.unique(fields.userId,   { name: 'profile_userId_unique' }),
+              constraints.unique(fields.username, { name: 'profile_username_unique' }),
+            ],
+          }))
+          // Target-specific SQL — table name, indexes, foreign keys.
+          .sql(({ cols, constraints }) => ({
+            table: 'profile',
+            foreignKeys: [
+              constraints.foreignKey(
+                cols.userId,
+                supabaseContract.models.AuthUser.refs.id,
+                {
+                  name: 'profile_userId_fkey',
+                  // Cascade across the contract-space boundary is the developer's
+                  // explicit opt-in. No diagnostic — see
+                  // `.agents/rules/explicit-opt-in-over-diagnostics.mdc`.
+                  onDelete: 'cascade',
+                },
+              ),
+            ],
+          }))
+          // Postgres-only stage; only typed when the target carries RLS support.
+          // Array of named policy descriptors — each carries its own name, operation,
+          // roles, optional `as`, plus the predicate bodies. Multiple permissive
+          // policies for the same operation are allowed (Postgres ORs them); the
+          // PSL surface mirrors this with named-block policies.
+          .rls([
+            {
               name: 'profiles_select_anon_and_authed',
-              command: 'select',
+              operation: 'select',
               roles: [supabase.roles.anon, supabase.roles.authenticated],
               using: 'true',
-            }),
-            // Authenticated users may insert / update / delete only their own profile.
+            },
             // auth.uid() is declared in the Supabase contract as an externally-managed
             // function (see migrations/supabase/contract.json).
-            rlsPolicy({
+            {
               name: 'profiles_insert_own',
-              command: 'insert',
+              operation: 'insert',
               roles: [supabase.roles.authenticated],
-              check: 'user_id = (auth.uid())::uuid',
-            }),
-            rlsPolicy({
+              withCheck: 'user_id = (auth.uid())::uuid',
+            },
+            {
               name: 'profiles_update_own',
-              command: 'update',
+              operation: 'update',
               roles: [supabase.roles.authenticated],
-              using: 'user_id = (auth.uid())::uuid',
-              check: 'user_id = (auth.uid())::uuid',
-            }),
-            rlsPolicy({
+              using:     'user_id = (auth.uid())::uuid',
+              withCheck: 'user_id = (auth.uid())::uuid',
+            },
+            {
               name: 'profiles_delete_own',
-              command: 'delete',
+              operation: 'delete',
               roles: [supabase.roles.authenticated],
               using: 'user_id = (auth.uid())::uuid',
-            }),
-          ],
-        })),
+            },
+          ]),
 
         // Post: local FK to Profile (within-namespace), RLS subqueries reference profile.
         Post: Post.relations({
           author: rel.belongsTo(Profile, { from: 'authorId', to: 'id' }),
-        }).sql(({ cols, constraints, rlsPolicy }) => ({
-          table: 'post',
-          foreignKeys: [
-            constraints.foreignKey(cols.authorId, Profile.refs.id, {
-              name: 'post_authorId_fkey',
-              onDelete: 'cascade',
-            }),
-          ],
-          rlsPolicies: [
-            // Anyone (incl. anon) can read published posts.
-            rlsPolicy({
+        })
+          .sql(({ cols, constraints }) => ({
+            table: 'post',
+            foreignKeys: [
+              constraints.foreignKey(cols.authorId, Profile.refs.id, {
+                name: 'post_authorId_fkey',
+                onDelete: 'cascade',
+              }),
+            ],
+          }))
+          // `using`/`withCheck` accept `string | (ctx) => string`. The function
+          // form exposes `ref(modelHandle)` which returns the canonical, quoted,
+          // namespace-qualified table identifier — so renames in Profile.sql({ table })
+          // or its namespace track automatically. Bare strings (no table reference)
+          // stay one-liners. (See design-holes #5.)
+          .rls([
+            {
               name: 'posts_select_published',
-              command: 'select',
+              operation: 'select',
               roles: [supabase.roles.anon, supabase.roles.authenticated],
               using: 'published_at IS NOT NULL',
-            }),
-            // Authenticated users can additionally see their own drafts.
-            // DESIGN HOLE #5: predicate references the `public.profile` table.
-            // Should the framework canonicalize this qualifier, or are users
-            // responsible for matching their own contract's namespace layout?
-            rlsPolicy({
-              name: 'posts_select_own_drafts',
-              command: 'select',
-              roles: [supabase.roles.authenticated],
-              using:
-                'author_id IN (SELECT id FROM public.profile WHERE user_id = (auth.uid())::uuid)',
-            }),
-            rlsPolicy({
+            },
+            {
               name: 'posts_insert_own',
-              command: 'insert',
+              operation: 'insert',
               roles: [supabase.roles.authenticated],
-              check:
-                'author_id IN (SELECT id FROM public.profile WHERE user_id = (auth.uid())::uuid)',
-            }),
-          ],
-        })),
+              withCheck: ({ ref }) =>
+                `author_id IN (SELECT id FROM ${ref(Profile)} WHERE user_id = (auth.uid())::uuid)`,
+            },
+            {
+              name: 'posts_update_own',
+              operation: 'update',
+              roles: [supabase.roles.authenticated],
+              using: ({ ref }) =>
+                `author_id IN (SELECT id FROM ${ref(Profile)} WHERE user_id = (auth.uid())::uuid)`,
+              withCheck: ({ ref }) =>
+                `author_id IN (SELECT id FROM ${ref(Profile)} WHERE user_id = (auth.uid())::uuid)`,
+            },
+            {
+              name: 'posts_delete_own',
+              operation: 'delete',
+              roles: [supabase.roles.authenticated],
+              using: ({ ref }) =>
+                `author_id IN (SELECT id FROM ${ref(Profile)} WHERE user_id = (auth.uid())::uuid)`,
+            },
+          ]),
       },
     };
   },

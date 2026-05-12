@@ -10,57 +10,306 @@ Status legend:
 
 ## Contract authoring (`src/prisma/contract.ts`)
 
-### 🔴 #1 — Capability gate for RLS
+### ✅ #1 — Capability gate for RLS — **DECIDED: no explicit capability flag**
 
-The example sets `capabilities.postgres['postgres.rls']: true`. Two options:
+**Resolution:** target presence is the gate. The Postgres target carries RLS support; pack-aware typing makes the `.rls(...)` slot visible on the model builder only when the target supports it (same mechanism `IndexTypes` uses today in `SqlContext` — see [`contract-dsl.ts`](../../../packages/2-sql/2-authoring/contract-ts/src/contract-dsl.ts) `PackAwareSqlConstraints<IndexTypes>`). Non-Postgres targets simply don't expose the slot; no capability flag is required.
 
-- `'postgres.rls'` — RLS is a Postgres-target capability. Any Postgres consumer can use it; Supabase happens to be one. Aligns with how other Postgres-only features gate.
-- `'supabase.rls'` — RLS is bound to the Supabase extension. Stops non-Supabase Postgres apps from accidentally using the DSL.
+Verifier strictness opt-out (e.g. "skip RLS checks for this table") is a *separate* concern handled by table-level posture, not a capability switch.
 
-**Recommendation: `'postgres.rls'`.** RLS is a Postgres mechanic, not a Supabase one. Other Postgres apps will want it (multi-tenant SaaS, internal admin tools, etc.). Make it target-level, gate the DSL on its presence in the capabilities, and have the Supabase extension pre-enable it by default in any contract using `extensionPacks: { supabase: ... }`.
+The example app should drop `capabilities.postgres['postgres.rls']: true` from its contract config.
 
-Touches: [`rls.md`](../rls.md) (needs the capability-key decision), [`extension-package.md`](../extension-package.md) (needs the auto-enable behaviour documented).
+Touches: [`rls.md`](../rls.md) (the capability-key discussion can be removed — there is no capability key), example contract.ts.
 
-### 🟡 #2 — `rlsPolicy(...)` injection point
+### ✅ #2 — `rlsPolicy(...)` injection point — **DECIDED: separate `.rls(...)` stage, dict keyed by operation**
 
-The example destructures `rlsPolicy` from the `.sql()` closure alongside `cols` and `constraints`:
+**Resolution:** add a fourth named stage on `ContractModelBuilder` alongside `.attributes(...)` and `.sql(...)`. The argument is an **array of named policy descriptors** — each policy carries its own `name`, `operation`, `roles`, optional `as`, and the predicate bodies:
 
 ```ts
-.sql(({ cols, constraints, rlsPolicy }) => ({
-  table: 'profile',
-  rlsPolicies: [ rlsPolicy({ ... }) ],
-}))
+const Post = model('Post', { /* fields */ })
+  .relations({ author: rel.belongsTo(Profile, { from: 'authorId', to: 'id' }) })
+  .attributes(({ fields, constraints }) => ({
+    id: constraints.id(fields.id),
+  }))
+  .sql(({ cols, constraints }) => ({
+    table: 'post',
+    foreignKeys: [ constraints.foreignKey(cols.authorId, Profile.refs.id) ],
+  }))
+  .rls([
+    {
+      name: 'posts_select_published',
+      operation: 'select',
+      roles: [supabase.roles.anon, supabase.roles.authenticated],
+      using: 'is_published = true',
+    },
+    {
+      name: 'posts_insert_own',
+      operation: 'insert',
+      roles: [supabase.roles.authenticated],
+      withCheck: 'author_id IN (SELECT id FROM public.profile WHERE user_id = (auth.uid())::uuid)',
+    },
+    {
+      name: 'posts_update_own',
+      operation: 'update',
+      roles: [supabase.roles.authenticated],
+      using:     'author_id IN (SELECT id FROM public.profile WHERE user_id = (auth.uid())::uuid)',
+      withCheck: 'author_id IN (SELECT id FROM public.profile WHERE user_id = (auth.uid())::uuid)',
+    },
+    {
+      name: 'posts_delete_own',
+      operation: 'delete',
+      roles: [supabase.roles.authenticated],
+      using: 'author_id IN (SELECT id FROM public.profile WHERE user_id = (auth.uid())::uuid)',
+    },
+    // Permissive layered with restrictive — Postgres composes them at evaluation time.
+    // {
+    //   name: 'posts_select_no_archived',
+    //   operation: 'select',
+    //   as: 'restrictive',
+    //   roles: [supabase.roles.authenticated],
+    //   using: 'is_archived = false',
+    // },
+  ]);
 ```
 
-`rls.md` shows the alternative `c.rlsPolicy({...})` on a separate `constraints` callback. Pick one shape and apply consistently.
+**Why a separate `.rls(...)` stage rather than living in `.sql(...)`:**
 
-**Recommendation: keep `rlsPolicy` on the `.sql()` closure** alongside other Postgres-only structural concerns (foreign keys, unique constraints). RLS is Postgres-specific; it belongs with the SQL block, not in a target-agnostic `constraints` callback.
+- The existing DSL has clear precedent: `.attributes(...)` is **target-agnostic** (`id`, `uniques`), `.sql(...)` is **target-specific** (`indexes`, `foreignKeys`). RLS is a third concern — structurally Postgres-specific, but conceptually about **access control**, not table structure. Giving it its own stage keeps `.sql(...)` focused on schema topology and makes RLS visually scannable in a model definition.
+- Pack-aware typing gates the method itself: `.rls(...)` is typed on `ContractModelBuilder` only when the target carries RLS support. Same mechanism as `PackAwareSqlConstraints<IndexTypes>` today.
 
-### 🟡 #3 — `onDelete` (and friends) on cross-contract FKs
+**Why an array of named descriptors rather than a dict keyed by operation:**
 
-The example sets `onDelete: 'cascade'` on the cross-contract FK from `Profile.userId` to `auth.users.id`. The cross-contract-refs design note flags cascading actions as an open question. The example forces the answer.
+The earlier version of this section recommended a dict keyed by operation (`{ select: {...}, insert: {...}, ... }`) on the basis that it structurally enforced "one permissive policy per operation." That positioning was reversed: it makes the TS surface *more restricted* than PSL (which uses named-block policies and naturally allows multiple permissive policies per op when names differ). The framework's typical positioning is the inverse — TS is the more expressive surface, PSL the simpler restricted one. The array form restores that ordering.
 
-**Recommendation: permit, but emit a planner warning** when a cascading action targets an `externally-managed` table. The warning is informational ("Profile rows will be deleted when an auth.users row is deleted by Supabase. This is your intent if you want orphan cleanup; flag if not."). Migration emission is unaffected.
+- The operation is still a closed-set literal on each entry (`operation: 'select' | 'insert' | 'update' | 'delete' | 'all'`); the type system catches typos.
+- Each policy carries its own name. Duplicate names across the array (within the same model) are detected at lowering time.
+- Multiple permissive policies for the same operation are valid — Postgres ORs them; the framework emits them as N CREATE POLICY statements. PSL behaves the same way (one named-block per policy).
+- One permissive + one restrictive on the same operation works naturally (Postgres composes them; the framework emits both).
 
-Touches: [`cross-contract-refs.md`](../cross-contract-refs.md) open-questions list — promote from open to settled.
+**PSL surface** — settled in a parallel discussion. Top-level named-block declarations:
 
-### 🟢 #4 — `uniqueConstraints` in `.sql()` block
+```psl
+namespace public {
+  policy profile_select {
+    target = Profile
+    operation = select
+    roles = [anon, authenticated]
+    using = "true"
+  }
+}
+```
 
-The example places named unique constraints inside the `.sql()` block. The existing demo example expresses uniques via field-level `.unique()`. Both should work; the SQL-block form supports naming and composite keys.
+Body uses the `key = value` line convention already established for datasource/generator-shaped declarations. Predicates are plain strings in v0.1 (no interpolation); the structured-reference helper analogous to TS's `({ ref }) => ...` is a stretch goal — see #5.
 
-**Recommendation: both. Field-level `.unique()` for single-column unnamed uniques, SQL-block `constraints.unique([cols.x, cols.y], { name })` for composite or named uniques.** No spec impact; documentation only.
+### ✅ #3 — `onDelete` (and friends) on cross-contract FKs — **DECIDED: permit, no diagnostic**
 
-### 🔴 #5 — RLS predicate qualified-table semantics
+**Resolution:** permit cascading actions on cross-contract FKs to externally-managed tables. **No diagnostic.** The developer's explicit `onDelete: 'cascade'` at the call site is the audit trail; emitting a warning on every build for a path the user opted into deliberately is noise.
 
-The example RLS predicate `'author_id IN (SELECT id FROM public.profile WHERE ...)'` references the local table by qualified name. Three questions surface:
+This is the first concrete application of the repo-wide policy now codified in [`.agents/rules/explicit-opt-in-over-diagnostics.mdc`](../../../.agents/rules/explicit-opt-in-over-diagnostics.mdc): when a user has to type something to enable a risky behaviour, the typed-in code *is* the documentation of intent — a diagnostic adds noise without adding signal.
 
-1. **Canonicalization.** Does the framework rewrite `public.profile` to whatever the contract's effective namespace + table-name resolution produces? If a user renames the SQL `table: 'profile'` to `table: 'user_profile'`, does the predicate auto-track?
-2. **`__unspecified__` interaction.** If the model lives in `__unspecified__` (Postgres) and the predicate hardcodes `public.profile`, the predicate may be wrong in multi-tenant deployments where the schema isn't `public`.
-3. **Diagnostic / lint.** Should the framework parse predicate strings well enough to warn on stale table references?
+If a future use case surfaces where the choice is genuinely non-obvious (e.g. the user can't see from local code that the target is externally-managed), the answer is to make the API more explicit (e.g. require `crossContractCascade: true` as a deliberate opt-in beyond `onDelete: 'cascade'`), **not** to add a build-time warning.
 
-**Recommendation:** v0.1 takes predicates **verbatim** — no canonicalization, no parsing. Document the convention "use the schema-qualified name that your migrations emit" and add a CLI lint (`prisma-next check`) that pattern-matches likely table references in predicates against the contract and warns on mismatches. Defer typed-predicate IR to follow-up work.
+Touches: [`cross-contract-refs.md`](../cross-contract-refs.md) — close the open question; permit cascading without diagnostic.
 
-Touches: [`rls.md`](../rls.md) needs this rule documented.
+### ✅ #4 — `uniqueConstraints` in `.sql()` block — **RESOLVED: the DSL already covers this; example was wrong**
+
+**Grounded by codebase inspection of [`contract-dsl.ts`](../../../packages/2-sql/2-authoring/contract-ts/src/contract-dsl.ts):** the DSL already has a clean home for composite/named uniques. The example app put them in the wrong place.
+
+The model builder has **two staged closures**, with deliberately different scopes:
+
+- `.attributes(({ fields, constraints }) => ({ id, uniques }))` — **target-agnostic** model attributes. `constraints` here exposes only `{ id, unique }` (both are concepts every SQL target supports). The spec shape is `ModelAttributesSpec = { id?, uniques?: UniqueConstraint[] }`.
+- `.sql(({ cols, constraints }) => ({ table, indexes, foreignKeys }))` — **target-specific** SQL block. `constraints` here exposes `{ foreignKey, ref, index }` plus a `PackAwareIndex` typed by the target's index-type pack. The spec shape is `SqlStageSpec = { table?, indexes?, foreignKeys? }`.
+
+Composite or named uniques belong in `.attributes(...)`, not `.sql(...)`. Field-level `.unique({ name? })` on `ScalarFieldBuilder` handles the single-column case. **No DSL extension required** — the example app simply moves to the right shape:
+
+```ts
+const Profile = model('Profile', {
+  fields: {
+    id:       field.id.uuidv4(),
+    userId:   field.uuid(),
+    username: field.text(),
+  },
+})
+  .relations({ user: rel.belongsTo(supabaseContract.models.AuthUser, { from: 'userId', to: 'id' }) })
+  .attributes(({ fields, constraints }) => ({
+    id: constraints.id(fields.id),
+    uniques: [
+      constraints.unique(fields.userId,   { name: 'profile_userId_unique' }),
+      constraints.unique(fields.username, { name: 'profile_username_unique' }),
+      constraints.unique([fields.userId, fields.username], { name: 'profile_user_username_composite' }),
+    ],
+  }))
+  .sql(({ cols, constraints }) => ({
+    table: 'profile',
+    foreignKeys: [
+      constraints.foreignKey(cols.userId, supabaseContract.models.AuthUser.refs.id, {
+        name: 'profile_userId_fkey',
+        onDelete: 'cascade',
+      }),
+    ],
+  }));
+```
+
+**Spec impact:** none. **Example app impact:** fix the contract to use `.attributes(...)` for uniques and reserve `.sql(...)` for indexes / foreign keys. **Documentation impact:** the developer-experience doc should call out the `.attributes` / `.sql` / `.rls` separation explicitly so users know where each concern goes.
+
+This finding also informs the precedent for #2: a fourth `.rls(...)` stage fits naturally next to `.attributes` and `.sql`.
+
+### ✅ #5 — RLS predicate qualified-table semantics — **DECIDED: TS gets structured `ref()`; PSL stays verbatim in v0.1; interpolation is a stretch goal**
+
+**Reframing.** The framework owns almost the entire `CREATE POLICY` statement. Crossed against the DSL:
+
+| CREATE POLICY clause | Source | Owner |
+|---|---|---|
+| `<name>` | `policy.name` (TS) / declaration head ident (PSL) | framework |
+| `ON <schema>.<table>` | model `namespace` + `.sql({ table })` | framework |
+| `AS PERMISSIVE / RESTRICTIVE` | `policy.as` (default `permissive`) | framework |
+| `FOR <op>` | `policy.operation` (TS) / `operation =` (PSL) | framework |
+| `TO <roles>` | `policy.roles` | framework |
+| `USING (...)` body | condition expression | **user** |
+| `WITH CHECK (...)` body | condition expression | **user** |
+
+The opaque surface is exactly two strings per policy. Most predicates name no table at all (they reference columns of the row in scope, plus functions like `auth.uid()`). The qualified-table problem only appears in **subquery predicates** that name *other* tables.
+
+**Resolution (TS):** `using` and `withCheck` accept `string | ((ctx) => string)`. The context exposes a structured `ref(modelHandle)` helper that returns the canonical, quoted, namespace-qualified table identifier. Subqueries get rename-tracking for free; bare-column predicates stay one-line strings; the verbatim escape hatch remains available.
+
+**Resolution (PSL):** v0.1 takes predicates **verbatim**. Authors use the schema-qualified name their migrations emit. Renames in `target =` don't auto-update subquery predicates. The structured analogue — `${ModelName}` and `${supabase:auth.User}` interpolation tokens inside string literals — is a **stretch goal**, not on the v0.1 critical path. New string-literal kind in the lexer is small but real grammar work.
+
+The TS-gets-`ref()` / PSL-stays-verbatim split aligns with the framework's typical positioning: TS is the more expressive surface; PSL is the simpler, more restricted one. PSL users who hit rename pain in v0.1 can either move the contract to TS, or wait for the interpolation stretch.
+
+#### Shape (TS)
+
+```ts
+type RlsPredicate =
+  | string
+  | ((ctx: RlsPredicateContext) => string);
+
+type RlsPredicateContext = {
+  /**
+   * Returns the canonical, quoted, namespace-qualified identifier for a model's
+   * table. Renames in `.sql({ table })` or model namespace propagate here.
+   *
+   * - Models in named namespaces:           `"public"."profile"`
+   * - Models in `__unspecified__`:          `"profile"`  (bare; database resolves via search_path)
+   * - Cross-contract models (handle from `extensionPacks`):
+   *                                          `"auth"."users"`  (or bare if extension target is __unspecified__)
+   */
+  readonly ref: (modelHandle: ModelHandle) => string;
+};
+```
+
+#### Authoring (TS)
+
+The simple case stays a one-liner — no helper needed because there is no table reference:
+
+```ts
+.rls([
+  {
+    name: 'posts_select_published',
+    operation: 'select',
+    roles: [supabase.roles.anon, supabase.roles.authenticated],
+    using: 'is_published = true',                              // no helper, no table ref
+  },
+  {
+    name: 'profiles_insert_own',
+    operation: 'insert',
+    roles: [supabase.roles.authenticated],
+    withCheck: 'user_id = (auth.uid())::uuid',                 // no helper, no table ref
+  },
+])
+```
+
+The subquery case takes the function form. The `ref()` helper is the only thing the framework intercepts; the rest of the string is whatever Postgres SQL the user wants:
+
+```ts
+.rls([
+  {
+    name: 'posts_update_own',
+    operation: 'update',
+    roles: [supabase.roles.authenticated],
+    using:     ({ ref }) =>
+      `author_id IN (SELECT id FROM ${ref(Profile)} WHERE user_id = (auth.uid())::uuid)`,
+    withCheck: ({ ref }) =>
+      `author_id IN (SELECT id FROM ${ref(Profile)} WHERE user_id = (auth.uid())::uuid)`,
+  },
+])
+```
+
+#### Authoring (PSL, v0.1)
+
+Plain strings only. Authors type qualified names matching their migrations:
+
+```psl
+namespace public {
+  policy posts_update_own {
+    target = Post
+    operation = update
+    roles = [authenticated]
+    using = "author_id IN (SELECT id FROM public.profile WHERE user_id = (auth.uid())::uuid)"
+    withCheck = "author_id IN (SELECT id FROM public.profile WHERE user_id = (auth.uid())::uuid)"
+  }
+}
+```
+
+A rename of `Profile.sql({ table })` from `'profile'` to `'user_profile'` leaves this predicate referencing the old name. v0.1 ships with that as a known trade-off; the interpolation stretch goal closes it.
+
+If `Profile.sql({ table })` is renamed `'profile' → 'user_profile'`, or its namespace moves `'public' → 'tenant_a'`, the predicate updates automatically. The user never types `"public"."profile"`; the framework synthesises it at lowering time.
+
+Cross-contract refs work the same way — `ref()` accepts any model handle the contract is allowed to reference:
+
+```ts
+using: ({ ref }) =>
+  `tenant_id = (SELECT default_tenant FROM ${ref(supabaseContract.models.AuthUser)} WHERE id = (auth.uid())::uuid)`,
+```
+
+#### Why this beats "verbatim + lint"
+
+- **Renames track.** No lint needed for the structured path — rename safety is provided by construction, not by best-effort pattern matching.
+- **No diagnostic noise.** The "verbatim + lint" route had a `RLS_PREDICATE_UNKNOWN_TABLE` warning class fighting against the explicit-opt-in rule (`.agents/rules/explicit-opt-in-over-diagnostics.mdc`). Structured refs make the warning unnecessary.
+- **The opaque surface narrows to exactly what it must.** Postgres SQL expression syntax inside the condition body is the only thing the framework still has to take on faith. Subexpressions like `auth.uid()`, `(value)::uuid`, `IN (...)`, `JSON_EXTRACT(...)` all stay valid; the framework intercepts table identifiers only.
+- **No parser dependency.** `ref()` is a function call that returns a string at policy-build time. The framework never has to understand the SQL around it.
+- **`__unspecified__` is automatic.** When a model lives in `__unspecified__`, `ref(Model)` returns the bare quoted name (`"profile"`); the database resolves via `search_path` at runtime. Matches the cross-namespace FK rule and the per-tenant migration story we already settled in TML-2459.
+
+#### Implementation sketch
+
+```ts
+// packages/2-sql/2-authoring/contract-ts/src/rls/predicate.ts
+
+import { quoteIdent } from '@prisma-next/sql-postgres/identifiers';
+
+type ModelHandle = { readonly __name: string };
+
+type LoweringContext = {
+  readonly modelTable: (handle: ModelHandle) => { namespace: string; table: string };
+  readonly currentTarget: 'postgres' | 'sqlite' | /* ... */;
+};
+
+export function buildRlsPredicateContext(lowering: LoweringContext): RlsPredicateContext {
+  return {
+    ref(handle) {
+      const { namespace, table } = lowering.modelTable(handle);
+      if (namespace === '__unspecified__') {
+        return quoteIdent(table);
+      }
+      return `${quoteIdent(namespace)}.${quoteIdent(table)}`;
+    },
+  };
+}
+
+export function evaluateRlsPredicate(
+  predicate: RlsPredicate,
+  ctx: RlsPredicateContext,
+): string {
+  return typeof predicate === 'function' ? predicate(ctx) : predicate;
+}
+```
+
+This is invoked once per `(model, operation, kind)` triple at lowering time, before the contract is serialized to JSON. The function form runs eagerly — the JSON contract holds resolved condition strings, not closures.
+
+#### Open follow-ups (non-blocking)
+
+- **Schema/column refs inside expressions.** The current `ref()` surface covers table identifiers. A predicate that wants to reference a *column* qualified by table (`p.user_id`) or a *function* by handle (`ref(supabaseContract.functions.uid)()`) is still raw. Add helpers if real predicates demand them. Not a v0.1 requirement — every real-world Supabase RLS example I checked uses bare column names plus `auth.uid()` / `auth.role()` literals.
+- **Escape hatch.** Users who genuinely need a raw SQL fragment with table names baked in can keep using the string form. No diagnostic, no lint — their string, their consequences.
+
+Touches: [`rls.md`](../rls.md) — record this design; remove the verbatim-plus-lint section.
 
 ### 🟢 #6 — Cross-namespace `rel.hasMany`
 
@@ -142,27 +391,27 @@ Touches: [`extension-package.md`](../extension-package.md) §"Pool consideration
 
 ## Pinned mirror (`migrations/supabase/contract.json`, `contract.d.ts`)
 
-### 🔴 #15 — Function IR shape
+### ✅ #15 — Function IR shape — CLOSED (out of scope for v0.1)
 
-The example invents `functions: { <name>: { namespace, posture, returns: { type }, args: [...] } }`. The shape is ungrounded — the contract IR doesn't have a `functions` key today.
+The example invented `functions: { <name>: { namespace, posture, returns, args } }`. Closed by [`decisions.md` C4](../decisions.md): functions are not contract elements in v0.1. The four typical Supabase flows (FK to `auth.users` with cascade, server-generated UUIDs, RLS predicates using `auth.uid()`, column-default function invocations) map to existing mechanisms — cross-contract FK refs, the framework's `DefaultFunctionRegistry`, and opaque RLS predicate strings. The verifier never introspects `pg_proc`; missing functions surface as Postgres errors at migration / query time.
 
-**Recommendation: model functions as siblings to models in the contract IR.** Per-function fields: `namespace`, `name`, `posture` (defaulting from contract `defaultPosture`), `returns: TypeRef`, `args: ParamRef[]`, optional `volatility: 'immutable' | 'stable' | 'volatile'` (matches Postgres semantics). The verifier reads `pg_proc` and matches by `(namespace, name, argtypes)`.
+The example app's contract.json should drop the `functions` block entirely. Promoting functions to first-class IR pairs with the trigger work as a stretch goal; see [`overview.md`](../overview.md) "Stretch goals."
 
-Touches: [`posture.md`](../posture.md) §"Function-level posture" — the IR sketch there must concretize.
+### ✅ #16 — Function-name canonicalization — CLOSED (moot)
 
-### 🟡 #16 — Function-name canonicalization
+Closed by #15. No function IR keys to canonicalize in v0.1.
 
-The example's contract.json keys functions by bare name (`"uid"`, `"jwt"`, `"role"`) with `namespace` as a separate field — matching the model convention. The original sketch in `posture.md` used dot-keyed names (`"auth.uid"`).
+### ✅ #17 — `TypedContract<T>` accessor surface — CLOSED (superseded by C5+C6+C7)
 
-**Recommendation: bare-name keys + separate `namespace` field**, matching models. Consistency.
+The original framing assumed extensions ship a generic `Contract` type spec and consumers' authoring DSL applies a `TypedContract<T>` mapped type to derive `.models.<Name>.refs.<field>` accessors at use-site. Closed by [`decisions.md` C5/C6/C7](../decisions.md):
 
-### 🔴 #17 — `TypedContract<T>` shape and `.models.<Name>.refs.<field>` accessors
+- **C7**: extensions ship a pre-built `/contract` submodule with concrete typed handles (hand-written for v0.1; emitter-generated as roadmap). No consumer-side type-level lifting.
+- **C6**: those handles are imported from `@prisma-next/extension-supabase/contract` directly; no `supabase.contract<C>(json)` runtime factory dance for authoring.
+- **C5**: the same `/contract` builder exposes `roles.<name>` as branded `RoleRef`s — uniform with `models.<Name>.refs.<field>` shape.
 
-The cross-contract-refs design references `supabaseContract.models.AuthUser.refs.id` — a typed accessor path. The type-level machinery that lifts a `Contract` type spec into this accessor tree is currently unwritten.
+The minimal new type-level work is: a single `ColumnRef<spaceId>` branded type (with `<self>` sentinel for local refs and concrete extension `spaceId`s for cross-contract refs) plus an extension to FK / relation call-site signatures. No mapped type required.
 
-**Recommendation: `TypedContract<T>` is a mapped type that emits `.models` (keyed by model name) and per-model `.refs` (keyed by field name) accessors.** Each `.refs.<field>` produces a branded `ColumnRef<{ spaceId, namespace, table, column, type }>` that the framework consumes in FK and relation declarations. This is one focused type-level surface in `@prisma-next/contract-core`; not a large piece of work, but explicit.
-
-Touches: cross-contract-refs.md's "What's the typed handle returned by `supabase.contract<C>(json)`?" open question — promote to settled with this answer.
+Touches: `cross-contract-refs.md`'s "What's the typed handle returned by `supabase.contract<C>(json)`?" open question — closed; there *is* no such factory in v0.1.
 
 ## Cross-cutting
 
@@ -194,17 +443,20 @@ Touches: [`extension-package.md`](../extension-package.md) — remove the `supab
 
 ## Summary of blocking holes
 
-| # | Concern | Resolution direction |
-|---|---------|---------------------|
-| 1 | RLS capability gate | `'postgres.rls'` (target-level) |
-| 5 | RLS predicate qualified-table semantics | Verbatim v0.1; CLI lint for mismatches |
-| 7 | `middleware` on SupabaseRuntimeOptions | Add it |
-| 8 | Middleware ordering vs role-binding | User middleware outermost |
-| 11 | Multi-statement transactions | `.transaction(async tx => …)` on each role-bound Db |
-| 13 | JWT validation timing | Eager on `asUser(jwt)` |
-| 14 | Implicit transaction for SET LOCAL | Every role-bound execute is in a txn |
-| 15 | Function IR shape | Models-sibling, posture-bearing |
-| 17 | `TypedContract<T>` accessor shape | `.models.<Name>.refs.<field>` mapped type |
-| 19 | RLS verifier check semantics | Identity by name, predicate verbatim+normalized |
+| # | Concern | Status | Resolution |
+|---|---------|--------|-----------|
+| 1 | RLS capability gate | ✅ Decided | No capability flag; target presence is the gate |
+| 2 | `rlsPolicy(...)` injection point | ✅ Decided | Separate `.rls(...)` stage; array of named descriptors |
+| 3 | `onDelete` on cross-contract FKs | ✅ Decided | Permit; no diagnostic (see `.agents/rules/explicit-opt-in-over-diagnostics.mdc`) |
+| 4 | Composite/named uniques | ✅ Resolved | DSL already covers via `.attributes(...)`; example app was wrong |
+| 5 | RLS predicate qualified-table semantics | ✅ Decided | TS gets `ref()`; PSL stays verbatim in v0.1 |
+| 7 | `middleware` on SupabaseRuntimeOptions | 🔴 Open | Add it |
+| 8 | Middleware ordering vs role-binding | 🔴 Open | User middleware outermost |
+| 11 | Multi-statement transactions | 🔴 Open | `.transaction(async tx => …)` on each role-bound Db |
+| 13 | JWT validation timing | 🔴 Open | Eager on `asUser(jwt)` |
+| 14 | Implicit transaction for SET LOCAL | 🔴 Open | Every role-bound execute is in a txn |
+| 15 | Function IR shape | ✅ Closed | Out of scope for v0.1; functions not contract elements (see decisions C4) |
+| 17 | `TypedContract<T>` accessor shape | ✅ Closed | Superseded by C5+C6+C7; extensions ship pre-built `/contract` with concrete typed handles |
+| 19 | RLS verifier check semantics | 🔴 Open | Identity by name, predicate verbatim+normalized |
 
-The remaining holes (🟡 / 🟢) are either default-able with working assumptions or pure cosmetics. The 10 blockers above are what the project spec needs to settle before execution begins.
+The remaining holes (🟡 / 🟢) are either default-able with working assumptions or pure cosmetics.
