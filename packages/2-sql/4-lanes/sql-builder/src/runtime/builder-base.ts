@@ -174,10 +174,11 @@ export function tableToScope(
   options?: { readonly storage?: SqlStorage | undefined; readonly tableName?: string | undefined },
 ): Scope {
   const storage = options?.storage;
-  const lookupName = options?.tableName ?? alias;
+  const lookupName = options?.tableName;
   const fields: ScopeTable = {};
   for (const [colName, col] of Object.entries(table.columns)) {
-    const codec = storage ? codecRefForStorageColumn(storage, lookupName, colName) : undefined;
+    const codec =
+      storage && lookupName ? codecRefForStorageColumn(storage, lookupName, colName) : undefined;
     fields[colName] = {
       codecId: col.codecId,
       nullable: col.nullable,

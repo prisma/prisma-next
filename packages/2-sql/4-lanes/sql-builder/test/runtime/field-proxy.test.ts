@@ -1,5 +1,7 @@
+import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { ColumnRef, IdentifierRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
+import { tableToScope } from '../../src/runtime/builder-base';
 import { ExpressionImpl } from '../../src/runtime/expression-impl';
 import { createFieldProxy } from '../../src/runtime/field-proxy';
 import { joinedScope, usersScope } from './test-helpers';
@@ -52,6 +54,29 @@ describe('createFieldProxy', () => {
     const idExpr = proxy.id as ExpressionImpl;
 
     expect(idExpr.codec).toEqual(usersScope.topLevel.id.codec);
+  });
+
+  it('tableToScope resolves codec by storage table name when alias differs', () => {
+    const table: StorageTable = {
+      columns: {
+        embedding: { codecId: 'pgvector/vector@1', nullable: false, typeRef: 'Embedding1536' },
+      },
+      uniques: [],
+      indexes: [],
+      foreignKeys: [],
+    };
+    const storage: SqlStorage = {
+      tables: { Post: table },
+      types: {
+        Embedding1536: { codecId: 'pgvector/vector@1', typeParams: { length: 1536 } },
+      },
+      storageHash: 'h',
+    };
+    const scope = tableToScope('post_alias', table, { storage, tableName: 'Post' });
+    expect(scope.namespaces['post_alias']?.embedding?.codec).toEqual({
+      codecId: 'pgvector/vector@1',
+      typeParams: { length: 1536 },
+    });
   });
 
   it('codec is undefined for top-level fields without a codec', () => {
