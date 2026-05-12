@@ -116,7 +116,12 @@ export async function decryptAll(rows: unknown, opts?: DecryptAllOptions): Promi
       const target = group[i];
       const plaintext = plaintexts[i];
       if (!target || plaintext === undefined) continue;
-      setHandlePlaintextCache(target.envelope, plaintext);
+      // The SDK's `bulkDecrypt` returns `ReadonlyArray<unknown>` because
+      // each codec narrows to its own plaintext type. `EncryptedString` is
+      // the only envelope today; its plaintext slot is `string`. The
+      // per-subclass narrowing hook lands with the polymorphic envelope
+      // hierarchy.
+      setHandlePlaintextCache(target.envelope, plaintext as string);
     }
   }
 }

@@ -45,7 +45,13 @@ export interface CipherstashSingleDecryptArgs {
 
 export interface CipherstashBulkEncryptArgs {
   readonly routingKey: CipherstashRoutingKey;
-  readonly values: ReadonlyArray<string>;
+  /**
+   * Plaintext values to encrypt. Polymorphic at the SDK boundary: each
+   * batch is homogeneously typed by its `(table, column)` routing key,
+   * so the SDK derives the EQL `cast_as` from the search-config already
+   * registered on the column rather than from a per-batch hint.
+   */
+  readonly values: ReadonlyArray<unknown>;
   readonly signal?: AbortSignal;
 }
 
@@ -64,5 +70,5 @@ export interface CipherstashBulkDecryptArgs {
 export interface CipherstashSdk {
   decrypt(args: CipherstashSingleDecryptArgs): Promise<string>;
   bulkEncrypt(args: CipherstashBulkEncryptArgs): Promise<ReadonlyArray<unknown>>;
-  bulkDecrypt(args: CipherstashBulkDecryptArgs): Promise<ReadonlyArray<string>>;
+  bulkDecrypt(args: CipherstashBulkDecryptArgs): Promise<ReadonlyArray<unknown>>;
 }
