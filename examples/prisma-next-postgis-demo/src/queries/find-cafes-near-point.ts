@@ -1,23 +1,30 @@
 import type { Geometry } from '@prisma-next/extension-postgis/codec-types';
-import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 
 /**
  * Order all cafes by spherical distance to a query point and return the
- * closest `limit` rows.
+ * closest `limit` rows, projecting the distance as a `meters` field.
  *
- * SQL shape (one statement):
+ * Stays on the SQL builder (not the ORM `db.orm.Cafe` collection)
+ * because the result row needs an arbitrary computed column
+ * (`distanceSphere(location, point) AS meters`) alongside the model
+ * fields. The ORM collection surface exposes the predicate (`.lte`),
+ * the order helper (`.asc`/`.desc`), and model-field projection, but
+ * not arbitrary expression projection — that's the seam where the SQL
+ * builder is the right tool.
+ *
+ * SQL shape:
  *   SELECT id, name, ST_DistanceSphere(location, $point) AS meters
  *   FROM cafe
  *   ORDER BY ST_DistanceSphere(location, $point) ASC
  *   LIMIT $limit
  */
-export function findCafesNearPoint(point: Geometry, limit: number, runtime: Runtime) {
+export function findCafesNearPoint(point: Geometry, limit: number) {
   const plan = db.sql.cafe
     .select('id', 'name')
     .select('meters', (f, fns) => fns.distanceSphere(f.location, point))
     .orderBy((f, fns) => fns.distanceSphere(f.location, point), { direction: 'asc' })
     .limit(limit)
     .build();
-  return runtime.execute(plan);
+  return db.runtime().execute(plan);
 }

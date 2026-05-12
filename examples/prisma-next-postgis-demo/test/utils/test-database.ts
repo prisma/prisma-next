@@ -4,17 +4,14 @@
  * server isn't reachable so a clean clone of the repo doesn't fail
  * unexpectedly; you opt in by running `pnpm db:up`.
  */
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import postgis from '@prisma-next/extension-postgis/control';
 import sql from '@prisma-next/family-sql/control';
-import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
-import { type CreateRuntimeOptions, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
 import postgres from '@prisma-next/target-postgres/control';
 import pg from 'pg';
 
@@ -56,14 +53,27 @@ function createPostgisControlClient(connection: string): ControlClient {
 }
 
 /**
- * Drop+recreate the public schema, then run `dbInit` to apply the contract
- * (which also installs the postgis extension via the descriptor-bundled
- * contract-space baseline).
+ * Project root resolved from this file's location: `<root>/test/utils/`.
+ */
+const PROJECT_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
+
+/**
+ * The demo's on-disk `migrations/` directory. Contains both the user-owned
+ * `app/` space and the planned `postgis/` extension space (materialised
+ * by `pnpm exec prisma-next migration plan`).
  *
- * `dbInit` requires an on-disk `migrationsDir` so the per-space flow has a
- * root to read user-owned migrations from. The demo ships no user
- * migrations, so we point it at an empty temp directory; the postgis
- * baseline reaches the planner through the bundled extension descriptor.
+ * `db init` requires this directory to exist with the extension space
+ * already planned in; see Linear TML-2495 for the gotcha. Tests fail
+ * early with a clear message rather than the cryptic
+ * `PN-MIG-5001 [declaredButUnmigrated] postgis` when the prerequisite
+ * step is missing.
+ */
+const MIGRATIONS_DIR = join(PROJECT_ROOT, 'migrations');
+
+/**
+ * Drop+recreate the public schema, then run `dbInit` to apply the contract
+ * (which also installs the postgis extension via the planned baseline
+ * migration under `migrations/postgis/`).
  */
 export async function resetTestDatabase(contract: unknown): Promise<void> {
   const client = new pg.Client({ connectionString: TEST_DATABASE_URL });
@@ -76,54 +86,19 @@ export async function resetTestDatabase(contract: unknown): Promise<void> {
     await client.end();
   }
 
-  const migrationsDir = mkdtempSync(join(tmpdir(), 'postgis-demo-test-migrations-'));
   const controlClient = createPostgisControlClient(TEST_DATABASE_URL);
   try {
-    const result = await controlClient.dbInit({ contract, mode: 'apply', migrationsDir });
+    const result = await controlClient.dbInit({
+      contract,
+      mode: 'apply',
+      migrationsDir: MIGRATIONS_DIR,
+    });
     if (!result.ok) {
       throw new Error(
-        `dbInit failed: ${result.failure.summary}\n\n${JSON.stringify(result.failure, null, 2)}`,
+        `dbInit failed: ${result.failure.summary}\n\nDid you run \`pnpm exec prisma-next migration plan\` before \`pnpm test\`? (See Linear TML-2495.)\n\n${JSON.stringify(result.failure, null, 2)}`,
       );
     }
   } finally {
     await controlClient.close();
-    rmSync(migrationsDir, { recursive: true, force: true });
-  }
-}
-
-function isSqlDriver(candidate: unknown): candidate is SqlDriver<unknown> {
-  return (
-    typeof candidate === 'object' &&
-    candidate !== null &&
-    typeof (candidate as { connect?: unknown }).connect === 'function' &&
-    typeof (candidate as { acquireConnection?: unknown }).acquireConnection === 'function' &&
-    typeof (candidate as { close?: unknown }).close === 'function'
-  );
-}
-
-export async function buildTestRuntime(
-  executionStack: Parameters<typeof instantiateExecutionStack>[0],
-  context: CreateRuntimeOptions['context'],
-): Promise<Runtime> {
-  const stackInstance = instantiateExecutionStack(
-    executionStack,
-  ) as CreateRuntimeOptions['stackInstance'];
-  const candidateDriver: unknown = stackInstance.driver;
-  if (!isSqlDriver(candidateDriver)) {
-    throw new Error('Driver descriptor missing from execution stack');
-  }
-  const driver = candidateDriver;
-  const pool = new pg.Pool({ connectionString: TEST_DATABASE_URL });
-  try {
-    await driver.connect({ kind: 'pgPool', pool });
-    return createRuntime({
-      stackInstance,
-      context,
-      driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
-  } catch (error) {
-    await pool.end();
-    throw error;
   }
 }

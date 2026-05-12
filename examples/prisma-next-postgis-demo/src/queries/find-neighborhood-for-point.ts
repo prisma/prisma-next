@@ -1,5 +1,4 @@
 import type { Geometry } from '@prisma-next/extension-postgis/codec-types';
-import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 
 /**
@@ -7,10 +6,6 @@ import { db } from '../prisma/db';
  *
  * SQL: WHERE ST_Contains(boundary, $point)
  */
-export function findNeighborhoodForPoint(point: Geometry, runtime: Runtime) {
-  const plan = db.sql.neighborhood
-    .select('id', 'name')
-    .where((f, fns) => fns.contains(f.boundary, point))
-    .build();
-  return runtime.execute(plan);
+export function findNeighborhoodForPoint(point: Geometry) {
+  return db.orm.Neighborhood.where((n) => n.boundary.contains(point)).all();
 }

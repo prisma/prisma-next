@@ -7,7 +7,6 @@
  */
 
 import { point, polygon } from '@prisma-next/extension-postgis/geojson';
-import { sql } from '@prisma-next/sql-builder/runtime';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -19,11 +18,9 @@ import { findCafesWithinRadius } from '../src/queries/find-cafes-within-radius';
 import { findNeighborhoodForPoint } from '../src/queries/find-neighborhood-for-point';
 import { findRoutesIntersecting } from '../src/queries/find-routes-intersecting';
 import { cafes, neighborhoods, routes } from '../src/seed-data';
-import { buildTestRuntime, isPostgisAvailable, resetTestDatabase } from './utils/test-database';
+import { isPostgisAvailable, resetTestDatabase, TEST_DATABASE_URL } from './utils/test-database';
 
-const context = db.context;
-const { contract } = context;
-const executionStack = db.stack;
+const { contract } = db.context;
 
 const cafeBy = (name: string) => cafes.find((c) => c.name === name);
 const hoodBy = (name: string) => neighborhoods.find((h) => h.name === name);
@@ -39,17 +36,16 @@ describe.runIf(await isPostgisAvailable())('postgis e2e', () => {
 
   beforeAll(async () => {
     await resetTestDatabase(contract);
-    runtime = await buildTestRuntime(executionStack, context);
+    runtime = await db.connect({ url: TEST_DATABASE_URL });
 
-    const builder = sql({ context });
     for (const cafe of cafes) {
-      await runtime.execute(builder.cafe.insert(cafe).build());
+      await runtime.execute(db.sql.cafe.insert(cafe).build());
     }
     for (const hood of neighborhoods) {
-      await runtime.execute(builder.neighborhood.insert(hood).build());
+      await runtime.execute(db.sql.neighborhood.insert(hood).build());
     }
     for (const route of routes) {
-      await runtime.execute(builder.route.insert(route).build());
+      await runtime.execute(db.sql.route.insert(route).build());
     }
   }, timeouts.spinUpPpgDev);
 
@@ -58,8 +54,7 @@ describe.runIf(await isPostgisAvailable())('postgis e2e', () => {
   });
 
   it('seed data round-trips Point/LineString/Polygon geometry intact', async () => {
-    const builder = sql({ context });
-    const cafeRows = await runtime.execute(builder.cafe.select('id', 'name', 'location').build());
+    const cafeRows = await runtime.execute(db.sql.cafe.select('id', 'name', 'location').build());
     expect(cafeRows).toHaveLength(cafes.length);
     const sightglass = cafeRows.find((r) => r.id === SIGHTGLASS.id);
     expect(sightglass?.location).toEqual({
@@ -69,13 +64,13 @@ describe.runIf(await isPostgisAvailable())('postgis e2e', () => {
     });
 
     const hoodRows = await runtime.execute(
-      builder.neighborhood.select('id', 'name', 'boundary').build(),
+      db.sql.neighborhood.select('id', 'name', 'boundary').build(),
     );
     const soma = hoodRows.find((r) => r.id === SOMA.id);
     expect(soma?.boundary.type).toBe('Polygon');
     expect(soma?.boundary.srid).toBe(4326);
 
-    const routeRows = await runtime.execute(builder.route.select('id', 'name', 'path').build());
+    const routeRows = await runtime.execute(db.sql.route.select('id', 'name', 'path').build());
     const market = routeRows.find((r) => r.name === 'Market Street stroll');
     expect(market?.path.type).toBe('LineString');
     expect(market?.path.coordinates).toEqual([
@@ -87,7 +82,7 @@ describe.runIf(await isPostgisAvailable())('postgis e2e', () => {
 
   it('findCafesNearPoint orders by distanceSphere ascending and returns metres', async () => {
     const ferryBuilding = point(-122.3937, 37.7955, 4326);
-    const rows = await findCafesNearPoint(ferryBuilding, 5, runtime);
+    const rows = await findCafesNearPoint(ferryBuilding, 5);
 
     // Sightglass + Blue Bottle + Réveille are downtown — they should beat
     // the Mission + Sunset cafes on distance to the Ferry Building. The
@@ -112,7 +107,7 @@ describe.runIf(await isPostgisAvailable())('postgis e2e', () => {
     const ferryBuilding = point(-122.3937, 37.7955, 4326);
     // 3 km of the Ferry Building = the three downtown cafes; Mission
     // (Ritual) and Outer Sunset (Andytown) are well outside.
-    const rows = await findCafesWithinRadius(ferryBuilding, 3_000, 50, runtime);
+    const rows = await findCafesWithinRadius(ferryBuilding, 3_000, 50);
     const names = rows.map((r) => r.name).sort();
     expect(names).toEqual(
       ['Blue Bottle (Mint Plaza)', 'Réveille Polk', 'Sightglass Coffee'].sort(),
@@ -121,24 +116,24 @@ describe.runIf(await isPostgisAvailable())('postgis e2e', () => {
 
   it('findNeighborhoodForPoint returns the polygon containing the point', async () => {
     const sightglassPoint = SIGHTGLASS.location;
-    const rows = await findNeighborhoodForPoint(sightglassPoint, runtime);
+    const rows = await findNeighborhoodForPoint(sightglassPoint);
     expect(rows.map((r) => r.name)).toEqual(['SoMa']);
 
     const andytownPoint = ANDYTOWN.location;
-    const sunsetRows = await findNeighborhoodForPoint(andytownPoint, runtime);
+    const sunsetRows = await findNeighborhoodForPoint(andytownPoint);
     expect(sunsetRows.map((r) => r.name)).toEqual(['Outer Sunset']);
   });
 
   it('findCafesInNeighborhood returns cafes inside the polygon', async () => {
-    const somaCafes = await findCafesInNeighborhood(SOMA.boundary, runtime);
+    const somaCafes = await findCafesInNeighborhood(SOMA.boundary);
     expect(somaCafes.map((c) => c.name).sort()).toEqual(
       ['Sightglass Coffee', 'Blue Bottle (Mint Plaza)'].sort(),
     );
 
-    const missionCafes = await findCafesInNeighborhood(MISSION.boundary, runtime);
+    const missionCafes = await findCafesInNeighborhood(MISSION.boundary);
     expect(missionCafes.map((c) => c.name)).toEqual(['Ritual (Mission)']);
 
-    const sunsetCafes = await findCafesInNeighborhood(OUTER_SUNSET.boundary, runtime);
+    const sunsetCafes = await findCafesInNeighborhood(OUTER_SUNSET.boundary);
     expect(sunsetCafes.map((c) => c.name)).toEqual(['Andytown (Outer Sunset)']);
   });
 
@@ -155,14 +150,14 @@ describe.runIf(await isPostgisAvailable())('postgis e2e', () => {
       ],
       4326,
     );
-    const rows = await findRoutesIntersecting(closure, runtime);
+    const rows = await findRoutesIntersecting(closure);
     expect(rows.map((r) => r.name)).toEqual(['Market Street stroll']);
   });
 
   it('findCafesInBbox returns cafes whose bbox intersects the viewport', async () => {
     // Tight downtown viewport — should match the three downtown cafes
     // and exclude the Mission + Outer Sunset locations.
-    const rows = await findCafesInBbox([-122.425, 37.775, -122.4, 37.8], runtime);
+    const rows = await findCafesInBbox([-122.425, 37.775, -122.4, 37.8]);
     expect(rows.map((c) => c.name).sort()).toEqual(
       ['Blue Bottle (Mint Plaza)', 'Réveille Polk', 'Sightglass Coffee'].sort(),
     );

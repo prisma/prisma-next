@@ -431,30 +431,33 @@ async function runActive(
     somaBoundary: (typeof neighborhoods)[number]['boundary'];
   },
 ): Promise<ActiveResult> {
-  const runtime = await getRuntime();
+  // Ensure the singleton `db` is connected before any query runs; the
+  // query helpers go through `db.orm` / `db.runtime()` and rely on the
+  // connection being open.
+  await getRuntime();
   switch (active) {
     case 'near': {
-      const rows = await findCafesNearPoint(ctx.queryPoint, ctx.limit, runtime);
+      const rows = await findCafesNearPoint(ctx.queryPoint, ctx.limit);
       return { kind: 'near', rows };
     }
     case 'within': {
-      const rows = await findCafesWithinRadius(ctx.queryPoint, ctx.radius, 50, runtime);
+      const rows = await findCafesWithinRadius(ctx.queryPoint, ctx.radius, 50);
       return { kind: 'within', rows };
     }
     case 'contains': {
-      const rows = await findNeighborhoodForPoint(ctx.queryPoint, runtime);
+      const rows = await findNeighborhoodForPoint(ctx.queryPoint);
       return { kind: 'contains', rows };
     }
     case 'soma': {
-      const rows = await findCafesInNeighborhood(ctx.somaBoundary, runtime);
+      const rows = await findCafesInNeighborhood(ctx.somaBoundary);
       return { kind: 'soma', rows };
     }
     case 'intersect': {
-      const rows = await findRoutesIntersecting(ctx.closurePolygon, runtime);
+      const rows = await findRoutesIntersecting(ctx.closurePolygon);
       return { kind: 'intersect', rows };
     }
     case 'bbox': {
-      const rows = await findCafesInBbox(DOWNTOWN_BBOX, runtime);
+      const rows = await findCafesInBbox(DOWNTOWN_BBOX);
       return { kind: 'bbox', rows };
     }
   }

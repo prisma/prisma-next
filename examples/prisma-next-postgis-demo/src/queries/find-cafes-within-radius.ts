@@ -1,5 +1,4 @@
 import type { Geometry } from '@prisma-next/extension-postgis/codec-types';
-import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 
 /**
@@ -11,16 +10,8 @@ import { db } from '../prisma/db';
  *
  * SQL: WHERE ST_DistanceSphere(location, $point) <= $metres
  */
-export function findCafesWithinRadius(
-  point: Geometry,
-  metres: number,
-  limit: number,
-  runtime: Runtime,
-) {
-  const plan = db.sql.cafe
-    .select('id', 'name')
-    .where((f, fns) => fns.lte(fns.distanceSphere(f.location, point), metres))
-    .limit(limit)
-    .build();
-  return runtime.execute(plan);
+export function findCafesWithinRadius(point: Geometry, metres: number, limit: number) {
+  return db.orm.Cafe.where((c) => c.location.distanceSphere(point).lte(metres))
+    .take(limit)
+    .all();
 }

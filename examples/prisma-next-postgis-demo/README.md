@@ -187,12 +187,23 @@ const downtownViewport = bboxPolygon([-122.425, 37.775, -122.4, 37.8], 4326);
 ## Query examples
 
 Every example lives in `src/queries/` and each file documents its SQL
-shape in a header comment. Each query takes the runtime as its last
-argument — typically obtained via `db.connect({ url })`.
+shape in a header comment. Five of the six are expressed with the ORM
+collection surface (`db.orm.Cafe`, `db.orm.Route`, `db.orm.Neighborhood`)
+— the PostGIS extension hangs `.contains` / `.within` / `.intersects` /
+`.intersectsBbox` / `.distanceSphere` / `.distance` / `.dwithin` directly
+on geometry fields, so spatial predicates compose with the usual
+`.where` / `.take` / `.orderBy` chain.
+
+`findCafesNearPoint` is the exception: it projects a computed
+`meters` column alongside the model fields, which only the SQL builder
+expresses cleanly today (the ORM collection surface doesn't expose
+arbitrary expression projection). That query stays on `db.sql.cafe`.
+
+All queries assume `db` is already connected:
 
 ```typescript
 import { db } from './src/prisma/db';
-const runtime = await db.connect({ url: process.env['DATABASE_URL']! });
+await db.connect({ url: process.env['DATABASE_URL']! });
 ```
 
 ### 1. Distance — `findCafesNearPoint`
@@ -206,7 +217,7 @@ import { point } from '@prisma-next/extension-postgis/geojson';
 import { findCafesNearPoint } from './src/queries/find-cafes-near-point';
 
 const ferryBuilding = point(-122.3937, 37.7955, 4326);
-const closest = await findCafesNearPoint(ferryBuilding, 5, runtime);
+const closest = await findCafesNearPoint(ferryBuilding, 5);
 // → [{ id, name: 'Blue Bottle (Mint Plaza)', meters: 1234.5 }, …]
 ```
 
@@ -216,7 +227,7 @@ Cafes within `metres` of a query point, using
 `ST_DistanceSphere(...) <= $metres`.
 
 ```typescript
-const within2km = await findCafesWithinRadius(ferryBuilding, 2_000, 50, runtime);
+const within2km = await findCafesWithinRadius(ferryBuilding, 2_000, 50);
 ```
 
 ### 3. Containment (point-in-polygon) — `findNeighborhoodForPoint`
@@ -224,8 +235,8 @@ const within2km = await findCafesWithinRadius(ferryBuilding, 2_000, 50, runtime)
 Reverse geocode a point against polygon boundaries with `ST_Contains`.
 
 ```typescript
-const inside = await findNeighborhoodForPoint(sightglass, runtime);
-// → [{ id, name: 'SoMa' }]
+const inside = await findNeighborhoodForPoint(sightglass);
+// → [{ id, name: 'SoMa', boundary: { … } }]
 ```
 
 ### 4. Containment (point-in-polygon, inverted) — `findCafesInNeighborhood`
@@ -233,7 +244,7 @@ const inside = await findNeighborhoodForPoint(sightglass, runtime);
 Find cafes whose `location` is inside a polygon using `ST_Within`.
 
 ```typescript
-const somaCafes = await findCafesInNeighborhood(soma, runtime);
+const somaCafes = await findCafesInNeighborhood(soma);
 ```
 
 ### 5. Intersection — `findRoutesIntersecting`
@@ -243,7 +254,7 @@ Routes whose path intersects an arbitrary geometry — typically a polygon
 
 ```typescript
 const closure = polygon(/* downtown polygon */);
-const affected = await findRoutesIntersecting(closure, runtime);
+const affected = await findRoutesIntersecting(closure);
 ```
 
 ### 6. Bounding box — `findCafesInBbox`
@@ -253,7 +264,7 @@ operator (compares 2-D bounding boxes only — the `intersectsBbox`
 operation in the extension).
 
 ```typescript
-const inViewport = await findCafesInBbox([-122.425, 37.775, -122.4, 37.8], runtime);
+const inViewport = await findCafesInBbox([-122.425, 37.775, -122.4, 37.8]);
 ```
 
 ### 7. Ordering by distance

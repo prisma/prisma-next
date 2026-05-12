@@ -1,5 +1,4 @@
 import type { Geometry } from '@prisma-next/extension-postgis/codec-types';
-import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 
 /**
@@ -8,10 +7,6 @@ import { db } from '../prisma/db';
  *
  * SQL: WHERE ST_Intersects(path, $other)
  */
-export function findRoutesIntersecting(other: Geometry, runtime: Runtime) {
-  const plan = db.sql.route
-    .select('id', 'name')
-    .where((f, fns) => fns.intersects(f.path, other))
-    .build();
-  return runtime.execute(plan);
+export function findRoutesIntersecting(other: Geometry) {
+  return db.orm.Route.where((r) => r.path.intersects(other)).all();
 }
