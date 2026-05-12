@@ -78,22 +78,17 @@ Today: both `ParamRef`s carry `refs: { table: 'p1' or 'p2', column: 'embedding' 
 
 After: both `ParamRef`s carry `codec: { codecId: 'pg/vector@1', typeParams: { length: 1536 } }` directly (the builder resolved it at construction-time using the *underlying* table reference, not the alias). The `< 0.5` comparison gets `codec: { codecId: 'pg/float8@1' }` from the operation's `returns: ParamSpec`. No alias resolution. `alias-resolver.ts` deletes.
 
-### Case M — Migration `dataTransform` round-trip (forward-looking)
+### Case M — In-memory AST is JSON-safe (diagnostics, cache keying)
 
-A new SQL operation type (added in this project, see AC-7) embeds the AST raw:
+`CodecRef.typeParams` is structurally `JsonValue`-safe (descriptors register `paramsSchema` that rejects non-JSON-safe values). This is useful for in-memory uses: stable cache keys via `canonicalizeJson`, diagnostic dumps of AST nodes, and in-process round-trips during testing.
 
-```ts
-this.dataTransformAst(endContract, 'backfill embeddings', {
-  run: () => db.sql.document.update({ embedding: defaultVector }).where(...),
-});
-```
-
-The op's `ops.json` payload contains the serialized AST. On migration apply, the AST is deserialized; every `ParamRef.codec` survives the round-trip as `{codecId, typeParams: <JsonValue>}`. The descriptor's `paramsSchema['~standard'].validate(typeParams)` runs at AST-load time as the same fail-fast it runs at contract-load time today, rejecting malformed serialized typeParams before the resolver materializes.
+It is **not** a license to embed the pre-lowering AST in `ops.json`. `CodecRef` is a build-time concept; the lowerer consumes it during `migration plan` / `migration emit` and the encoded wire value lands in `params[]`. By the time anything reaches `ops.json` for SQL, every parameter is a JSON-safe wire value and no codec metadata appears anywhere. See [ADR 192 § "No compilation at apply time"](../../docs/architecture%20docs/adrs/ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md) and [ADR 212](../../docs/architecture%20docs/adrs/ADR%20212%20-%20AST-bound%20codec%20resolution.md).
 
 What this case pins:
 
 - `CodecRef.typeParams` MUST be `JsonValue`-safe. Descriptors whose params shape includes non-JSON-safe values (functions, classes, symbols, BigInts, Dates) cannot register. `paramsSchema` enforces this structurally — if it accepts the value at the JSON boundary, the value is JSON-safe by construction.
-- The resolver is the *only* dispatch path that survives serialization. Anything that depends on contract-walk pre-population (today: `byColumn`) is lost when the AST is deserialized at migration-apply time without the original execution context — but the content-keyed `byCodecRef` cache rebuilds lazily on first `forCodecRef` call.
+- The resolver is the canonical in-memory dispatch path. Pre-population via the contract walk warms the cache for the common case; refs not in the contract walk are materialized lazily on first `forCodecRef` call.
+- Bringing SQL `ops.json` into structural symmetry with Mongo's typed driver-AST + serializer pattern (so the runner deserializes typed commands instead of trusting a `(sql, params)` literal) is tracked as [TML-2491](https://linear.app/prisma-company/issue/TML-2491). It is independent of this project: this project's CodecRef change does not depend on it, and the post-lowering driver-AST design does not require any change to CodecRef or this project's resolver.
 
 ### Case R — Refs-less raw SQL (caller declares codec)
 
@@ -188,12 +183,15 @@ Every column-bound `ParamRef` / `ProjectionItem` construction site stamps `codec
 
 Refs-less call sites (raw SQL, transient builder paths) either accept an explicit `codec: CodecRef` argument or throw at build time naming the value site (no silent fallback).
 
-### AC-7. `dataTransformAst` op + migration round-trip
+### AC-7. `CodecRef` does not survive lowering (rescoped)
 
-- New SQL migration operation `dataTransformAst` lives at `packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform-ast.ts` (postgres-target only; the AST shape is target-agnostic but apply-time execution is target-specific). Accepts an AST closure, embeds the serialized `AnyQueryAst` in `ops.json` (no pre-lowering), and lowers at apply time.
-- Adds a new migration directory under `examples/prisma-next-demo/migrations/app/` exercising a `dataTransformAst` whose AST contains a `ParamRef` with a parameterized `CodecRef` (e.g. backfilling a vector column with a constant `vector(1536)` value).
-- `pnpm fixtures:check` covers the round-trip: migration-author-time AST → JSON serialization in `ops.json` → apply-time `parseAnyQueryAst` → resolver materializes the codec → encode produces the same wire bytes as the in-memory path would have produced if `dataTransform` (today's lower-first variant) had been used with the same inputs.
-- The descriptor's `paramsSchema['~standard'].validate(typeParams)` runs at AST-load time and rejects malformed serialized typeParams with a stable diagnostic (`RUNTIME.TYPE_PARAMS_INVALID`).
+This AC was originally framed as "ship a `dataTransformAst` op that embeds the serialized AST in `ops.json` and re-lowers at apply time, demonstrating that `CodecRef` survives JSON round-trip". During branch review we identified that framing as a category error: it would have placed compilation (codec resolution + AST lowering) on the apply side of `ops.json`, violating ADR 192's "no compilation at apply time" invariant. See [discussion in ADR 192](../../docs/architecture%20docs/adrs/ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md) and the rewritten [Case M](#case-m--in-memory-ast-is-json-safe-diagnostics-cache-keying) above.
+
+Rescoped acceptance:
+
+- The lowerer consumes `paramRef.codec` and produces a post-lowering `(sql_template, params[])` where every `params[i]` is a JSON-safe wire value. `CodecRef` does not appear in the lowered output. This is exercised in the existing `dataTransform` op (which lowers eagerly and writes `(sql, params)` into `ops.json`).
+- No SQL `ops.json` artifact in the repository contains a `codec`, `codecId`, or `typeParams` field anywhere in its JSON. This is verified by inspection of all committed `ops.json` fixtures plus the regenerated outputs from `pnpm fixtures:emit`. (A cross-cutting invariant test is a follow-up — out of scope for this project; tracked alongside the symmetric driver-AST work in [TML-2491](https://linear.app/prisma-company/issue/TML-2491).)
+- The misframing is removed from the codebase: `dataTransformAst`, `parseAnyQueryAst`, the demo migration that exercised them, and the apply-time AST-parse branch in the Postgres migration runner are all deleted in this project.
 
 ### AC-8. Validation gates
 
@@ -216,7 +214,7 @@ Refs-less call sites (raw SQL, transient builder paths) either accept an explici
 - **Mongo family AST-bound codec resolution.** Folded into [TML-2442](https://linear.app/prisma-company/issue/TML-2442) or its own follow-up; structurally compatible because `CodecRef` lives in family-agnostic `framework-components/codec`.
 - **`pgEnumCodec` factory audit.** Deferred from TML-2357; separate ticket.
 - **Reshape of `CodecDescriptor`, `Codec`, `CodecCallContext`, `CodecInstanceContext`** — all baselines this work composes with (ADRs 207, 208).
-- **Op-type changes beyond `dataTransformAst`** — single new op for the round-trip fixture; broader op-type reshape is separate.
+- **Op-type / driver-AST reshape for SQL `ops.json`** — the symmetric typed driver-AST + serializer mirroring Mongo is tracked as [TML-2491](https://linear.app/prisma-company/issue/TML-2491) and is independent of CodecRef.
 
 ## Project base
 
@@ -228,15 +226,14 @@ If size or sequencing pushes us off one PR, the natural split point is between M
 
 - One fact about a codec, one location: `paramRef.codec: CodecRef`. Encode/decode is `resolver.forCodecRef(node.codec)`. No triangulation.
 - Eight artifacts (the seven heuristics + `validateParamRefRefs`) deleted in one cohesive change.
-- The dispatch path is structurally amenable to AST serialization (case M); the migration round-trip works without a parallel "rebuild refs from contract" path.
+- The lowerer consumes `paramRef.codec` and produces a JSON-safe `(sql, params)` post-lowering form. CodecRef is a build-time concept; nothing in `ops.json` references codecs.
 - `CodecRef` lives in `framework-components`, ready to be consumed by Mongo's parallel work (TML-2442) without redesign.
 
 ## Forward-looking work captured but out of scope
 
 - **Default-codec ergonomics** — when raw SQL/`sql.value(...)` calls don't carry explicit codecs, the build fails today (per Case R). Future ergonomics: family adapter advertises a `defaultCodecForJsType` table, builder consults it at the call site, AST records the resolved `CodecRef`. Separate ticket.
 - **Mongo AST-bound resolution** — TML-2442 or its own follow-up.
-- **Migration AST forward-compat reader** — irrelevant for SQL today (no shipped `ParamRef`-bearing migrations); becomes relevant once `dataTransformAst` ships and SQL migrations on disk carry AST. At that point a reader-deletion ticket may be appropriate.
-- **Op-type reshape** beyond `dataTransformAst` — broader exploration of which SQL ops should embed AST (vs. lower to SQL text) is its own design conversation.
+- **Symmetric SQL post-lowering driver-AST + serializer** — bring SQL `ops.json` into structural symmetry with Mongo (typed `kind`-discriminated commands, arktype-validated parser, runner dispatches on rehydrated class instances). Tracked as [TML-2491](https://linear.app/prisma-company/issue/TML-2491). The current SQL `(sql, params)` shape satisfies ADR 192's invariant; this work adds the structural symmetry and the parse-time validation surface.
 
 ## References
 

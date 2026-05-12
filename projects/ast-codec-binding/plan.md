@@ -157,29 +157,27 @@ Cross-package grep before declaring M3c done: `rg 'forCodecId|parameterizedRepre
 
 **Acceptance.** All gates green. Existing tests of raw-SQL paths that relied on silent fallback either pass an explicit codec or the test's intent moves to a different surface.
 
-### M5 — `dataTransformAst` op + round-trip fixture
+### M5 — Retired (originally `dataTransformAst` op + round-trip fixture)
 
-**Scope.** New SQL migration op type that embeds the serialized `AnyQueryAst` in `ops.json`; fixture exercising the round-trip end-to-end.
+**Outcome.** Implemented during execution, then **removed in a follow-up commit** after branch review identified the design as a category error. The intended round-trip property — "`CodecRef` survives JSON serialization" — was conflated with an apply-time use case ("re-lower the AST when the migration applies") that violates ADR 192's "no compilation at apply time" invariant. The right shape for SQL post-lowering serialization is a typed driver-AST mirroring Mongo's pattern; that is tracked separately as [TML-2491](https://linear.app/prisma-company/issue/TML-2491) and is independent of CodecRef.
 
-**Files added.**
+**Removed in close-out.**
 
-- `packages/2-sql/4-lanes/relational-core/src/ast/parse.ts` — new `parseAnyQueryAst(json, registry): AnyQueryAst` parser (per M5.R below). Walks `kind` discriminator, reconstructs class instances via existing `static of(...)` factories, validates each `ParamRef.codec.typeParams` via `registry.descriptorFor(codecId).paramsSchema['~standard'].validate(...)`.
-- `packages/2-sql/4-lanes/relational-core/test/ast-parse.test.ts` — round-trip tests (`parse(JSON.parse(JSON.stringify(ast)))` produces structurally identical AST); negative tests for malformed `typeParams` throwing `RUNTIME.TYPE_PARAMS_INVALID`.
-- `packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform-ast.ts` — new op factory. Same shape as `dataTransform` but skips the `adapter.lower(...)` step; embeds the JSON-serialized AST in the op payload. Apply-time runner calls `parseAnyQueryAst(jsonAst, registry)` then `adapter.lower(parsedAst, {contract})` to materialize `{sql, params}` at apply time.
-- `packages/3-targets/3-targets/postgres/src/exports/data-transform.ts` — re-export `dataTransformAst`.
-- `packages/3-targets/3-targets/postgres/test/migrations/data-transform-ast.test.ts` — unit + integration tests covering build → JSON → parse → resolver → encode/execute path.
-- New migration directory `examples/prisma-next-demo/migrations/app/<timestamp>_vector-backfill-ast/` with a `migration.ts` that authors a `dataTransformAst`, an emitted `ops.json`, and the corresponding fixture entries `pnpm fixtures:check` validates byte-for-byte.
+- `packages/2-sql/4-lanes/relational-core/src/ast/parse.ts` and its unit test.
+- `packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform-ast.ts` and its `AST_BOUND_SENTINEL` re-export.
+- `packages/3-targets/3-targets/postgres/src/core/migrations/postgres-migration.ts` `dataTransformAst` instance method.
+- `runner.ts` `resolveStep` AST-bound branch and the `destinationContract` parameter threading on `runExecuteSteps` / `runExpectationSteps` / `expectationsAreSatisfied`.
+- The `examples/prisma-next-demo/migrations/app/20260511T1800_vector-backfill-ast/` demo directory.
+- `packages/3-targets/6-adapters/postgres/test/migrations/data-transform-ast.test.ts` and `runner.ast-steps.integration.test.ts`.
 
-**Validation gate.**
+**Documented in close-out.**
 
-- `pnpm typecheck` (workspace) — new files + new op type.
-- `pnpm test:packages` (workspace) — new test files in relational-core + postgres-target.
-- `pnpm test:integration` — the apply path exercises real Postgres.
-- `pnpm lint:deps` — new cross-package imports (relational-core → framework-components for parse; postgres-target → relational-core for `parseAnyQueryAst`).
-- `pnpm fixtures:check` — validates the new demo fixture byte-for-byte.
-- `pnpm build` — new exports from postgres-target.
+- ADR 192 — explicit "no compilation at apply time" invariant, target-agnostic, with an Alternatives entry covering the rejected pre-lowering-AST design.
+- ADR 028 — the same invariant repeated under § Operation resolution.
+- ADR 212 — strike the AST-embedding-in-ops.json paragraph; replace with "CodecRef is a build-time concept; never appears in ops.json".
+- `packages/1-framework/3-tooling/migration/README.md` — new "What ops.json does NOT contain" section.
 
-**Acceptance.** All gates green. `pnpm fixtures:check` covers the new fixture. `pnpm test:integration` exercises the apply path.
+**Lesson recorded.** When proposing AST serialization for any layer, categorise the AST first: pre-lowering (build-time concept; carries codec refs and other compile-time facts) vs post-lowering (apply-time concept; carries wire-format values). ADR 192's "no compilation at apply time" invariant means only post-lowering ASTs may appear in `ops.json`; pre-lowering ASTs stay on the runtime/build side of the boundary. The dual-target instinct ("Mongo serializes AST, why doesn't SQL?") is correct, but the AST in question is the post-lowering driver AST, not the pre-lowering relational AST.
 
 ### M6 — Documentation
 
@@ -227,12 +225,12 @@ Cross-package grep before declaring M3c done: `rg 'forCodecId|parameterizedRepre
 
 - **R.** Existing tests may be using raw `sql.value(...)` without codec, relying on silent fallback. **Mitigation.** Grep first; either supply explicit codec or refactor test to use a column-bound builder path.
 
-### M5
+### M5 (retired)
 
-- **Q.** Does `dataTransformAst` participate in invariant-aware routing the same way `dataTransform` does (`invariantId?`)? **A.** Yes; same options shape, same routing semantics. The only difference is serialization timing.
-- **R.** No AST parser/deserializer exists in the codebase today. The class-based AST uses `accept<R>(visitor)` methods, so naive `JSON.parse` returns plain objects that don't satisfy the `AnyQueryAst` class instance shape. **Decision.** Add a structural AST parser at `packages/2-sql/4-lanes/relational-core/src/ast/parse.ts` (`parseAnyQueryAst(json: JsonValue): AnyQueryAst`) that walks the `kind` discriminator and reconstructs class instances via the existing `static of(...)` factories. The parser is part of M5 scope; tests cover round-trip equality (`parse(serialize(ast))` produces a structurally identical AST that passes the same visitor traversals).
-- **R.** AST serialization needs canonical, stable shape. **Mitigation.** AST classes already produce frozen objects with `kind`-discriminated, enumerable own properties; default `JSON.stringify` produces the canonical shape. No custom `toJSON()` methods needed.
-- **Q.** Apply-time validation: where does `paramsSchema['~standard'].validate(typeParams)` run? **A.** Inside `parseAnyQueryAst` — when reconstructing a `ParamRef` whose `codec` is present, the parser consults the `CodecDescriptorRegistry` (passed in at parse time) and validates `typeParams` via the descriptor's `paramsSchema`. Throws `RUNTIME.TYPE_PARAMS_INVALID` on rejection. The migration-apply caller threads the registry from the apply-time `ExecutionContext`.
+The questions and risks below were resolved during the M5 implementation phase, but the milestone itself was retired during branch review (see § M5 retirement above and [TML-2491](https://linear.app/prisma-company/issue/TML-2491) for the correct successor design). Kept here for historical context.
+
+- **Realization.** "Embed the pre-lowering AST in `ops.json` and re-lower at apply time" is the wrong layer. The right shape for SQL is a **post-lowering** typed driver-AST mirroring Mongo's pattern — kind-discriminated commands, arktype-validated parser, runner dispatches on rehydrated class instances. Codec resolution belongs on the emit side; `ops.json` carries only post-lowering wire shape.
+- **Q.** Does the retired `dataTransformAst` participate in invariant-aware routing? **A.** Moot — the op was deleted during close-out. The retained `dataTransform` op (which lowers eagerly) carries `invariantId?` and routes correctly.
 
 ### M6
 
@@ -258,4 +256,4 @@ Total: ~1200/-950 LoC, ~2150 LoC of churn. Comfortably one PR. If review feedbac
 - Mongo family AST-bound resolution (TML-2442)
 - `pgEnumCodec` factory audit
 - Reshaping `CodecDescriptor`, `Codec`, `CodecCallContext`, `CodecInstanceContext`
-- Op-type changes beyond `dataTransformAst`
+- Symmetric SQL post-lowering driver-AST + serializer (TML-2491)
