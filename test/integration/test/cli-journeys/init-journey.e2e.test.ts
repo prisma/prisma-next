@@ -123,21 +123,30 @@ describe.each(
   );
 
   it(
-    'step 6 (user code: control readMarker query) (TML-2314 seam)',
+    'step 6 (user code: write & read an entity through the contract) (TML-2314 seam)',
     async () => {
       if (cell.target !== 'postgres') return;
-      // Real end-to-end control-plane query: the user instantiates the
-      // facade-composed client, connects to the live DB (DATABASE_URL is
-      // injected via `--env-file-if-exists=.env` in the subprocess) and
-      // reads the contract marker that step 4's `db init` wrote. This
-      // proves the facade composes a working family + target + adapter +
-      // driver stack and round-trips a real query, not just that the
-      // export is importable.
+      // The core "bolt user code on top" assertion: a freshly-scaffolded
+      // user opens the runtime facade, writes a `User` row through the
+      // typed ORM, reads it back by `email`, and verifies the round-trip.
+      // This is the user inner loop the journey exists to backstop —
+      // everything before this (init, install, emit, db init) is
+      // pre-amble that only matters if the user can then write/read
+      // data.
+      //
+      // The same script also exercises the control facade
+      // (`createPostgresControlClient`) — the TML-2314 seam. The runtime
+      // and control facades are distinct surfaces, but a real user
+      // typically uses both in the same script (data path + programmatic
+      // migrations / health-check), so they ride together here.
       const run = await runUserCode(
         ctx.project,
-        'check-control.ts',
+        'check-postgres-journey.ts',
         [
           "import { createPostgresControlClient } from '@prisma-next/postgres/control';",
+          "import postgres from '@prisma-next/postgres/runtime';",
+          "import type { Contract } from './prisma/contract.d';",
+          "import contractJson from './prisma/contract.json' with { type: 'json' };",
           '',
           'const url = process.env.DATABASE_URL;',
           'if (url === undefined) {',
@@ -145,14 +154,32 @@ describe.each(
           '  process.exit(2);',
           '}',
           '',
-          'const client = createPostgresControlClient({ connection: url });',
-          'await client.connect();',
+          'const db = postgres<Contract>({ contractJson, url });',
+          'const email = `journey-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;',
           'try {',
-          '  const marker = await client.readMarker();',
-          "  console.log(marker !== null ? 'ok' : 'no-marker');",
+          "  const created = await db.orm.User.create({ email, name: 'Journey User' });",
+          '  const found = await db.orm.User.where((u) => u.email.eq(email)).first();',
+          '  if (found === null || found.id !== created.id || found.email !== email) {',
+          "    console.error('runtime CRUD roundtrip failed', { created, found });",
+          '    process.exit(1);',
+          '  }',
           '} finally {',
-          '  await client.close();',
+          '  await db.runtime().close();',
           '}',
+          '',
+          'const control = createPostgresControlClient({ connection: url });',
+          'try {',
+          '  await control.connect();',
+          '  const marker = await control.readMarker();',
+          '  if (marker === null) {',
+          "    console.error('control readMarker returned null after db init');",
+          '    process.exit(3);',
+          '  }',
+          '} finally {',
+          '  await control.close();',
+          '}',
+          '',
+          "console.log('ok');",
           '',
         ].join('\n'),
       );
@@ -221,16 +248,17 @@ const TML_2487_seam = seamExpectation<StepResult>({
 
 const TML_2314_seam = seamExpectation<StepResult>({
   ticket: 'TML-2314',
-  description: '@prisma-next/postgres/control composes a working control stack',
+  description:
+    'user can write/read an entity via @prisma-next/postgres/runtime and the /control facade composes a working stack',
   status: 'fixed',
   whenBroken: (r) => {
     expect(r.exitCode, 'TML-2314 still broken: control import must currently fail').not.toBe(0);
   },
   whenFixed: (r) => {
-    expect(r.exitCode, formatStepDiagnostic('control readMarker', null, r)).toBe(0);
+    expect(r.exitCode, formatStepDiagnostic('postgres journey user-code', null, r)).toBe(0);
     expect(
       r.stdout.trim(),
-      'control client must connect and read the marker written by db init',
+      'postgres journey must complete a runtime CRUD round-trip and a control readMarker',
     ).toBe('ok');
   },
 });
