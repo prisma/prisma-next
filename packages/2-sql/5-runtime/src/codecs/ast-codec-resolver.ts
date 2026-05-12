@@ -46,7 +46,17 @@ export function createAstCodecResolver(
         );
       }
 
-      const validated = validateTypeParams(descriptor.paramsSchema, ref);
+      // Parameterized codecs whose paramsSchema accepts `{}` (every field
+      // optional, e.g. `pg/timestamptz@1` precision) tolerate refs that omit
+      // `typeParams` entirely. Normalize `undefined` to `{}` at the validation
+      // boundary; the integrity check upstream already rejected refs whose
+      // schemas reject the empty object.
+      const validated = validateTypeParams(
+        descriptor.paramsSchema,
+        descriptor.isParameterized && ref.typeParams === undefined
+          ? { ...ref, typeParams: {} }
+          : ref,
+      );
       const ctx = instanceContextFor(ref);
       // The descriptor's `factory` is typed against its own `P`; the registry erases `P` to `unknown`, so callers narrow per codec id at the dispatch boundary. The descriptor's `paramsSchema` validates the input above before we forward it, so this narrow is safe by construction.
       const codec = (

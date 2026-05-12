@@ -381,17 +381,26 @@ function assertColumnCodecIntegrity(
       }
 
       if (descriptor.isParameterized && ref.typeParams === undefined) {
-        throw runtimeError(
-          'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH',
-          `Column '${tableName}.${columnName}' uses parameterized codec '${ref.codecId}' but no typeParams are supplied. Provide typeParams on the column, or use a typeRef pointing at a storage.types entry that carries them.`,
-          {
-            table: tableName,
-            column: columnName,
-            codecId: ref.codecId,
-            expected: 'parameterized',
-            actual: 'no typeParams',
-          },
-        );
+        // Some parameterized codecs declare every paramsSchema field as optional
+        // (e.g. `pg/timestamptz@1` precision). Defer to the descriptor's own
+        // schema rather than rejecting purely on structural absence: probe the
+        // schema with an empty params object and only fail when the schema
+        // rejects it (i.e. at least one field is required).
+        const probe = descriptor.paramsSchema['~standard'].validate({});
+        const rejects = !(probe instanceof Promise) && 'issues' in probe && !!probe.issues;
+        if (rejects) {
+          throw runtimeError(
+            'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH',
+            `Column '${tableName}.${columnName}' uses parameterized codec '${ref.codecId}' but no typeParams are supplied. Provide typeParams on the column, or use a typeRef pointing at a storage.types entry that carries them.`,
+            {
+              table: tableName,
+              column: columnName,
+              codecId: ref.codecId,
+              expected: 'parameterized',
+              actual: 'no typeParams',
+            },
+          );
+        }
       }
 
       if (!descriptor.isParameterized && ref.typeParams !== undefined) {

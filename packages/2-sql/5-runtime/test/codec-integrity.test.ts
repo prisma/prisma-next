@@ -31,7 +31,13 @@ describe('createExecutionContext — column codec integrity', () => {
         '~standard': {
           version: 1,
           vendor: 'test',
-          validate: (value) => ({ value: value as { length: number } }),
+          validate: (value) => {
+            const v = value as { length?: unknown } | undefined;
+            if (!v || typeof v.length !== 'number') {
+              return { issues: [{ message: 'length is required' }] };
+            }
+            return { value: v as { length: number } };
+          },
         },
       },
       isParameterized: true,
