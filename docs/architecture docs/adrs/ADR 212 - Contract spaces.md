@@ -59,26 +59,31 @@ Spaces are **disjoint at the artefact level** (separate `contract.json`, separat
 
 The SQL family's extension descriptor gains an optional `contractSpace` field. Schema-contributing extensions populate it; codec-only or query-op-only extensions leave it absent.
 
+The shape is family-agnostic. `ContractSpace<TContract>` and `ContractSpaceHeadRef` live in `@prisma-next/framework-components/control` so every family (SQL, Mongo, future) reuses the same triple; the family-side descriptor only specialises the contract type parameter:
+
 ```ts
-// packages/2-sql/9-family/src/core/migrations/types.ts
-export interface ExtensionContractRef {
+// packages/1-framework/1-core/framework-components/src/control/control-spaces.ts
+export interface ContractSpaceHeadRef {
   readonly hash: string;
   readonly invariants: readonly string[];
 }
 
-export interface ExtensionContractSpace {
-  readonly contractJson: Contract<SqlStorage>;
+export interface ContractSpace<TContract extends Contract = Contract> {
+  readonly contractJson: TContract;
   readonly migrations: readonly MigrationPackage[]; // canonical on-disk shape
-  readonly headRef: ExtensionContractRef;
+  readonly headRef: ContractSpaceHeadRef;
 }
 
+// packages/2-sql/9-family/src/core/migrations/types.ts
 export interface SqlControlExtensionDescriptor<TTargetId extends string>
   extends ControlExtensionDescriptor<'sql', TTargetId> {
-  readonly contractSpace?: ExtensionContractSpace;
+  readonly contractSpace?: ContractSpace<Contract<SqlStorage>>;
 }
 ```
 
-There is **one** migration package shape across the workspace: `MigrationPackage` from `@prisma-next/migration-tools/package` (`{ dirName, dirPath, metadata, ops }`). The SQL family, the migration-tools I/O helpers, and the CLI's `runContractSpaceExtensionMigrationsPass` all consume that single shape — earlier parallel types (`ExtensionMigrationPackage`, `MigrationPackageContents`, `DescriptorMigrationPackage`) whose only difference was the absence of `dirPath` have been collapsed onto `MigrationPackage`.
+Whether a value is the application's space or an extension's space is a control-plane concern (the descriptor it travels with, and the `space-id` the runner stamps onto the marker row); the type carries no such distinction. This is what lets the Mongo family adopt the concept by specialising the same generic to `ContractSpace<Contract<MongoStorage>>` without duplicating the structural shape.
+
+There is **one** migration package shape across the workspace: `MigrationPackage` from `@prisma-next/framework-components/control` (`{ dirName, metadata, ops }`), augmented to `OnDiskMigrationPackage` with a `dirPath` by the on-disk readers in `@prisma-next/migration-tools`. The SQL family, the migration-tools I/O helpers, and the CLI's `runContractSpaceExtensionMigrationsPass` all consume that single shape — earlier parallel types (`ExtensionMigrationPackage`, `MigrationPackageContents`, `DescriptorMigrationPackage`) whose only difference was the absence of `dirPath` have been collapsed onto `MigrationPackage`.
 
 The descriptor's `migrations` are the same artefacts the framework's emitter writes for application authors. The expected authoring convention is the **contract-space package layout** (see below): the extension's package contains its own emitted `src/contract.json` and `migrations/<dirName>/...` directories, and the descriptor module wires them via JSON-import declarations. The framework reads these values only at `migrate` time and materialises them into the consuming application's repo, where they become indistinguishable from app-authored migrations.
 
@@ -206,7 +211,7 @@ The framework runs the same machinery once per space:
 - **Runner.** Applies each space's migrations against the live database, updating the corresponding marker row.
 - **Verifier.** Aggregates all loaded spaces' contracts into an in-memory expected schema, then compares against the live database.
 
-The producer-side helpers (`planAllSpaces`, `concatenateSpaceApplyInputs`, `verifyContractSpaces`, `emitPinnedSpaceArtefacts`, `gatherDiskContractSpaceState`, `detectSpaceContractDrift`) live in `@prisma-next/migration-tools/exports/spaces` — target-agnostic primitives. The SQL family wires them into `db init` / `db update` / `db verify` at consumption sites; a Mongo or other family would compose them the same way (the contract-space concept is not SQL-specific even though today only the SQL family ships the wiring).
+The producer-side helpers (`planAllSpaces`, `concatenateSpaceApplyInputs`, `verifyContractSpaces`, `emitContractSpaceArtefacts`, `gatherDiskContractSpaceState`, `detectSpaceContractDrift`) live in `@prisma-next/migration-tools/exports/spaces` — target-agnostic primitives. The SQL family wires them into `db init` / `db update` / `db verify` at consumption sites; a Mongo or other family would compose them the same way (the contract-space concept is not SQL-specific even though today only the SQL family ships the wiring).
 
 ### Apply-time atomicity and ordering
 
@@ -349,7 +354,7 @@ The asymmetry between `migrate` (authoring) and the apply/verify path is what ma
 
 ### Trade-offs
 
-- **Extension authors must ship a contract + migration graph**, not just an init-SQL string. The contract-space package layout convention reuses the same CLI pipeline app authors use, so the authoring story is symmetrical: write a TS or PSL schema, run `prisma-next contract emit` + `prisma-next migration plan`, and the descriptor module JSON-imports the resulting artefacts. The framework helpers `emitPinnedSpaceArtefacts` / `materialiseExtensionMigrationPackageIfMissing` cover the consuming application's repo half; cipherstash, pgvector, and paradedb all ship this convention.
+- **Extension authors must ship a contract + migration graph**, not just an init-SQL string. The contract-space package layout convention reuses the same CLI pipeline app authors use, so the authoring story is symmetrical: write a TS or PSL schema, run `prisma-next contract emit` + `prisma-next migration plan`, and the descriptor module JSON-imports the resulting artefacts. The framework helpers `emitContractSpaceArtefacts` / `materialiseExtensionMigrationPackageIfMissing` cover the consuming application's repo half; cipherstash, pgvector, and paradedb all ship this convention.
 - **`migrate` becomes the canonical way to materialise extension bumps.** Bumping an extension in `node_modules` without running `migrate` produces stale pinned artefacts; the drift-detection helper surfaces a non-fatal warning at the next `migrate` invocation.
 - **One outer transaction across spaces** is a stronger correctness guarantee than the per-extension `databaseDependencies.init` path provided. The framework inherits the constraint that all SQL across all spaces in a single emit must be transactionally compatible (which is already true of the existing single-space path).
 
