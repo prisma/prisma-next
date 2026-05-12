@@ -76,8 +76,9 @@ export interface MigrationCommandResult {
   /**
    * Per-space execution breakdown in canonical schedule order
    * (extensions alphabetically, then app). Surfaces per-space markers
-   * + ops grouped by space; closes F1 / F4 / F7 from the M6
-   * verification doc. See {@link AggregatePerSpaceExecutionEntry}.
+   * and the ops grouped by space, so the CLI summary can name which
+   * space each op and marker belongs to instead of flattening them
+   * into a single ambiguous list. See {@link AggregatePerSpaceExecutionEntry}.
    */
   readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
   readonly summary: string;
@@ -88,10 +89,9 @@ export interface MigrationCommandResult {
 
 /**
  * Render the shared per-space execution block consumed by the `db init`
- * / `db update` / `migration apply` summaries (M6 sub-spec § Output
- * shape contract). Always shows: space label (`Extension space: <id>`
- * or `App space`) → per-op lines under each space → per-space marker
- * hash (when known).
+ * / `db update` / `migration apply` summaries. Always shows: space
+ * label (`Extension space: <id>` or `App space`) → per-op lines under
+ * each space → per-space marker hash (when known).
  *
  * `mode` controls the marker label phrasing — `'apply'` shows
  * `marker → <hash>` (post-apply), `'plan'` omits the marker line
@@ -165,7 +165,7 @@ export function formatMigrationPlanOutput(
   const formatYellow = createColorFormatter(useColor, yellow);
 
   // Per-space breakdown takes precedence over the flat ops tree when
-  // the aggregate flow surfaced one (M6 sub-spec § Output shape contract).
+  // the aggregate flow surfaced one.
   if (result.perSpace && result.perSpace.length > 0) {
     lines.push('');
     lines.push(...formatPerSpaceBlock(result.perSpace, 'plan', useColor));
@@ -442,7 +442,7 @@ export function formatMigrationApplyOutput(
     }
 
     // Per-space breakdown — replaces the single ambiguous `Signature:`
-    // line per M6 sub-spec § Output shape contract / AC4 / AC5.
+    // line with a per-space marker + ops listing.
     if (result.perSpace && result.perSpace.length > 0) {
       lines.push('');
       lines.push(...formatPerSpaceBlock(result.perSpace, 'apply', useColor));
@@ -456,9 +456,9 @@ export function formatMigrationApplyOutput(
       );
     } else if (result.marker) {
       // Single-space fallback (no aggregate breakdown surfaced — e.g.
-      // older callers / non-aggregate code paths). Renamed from
-      // `Signature` to `App-space marker` per AC4 — when only one
-      // marker is observable, name what it covers explicitly.
+      // older callers / non-aggregate code paths). The label is
+      // `App-space marker` (not `Signature`) so that when only one
+      // marker is observable we still name what it covers explicitly.
       lines.push(`${formatDimText(`  App-space marker: ${result.marker.storageHash}`)}`);
       if (result.marker.profileHash) {
         lines.push(`${formatDimText(`  Profile hash: ${result.marker.profileHash}`)}`);

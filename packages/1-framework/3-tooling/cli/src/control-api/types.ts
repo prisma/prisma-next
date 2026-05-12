@@ -316,10 +316,10 @@ export interface EmitOptions {
  * then app — together with the operations attributed to each space and,
  * when the run was applied, the resulting per-space marker hash.
  *
- * M6 sub-spec § Output shape contract — every space involved in a run
- * is observable in the success summary, including its post-apply
- * marker, so the per-space invariant is visible to the user (closing
- * F4 / F7 from `e2e-verification.md`).
+ * Every space involved in a run is observable in the success summary,
+ * including its post-apply marker — the per-space marker is visible
+ * to the user instead of being collapsed into a single ambiguous
+ * top-level hash.
  */
 export interface AggregatePerSpaceExecutionEntry {
   readonly spaceId: string;
@@ -536,8 +536,6 @@ export type EmitResult = Result<EmitSuccess, EmitFailure>;
  * through the shared `applyAggregate` primitive. The CLI command
  * just resolves the descriptor surface (config, refs, contract
  * envelope, app-space migration packages) and hands the inputs in.
- *
- * Sub-spec § `migration apply` semantics + § Required changes 1.
  */
 export interface MigrationApplyOptions {
   /** Already-validated app contract (the canonical "where we are heading" hash). */
@@ -628,8 +626,8 @@ export interface MigrationApplyAppliedEntry {
  * Successful migrationApply result. Carries both the legacy
  * single-space fields (`markerHash` is the **app member's** post-apply
  * marker, surfaced for back-compat with single-space callers) and the
- * per-space breakdown (`perSpace` — markers / operations / canonical
- * order, per M6 sub-spec § Output shape).
+ * per-space breakdown (`perSpace` — markers / operations in canonical
+ * schedule order).
  */
 /**
  * Path-decision summary for the **app member** post-apply. Surfaced
