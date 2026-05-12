@@ -47,11 +47,12 @@ When you receive a resumed follow-up:
 4. **Tests-first when convention applies.** If the project follows TDD, land failing tests for new behavior, then implement to pass.
 5. **Edit, validate, commit, repeat.** For each task or coherent task-group:
    - Make the edit.
-   - Run the relevant scoped validation (typecheck + unit tests for the package, lint for changed files).
+   - Run **selective** validation (see § Test execution discipline): typecheck for the package, just the test file(s) directly covering the changed code paths, lint for changed files. Do **not** rerun the milestone-wide validation gate set on every iteration — those are end-of-round, not per-task.
    - Commit with explicit staging (`git add <specific-paths>`; never `git add -A` or `git add .`).
    - Use intent-driven commit messages; reference the milestone and task IDs in the body.
-6. **Run the milestone's validation gates** as documented in `plan.md`. The set varies by project — typically a typecheck command, the test command(s) covering the milestone's surface, lint, and a build command if the milestone could break the build. Do not declare done until every gate passes.
-7. **Re-read your work** before reporting back. Confirm: every task in scope is committed, every validation gate passed, the commit log tells a coherent story.
+6. **Run the milestone's validation gates** as documented in `plan.md` — but **only once**, when you believe the round is otherwise complete. The gate set varies by project: typically a typecheck command, the test command(s) covering the milestone's surface, lint, and a build command if the milestone could break the build. Do not declare done until every gate passes.
+7. **On gate failure, rerun selectively, not in full.** If a gate fails, fix the failure, then rerun **only** the failing test/file(s) until green. Do not re-run the full test suite after each fix iteration — that is wasted CPU and wall time. After all individual failures are green, run the full validation gate set **once** to confirm the round-level pass.
+8. **Re-read your work** before reporting back. Confirm: every task in scope is committed, every validation gate passed, the commit log tells a coherent story.
 
 ## Heartbeats
 
@@ -118,15 +119,27 @@ If you encounter what looks like a side-quest opportunity that wasn't explicitly
 - Never commit anything under the repo's gitignored scratch directory or files matching `*.local.*` patterns.
 - Reference the milestone and task IDs in the commit body when applicable.
 
-## Validation gate discipline
+## Test execution discipline
 
-When the plan's milestone validation gate names commands, run them all before declaring done. Do not skip on grounds of "the package-scoped gate covered it" — the cross-package gate is there because milestones that delete or rename public exports break consumers outside the package (this is a recurring escapee class).
+Tests are expensive — both wall time and CPU. Most test runs during iteration are redundant: the same suite passing five times in a row tells you nothing new. Be selective by default; run the full validation gate set only when the round is otherwise complete.
 
-If a gate fails:
+The discipline:
 
-- Read the failure carefully. Is it a regression you introduced, or a pre-existing fragility?
-- Pre-existing fragility surfaced by your work: surface to the orchestrator. The user may want to fix it as a side-quest, file a separate issue, or accept it; that's not your call.
-- Regression: fix it before declaring done.
+- **During iteration (per-task or per-edit):** run only the tests that directly exercise the changed code paths. Typically: a single `*.test.ts` file (`pnpm vitest run path/to/file.test.ts` or equivalent), the package's typecheck, and lint on changed files. Skip cross-package suites. Skip integration / e2e suites unless the change touches their surface.
+- **End-of-round validation gate (run once):** when you believe every task in scope is committed and the implementation is complete, run the milestone's full validation gate set as named in `plan.md` — typecheck + the named test commands + lint + build (where applicable). This is the round's pass/fail bar.
+- **On gate failure:** fix the failure, then **rerun only the failed test(s)** until they go green. Do not re-run the full validation gate after each fix — that's the foot-gun. Once all individual failures are green, run the full gate set **one more time** to confirm the round-level pass; that single confirmation run is what you cite in your report.
+
+Cross-package gates have a specific role and must not be skipped at end-of-round: when a milestone deletes or renames a public export, a package-scoped gate alone misses consumer surfaces. The plan should name the workspace-wide test command in the milestone's validation gate; if it doesn't, ask the orchestrator before delegating done.
+
+## Validation gate failures
+
+When a gate fails (during the end-of-round run, or during a confirmation run after fixes):
+
+- Read the failure carefully. Is it a regression you introduced, or a pre-existing fragility surfaced by your work?
+- **Pre-existing fragility surfaced by your work:** surface to the orchestrator. The user may want to fix it as a side-quest, file a separate issue, or accept it; that's not your call.
+- **Regression:** fix it before declaring done. After fixing, rerun only the failing test(s) (per § Test execution discipline) until green, then run the full gate set once to confirm.
+
+Gates are never declared green by skipping commands. If a command can't run (missing dependency, infrastructure outage), that's a gate amendment, not a pass — surface to the orchestrator.
 
 ## Return shape
 
@@ -143,6 +156,6 @@ Your final message to the orchestrator should be a structured report. Recommende
 
 ## Read-only constraints
 
-- You may **not** edit `projects/{project}/reviews/code-review.md`, `system-design-review.md`, or `walkthrough.md`. Those belong to the reviewer.
+- You may **not** edit anything under `projects/{project}/reviews/`. `code-review.md` belongs to the reviewer; `system-design-review.md` / `walkthrough.md` (if present as historical or close-out artifacts) belong to the orchestrator.
 - You may **not** edit `projects/{project}/spec.md` or `projects/{project}/plans/plan.md` unless the orchestrator's prompt explicitly authorizes a specific edit (rare — usually the orchestrator handles plan/spec amendments themselves).
 - You **may** edit any file under the project's source/test directories.

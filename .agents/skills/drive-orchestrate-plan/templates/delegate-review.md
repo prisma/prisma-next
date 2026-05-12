@@ -72,19 +72,13 @@ If any item is not satisfied, the verdict is `ANOTHER ROUND NEEDED` (with concre
 
 If a candidate fails this bar, do **not** file it. Surface to the orchestrator in § Items for the user's attention so the orchestrator can update the plan, file a follow-up ticket, or drop the observation. There is no `informational` severity tier — only `must-fix`, `should-fix`, and `low / process`, all of which represent in-PR actions.
 
-## Mandatory artifact refresh — `system-design-review.md` and `walkthrough.md`
+## Round-entry format
 
-You **must** produce or refresh both files this round. This is a hard delegation deliverable, not a stale-artifact check. Use `<skill-dir>/agents/reviewer.md § Mandatory per-round refresh` for shape guidance.
-
-- **R1** of a milestone: write substantively if the milestone establishes design; write a "Round 1 — design stable" note if the milestone only implements an existing design. The walkthrough always reflects HEAD's diff against the project base.
-- **R2+** of a milestone: append a "Round N delta" section to each, or rewrite affected sections if substance shifted.
-- The walkthrough must follow the `drive-pr-walkthrough` shape (curated copy at `skills/.curated/drive-pr-walkthrough/SKILL.md` in the Ignite repository, or the consuming repo's installed copy).
-
-If you return without both files reflecting HEAD, the orchestrator will treat this round as incomplete and re-delegate with a refresh-only prompt.
+Append a single block under `## Round notes` in `code-review.md` using the format in `<skill-dir>/agents/reviewer.md § Round-entry format`. Three lines plus heading is the target for clean rounds. If your entry runs more than ~12 lines, you are narrating — trim it.
 
 ## Read-only constraint reminder
 
-You may **only** modify files under `projects/{project}/reviews/` and `wip/heartbeats/reviewer.txt` (the heartbeat snapshot — see below). Do **not** edit code, tests, `spec.md`, or `plan.md`. If you observe a trivial fix you're tempted to make: file as F<N> with a one-line "recommended fix" snippet instead — provided the finding meets the § Findings discipline bar.
+You may **only** modify `projects/{project}/reviews/code-review.md` and `wip/heartbeats/reviewer.txt` (your heartbeat snapshot). Do **not** edit code, tests, `spec.md`, or `plan.md`. Do **not** produce or refresh `system-design-review.md` or `walkthrough.md` — those are out of scope for the iteration loop (the walkthrough is generated at PR-open time by the team's PR-opening skill). If you observe a trivial fix you're tempted to make: file as F<N> with a one-line "recommended fix" snippet instead — provided the finding meets the § Findings discipline bar.
 
 ## Heartbeats
 
@@ -92,16 +86,17 @@ Write to `wip/heartbeats/reviewer.txt` on the cadence in `<skill-dir>/agents/rev
 
 ## Return shape
 
-Your final message must include all of:
+Your final message is a structured response, **not a long narrative**:
 
 1. **Verdict**: SATISFIED / ANOTHER ROUND NEEDED / ESCALATING TO USER.
-2. **Milestone task verification** — task-by-task pass/partial/regressed.
-3. **AC scoreboard delta** — what got promoted/demoted; current totals.
-4. **Triage of implementer-flagged items** — your verdict on each.
-5. **New findings** — F-numbers, summaries, severities, recommended next actions. Each must clear the § Findings discipline bar.
-6. **Items for the user's attention** — escalations as numbered decisions, including any plan amendments the orchestrator should make.
-7. **Refresh summary** — one line per file: SDR (what new content / delta this round) and walkthrough (what new content / delta this round). Both files must have been touched.
-8. **Files modified** — must list `code-review.md`, `system-design-review.md`, and `walkthrough.md` (all three, all under `reviews/`). A missing file = incomplete round.
+2. **Task verification** — one line per task in scope: clean / partial / regressed.
+3. **AC scoreboard delta** — what got promoted/demoted, with evidence (commit SHA + test file path). Current totals.
+4. **Triage of orchestrator-flagged items** — one line per item: Accept / File as F<N> / Escalate.
+5. **New findings** — F-numbers, ≤ 1 line each, severities. None if SATISFIED with no findings.
+6. **Items for the user's attention** — non-finding escalations as numbered decisions, including any plan amendments the orchestrator should make. None if there are none.
+7. **Files modified** — must list `code-review.md` (and only `code-review.md`).
+
+No "round notes" prose, no "what changed since last review" recap, no SDR delta, no walkthrough delta. The round entry under `## Round notes` is the durable artifact; your return message is the conversational summary.
 
 Begin.
 
@@ -114,7 +109,7 @@ Begin.
 ````markdown
 ## Resume — `<project-name>`, `<milestone-id>` `<round-id>` (e.g. m3 R2)
 
-> You are being resumed. You retain your full prior transcript including the AC scoreboard you maintain, every finding you filed, every verdict you issued, and every refresh of `system-design-review.md` and `walkthrough.md`. Trust your prior transcript; reconcile from on-disk `code-review.md` only where the orchestrator made between-round edits visible under `## Orchestrator notes` (orchestrator wins on those reconciliations).
+> You are being resumed. You retain your full prior transcript including the AC scoreboard you maintain, every finding you filed, and every verdict you issued. Trust your prior transcript; reconcile from on-disk `code-review.md` only where the orchestrator made between-round edits visible under `## Orchestrator notes` (orchestrator wins on those reconciliations).
 
 ## What changed since the last review
 
@@ -141,9 +136,9 @@ Pull the diff via `git show <sha>` or `git diff <prior-head>..HEAD`.
 - <e.g. "the orchestrator promoted F3 from `low / process` to `should-fix` after consulting the user — see ## Orchestrator notes block in code-review.md"; "plan.md gained a new task — review the new task as part of milestone scope">
 - — or — "Nothing has changed."
 
-## Refresh reminders (terse)
+## Reminders (terse)
 
-- All three review artifacts touched (`code-review.md`, `system-design-review.md`, `walkthrough.md`) — mandatory.
+- Append a single round entry under `## Round notes` in `code-review.md` (format: `<skill-dir>/agents/reviewer.md § Round-entry format`). Three lines plus heading is the target for clean rounds.
 - Findings must be addressable in this PR (see § Findings discipline). No `informational` severity.
 - Heartbeats to `wip/heartbeats/reviewer.txt` per `<skill-dir>/agents/reviewer.md § Heartbeats` (at round start, before/after long shell calls, at each F-number, at each artifact write, every ~5 min otherwise).
 

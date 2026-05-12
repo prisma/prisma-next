@@ -7,7 +7,7 @@ description: >
   the reviewer reports SATISFIED on each milestone. Runs after `drive-create-plan` and
   before the team's PR-opening skill.
 metadata:
-  version: "2026.4.29"
+  version: "2026.5.12"
 ---
 
 # Drive: Orchestrate Plan
@@ -17,7 +17,9 @@ Run the local implement-review iteration loop on a project plan: **delegate one 
 This skill is an **orchestrator**. It delegates:
 
 - implementation to `./agents/implementer.md`
-- review to `./agents/reviewer.md` (full) **or** `../drive-review-fast/SKILL.md` (lightweight — single artifact, terse round entry, no SDR / walkthrough refresh). The orchestrator picks per project based on whether the user wants a written architectural narrative for asynchronous review (full) or a fast iteration loop with the user reading at PR-open time (fast). See `drive-review-fast` § When to use for the trade-off.
+- review to `./agents/reviewer.md`
+
+The reviewer is a **single-artifact, fast-iteration** protocol: it maintains `code-review.md` only, with terse verdict-first round entries. SDR and walkthrough are not per-round deliverables — the walkthrough is generated at PR-open time by the team's PR-opening skill, against the project base.
 
 The orchestrator owns sequencing, escalation, plan/spec amendment in response to user decisions, and loop control. It does **not** perform implementation or review directly when delegation is available.
 
@@ -53,8 +55,7 @@ The implementer and reviewer subagents are *not* the tech-lead persona — they 
 
 - Each milestone identified by the plan has reached `SATISFIED` per the reviewer's verdict in `projects/{project}/reviews/code-review.md`.
 - The acceptance-criteria scoreboard in `code-review.md` records every spec AC as PASS, accepted-deferral, or out-of-scope.
-- `system-design-review.md` and `walkthrough.md` reflect the as-built state at HEAD (refreshed by the reviewer every round; see § The artifact contract).
-- The branch is ready for the team's PR-opening skill.
+- The branch is ready for the team's PR-opening skill, which generates the PR walkthrough against the project base at PR-open time.
 
 ## Locating sibling artifacts
 
@@ -117,7 +118,7 @@ The orchestrator is also responsible for **subagent continuity**: tracking the i
 
 - Re-litigating the spec mid-loop without explicit user buy-in.
 - Forming independent opinions about correctness without delegating.
-- Accepting a reviewer return that omits `system-design-review.md` or `walkthrough.md`. Both refresh every round; missing files mean the round is incomplete (see § The artifact contract).
+- Asking the reviewer for SDR or walkthrough refreshes. Those are not per-round deliverables; the walkthrough lives at PR-open time. If you find yourself wanting one mid-loop, surface intent context yourself (it is your unique contribution) rather than expanding the reviewer's scope.
 - Treating reviewer verdicts as authoritative on intent. Reviewer verdicts are authoritative on artifact-match; intent fidelity is yours alone.
 
 ### Implementer (sub-agent at `./agents/implementer.md`)
@@ -196,9 +197,7 @@ projects/{project}/
 ├── plans/
 │   └── plan.md                      # tasks, milestones, validation gates (drive-create-plan)
 ├── reviews/
-│   ├── code-review.md               # scoreboard + subagent IDs + F-numbered findings (reviewer-maintained)
-│   ├── system-design-review.md      # architectural review (reviewer-refreshed every round)
-│   └── walkthrough.md               # semantic narrative (reviewer-refreshed every round)
+│   └── code-review.md               # scoreboard + subagent IDs + F-numbered findings + terse round notes (reviewer-maintained)
 └── learnings.md                     # patterns surfaced this run (orchestrator-maintained; see § Project learnings)
 
 wip/heartbeats/                      # transient subagent liveness signals (gitignored; one file per role)
@@ -208,27 +207,29 @@ wip/heartbeats/                      # transient subagent liveness signals (giti
 
 The `projects/{project}/` artifacts are durable round-by-round outputs; the `wip/heartbeats/` files are ephemeral liveness pings (see § Heartbeats). Both flow through the orchestrator's awareness, but only the former survive to PR-review time.
 
-`code-review.md` carries a § Subagent IDs section directly under the AC scoreboard recording the persistent implementer + reviewer IDs (see § Subagent continuity). The orchestrator owns this section under the write carve-out documented in the read/write matrix below; the reviewer treats it as read-only.
+`code-review.md` is the **single per-round review artifact**. It carries:
 
-**All three review artifacts are produced or refreshed on every round.** None of the three may be deferred or skipped — including the first round. The reviewer's first round bootstraps all three; subsequent rounds refresh them with the round's delta.
+- The AC scoreboard at the top, with current totals and per-AC status (PASS / FAIL / NOT VERIFIED / ACCEPTED DEFERRAL / OUT OF SCOPE).
+- A `## Subagent IDs` section directly under the scoreboard recording the persistent implementer + reviewer IDs (orchestrator-owned write carve-out — see § Subagent continuity).
+- A `## Orchestrator notes` section for visible verdict overrides and protocol decisions (orchestrator-owned write carve-out — see § Loop algorithm step 7).
+- A `## Round notes` section: one terse block per round (verdict, scope, AC delta, findings list, items for orchestrator). Three lines plus heading is the target for a clean round.
+- A `## Findings log` section: F-numbered entries, stable across rounds, with full bodies.
 
-When a round genuinely adds nothing substantive to `system-design-review.md` (e.g. m1 establishes the design; m2 implements the runtime without changing design decisions), the document still updates — it gains a "Round N" note recording what was evaluated, what stayed stable, and what new evidence (commits, tests) corroborates the design. "No design changes this round" is content for the document, not a reason to skip it.
+There is **no per-round SDR or walkthrough refresh**. The walkthrough that the team needs is generated at **PR-open time** by the team's PR-opening skill (e.g. `drive-pr-walkthrough` against the project base), not iteration-by-iteration. SDR-style architectural narratives, when needed for a project, live in durable docs (e.g. `docs/architecture docs/`) and are produced as a deliberate close-out artifact, not a per-round one.
 
-The walkthrough is the user's **primary review surface** for any single round. It must always reflect HEAD. A missing or stale walkthrough is a delegation-protocol failure on the same level as a missing verdict.
+**Historical note.** Older runs of this skill produced `system-design-review.md` and `walkthrough.md` per round. Those files are no longer part of the iteration loop. If a project carries them as historical artifacts (e.g. from rounds that ran under the older protocol), leave them where they are — they are records, not commitments. The reviewer does not write to them; the orchestrator may treat them as inputs at close-out time.
 
 **Read/write matrix:**
 
-| Artifact                          | Orchestrator | Implementer    | Reviewer       |
-|-----------------------------------|--------------|----------------|----------------|
-| `spec.md`                         | RW           | R              | R              |
-| `plan.md`                         | RW           | R              | R              |
-| `code-review.md`                  | R[^1]        | R              | RW             |
-| `code-review.md § Subagent IDs`   | RW           | R              | R              |
-| `code-review.md § Orchestrator notes` | RW       | R              | R              |
-| `system-design-review.md`         | R            | R              | RW             |
-| `walkthrough.md`                  | R            | R              | RW             |
-| `packages/**`                     | —            | RW             | R              |
-| `test/**`                         | —            | RW             | R              |
+| Artifact                              | Orchestrator | Implementer | Reviewer |
+|---------------------------------------|--------------|-------------|----------|
+| `spec.md`                             | RW           | R           | R        |
+| `plan.md`                             | RW           | R           | R        |
+| `code-review.md`                      | R[^1]        | R           | RW       |
+| `code-review.md § Subagent IDs`       | RW           | R           | R        |
+| `code-review.md § Orchestrator notes` | RW           | R           | R        |
+| `packages/**`                         | —            | RW          | R        |
+| `test/**`                             | —            | RW          | R        |
 
 [^1]: The orchestrator has a write carve-out for two specific subsections of `code-review.md`: § Subagent IDs (records the persistent implementer + reviewer subagent IDs — see § Subagent continuity) and § Orchestrator notes (records visible verdict overrides per § Loop algorithm step 7). Everything else under `code-review.md` is reviewer-only RW.
 
@@ -359,7 +360,7 @@ For each milestone in `plan.md` (or the single milestone named in `iterate <mile
 4. **If implementer returns deferral requests**: surface to the user as a structured decision (see § Escalation surface). Do not re-delegate until the user has decided.
 5. **Delegate review** using `./templates/delegate-review.md`, passing pointers to recent commits and the implementer's report. **Resume the persistent reviewer subagent** using your harness's resume mechanism, except on the first round of the project where you spawn fresh and record the new ID (see § Subagent continuity).
 6. **Receive reviewer verdict.** One of `SATISFIED`, `ANOTHER ROUND NEEDED`, `ESCALATING TO USER`.
-7. **Validate the review against intent.** Required step. The reviewer reasons forward from artifacts; you reason forward from intent (see § The three personas → Orchestrator → Epistemic frame). Read the verdict, the AC scoreboard delta, the new findings (and their severities), and any narrative artifacts the reviewer refreshed (`system-design-review.md`, `walkthrough.md`). Apply your project-level context to four questions:
+7. **Validate the review against intent.** Required step. The reviewer reasons forward from artifacts; you reason forward from intent (see § The three personas → Orchestrator → Epistemic frame). Read the verdict, the AC scoreboard delta, the new findings (and their severities), and the round entry the reviewer appended under `## Round notes` in `code-review.md`. Apply your project-level context to four questions:
 
    - **Does this verdict reflect intent, not just artifact-match?** A `SATISFIED` verdict on a spec that misses a subtle decision is still wrong.
    - **Did the reviewer let any architectural choice through that I should question?** The reviewer's role discipline is to validate against the spec; the orchestrator's role *is* to second-guess design when intent demands it.
@@ -379,7 +380,6 @@ For each milestone in `plan.md` (or the single milestone named in `iterate <mile
    - `SATISFIED` → report milestone completion to the user, recommend the next milestone or transition to PR.
    - `ANOTHER ROUND NEEDED` → re-prompt implementer with the reviewer's findings; loop to step 2.
    - `ESCALATING TO USER` → surface the reviewer's concerns as a structured decision.
-9. **Confirm narrative-artifact refresh.** After `SATISFIED` on a milestone, verify that `system-design-review.md` and `walkthrough.md` reflect the as-built state at HEAD. The reviewer is required to refresh both every round (see § The artifact contract); your job here is to confirm — open both, scan for round-N content, fail loudly if either is missing or outdated. If the reviewer skipped the refresh, that's a delegation-protocol failure: re-prompt the reviewer with a refresh-only delegation; do not accept the milestone as `SATISFIED` until both reflect HEAD.
 
 ## Escalation surface
 
@@ -543,7 +543,7 @@ These are the cross-cutting invariants the orchestrator is responsible for enfor
 - **Implementer flags > silent descope.** If the implementer surfaces a deferral request, treat it as a hard pause; do not delegate review with the deferral unaddressed.
 - **Reviewer is read-only on code, tests, and planning artifacts.** Reviewer can only modify files under `reviews/`. If a reviewer attempts to amend `plan.md` or `spec.md`, treat that as a delegation-protocol failure and re-delegate.
 - **Side-quests get explicit framing + their own commit.** Out-of-scope fixes (e.g. fixing a pre-existing flake the user requests during the loop) commit separately with a scope-note in the commit message; the implementer should never bundle them with milestone work.
-- **All three review artifacts produced or refreshed every round, no exceptions.** `code-review.md`, `system-design-review.md`, and `walkthrough.md` all update on every round (see § The artifact contract). The walkthrough is the user's primary per-round review surface; missing it breaks their ability to review the round. If the reviewer returns without all three reflecting HEAD, re-prompt with a refresh-only delegation before accepting the verdict.
+- **`code-review.md` is the single per-round review artifact.** The reviewer maintains it; every round appends a terse entry under `## Round notes`. SDR and walkthrough are not per-round deliverables (see § The artifact contract). The walkthrough is generated at PR-open time by the team's PR-opening skill against the project base.
 - **Findings are work for the implementer's next round.** Every entry in `code-review.md` § Findings log is a concrete action the implementer addresses before the milestone reaches `SATISFIED`. All severities (`must-fix`, `should-fix`, `low / process`) block milestone close — severity is for within-round prioritization, not for letting items carry forward. "Consider for future," "out of scope," or "no action" findings are noise; surface plan amendments to the orchestrator instead so they land in `plan.md` (§ Open items, future milestone task list, or a follow-up ticket) before the next implementer delegation. See § Findings discipline.
 - **Validation gates must include cross-package tests when the milestone deletes or renames public exports.** A package-scoped gate alone misses consumer surfaces; always extend the gate with the project's workspace-wide test command and a grep for the deleted-or-renamed symbol across consumer directories. See § Validation gates.
 - **Honest implementer pushback is valuable.** When the implementer presents evidence that contradicts a reviewer finding (file paths, diffs, prior commits), the orchestrator should update the reviewer's record rather than insist the implementer comply.

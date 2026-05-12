@@ -52,7 +52,9 @@ The plan documents the milestone's validation gates explicitly. Restated here so
 - `<command 2>` — e.g. test (package- or workspace-scoped per the milestone)
 - `<command 3>` — e.g. lint, build (when applicable)
 
-If any gate fails, stop and surface to the orchestrator before declaring done.
+**Test execution discipline** (see `<skill-dir>/agents/implementer.md § Test execution discipline`): run **selective** tests during iteration (the single test file for the code path you just changed; the package's typecheck and lint on changed files). Run the **full** validation gate set above only **once**, at end-of-round when you believe the round is complete. If a gate fails, rerun **only** the failing test(s) until green, then run the full gate set one more time to confirm.
+
+If any gate fails after the confirmation run, stop and surface to the orchestrator before declaring done.
 
 ## Constraints
 
@@ -62,7 +64,7 @@ If any gate fails, stop and surface to the orchestrator before declaring done.
 - **No push** without explicit authorization.
 - **Commit organization:** <one suggested split, e.g. "one commit per task; or, one commit covering tasks T<N.x>-T<N.y> as a unit and a separate commit for T<N.z>"> — use your judgment if a different split reads cleaner; surface the choice in your report.
 - **Side-quests:** <none authorized | "fix X if you encounter it; commit separately with scope-note" | etc.>
-- **Read-only constraints:** do not edit `code-review.md`, `system-design-review.md`, `walkthrough.md`, `spec.md`, or `plan.md`. Those are not yours.
+- **Read-only constraints:** do not edit anything under `projects/{project}/reviews/`, or `spec.md` / `plan.md`. Those are not yours.
 
 ## Heartbeats
 
