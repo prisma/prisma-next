@@ -47,11 +47,10 @@
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/2-mongo-family/9-family"
   },
-  "main": "./dist/control.mjs",
-  "module": "./dist/control.mjs",
   "types": "./dist/control.d.mts",
   "exports": {
     "./control": "./dist/control.mjs",
+    "./ir": "./dist/ir.mjs",
     "./migration": "./dist/migration.mjs",
     "./pack": "./dist/pack.mjs",
     "./schema-verify": "./dist/schema-verify.mjs",

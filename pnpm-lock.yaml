@@ -1850,6 +1850,9 @@ importers:
 
   packages/2-mongo-family/3-tooling/mongo-schema-ir:
     dependencies:
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../../1-foundation/mongo-contract
