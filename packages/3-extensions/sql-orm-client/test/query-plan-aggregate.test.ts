@@ -194,7 +194,7 @@ describe('query plan aggregate', () => {
     expect(params[0]?.codec?.codecId).toBe('pg/int4@1');
   });
 
-  it('stamps min/max ProjectionItem.codecId from the underlying column', () => {
+  it('stamps min/max ProjectionItem.codec from the underlying column', () => {
     const plan = compileAggregate(baseContract, 'posts', [], {
       minViews: { kind: 'aggregate', fn: 'min', column: 'views' },
       maxViews: { kind: 'aggregate', fn: 'max', column: 'views' },
@@ -206,7 +206,7 @@ describe('query plan aggregate', () => {
     expect(byAlias).toEqual({ minViews: 'pg/int4@1', maxViews: 'pg/int4@1' });
   });
 
-  it('leaves count/sum/avg ProjectionItem.codecId undefined (deferred until target+widening-aware mapping)', () => {
+  it('leaves count/sum/avg ProjectionItem.codec undefined (deferred until target+widening-aware mapping)', () => {
     const plan = compileAggregate(baseContract, 'posts', [], {
       total: { kind: 'aggregate', fn: 'count' },
       sumViews: { kind: 'aggregate', fn: 'sum', column: 'views' },

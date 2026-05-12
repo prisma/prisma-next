@@ -398,7 +398,7 @@ describe('runBeforeCompileChain', () => {
   );
 
   it(
-    'decodes RETURNING values via ProjectionItem.codecId on a mutation AST',
+    'decodes RETURNING values via ProjectionItem.codec on a mutation AST',
     async () => {
       const { InsertAst } = await import('@prisma-next/sql-relational-core/ast');
 
