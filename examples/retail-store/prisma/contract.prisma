@@ -62,6 +62,7 @@ model Product {
   @@map("products")
   @@textIndex([name, description], weights: "{\"name\": 10, \"description\": 1}")
   @@index([brand, subCategory])
+  @@index([masterCategory, articleType])
   @@index([code], type: "hashed")
 }
 

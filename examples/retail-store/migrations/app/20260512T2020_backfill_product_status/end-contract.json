@@ -65,8 +65,12 @@
         "user": {
           "cardinality": "N:1",
           "on": {
-            "localFields": ["userId"],
-            "targetFields": ["_id"]
+            "localFields": [
+              "userId"
+            ],
+            "targetFields": [
+              "_id"
+            ]
           },
           "to": "User"
         }
@@ -189,8 +193,12 @@
         "order": {
           "cardinality": "N:1",
           "on": {
-            "localFields": ["orderId"],
-            "targetFields": ["_id"]
+            "localFields": [
+              "orderId"
+            ],
+            "targetFields": [
+              "_id"
+            ]
           },
           "to": "Order"
         }
@@ -300,16 +308,24 @@
         "invoices": {
           "cardinality": "1:N",
           "on": {
-            "localFields": ["_id"],
-            "targetFields": ["orderId"]
+            "localFields": [
+              "_id"
+            ],
+            "targetFields": [
+              "orderId"
+            ]
           },
           "to": "Invoice"
         },
         "user": {
           "cardinality": "N:1",
           "on": {
-            "localFields": ["userId"],
-            "targetFields": ["_id"]
+            "localFields": [
+              "userId"
+            ],
+            "targetFields": [
+              "_id"
+            ]
           },
           "to": "User"
         }
@@ -462,16 +478,24 @@
         "carts": {
           "cardinality": "1:N",
           "on": {
-            "localFields": ["_id"],
-            "targetFields": ["userId"]
+            "localFields": [
+              "_id"
+            ],
+            "targetFields": [
+              "userId"
+            ]
           },
           "to": "Cart"
         },
         "orders": {
           "cardinality": "1:N",
           "on": {
-            "localFields": ["_id"],
-            "targetFields": ["userId"]
+            "localFields": [
+              "_id"
+            ],
+            "targetFields": [
+              "userId"
+            ]
           },
           "to": "Order"
         }
@@ -762,7 +786,9 @@
                           "bsonType": "string"
                         }
                       },
-                      "required": ["url"]
+                      "required": [
+                        "url"
+                      ]
                     },
                     "name": {
                       "bsonType": "string"
@@ -777,20 +803,34 @@
                           "bsonType": "string"
                         }
                       },
-                      "required": ["amount", "currency"]
+                      "required": [
+                        "amount",
+                        "currency"
+                      ]
                     },
                     "productId": {
                       "bsonType": "string"
                     }
                   },
-                  "required": ["amount", "brand", "image", "name", "price", "productId"]
+                  "required": [
+                    "amount",
+                    "brand",
+                    "image",
+                    "name",
+                    "price",
+                    "productId"
+                  ]
                 }
               },
               "userId": {
                 "bsonType": "objectId"
               }
             },
-            "required": ["_id", "items", "userId"]
+            "required": [
+              "_id",
+              "items",
+              "userId"
+            ]
           },
           "validationAction": "error",
           "validationLevel": "strict"
@@ -830,7 +870,10 @@
                     "bsonType": "string"
                   },
                   "exitMethod": {
-                    "bsonType": ["null", "string"]
+                    "bsonType": [
+                      "null",
+                      "string"
+                    ]
                   },
                   "productId": {
                     "bsonType": "string"
@@ -839,10 +882,17 @@
                     "bsonType": "string"
                   },
                   "type": {
-                    "enum": ["view-product"]
+                    "enum": [
+                      "view-product"
+                    ]
                   }
                 },
-                "required": ["brand", "productId", "subCategory", "type"]
+                "required": [
+                  "brand",
+                  "productId",
+                  "subCategory",
+                  "type"
+                ]
               },
               {
                 "properties": {
@@ -850,10 +900,15 @@
                     "bsonType": "string"
                   },
                   "type": {
-                    "enum": ["search"]
+                    "enum": [
+                      "search"
+                    ]
                   }
                 },
-                "required": ["query", "type"]
+                "required": [
+                  "query",
+                  "type"
+                ]
               },
               {
                 "properties": {
@@ -864,10 +919,16 @@
                     "bsonType": "string"
                   },
                   "type": {
-                    "enum": ["add-to-cart"]
+                    "enum": [
+                      "add-to-cart"
+                    ]
                   }
                 },
-                "required": ["brand", "productId", "type"]
+                "required": [
+                  "brand",
+                  "productId",
+                  "type"
+                ]
               }
             ],
             "properties": {
@@ -887,7 +948,13 @@
                 "bsonType": "string"
               }
             },
-            "required": ["_id", "sessionId", "timestamp", "type", "userId"]
+            "required": [
+              "_id",
+              "sessionId",
+              "timestamp",
+              "type",
+              "userId"
+            ]
           },
           "validationAction": "error",
           "validationLevel": "strict"
@@ -941,7 +1008,12 @@
                       "bsonType": "double"
                     }
                   },
-                  "required": ["amount", "lineTotal", "name", "unitPrice"]
+                  "required": [
+                    "amount",
+                    "lineTotal",
+                    "name",
+                    "unitPrice"
+                  ]
                 }
               },
               "orderId": {
@@ -957,7 +1029,15 @@
                 "bsonType": "double"
               }
             },
-            "required": ["_id", "issuedAt", "items", "orderId", "subtotal", "tax", "total"]
+            "required": [
+              "_id",
+              "issuedAt",
+              "items",
+              "orderId",
+              "subtotal",
+              "tax",
+              "total"
+            ]
           },
           "validationAction": "error",
           "validationLevel": "strict"
@@ -1005,7 +1085,14 @@
                 "bsonType": "string"
               }
             },
-            "required": ["_id", "city", "country", "name", "postalCode", "streetAndNumber"]
+            "required": [
+              "_id",
+              "city",
+              "country",
+              "name",
+              "postalCode",
+              "streetAndNumber"
+            ]
           },
           "validationAction": "error",
           "validationLevel": "strict"
@@ -1047,7 +1134,9 @@
                           "bsonType": "string"
                         }
                       },
-                      "required": ["url"]
+                      "required": [
+                        "url"
+                      ]
                     },
                     "name": {
                       "bsonType": "string"
@@ -1062,13 +1151,23 @@
                           "bsonType": "string"
                         }
                       },
-                      "required": ["amount", "currency"]
+                      "required": [
+                        "amount",
+                        "currency"
+                      ]
                     },
                     "productId": {
                       "bsonType": "string"
                     }
                   },
-                  "required": ["amount", "brand", "image", "name", "price", "productId"]
+                  "required": [
+                    "amount",
+                    "brand",
+                    "image",
+                    "name",
+                    "price",
+                    "productId"
+                  ]
                 }
               },
               "shippingAddress": {
@@ -1086,7 +1185,10 @@
                       "bsonType": "date"
                     }
                   },
-                  "required": ["status", "timestamp"]
+                  "required": [
+                    "status",
+                    "timestamp"
+                  ]
                 }
               },
               "type": {
@@ -1096,7 +1198,14 @@
                 "bsonType": "objectId"
               }
             },
-            "required": ["_id", "items", "shippingAddress", "statusHistory", "type", "userId"]
+            "required": [
+              "_id",
+              "items",
+              "shippingAddress",
+              "statusHistory",
+              "type",
+              "userId"
+            ]
           },
           "validationAction": "error",
           "validationLevel": "strict"
@@ -1129,6 +1238,18 @@
               {
                 "direction": 1,
                 "field": "subCategory"
+              }
+            ]
+          },
+          {
+            "keys": [
+              {
+                "direction": 1,
+                "field": "masterCategory"
+              },
+              {
+                "direction": 1,
+                "field": "articleType"
               }
             ]
           },
@@ -1173,7 +1294,9 @@
                     "bsonType": "string"
                   }
                 },
-                "required": ["url"]
+                "required": [
+                  "url"
+                ]
               },
               "masterCategory": {
                 "bsonType": "string"
@@ -1191,7 +1314,10 @@
                     "bsonType": "string"
                   }
                 },
-                "required": ["amount", "currency"]
+                "required": [
+                  "amount",
+                  "currency"
+                ]
               },
               "status": {
                 "bsonType": "string"
@@ -1258,7 +1384,12 @@
                         "bsonType": "string"
                       }
                     },
-                    "required": ["city", "country", "postalCode", "streetAndNumber"]
+                    "required": [
+                      "city",
+                      "country",
+                      "postalCode",
+                      "streetAndNumber"
+                    ]
                   }
                 ]
               },
@@ -1269,14 +1400,18 @@
                 "bsonType": "string"
               }
             },
-            "required": ["_id", "email", "name"]
+            "required": [
+              "_id",
+              "email",
+              "name"
+            ]
           },
           "validationAction": "error",
           "validationLevel": "strict"
         }
       }
     },
-    "storageHash": "sha256:4407077380e2331b356697c35153192b3bdafadb432f0d64b081d24e8af3e55a"
+    "storageHash": "sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65"
   },
   "capabilities": {},
   "extensionPacks": {},

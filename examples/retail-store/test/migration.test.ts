@@ -43,6 +43,12 @@ describe('migration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
           { field: 'subCategory', direction: 1 },
         ],
       },
+      {
+        keys: [
+          { field: 'masterCategory', direction: 1 },
+          { field: 'articleType', direction: 1 },
+        ],
+      },
       { keys: [{ field: 'code', direction: 'hashed' }] },
     ]);
 
@@ -90,6 +96,7 @@ describe('migration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
         { weights: { name: 10, description: 1 } },
       );
     await db.collection('products').createIndex({ brand: 1, subCategory: 1 });
+    await db.collection('products').createIndex({ masterCategory: 1, articleType: 1 });
     await db.collection('products').createIndex({ code: 'hashed' });
     await db.collection('users').createIndex({ email: 1 }, { unique: true });
     await db.collection('carts').createIndex({ userId: 1 }, { unique: true });
@@ -110,6 +117,7 @@ describe('migration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
           weights: { name: 10, description: 1 },
         }),
         expect.objectContaining({ key: { brand: 1, subCategory: 1 } }),
+        expect.objectContaining({ key: { masterCategory: 1, articleType: 1 } }),
         expect.objectContaining({ key: { code: 'hashed' } }),
       ]),
     );

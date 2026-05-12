@@ -1,51 +1,5 @@
 [
   {
-    "id": "collection.addToCartEvent.create",
-    "label": "Create collection addToCartEvent",
-    "operationClass": "additive",
-    "precheck": [
-      {
-        "description": "collection addToCartEvent does not exist",
-        "source": {
-          "kind": "listCollections"
-        },
-        "filter": {
-          "kind": "field",
-          "field": "name",
-          "op": "$eq",
-          "value": "addToCartEvent"
-        },
-        "expect": "notExists"
-      }
-    ],
-    "execute": [
-      {
-        "description": "create collection addToCartEvent",
-        "command": {
-          "kind": "createCollection",
-          "collection": "addToCartEvent",
-          "validator": {
-            "$jsonSchema": {
-              "bsonType": "object",
-              "properties": {
-                "brand": {
-                  "bsonType": "string"
-                },
-                "productId": {
-                  "bsonType": "string"
-                }
-              },
-              "required": ["brand", "productId"]
-            }
-          },
-          "validationLevel": "strict",
-          "validationAction": "error"
-        }
-      }
-    ],
-    "postcheck": []
-  },
-  {
     "id": "collection.carts.create",
     "label": "Create collection carts",
     "operationClass": "additive",
@@ -95,7 +49,9 @@
                             "bsonType": "string"
                           }
                         },
-                        "required": ["url"]
+                        "required": [
+                          "url"
+                        ]
                       },
                       "name": {
                         "bsonType": "string"
@@ -103,24 +59,41 @@
                       "price": {
                         "bsonType": "object",
                         "properties": {
+                          "amount": {
+                            "bsonType": "double"
+                          },
                           "currency": {
                             "bsonType": "string"
                           }
                         },
-                        "required": ["currency"]
+                        "required": [
+                          "amount",
+                          "currency"
+                        ]
                       },
                       "productId": {
                         "bsonType": "string"
                       }
                     },
-                    "required": ["amount", "brand", "image", "name", "price", "productId"]
+                    "required": [
+                      "amount",
+                      "brand",
+                      "image",
+                      "name",
+                      "price",
+                      "productId"
+                    ]
                   }
                 },
                 "userId": {
                   "bsonType": "objectId"
                 }
               },
-              "required": ["_id", "items", "userId"]
+              "required": [
+                "_id",
+                "items",
+                "userId"
+              ]
             }
           },
           "validationLevel": "strict",
@@ -158,6 +131,74 @@
           "validator": {
             "$jsonSchema": {
               "bsonType": "object",
+              "oneOf": [
+                {
+                  "properties": {
+                    "brand": {
+                      "bsonType": "string"
+                    },
+                    "exitMethod": {
+                      "bsonType": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "productId": {
+                      "bsonType": "string"
+                    },
+                    "subCategory": {
+                      "bsonType": "string"
+                    },
+                    "type": {
+                      "enum": [
+                        "view-product"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "brand",
+                    "productId",
+                    "subCategory",
+                    "type"
+                  ]
+                },
+                {
+                  "properties": {
+                    "query": {
+                      "bsonType": "string"
+                    },
+                    "type": {
+                      "enum": [
+                        "search"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "query",
+                    "type"
+                  ]
+                },
+                {
+                  "properties": {
+                    "brand": {
+                      "bsonType": "string"
+                    },
+                    "productId": {
+                      "bsonType": "string"
+                    },
+                    "type": {
+                      "enum": [
+                        "add-to-cart"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "brand",
+                    "productId",
+                    "type"
+                  ]
+                }
+              ],
               "properties": {
                 "_id": {
                   "bsonType": "objectId"
@@ -175,7 +216,13 @@
                   "bsonType": "string"
                 }
               },
-              "required": ["_id", "sessionId", "timestamp", "type", "userId"]
+              "required": [
+                "_id",
+                "sessionId",
+                "timestamp",
+                "type",
+                "userId"
+              ]
             }
           },
           "validationLevel": "strict",
@@ -228,18 +275,46 @@
                       "amount": {
                         "bsonType": "int"
                       },
+                      "lineTotal": {
+                        "bsonType": "double"
+                      },
                       "name": {
                         "bsonType": "string"
+                      },
+                      "unitPrice": {
+                        "bsonType": "double"
                       }
                     },
-                    "required": ["amount", "name"]
+                    "required": [
+                      "amount",
+                      "lineTotal",
+                      "name",
+                      "unitPrice"
+                    ]
                   }
                 },
                 "orderId": {
                   "bsonType": "objectId"
+                },
+                "subtotal": {
+                  "bsonType": "double"
+                },
+                "tax": {
+                  "bsonType": "double"
+                },
+                "total": {
+                  "bsonType": "double"
                 }
               },
-              "required": ["_id", "issuedAt", "items", "orderId"]
+              "required": [
+                "_id",
+                "issuedAt",
+                "items",
+                "orderId",
+                "subtotal",
+                "tax",
+                "total"
+              ]
             }
           },
           "validationLevel": "strict",
@@ -297,7 +372,14 @@
                   "bsonType": "string"
                 }
               },
-              "required": ["_id", "city", "country", "name", "postalCode", "streetAndNumber"]
+              "required": [
+                "_id",
+                "city",
+                "country",
+                "name",
+                "postalCode",
+                "streetAndNumber"
+              ]
             }
           },
           "validationLevel": "strict",
@@ -357,7 +439,9 @@
                             "bsonType": "string"
                           }
                         },
-                        "required": ["url"]
+                        "required": [
+                          "url"
+                        ]
                       },
                       "name": {
                         "bsonType": "string"
@@ -365,17 +449,30 @@
                       "price": {
                         "bsonType": "object",
                         "properties": {
+                          "amount": {
+                            "bsonType": "double"
+                          },
                           "currency": {
                             "bsonType": "string"
                           }
                         },
-                        "required": ["currency"]
+                        "required": [
+                          "amount",
+                          "currency"
+                        ]
                       },
                       "productId": {
                         "bsonType": "string"
                       }
                     },
-                    "required": ["amount", "brand", "image", "name", "price", "productId"]
+                    "required": [
+                      "amount",
+                      "brand",
+                      "image",
+                      "name",
+                      "price",
+                      "productId"
+                    ]
                   }
                 },
                 "shippingAddress": {
@@ -393,7 +490,10 @@
                         "bsonType": "date"
                       }
                     },
-                    "required": ["status", "timestamp"]
+                    "required": [
+                      "status",
+                      "timestamp"
+                    ]
                   }
                 },
                 "type": {
@@ -403,7 +503,14 @@
                   "bsonType": "objectId"
                 }
               },
-              "required": ["_id", "items", "shippingAddress", "statusHistory", "type", "userId"]
+              "required": [
+                "_id",
+                "items",
+                "shippingAddress",
+                "statusHistory",
+                "type",
+                "userId"
+              ]
             }
           },
           "validationLevel": "strict",
@@ -457,6 +564,12 @@
                 "description": {
                   "bsonType": "string"
                 },
+                "embedding": {
+                  "bsonType": "array",
+                  "items": {
+                    "bsonType": "double"
+                  }
+                },
                 "image": {
                   "bsonType": "object",
                   "properties": {
@@ -464,7 +577,9 @@
                       "bsonType": "string"
                     }
                   },
-                  "required": ["url"]
+                  "required": [
+                    "url"
+                  ]
                 },
                 "masterCategory": {
                   "bsonType": "string"
@@ -475,11 +590,20 @@
                 "price": {
                   "bsonType": "object",
                   "properties": {
+                    "amount": {
+                      "bsonType": "double"
+                    },
                     "currency": {
                       "bsonType": "string"
                     }
                   },
-                  "required": ["currency"]
+                  "required": [
+                    "amount",
+                    "currency"
+                  ]
+                },
+                "status": {
+                  "bsonType": "string"
                 },
                 "subCategory": {
                   "bsonType": "string"
@@ -495,51 +619,9 @@
                 "masterCategory",
                 "name",
                 "price",
+                "status",
                 "subCategory"
               ]
-            }
-          },
-          "validationLevel": "strict",
-          "validationAction": "error"
-        }
-      }
-    ],
-    "postcheck": []
-  },
-  {
-    "id": "collection.searchEvent.create",
-    "label": "Create collection searchEvent",
-    "operationClass": "additive",
-    "precheck": [
-      {
-        "description": "collection searchEvent does not exist",
-        "source": {
-          "kind": "listCollections"
-        },
-        "filter": {
-          "kind": "field",
-          "field": "name",
-          "op": "$eq",
-          "value": "searchEvent"
-        },
-        "expect": "notExists"
-      }
-    ],
-    "execute": [
-      {
-        "description": "create collection searchEvent",
-        "command": {
-          "kind": "createCollection",
-          "collection": "searchEvent",
-          "validator": {
-            "$jsonSchema": {
-              "bsonType": "object",
-              "properties": {
-                "query": {
-                  "bsonType": "string"
-                }
-              },
-              "required": ["query"]
             }
           },
           "validationLevel": "strict",
@@ -602,7 +684,12 @@
                           "bsonType": "string"
                         }
                       },
-                      "required": ["city", "country", "postalCode", "streetAndNumber"]
+                      "required": [
+                        "city",
+                        "country",
+                        "postalCode",
+                        "streetAndNumber"
+                      ]
                     }
                   ]
                 },
@@ -613,59 +700,11 @@
                   "bsonType": "string"
                 }
               },
-              "required": ["_id", "email", "name"]
-            }
-          },
-          "validationLevel": "strict",
-          "validationAction": "error"
-        }
-      }
-    ],
-    "postcheck": []
-  },
-  {
-    "id": "collection.viewProductEvent.create",
-    "label": "Create collection viewProductEvent",
-    "operationClass": "additive",
-    "precheck": [
-      {
-        "description": "collection viewProductEvent does not exist",
-        "source": {
-          "kind": "listCollections"
-        },
-        "filter": {
-          "kind": "field",
-          "field": "name",
-          "op": "$eq",
-          "value": "viewProductEvent"
-        },
-        "expect": "notExists"
-      }
-    ],
-    "execute": [
-      {
-        "description": "create collection viewProductEvent",
-        "command": {
-          "kind": "createCollection",
-          "collection": "viewProductEvent",
-          "validator": {
-            "$jsonSchema": {
-              "bsonType": "object",
-              "properties": {
-                "brand": {
-                  "bsonType": "string"
-                },
-                "exitMethod": {
-                  "bsonType": ["null", "string"]
-                },
-                "productId": {
-                  "bsonType": "string"
-                },
-                "subCategory": {
-                  "bsonType": "string"
-                }
-              },
-              "required": ["brand", "productId", "subCategory"]
+              "required": [
+                "_id",
+                "email",
+                "name"
+              ]
             }
           },
           "validationLevel": "strict",
@@ -705,8 +744,8 @@
           "collection": "carts",
           "keys": [
             {
-              "field": "userId",
-              "direction": 1
+              "direction": 1,
+              "field": "userId"
             }
           ],
           "unique": true,
@@ -775,12 +814,12 @@
           "collection": "events",
           "keys": [
             {
-              "field": "userId",
-              "direction": 1
+              "direction": 1,
+              "field": "userId"
             },
             {
-              "field": "timestamp",
-              "direction": -1
+              "direction": -1,
+              "field": "timestamp"
             }
           ],
           "name": "userId_1_timestamp_-1"
@@ -837,8 +876,8 @@
           "collection": "events",
           "keys": [
             {
-              "field": "timestamp",
-              "direction": 1
+              "direction": 1,
+              "field": "timestamp"
             }
           ],
           "expireAfterSeconds": 7776000,
@@ -895,8 +934,8 @@
           "collection": "invoices",
           "keys": [
             {
-              "field": "orderId",
-              "direction": 1
+              "direction": 1,
+              "field": "orderId"
             }
           ],
           "name": "orderId_1"
@@ -952,8 +991,8 @@
           "collection": "invoices",
           "keys": [
             {
-              "field": "issuedAt",
-              "direction": -1
+              "direction": -1,
+              "field": "issuedAt"
             }
           ],
           "sparse": true,
@@ -1011,12 +1050,12 @@
           "collection": "locations",
           "keys": [
             {
-              "field": "city",
-              "direction": 1
+              "direction": 1,
+              "field": "city"
             },
             {
-              "field": "country",
-              "direction": 1
+              "direction": 1,
+              "field": "country"
             }
           ],
           "name": "city_1_country_1",
@@ -1077,8 +1116,8 @@
           "collection": "orders",
           "keys": [
             {
-              "field": "userId",
-              "direction": 1
+              "direction": 1,
+              "field": "userId"
             }
           ],
           "name": "userId_1"
@@ -1132,12 +1171,12 @@
           "collection": "products",
           "keys": [
             {
-              "field": "name",
-              "direction": "text"
+              "direction": "text",
+              "field": "name"
             },
             {
-              "field": "description",
-              "direction": "text"
+              "direction": "text",
+              "field": "description"
             }
           ],
           "name": "name_text_description_text",
@@ -1196,12 +1235,12 @@
           "collection": "products",
           "keys": [
             {
-              "field": "brand",
-              "direction": 1
+              "direction": 1,
+              "field": "brand"
             },
             {
-              "field": "subCategory",
-              "direction": 1
+              "direction": 1,
+              "field": "subCategory"
             }
           ],
           "name": "brand_1_subCategory_1"
@@ -1258,8 +1297,8 @@
           "collection": "products",
           "keys": [
             {
-              "field": "code",
-              "direction": "hashed"
+              "direction": "hashed",
+              "field": "code"
             }
           ],
           "name": "code_hashed"
@@ -1315,8 +1354,8 @@
           "collection": "users",
           "keys": [
             {
-              "field": "email",
-              "direction": 1
+              "direction": 1,
+              "field": "email"
             }
           ],
           "unique": true,

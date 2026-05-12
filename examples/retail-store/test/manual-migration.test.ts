@@ -10,10 +10,10 @@ import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { resolve } from 'pathe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import AddProductValidation from '../migrations/app/20260415_add-product-validation/migration';
+import BackfillProductStatus from '../migrations/app/20260512T2020_backfill_product_status/migration';
 
 const ALL_POLICY = {
-  allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
+  allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] as const,
 };
 
 function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
@@ -25,11 +25,11 @@ function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
 
 const migrationDir = resolve(
   import.meta.dirname,
-  '../migrations/app/20260415_add-product-validation',
+  '../migrations/app/20260512T2020_backfill_product_status',
 );
 
 describe(
-  'hand-authored migration (20260415_add-product-validation)',
+  'hand-authored migration (backfill-product-status)',
   { timeout: timeouts.spinUpMongoMemoryServer },
   () => {
     let replSet: MongoMemoryReplSet;
@@ -63,29 +63,33 @@ describe(
     }, timeouts.spinUpMongoMemoryServer);
 
     it('migration class can be imported and operations accessed directly', () => {
-      const instance = new AddProductValidation();
+      const instance = new BackfillProductStatus();
       const ops = instance.operations;
-      expect(ops).toHaveLength(2);
-      expect(ops[0]!.id).toBe('collection.products.setValidation');
-      expect(ops[1]!.id).toContain('index.products.create');
+      expect(ops).toHaveLength(1);
+      expect(ops[0]!.id).toBe('data_transform.backfill-product-status');
     });
 
     it('migration.json has expected structure', () => {
       const manifest = JSON.parse(readFileSync(resolve(migrationDir, 'migration.json'), 'utf-8'));
 
       expect(manifest.migrationHash).toMatch(/^sha256:/);
-      expect(manifest.labels).toEqual(['add-product-validation']);
+      expect(manifest.labels).toEqual(['backfill-product-status']);
       expect(manifest.from).toMatch(/^sha256:/);
       expect(manifest.to).toMatch(/^sha256:/);
       expect(manifest.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
 
-    it('ops.json deserializes and applies against real MongoDB', async () => {
-      await db.createCollection('products');
+    it('ops.json deserializes and applies against real MongoDB, backfilling missing status', async () => {
+      // Seed two pre-existing products that pre-date the `status` field;
+      // the data transform should observe both and update them.
+      await db.collection('products').insertMany([
+        { name: 'Pre-existing widget A', brand: 'Acme', price: { amount: 10, currency: 'USD' } },
+        { name: 'Pre-existing widget B', brand: 'Acme', price: { amount: 20, currency: 'USD' } },
+      ]);
 
       const opsJson = readFileSync(resolve(migrationDir, 'ops.json'), 'utf-8');
       const ops = deserializeMongoOps(JSON.parse(opsJson));
-      expect(ops).toHaveLength(2);
+      expect(ops).toHaveLength(1);
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
@@ -96,28 +100,23 @@ describe(
             makeFamily(),
           ),
         );
+        // Synthetic-contract opt-out (paired with `strictVerification: false`):
+        // this test isolates migration 3's apply mechanics against a real
+        // driver, without first running migrations 1 + 2. We supply the
+        // minimum well-formed shape the verifier reads (`storage.collections`)
+        // so it degrades to an empty-expected diff rather than failing on
+        // peer collections (carts, orders, …) that the chain prerequisites
+        // would normally create.
+        const STORAGE_HASH =
+          'sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65';
         const result = await runner.execute({
           plan: {
             targetId: 'mongo',
-            destination: {
-              storageHash:
-                'sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d',
-            },
+            destination: { storageHash: STORAGE_HASH },
             operations: JSON.parse(opsJson),
           },
-          // Synthetic-contract opt-out (paired with `strictVerification: false`):
-          // this test feeds a hand-rolled ops JSON file to the runner; we have
-          // no authored MongoContract to pass. Supply the minimum well-formed
-          // shape `contractToMongoSchemaIR` reads (`storage.collections`) so
-          // the verifier degrades to an empty-expected diff rather than
-          // crashing in `contractToMongoSchemaIR` before the strict flag
-          // is consulted.
           destinationContract: {
-            storage: {
-              storageHash:
-                'sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d',
-              collections: {},
-            },
+            storage: { storageHash: STORAGE_HASH, collections: {} },
           } as unknown as MongoContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -126,20 +125,13 @@ describe(
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;
-        expect(result.value.operationsExecuted).toBe(2);
+        expect(result.value.operationsExecuted).toBe(1);
 
-        const info = await db.listCollections({ name: 'products' }).toArray();
-        const options = (info[0] as Record<string, unknown>)['options'] as Record<string, unknown>;
-        expect(options['validator']).toBeDefined();
-
-        const indexes = await db.collection('products').listIndexes().toArray();
-        const categoryPriceIndex = indexes.find(
-          (idx) =>
-            idx['key'] &&
-            (idx['key'] as Record<string, number>)['category'] === 1 &&
-            (idx['key'] as Record<string, number>)['price'] === 1,
-        );
-        expect(categoryPriceIndex).toBeDefined();
+        const products = await db.collection('products').find({}).toArray();
+        expect(products).toHaveLength(2);
+        for (const p of products) {
+          expect(p['status']).toBe('active');
+        }
       } finally {
         await controlDriver.close();
       }

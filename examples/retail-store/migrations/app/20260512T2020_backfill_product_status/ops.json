@@ -29,9 +29,8 @@
           },
           "meta": {
             "target": "mongo",
-            "storageHash": "sha256:5f5aee268e41d345787b7c5d396778443a977b10dc2ec9f14c913171fd6d1411",
-            "lane": "mongo-query",
-            "paramDescriptors": []
+            "storageHash": "sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65",
+            "lane": "mongo-pipeline"
           }
         },
         "filter": {
@@ -46,25 +45,23 @@
       {
         "collection": "products",
         "command": {
-          "kind": "updateMany",
+          "kind": "rawUpdateMany",
           "collection": "products",
           "filter": {
-            "kind": "exists",
-            "field": "status",
-            "exists": false
+            "status": {
+              "$exists": false
+            }
           },
           "update": {
             "$set": {
               "status": "active"
             }
-          },
-          "upsert": false
+          }
         },
         "meta": {
           "target": "mongo",
-          "storageHash": "sha256:5f5aee268e41d345787b7c5d396778443a977b10dc2ec9f14c913171fd6d1411",
-          "lane": "mongo-query",
-          "paramDescriptors": []
+          "storageHash": "sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65",
+          "lane": "mongo-raw"
         }
       }
     ],
@@ -93,9 +90,8 @@
           },
           "meta": {
             "target": "mongo",
-            "storageHash": "sha256:5f5aee268e41d345787b7c5d396778443a977b10dc2ec9f14c913171fd6d1411",
-            "lane": "mongo-query",
-            "paramDescriptors": []
+            "storageHash": "sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65",
+            "lane": "mongo-pipeline"
           }
         },
         "filter": {

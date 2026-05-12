@@ -1,0 +1,197 @@
+[
+  {
+    "id": "index.products.create(masterCategory:1,articleType:1)",
+    "label": "Create index on products (masterCategory:1, articleType:1)",
+    "operationClass": "additive",
+    "precheck": [
+      {
+        "description": "index does not already exist on products",
+        "source": {
+          "kind": "listIndexes",
+          "collection": "products"
+        },
+        "filter": {
+          "kind": "field",
+          "field": "key",
+          "op": "$eq",
+          "value": {
+            "masterCategory": 1,
+            "articleType": 1
+          }
+        },
+        "expect": "notExists"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index on products",
+        "command": {
+          "kind": "createIndex",
+          "collection": "products",
+          "keys": [
+            {
+              "direction": 1,
+              "field": "masterCategory"
+            },
+            {
+              "direction": 1,
+              "field": "articleType"
+            }
+          ],
+          "name": "masterCategory_1_articleType_1"
+        }
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "index exists on products",
+        "source": {
+          "kind": "listIndexes",
+          "collection": "products"
+        },
+        "filter": {
+          "kind": "field",
+          "field": "key",
+          "op": "$eq",
+          "value": {
+            "masterCategory": 1,
+            "articleType": 1
+          }
+        },
+        "expect": "exists"
+      }
+    ]
+  },
+  {
+    "id": "validator.products.update",
+    "label": "Update validator on products",
+    "operationClass": "destructive",
+    "precheck": [
+      {
+        "description": "collection products exists",
+        "source": {
+          "kind": "listCollections"
+        },
+        "filter": {
+          "kind": "field",
+          "field": "name",
+          "op": "$eq",
+          "value": "products"
+        },
+        "expect": "exists"
+      }
+    ],
+    "execute": [
+      {
+        "description": "modify products",
+        "command": {
+          "kind": "collMod",
+          "collection": "products",
+          "validator": {
+            "$jsonSchema": {
+              "bsonType": "object",
+              "properties": {
+                "_id": {
+                  "bsonType": "objectId"
+                },
+                "articleType": {
+                  "bsonType": "string"
+                },
+                "brand": {
+                  "bsonType": "string"
+                },
+                "code": {
+                  "bsonType": "string"
+                },
+                "description": {
+                  "bsonType": "string"
+                },
+                "image": {
+                  "bsonType": "object",
+                  "properties": {
+                    "url": {
+                      "bsonType": "string"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ]
+                },
+                "masterCategory": {
+                  "bsonType": "string"
+                },
+                "name": {
+                  "bsonType": "string"
+                },
+                "price": {
+                  "bsonType": "object",
+                  "properties": {
+                    "amount": {
+                      "bsonType": "double"
+                    },
+                    "currency": {
+                      "bsonType": "string"
+                    }
+                  },
+                  "required": [
+                    "amount",
+                    "currency"
+                  ]
+                },
+                "subCategory": {
+                  "bsonType": "string"
+                }
+              },
+              "required": [
+                "_id",
+                "articleType",
+                "brand",
+                "code",
+                "description",
+                "image",
+                "masterCategory",
+                "name",
+                "price",
+                "subCategory"
+              ]
+            }
+          },
+          "validationLevel": "strict",
+          "validationAction": "error"
+        }
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "validator applied on products",
+        "source": {
+          "kind": "listCollections"
+        },
+        "filter": {
+          "kind": "and",
+          "exprs": [
+            {
+              "kind": "field",
+              "field": "name",
+              "op": "$eq",
+              "value": "products"
+            },
+            {
+              "kind": "field",
+              "field": "options.validationLevel",
+              "op": "$eq",
+              "value": "strict"
+            },
+            {
+              "kind": "field",
+              "field": "options.validationAction",
+              "op": "$eq",
+              "value": "error"
+            }
+          ]
+        },
+        "expect": "exists"
+      }
+    ]
+  }
+]

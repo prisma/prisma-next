@@ -13,13 +13,12 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:5f5aee268e41d345787b7c5d396778443a977b10dc2ec9f14c913171fd6d1411'>;
+  StorageHashBase<'sha256:8a15f8e37a3a8731578a87102f9507da65b5f84556f84320ea0ead82645e394d'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
 
 export type CodecTypes = MongoCodecTypes;
-export type OperationTypes = Record<string, never>;
 
 export type PriceOutput = {
   readonly amount: CodecTypes['mongo/double@1']['output'];
@@ -148,7 +147,6 @@ export type FieldOutputTypes = {
     readonly articleType: CodecTypes['mongo/string@1']['output'];
     readonly price: PriceOutput;
     readonly image: ImageOutput;
-    readonly embedding: ReadonlyArray<CodecTypes['mongo/double@1']['output']> | null;
   };
   readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['output'] };
   readonly User: {
@@ -217,7 +215,6 @@ export type FieldInputTypes = {
     readonly articleType: CodecTypes['mongo/string@1']['input'];
     readonly price: PriceInput;
     readonly image: ImageInput;
-    readonly embedding: ReadonlyArray<CodecTypes['mongo/double@1']['input']> | null;
   };
   readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['input'] };
   readonly User: {
@@ -233,7 +230,7 @@ export type FieldInputTypes = {
     readonly exitMethod: CodecTypes['mongo/string@1']['input'] | null;
   };
 };
-export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes, FieldInputTypes>;
+export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;
 
 type ContractBase = ContractType<
   {
@@ -253,6 +250,12 @@ type ContractBase = ContractType<
               { readonly field: 'subCategory'; readonly direction: 1 },
             ];
           },
+          {
+            readonly keys: readonly [
+              { readonly field: 'masterCategory'; readonly direction: 1 },
+              { readonly field: 'articleType'; readonly direction: 1 },
+            ];
+          },
           { readonly keys: readonly [{ readonly field: 'code'; readonly direction: 'hashed' }] },
         ];
         readonly validator: {
@@ -269,8 +272,11 @@ type ContractBase = ContractType<
               readonly articleType: { readonly bsonType: 'string' };
               readonly price: {
                 readonly bsonType: 'object';
-                readonly properties: { readonly currency: { readonly bsonType: 'string' } };
-                readonly required: readonly ['currency'];
+                readonly properties: {
+                  readonly amount: { readonly bsonType: 'double' };
+                  readonly currency: { readonly bsonType: 'string' };
+                };
+                readonly required: readonly ['amount', 'currency'];
               };
               readonly image: {
                 readonly bsonType: 'object';
@@ -360,8 +366,11 @@ type ContractBase = ContractType<
                     readonly amount: { readonly bsonType: 'int' };
                     readonly price: {
                       readonly bsonType: 'object';
-                      readonly properties: { readonly currency: { readonly bsonType: 'string' } };
-                      readonly required: readonly ['currency'];
+                      readonly properties: {
+                        readonly amount: { readonly bsonType: 'double' };
+                        readonly currency: { readonly bsonType: 'string' };
+                      };
+                      readonly required: readonly ['amount', 'currency'];
                     };
                     readonly image: {
                       readonly bsonType: 'object';
@@ -407,8 +416,11 @@ type ContractBase = ContractType<
                     readonly amount: { readonly bsonType: 'int' };
                     readonly price: {
                       readonly bsonType: 'object';
-                      readonly properties: { readonly currency: { readonly bsonType: 'string' } };
-                      readonly required: readonly ['currency'];
+                      readonly properties: {
+                        readonly amount: { readonly bsonType: 'double' };
+                        readonly currency: { readonly bsonType: 'string' };
+                      };
+                      readonly required: readonly ['amount', 'currency'];
                     };
                     readonly image: {
                       readonly bsonType: 'object';
@@ -508,13 +520,26 @@ type ContractBase = ContractType<
                   readonly properties: {
                     readonly name: { readonly bsonType: 'string' };
                     readonly amount: { readonly bsonType: 'int' };
+                    readonly unitPrice: { readonly bsonType: 'double' };
+                    readonly lineTotal: { readonly bsonType: 'double' };
                   };
-                  readonly required: readonly ['amount', 'name'];
+                  readonly required: readonly ['amount', 'lineTotal', 'name', 'unitPrice'];
                 };
               };
+              readonly subtotal: { readonly bsonType: 'double' };
+              readonly tax: { readonly bsonType: 'double' };
+              readonly total: { readonly bsonType: 'double' };
               readonly issuedAt: { readonly bsonType: 'date' };
             };
-            readonly required: readonly ['_id', 'issuedAt', 'items', 'orderId'];
+            readonly required: readonly [
+              '_id',
+              'issuedAt',
+              'items',
+              'orderId',
+              'subtotal',
+              'tax',
+              'total',
+            ];
           };
           readonly validationLevel: 'strict';
           readonly validationAction: 'error';
@@ -544,47 +569,33 @@ type ContractBase = ContractType<
               readonly timestamp: { readonly bsonType: 'date' };
             };
             readonly required: readonly ['_id', 'sessionId', 'timestamp', 'type', 'userId'];
-          };
-          readonly validationLevel: 'strict';
-          readonly validationAction: 'error';
-        };
-      };
-      readonly viewProductEvent: {
-        readonly validator: {
-          readonly jsonSchema: {
-            readonly bsonType: 'object';
-            readonly properties: {
-              readonly productId: { readonly bsonType: 'string' };
-              readonly subCategory: { readonly bsonType: 'string' };
-              readonly brand: { readonly bsonType: 'string' };
-              readonly exitMethod: { readonly bsonType: readonly ['null', 'string'] };
-            };
-            readonly required: readonly ['brand', 'productId', 'subCategory'];
-          };
-          readonly validationLevel: 'strict';
-          readonly validationAction: 'error';
-        };
-      };
-      readonly searchEvent: {
-        readonly validator: {
-          readonly jsonSchema: {
-            readonly bsonType: 'object';
-            readonly properties: { readonly query: { readonly bsonType: 'string' } };
-            readonly required: readonly ['query'];
-          };
-          readonly validationLevel: 'strict';
-          readonly validationAction: 'error';
-        };
-      };
-      readonly addToCartEvent: {
-        readonly validator: {
-          readonly jsonSchema: {
-            readonly bsonType: 'object';
-            readonly properties: {
-              readonly productId: { readonly bsonType: 'string' };
-              readonly brand: { readonly bsonType: 'string' };
-            };
-            readonly required: readonly ['brand', 'productId'];
+            readonly oneOf: readonly [
+              {
+                readonly properties: {
+                  readonly type: { readonly enum: readonly ['view-product'] };
+                  readonly productId: { readonly bsonType: 'string' };
+                  readonly subCategory: { readonly bsonType: 'string' };
+                  readonly brand: { readonly bsonType: 'string' };
+                  readonly exitMethod: { readonly bsonType: readonly ['null', 'string'] };
+                };
+                readonly required: readonly ['brand', 'productId', 'subCategory', 'type'];
+              },
+              {
+                readonly properties: {
+                  readonly type: { readonly enum: readonly ['search'] };
+                  readonly query: { readonly bsonType: 'string' };
+                };
+                readonly required: readonly ['query', 'type'];
+              },
+              {
+                readonly properties: {
+                  readonly type: { readonly enum: readonly ['add-to-cart'] };
+                  readonly productId: { readonly bsonType: 'string' };
+                  readonly brand: { readonly bsonType: 'string' };
+                };
+                readonly required: readonly ['brand', 'productId', 'type'];
+              },
+            ];
           };
           readonly validationLevel: 'strict';
           readonly validationAction: 'error';
@@ -833,11 +844,6 @@ type ContractBase = ContractType<
         readonly image: {
           readonly nullable: false;
           readonly type: { readonly kind: 'valueObject'; readonly name: 'Image' };
-        };
-        readonly embedding: {
-          readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/double@1' };
-          readonly many: true;
         };
       };
       readonly relations: Record<string, never>;
