@@ -1,18 +1,22 @@
 /**
- * TS contract factory for cipherstash-encrypted string columns.
+ * TS contract factories for cipherstash-encrypted columns.
  *
- * Counterpart to the PSL constructor `cipherstash.EncryptedString({...})`
- * registered in `../contract-authoring`. Both factories produce the same
- * `ColumnTypeDescriptor` shape so PSL- and TS-authored contracts emit
- * byte-identical `contract.json` (verified by the parity fixture under
- * `test/integration/test/authoring/parity/cipherstash-encrypted-string/`).
+ * Counterparts to the PSL constructors `cipherstash.Encrypted<Type>({...})`
+ * registered in `../contract-authoring`. The six factories
+ * (`encryptedString`, `encryptedDouble`, `encryptedBigInt`,
+ * `encryptedDate`, `encryptedBoolean`, `encryptedJson`) produce the
+ * same `ColumnTypeDescriptor` shape as their PSL counterparts, so
+ * PSL- and TS-authored contracts emit byte-identical `contract.json`.
+ * Pinned by the parity fixtures at
+ * `test/integration/test/authoring/parity/cipherstash-encrypted-{string,double,bigint,date,boolean,json}/`.
  *
- * Both flags default to `true` — searchable encryption is the
- * legitimate default for an extension whose entire reason for existing
- * is to make encrypted columns queryable. Users who want storage-only
- * encryption opt out explicitly: `encryptedString({ equality: false,
- * freeTextSearch: false })`. Mirrors the PSL constructor's `true`
- * defaults declared via `AuthoringArgRef.default`.
+ * Every search-mode flag defaults to `true` — searchable encryption
+ * is the legitimate default for an extension whose entire reason for
+ * existing is to make encrypted columns queryable. Users who want
+ * storage-only encryption opt out explicitly:
+ * `encryptedString({ equality: false, freeTextSearch: false, orderAndRange: false })`.
+ * Mirrors the PSL constructors' `true` defaults declared via
+ * `AuthoringArgRef.default`.
  */
 
 import {
