@@ -6,6 +6,7 @@
  *
  *   - `equality: true`        → `'unique'` index
  *   - `freeTextSearch: true`  → `'match'`  index
+ *   - `orderAndRange: true`   → `'ore'`    index (D6)
  *
  * The codec hook emits **one `add_search_config@v1` op per enabled
  * flag** (Decision option a) — each op is independently invertible by
@@ -112,6 +113,15 @@ describe('cipherstashStringCodecHooks.onFieldEvent — flag → index mapping', 
         `cipherstash-codec:${TABLE}.${FIELD}:add-search-config:match@v1`,
       );
       expect(ops[0]!.execute[0]!.sql).toContain(`'match'`);
+    });
+
+    it('emits add_search_config(ore) when typeParams.orderAndRange is true (D6)', () => {
+      const ops = onFieldEvent('added', ctx({ next: { typeParams: { orderAndRange: true } } }));
+      expect(ops).toHaveLength(1);
+      expect(ops[0]!.invariantId).toBe(
+        `cipherstash-codec:${TABLE}.${FIELD}:add-search-config:ore@v1`,
+      );
+      expect(ops[0]!.execute[0]!.sql).toContain(`'ore'`);
     });
 
     it('emits one op per enabled flag when both flags are true', () => {

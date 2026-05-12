@@ -218,9 +218,13 @@ describe('createParameterizedCodecDescriptors', () => {
       booleanDescriptor,
       jsonDescriptor,
     ] = createParameterizedCodecDescriptors(emptySdk());
-    expect(stringDescriptor?.renderOutputType?.({ equality: true, freeTextSearch: true })).toBe(
-      'EncryptedString',
-    );
+    expect(
+      stringDescriptor?.renderOutputType?.({
+        equality: true,
+        freeTextSearch: true,
+        orderAndRange: true,
+      }),
+    ).toBe('EncryptedString');
     expect(doubleDescriptor?.renderOutputType?.({ equality: true, orderAndRange: true })).toBe(
       'EncryptedDouble',
     );
@@ -234,21 +238,27 @@ describe('createParameterizedCodecDescriptors', () => {
     expect(jsonDescriptor?.renderOutputType?.({ searchableJson: true })).toBe('EncryptedJson');
   });
 
-  it('paramsSchema accepts { equality, freeTextSearch } booleans via Standard Schema', () => {
+  it('paramsSchema accepts { equality, freeTextSearch, orderAndRange } booleans via Standard Schema', () => {
     const result = encryptedStringParamsSchema['~standard'].validate({
       equality: true,
       freeTextSearch: false,
+      orderAndRange: true,
     });
     if (result instanceof Promise) throw new Error('expected synchronous validation');
     if (result.issues)
       throw new Error(`expected success, got issues: ${JSON.stringify(result.issues)}`);
-    expect(result.value).toEqual({ equality: true, freeTextSearch: false });
+    expect(result.value).toEqual({
+      equality: true,
+      freeTextSearch: false,
+      orderAndRange: true,
+    });
   });
 
   it('paramsSchema rejects non-boolean fields via Standard Schema', () => {
     const result = encryptedStringParamsSchema['~standard'].validate({
       equality: 'yes',
       freeTextSearch: false,
+      orderAndRange: true,
     });
     if (result instanceof Promise) throw new Error('expected synchronous validation');
     expect(result.issues?.length).toBeGreaterThan(0);
@@ -257,7 +267,11 @@ describe('createParameterizedCodecDescriptors', () => {
   it('factory(params)(ctx) yields the codec instance', () => {
     const sdk = emptySdk();
     const [descriptor] = createParameterizedCodecDescriptors(sdk);
-    const codecForInstance = descriptor!.factory({ equality: true, freeTextSearch: false })({
+    const codecForInstance = descriptor!.factory({
+      equality: true,
+      freeTextSearch: false,
+      orderAndRange: true,
+    })({
       name: 'User.email',
     });
     expect(codecForInstance.id).toBe(CIPHERSTASH_STRING_CODEC_ID);

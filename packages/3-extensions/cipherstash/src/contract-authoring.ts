@@ -46,6 +46,7 @@ export const cipherstashAuthoringTypes = {
           properties: {
             equality: { kind: 'boolean', optional: true },
             freeTextSearch: { kind: 'boolean', optional: true },
+            orderAndRange: { kind: 'boolean', optional: true },
           },
         },
       ],
@@ -58,6 +59,12 @@ export const cipherstashAuthoringTypes = {
             kind: 'arg',
             index: 0,
             path: ['freeTextSearch'],
+            default: true,
+          },
+          orderAndRange: {
+            kind: 'arg',
+            index: 0,
+            path: ['orderAndRange'],
             default: true,
           },
         },

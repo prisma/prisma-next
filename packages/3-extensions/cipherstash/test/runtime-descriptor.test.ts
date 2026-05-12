@@ -95,10 +95,18 @@ describe('createCipherstashRuntimeDescriptor — SDK isolation per descriptor', 
   it('produces a different codec instance per invocation so per-tenant SDKs do not cross-talk', () => {
     const a = createCipherstashRuntimeDescriptor({ sdk: emptySdk() });
     const b = createCipherstashRuntimeDescriptor({ sdk: emptySdk() });
-    const codecA = a.codecs?.()[0]?.factory({ equality: false, freeTextSearch: false })({
+    const codecA = a.codecs?.()[0]?.factory({
+      equality: false,
+      freeTextSearch: false,
+      orderAndRange: false,
+    })({
       name: 'x.y',
     });
-    const codecB = b.codecs?.()[0]?.factory({ equality: false, freeTextSearch: false })({
+    const codecB = b.codecs?.()[0]?.factory({
+      equality: false,
+      freeTextSearch: false,
+      orderAndRange: false,
+    })({
       name: 'x.y',
     });
     expect(codecA).not.toBe(codecB);

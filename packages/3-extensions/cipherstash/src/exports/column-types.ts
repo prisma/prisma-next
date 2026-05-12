@@ -26,12 +26,16 @@ import {
 } from '../extension-metadata/constants';
 
 /**
- * Search-mode parameters for `encryptedString({...})`. Both flags are
- * optional and default to `true` when omitted.
+ * Search-mode parameters for `encryptedString({...})`. Every flag is
+ * optional and defaults to `true` when omitted (per spec FR6 +
+ * D6 — `orderAndRange` joined the set in Project 2 to give string
+ * columns the same sortable / range-queryable surface the numeric +
+ * date codecs already had).
  */
 export interface EncryptedStringOptions {
   readonly equality?: boolean;
   readonly freeTextSearch?: boolean;
+  readonly orderAndRange?: boolean;
 }
 
 export interface EncryptedStringColumnDescriptor {
@@ -40,15 +44,16 @@ export interface EncryptedStringColumnDescriptor {
   readonly typeParams: {
     readonly equality: boolean;
     readonly freeTextSearch: boolean;
+    readonly orderAndRange: boolean;
   };
 }
 
 /**
- * `encryptedString({ equality?, freeTextSearch? })` — TS contract
- * factory that lowers to a `ColumnTypeDescriptor` with the
- * `cipherstash/string@1` codec and the `eql_v2_encrypted` Postgres
- * native type. The two boolean flags become `typeParams.equality` and
- * `typeParams.freeTextSearch`. Both default to `true`.
+ * `encryptedString({ equality?, freeTextSearch?, orderAndRange? })` —
+ * TS contract factory that lowers to a `ColumnTypeDescriptor` with
+ * the `cipherstash/string@1` codec and the `eql_v2_encrypted`
+ * Postgres native type. Each boolean flag becomes a `typeParams.*`
+ * slot; all default to `true`.
  *
  * The shape matches what the PSL constructor
  * `cipherstash.EncryptedString({...})` lowers to, byte-for-byte.
@@ -62,6 +67,7 @@ export function encryptedString(
     typeParams: {
       equality: options.equality ?? true,
       freeTextSearch: options.freeTextSearch ?? true,
+      orderAndRange: options.orderAndRange ?? true,
     },
   };
 }

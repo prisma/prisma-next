@@ -28,47 +28,63 @@ describe('cipherstash column-types', () => {
       });
     });
 
-    it('defaults both flags to true when called with no arguments', () => {
-      expect(encryptedString()).toMatchObject({
-        typeParams: { equality: true, freeTextSearch: true },
+    it('defaults all flags to true when called with no arguments', () => {
+      expect(encryptedString()).toEqual({
+        codecId: 'cipherstash/string@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: { equality: true, freeTextSearch: true, orderAndRange: true },
       });
     });
 
-    it('defaults both flags to true for an empty options object', () => {
-      expect(encryptedString({})).toMatchObject({
-        typeParams: { equality: true, freeTextSearch: true },
+    it('defaults all flags to true for an empty options object', () => {
+      expect(encryptedString({})).toEqual({
+        codecId: 'cipherstash/string@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: { equality: true, freeTextSearch: true, orderAndRange: true },
       });
     });
 
     it('lets equality be explicitly disabled', () => {
       expect(encryptedString({ equality: false })).toMatchObject({
-        typeParams: { equality: false, freeTextSearch: true },
+        typeParams: { equality: false, freeTextSearch: true, orderAndRange: true },
       });
     });
 
     it('lets freeTextSearch be explicitly disabled', () => {
       expect(encryptedString({ freeTextSearch: false })).toMatchObject({
-        typeParams: { equality: true, freeTextSearch: false },
+        typeParams: { equality: true, freeTextSearch: false, orderAndRange: true },
       });
     });
 
-    it('lets both flags be explicitly disabled (storage-only encryption)', () => {
-      expect(encryptedString({ equality: false, freeTextSearch: false })).toMatchObject({
-        typeParams: { equality: false, freeTextSearch: false },
+    it('lets orderAndRange be explicitly disabled (D6)', () => {
+      expect(encryptedString({ orderAndRange: false })).toMatchObject({
+        typeParams: { equality: true, freeTextSearch: true, orderAndRange: false },
       });
     });
 
-    it('preserves both flags when explicitly enabled', () => {
-      expect(encryptedString({ equality: true, freeTextSearch: true })).toMatchObject({
-        typeParams: { equality: true, freeTextSearch: true },
+    it('lets all flags be explicitly disabled (storage-only encryption)', () => {
+      expect(
+        encryptedString({ equality: false, freeTextSearch: false, orderAndRange: false }),
+      ).toMatchObject({
+        typeParams: { equality: false, freeTextSearch: false, orderAndRange: false },
+      });
+    });
+
+    it('preserves all flags when explicitly enabled', () => {
+      expect(
+        encryptedString({ equality: true, freeTextSearch: true, orderAndRange: true }),
+      ).toMatchObject({
+        typeParams: { equality: true, freeTextSearch: true, orderAndRange: true },
       });
     });
 
     it('returns a structurally equivalent descriptor to the PSL constructor lowering', () => {
-      expect(encryptedString({ equality: true, freeTextSearch: true })).toEqual({
+      expect(
+        encryptedString({ equality: true, freeTextSearch: true, orderAndRange: true }),
+      ).toEqual({
         codecId: 'cipherstash/string@1',
         nativeType: 'eql_v2_encrypted',
-        typeParams: { equality: true, freeTextSearch: true },
+        typeParams: { equality: true, freeTextSearch: true, orderAndRange: true },
       });
     });
   });

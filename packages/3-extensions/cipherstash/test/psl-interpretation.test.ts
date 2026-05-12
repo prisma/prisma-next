@@ -7,10 +7,11 @@
  * in the emitted contract, not about the descriptor template metadata.
  *
  * Pinned behaviour:
- *   - Full args lower to `typeParams { equality, freeTextSearch }`.
- *   - Empty `{}` (and the no-args form) defaults both flags to `true` —
+ *   - Full args lower to `typeParams { equality, freeTextSearch, orderAndRange }`.
+ *   - Empty `{}` (and the no-args form) defaults all three flags to `true` —
  *     searchable encryption is the legitimate default; users opt out
- *     explicitly with `equality: false` / `freeTextSearch: false`.
+ *     explicitly with `equality: false` / `freeTextSearch: false` /
+ *     `orderAndRange: false`.
  *   - `?` produces `nullable: true` on the column descriptor.
  *   - Unknown property name → `PSL_INVALID_ATTRIBUTE_ARGUMENT`.
  *   - Wrong type → `PSL_INVALID_ATTRIBUTE_ARGUMENT` mentioning
@@ -71,20 +72,22 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
   it('lowers full args to a column with codecId, nativeType, typeParams', () => {
     const result = interpret(`model User {
   id Int @id
-  email cipherstash.EncryptedString({ equality: true, freeTextSearch: true })
+  email cipherstash.EncryptedString({ equality: true, freeTextSearch: true, orderAndRange: true })
 }
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['user']?.columns['email']).toMatchObject({
-      codecId: 'cipherstash/string@1',
-      nativeType: 'eql_v2_encrypted',
-      typeParams: { equality: true, freeTextSearch: true },
-      nullable: false,
-    });
+    expect(asStorage(result.value.storage).tables['user']?.columns['email']).toEqual(
+      expect.objectContaining({
+        codecId: 'cipherstash/string@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: { equality: true, freeTextSearch: true, orderAndRange: true },
+        nullable: false,
+      }),
+    );
   });
 
-  it('defaults both flags to true for an empty options literal', () => {
+  it('defaults all flags to true for an empty options literal', () => {
     const result = interpret(`model User {
   id Int @id
   notes cipherstash.EncryptedString({})
@@ -92,15 +95,17 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toMatchObject({
-      codecId: 'cipherstash/string@1',
-      nativeType: 'eql_v2_encrypted',
-      typeParams: { equality: true, freeTextSearch: true },
-      nullable: false,
-    });
+    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toEqual(
+      expect.objectContaining({
+        codecId: 'cipherstash/string@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: { equality: true, freeTextSearch: true, orderAndRange: true },
+        nullable: false,
+      }),
+    );
   });
 
-  it('defaults both flags to true when called with no arguments', () => {
+  it('defaults all flags to true when called with no arguments', () => {
     const result = interpret(`model User {
   id Int @id
   notes cipherstash.EncryptedString()
@@ -108,12 +113,30 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toMatchObject({
-      codecId: 'cipherstash/string@1',
-      nativeType: 'eql_v2_encrypted',
-      typeParams: { equality: true, freeTextSearch: true },
-      nullable: false,
-    });
+    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toEqual(
+      expect.objectContaining({
+        codecId: 'cipherstash/string@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: { equality: true, freeTextSearch: true, orderAndRange: true },
+        nullable: false,
+      }),
+    );
+  });
+
+  it('lets orderAndRange be explicitly disabled (D6)', () => {
+    const result = interpret(`model User {
+  id Int @id
+  notes cipherstash.EncryptedString({ orderAndRange: false })
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['user']?.columns['notes']).toEqual(
+      expect.objectContaining({
+        codecId: 'cipherstash/string@1',
+        typeParams: { equality: true, freeTextSearch: true, orderAndRange: false },
+      }),
+    );
   });
 
   it('lets equality be explicitly disabled', () => {
@@ -167,7 +190,7 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
   it('rejects unknown argument names with PSL_INVALID_ATTRIBUTE_ARGUMENT', () => {
     const result = interpret(`model User {
   id Int @id
-  email cipherstash.EncryptedString({ orderAndRange: true })
+  email cipherstash.EncryptedString({ unknownFlag: true })
 }
 `);
     expect(result.ok).toBe(false);
@@ -176,7 +199,7 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
       expect.arrayContaining([
         expect.objectContaining({
           code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining('orderAndRange'),
+          message: expect.stringContaining('unknownFlag'),
         }),
       ]),
     );

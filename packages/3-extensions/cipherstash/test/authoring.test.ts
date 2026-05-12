@@ -33,7 +33,7 @@ describe('cipherstash pack authoring contributions', () => {
     });
   });
 
-  it('declares a single optional object argument with optional equality + freeTextSearch boolean properties', () => {
+  it('declares a single optional object argument with optional equality + freeTextSearch + orderAndRange boolean properties', () => {
     expect(cipherstashAuthoringTypes.cipherstash.EncryptedString).toMatchObject({
       kind: 'typeConstructor',
       args: [
@@ -43,13 +43,14 @@ describe('cipherstash pack authoring contributions', () => {
           properties: {
             equality: { kind: 'boolean', optional: true },
             freeTextSearch: { kind: 'boolean', optional: true },
+            orderAndRange: { kind: 'boolean', optional: true },
           },
         },
       ],
     });
   });
 
-  it('lowers to ColumnTypeDescriptor with codecId cipherstash/string@1 + nativeType eql_v2_encrypted, defaulting both flags to true', () => {
+  it('lowers to ColumnTypeDescriptor with codecId cipherstash/string@1 + nativeType eql_v2_encrypted, defaulting all flags to true', () => {
     expect(cipherstashAuthoringTypes.cipherstash.EncryptedString.output).toMatchObject({
       codecId: 'cipherstash/string@1',
       nativeType: 'eql_v2_encrypted',
@@ -59,6 +60,12 @@ describe('cipherstash pack authoring contributions', () => {
           kind: 'arg',
           index: 0,
           path: ['freeTextSearch'],
+          default: true,
+        },
+        orderAndRange: {
+          kind: 'arg',
+          index: 0,
+          path: ['orderAndRange'],
           default: true,
         },
       },

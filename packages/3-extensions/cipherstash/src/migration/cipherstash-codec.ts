@@ -45,6 +45,7 @@ export const cipherstashStringCodecHooks = makeCipherstashCodecHooks({
   flagToIndex: {
     equality: 'unique',
     freeTextSearch: 'match',
+    orderAndRange: 'ore',
   },
   castAs: 'text',
 });

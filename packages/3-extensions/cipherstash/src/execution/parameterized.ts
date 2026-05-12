@@ -21,7 +21,7 @@
  *
  * | Codec               | Params                              |
  * |---------------------|-------------------------------------|
- * | `cipherstash/string@1`  | `{ equality, freeTextSearch }`  |
+ * | `cipherstash/string@1`  | `{ equality, freeTextSearch, orderAndRange }` |
  * | `cipherstash/double@1`  | `{ equality, orderAndRange }`   |
  * | `cipherstash/bigint@1`  | `{ equality, orderAndRange }`   |
  * | `cipherstash/date@1`    | `{ equality, orderAndRange }`   |
@@ -60,6 +60,7 @@ import type { CipherstashSdk } from './sdk';
 export interface CipherstashStringParams {
   readonly equality: boolean;
   readonly freeTextSearch: boolean;
+  readonly orderAndRange: boolean;
 }
 
 export interface CipherstashNumericParams {
@@ -83,6 +84,7 @@ export interface CipherstashJsonParams {
 export const encryptedStringParamsSchema = arktype({
   equality: 'boolean',
   freeTextSearch: 'boolean',
+  orderAndRange: 'boolean',
 });
 
 export const encryptedDoubleParamsSchema = arktype({
