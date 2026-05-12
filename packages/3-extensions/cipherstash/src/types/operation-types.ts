@@ -42,9 +42,6 @@ type CodecTypesBase = Record<string, { readonly input: unknown; readonly output:
 const CIPHERSTASH_STRING_CODEC = 'cipherstash/string@1';
 type CipherstashStringCodec = typeof CIPHERSTASH_STRING_CODEC;
 
-const CIPHERSTASH_JSON_CODEC = 'cipherstash/json@1';
-type CipherstashJsonCodec = typeof CIPHERSTASH_JSON_CODEC;
-
 type PgBoolReturn = Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
 
 /**
@@ -77,6 +74,8 @@ type PgBoolReturn = Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
  */
 type EqualityTraits = readonly ['cipherstash:equality'];
 type OrderAndRangeTraits = readonly ['cipherstash:order-and-range'];
+type FreeTextSearchTraits = readonly ['cipherstash:free-text-search'];
+type SearchableJsonTraits = readonly ['cipherstash:searchable-json'];
 
 /**
  * Schematic constraint on `self` for a multi-codec cipherstash
@@ -129,11 +128,8 @@ export type QueryOperationTypes<CT extends CodecTypesBase> = CT extends CodecTyp
         ) => PgBoolReturn;
       };
       readonly cipherstashNotIlike: {
-        readonly self: { readonly codecId: CipherstashStringCodec };
-        readonly impl: (
-          self: CodecExpression<CipherstashStringCodec, boolean, CT>,
-          pattern: CodecExpression<'pg/text@1', boolean, CT>,
-        ) => PgBoolReturn;
+        readonly self: { readonly traits: FreeTextSearchTraits };
+        readonly impl: (self: AnyExpressionLike, pattern: string) => PgBoolReturn;
       };
       readonly cipherstashNe: {
         readonly self: { readonly traits: EqualityTraits };
@@ -172,11 +168,8 @@ export type QueryOperationTypes<CT extends CodecTypesBase> = CT extends CodecTyp
         readonly impl: (self: AnyExpressionLike, low: unknown, high: unknown) => PgBoolReturn;
       };
       readonly cipherstashJsonbPathExists: {
-        readonly self: { readonly codecId: CipherstashJsonCodec };
-        readonly impl: (
-          self: CodecExpression<CipherstashJsonCodec, boolean, CT>,
-          path: string,
-        ) => PgBoolReturn;
+        readonly self: { readonly traits: SearchableJsonTraits };
+        readonly impl: (self: AnyExpressionLike, path: string) => PgBoolReturn;
       };
     }
   : never;

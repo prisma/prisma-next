@@ -91,6 +91,8 @@ import {
   CIPHERSTASH_TRAIT_FREE_TEXT_SEARCH,
   CIPHERSTASH_TRAIT_ORDER_AND_RANGE,
   CIPHERSTASH_TRAIT_SEARCHABLE_JSON,
+  type CipherstashCodecId,
+  isCipherstashCodecId,
 } from '../extension-metadata/constants';
 import { EncryptedString, setHandleRoutingKey } from './envelope';
 import type { EncryptedEnvelopeBase } from './envelope-base';
@@ -148,43 +150,57 @@ function asEncryptedParam(selfAst: AnyExpression, columnCodecId: string, value: 
  * envelopes through unchanged. The error message lists the expected
  * plaintext type per codec so a user passing the wrong shape gets a
  * specific diagnostic at the call site.
+ *
+ * Dispatch is via a `Record<CipherstashCodecId, ...>` map so adding
+ * a new cipherstash codec id (which extends the closed
+ * {@link CipherstashCodecId} union) becomes a compile-time error
+ * here until the new branch is wired — closing off the runtime-only
+ * failure mode the previous if-chain shape tolerated.
  */
-function coerceToEnvelope(columnCodecId: string, value: unknown): EncryptedEnvelopeBase<unknown> {
-  if (columnCodecId === CIPHERSTASH_STRING_CODEC_ID) {
+type EnvelopeCoercer = (value: unknown) => EncryptedEnvelopeBase<unknown>;
+
+const ENVELOPE_COERCERS: Readonly<Record<CipherstashCodecId, EnvelopeCoercer>> = {
+  [CIPHERSTASH_STRING_CODEC_ID]: (value) => {
     if (value instanceof EncryptedString) return value;
     if (typeof value === 'string') return EncryptedString.from(value);
     throw envelopeTypeError('EncryptedString', 'string', value);
-  }
-  if (columnCodecId === CIPHERSTASH_DOUBLE_CODEC_ID) {
+  },
+  [CIPHERSTASH_DOUBLE_CODEC_ID]: (value) => {
     if (value instanceof EncryptedDouble) return value;
     if (typeof value === 'number') return EncryptedDouble.from(value);
     throw envelopeTypeError('EncryptedDouble', 'number', value);
-  }
-  if (columnCodecId === CIPHERSTASH_BIGINT_CODEC_ID) {
+  },
+  [CIPHERSTASH_BIGINT_CODEC_ID]: (value) => {
     if (value instanceof EncryptedBigInt) return value;
     if (typeof value === 'bigint') return EncryptedBigInt.from(value);
     throw envelopeTypeError('EncryptedBigInt', 'bigint', value);
-  }
-  if (columnCodecId === CIPHERSTASH_DATE_CODEC_ID) {
+  },
+  [CIPHERSTASH_DATE_CODEC_ID]: (value) => {
     if (value instanceof EncryptedDate) return value;
     if (value instanceof Date) return EncryptedDate.from(value);
     throw envelopeTypeError('EncryptedDate', 'Date', value);
-  }
-  if (columnCodecId === CIPHERSTASH_BOOLEAN_CODEC_ID) {
+  },
+  [CIPHERSTASH_BOOLEAN_CODEC_ID]: (value) => {
     if (value instanceof EncryptedBoolean) return value;
     if (typeof value === 'boolean') return EncryptedBoolean.from(value);
     throw envelopeTypeError('EncryptedBoolean', 'boolean', value);
-  }
-  if (columnCodecId === CIPHERSTASH_JSON_CODEC_ID) {
+  },
+  [CIPHERSTASH_JSON_CODEC_ID]: (value) => {
     if (value instanceof EncryptedJson) return value;
     return EncryptedJson.from(value);
+  },
+};
+
+function coerceToEnvelope(columnCodecId: string, value: unknown): EncryptedEnvelopeBase<unknown> {
+  if (!isCipherstashCodecId(columnCodecId)) {
+    throw new Error(
+      `cipherstash operator: column codec id "${columnCodecId}" is not a cipherstash codec; ` +
+        'this operator should not be reachable on a non-cipherstash column. ' +
+        'If you see this error, the operator-registry trait dispatch is wired against a ' +
+        'codec that should not advertise the cipherstash trait. File a bug against the package.',
+    );
   }
-  throw new Error(
-    `cipherstash operator: column codec id "${columnCodecId}" is not a cipherstash codec; ` +
-      'this operator should not be reachable on a non-cipherstash column. ' +
-      'If you see this error, the operator-registry trait dispatch is wired against a ' +
-      'codec that should not advertise the cipherstash trait. File a bug against the package.',
-  );
+  return ENVELOPE_COERCERS[columnCodecId](value);
 }
 
 function envelopeTypeError(envelopeType: string, expected: string, value: unknown): TypeError {
