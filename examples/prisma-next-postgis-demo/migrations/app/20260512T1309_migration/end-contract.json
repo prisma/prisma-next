@@ -1,0 +1,352 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "roots": {
+    "cafe": "Cafe",
+    "neighborhood": "Neighborhood",
+    "route": "Route"
+  },
+  "models": {
+    "Cafe": {
+      "fields": {
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "location": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/geometry@1",
+            "kind": "scalar"
+          }
+        },
+        "name": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "fields": {
+          "id": {
+            "column": "id"
+          },
+          "location": {
+            "column": "location"
+          },
+          "name": {
+            "column": "name"
+          }
+        },
+        "table": "cafe"
+      }
+    },
+    "Neighborhood": {
+      "fields": {
+        "boundary": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/geometry@1",
+            "kind": "scalar"
+          }
+        },
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "name": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "fields": {
+          "boundary": {
+            "column": "boundary"
+          },
+          "id": {
+            "column": "id"
+          },
+          "name": {
+            "column": "name"
+          }
+        },
+        "table": "neighborhood"
+      }
+    },
+    "Route": {
+      "fields": {
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "name": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "path": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/geometry@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "fields": {
+          "id": {
+            "column": "id"
+          },
+          "name": {
+            "column": "name"
+          },
+          "path": {
+            "column": "path"
+          }
+        },
+        "table": "route"
+      }
+    }
+  },
+  "storage": {
+    "storageHash": "sha256:a4d4a44c54bf14eed68d613d1cff97649a3f1fe617345839d968aad16a901221",
+    "tables": {
+      "cafe": {
+        "columns": {
+          "id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          },
+          "location": {
+            "codecId": "pg/geometry@1",
+            "nativeType": "geometry",
+            "nullable": false,
+            "typeRef": "WgsGeometry"
+          },
+          "name": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "neighborhood": {
+        "columns": {
+          "boundary": {
+            "codecId": "pg/geometry@1",
+            "nativeType": "geometry",
+            "nullable": false,
+            "typeRef": "WgsGeometry"
+          },
+          "id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          },
+          "name": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "route": {
+        "columns": {
+          "id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          },
+          "name": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "path": {
+            "codecId": "pg/geometry@1",
+            "nativeType": "geometry",
+            "nullable": false,
+            "typeRef": "WgsGeometry"
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      }
+    },
+    "types": {
+      "WgsGeometry": {
+        "codecId": "pg/geometry@1",
+        "nativeType": "geometry",
+        "typeParams": {
+          "srid": 4326
+        }
+      }
+    }
+  },
+  "execution": {
+    "executionHash": "sha256:815d2a9f2f35488d3bb0aeba687849e2475b621c331c1d27ad79e37b6e56182f",
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "cafe"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "neighborhood"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "route"
+          }
+        }
+      ]
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "postgis.geometry": true,
+      "returning": true
+    },
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "returning": true
+    }
+  },
+  "extensionPacks": {
+    "postgis": {
+      "capabilities": {
+        "postgres": {
+          "postgis.geometry": true
+        }
+      },
+      "familyId": "sql",
+      "id": "postgis",
+      "kind": "extension",
+      "targetId": "postgres",
+      "types": {
+        "codecTypes": {
+          "import": {
+            "alias": "PostgisTypes",
+            "named": "CodecTypes",
+            "package": "@prisma-next/extension-postgis/codec-types"
+          },
+          "typeImports": [
+            {
+              "alias": "Geometry",
+              "named": "Geometry",
+              "package": "@prisma-next/extension-postgis/codec-types"
+            }
+          ]
+        },
+        "queryOperationTypes": {
+          "import": {
+            "alias": "PostgisQueryOperationTypes",
+            "named": "QueryOperationTypes",
+            "package": "@prisma-next/extension-postgis/operation-types"
+          }
+        },
+        "storage": [
+          {
+            "familyId": "sql",
+            "nativeType": "geometry",
+            "targetId": "postgres",
+            "typeId": "pg/geometry@1"
+          }
+        ]
+      },
+      "version": "0.0.1"
+    }
+  },
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}
