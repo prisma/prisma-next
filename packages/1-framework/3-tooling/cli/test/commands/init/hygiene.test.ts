@@ -261,6 +261,15 @@ describe('ensureEsmModuleType (TML-2494)', () => {
     expect(warning).toContain('module');
   });
 
+  it('normalises a non-string "type" (e.g. null) to "module" without leaving the bogus value', () => {
+    const pkg = JSON.stringify({ name: 'app', type: null }, null, 2);
+    const { content, warning } = ensureEsmModuleType(pkg);
+    expect(warning).toBeNull();
+    expect(content).not.toBeNull();
+    const parsed = JSON.parse(content ?? '');
+    expect(parsed.type).toBe('module');
+  });
+
   it('preserves the trailing newline if the input had one', () => {
     const pkg = `${JSON.stringify({ name: 'app' }, null, 2)}\n`;
     const { content } = ensureEsmModuleType(pkg);
