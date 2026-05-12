@@ -24,7 +24,12 @@
  */
 
 import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
-import { CIPHERSTASH_STRING_CODEC_ID, EQL_V2_ENCRYPTED_TYPE } from './extension-metadata/constants';
+import {
+  CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_STRING_CODEC_ID,
+  EQL_V2_ENCRYPTED_TYPE,
+} from './extension-metadata/constants';
 
 export const cipherstashAuthoringTypes = {
   cipherstash: {
@@ -50,6 +55,60 @@ export const cipherstashAuthoringTypes = {
             kind: 'arg',
             index: 0,
             path: ['freeTextSearch'],
+            default: true,
+          },
+        },
+      },
+    },
+    EncryptedDouble: {
+      kind: 'typeConstructor',
+      args: [
+        {
+          kind: 'object',
+          name: 'options',
+          optional: true,
+          properties: {
+            equality: { kind: 'boolean', optional: true },
+            orderAndRange: { kind: 'boolean', optional: true },
+          },
+        },
+      ],
+      output: {
+        codecId: CIPHERSTASH_DOUBLE_CODEC_ID,
+        nativeType: EQL_V2_ENCRYPTED_TYPE,
+        typeParams: {
+          equality: { kind: 'arg', index: 0, path: ['equality'], default: true },
+          orderAndRange: {
+            kind: 'arg',
+            index: 0,
+            path: ['orderAndRange'],
+            default: true,
+          },
+        },
+      },
+    },
+    EncryptedBigInt: {
+      kind: 'typeConstructor',
+      args: [
+        {
+          kind: 'object',
+          name: 'options',
+          optional: true,
+          properties: {
+            equality: { kind: 'boolean', optional: true },
+            orderAndRange: { kind: 'boolean', optional: true },
+          },
+        },
+      ],
+      output: {
+        codecId: CIPHERSTASH_BIGINT_CODEC_ID,
+        nativeType: EQL_V2_ENCRYPTED_TYPE,
+        typeParams: {
+          equality: { kind: 'arg', index: 0, path: ['equality'], default: true },
+          orderAndRange: {
+            kind: 'arg',
+            index: 0,
+            path: ['orderAndRange'],
             default: true,
           },
         },

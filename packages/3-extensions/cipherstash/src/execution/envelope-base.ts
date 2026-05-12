@@ -66,6 +66,29 @@ export interface EncryptedEnvelopeFromInternalArgs {
 
 const REDACTED = '[REDACTED]';
 
+/**
+ * Placeholder shape returned by `JSON.stringify(envelope)` for every
+ * concrete envelope. The marker key is derived from the subclass's
+ * `typeName` (e.g. `EncryptedString` → `$encryptedString`,
+ * `EncryptedDouble` → `$encryptedDouble`) so each codec carries a
+ * distinct, machine-recognisable signature in serialised payloads.
+ *
+ * Resolves the AC-ENV4 vs AC-ENV5 tension: the four other coercion
+ * paths (`toString` / `valueOf` / `[Symbol.toPrimitive]` /
+ * `[Symbol.for('nodejs.util.inspect.custom')]`) keep returning the
+ * literal `[REDACTED]` string for AC-ENV4; only `toJSON` returns the
+ * per-type placeholder object so `JSON.stringify` renders the
+ * marker shape AC-ENV5 mandates.
+ */
+export interface EncryptedEnvelopePlaceholder {
+  readonly [marker: `$${string}`]: '<opaque>';
+}
+
+function placeholderFor(typeName: string): EncryptedEnvelopePlaceholder {
+  const marker = `$${typeName.charAt(0).toLowerCase()}${typeName.slice(1)}` as const;
+  return { [marker]: '<opaque>' } as unknown as EncryptedEnvelopePlaceholder;
+}
+
 export abstract class EncryptedEnvelopeBase<T> {
   readonly #handle: EncryptedEnvelopeHandle<T>;
 
@@ -155,8 +178,8 @@ export abstract class EncryptedEnvelopeBase<T> {
     return plaintext;
   }
 
-  toJSON(): string {
-    return REDACTED;
+  toJSON(): EncryptedEnvelopePlaceholder {
+    return placeholderFor(this.typeName);
   }
 
   toString(): string {

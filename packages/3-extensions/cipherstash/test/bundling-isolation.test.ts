@@ -54,10 +54,14 @@ const ENTRY_FILES = ['control.mjs', 'runtime.mjs', 'middleware.mjs'] as const;
  */
 const CONTROL_FORBIDDEN = [
   'EncryptedString',
+  'EncryptedDouble',
+  'EncryptedBigInt',
   'setHandleCiphertext',
   'CipherstashSdk',
   'bulkEncryptMiddleware',
   'createCipherstashStringCodec',
+  'createCipherstashDoubleCodec',
+  'createCipherstashBigIntCodec',
   'createCipherstashRuntimeDescriptor',
 ] as const;
 
@@ -74,6 +78,8 @@ const RUNTIME_FORBIDDEN = [
   'cipherstashBaselineMigration',
   'cipherstashHeadRef',
   'cipherstashStringCodecHooks',
+  'cipherstashDoubleCodecHooks',
+  'cipherstashBigIntCodecHooks',
   'add_search_config',
   'remove_search_config',
 ] as const;

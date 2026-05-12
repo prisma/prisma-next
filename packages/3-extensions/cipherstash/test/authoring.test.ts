@@ -73,4 +73,73 @@ describe('cipherstash pack authoring contributions', () => {
       nativeType: 'eql_v2_encrypted',
     });
   });
+
+  describe('cipherstash.EncryptedDouble', () => {
+    it('exposes EncryptedDouble as a namespaced type constructor', () => {
+      expect(cipherstashPack.authoring?.type).toMatchObject({
+        cipherstash: { EncryptedDouble: { kind: 'typeConstructor' } },
+      });
+    });
+
+    it('declares { equality, orderAndRange } booleans, defaulting both to true', () => {
+      expect(cipherstashAuthoringTypes.cipherstash.EncryptedDouble).toMatchObject({
+        kind: 'typeConstructor',
+        args: [
+          {
+            kind: 'object',
+            optional: true,
+            properties: {
+              equality: { kind: 'boolean', optional: true },
+              orderAndRange: { kind: 'boolean', optional: true },
+            },
+          },
+        ],
+      });
+      expect(cipherstashAuthoringTypes.cipherstash.EncryptedDouble.output).toMatchObject({
+        codecId: 'cipherstash/double@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: {
+          equality: { kind: 'arg', index: 0, path: ['equality'], default: true },
+          orderAndRange: { kind: 'arg', index: 0, path: ['orderAndRange'], default: true },
+        },
+      });
+    });
+
+    it('registers the cipherstash/double@1 storage type', () => {
+      expect(cipherstashPack.types?.storage).toContainEqual({
+        typeId: 'cipherstash/double@1',
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: 'eql_v2_encrypted',
+      });
+    });
+  });
+
+  describe('cipherstash.EncryptedBigInt', () => {
+    it('exposes EncryptedBigInt as a namespaced type constructor', () => {
+      expect(cipherstashPack.authoring?.type).toMatchObject({
+        cipherstash: { EncryptedBigInt: { kind: 'typeConstructor' } },
+      });
+    });
+
+    it('lowers to ColumnTypeDescriptor with codecId cipherstash/bigint@1, defaulting both flags to true', () => {
+      expect(cipherstashAuthoringTypes.cipherstash.EncryptedBigInt.output).toMatchObject({
+        codecId: 'cipherstash/bigint@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: {
+          equality: { kind: 'arg', index: 0, path: ['equality'], default: true },
+          orderAndRange: { kind: 'arg', index: 0, path: ['orderAndRange'], default: true },
+        },
+      });
+    });
+
+    it('registers the cipherstash/bigint@1 storage type', () => {
+      expect(cipherstashPack.types?.storage).toContainEqual({
+        typeId: 'cipherstash/bigint@1',
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: 'eql_v2_encrypted',
+      });
+    });
+  });
 });

@@ -12,14 +12,24 @@ import type { SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CIPHERSTASH_STRING_CODEC_ID,
+  createCipherstashBigIntCodec,
+  createCipherstashDoubleCodec,
   createCipherstashStringCodec,
 } from '../src/execution/codec-runtime';
 import { EncryptedString, setHandleCiphertext } from '../src/execution/envelope';
+import { EncryptedBigInt } from '../src/execution/envelope-bigint';
+import { EncryptedDouble } from '../src/execution/envelope-double';
 import {
   createParameterizedCodecDescriptors,
+  encryptedBigIntParamsSchema,
+  encryptedDoubleParamsSchema,
   encryptedStringParamsSchema,
 } from '../src/execution/parameterized';
 import type { CipherstashSdk } from '../src/execution/sdk';
+import {
+  CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_DOUBLE_CODEC_ID,
+} from '../src/extension-metadata/constants';
 
 function emptySdk(): CipherstashSdk {
   return {
@@ -166,18 +176,37 @@ describe('eql_v2_encrypted wire-format round-trip — wire-format fix', () => {
 });
 
 describe('createParameterizedCodecDescriptors', () => {
-  it('exposes a single descriptor for cipherstash/string@1', () => {
+  // R3 wires three descriptors (string + double + bigint). R4 will
+  // grow this to six (adds date / boolean / json). The full-six
+  // assertion (AC-CODEC2) lands with R4; for now we pin the
+  // current-state count + ordering so a missed wiring surfaces here.
+  it('exposes the cipherstash/{string,double,bigint}@1 descriptors in stable order', () => {
     const descriptors = createParameterizedCodecDescriptors(emptySdk());
-    expect(descriptors).toHaveLength(1);
-    const [descriptor] = descriptors;
-    expect(descriptor?.codecId).toBe(CIPHERSTASH_STRING_CODEC_ID);
-    expect(descriptor?.targetTypes).toEqual(['eql_v2_encrypted']);
-    // No codec traits — see the `declares no codec traits` test
-    // above for the rationale (mirrors the runtime codec`s trait
-    // declaration so contract emit and runtime agree).
-    expect(descriptor?.traits).toEqual([]);
-    expect(descriptor?.renderOutputType?.({ equality: true, freeTextSearch: true })).toBe(
+    expect(descriptors).toHaveLength(3);
+    expect(descriptors.map((d) => d.codecId)).toEqual([
+      CIPHERSTASH_STRING_CODEC_ID,
+      CIPHERSTASH_DOUBLE_CODEC_ID,
+      CIPHERSTASH_BIGINT_CODEC_ID,
+    ]);
+    for (const descriptor of descriptors) {
+      expect(descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
+      // No codec traits — see the `declares no codec traits` test
+      // above for the rationale.
+      expect(descriptor.traits).toEqual([]);
+    }
+  });
+
+  it('renderOutputType returns the per-codec envelope class name', () => {
+    const [stringDescriptor, doubleDescriptor, bigIntDescriptor] =
+      createParameterizedCodecDescriptors(emptySdk());
+    expect(stringDescriptor?.renderOutputType?.({ equality: true, freeTextSearch: true })).toBe(
       'EncryptedString',
+    );
+    expect(doubleDescriptor?.renderOutputType?.({ equality: true, orderAndRange: true })).toBe(
+      'EncryptedDouble',
+    );
+    expect(bigIntDescriptor?.renderOutputType?.({ equality: true, orderAndRange: true })).toBe(
+      'EncryptedBigInt',
     );
   });
 
@@ -208,5 +237,67 @@ describe('createParameterizedCodecDescriptors', () => {
       name: 'User.email',
     });
     expect(codecForInstance.id).toBe(CIPHERSTASH_STRING_CODEC_ID);
+  });
+
+  it('numeric paramsSchemas accept { equality, orderAndRange } booleans via Standard Schema', () => {
+    for (const schema of [encryptedDoubleParamsSchema, encryptedBigIntParamsSchema]) {
+      const ok = schema['~standard'].validate({ equality: true, orderAndRange: false });
+      if (ok instanceof Promise) throw new Error('expected synchronous validation');
+      if (ok.issues) throw new Error(`expected success, got issues: ${JSON.stringify(ok.issues)}`);
+      expect(ok.value).toEqual({ equality: true, orderAndRange: false });
+
+      const bad = schema['~standard'].validate({ equality: 'yes', orderAndRange: true });
+      if (bad instanceof Promise) throw new Error('expected synchronous validation');
+      expect(bad.issues?.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('createCipherstashDoubleCodec — registration shape', () => {
+  it('uses cipherstash/double@1 as the codec id and targets eql_v2_encrypted', () => {
+    const codec = createCipherstashDoubleCodec(emptySdk());
+    expect(codec.id).toBe(CIPHERSTASH_DOUBLE_CODEC_ID);
+    expect(codec.descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
+    expect(codec.descriptor.traits).toEqual([]);
+    expect(codec.descriptor.renderOutputType?.({})).toBe('EncryptedDouble');
+  });
+
+  it('encode → decode round-trip preserves the ciphertext through the composite text format', async () => {
+    const sdk = emptySdk();
+    const codec = createCipherstashDoubleCodec(sdk);
+    const payload = { c: 'numeric-cipher', i: { t: 'metric', c: 'value' }, v: 2 };
+    const envelope = EncryptedDouble.from(3.14);
+    // The base's `setHandleCiphertext` helper accepts any envelope
+    // subclass; we re-use the string export as it's the same generic
+    // helper. (envelope.ts re-exports it; the function itself lives
+    // in envelope-base.ts and is generic over `T`.)
+    setHandleCiphertext(envelope, payload);
+
+    const wire = await codec.encode(envelope, ctxWithoutColumn);
+    const decoded = await codec.decode(wire as string, ctxWithColumn('metric', 'value'));
+    expect(decoded).toBeInstanceOf(EncryptedDouble);
+    expect(decoded.expose().ciphertext).toEqual(payload);
+  });
+});
+
+describe('createCipherstashBigIntCodec — registration shape', () => {
+  it('uses cipherstash/bigint@1 as the codec id and targets eql_v2_encrypted', () => {
+    const codec = createCipherstashBigIntCodec(emptySdk());
+    expect(codec.id).toBe(CIPHERSTASH_BIGINT_CODEC_ID);
+    expect(codec.descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
+    expect(codec.descriptor.traits).toEqual([]);
+    expect(codec.descriptor.renderOutputType?.({})).toBe('EncryptedBigInt');
+  });
+
+  it('encode → decode round-trip preserves the ciphertext', async () => {
+    const sdk = emptySdk();
+    const codec = createCipherstashBigIntCodec(sdk);
+    const payload = { c: 'bigint-cipher', i: { t: 'ledger', c: 'amount' } };
+    const envelope = EncryptedBigInt.from(42n);
+    setHandleCiphertext(envelope, payload);
+    const wire = await codec.encode(envelope, ctxWithoutColumn);
+    const decoded = await codec.decode(wire as string, ctxWithColumn('ledger', 'amount'));
+    expect(decoded).toBeInstanceOf(EncryptedBigInt);
+    expect(decoded.expose().ciphertext).toEqual(payload);
   });
 });

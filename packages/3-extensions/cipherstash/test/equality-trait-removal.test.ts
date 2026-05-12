@@ -52,12 +52,13 @@ describe('cipherstash codec: no `equality` trait', () => {
     expect(codec.descriptor.traits ?? []).not.toContain('equality');
   });
 
-  it('parameterized codec descriptor (the one the runtime consumes for dispatch) declares an empty traits list', () => {
+  it('parameterized codec descriptors (the ones the runtime consumes for dispatch) declare an empty traits list', () => {
     const descriptors = createParameterizedCodecDescriptors(emptySdk());
-    expect(descriptors).toHaveLength(1);
-    const [only] = descriptors;
-    expect(only?.traits).toEqual([]);
-    expect(only?.traits ?? []).not.toContain('equality');
+    expect(descriptors.length).toBeGreaterThan(0);
+    for (const descriptor of descriptors) {
+      expect(descriptor.traits).toEqual([]);
+      expect(descriptor.traits ?? []).not.toContain('equality');
+    }
   });
 
   it('SDK-free pack-meta codec metadata declares an empty traits list', () => {
@@ -65,13 +66,16 @@ describe('cipherstash codec: no `equality` trait', () => {
     expect(cipherstashStringCodecMetadata.descriptor.traits ?? []).not.toContain('equality');
   });
 
-  it('the three trait declarations agree (runtime / parameterized / pack-meta)', () => {
+  it('the three trait declarations agree (runtime / parameterized / pack-meta) for the string codec', () => {
     // If these three diverge, contract emit (which reads pack-meta) and
     // the runtime (which reads the parameterized descriptor) will
     // disagree about which built-in operations are reachable on
     // cipherstash columns. They must always be identical.
     const runtime = createCipherstashStringCodec(emptySdk()).descriptor.traits ?? [];
-    const parameterized = createParameterizedCodecDescriptors(emptySdk())[0]?.traits ?? [];
+    const parameterized =
+      createParameterizedCodecDescriptors(emptySdk()).find(
+        (d) => d.codecId === 'cipherstash/string@1',
+      )?.traits ?? [];
     const packMeta = cipherstashStringCodecMetadata.descriptor.traits ?? [];
     expect([...runtime].sort()).toEqual([...parameterized].sort());
     expect([...runtime].sort()).toEqual([...packMeta].sort());

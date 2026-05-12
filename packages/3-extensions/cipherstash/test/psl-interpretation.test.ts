@@ -278,3 +278,111 @@ model User {
     });
   });
 });
+
+describe('PSL interpretation: cipherstash.EncryptedDouble constructor', () => {
+  it('lowers full args to a column with cipherstash/double@1 codec, eql_v2_encrypted nativeType', () => {
+    const result = interpret(`model Metric {
+  id Int @id
+  value cipherstash.EncryptedDouble({ equality: true, orderAndRange: true })
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['metric']?.columns['value']).toMatchObject({
+      codecId: 'cipherstash/double@1',
+      nativeType: 'eql_v2_encrypted',
+      typeParams: { equality: true, orderAndRange: true },
+      nullable: false,
+    });
+  });
+
+  it('defaults both flags to true for an empty options literal', () => {
+    const result = interpret(`model Metric {
+  id Int @id
+  value cipherstash.EncryptedDouble({})
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['metric']?.columns['value']).toMatchObject({
+      codecId: 'cipherstash/double@1',
+      typeParams: { equality: true, orderAndRange: true },
+    });
+  });
+
+  it('rejects unknown argument names with PSL_INVALID_ATTRIBUTE_ARGUMENT', () => {
+    const result = interpret(`model Metric {
+  id Int @id
+  value cipherstash.EncryptedDouble({ freeTextSearch: true })
+}
+`);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining('freeTextSearch'),
+        }),
+      ]),
+    );
+  });
+
+  it('produces an inline-form descriptor structurally identical to the TS factory output', () => {
+    const result = interpret(`model Metric {
+  id Int @id
+  value cipherstash.EncryptedDouble({ equality: true, orderAndRange: false })
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const col = asStorage(result.value.storage).tables['metric']?.columns['value'];
+    // Stripping `nullable` (PSL-specific) the column descriptor mirrors
+    // the TS factory's lowered shape byte-for-byte (parity AC-AUTH2).
+    expect(col).toMatchObject({
+      codecId: 'cipherstash/double@1',
+      nativeType: 'eql_v2_encrypted',
+      typeParams: { equality: true, orderAndRange: false },
+    });
+  });
+});
+
+describe('PSL interpretation: cipherstash.EncryptedBigInt constructor', () => {
+  it('lowers full args to a column with cipherstash/bigint@1 codec, eql_v2_encrypted nativeType', () => {
+    const result = interpret(`model Ledger {
+  id Int @id
+  amount cipherstash.EncryptedBigInt({ equality: true, orderAndRange: true })
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['ledger']?.columns['amount']).toMatchObject({
+      codecId: 'cipherstash/bigint@1',
+      nativeType: 'eql_v2_encrypted',
+      typeParams: { equality: true, orderAndRange: true },
+    });
+  });
+
+  it('defaults both flags to true with no arguments', () => {
+    const result = interpret(`model Ledger {
+  id Int @id
+  amount cipherstash.EncryptedBigInt()
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['ledger']?.columns['amount']).toMatchObject({
+      codecId: 'cipherstash/bigint@1',
+      typeParams: { equality: true, orderAndRange: true },
+    });
+  });
+
+  it('rejects unknown argument names with PSL_INVALID_ATTRIBUTE_ARGUMENT', () => {
+    const result = interpret(`model Ledger {
+  id Int @id
+  amount cipherstash.EncryptedBigInt({ freeTextSearch: true })
+}
+`);
+    expect(result.ok).toBe(false);
+  });
+});

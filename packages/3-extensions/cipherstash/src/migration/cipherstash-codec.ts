@@ -31,7 +31,11 @@
  * from a `text` plaintext.
  */
 
-import { CIPHERSTASH_STRING_CODEC_ID } from '../extension-metadata/constants';
+import {
+  CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_STRING_CODEC_ID,
+} from '../extension-metadata/constants';
 import { makeCipherstashCodecHooks } from './codec-hooks-factory';
 
 export const cipherstashStringCodecHooks = makeCipherstashCodecHooks({
@@ -42,5 +46,28 @@ export const cipherstashStringCodecHooks = makeCipherstashCodecHooks({
   castAs: 'text',
 });
 
-/** Re-export the codec id alongside the hooks so wiring sites import them together. */
-export { CIPHERSTASH_STRING_CODEC_ID };
+/**
+ * Codec lifecycle hooks for `cipherstash/double@1`. The numeric codecs
+ * share the `{ equality, orderAndRange }` flag set and differ only in
+ * `cast_as` (`double` vs `big_int`). See spec D2 for the codec id
+ * naming rationale.
+ */
+export const cipherstashDoubleCodecHooks = makeCipherstashCodecHooks({
+  flagToIndex: {
+    equality: 'unique',
+    orderAndRange: 'ore',
+  },
+  castAs: 'double',
+});
+
+/** Codec lifecycle hooks for `cipherstash/bigint@1`. */
+export const cipherstashBigIntCodecHooks = makeCipherstashCodecHooks({
+  flagToIndex: {
+    equality: 'unique',
+    orderAndRange: 'ore',
+  },
+  castAs: 'big_int',
+});
+
+/** Re-export the codec ids alongside the hooks so wiring sites import them together. */
+export { CIPHERSTASH_BIGINT_CODEC_ID, CIPHERSTASH_DOUBLE_CODEC_ID, CIPHERSTASH_STRING_CODEC_ID };

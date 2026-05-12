@@ -22,8 +22,14 @@
  */
 
 import { cipherstashAuthoringTypes } from '../contract-authoring';
-import { cipherstashStringCodecMetadata } from './codec-metadata';
 import {
+  cipherstashBigIntCodecMetadata,
+  cipherstashDoubleCodecMetadata,
+  cipherstashStringCodecMetadata,
+} from './codec-metadata';
+import {
+  CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_DOUBLE_CODEC_ID,
   CIPHERSTASH_EXTENSION_VERSION,
   CIPHERSTASH_SPACE_ID,
   CIPHERSTASH_STRING_CODEC_ID,
@@ -43,17 +49,32 @@ export const cipherstashPackMeta = {
   },
   types: {
     codecTypes: {
-      codecInstances: [cipherstashStringCodecMetadata],
-      // `renderOutputType` returns the bare type name `EncryptedString`
-      // for parameterized cipherstash columns; the contract emitter
-      // needs to import the type alongside that occurrence so the
-      // generated `.d.ts` typechecks cleanly. Mirrors pgvector's
-      // `Vector` typeImports declaration.
+      codecInstances: [
+        cipherstashStringCodecMetadata,
+        cipherstashDoubleCodecMetadata,
+        cipherstashBigIntCodecMetadata,
+      ],
+      // `renderOutputType` returns the bare envelope type name (e.g.
+      // `EncryptedString`, `EncryptedDouble`) for parameterized
+      // cipherstash columns; the contract emitter needs to import each
+      // type alongside its occurrence so the generated `.d.ts`
+      // typechecks cleanly. Mirrors pgvector's `Vector` typeImports
+      // declaration.
       typeImports: [
         {
           package: '@prisma-next/extension-cipherstash/runtime',
           named: 'EncryptedString',
           alias: 'EncryptedString',
+        },
+        {
+          package: '@prisma-next/extension-cipherstash/runtime',
+          named: 'EncryptedDouble',
+          alias: 'EncryptedDouble',
+        },
+        {
+          package: '@prisma-next/extension-cipherstash/runtime',
+          named: 'EncryptedBigInt',
+          alias: 'EncryptedBigInt',
         },
       ],
     },
@@ -67,6 +88,18 @@ export const cipherstashPackMeta = {
     storage: [
       {
         typeId: CIPHERSTASH_STRING_CODEC_ID,
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: EQL_V2_ENCRYPTED_TYPE,
+      },
+      {
+        typeId: CIPHERSTASH_DOUBLE_CODEC_ID,
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: EQL_V2_ENCRYPTED_TYPE,
+      },
+      {
+        typeId: CIPHERSTASH_BIGINT_CODEC_ID,
         familyId: 'sql',
         targetId: 'postgres',
         nativeType: EQL_V2_ENCRYPTED_TYPE,

@@ -33,6 +33,20 @@ export const CIPHERSTASH_EXTENSION_VERSION = '0.0.1' as const;
  */
 export const CIPHERSTASH_STRING_CODEC_ID = 'cipherstash/string@1';
 
+/**
+ * Codec id for the `cipherstash/double@1` codec — IEEE-754 double
+ * plaintext (`number`) lowering to `eql_v2_encrypted` with EQL
+ * `cast_as = 'double'`. See spec D2 for the codec id naming rationale.
+ */
+export const CIPHERSTASH_DOUBLE_CODEC_ID = 'cipherstash/double@1';
+
+/**
+ * Codec id for the `cipherstash/bigint@1` codec — JS `bigint`
+ * plaintext lowering to `eql_v2_encrypted` with EQL
+ * `cast_as = 'big_int'`. See spec D2.
+ */
+export const CIPHERSTASH_BIGINT_CODEC_ID = 'cipherstash/bigint@1';
+
 /** Schema CipherStash installs its functions/operators/casts/types into. */
 export const EQL_V2_SCHEMA = 'eql_v2';
 

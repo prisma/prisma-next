@@ -42,10 +42,16 @@ import headRef from '../../migrations/refs/head.json' with { type: 'json' };
 import contractJson from '../contract.json' with { type: 'json' };
 import {
   CIPHERSTASH_BASELINE_MIGRATION_NAME,
+  CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_DOUBLE_CODEC_ID,
   CIPHERSTASH_STRING_CODEC_ID,
 } from '../extension-metadata/constants';
 import { cipherstashPackMeta } from '../extension-metadata/descriptor-meta';
-import { cipherstashStringCodecHooks } from '../migration/cipherstash-codec';
+import {
+  cipherstashBigIntCodecHooks,
+  cipherstashDoubleCodecHooks,
+  cipherstashStringCodecHooks,
+} from '../migration/cipherstash-codec';
 
 const cipherstashContractSpace = contractSpaceFromJson<Contract<SqlStorage>>({
   contractJson,
@@ -81,6 +87,8 @@ const cipherstashExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> 
       ...cipherstashPackMeta.types.codecTypes,
       controlPlaneHooks: {
         [CIPHERSTASH_STRING_CODEC_ID]: cipherstashStringCodecHooks,
+        [CIPHERSTASH_DOUBLE_CODEC_ID]: cipherstashDoubleCodecHooks,
+        [CIPHERSTASH_BIGINT_CODEC_ID]: cipherstashBigIntCodecHooks,
       },
     },
   },

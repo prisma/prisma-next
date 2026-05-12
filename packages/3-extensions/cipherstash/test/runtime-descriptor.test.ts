@@ -42,26 +42,37 @@ describe('createCipherstashRuntimeDescriptor — descriptor shape', () => {
     expect(descriptor.targetId).toBe('postgres');
   });
 
-  it('exposes one codec descriptor under types.codecTypes.codecDescriptors', () => {
+  it('exposes the cipherstash codec descriptors under types.codecTypes.codecDescriptors', () => {
+    // R3 wires three (string + double + bigint); R4 will grow this to
+    // six. The current-state count + ordering is pinned here so a
+    // missed wiring surfaces during R3 → R4 instead of leaking
+    // through e2e.
     const descriptor = createCipherstashRuntimeDescriptor({ sdk: emptySdk() });
     const codecDescriptors = descriptor.types?.codecTypes?.codecDescriptors ?? [];
-    expect(codecDescriptors).toHaveLength(1);
+    expect(codecDescriptors).toHaveLength(3);
     expect(codecDescriptors[0]?.codecId).toBe(CIPHERSTASH_STRING_CODEC_ID);
+    expect(codecDescriptors[1]?.codecId).toBe('cipherstash/double@1');
+    expect(codecDescriptors[2]?.codecId).toBe('cipherstash/bigint@1');
   });
 });
 
 describe('createCipherstashRuntimeDescriptor — codecs()', () => {
-  it('returns the parameterized codec descriptor for cipherstash/string@1', () => {
+  it('returns the parameterized codec descriptors in stable order', () => {
     const descriptor = createCipherstashRuntimeDescriptor({ sdk: emptySdk() });
     const codecs = descriptor.codecs?.() ?? [];
-    expect(codecs).toHaveLength(1);
-    const only = codecs[0]!;
-    expect(only.codecId).toBe(CIPHERSTASH_STRING_CODEC_ID);
-    expect(only.targetTypes).toEqual(['eql_v2_encrypted']);
-    // Empty traits — equality search routes through the cipherstash-
-    // namespaced `cipherstashEq` operator (see codec-runtime.test.ts
-    // for the regression assertion + rationale).
-    expect(only.traits).toEqual([]);
+    expect(codecs).toHaveLength(3);
+    expect(codecs.map((c) => c.codecId)).toEqual([
+      CIPHERSTASH_STRING_CODEC_ID,
+      'cipherstash/double@1',
+      'cipherstash/bigint@1',
+    ]);
+    for (const c of codecs) {
+      expect(c.targetTypes).toEqual(['eql_v2_encrypted']);
+      // Empty traits — equality search routes through the cipherstash-
+      // namespaced `cipherstashEq` operator (see codec-runtime.test.ts
+      // for the regression assertion + rationale).
+      expect(c.traits).toEqual([]);
+    }
   });
 });
 

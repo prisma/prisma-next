@@ -24,33 +24,42 @@
 
 import type { JsonValue } from '@prisma-next/contract/types';
 import { type AnyCodecDescriptor, CodecImpl } from '@prisma-next/framework-components/codec';
-import { CIPHERSTASH_STRING_CODEC_ID, EQL_V2_ENCRYPTED_TYPE } from './constants';
+import {
+  CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_STRING_CODEC_ID,
+  EQL_V2_ENCRYPTED_TYPE,
+} from './constants';
 
-const METADATA_DESCRIPTOR: AnyCodecDescriptor = {
-  codecId: CIPHERSTASH_STRING_CODEC_ID,
-  traits: [],
-  targetTypes: [EQL_V2_ENCRYPTED_TYPE],
-  meta: { db: { sql: { postgres: { nativeType: EQL_V2_ENCRYPTED_TYPE } } } },
-  paramsSchema: {
-    '~standard': {
-      version: 1,
-      vendor: 'cipherstash',
-      validate: (value: unknown) => ({ value }),
+function makeMetadataDescriptor(codecId: string, typeName: string): AnyCodecDescriptor {
+  return {
+    codecId,
+    traits: [],
+    targetTypes: [EQL_V2_ENCRYPTED_TYPE],
+    meta: { db: { sql: { postgres: { nativeType: EQL_V2_ENCRYPTED_TYPE } } } },
+    paramsSchema: {
+      '~standard': {
+        version: 1,
+        vendor: 'cipherstash',
+        validate: (value: unknown) => ({ value }),
+      },
     },
-  },
-  isParameterized: false,
-  renderOutputType: () => 'EncryptedString',
-  factory: () => () => {
-    throw new Error('cipherstash codec: metadata descriptor factory is not callable');
-  },
-};
+    isParameterized: false,
+    renderOutputType: () => typeName,
+    factory: () => () => {
+      throw new Error('cipherstash codec: metadata descriptor factory is not callable');
+    },
+  };
+}
 
-class CipherstashStringCodecMetadata extends CodecImpl<
-  typeof CIPHERSTASH_STRING_CODEC_ID,
-  readonly [],
-  unknown,
-  unknown
-> {
+class CipherstashCodecMetadata extends CodecImpl<string, readonly [], unknown, unknown> {
+  readonly #typeName: string;
+
+  constructor(descriptor: AnyCodecDescriptor, typeName: string) {
+    super(descriptor);
+    this.#typeName = typeName;
+  }
+
   async encode(): Promise<unknown> {
     throw new Error(
       'cipherstash codec: encode called on the pack-meta metadata codec. ' +
@@ -66,7 +75,8 @@ class CipherstashStringCodecMetadata extends CodecImpl<
   }
 
   encodeJson(): JsonValue {
-    return { $encryptedString: '<opaque>' };
+    const marker = `$${this.#typeName.charAt(0).toLowerCase()}${this.#typeName.slice(1)}`;
+    return { [marker]: '<opaque>' } as JsonValue;
   }
 
   decodeJson(): unknown {
@@ -76,6 +86,17 @@ class CipherstashStringCodecMetadata extends CodecImpl<
   }
 }
 
-export const cipherstashStringCodecMetadata = new CipherstashStringCodecMetadata(
-  METADATA_DESCRIPTOR,
+export const cipherstashStringCodecMetadata = new CipherstashCodecMetadata(
+  makeMetadataDescriptor(CIPHERSTASH_STRING_CODEC_ID, 'EncryptedString'),
+  'EncryptedString',
+);
+
+export const cipherstashDoubleCodecMetadata = new CipherstashCodecMetadata(
+  makeMetadataDescriptor(CIPHERSTASH_DOUBLE_CODEC_ID, 'EncryptedDouble'),
+  'EncryptedDouble',
+);
+
+export const cipherstashBigIntCodecMetadata = new CipherstashCodecMetadata(
+  makeMetadataDescriptor(CIPHERSTASH_BIGINT_CODEC_ID, 'EncryptedBigInt'),
+  'EncryptedBigInt',
 );

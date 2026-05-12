@@ -36,6 +36,9 @@ import {
 export type { CipherstashStringCodec } from '../execution/codec-runtime';
 export {
   CIPHERSTASH_STRING_CODEC_ID,
+  CipherstashCellCodec,
+  createCipherstashBigIntCodec,
+  createCipherstashDoubleCodec,
   createCipherstashStringCodec,
 } from '../execution/codec-runtime';
 export type { DecryptAllOptions } from '../execution/decrypt-all';
@@ -45,10 +48,28 @@ export type {
   EncryptedStringHandle,
 } from '../execution/envelope';
 export { EncryptedString } from '../execution/envelope';
-export type { CipherstashStringParams } from '../execution/parameterized';
+export type {
+  EncryptedBigIntFromInternalArgs,
+  EncryptedBigIntHandle,
+} from '../execution/envelope-bigint';
+export { EncryptedBigInt } from '../execution/envelope-bigint';
+export type {
+  EncryptedDoubleFromInternalArgs,
+  EncryptedDoubleHandle,
+} from '../execution/envelope-double';
+export { EncryptedDouble } from '../execution/envelope-double';
+export type {
+  CipherstashAnyParams,
+  CipherstashNumericParams,
+  CipherstashStringParams,
+} from '../execution/parameterized';
 export {
   createParameterizedCodecDescriptors,
+  encryptedBigIntParamsSchema,
+  encryptedDoubleParamsSchema,
   encryptedStringParamsSchema,
+  renderEncryptedBigIntOutputType,
+  renderEncryptedDoubleOutputType,
   renderEncryptedStringOutputType,
 } from '../execution/parameterized';
 export type {
@@ -58,6 +79,10 @@ export type {
   CipherstashSdk,
   CipherstashSingleDecryptArgs,
 } from '../execution/sdk';
+export {
+  CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_DOUBLE_CODEC_ID,
+} from '../extension-metadata/constants';
 
 export { CIPHERSTASH_EXTENSION_VERSION };
 

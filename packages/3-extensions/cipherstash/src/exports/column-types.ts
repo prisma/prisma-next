@@ -16,6 +16,8 @@
  */
 
 import {
+  CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_DOUBLE_CODEC_ID,
   CIPHERSTASH_STRING_CODEC_ID,
   EQL_V2_ENCRYPTED_TYPE,
 } from '../extension-metadata/constants';
@@ -57,6 +59,72 @@ export function encryptedString(
     typeParams: {
       equality: options.equality ?? true,
       freeTextSearch: options.freeTextSearch ?? true,
+    },
+  };
+}
+
+/**
+ * Search-mode parameters for `encryptedDouble({...})` and
+ * `encryptedBigInt({...})`. Both flags are optional and default to
+ * `true` when omitted (per spec FR6 — searchable encryption is the
+ * legitimate default).
+ */
+export interface EncryptedNumericOptions {
+  readonly equality?: boolean;
+  readonly orderAndRange?: boolean;
+}
+
+export interface EncryptedDoubleColumnDescriptor {
+  readonly codecId: typeof CIPHERSTASH_DOUBLE_CODEC_ID;
+  readonly nativeType: typeof EQL_V2_ENCRYPTED_TYPE;
+  readonly typeParams: {
+    readonly equality: boolean;
+    readonly orderAndRange: boolean;
+  };
+}
+
+export interface EncryptedBigIntColumnDescriptor {
+  readonly codecId: typeof CIPHERSTASH_BIGINT_CODEC_ID;
+  readonly nativeType: typeof EQL_V2_ENCRYPTED_TYPE;
+  readonly typeParams: {
+    readonly equality: boolean;
+    readonly orderAndRange: boolean;
+  };
+}
+
+/**
+ * `encryptedDouble({ equality?, orderAndRange? })` — TS contract
+ * factory that lowers to a `ColumnTypeDescriptor` with the
+ * `cipherstash/double@1` codec and the `eql_v2_encrypted` Postgres
+ * native type. Mirrors what
+ * `cipherstash.EncryptedDouble({...})` lowers to byte-for-byte.
+ */
+export function encryptedDouble(
+  options: EncryptedNumericOptions = {},
+): EncryptedDoubleColumnDescriptor {
+  return {
+    codecId: CIPHERSTASH_DOUBLE_CODEC_ID,
+    nativeType: EQL_V2_ENCRYPTED_TYPE,
+    typeParams: {
+      equality: options.equality ?? true,
+      orderAndRange: options.orderAndRange ?? true,
+    },
+  };
+}
+
+/**
+ * `encryptedBigInt({ equality?, orderAndRange? })` — TS contract
+ * factory matching `cipherstash.EncryptedBigInt({...})`.
+ */
+export function encryptedBigInt(
+  options: EncryptedNumericOptions = {},
+): EncryptedBigIntColumnDescriptor {
+  return {
+    codecId: CIPHERSTASH_BIGINT_CODEC_ID,
+    nativeType: EQL_V2_ENCRYPTED_TYPE,
+    typeParams: {
+      equality: options.equality ?? true,
+      orderAndRange: options.orderAndRange ?? true,
     },
   };
 }

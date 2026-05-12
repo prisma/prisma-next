@@ -143,6 +143,16 @@ describe('EncryptedString — accidental-exposure overrides (Rust `secrecy` styl
     expect(json).not.toContain('top-secret');
   });
 
+  it('JSON.stringify renders the per-type placeholder marker shape', () => {
+    const envelope = EncryptedString.from('top-secret');
+    expect(JSON.parse(JSON.stringify(envelope))).toEqual({ $encryptedString: '<opaque>' });
+  });
+
+  it('toJSON returns the placeholder object directly', () => {
+    const envelope = EncryptedString.from('top-secret');
+    expect(envelope.toJSON()).toEqual({ $encryptedString: '<opaque>' });
+  });
+
   it('String(envelope) and toString() cannot leak plaintext', () => {
     const envelope = EncryptedString.from('top-secret');
     expect(String(envelope)).not.toContain('top-secret');

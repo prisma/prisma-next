@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { encryptedString } from '../src/exports/column-types';
+import { encryptedBigInt, encryptedDouble, encryptedString } from '../src/exports/column-types';
 
 describe('cipherstash column-types', () => {
   describe('encryptedString({...}) factory', () => {
@@ -62,6 +62,70 @@ describe('cipherstash column-types', () => {
         codecId: 'cipherstash/string@1',
         nativeType: 'eql_v2_encrypted',
         typeParams: { equality: true, freeTextSearch: true },
+      });
+    });
+  });
+
+  describe('encryptedDouble({...}) factory', () => {
+    it('produces a ColumnTypeDescriptor with cipherstash/double@1 codec id', () => {
+      expect(encryptedDouble()).toMatchObject({
+        codecId: 'cipherstash/double@1',
+        nativeType: 'eql_v2_encrypted',
+      });
+    });
+
+    it('defaults both flags to true when called with no arguments', () => {
+      expect(encryptedDouble()).toMatchObject({
+        typeParams: { equality: true, orderAndRange: true },
+      });
+    });
+
+    it('defaults both flags to true for an empty options object', () => {
+      expect(encryptedDouble({})).toMatchObject({
+        typeParams: { equality: true, orderAndRange: true },
+      });
+    });
+
+    it('lets equality be explicitly disabled', () => {
+      expect(encryptedDouble({ equality: false })).toMatchObject({
+        typeParams: { equality: false, orderAndRange: true },
+      });
+    });
+
+    it('lets orderAndRange be explicitly disabled', () => {
+      expect(encryptedDouble({ orderAndRange: false })).toMatchObject({
+        typeParams: { equality: true, orderAndRange: false },
+      });
+    });
+
+    it('lets both flags be explicitly disabled (storage-only encryption)', () => {
+      expect(encryptedDouble({ equality: false, orderAndRange: false })).toEqual({
+        codecId: 'cipherstash/double@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: { equality: false, orderAndRange: false },
+      });
+    });
+  });
+
+  describe('encryptedBigInt({...}) factory', () => {
+    it('produces a ColumnTypeDescriptor with cipherstash/bigint@1 codec id', () => {
+      expect(encryptedBigInt()).toMatchObject({
+        codecId: 'cipherstash/bigint@1',
+        nativeType: 'eql_v2_encrypted',
+      });
+    });
+
+    it('defaults both flags to true when called with no arguments', () => {
+      expect(encryptedBigInt()).toMatchObject({
+        typeParams: { equality: true, orderAndRange: true },
+      });
+    });
+
+    it('lets both flags be explicitly disabled (storage-only encryption)', () => {
+      expect(encryptedBigInt({ equality: false, orderAndRange: false })).toEqual({
+        codecId: 'cipherstash/bigint@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: { equality: false, orderAndRange: false },
       });
     });
   });
