@@ -31,6 +31,7 @@
   },
   "devDependencies": {
     "@prisma-next/mongo-contract-ts": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "tsdown": "catalog:",
