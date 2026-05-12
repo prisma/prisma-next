@@ -20,6 +20,7 @@ import {
   VERIFY_CODE_MARKER_MISSING,
   VERIFY_CODE_TARGET_MISMATCH,
 } from '@prisma-next/framework-components/control';
+import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
@@ -33,6 +34,7 @@ import {
 import { verifyMongoSchema } from '@prisma-next/target-mongo/schema-verify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Db } from 'mongodb';
+import type { MongoControlExtensionDescriptor } from './control-types';
 import { mongoSchemaToView } from './schema-to-view';
 
 export interface MongoControlFamilyInstance
@@ -346,6 +348,30 @@ function buildVerifyResult(opts: {
   };
 }
 
-export function createMongoFamilyInstance(_controlStack: ControlStack): MongoControlFamilyInstance {
+export function createMongoFamilyInstance(controlStack: ControlStack): MongoControlFamilyInstance {
+  // Descriptor self-consistency check.
+  // Each extension that exposes a `contractSpace` must publish a
+  // `headRef.hash` that matches the canonical hash recomputed from its
+  // `contractJson`. A stale value would silently corrupt every downstream
+  // boundary that trusts `headRef.hash` as the canonical identity (drift
+  // detection, on-disk artefact emission, runner marker writes). Failing
+  // fast at descriptor-load time turns "extension author shipped an
+  // inconsistent descriptor" into an explicit, actionable error
+  // (`MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH`) rather than a confusing
+  // mismatch surfacing several layers downstream. Mirrors the SQL family.
+  const extensions = (controlStack.extensionPacks ??
+    []) as readonly MongoControlExtensionDescriptor[];
+  for (const extension of extensions) {
+    if (extension.contractSpace) {
+      const { contractJson, headRef } = extension.contractSpace;
+      assertDescriptorSelfConsistency({
+        extensionId: extension.id,
+        target: contractJson.target,
+        targetFamily: contractJson.targetFamily,
+        storage: contractJson.storage,
+        headRefHash: headRef.hash,
+      });
+    }
+  }
   return new MongoFamilyInstance();
 }
