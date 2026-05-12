@@ -6,6 +6,7 @@
  * plaintext type and marker name.
  */
 
+import { inspect } from 'node:util';
 import { describe, expect, it, vi } from 'vitest';
 import { EncryptedEnvelopeBase } from '../src/execution/envelope-base';
 import { EncryptedBigInt } from '../src/execution/envelope-bigint';
@@ -57,6 +58,18 @@ describe('EncryptedBigInt — accidental-exposure overrides', () => {
 
   it('valueOf() returns [REDACTED]', () => {
     expect(EncryptedBigInt.from(42n).valueOf()).toBe('[REDACTED]');
+  });
+
+  it('Symbol.toPrimitive returns [REDACTED] for template-literal coercion', () => {
+    const envelope = EncryptedBigInt.from(42n);
+    expect(`v=${envelope}`).toBe('v=[REDACTED]');
+  });
+
+  it('util.inspect returns [REDACTED]', () => {
+    const envelope = EncryptedBigInt.from(42n);
+    const inspected = inspect(envelope, { depth: Number.POSITIVE_INFINITY, getters: true });
+    expect(inspected).not.toContain('42');
+    expect(inspected).toContain('[REDACTED]');
   });
 
   it('JSON.stringify renders the per-type placeholder marker shape', () => {

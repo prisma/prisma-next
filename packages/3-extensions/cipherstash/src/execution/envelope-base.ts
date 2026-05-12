@@ -86,6 +86,14 @@ export interface EncryptedEnvelopePlaceholder {
 
 function placeholderFor(typeName: string): EncryptedEnvelopePlaceholder {
   const marker = `$${typeName.charAt(0).toLowerCase()}${typeName.slice(1)}` as const;
+  // The marker key is constructed at runtime from `typeName`, so TS
+  // widens the literal-form `{ [marker]: '<opaque>' }` to
+  // `{ [k: string]: string }` rather than the template-literal-keyed
+  // `EncryptedEnvelopePlaceholder` shape. The structural identity
+  // holds at runtime — every key is `$${typeName}` per construction —
+  // but the type system can't follow the dynamic key derivation, so a
+  // last-resort `unknown` cast bridges the two. AGENTS.md requires
+  // this rationale comment alongside any `as unknown as` cast.
   return { [marker]: '<opaque>' } as unknown as EncryptedEnvelopePlaceholder;
 }
 
