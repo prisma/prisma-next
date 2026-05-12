@@ -3,7 +3,7 @@ import type { Namespace } from './namespace';
 /**
  * Framework-level promise that every Contract IR / Schema IR carries a
  * collection of namespaces keyed by namespace id. Family abstract bases
- * (`SqlStorage`, `MongoStorage`) refine the shape with family-specific
+ * (`SqlStorage`, `MongoStorageBase`) refine the shape with family-specific
  * fields (tables, collections, enums, …); target concretions add target
  * fields where the family vocabulary doesn't reach.
  *
