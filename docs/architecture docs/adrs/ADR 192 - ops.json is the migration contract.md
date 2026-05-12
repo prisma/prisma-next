@@ -22,7 +22,20 @@ When a developer runs `migration apply`, the runner reads `migration.json` and `
 
 The `migrationId` in `migration.json` is a content-addressed hash computed over the *stripped* manifest metadata plus `ops.json` — `fromContract`, `toContract`, and `hints` are excluded so the identity reflects what the migration does to storage, not the shape of the contract objects at planning time (see [ADR 199 — Storage-only migration identity](ADR%20199%20-%20Storage-only%20migration%20identity.md); manifest layout in [ADR 028](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md), [ADR 169](ADR%20169%20-%20On-disk%20migration%20persistence.md)). Editing `ops.json` changes the `migrationId`. Editing `migration.ts` in a way that doesn't change the emitted ops — reformatting, adding comments, renaming local variables — does not.
 
-This works naturally for MongoDB because MongoDB commands *are* JSON. The query builders produce AST objects (`CreateIndexCommand`, `UpdateManyCommand`, `AggregateCommand`) that serialize directly via `JSON.stringify` — each node has a `kind` discriminant and plain properties (see [ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md)). Deserialization reconstructs the live class instances from the `kind` field, validated by arktype schemas. The runner works with rehydrated operations identically to planner-produced ones.
+### No compilation at apply time
+
+A strictly-equivalent way to state the "no TypeScript at apply time" decision: `ops.json` carries the **post-lowering execution form**. The runner does not invoke the lowerer, the codec system, the contract validator, or any other build-time compilation step. Whatever computation has to happen between user authoring and database execution happens during `migration plan` / `migration emit`, lands in `ops.json`, and is attested via `migrationId`.
+
+This invariant is target-agnostic. The wire-protocol leaf grammar differs by target — and that is the only thing that differs:
+
+- **MongoDB.** The driver consumes structured JSON commands. Post-lowering = a `kind`-discriminated AST of commands. `ops.json` carries that AST verbatim, and the runner rehydrates each command via arktype-validated class deserialization (`CreateIndexCommand`, `UpdateManyCommand`, `AggregateCommand`; see [ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md)) before dispatch.
+- **SQL.** The driver consumes `(sql_template, params[])`. Post-lowering = exactly that pair. `ops.json` carries the rendered SQL template and the wire-format parameter array, and the runner forwards both to `driver.query`.
+
+In both cases, codec resolution, expression lowering, identifier quoting, parameter encoding, and any other contract-driven compilation belong on the **emit** side of the boundary. Their results land in `ops.json` as inert data. The apply-time runner is a dispatcher, not a compiler.
+
+A practical corollary specific to SQL: every parameter reaches `params[]` as a JSON-safe wire value (string, number, boolean, null, array, record). Codec metadata (`CodecRef`, `codecId`, `typeParams`) is a build-time concept used during lowering and **must not appear anywhere in `ops.json`**. Parametrised queries (template plus separate value array) provide the standard SQL-injection defence: wire values never get inlined into the SQL template.
+
+Today's symmetric realization of this invariant lives on the Mongo side (`packages/3-mongo-target/1-mongo-target/src/core/mongo-ops-serializer.ts`). The SQL side currently relies on the simpler primitive shape `{ description, sql, params? }` and skips the explicit class/parser layer; the *invariant* (post-lowering, no apply-time compilation) holds either way, but a follow-up will bring SQL into structural symmetry with Mongo (typed driver-AST + parser-driven dispatch). See [ADR 212](ADR%20212%20-%20AST-bound%20codec%20resolution.md) for the current SQL boundary and the linked follow-up Linear ticket for the symmetric-driver-AST design.
 
 ## Why
 
@@ -78,11 +91,24 @@ Rejected because it violates all four properties above. A migration that behaves
 
 Rejected because it reintroduces TypeScript evaluation at apply time (same problems as above) and makes the `migrationId` hash meaningless: the hash covers `ops.json`, but the runner might not use `ops.json`. Reviewers can't trust the JSON because the runner might ignore it.
 
-### SQL-string approach (no AST serialization)
+### Shell-syntax strings for MongoDB
 
-For SQL targets, `ops.json` contains raw SQL strings — no AST, no rehydration. We could do the same for MongoDB: serialize commands as shell-syntax strings (`db.users.createIndex({email: 1})`).
+We considered serializing MongoDB commands as shell-syntax strings (`db.users.createIndex({email: 1})`) — analogous to how today's SQL `ops.json` carries rendered SQL templates as strings.
 
-Rejected because MongoDB commands have richer structure than SQL DDL strings. Checks compose source commands with filter expressions and expect clauses ([ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md)). Flattening that structure to strings would lose the composability and require a parser on the deserialization side. The AST approach — `kind`-discriminated JSON objects validated by arktype schemas — is lossless, round-trips cleanly, and is already proven for DDL commands.
+Rejected because MongoDB commands have richer structure than SQL DDL. Checks compose source commands with filter expressions and expect clauses ([ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md)). Flattening that structure to strings would lose the composability and require a parser on the deserialization side. The AST approach — `kind`-discriminated JSON objects validated by arktype schemas — is lossless, round-trips cleanly, and matches the wire protocol the driver consumes. The structural choice tracks the wire-protocol leaf grammar of each target; what matters for this ADR is that both targets serialize the **post-lowering** form.
+
+### Pre-lowering AST in `ops.json` (deferred lowering at apply time)
+
+We considered embedding the pre-lowering relational-core AST in `ops.json` for SQL data-transform ops, with the runner re-running the lowerer at apply time.
+
+Rejected because it violates every property the "no compilation at apply time" invariant guarantees:
+
+- **Determinism.** The same `ops.json` would produce different SQL across runtime versions whenever the lowerer changes (cast policy, identifier quoting, parameter style).
+- **Auditability.** Reviewers reading `ops.json` would see structured AST nodes, not the SQL that actually executes; what was attested would not match what runs.
+- **Security.** Apply-time compilation widens the attack surface from "execute a string" to "walk attacker-influenceable JSON tree → reconstruct AST classes → push through the lowerer". The `migrationId` hash pins the AST, not the SQL — so attestation drifts from execution as soon as the lowerer evolves.
+- **Portability.** The runner would need the contract, the codec system, and the lowerer at apply time — defeating the "any environment that can read JSON and talk to the database" promise.
+
+The codec-resolution refactor in [ADR 212](ADR%20212%20-%20AST-bound%20codec%20resolution.md) attached `CodecRef` to the in-memory AST for *runtime-side* dispatch and lowering. `CodecRef` is consumed during lowering and dropped before serialization; it never appears in `ops.json`.
 
 ## References
 

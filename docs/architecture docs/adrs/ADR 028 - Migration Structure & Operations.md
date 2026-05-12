@@ -194,6 +194,16 @@ Ops in `ops.json` resolve to executors at apply time:
 - Extension ops carry `kind: "ext.op"` and `extId`; they are validated and executed by the corresponding extension pack, with capability gates enforced (ADR 116).
 - Pre/post checks use `{ description, sql }` for SQL targets (this ADR §Operation envelope) and the per-family check vocabulary for other targets ([ADR 188](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md)). Canonicalization and deterministic naming make ops hash-stable (ADR 010, ADR 009, ADR 106).
 
+### No compilation at apply time
+
+`ops.json` carries the **post-lowering execution form** for both targets. The runner is a dispatcher, not a compiler: it does not invoke the lowerer, the codec system, the contract validator, or any other build-time pipeline at apply time. See [ADR 192 §"No compilation at apply time"](ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md). Concretely:
+
+- Every parameter that reaches a SQL step's `params[]` is already a JSON-safe wire value. Codec metadata (`CodecRef`, `codecId`, `typeParams`) is consumed during lowering and never appears in `ops.json` — see [ADR 212 — AST-bound codec resolution](ADR%20212%20-%20AST-bound%20codec%20resolution.md).
+- Every Mongo step is a `kind`-discriminated command that the runner rehydrates via arktype-validated class deserialization before dispatch.
+- The on-disk shape is what the driver consumes (modulo target-specific deserialization). No SQL rendering, identifier quoting, or value encoding happens between `ops.json` and `driver.query`.
+
+This invariant is what makes `migrationId` meaningful: the hash pins what executes, not just what the author intended.
+
 ## Lifecycle, attestation, and commands (spec overview)
 
 This section aligns lifecycle terminology and commands with the Migration System subsystem.

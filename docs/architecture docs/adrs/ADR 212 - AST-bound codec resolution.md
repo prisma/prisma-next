@@ -62,9 +62,13 @@ The cache key is `${codecId}:${canonicalizeJson(typeParams)}`, where `canonicali
 
 `descriptors.codecRefForColumn(table, column)` derives the canonical `CodecRef` from contract storage (resolving `typeRef` entries to their `storage.types` `typeParams`). The existing `forColumn(table, column): Codec` wrapper is retained as a convenience API; internally it calls `forCodecRef(codecRefForColumn(table, column))`. The runtime encode/decode hot path reads `node.codec` directly and never calls `forColumn`.
 
-### AST serialization round-trip
+### `CodecRef` is a build-time concept; never appears in `ops.json`
 
-`CodecRef` is `JsonValue`-safe by construction: `codecId` is a string; `typeParams` is validated by `descriptor.paramsSchema` which structurally rejects non-JSON-safe values. This means AST nodes survive `JSON.stringify` → `JSON.parse` without loss. The `dataTransformAst` migration operation type exploits this property: it embeds the serialized AST in `ops.json` at authoring time and reconstructs it via `parseAnyQueryAst` at apply time. The resolver materializes codecs from the deserialized `CodecRef`s using the same content-keyed path as the in-memory execution path. See [ADR 192](ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md) for why `ops.json` is the authoritative migration artifact.
+`CodecRef` lives on the **in-memory** AST. It is consumed by the lowerer when rendering a query plan to its post-lowering execution form: the resolver materializes the codec, the codec encodes the value, and the encoded wire value lands in the lowered output (for SQL: into `params[]` alongside the rendered template; for Mongo: as a literal in the structured command).
+
+By the time anything reaches `ops.json`, all codec resolution has already happened. `ops.json` carries the post-lowering execution form only — see [ADR 192 §"No compilation at apply time"](ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md). `CodecRef` (and `codecId`, `typeParams`) **must not appear anywhere in `ops.json`**. The apply-time runner does not invoke the lowerer, the codec system, or the contract validator.
+
+`CodecRef` is structurally `JsonValue`-safe (`codecId: string`; `typeParams` validated by `descriptor.paramsSchema` which rejects non-JSON-safe values). That property is useful for in-memory cache keying via `canonicalizeJson` and for diagnostic dumps; it is *not* a license to embed pre-lowering ASTs in migration artifacts. SQL today carries `(sql_template, params[])` post-lowering forms in `ops.json`. Bringing SQL into structural symmetry with Mongo's typed driver-AST + serializer/deserializer pattern is tracked as a follow-up ([TML-2491](https://linear.app/prisma-company/issue/TML-2491)) and is independent of this ADR.
 
 ### Honest descriptor signatures
 
@@ -76,7 +80,7 @@ With the triangulation removed, descriptors no longer need to accept `undefined`
 
 - **Single dispatch path.** Encode and decode both resolve codecs via `resolver.forCodecRef(node.codec)`. No alias resolution, no consistency check, no ambiguity detection, no fallback chain.
 - **Self-joins require no special handling.** Both sides of a self-join carry identical `CodecRef`s stamped at build time from the underlying table, not from query-local aliases. `alias-resolver.ts` is deleted.
-- **AST serialization is lossless.** `CodecRef` round-trips through JSON without a "rebuild refs from contract" reconstruction step. Migration ASTs embedded in `ops.json` carry their codec identity through the serialization boundary.
+- **In-memory AST is JSON-safe.** `CodecRef` is structurally JSON-safe, which simplifies cache keying (via `canonicalizeJson`) and diagnostic serialization. The pre-lowering AST is not, however, an apply-time artifact — it stays on the runtime/build side of the boundary; `ops.json` carries the post-lowering execution form only (see [ADR 192](ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md)).
 - **Type-safe descriptors.** Parameterized descriptors receive validated params; non-parameterized descriptors receive `void`. No runtime type lies, no `as unknown as` casts.
 - **Net code deletion.** The change removes more lines than it adds. The eight heuristics and their associated test infrastructure are replaced by a content-keyed cache and a `CodecRef` field on two AST node types.
 
@@ -90,5 +94,6 @@ With the triangulation removed, descriptors no longer need to accept `undefined`
 
 - [ADR 208 — Higher-order codecs for parameterized types](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md). The codec descriptor model this ADR composes with; defines `factory(params)(ctx)` and the descriptor registry. ADR 208's `ParamRef.refs`-based dispatch (§ "Trade-offs") is superseded by this ADR's `CodecRef`-based dispatch.
 - [ADR 207 — Codec call context: per-query AbortSignal and column metadata](ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md). Per-call context baseline (`SqlCodecCallContext`). This ADR does not change the per-call context; it changes the per-node identity that selects *which* codec receives the call.
-- [ADR 192 — ops.json is the migration contract](ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md). Migration serialization contract. `CodecRef`'s JSON-safety enables AST embedding in `ops.json` via `dataTransformAst`.
+- [ADR 192 — ops.json is the migration contract](ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md). Migration serialization contract. `CodecRef` is a build-time concept and never appears in `ops.json`; codec resolution belongs on the emit side of the boundary.
 - [Linear: TML-2456](https://linear.app/prisma-company/issue/TML-2456). Implementation ticket.
+- [Linear: TML-2491](https://linear.app/prisma-company/issue/TML-2491). Follow-up: bring SQL `ops.json` into structural symmetry with Mongo (typed post-lowering driver-AST + serializer/deserializer).
