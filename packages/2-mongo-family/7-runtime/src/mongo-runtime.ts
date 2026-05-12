@@ -5,6 +5,7 @@ import {
   checkMiddlewareCompatibility,
   RuntimeCore,
   type RuntimeExecuteOptions,
+  runBeforeExecuteChain,
   runWithMiddleware,
 } from '@prisma-next/framework-components/runtime';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
@@ -125,6 +126,7 @@ class MongoRuntimeImpl
       checkAborted(codecCtx, 'stream');
       const compiled = await self.runBeforeCompile(plan);
       const exec = await self.lower(compiled, codecCtx);
+      await runBeforeExecuteChain<MongoExecutionPlan>(exec, self.middleware, self.ctx);
       const stream = runWithMiddleware<MongoExecutionPlan, Record<string, unknown>>(
         exec,
         self.middleware,

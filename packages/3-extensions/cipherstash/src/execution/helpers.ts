@@ -178,7 +178,7 @@ export function cipherstashJsonbPathQueryFirst(
   const checked = requirePathString(path, 'cipherstashJsonbPathQueryFirst');
   return buildOperation({
     method: 'cipherstashJsonbPathQueryFirst',
-    args: [selfAst, ParamRef.of(checked, { codecId: 'pg/text@1' })],
+    args: [selfAst, ParamRef.of(checked, { codec: { codecId: 'pg/text@1' } })],
     returns: { codecId: CIPHERSTASH_JSON_CODEC_ID, nullable: false },
     lowering: {
       targetFamily: 'sql',
@@ -210,7 +210,7 @@ export function cipherstashJsonbGet(
   const checked = requirePathString(path, 'cipherstashJsonbGet');
   return buildOperation({
     method: 'cipherstashJsonbGet',
-    args: [selfAst, ParamRef.of(checked, { codecId: 'pg/text@1' })],
+    args: [selfAst, ParamRef.of(checked, { codec: { codecId: 'pg/text@1' } })],
     returns: { codecId: CIPHERSTASH_JSON_CODEC_ID, nullable: false },
     lowering: {
       targetFamily: 'sql',

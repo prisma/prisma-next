@@ -373,7 +373,7 @@ describe('bulkEncryptMiddleware', () => {
       const params: unknown[] = [];
       const row: Record<string, ParamRef> = {};
       for (const col of columns) {
-        const ref = ParamRef.of(col.envelope, { codecId: col.codecId });
+        const ref = ParamRef.of(col.envelope, { codec: { codecId: col.codecId } });
         row[col.name] = ref;
         params.push(col.envelope);
       }
@@ -457,7 +457,7 @@ describe('bulkEncryptMiddleware', () => {
       const sdk = makeCounterSdk();
       const middleware = bulkEncryptMiddleware(sdk);
       const ast = new InsertAst(TableSource.named('user'), [
-        { id: ParamRef.of(1, { codecId: 'pg/text@1' }) },
+        { id: ParamRef.of(1, { codec: { codecId: 'pg/text@1' } }) },
       ]);
       const plan = {
         sql: 'INSERT INTO "user" (id) VALUES ($1)',
