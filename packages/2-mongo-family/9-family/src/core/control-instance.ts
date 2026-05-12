@@ -21,12 +21,11 @@ import {
   VERIFY_CODE_TARGET_MISMATCH,
 } from '@prisma-next/framework-components/control';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
-import type { MongoContract } from '@prisma-next/mongo-contract';
-import { validateMongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import {
   formatMongoOperations,
   initMarker,
+  type MongoTargetContract,
   readAllMarkers,
   readMarker,
   updateMarker,
@@ -35,12 +34,18 @@ import { verifyMongoSchema } from '@prisma-next/target-mongo/schema-verify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Db } from 'mongodb';
 import type { MongoControlExtensionDescriptor } from './control-types';
+import { mongoTargetDescriptor } from './mongo-target-descriptor';
 import { mongoSchemaToView } from './schema-to-view';
 
 export interface MongoControlFamilyInstance
   extends ControlFamilyInstance<'mongo', MongoSchemaIR>,
     SchemaViewCapable<MongoSchemaIR>,
     OperationPreviewCapable {
+  /**
+   * Deprecated since M2 R1; kept on the public surface for SQL parity
+   * until FR8 finishes for all targets. Internally delegates to
+   * `mongoTargetDescriptor.contractSerializer.deserializeContract`.
+   */
   validateContract(contractJson: unknown): Contract;
 }
 
@@ -55,14 +60,18 @@ function extractDb(driver: ControlDriverInstance<'mongo', string>): Db {
   return mongoDriver.db;
 }
 
+function deserializeMongoContract(contractJson: unknown): MongoTargetContract {
+  return mongoTargetDescriptor.contractSerializer.deserializeContract(contractJson);
+}
+
 class MongoFamilyInstance implements MongoControlFamilyInstance {
   readonly familyId = 'mongo' as const;
 
   validateContract(contractJson: unknown): Contract {
-    const validated = validateMongoContract<MongoContract>(contractJson);
-    // MongoContract and Contract share structure but are typed independently;
-    // validateMongoContract guarantees the shape, so the double cast is safe.
-    return validated.contract as unknown as Contract;
+    // The class form (MongoTargetContract) and the framework Contract are
+    // structurally compatible — same fields, just a class instance on the
+    // storage envelope. The cast preserves the framework signature.
+    return deserializeMongoContract(contractJson) as unknown as Contract;
   }
 
   async verify(options: {
@@ -75,8 +84,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     const { driver, contract: rawContract, expectedTargetId, contractPath, configPath } = options;
     const startTime = Date.now();
 
-    const validated = validateMongoContract<MongoContract>(rawContract);
-    const contract = validated.contract;
+    const contract = deserializeMongoContract(rawContract);
 
     const contractStorageHash = contract.storage.storageHash;
     const contractProfileHash = contract.profileHash;
@@ -155,8 +163,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
   }): Promise<VerifyDatabaseSchemaResult> {
     const { driver, contract: rawContract, strict, contractPath, configPath } = options;
 
-    const validated = validateMongoContract<MongoContract>(rawContract);
-    const contract = validated.contract;
+    const contract = deserializeMongoContract(rawContract);
 
     const db = extractDb(driver);
     const liveIR = await introspectSchema(db);
@@ -179,9 +186,9 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     readonly strict: boolean;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', string>>;
   }): VerifyDatabaseSchemaResult {
-    const validated = validateMongoContract<MongoContract>(options.contract);
+    const contract = deserializeMongoContract(options.contract);
     return verifyMongoSchema({
-      contract: validated.contract,
+      contract,
       schema: options.schema,
       strict: options.strict,
       frameworkComponents: options.frameworkComponents,
@@ -197,8 +204,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     const { driver, contract: rawContract, contractPath, configPath } = options;
     const startTime = Date.now();
 
-    const validated = validateMongoContract<MongoContract>(rawContract);
-    const contract = validated.contract;
+    const contract = deserializeMongoContract(rawContract);
 
     const contractStorageHash = contract.storage.storageHash;
     const contractProfileHash = contract.profileHash;

@@ -2,6 +2,7 @@ import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/con
 import type { Contract } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import type {
+  ContractSerializer,
   MigratableTargetDescriptor,
   MigrationRunner,
   MigrationRunnerResult,
@@ -10,6 +11,7 @@ import type {
   MultiSpaceRunnerFailure,
   MultiSpaceRunnerPerSpaceOptions,
   MultiSpaceRunnerResult,
+  SchemaVerifier,
 } from '@prisma-next/framework-components/control';
 import {
   type ContractSpaceMember,
@@ -24,10 +26,32 @@ import {
   MongoMigrationRunner,
   type MongoMigrationRunnerExecuteOptions,
   type MongoRunnerDependencies,
+  type MongoTargetContract,
+  MongoTargetContractSerializer,
+  MongoTargetSchemaVerifier,
 } from '@prisma-next/target-mongo/control';
 import mongoTargetDescriptorMeta from '@prisma-next/target-mongo/pack';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { MongoControlFamilyInstance } from './control-instance';
+
+/**
+ * Mongo target control descriptor type. Extends the framework's
+ * MigratableTargetDescriptor with two named SPI properties next to the
+ * existing `migrations` capability:
+ *
+ * - `contractSerializer` — JSON ⇄ class boundary for Mongo contracts.
+ * - `schemaVerifier` — per-target verifier walking MongoTargetContract +
+ *   MongoSchemaIR.
+ *
+ * No new `Target<TContract, TSchema>` aggregator interface is introduced;
+ * the descriptor itself IS the aggregator. SQL targets pick up the same
+ * pattern in M3.
+ */
+export interface MongoControlTargetDescriptor
+  extends MigratableTargetDescriptor<'mongo', 'mongo', MongoControlFamilyInstance> {
+  readonly contractSerializer: ContractSerializer<MongoTargetContract>;
+  readonly schemaVerifier: SchemaVerifier<MongoTargetContract, MongoSchemaIR>;
+}
 
 /**
  * `migration.ts` default-exports a `Migration` subclass whose `operations`
@@ -39,12 +63,10 @@ import type { MongoControlFamilyInstance } from './control-instance';
  * `migration.ts` directly (via `node migration.ts`) to self-emit
  * `ops.json` and attest the `migrationHash`.
  */
-export const mongoTargetDescriptor: MigratableTargetDescriptor<
-  'mongo',
-  'mongo',
-  MongoControlFamilyInstance
-> = {
+export const mongoTargetDescriptor: MongoControlTargetDescriptor = {
   ...mongoTargetDescriptorMeta,
+  contractSerializer: new MongoTargetContractSerializer(),
+  schemaVerifier: new MongoTargetSchemaVerifier(),
   migrations: {
     createPlanner(_family: MongoControlFamilyInstance) {
       return new MongoMigrationPlanner();
