@@ -1,5 +1,5 @@
 /**
- * Free-standing helper tests (T11) — sort + JSON SELECT-expression
+ * Free-standing helper tests — sort + JSON SELECT-expression
  * helpers.
  *
  * These are not registered operators; they're pure functions imported
@@ -10,8 +10,8 @@
  *     `cipherstashDesc` mirrors with `dir: 'desc'`.
  *   - **SQL snapshot** — the lowered SELECT shape with the helper
  *     in `ORDER BY` (sort) or in the projection list (JSON helpers)
- *     pins the user-visible SQL the live-Postgres exercise will
- *     execute against the EQL bundle (R8 / T12 verifies).
+ *     pins the user-visible SQL the live-Postgres e2e harness
+ *     executes against the EQL bundle.
  *   - **Error path** — each helper rejects a non-cipherstash column
  *     (or, for the JSON helpers, a cipherstash-but-non-JSON column)
  *     with a `TypeError` naming the helper and the accepted codec

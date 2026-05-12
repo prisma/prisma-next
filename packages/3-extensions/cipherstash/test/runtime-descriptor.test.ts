@@ -43,10 +43,10 @@ describe('createCipherstashRuntimeDescriptor — descriptor shape', () => {
   });
 
   it('exposes the cipherstash codec descriptors under types.codecTypes.codecDescriptors', () => {
-    // R4 wires the full six-codec surface (string + double + bigint +
-    // date + boolean + json). The current-state count + ordering is
-    // pinned here so a missed wiring surfaces in unit tests instead
-    // of leaking through e2e.
+    // The descriptor wires the full six-codec surface (string +
+    // double + bigint + date + boolean + json). The current count +
+    // ordering is pinned here so a missed wiring surfaces in unit
+    // tests instead of leaking through e2e.
     const descriptor = createCipherstashRuntimeDescriptor({ sdk: emptySdk() });
     const codecDescriptors = descriptor.types?.codecTypes?.codecDescriptors ?? [];
     expect(codecDescriptors).toHaveLength(6);

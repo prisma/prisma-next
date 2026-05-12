@@ -284,9 +284,9 @@ function eqlOperator(publicMethod: string, eqlFunction: 'eq' | 'ilike'): SqlOper
 /**
  * Build a cipherstash predicate operator dispatched via a
  * cipherstash-namespaced trait — the multi-codec shape used for the
- * eleven new operators added in Project 2 (per spec FR7). The
- * operator attaches to every codec descriptor whose `traits` list
- * contains {@link trait}; the model-accessor's trait dispatch
+ * trait-namespaced predicate surface (see ADR 214). The operator
+ * attaches to every codec descriptor whose `traits` list contains
+ * {@link trait}; the model-accessor's trait dispatch
  * (`packages/3-extensions/sql-orm-client/src/model-accessor.ts`)
  * handles the per-codec attachment.
  *
@@ -348,8 +348,8 @@ function envelopeOperator(
 
 /**
  * Build a cipherstash variable-arity predicate operator — the shape
- * used for `cipherstashInArray` / `cipherstashNotInArray` per spec
- * FR7. Each array element is wrapped in its own envelope sharing the
+ * used for `cipherstashInArray` / `cipherstashNotInArray`. Each
+ * array element is wrapped in its own envelope sharing the
  * column's `(table, column)` routing key, and the lowering template
  * is built dynamically per call from {@link buildTemplate} based on
  * the array length so the framework's `{{argN}}` placeholder
@@ -364,8 +364,7 @@ function envelopeOperator(
  * @param publicMethod - User-facing method name (`cipherstashInArray`,
  *   `cipherstashNotInArray`).
  * @param trait - Cipherstash-namespaced trait that gates codec
- *   visibility (`cipherstash:equality` for both in-array operators
- *   per spec D7).
+ *   visibility (`cipherstash:equality` for both in-array operators).
  * @param buildTemplate - Pure function `(n) => template` that
  *   produces the lowering template for an `n`-element array. For
  *   `cipherstashInArray`: `(n) => "(<OR-of-n eq calls>)"`. For
@@ -432,11 +431,17 @@ function buildNotInArrayTemplate(n: number): string {
 /**
  * Build the cipherstash JSONB-path-exists operator. Unlike the
  * envelope-wrapping operators above, the path argument is a plain
- * SQL text literal (the JSONpath expression is user-authored static
- * input, not an encrypted value — see spec D8) so this operator
- * passes the path through `toExpr` directly without envelope
- * wrapping. The column self IS encrypted; only the path argument
- * is plain.
+ * SQL text literal — the JSONpath expression is a user-authored
+ * static input, not an encrypted value — so this operator passes
+ * the path through `toExpr` directly without envelope wrapping. The
+ * column self IS encrypted; only the path argument is plain.
+ *
+ * Note: predicate filtering via this operator is gapped against the
+ * live EQL bundle pending STE-VEC selector hashing — see TML-2504.
+ * The framework binds the JSONpath as a plain `pg/text@1` `ParamRef`
+ * but EQL probes the per-column STE-VEC index for a hashed-selector
+ * key. The lowering template + AST construction below are correct;
+ * the bundle-side hashing is the missing piece.
  */
 function jsonbPathExistsOperator(): SqlOperationDescriptor {
   return {
@@ -479,7 +484,7 @@ function jsonbPathExistsOperator(): SqlOperationDescriptor {
  *     `self: { codecId: 'cipherstash/string@1' }`. Predates the
  *     trait-namespaced surface; visibility is fixed to the string
  *     codec.
- *   - **Trait-namespaced** (everything else, per spec D7) —
+ *   - **Trait-namespaced** (everything else, see ADR 214) —
  *     `self: { traits: ['cipherstash:<x>'] }`. Visible on every
  *     codec descriptor whose `traits` list contains the trait
  *     identifier. The `cipherstash:` prefix isolates these from
@@ -487,7 +492,7 @@ function jsonbPathExistsOperator(): SqlOperationDescriptor {
  *     `'order'`, ...) so adding them to a cipherstash codec
  *     descriptor cannot silently re-attach a framework built-in.
  *
- * Operator -> codec visibility (per spec FR7 / D7):
+ * Operator -> codec visibility:
  *
  *   - `cipherstashEq` (string only — single-codec, legacy)
  *   - `cipherstashIlike` (string only — single-codec, legacy)
@@ -503,8 +508,8 @@ function jsonbPathExistsOperator(): SqlOperationDescriptor {
  *   - `cipherstashJsonbPathExists` (trait
  *     `cipherstash:searchable-json` -> json)
  *
- * The lowering templates mirror the canonical EQL function calls
- * per spec FR7. The variable-arity `inArray` / `notInArray`
+ * The lowering templates mirror the canonical EQL function calls.
+ * The variable-arity `inArray` / `notInArray`
  * lowerings build their template per call from the array length
  * (see {@link variableArityEnvelopeOperator}).
  */

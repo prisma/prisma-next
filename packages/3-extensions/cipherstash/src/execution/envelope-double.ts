@@ -2,13 +2,12 @@
  * `EncryptedDouble` envelope — the user-facing input/output type for
  * `cipherstash/double@1` columns. Concrete subclass of
  * {@link EncryptedEnvelopeBase} parameterised on `number` (IEEE-754
- * double per spec D2). Mirrors `EncryptedString` byte-for-byte beyond
- * the typed factories and `typeName`.
+ * double; EQL `cast_as = 'double'`). Mirrors `EncryptedString`
+ * byte-for-byte beyond the typed factories and `typeName`.
  *
  * No `parseDecryptedValue` override is needed: the SDK's polymorphic
  * `bulkDecrypt` / single-cell `decrypt` already returns numeric
- * plaintexts as `number` per spec D1; the base's default identity cast
- * suffices.
+ * plaintexts as `number`; the base's default identity cast suffices.
  */
 
 import {

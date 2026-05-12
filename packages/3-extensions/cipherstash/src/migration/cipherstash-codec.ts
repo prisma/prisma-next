@@ -53,8 +53,10 @@ export const cipherstashStringCodecHooks = makeCipherstashCodecHooks({
 /**
  * Codec lifecycle hooks for `cipherstash/double@1`. The numeric codecs
  * share the `{ equality, orderAndRange }` flag set and differ only in
- * `cast_as` (`double` vs `big_int`). See spec D2 for the codec id
- * naming rationale.
+ * `cast_as` (`double` vs `big_int`). Codec ids name the underlying
+ * machine type (the EQL `cast_as` value) rather than the JS-language
+ * category; the user-facing constructor name follows the same
+ * naming.
  */
 export const cipherstashDoubleCodecHooks = makeCipherstashCodecHooks({
   flagToIndex: {

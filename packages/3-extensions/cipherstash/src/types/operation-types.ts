@@ -45,7 +45,7 @@ type CipherstashStringCodec = typeof CIPHERSTASH_STRING_CODEC;
 type PgBoolReturn = Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
 
 /**
- * Trait tuples used to gate multi-codec operators per spec D7 / FR7.
+ * Trait tuples used to gate multi-codec operators (see ADR 214).
  *
  * Cipherstash uses extension-namespaced trait identifiers
  * (`cipherstash:equality`, `cipherstash:order-and-range`) that

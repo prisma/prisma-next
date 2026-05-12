@@ -373,10 +373,10 @@ describe('cipherstash operator lowering — null short-circuit', () => {
   });
 });
 
-describe('cipherstash operator lowering — equality extensions (T9)', () => {
+describe('cipherstash operator lowering — equality extensions', () => {
   // `cipherstashNe`, `cipherstashInArray`, `cipherstashNotInArray`
   // dispatch via the `cipherstash:equality` trait — visible on
-  // string, double, bigint, date, boolean codecs (per spec D7).
+  // string, double, bigint, date, boolean codecs.
 
   it('lowers email.cipherstashNe(plaintext) to NOT eql_v2.eq(...)', () => {
     const op = getOperator('cipherstashNe');
@@ -453,7 +453,7 @@ describe('cipherstash operator lowering — equality extensions (T9)', () => {
   });
 });
 
-describe('cipherstash operator lowering — free-text-search extensions (T9)', () => {
+describe('cipherstash operator lowering — free-text-search extensions', () => {
   it('lowers cipherstashNotIlike(pattern) to NOT eql_v2.ilike(...)', () => {
     const op = getOperator('cipherstashNotIlike');
     const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), '%alice%');
@@ -464,10 +464,10 @@ describe('cipherstash operator lowering — free-text-search extensions (T9)', (
   });
 });
 
-describe('cipherstash operator lowering — order-and-range extensions (T9)', () => {
+describe('cipherstash operator lowering — order-and-range extensions', () => {
   // `cipherstashGt/Gte/Lt/Lte/Between/NotBetween` dispatch via the
   // `cipherstash:order-and-range` trait — visible on string,
-  // double, bigint, date codecs (per spec D7).
+  // double, bigint, date codecs.
 
   it('lowers cipherstashGt(plaintext) to eql_v2.gt(...)', () => {
     const op = getOperator('cipherstashGt');
@@ -530,7 +530,7 @@ describe('cipherstash operator lowering — order-and-range extensions (T9)', ()
   });
 });
 
-describe('cipherstash operator lowering — per-codec envelope dispatch (T9)', () => {
+describe('cipherstash operator lowering — per-codec envelope dispatch', () => {
   // Trait-dispatched operators wrap the user-supplied value in the
   // envelope subclass that matches the column's codec id at impl
   // time. Each row here pins the dispatch is correct for one codec.
@@ -591,7 +591,7 @@ describe('cipherstash operator lowering — per-codec envelope dispatch (T9)', (
   });
 });
 
-describe('cipherstash operator lowering — JSON path predicate (T9)', () => {
+describe('cipherstash operator lowering — JSON path predicate', () => {
   it('lowers cipherstashJsonbPathExists(path) to eql_v2.jsonb_path_exists(...)', () => {
     const op = getOperator('cipherstashJsonbPathExists');
     const predicate = callOperator(
@@ -622,9 +622,9 @@ describe('createCipherstashRuntimeDescriptor — queryOperations registration', 
     // overriding them. The trade-off is documented in
     // `src/execution/operators.ts`'s top-level docblock.
     //
-    // Two registration shapes coexist (per spec D7):
-    //   - Single-codec: `cipherstashEq` / `cipherstashIlike` (legacy
-    //     from Project 1) target the string codec by codec id.
+    // Two registration shapes coexist (see ADR 214):
+    //   - Single-codec: `cipherstashEq` / `cipherstashIlike` (the
+    //     original predicate pair) target the string codec by id.
     //   - Trait-namespaced: every other operator targets a
     //     `cipherstash:*` trait. The model accessor attaches the
     //     operator to every codec descriptor whose `traits` list

@@ -1,9 +1,10 @@
 /**
  * Behavioural tests for the `EncryptedBigInt` envelope.
  *
- * Pins AC-ENV3 / AC-ENV4 / AC-ENV5 for the `cipherstash/bigint@1`
- * codec; mirrors `envelope-double.test.ts` byte-for-byte beyond the
- * plaintext type and marker name.
+ * Pins the subclass surface, redaction overrides, and `toJSON`
+ * placeholder shape for the `cipherstash/bigint@1` codec; mirrors
+ * `envelope-double.test.ts` byte-for-byte beyond the plaintext type
+ * and marker name.
  */
 
 import { inspect } from 'node:util';

@@ -2,7 +2,7 @@
  * `EncryptedJson` envelope — the user-facing input/output type for
  * `cipherstash/json@1` columns. Concrete subclass of
  * {@link EncryptedEnvelopeBase} parameterised on `unknown`
- * (JSON-serialisable per spec D2; EQL `cast_as = 'jsonb'`).
+ * (JSON-serialisable; EQL `cast_as = 'jsonb'`).
  *
  * The plaintext slot intentionally types as `unknown` rather than a
  * tighter `JsonValue`-style alias: cipherstash users routinely round-
@@ -12,8 +12,8 @@
  * (the bulk-encrypt path JSON-stringifies the value, surfacing any
  * non-serialisable shape as an SDK-level error).
  *
- * No `parseDecryptedValue` override is needed: the SDK returns the
- * decoded JSON value as-is per spec D1.
+ * No `parseDecryptedValue` override is needed: the SDK's polymorphic
+ * decrypt path returns the decoded JSON value as-is.
  */
 
 import {

@@ -1,7 +1,8 @@
 /**
  * Behavioural tests for the `EncryptedJson` envelope.
  *
- * Pins AC-ENV3 / AC-ENV4 / AC-ENV5 for the `cipherstash/json@1` codec.
+ * Pins the subclass surface, redaction overrides, and `toJSON`
+ * placeholder shape for the `cipherstash/json@1` codec.
  * The plaintext type is intentionally `unknown` (any
  * JSON-serialisable shape) — we exercise objects, arrays, and
  * primitives to confirm the envelope round-trips opaque payloads

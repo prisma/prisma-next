@@ -31,10 +31,10 @@ import {
 
 /**
  * Search-mode parameters for `encryptedString({...})`. Every flag is
- * optional and defaults to `true` when omitted (per spec FR6 +
- * D6 — `orderAndRange` joined the set in Project 2 to give string
+ * optional and defaults to `true` when omitted — searchable
+ * encryption is the legitimate default. `orderAndRange` gives string
  * columns the same sortable / range-queryable surface the numeric +
- * date codecs already had).
+ * date codecs already had.
  */
 export interface EncryptedStringOptions {
   readonly equality?: boolean;
@@ -79,8 +79,8 @@ export function encryptedString(
 /**
  * Search-mode parameters for `encryptedDouble({...})` and
  * `encryptedBigInt({...})`. Both flags are optional and default to
- * `true` when omitted (per spec FR6 — searchable encryption is the
- * legitimate default).
+ * `true` when omitted — searchable encryption is the legitimate
+ * default.
  */
 export interface EncryptedNumericOptions {
   readonly equality?: boolean;
@@ -144,7 +144,7 @@ export function encryptedBigInt(
 
 /**
  * Search-mode parameters for `encryptedDate({...})`. Both flags are
- * optional and default to `true` per spec FR6.
+ * optional and default to `true`.
  */
 export interface EncryptedDateOptions {
   readonly equality?: boolean;

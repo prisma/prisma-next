@@ -1,6 +1,6 @@
 /**
  * Cipherstash free-standing helpers — the non-predicate side of the
- * cipherstash operator surface (per spec D7 / D8 / FR7).
+ * cipherstash operator surface (see ADR 214).
  *
  * Predicates (`cipherstashEq`, `cipherstashGt`, …) live in the
  * operator registry and surface as column methods through trait-
@@ -32,9 +32,8 @@
  * RIGHTARG=eql_v2_encrypted, …)` definition in the bundled EQL
  * install) so Postgres uses the EQL operator family for the sort
  * comparison. The wrapped form (`eql_v2.order_by_<index>(col)`) is
- * the documented fallback if the bare-column form fails at the
- * live-Postgres + EQL level (R8 / T12 verifies); revert to the
- * wrapped form there if needed.
+ * the documented fallback if the bare-column form ever stops working
+ * against a future EQL bundle.
  *
  * # JSON helpers — Expression-typed OperationExpr
  *

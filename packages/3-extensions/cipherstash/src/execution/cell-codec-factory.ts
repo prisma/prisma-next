@@ -2,7 +2,8 @@
  * Shared factory for every cipherstash storage codec runtime.
  *
  * Every cipherstash codec (`cipherstash/string@1`, `cipherstash/double@1`,
- * `cipherstash/bigint@1`, plus the codecs landing in R4) wires the same
+ * `cipherstash/bigint@1`, `cipherstash/date@1`,
+ * `cipherstash/boolean@1`, `cipherstash/json@1`) wires the same
  * encode/decode body:
  *
  *   - `encode(envelope, ctx)` extracts `handle.ciphertext` and renders

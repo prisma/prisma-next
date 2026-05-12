@@ -161,7 +161,7 @@ const customers = await db.orm.User
 
 The predicate operators (`cipherstashIlike`, `cipherstashGt`, `cipherstashLt`) surface on the column accessor via the operation registry and the trait-gated `QueryOperationTypes` entries. The helpers (`cipherstashAsc`, `cipherstashDesc`) are pure functions consuming column expressions and returning `OrderByItem` values. The two surfaces compose at the query-builder layer without either needing to know about the other.
 
-Per-codec coverage is captured in the spec at `projects/cipherstash-integration/project-2/spec.md § D7` (recorded historically; the spec is deleted at project close-out) and in the package's behavioural-invariant tests (`packages/3-extensions/cipherstash/test/operator-lowering.test.ts`, `test/helpers.test.ts`).
+Per-codec coverage and per-operator lowering details live in the package's behavioural-invariant tests (`packages/3-extensions/cipherstash/test/operator-lowering.test.ts`, `test/helpers.test.ts`) and in the README's operator-surface tables.
 
 ## Related
 

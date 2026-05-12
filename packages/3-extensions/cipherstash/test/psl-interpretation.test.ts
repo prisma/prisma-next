@@ -361,7 +361,7 @@ describe('PSL interpretation: cipherstash.EncryptedDouble constructor', () => {
     if (!result.ok) return;
     const col = asStorage(result.value.storage).tables['metric']?.columns['value'];
     // Stripping `nullable` (PSL-specific) the column descriptor mirrors
-    // the TS factory's lowered shape byte-for-byte (parity AC-AUTH2).
+    // the TS factory's lowered shape byte-for-byte (PSL/TS parity).
     expect(col).toMatchObject({
       codecId: 'cipherstash/double@1',
       nativeType: 'eql_v2_encrypted',
