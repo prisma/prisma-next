@@ -37,6 +37,28 @@ describe('deserializeDmlCommand', () => {
       expect(result).toMatchObject({ collection: 'users', document: { name: 'Alice', age: 30 } });
     });
 
+    it('preserves prototype-bound payload values through in-process deserialize (no JSON round-trip)', () => {
+      // Simulate a BSON-style wrapper (e.g. ObjectId) embedded in a payload:
+      // it's a class instance whose enumerable own properties carry no
+      // `undefined` values, so stripUndefinedDeep must leave it untouched.
+      class FakeObjectId {
+        readonly _bsontype = 'ObjectId';
+        constructor(public readonly id: string) {}
+        toString(): string {
+          return `ObjectId(${this.id})`;
+        }
+      }
+      const oid = new FakeObjectId('507f1f77bcf86cd799439011');
+      const cmd = new RawInsertOneCommand('users', { _id: oid, name: 'Alice' });
+      // Pass the class instance directly — no JSON.stringify boundary.
+      const result = deserializeDmlCommand(cmd) as RawInsertOneCommand;
+      expect(result.kind).toBe('rawInsertOne');
+      const doc = result.document as { _id: unknown; name: string };
+      expect(doc._id).toBe(oid);
+      expect(doc._id).toBeInstanceOf(FakeObjectId);
+      expect((doc._id as FakeObjectId).toString()).toBe('ObjectId(507f1f77bcf86cd799439011)');
+    });
+
     it('round-trips rawInsertMany', () => {
       const cmd = new RawInsertManyCommand('users', [{ name: 'Alice' }, { name: 'Bob' }]);
       const json = JSON.parse(JSON.stringify(cmd));
