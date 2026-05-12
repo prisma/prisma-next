@@ -274,23 +274,39 @@ function validate<T>(schema: { assert: (data: unknown) => T }, data: unknown, co
  * recovers the JSON-round-tripped shape (undefined keys absent) without
  * forcing every caller to round-trip.
  *
- * Class instances are normalised to plain objects with the same enumerable
- * own properties: the deserializers only read field values off the result,
- * so prototype identity is irrelevant.
+ * Returns the original value reference whenever no change is needed.
+ * That preserves prototype-bound payload values such as BSON wrappers
+ * (`ObjectId`, `Decimal128`, `Binary`, …) which embed no `undefined`
+ * own-enumerable properties and therefore never trigger a rebuild.
+ * Top-level op IRs (class instances with `undefined` optional fields)
+ * still get flattened to plain records as required by arktype.
  */
 function stripUndefinedDeep(value: unknown): unknown {
   if (Array.isArray(value)) {
-    return value.map(stripUndefinedDeep);
+    let changed = false;
+    const next = value.map((item) => {
+      const stripped = stripUndefinedDeep(item);
+      if (stripped !== item) changed = true;
+      return stripped;
+    });
+    return changed ? next : value;
   }
   if (value === null || typeof value !== 'object') {
     return value;
   }
+  const entries = Object.entries(value as Record<string, unknown>);
   const out: Record<string, unknown> = {};
-  for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-    if (val === undefined) continue;
-    out[key] = stripUndefinedDeep(val);
+  let changed = false;
+  for (const [key, val] of entries) {
+    if (val === undefined) {
+      changed = true;
+      continue;
+    }
+    const stripped = stripUndefinedDeep(val);
+    if (stripped !== val) changed = true;
+    out[key] = stripped;
   }
-  return out;
+  return changed ? out : value;
 }
 
 function deserializeFilterExpr(json: unknown): MongoFilterExpr {
