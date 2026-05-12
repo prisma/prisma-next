@@ -50,7 +50,6 @@
   "types": "./dist/control.d.mts",
   "exports": {
     "./control": "./dist/control.mjs",
-    "./ir": "./dist/ir.mjs",
     "./migration": "./dist/migration.mjs",
     "./pack": "./dist/pack.mjs",
     "./schema-verify": "./dist/schema-verify.mjs",

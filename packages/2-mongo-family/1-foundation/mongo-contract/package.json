@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "arktype": "catalog:"
   },
   "devDependencies": {
@@ -33,6 +35,7 @@
   ],
   "exports": {
     ".": "./dist/index.mjs",
+    "./ir": "./dist/ir.mjs",
     "./package.json": "./package.json"
   },
   "types": "./dist/index.d.mts",
