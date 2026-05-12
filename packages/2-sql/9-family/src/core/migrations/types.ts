@@ -326,7 +326,8 @@ export interface SqlMigrationPlannerPlanOptions {
   readonly fromContract: Contract<SqlStorage> | null;
   /**
    * Active framework components participating in this composition.
-   * SQL targets can interpret this list to derive database dependencies.
+   * Each component is target-bound so SQL targets can dispatch
+   * component-owned planning behaviour from the same descriptor list.
    * All components must have matching familyId ('sql') and targetId.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
@@ -373,7 +374,8 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
   readonly executionChecks?: MigrationRunnerExecutionChecks;
   /**
    * Active framework components participating in this composition.
-   * SQL targets can interpret this list to derive database dependencies.
+   * Each component is target-bound so SQL targets can dispatch
+   * component-owned execution behaviour from the same descriptor list.
    * All components must have matching familyId ('sql') and targetId.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
