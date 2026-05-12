@@ -38,26 +38,26 @@ const Post = model('Post', { /* fields */ })
     {
       name: 'posts_select_published',
       operation: 'select',
-      roles: [supabase.roles.anon, supabase.roles.authenticated],
+      roles: [supabaseRoles.anon, supabaseRoles.authenticated],
       using: 'is_published = true',
     },
     {
       name: 'posts_insert_own',
       operation: 'insert',
-      roles: [supabase.roles.authenticated],
+      roles: [supabaseRoles.authenticated],
       withCheck: 'author_id IN (SELECT id FROM public.profile WHERE user_id = (auth.uid())::uuid)',
     },
     {
       name: 'posts_update_own',
       operation: 'update',
-      roles: [supabase.roles.authenticated],
+      roles: [supabaseRoles.authenticated],
       using:     'author_id IN (SELECT id FROM public.profile WHERE user_id = (auth.uid())::uuid)',
       withCheck: 'author_id IN (SELECT id FROM public.profile WHERE user_id = (auth.uid())::uuid)',
     },
     {
       name: 'posts_delete_own',
       operation: 'delete',
-      roles: [supabase.roles.authenticated],
+      roles: [supabaseRoles.authenticated],
       using: 'author_id IN (SELECT id FROM public.profile WHERE user_id = (auth.uid())::uuid)',
     },
     // Permissive layered with restrictive — Postgres composes them at evaluation time.
@@ -65,7 +65,7 @@ const Post = model('Post', { /* fields */ })
     //   name: 'posts_select_no_archived',
     //   operation: 'select',
     //   as: 'restrictive',
-    //   roles: [supabase.roles.authenticated],
+    //   roles: [supabaseRoles.authenticated],
     //   using: 'is_archived = false',
     // },
   ]);
@@ -129,7 +129,7 @@ const Profile = model('Profile', {
     username: field.text(),
   },
 })
-  .relations({ user: rel.belongsTo(supabaseContract.models.AuthUser, { from: 'userId', to: 'id' }) })
+  .relations({ user: rel.belongsTo(AuthUser, { from: 'userId', to: 'id' }) })
   .attributes(({ fields, constraints }) => ({
     id: constraints.id(fields.id),
     uniques: [
@@ -141,7 +141,7 @@ const Profile = model('Profile', {
   .sql(({ cols, constraints }) => ({
     table: 'profile',
     foreignKeys: [
-      constraints.foreignKey(cols.userId, supabaseContract.models.AuthUser.refs.id, {
+      constraints.foreignKey(cols.userId, AuthUser.refs.id, {
         name: 'profile_userId_fkey',
         onDelete: 'cascade',
       }),
@@ -205,13 +205,13 @@ The simple case stays a one-liner — no helper needed because there is no table
   {
     name: 'posts_select_published',
     operation: 'select',
-    roles: [supabase.roles.anon, supabase.roles.authenticated],
+    roles: [supabaseRoles.anon, supabaseRoles.authenticated],
     using: 'is_published = true',                              // no helper, no table ref
   },
   {
     name: 'profiles_insert_own',
     operation: 'insert',
-    roles: [supabase.roles.authenticated],
+    roles: [supabaseRoles.authenticated],
     withCheck: 'user_id = (auth.uid())::uuid',                 // no helper, no table ref
   },
 ])
@@ -224,7 +224,7 @@ The subquery case takes the function form. The `ref()` helper is the only thing 
   {
     name: 'posts_update_own',
     operation: 'update',
-    roles: [supabase.roles.authenticated],
+    roles: [supabaseRoles.authenticated],
     using:     ({ ref }) =>
       `author_id IN (SELECT id FROM ${ref(Profile)} WHERE user_id = (auth.uid())::uuid)`,
     withCheck: ({ ref }) =>
@@ -257,7 +257,7 @@ Cross-contract refs work the same way — `ref()` accepts any model handle the c
 
 ```ts
 using: ({ ref }) =>
-  `tenant_id = (SELECT default_tenant FROM ${ref(supabaseContract.models.AuthUser)} WHERE id = (auth.uid())::uuid)`,
+  `tenant_id = (SELECT default_tenant FROM ${ref(AuthUser)} WHERE id = (auth.uid())::uuid)`,
 ```
 
 #### Why this beats "verbatim + lint"
@@ -306,14 +306,14 @@ This is invoked once per `(model, operation, kind)` triple at lowering time, bef
 
 #### Open follow-ups (non-blocking)
 
-- **Schema/column refs inside expressions.** The current `ref()` surface covers table identifiers. A predicate that wants to reference a *column* qualified by table (`p.user_id`) or a *function* by handle (`ref(supabaseContract.functions.uid)()`) is still raw. Add helpers if real predicates demand them. Not a v0.1 requirement — every real-world Supabase RLS example I checked uses bare column names plus `auth.uid()` / `auth.role()` literals.
+- **Schema/column refs inside expressions.** The current `ref()` surface covers table identifiers. A predicate that wants to reference a *column* qualified by table (`p.user_id`) is still raw. Functions like `auth.uid()` / `auth.role()` are not contract elements in v0.1 (see [C4](../decisions.md)) — they stay as opaque tokens in predicate strings. Add helpers if real predicates demand them. Not a v0.1 requirement — every real-world Supabase RLS example I checked uses bare column names plus `auth.uid()` / `auth.role()` literals.
 - **Escape hatch.** Users who genuinely need a raw SQL fragment with table names baked in can keep using the string form. No diagnostic, no lint — their string, their consequences.
 
 Touches: [`rls.md`](../rls.md) — record this design; remove the verbatim-plus-lint section.
 
 ### 🟢 #6 — Cross-namespace `rel.hasMany`
 
-Not exercised in the example (Profile.hasMany(Post) is within `public`). But the design implies `hasMany(supabaseContract.models.X)` should work too. Confirm at implementation time.
+Not exercised in the example (Profile.hasMany(Post) is within `public`). But the design implies `hasMany(SomeExtensionModel)` (model handle imported from an extension's `/contract` subpath) should work too. Confirm at implementation time.
 
 **Recommendation: zero new syntax**, same rule as `belongsTo` — model handle carries the namespace + contract-space coordinate.
 
@@ -440,13 +440,11 @@ See [`decisions.md` C9 + C10](../decisions.md) and the design rationale in [`spe
 
 Touches: [`rls.md`](../rls.md) §"Verifier behaviour" — rewritten to use the content-addressed model.
 
-### 🟡 #20 — `supabase.pack()` vs `supabase()` shorthand
+### ✅ #20 — `supabase.pack()` vs `supabase()` shorthand — DECIDED: subpath-only entrypoints (C6)
 
-`extension-package.md` says `supabase()` is sugar for `supabase.pack()`. But `supabase` is also a namespace object (`supabase.contract`, `supabase.roles`). Making it callable requires either (a) `supabase` is `Callable & Namespace` (the JS idiom is awkward), or (b) drop the shorthand and always use `supabase.pack()`.
+**Resolution:** the entire `supabase.*` umbrella goes away. [C6](../decisions.md) makes extension entrypoints subpath-only: `import supabasePack from '@prisma-next/extension-supabase/pack'` (value), `import { AuthUser, roles } from '@prisma-next/extension-supabase/contract'`, `import supabase from '@prisma-next/extension-supabase/runtime'` (default-export factory). No callable namespace, no shorthand vs longhand inconsistency.
 
-**Recommendation: drop the shorthand. Always `supabase.pack()`.** Removes one inconsistency, one tiny JS oddity. Consistent with the rest of the namespace API.
-
-Touches: [`extension-package.md`](../extension-package.md) — remove the `supabase()` shorthand line.
+The original recommendation ("drop the shorthand; always `supabase.pack()`") is superseded — there is no `supabase.pack()` either, just a value-imported `supabasePack`.
 
 ## Summary of blocking holes
 

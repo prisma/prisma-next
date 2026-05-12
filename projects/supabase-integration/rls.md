@@ -15,6 +15,8 @@ RLS is Postgres-only. It must be representable as a Postgres-target-only IR kind
 Policies are declared via a fourth staged-builder method on the model, alongside `.attributes(...)` and `.sql(...)`:
 
 ```ts
+import { AuthUser, roles as supabaseRoles } from '@prisma-next/extension-supabase/contract';
+
 const Profile = model('Profile', {
   namespace: 'public',
   fields: {
@@ -23,14 +25,14 @@ const Profile = model('Profile', {
     username: field.text(),
   },
 })
-  .relations({ user: rel.belongsTo(supabaseContract.models.AuthUser, { from: 'userId', to: 'id' }) })
+  .relations({ user: rel.belongsTo(AuthUser, { from: 'userId', to: 'id' }) })
   .attributes(({ fields, constraints }) => ({
     uniques: [ constraints.unique(fields.userId, { name: 'profile_userId_unique' }) ],
   }))
   .sql(({ cols, constraints }) => ({
     table: 'profile',
     foreignKeys: [
-      constraints.foreignKey(cols.userId, supabaseContract.models.AuthUser.refs.id, {
+      constraints.foreignKey(cols.userId, AuthUser.refs.id, {
         name: 'profile_userId_fkey',
         onDelete: 'cascade',
       }),
@@ -40,13 +42,13 @@ const Profile = model('Profile', {
     {
       name: 'profiles_select_anon_and_authed',
       operation: 'select',
-      roles: [supabase.roles.anon, supabase.roles.authenticated],
+      roles: [supabaseRoles.anon, supabaseRoles.authenticated],
       using: 'true',
     },
     {
       name: 'profiles_update_own',
       operation: 'update',
-      roles: [supabase.roles.authenticated],
+      roles: [supabaseRoles.authenticated],
       using:     'user_id = (auth.uid())::uuid',
       withCheck: 'user_id = (auth.uid())::uuid',
     },
@@ -75,13 +77,13 @@ The operation is still a closed-set literal on each entry (`operation: 'select' 
   {
     name: 'posts_select_published',
     operation: 'select',
-    roles: [supabase.roles.anon, supabase.roles.authenticated],
+    roles: [supabaseRoles.anon, supabaseRoles.authenticated],
     using: 'is_published = true',
   },
   {
     name: 'posts_update_own',
     operation: 'update',
-    roles: [supabase.roles.authenticated],
+    roles: [supabaseRoles.authenticated],
     using:     ({ ref }) =>
       `author_id IN (SELECT id FROM ${ref(Profile)} WHERE user_id = (auth.uid())::uuid)`,
     withCheck: ({ ref }) =>
@@ -135,7 +137,7 @@ Grammar choices:
 - **Head:** `policy <name> { body }` — existing PSL idiom (`model <Name> { ... }`, `enum <Name> { ... }`, `namespace <Name> { ... }`). Zero new declaration-head primitives.
 - **Body:** `key = value` lines — the existing convention for *configuration-shaped* declarations (datasource, generator). Distinct from the `field Type @attrs...` body shape used for typed members like model fields. The two body-form pattern is an architectural observation deserving its own ADR; see [`decisions.md` OC1](decisions.md).
 - **`as = restrictive`** is an optional body field; default `permissive`. Goes in the body rather than the head so the head is purely identity.
-- **Roles** are bare identifiers (`[anon, authenticated, public]`), matching how Postgres treats role names and how the TS API's `supabase.roles.<id>` resolves. Role names with special characters are out of scope for v0.1 PSL; escape to the TS API.
+- **Roles** are bare identifiers (`[anon, authenticated, public]`), matching how Postgres treats role names and how the TS API's `supabaseRoles.<id>` resolves. Role names with special characters are out of scope for v0.1 PSL; escape to the TS API.
 - **Operation** is a closed-set identifier: `select | insert | update | delete | all`.
 
 **Predicates are plain strings in v0.1 PSL.** Authors type schema-qualified names matching their migrations. Renames in `target = ...` don't auto-track inside subquery predicates. The TS surface's `ref()` helper has no PSL equivalent in v0.1 — the structured-interpolation analogue (`${ModelName}`, `${supabase:auth.User}` inside string literals) is a stretch goal. See [`decisions.md` OC3](decisions.md).
@@ -177,7 +179,7 @@ export const supabase = {
 };
 ```
 
-TS authors use `supabase.roles.authenticated`; plain string role names also work. The constants exist for discoverability and to typo-proof the common cases. PSL uses bare identifiers (`[anon, authenticated]`); the role-name resolution rules at lowering time accept any of: a bare identifier matching a known role, a quoted string, or a member of `supabase.roles`.
+TS authors use `supabaseRoles.authenticated` (imported as `roles as supabaseRoles` from `@prisma-next/extension-supabase/contract`); plain string role names also work. The constants exist for discoverability and to typo-proof the common cases. PSL uses bare identifiers (`[anon, authenticated]`); the role-name resolution rules at lowering time accept any of: a bare identifier matching a known role, a quoted string, or a member of the imported `roles` constants.
 
 ### Implicit `ENABLE ROW LEVEL SECURITY`
 

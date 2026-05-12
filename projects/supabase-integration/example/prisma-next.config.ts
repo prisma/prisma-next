@@ -2,7 +2,7 @@ import 'dotenv/config';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { defineConfig } from '@prisma-next/cli/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
-import { supabase } from '@prisma-next/extension-supabase';
+import supabasePack from '@prisma-next/extension-supabase/pack';
 import sql from '@prisma-next/family-sql/control';
 import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgres from '@prisma-next/target-postgres/control';
@@ -13,7 +13,7 @@ export default defineConfig({
   target: postgres,
   driver: postgresDriver,
   adapter: postgresAdapter,
-  extensionPacks: [supabase.pack()],
+  extensionPacks: [supabasePack],
   contract: typescriptContract(contract, 'src/prisma/contract.json'),
   db: {
     // biome-ignore lint/style/noNonNullAssertion: loaded from .env
