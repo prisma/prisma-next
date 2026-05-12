@@ -110,14 +110,15 @@ describe('runWithMiddleware — intercept', () => {
       expect(driverFactory).not.toHaveBeenCalled();
     });
 
-    it('mixed chain: A is observer-only, B intercepts → A.beforeExecute is NOT called (it was a hit)', async () => {
+    it('mixed chain: A is observer-only, B intercepts → driver is skipped; intercept + afterExecute fire', async () => {
       const events: string[] = [];
 
       const a: RuntimeMiddleware<MockExec> = {
         name: 'A',
-        async beforeExecute() {
-          events.push('A:beforeExecute');
-        },
+        // `beforeExecute` is fired by the family runtime via
+        // `runBeforeExecuteChain` before `runWithMiddleware` is
+        // even reached; it is therefore not visible to interceptors.
+        // See `before-execute-chain.test.ts`.
         async afterExecute() {
           events.push('A:afterExecute');
         },
@@ -144,26 +145,25 @@ describe('runWithMiddleware — intercept', () => {
 
       await result.toArray();
 
-      // beforeExecute is suppressed for ALL middleware on the hit path,
-      // including middleware A which itself didn't intercept.
       expect(events).toEqual(['B:intercept', 'A:afterExecute', 'B:afterExecute']);
       expect(driverFactory).not.toHaveBeenCalled();
     });
   });
 
   describe('hit path', () => {
-    it('skips beforeExecute and onRow; afterExecute fires with source: "middleware"', async () => {
+    it('skips onRow; afterExecute fires with source: "middleware"', async () => {
       const events: string[] = [];
       let observedResult: AfterExecuteResult | undefined;
 
+      // `beforeExecute` is fired by the family runtime via
+      // `runBeforeExecuteChain` before `runWithMiddleware`; it is not
+      // visible at the intercept-vs-driver decision point. Asserted in
+      // `before-execute-chain.test.ts`.
       const interceptor: RuntimeMiddleware<MockExec> = {
         name: 'interceptor',
         async intercept() {
           events.push('intercept');
           return { rows: [{ id: 1 }, { id: 2 }, { id: 3 }] };
-        },
-        async beforeExecute() {
-          events.push('beforeExecute');
         },
         async onRow() {
           events.push('onRow');
@@ -355,9 +355,6 @@ describe('runWithMiddleware — intercept', () => {
           events.push('A:intercept');
           return undefined;
         },
-        async beforeExecute() {
-          events.push('A:beforeExecute');
-        },
         async onRow() {
           events.push('A:onRow');
         },
@@ -387,10 +384,12 @@ describe('runWithMiddleware — intercept', () => {
 
       expect(out).toEqual(driverRows);
       expect(driverFactory).toHaveBeenCalledTimes(1);
+      // `beforeExecute` is fired by `runBeforeExecuteChain` outside this
+      // helper; the event log here only sees `intercept`, `onRow`, and
+      // `afterExecute`.
       expect(events).toEqual([
         'A:intercept',
         'B:intercept',
-        'A:beforeExecute',
         'A:onRow',
         'A:onRow',
         'A:afterExecute',
@@ -404,9 +403,6 @@ describe('runWithMiddleware — intercept', () => {
 
       const observer: RuntimeMiddleware<MockExec> = {
         name: 'observer',
-        async beforeExecute() {
-          events.push('beforeExecute');
-        },
         async onRow() {
           events.push('onRow');
         },
@@ -428,7 +424,7 @@ describe('runWithMiddleware — intercept', () => {
 
       expect(out).toEqual(driverRows);
       expect(driverFactory).toHaveBeenCalledTimes(1);
-      expect(events).toEqual(['beforeExecute', 'onRow', 'afterExecute']);
+      expect(events).toEqual(['onRow', 'afterExecute']);
     });
 
     it('runDriver factory is invoked lazily — only after intercept chain resolves to passthrough', async () => {

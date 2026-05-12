@@ -162,6 +162,32 @@ export interface RuntimeMiddleware<
    * rows directly: caching, mocks, rate limiting, circuit breaking.
    */
   intercept?(plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<InterceptResult | undefined>;
+  /**
+   * Fires after the family runtime has produced a draft execution
+   * plan from the AST, but before the family encodes parameter values
+   * to driver wire format. Mutations applied via the
+   * family-specific `params` mutator are visible to the subsequent
+   * encode step.
+   *
+   * Lifecycle position (SQL example):
+   *   `runBeforeCompile → lowerSqlPlan → beforeExecute → encodeParams → intercept → driver`.
+   *
+   * The `params` argument is a family-specific {@link ParamRefMutator}
+   * scoped to the value slots of `ParamRef` nodes in the plan's AST.
+   * Middleware that doesn't need to mutate params can ignore the
+   * argument; existing `(plan)` / `(plan, ctx)` bodies stay compatible.
+   *
+   * `ctx.signal` carries the per-query `AbortSignal`; middleware that
+   * wraps a network SDK forwards it. Cooperative cancellation
+   * surfaces a `RUNTIME.ABORTED { phase: 'beforeExecute' }` envelope
+   * promptly even when the body ignores the signal.
+   *
+   * Intercept ordering: `intercept` runs *after* this hook; an
+   * interceptor that short-circuits the driver path still observes
+   * the post-`beforeExecute`, fully-encoded plan. The trade-off is
+   * that any `beforeExecute` SDK round-trips happen even when a
+   * downstream interceptor would have skipped the driver entirely.
+   */
   beforeExecute?(
     plan: TPlan,
     ctx: RuntimeMiddlewareContext,
