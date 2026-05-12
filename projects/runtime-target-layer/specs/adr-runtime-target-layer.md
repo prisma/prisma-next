@@ -2,7 +2,7 @@
 
 Status: **Draft** (workspace ADR; promoted to `docs/architecture docs/adrs/` at project close-out).
 
-Related: [TML-2459 — Target-extensible IR](../../target-extensible-ir/spec.md) (same three-layer pattern applied to IR), [ADR 005 — Thin core, fat targets](../../../docs/architecture%20docs/adrs/ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md), [`no-target-branches.mdc`](../../../.cursor/rules/no-target-branches.mdc) (the rule this ADR gives a structural home), [`decisions.md` C12](../decisions.md).
+Related: [TML-2459 — Target-extensible IR](../../target-extensible-ir/spec.md) (same three-layer pattern applied to IR), [ADR 005 — Thin core, fat targets](../../../docs/architecture%20docs/adrs/ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md), [`no-target-branches.mdc`](../../../.cursor/rules/no-target-branches.mdc) (the rule this ADR gives a structural home), [umbrella `decisions.md` C12](../../supabase-integration/decisions.md), this project's [`spec.md`](../spec.md).
 
 ## Context
 
@@ -23,7 +23,7 @@ The Supabase integration project is the first concrete case where a downstream p
 
 - `SET LOCAL role = '...'` + `SET LOCAL request.jwt.claims = '...'` issued on every role-bound execute.
 - Always-in-a-transaction guarantee (`SET LOCAL` requires it; pool reuse demands it).
-- These behaviours **must not** be configurable away by user middleware — they're load-bearing for RLS enforcement (see [`decisions.md` C12](../decisions.md), [`extension-package.md`](../extension-package.md) §"Why `SET LOCAL` is below the middleware chain").
+- These behaviours **must not** be configurable away by user middleware — they're load-bearing for RLS enforcement (see [umbrella `decisions.md` C12](../../supabase-integration/decisions.md), [`extension-supabase` spec](../../extension-supabase/spec.md) §"Runtime architecture").
 
 Three options were considered:
 

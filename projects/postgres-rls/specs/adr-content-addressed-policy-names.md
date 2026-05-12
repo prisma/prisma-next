@@ -123,4 +123,4 @@ The escape hatch we explicitly **do not** want to build in v0.1: an intentionall
 
 - Drafted in the Supabase integration project (v0.1 scope: applies to `PostgresRlsPolicy` only).
 - Promotes to `docs/architecture docs/adrs/` with an assigned number at Supabase project close-out.
-- The per-object-kind backport list (indexes, functions, views, check constraints) is captured in the [decisions log](../decisions.md) as architectural offcut **OC4** for future-project consumption.
+- The per-object-kind backport list (indexes, functions, views, check constraints) is captured in the umbrella [decisions log](../../supabase-integration/decisions.md) as architectural offcut **OC4** for future-project consumption.

@@ -78,7 +78,7 @@ We need an "adopt existing schema" workflow. Sketch:
 
 Beyond scaffold and docs, three small things matter for daily use:
 
-- **Editor completions on extension model handles.** `import { <TAB> } from '@prisma-next/extension-supabase/contract'` should autocomplete to known model and role names. `AuthUser.refs.<TAB>` should autocomplete to its column names. This is a type-level concern carried by the hand-authored typed handles the extension ships; the surface is described in [`cross-contract-refs.md`](cross-contract-refs.md).
+- **Editor completions on extension model handles.** `import { <TAB> } from '@prisma-next/extension-supabase/contract'` should autocomplete to known model and role names. `AuthUser.refs.<TAB>` should autocomplete to its column names. This is a type-level concern carried by the hand-authored typed handles the extension ships; the surface is described in [cross-contract-refs spec](../cross-contract-refs/spec.md).
 - **Editor completions on `roles: [supabaseRoles.<TAB>]`.** The `roles` export from `@prisma-next/extension-supabase/contract` is a typed `as const` object, so completion works naturally; no extra work.
 - **Diagnostic clarity.** When a cross-contract reference fails to resolve, the error message should say *which extension is expected* and *how to add it* (e.g., "model `AuthUser` from contract space `supabase` is referenced but `supabase` is not in `extensionPacks`; add `supabasePack` (from `@prisma-next/extension-supabase/pack`) to `defineContract`'s config"). When an RLS predicate fails Postgres validation at migration time, the error should attach the policy name and the line in the user's contract that declared it.
 

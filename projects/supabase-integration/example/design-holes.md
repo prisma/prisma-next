@@ -18,7 +18,7 @@ Verifier strictness opt-out (e.g. "skip RLS checks for this table") is a *separa
 
 The example app should drop `capabilities.postgres['postgres.rls']: true` from its contract config.
 
-Touches: [`rls.md`](../rls.md) (the capability-key discussion can be removed — there is no capability key), example contract.ts.
+Touches: [postgres-rls spec](../../postgres-rls/spec.md) (the capability-key discussion can be removed — there is no capability key), example contract.ts.
 
 ### ✅ #2 — `rlsPolicy(...)` injection point — **DECIDED: separate `.rls(...)` stage, dict keyed by operation**
 
@@ -108,7 +108,7 @@ This is the first concrete application of the repo-wide policy now codified in [
 
 If a future use case surfaces where the choice is genuinely non-obvious (e.g. the user can't see from local code that the target is externally-managed), the answer is to make the API more explicit (e.g. require `crossContractCascade: true` as a deliberate opt-in beyond `onDelete: 'cascade'`), **not** to add a build-time warning.
 
-Touches: [`cross-contract-refs.md`](../cross-contract-refs.md) — close the open question; permit cascading without diagnostic.
+Touches: [cross-contract-refs spec](../../cross-contract-refs/spec.md) — close the open question; permit cascading without diagnostic.
 
 ### ✅ #4 — `uniqueConstraints` in `.sql()` block — **RESOLVED: the DSL already covers this; example was wrong**
 
@@ -309,7 +309,7 @@ This is invoked once per `(model, operation, kind)` triple at lowering time, bef
 - **Schema/column refs inside expressions.** The current `ref()` surface covers table identifiers. A predicate that wants to reference a *column* qualified by table (`p.user_id`) is still raw. Functions like `auth.uid()` / `auth.role()` are not contract elements in v0.1 (see [C4](../decisions.md)) — they stay as opaque tokens in predicate strings. Add helpers if real predicates demand them. Not a v0.1 requirement — every real-world Supabase RLS example I checked uses bare column names plus `auth.uid()` / `auth.role()` literals.
 - **Escape hatch.** Users who genuinely need a raw SQL fragment with table names baked in can keep using the string form. No diagnostic, no lint — their string, their consequences.
 
-Touches: [`rls.md`](../rls.md) — record this design; remove the verbatim-plus-lint section.
+Touches: [postgres-rls spec](../../postgres-rls/spec.md) — record this design; remove the verbatim-plus-lint section.
 
 ### 🟢 #6 — Cross-namespace `rel.hasMany`
 
@@ -321,7 +321,7 @@ Not exercised in the example (Profile.hasMany(Post) is within `public`). But the
 
 ### ✅ #7 — `middleware` on `SupabaseRuntimeOptions` — DECIDED: add it; forward to base
 
-**Resolution:** add `middleware?: readonly SqlMiddleware[]` to `SupabaseRuntimeOptions`; the `SupabaseRuntime` subclass forwards it to the `super(...)` constructor unchanged. Middleware composes against the base Postgres runtime exactly as if the user had called `postgres({...})` directly. See [`decisions.md` C12](../decisions.md) and [`extension-package.md`](../extension-package.md) §"Runtime facade".
+**Resolution:** add `middleware?: readonly SqlMiddleware[]` to `SupabaseRuntimeOptions`; the `SupabaseRuntime` subclass forwards it to the `super(...)` constructor unchanged. Middleware composes against the base Postgres runtime exactly as if the user had called `postgres({...})` directly. See [`decisions.md` C12](../decisions.md) and [extension-supabase spec](../../extension-supabase/spec.md) §"Runtime facade".
 
 ### ✅ #8 — Middleware ordering relative to role-binding — DECIDED: `SET LOCAL` is below the middleware chain
 
@@ -335,7 +335,7 @@ This is security-by-architecture, not policy:
 
 The only way to bypass `SET LOCAL` is to subclass `SupabaseRuntime` itself — a code-review-visible action, not an accident.
 
-See [`decisions.md` C12](../decisions.md), [`extension-package.md`](../extension-package.md) §"Why `SET LOCAL` is below the middleware chain".
+See [`decisions.md` C12](../decisions.md), [extension-supabase spec](../../extension-supabase/spec.md) §"Why `SET LOCAL` is below the middleware chain".
 
 ### 🟡 #9 — `TypeMaps` generation
 
@@ -355,7 +355,7 @@ Is `db.asAnon()` cheap (memoized handle, no IO) or expensive (acquires a connect
 
 **Resolution:** `db.asUser(jwt).transaction(async (tx) => { ... })` where `tx: RoleBoundDb` is pinned to a single connection across the closure. The `SupabaseRuntime` subclass opens the transaction on the underlying connection and issues `SET LOCAL role = ...; SET LOCAL request.jwt.claims = ...;` once at transaction open. The closure runs against `tx`; on exit, COMMIT (or ROLLBACK on throw) resets the SET LOCAL state before the connection returns to the pool.
 
-Implementation reuses the base SQL runtime's `withTransaction` — the subclass override threads `SET LOCAL` into the transaction-open path. Same shape for `asAnon().transaction()` and `asServiceRole().transaction()`. See [`decisions.md` C12](../decisions.md), [`extension-package.md`](../extension-package.md) §"Implicit transaction".
+Implementation reuses the base SQL runtime's `withTransaction` — the subclass override threads `SET LOCAL` into the transaction-open path. Same shape for `asAnon().transaction()` and `asServiceRole().transaction()`. See [`decisions.md` C12](../decisions.md), [extension-supabase spec](../../extension-supabase/spec.md) §"Implicit transaction".
 
 ### 🟡 #12 — `asUser(jwt).runtime()` lifecycle
 
@@ -369,7 +369,7 @@ Per-call construction or one-runtime-per-Db? Affects observability (where do you
 
 To accommodate the `jwksUrl` warmup path (HTTP fetch on init), `supabase({...})` is **uniformly async**: it returns `Promise<SupabaseDb>` regardless of whether `jwtSecret` or `jwksUrl` is configured. The signing key is in hand before any `asUser(jwt)` call, so `asUser` stays sync. The alternative (sync-when-`jwtSecret` / async-when-`jwksUrl` API split) was rejected — minor ergonomic gain, real API churn.
 
-See [`decisions.md` C12](../decisions.md), [`extension-package.md`](../extension-package.md) §"Why the factory is async".
+See [`decisions.md` C12](../decisions.md), [extension-supabase spec](../../extension-supabase/spec.md) §"Why the factory is async".
 
 ### ✅ #14 — Implicit transaction for `SET LOCAL` — DECIDED: every role-bound execute is in a transaction
 
@@ -380,7 +380,7 @@ See [`decisions.md` C12](../decisions.md), [`extension-package.md`](../extension
 
 `SET LOCAL` never outlives its transaction. Transaction commit/rollback resets it before the connection returns to the pool — the RLS-bypass-footgun is eliminated structurally, not by documentation.
 
-See [`decisions.md` C12](../decisions.md), [`extension-package.md`](../extension-package.md) §"Implicit transaction".
+See [`decisions.md` C12](../decisions.md), [extension-supabase spec](../../extension-supabase/spec.md) §"Implicit transaction".
 
 ## Pinned mirror (`migrations/supabase/contract.json`, `contract.d.ts`)
 
@@ -404,7 +404,7 @@ The original framing assumed extensions ship a generic `Contract` type spec and 
 
 The minimal new type-level work is: a single `ColumnRef<spaceId>` branded type (with `<self>` sentinel for local refs and concrete extension `spaceId`s for cross-contract refs) plus an extension to FK / relation call-site signatures. No mapped type required.
 
-Touches: `cross-contract-refs.md`'s "What's the typed handle returned by `supabase.contract<C>(json)`?" open question — closed; there *is* no such factory in v0.1.
+Touches: [cross-contract-refs spec](../../cross-contract-refs/spec.md)'s "What's the typed handle returned by `supabase.contract<C>(json)`?" open question — closed; there *is* no such factory in v0.1.
 
 ## Cross-cutting
 
@@ -436,9 +436,9 @@ Settled fields of the verifier loop:
 - **Missing policy:** error under `managed`, severity dispatched via control policy.
 - **Extra policy:** governed by table's control policy (managed → error, tolerated → warn, external → ignored, observed → silent).
 
-See [`decisions.md` C9 + C10](../decisions.md) and the design rationale in [`specs/adr-content-addressed-policy-names.md`](../specs/adr-content-addressed-policy-names.md).
+See [`decisions.md` C9 + C10](../decisions.md) and the design rationale in [postgres-rls ADR](../../postgres-rls/specs/adr-content-addressed-policy-names.md).
 
-Touches: [`rls.md`](../rls.md) §"Verifier behaviour" — rewritten to use the content-addressed model.
+Touches: [postgres-rls spec](../../postgres-rls/spec.md) §"Verifier behaviour" — rewritten to use the content-addressed model.
 
 ### ✅ #20 — `supabase.pack()` vs `supabase()` shorthand — DECIDED: subpath-only entrypoints (C6)
 
