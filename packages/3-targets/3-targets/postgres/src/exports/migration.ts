@@ -29,7 +29,11 @@ export {
   type DataTransformOptions,
   dataTransform,
 } from '../core/migrations/operations/data-transform';
-export { createExtension, createSchema } from '../core/migrations/operations/dependencies';
+export {
+  createExtension,
+  createSchema,
+  installExtension,
+} from '../core/migrations/operations/dependencies';
 export {
   addEnumValues,
   createEnumType,

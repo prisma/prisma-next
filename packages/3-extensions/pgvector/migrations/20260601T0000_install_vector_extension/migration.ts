@@ -26,7 +26,7 @@
  * were authored by hand; `node migration.ts` then re-emits
  * `ops.json` + `migration.json` deterministically.
  */
-import { Migration, MigrationCLI, rawSql } from '@prisma-next/target-postgres/migration';
+import { installExtension, Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
 import { PGVECTOR_INVARIANTS } from '../../src/core/contract-space-constants';
 
 export default class M extends Migration {
@@ -39,37 +39,10 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      rawSql({
+      installExtension({
         id: 'pgvector.install-vector-extension',
-        label: 'Enable extension "vector"',
-        operationClass: 'additive',
+        extensionName: 'vector',
         invariantId: PGVECTOR_INVARIANTS.installVector,
-        target: {
-          id: 'postgres',
-          details: {
-            schema: 'public',
-            objectType: 'extension',
-            name: 'vector',
-          },
-        },
-        precheck: [
-          {
-            description: 'verify extension "vector" is not already enabled',
-            sql: "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-          },
-        ],
-        execute: [
-          {
-            description: 'create extension "vector"',
-            sql: 'CREATE EXTENSION IF NOT EXISTS vector',
-          },
-        ],
-        postcheck: [
-          {
-            description: 'confirm extension "vector" is enabled',
-            sql: "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-          },
-        ],
       }),
     ];
   }
