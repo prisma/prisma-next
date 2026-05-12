@@ -57,8 +57,8 @@ describe('mongo contract builder', () => {
       posts: 'Post',
     });
     expect(contract.storage.collections).toEqual({
-      users: {},
-      posts: {},
+      users: { kind: 'mongo-collection' },
+      posts: { kind: 'mongo-collection' },
     });
     expect(contract.models.Post).toEqual({
       storage: {
@@ -141,7 +141,7 @@ describe('mongo contract builder', () => {
       tasks: 'Task',
     });
     expect(contract.storage.collections).toEqual({
-      tasks: {},
+      tasks: { kind: 'mongo-collection' },
     });
     expect(contract.valueObjects).toEqual({
       Address: {
@@ -189,6 +189,7 @@ describe('mongo contract builder', () => {
 
     expect(contract.storage.collections).toEqual({
       users: {
+        kind: 'mongo-collection',
         indexes: [
           { kind: 'mongo-index', keys: [{ field: 'email', direction: 1 }], unique: true },
           {
@@ -257,6 +258,7 @@ describe('mongo contract builder', () => {
 
     expect(contract.storage.collections).toEqual({
       tasks: {
+        kind: 'mongo-collection',
         indexes: [
           { kind: 'mongo-index', keys: [{ field: 'title', direction: 1 }], unique: true },
           {
@@ -393,6 +395,7 @@ describe('mongo contract builder', () => {
 
     expect(contract.storage.collections).toEqual({
       users: {
+        kind: 'mongo-collection',
         options: {
           kind: 'mongo-collection-options',
           collation: { kind: 'mongo-collation-options', locale: 'en', strength: 2 },

@@ -1,8 +1,8 @@
 import type {
+  MongoCollection,
   MongoCollectionOptions,
   MongoContract,
   MongoIndex,
-  MongoStorageCollection,
   MongoValidator,
 } from '@prisma-next/mongo-contract';
 import {
@@ -61,7 +61,7 @@ function convertOptions(o: MongoCollectionOptions): MongoSchemaCollectionOptions
   });
 }
 
-function convertCollection(name: string, def: MongoStorageCollection): MongoSchemaCollection {
+function convertCollection(name: string, def: MongoCollection): MongoSchemaCollection {
   const indexes = (def.indexes ?? []).map(convertIndex);
   return new MongoSchemaCollection({
     name,

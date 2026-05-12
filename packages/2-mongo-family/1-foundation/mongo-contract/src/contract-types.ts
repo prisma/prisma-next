@@ -5,10 +5,8 @@ import type {
   ContractValueObject,
   StorageBase,
 } from '@prisma-next/contract/types';
-import type { MongoCollectionOptions } from './ir/mongo-collection-options';
-import type { MongoIndex } from './ir/mongo-index';
+import type { MongoCollection } from './ir/mongo-collection';
 import type { MongoIndexOptionsInput } from './ir/mongo-index-options';
-import type { MongoValidator } from './ir/mongo-validator';
 
 export type MongoIndexFieldValue = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
 
@@ -28,7 +26,7 @@ export type MongoWildcardProjection = Readonly<Record<string, 0 | 1>>;
  * Authoring-DSL shape for a single index entry on a model — the
  * `indexes` array element accepted by the contract-ts builder. The
  * builder translates these (with model context) into {@link MongoIndex}
- * IR-class instances on `MongoStorageCollection.indexes`.
+ * IR-class instances on `MongoCollection.indexes`.
  */
 export type MongoIndexAuthoringInput = {
   readonly fields: MongoIndexFields;
@@ -42,14 +40,8 @@ export interface MongoIndexKey {
   readonly direction: MongoIndexKeyDirection;
 }
 
-export interface MongoStorageCollection {
-  readonly indexes?: ReadonlyArray<MongoIndex>;
-  readonly validator?: MongoValidator;
-  readonly options?: MongoCollectionOptions;
-}
-
 export type MongoStorage<THash extends string = string> = StorageBase<THash> & {
-  readonly collections: Record<string, MongoStorageCollection>;
+  readonly collections: Record<string, MongoCollection>;
 };
 
 export type MongoModelStorage = {

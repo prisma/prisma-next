@@ -7,6 +7,7 @@ import type {
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '../src/contract-types';
+import type { MongoCollection } from '../src/ir/mongo-collection';
 import type { MongoCollectionOptionsAuthoringInput } from '../src/ir/mongo-collection-options';
 import type { MongoIndexOptionsInput } from '../src/ir/mongo-index-options';
 
@@ -79,7 +80,7 @@ type ContractWithVO = MongoContractWithTypeMaps<
       };
     };
     readonly storage: {
-      readonly collections: { readonly users: Record<string, never> };
+      readonly collections: { readonly users: MongoCollection };
       readonly storageHash: StorageHashBase<'sha256:test-storage'>;
     };
   },

@@ -1,12 +1,12 @@
 import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
 import {
-  MongoCollectionOptions,
+  MongoCollection,
+  type MongoCollectionOptions,
   type MongoCollectionOptionsInput,
   type MongoContract,
-  MongoIndex,
+  type MongoIndex,
   type MongoIndexInput,
-  type MongoStorageCollection,
-  MongoValidator,
+  type MongoValidator,
   type MongoValidatorInput,
 } from '@prisma-next/mongo-contract';
 import type {
@@ -36,39 +36,21 @@ const ADDITIVE_ONLY_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive'],
 };
 
-type MongoStorageCollectionData = {
+type MongoCollectionData = {
   readonly indexes?: readonly (MongoIndex | MongoIndexInput)[];
   readonly validator?: MongoValidator | MongoValidatorInput;
   readonly options?: MongoCollectionOptions | MongoCollectionOptionsInput;
 };
 
-function makeStorageCollection(data: MongoStorageCollectionData): MongoStorageCollection {
-  const collection: Record<string, unknown> = {};
-  if (data.indexes) {
-    collection['indexes'] = data.indexes.map((idx) =>
-      idx instanceof MongoIndex ? idx : new MongoIndex(idx),
-    );
-  }
-  if (data.validator !== undefined) {
-    collection['validator'] =
-      data.validator instanceof MongoValidator
-        ? data.validator
-        : new MongoValidator(data.validator);
-  }
-  if (data.options !== undefined) {
-    collection['options'] =
-      data.options instanceof MongoCollectionOptions
-        ? data.options
-        : new MongoCollectionOptions(data.options);
-  }
-  return collection as MongoStorageCollection;
+function makeStorageCollection(data: MongoCollectionData): MongoCollection {
+  return new MongoCollection(data);
 }
 
 function makeContract(
-  collections: Record<string, MongoStorageCollectionData>,
+  collections: Record<string, MongoCollectionData>,
   storageHash = 'sha256:test-storage',
 ): MongoContract {
-  const builtCollections: Record<string, MongoStorageCollection> = {};
+  const builtCollections: Record<string, MongoCollection> = {};
   for (const [name, data] of Object.entries(collections)) {
     builtCollections[name] = makeStorageCollection(data);
   }

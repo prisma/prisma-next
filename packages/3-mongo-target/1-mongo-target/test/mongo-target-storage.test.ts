@@ -1,5 +1,5 @@
 import { coreHash } from '@prisma-next/contract/types';
-import { MongoIndex } from '@prisma-next/mongo-contract';
+import { MongoCollection, MongoIndex } from '@prisma-next/mongo-contract';
 import { MongoStorageBase } from '@prisma-next/mongo-contract/ir';
 import { describe, expect, it } from 'vitest';
 import {
@@ -27,7 +27,9 @@ describe('MongoTargetStorage', () => {
 
   it('preserves collections passed in (IR-class instances post M2 R2)', () => {
     const collections = {
-      events: { indexes: [new MongoIndex({ keys: [{ field: 'ts', direction: 1 }] })] },
+      events: new MongoCollection({
+        indexes: [new MongoIndex({ keys: [{ field: 'ts', direction: 1 }] })],
+      }),
     };
     const storage = new MongoTargetStorage({ storageHash: hash, collections });
     expect(storage.collections).toBe(collections);
@@ -59,7 +61,7 @@ describe('MongoTargetStorage', () => {
   it('omits namespaces from JSON.stringify (runtime-only class field)', () => {
     const storage = new MongoTargetStorage({
       storageHash: hash,
-      collections: { events: { indexes: [] } },
+      collections: { events: new MongoCollection({ indexes: [] }) },
     });
     const parsed = JSON.parse(JSON.stringify(storage)) as Record<string, unknown>;
     expect(parsed).not.toHaveProperty('namespaces');

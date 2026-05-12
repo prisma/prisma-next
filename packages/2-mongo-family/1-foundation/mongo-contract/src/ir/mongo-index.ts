@@ -22,7 +22,7 @@ export interface MongoIndexInput {
 
 /**
  * Mongo Contract IR node for a single collection index entry (one
- * element of `MongoStorageCollection.indexes`). Lifted from the
+ * element of `MongoCollection.indexes`). Lifted from the
  * pre-M2R2 `MongoStorageIndex` storage interface to a class extending
  * `SchemaNodeBase` per FR18.
  *

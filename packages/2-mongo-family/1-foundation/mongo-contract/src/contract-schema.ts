@@ -311,6 +311,7 @@ const MongoCollectionOptionsSchema = type({
 
 const StorageCollectionSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-collection'",
   'indexes?': MongoStorageIndexSchema.array(),
   'validator?': MongoStorageValidatorSchema,
   'options?': MongoCollectionOptionsSchema,

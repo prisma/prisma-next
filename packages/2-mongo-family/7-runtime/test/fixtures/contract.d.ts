@@ -1,4 +1,5 @@
 import type {
+  MongoCollection,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
@@ -99,7 +100,7 @@ type BlogContract = MongoContract<
   },
   {
     readonly collections: {
-      readonly users: Record<string, never>;
+      readonly users: MongoCollection;
       readonly posts: Record<string, never>;
     };
   },

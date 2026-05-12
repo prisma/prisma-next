@@ -15,6 +15,8 @@ import type {
 } from '@prisma-next/framework-components/components';
 import {
   applyPolymorphicScopeToMongoIndex,
+  MongoCollection,
+  type MongoCollectionInput,
   MongoCollectionOptions,
   type MongoCollectionOptionsAuthoringInput,
   type MongoCollectionOptionsInput,
@@ -26,7 +28,6 @@ import {
   type MongoIndexInput,
   type MongoIndexOptionsInput,
   type MongoStorage,
-  type MongoStorageCollection,
   type MongoTypeMaps,
   validateMongoContract,
 } from '@prisma-next/mongo-contract';
@@ -414,7 +415,7 @@ type DerivedRootModels<Models extends Record<string, AnyModelBuilder>> = Simplif
 }>;
 
 type StorageCollectionsFromModels<Models extends Record<string, AnyModelBuilder>> = Simplify<{
-  readonly [K in keyof Models as CollectionName<Models[K]>]: MongoStorageCollection;
+  readonly [K in keyof Models as CollectionName<Models[K]>]: MongoCollection;
 }>;
 
 type NormalizeRoots<Roots extends Record<string, ModelNameInput>> = Simplify<{
@@ -1271,8 +1272,8 @@ function scopeVariantIndex(
 
 function buildCollections(
   models: Record<string, AnyModelBuilder> | undefined,
-): Record<string, MongoStorageCollection> {
-  const collections: Record<string, MongoStorageCollection> = {};
+): Record<string, MongoCollection> {
+  const intermediate: Record<string, MongoCollectionInput> = {};
   const declaredIndexOwners = new Map<string, string>();
   const modelMap = models ?? {};
   const modelsByName: Record<string, AnyModelBuilder> = {};
@@ -1297,7 +1298,7 @@ function buildCollections(
       continue;
     }
 
-    const existingCollection = collections[modelBuilder.__collection] ?? {};
+    const existingCollection: MongoCollectionInput = intermediate[modelBuilder.__collection] ?? {};
     const existingIndexes = existingCollection.indexes ?? [];
 
     if (existingCollection.options && modelBuilder.__collectionOptions) {
@@ -1354,7 +1355,7 @@ function buildCollections(
       ? toStorageCollectionOptions(modelBuilder.__collectionOptions)
       : undefined;
 
-    collections[modelBuilder.__collection] =
+    intermediate[modelBuilder.__collection] =
       storageIndexes.length > 0
         ? {
             ...existingCollection,
@@ -1369,6 +1370,10 @@ function buildCollections(
           : existingCollection;
   }
 
+  const collections: Record<string, MongoCollection> = {};
+  for (const [name, data] of Object.entries(intermediate)) {
+    collections[name] = new MongoCollection(data);
+  }
   return collections;
 }
 

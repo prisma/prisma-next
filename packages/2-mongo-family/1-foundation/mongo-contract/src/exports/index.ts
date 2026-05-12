@@ -17,7 +17,6 @@ export type {
   MongoModelDefinition,
   MongoModelStorage,
   MongoStorage,
-  MongoStorageCollection,
   MongoTypeMaps,
   MongoTypeMapsPhantomKey,
   MongoWildcardProjection,
@@ -37,6 +36,8 @@ export type {
   MongoCollationStrength,
 } from '../ir/mongo-collation-options';
 export { MongoCollationOptions } from '../ir/mongo-collation-options';
+export type { MongoCollectionInput } from '../ir/mongo-collection';
+export { MongoCollection } from '../ir/mongo-collection';
 export type {
   MongoCollectionOptionsAuthoringInput,
   MongoCollectionOptionsInput,
