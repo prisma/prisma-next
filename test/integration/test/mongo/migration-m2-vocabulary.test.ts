@@ -3,7 +3,11 @@ import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
-import type { MongoContract, MongoStorageCollection } from '@prisma-next/mongo-contract';
+import {
+  MongoCollection,
+  type MongoCollectionInput,
+  type MongoContract,
+} from '@prisma-next/mongo-contract';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import {
   contractToMongoSchemaIR,
@@ -28,9 +32,13 @@ function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
 }
 
 function makeContract(
-  collections: Record<string, MongoStorageCollection>,
+  collections: Record<string, MongoCollectionInput>,
   hashSeed: string,
 ): MongoContract {
+  const normalized: Record<string, MongoCollection> = {};
+  for (const [name, coll] of Object.entries(collections)) {
+    normalized[name] = coll instanceof MongoCollection ? coll : new MongoCollection(coll);
+  }
   return {
     target: 'mongo',
     targetFamily: 'mongo',
@@ -51,7 +59,7 @@ function makeContract(
       ]),
     ),
     storage: {
-      collections,
+      collections: normalized,
       storageHash: coreHash(`sha256:${hashSeed}`),
     },
     capabilities: {},

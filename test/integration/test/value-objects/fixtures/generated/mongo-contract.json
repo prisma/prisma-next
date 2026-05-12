@@ -10,19 +10,31 @@
     "Shop": {
       "fields": {
         "_id": {
-          "type": { "kind": "scalar", "codecId": "mongo/objectId@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/objectId@1"
+          },
           "nullable": false
         },
         "name": {
-          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         },
         "location": {
-          "type": { "kind": "valueObject", "name": "Location" },
+          "type": {
+            "kind": "valueObject",
+            "name": "Location"
+          },
           "nullable": false
         },
         "notes": {
-          "type": { "kind": "valueObject", "name": "Location" },
+          "type": {
+            "kind": "valueObject",
+            "name": "Location"
+          },
           "nullable": true
         }
       },
@@ -36,15 +48,24 @@
     "Location": {
       "fields": {
         "street": {
-          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         },
         "city": {
-          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         },
         "zip": {
-          "type": { "kind": "scalar", "codecId": "mongo/string@1" },
+          "type": {
+            "kind": "scalar",
+            "codecId": "mongo/string@1"
+          },
           "nullable": false
         }
       }
@@ -52,7 +73,9 @@
   },
   "storage": {
     "collections": {
-      "shops": {}
+      "shops": {
+        "kind": "mongo-collection"
+      }
     },
     "storageHash": "sha256:vo-test-storage-hash"
   },

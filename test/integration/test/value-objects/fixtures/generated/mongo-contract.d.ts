@@ -69,7 +69,7 @@ type ContractBase = {
   };
   readonly storage: {
     readonly collections: {
-      readonly shops: Record<string, never>;
+      readonly shops: { readonly kind: 'mongo-collection' };
     };
     readonly storageHash: StorageHash;
   };

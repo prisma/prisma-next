@@ -214,7 +214,9 @@
   },
   "storage": {
     "collections": {
-      "tasks": {},
+      "tasks": {
+        "kind": "mongo-collection"
+      },
       "users": {
         "indexes": [
           {
@@ -224,18 +226,22 @@
                 "field": "email"
               }
             ],
+            "kind": "mongo-index",
             "unique": true
           }
         ],
+        "kind": "mongo-collection",
         "options": {
           "collation": {
+            "kind": "mongo-collation-options",
             "locale": "en",
             "strength": 2
-          }
+          },
+          "kind": "mongo-collection-options"
         }
       }
     },
-    "storageHash": "sha256:7146bd2870044773881d126136be3b87f5b15d6456dafcdc30ac1d834cbbaa6b"
+    "storageHash": "sha256:b09d2fcb1959b566aaa597d86d84e834db396431d5134a983ff3a600908c6786"
   },
   "capabilities": {},
   "extensionPacks": {},

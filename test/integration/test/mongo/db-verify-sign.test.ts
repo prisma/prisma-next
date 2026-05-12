@@ -6,7 +6,7 @@ import {
   mongoTargetDescriptor,
 } from '@prisma-next/family-mongo/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import type { MongoContract } from '@prisma-next/mongo-contract';
+import { MongoCollection, type MongoContract, MongoIndex } from '@prisma-next/mongo-contract';
 import { initMarker } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
@@ -29,9 +29,11 @@ const baseContract: MongoContract = {
   },
   storage: {
     collections: {
-      users: {
-        indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
-      },
+      users: new MongoCollection({
+        indexes: [
+          new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
+        ],
+      }),
     },
     storageHash: coreHash('sha256:verify-test'),
   },
