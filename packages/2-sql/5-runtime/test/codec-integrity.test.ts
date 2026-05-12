@@ -4,6 +4,7 @@ import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import type { SqlRuntimeExtensionDescriptor } from '../src/sql-context';
 import { createStubAdapter, createTestContext } from './utils';
@@ -124,8 +125,8 @@ describe('createExecutionContext — column codec integrity', () => {
               nativeType: column.nativeType,
               codecId: column.codecId,
               nullable: false,
-              ...(column.typeParams ? { typeParams: column.typeParams } : {}),
-              ...(column.typeRef ? { typeRef: column.typeRef } : {}),
+              ...ifDefined('typeParams', column.typeParams),
+              ...ifDefined('typeRef', column.typeRef),
             },
           },
           primaryKey: { columns: ['field'] },
@@ -153,11 +154,12 @@ describe('createExecutionContext — column codec integrity', () => {
       codecId: 'nope/missing@1',
       nativeType: 'vector',
     });
-    expect(() =>
+    const act = () =>
       createTestContext(contract, createStubAdapter(), {
         extensionPacks: [parameterizedExtension()],
-      }),
-    ).toThrow(/CODEC_DESCRIPTOR_MISSING|nope\/missing@1/);
+      });
+    expect(act).toThrow(expect.objectContaining({ code: 'RUNTIME.CODEC_DESCRIPTOR_MISSING' }));
+    expect(act).toThrow(/nope\/missing@1/);
   });
 
   it('throws CODEC_PARAMETERIZATION_MISMATCH when a parameterized codec column lacks typeParams', () => {
@@ -165,11 +167,14 @@ describe('createExecutionContext — column codec integrity', () => {
       codecId: 'pgvector/vector@1',
       nativeType: 'vector',
     });
-    expect(() =>
+    const act = () =>
       createTestContext(contract, createStubAdapter(), {
         extensionPacks: [parameterizedExtension()],
-      }),
-    ).toThrow(/CODEC_PARAMETERIZATION_MISMATCH|pgvector\/vector@1/);
+      });
+    expect(act).toThrow(
+      expect.objectContaining({ code: 'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH' }),
+    );
+    expect(act).toThrow(/pgvector\/vector@1/);
   });
 
   it('throws CODEC_PARAMETERIZATION_MISMATCH when a non-parameterized codec column carries typeParams', () => {
@@ -178,11 +183,14 @@ describe('createExecutionContext — column codec integrity', () => {
       nativeType: 'scalar',
       typeParams: { unexpected: 1 },
     });
-    expect(() =>
+    const act = () =>
       createTestContext(contract, createStubAdapter(), {
         extensionPacks: [nonParameterizedExtension()],
-      }),
-    ).toThrow(/CODEC_PARAMETERIZATION_MISMATCH|test\/scalar@1/);
+      });
+    expect(act).toThrow(
+      expect.objectContaining({ code: 'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH' }),
+    );
+    expect(act).toThrow(/test\/scalar@1/);
   });
 
   it('error message names the (table, column) site for missing codec', () => {
@@ -239,11 +247,12 @@ describe('createExecutionContext — column codec integrity', () => {
       codecId: 'async/vector@1',
       nativeType: 'vector',
     });
-    expect(() =>
+    const act = () =>
       createTestContext(contract, createStubAdapter(), {
         extensionPacks: [asyncParamsSchemaExtension()],
-      }),
-    ).toThrow(/TYPE_PARAMS_INVALID|Promise|synchronous/);
+      });
+    expect(act).toThrow(expect.objectContaining({ code: 'RUNTIME.TYPE_PARAMS_INVALID' }));
+    expect(act).toThrow(/Promise|synchronous/);
   });
 
   it('throws TYPE_PARAMS_INVALID when validateTypeParams encounters an async paramsSchema for a column with typeParams', () => {
@@ -252,11 +261,12 @@ describe('createExecutionContext — column codec integrity', () => {
       nativeType: 'vector',
       typeParams: { length: 1536 },
     });
-    expect(() =>
+    const act = () =>
       createTestContext(contract, createStubAdapter(), {
         extensionPacks: [asyncParamsSchemaExtension()],
-      }),
-    ).toThrow(/TYPE_PARAMS_INVALID|Promise|synchronous/);
+      });
+    expect(act).toThrow(expect.objectContaining({ code: 'RUNTIME.TYPE_PARAMS_INVALID' }));
+    expect(act).toThrow(/Promise|synchronous/);
   });
 
   it('accepts a typeRef column whose typed instance carries typeParams', () => {
