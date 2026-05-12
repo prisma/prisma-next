@@ -101,7 +101,40 @@ describe('encodeParam — CodecRef dispatch', () => {
     expect(wire).toBe('raw');
   });
 
-  it('null/undefined values bypass codec dispatch entirely', async () => {
+  it('undefined values bypass codec dispatch and normalize to null', async () => {
+    let invoked = false;
+    const codec: Codec = defineTestCodec({
+      typeId: 'pgvector/vector@1',
+      encode: (v: number[]) => {
+        invoked = true;
+        return v;
+      },
+      decode: (w: number[]) => w,
+    });
+
+    const contractCodecs: ContractCodecRegistry = {
+      forColumn: () => undefined,
+      forCodecRef: () => codec,
+    };
+
+    const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
+
+    const result = await encodeParam(
+      undefined,
+      {
+        codec: { codecId: 'pgvector/vector@1', typeParams: 1024 },
+        name: 'p0',
+      },
+      0,
+      ctx,
+      contractCodecs,
+    );
+
+    expect(result).toBeNull();
+    expect(invoked).toBe(false);
+  });
+
+  it('null values bypass codec dispatch entirely', async () => {
     let invoked = false;
     const codec: Codec = defineTestCodec({
       typeId: 'pgvector/vector@1',
