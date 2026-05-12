@@ -39,7 +39,7 @@ my-app/
 └── README.md                      # links to getting-started docs
 ```
 
-The example model is `Profile` with RLS policies that match the canonical Supabase "users can read/write their own profile" pattern. It's lifted directly from [`overview.md`](overview.md). The example is small enough to read in one screen, deep enough that the user has seen `refIn`, `c.rlsPolicy`, role constants, and the runtime split.
+The example model is `Profile` with RLS policies that match the canonical Supabase "users can read/write their own profile" pattern. It's lifted directly from [`overview.md`](overview.md). The example is small enough to read in one screen, deep enough that the user has seen a cross-contract FK to `auth.User`, `c.rlsPolicy`, role constants, and the runtime split.
 
 ### Getting-started doc
 
@@ -47,7 +47,7 @@ Lives in `docs/` (canonical) or in the package's `README.md` (entry-point friend
 
 1. **At a glance.** The same canonical code sample from [`overview.md`](overview.md), so users see the surface immediately.
 2. **Setup.** `prisma-next init --supabase`; what env vars to populate; one paragraph on how the Supabase project's database connection URL maps to `DATABASE_URL`.
-3. **Your first model.** Walk through the scaffolded `Profile` model. Explain `refIn`, `posture` (implicit via Supabase contract), `c.rlsPolicy`.
+3. **Your first model.** Walk through the scaffolded `Profile` model. Explain the cross-contract FK (model handle from `supabaseContract.models.AuthUser`), `posture` (implicit via Supabase contract), `c.rlsPolicy`.
 4. **Your first migration.** Run the planner; show the generated DDL; explain what's *not* in it (no `CREATE TABLE auth.users` because it's externally-managed).
 5. **Your first query.** Show `db.asUser(jwt).sql.from(Profile)...`. Show what RLS enforcement looks like (a query that would return another user's row returns empty).
 6. **What's next.** Link to ref docs (Postgres target, contract authoring, RLS, etc.).
@@ -62,8 +62,8 @@ This is the harder DX problem. Existing Supabase apps have:
 We need an "adopt existing schema" workflow. Sketch:
 
 1. `prisma-next adopt --from-database <DATABASE_URL>` introspects the live database and emits an initial `contract.ts` for the user's `public.*` schema.
-   - Tables → `m.model(...)` declarations.
-   - FKs → `m.constraints.ref(...)` or `m.constraints.refIn(...)` depending on the target namespace.
+   - Tables → `model(...)` declarations with `namespace: '<schema>'`.
+   - FKs → `constraints.foreignKey(cols.x, OtherModel.refs.y, …)` — local model handle for in-contract refs, extension contract model handle (e.g. `supabaseContract.models.AuthUser`) for cross-contract refs. Same call shape either way.
    - RLS policies → `c.rlsPolicy({ ... })` with predicates copied verbatim as strings.
    - Posture → `tolerated` for all introspected objects by default (let extras through; don't generate ALTER ops).
 2. The user reviews the emitted `contract.ts`, deletes or moves what they don't want, commits it.
@@ -78,9 +78,9 @@ We need an "adopt existing schema" workflow. Sketch:
 
 Beyond scaffold and docs, three small things matter for daily use:
 
-- **Editor completions on `m.constraints.refIn(supabaseContract, '...', '...')`.** The second and third arguments must autocomplete to known model/field names. This is a type-level concern in `@prisma-next/contract-ts`; the surface is already designed in [`cross-contract-refs.md`](cross-contract-refs.md).
+- **Editor completions on `supabaseContract.models.<TAB>.refs.<TAB>`.** Navigating the typed extension-contract handle must autocomplete to known model names then field names. This is a type-level concern in `@prisma-next/sql-contract-ts`; the surface is already designed in [`cross-contract-refs.md`](cross-contract-refs.md).
 - **Editor completions on `c.rlsPolicy({ roles: [supabase.roles.<TAB>] })`.** The role-constants object is `as const`, so completion works naturally; no extra work.
-- **Diagnostic clarity.** When a cross-contract `refIn` fails to resolve, the error message should say *which extension is expected* and *how to add it* (e.g., "Did you add `supabase()` to `extensionPacks`?"). When an RLS predicate fails Postgres validation at migration time, the error should attach the policy name and the line in the user's contract that declared it.
+- **Diagnostic clarity.** When a cross-contract reference fails to resolve, the error message should say *which extension is expected* and *how to add it* (e.g., "model `AuthUser` from contract space `supabase` is referenced but `supabase` is not in `extensionPacks`; add `supabase: supabase.pack()` to `defineContract`'s config"). When an RLS predicate fails Postgres validation at migration time, the error should attach the policy name and the line in the user's contract that declared it.
 
 ### Documentation deliverables
 
@@ -89,7 +89,7 @@ For v0.1 (specifics to settle when this becomes a real spec):
 - **Getting-started page** (canonical doc).
 - **`@prisma-next/extension-supabase` package README** with quick reference.
 - **RLS reference page** (the policy DSL, predicate string conventions, common patterns).
-- **Cross-contract refs reference page** (`refIn` shape, when to use it, troubleshooting).
+- **Cross-contract refs reference page** (typed extension-contract handles, PSL colon-prefix syntax, troubleshooting).
 - **Posture reference page** (the four postures, when each applies, the user-author defaults).
 - **Migration guide from `@supabase/supabase-js`** (link to scaffold; manual workflow; pointers).
 

@@ -4,7 +4,7 @@
 
 The project ships in seven PRs sequenced foundation → consumers → exemplars → docs. The opening foundation PR introduces the framework SPI interfaces, per-SPI family abstract bases, and the aggregating `Target<TContract, TSchema>` interface. Mongo lands as the first consumer of the foundation (rather than as a parallel stream) so SPI shape disagreements surface against a second family before SQL targets commit to the SPI shape. Postgres SPI shells follow, carrying the `validateContract` → `target.contractSerializer.deserializeContract(json)` migration alongside the structural lift to class-hierarchy IR. The two structural exemplars (enums, then namespace) build on the now-stable foundation; the namespace exemplar splits in two — M5a introduces the namespace concept, multi-tenancy, and the authoring-DSL surface; M5b adds cross-namespace FKs as the load-bearing user-facing capability. Documentation lands at close-out.
 
-The user-facing capabilities this project delivers are: multi-schema Postgres contracts with namespace declarations in PSL and the TS builder; cross-namespace FK references within a contract space (the FL-02 fix that unblocks Supabase's `auth.users` story); connection-bound multi-tenancy via `__unspecified__` + `search_path`. The IR refactor that underwrites these capabilities is invisible to users but is what makes the follow-up Supabase project (RLS policies, `createSupabaseRuntime`, `auth.users` queryable surface) a series of focused feature PRs rather than another foundational reshape.
+The user-facing capabilities this project delivers are: multi-schema Postgres contracts with namespace declarations in PSL (top-level `namespace { … }` blocks; namespaces do not recursively nest) and the TS builder; cross-namespace FK references within a contract space via dot-qualified type references in `@relation` (the FL-02 fix that unblocks Supabase's `auth.users` story); connection-bound multi-tenancy via `__unspecified__` + `search_path`. The IR refactor that underwrites these capabilities is invisible to users but is what makes the follow-up Supabase project (RLS policies, `supabase()` runtime facade, `auth.users` queryable surface) a series of focused feature PRs rather than another foundational reshape.
 
 **Spec:** [`projects/target-extensible-ir/spec.md`](spec.md)
 
@@ -101,9 +101,9 @@ The seven PRs below correspond to the seven milestones (M1, M2, M3, M4, M5a, M5b
 - [ ] Mongo's analog (database name or singleton) decided here in implementation; reflect the call in M2 if that step would benefit from foreshadowing.
 - [ ] Re-key every storage object (table, enum, function, …) by `(namespace.id, name)` rather than `name` alone. Verifier walks two parallel trees of namespace-scoped objects. (FKs are still single-namespace at this milestone — M5b adds the cross-namespace FK shape.)
 - [ ] Authoring DSL — TS builder: top-level `namespaces` declaration list + per-model `namespace` field; defaulting to `__unspecified__` when omitted (FR16a).
-- [ ] Authoring DSL — PSL: structurally parallel surface (top-level namespace block + per-model namespace attribute); the parser path lowers to the same Contract IR shape.
+- [ ] Authoring DSL — PSL: top-level `namespace <name> { … }` blocks (reopenable; namespace blocks do not recursively nest; elements declared outside any block live in `__unspecified__`); the parser path lowers to the same Contract IR shape. AST changes: `PslDocumentAst.namespaces`, `PslField.typeNamespace?` (the latter consumed in M5b).
 - [ ] Multi-tenancy `__unspecified__` resolution end-to-end via connection `search_path` (AC6).
-- [ ] Existing single-namespace contracts migrate mechanically: Postgres contracts get an explicit `public` namespace by default; SQLite gets singleton; Mongo gets analog.
+- [ ] Existing single-namespace contracts migrate mechanically: Postgres contracts default to `__unspecified__` (search_path resolves to `public` at the database level, matching today's behaviour); SQLite gets singleton; Mongo gets analog.
 
 **Validation:** ACs 4a, 5, 6 pass. Multi-namespace + multi-tenancy integration tests green. AC4 (cross-namespace FK demonstration) is *not* yet green at this milestone — it lands in M5b.
 
@@ -115,8 +115,8 @@ The seven PRs below correspond to the seven milestones (M1, M2, M3, M4, M5a, M5b
 
 - [ ] FK reference IR carries a namespace coordinate on both sides (the table side already gains one in M5a; this milestone adds it to the *reference* side).
 - [ ] Verifier dispatches on `(namespace.id, name)` for both ends of an FK; walks across namespaces correctly.
-- [ ] Planner-DDL builder emits qualified `REFERENCES "<schema>"."<table>"("<col>")` clauses.
-- [ ] Authoring DSL: `m.constraints.ref(otherModel)` (TS builder) and PSL equivalent infer the cross-namespace coordinate from the target model's `namespace` field — users do not declare the namespace per-reference.
+- [ ] Planner-DDL builder emits qualified `REFERENCES "<schema>"."<table>"("<col>")` clauses for named namespaces and unqualified `REFERENCES "<table>"("<col>")` for `__unspecified__` (search_path resolves at migration time).
+- [ ] Authoring DSL: `m.constraints.ref(otherModel)` (TS builder) and dot-qualified type references in `@relation` (PSL: `user auth.User @relation(fields: [userId], references: [id])`) infer the cross-namespace coordinate from the target model's `namespace` field — users do not declare the namespace per-reference.
 - [ ] Integration test (PGlite): a Postgres contract with `public.profiles.user_id REFERENCES auth.users(id)` migrates, emits, and verifies end-to-end (FL-02 scenario).
 
 **Validation:** AC4 (cross-namespace FK) passes. FL-02 acceptance demonstrated via PGlite integration test. The Supabase `auth.users` reference shape is now expressible in Prisma Next contracts.

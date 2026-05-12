@@ -65,6 +65,46 @@ Target (3-targets/postgres/, 3-targets/sqlite/, 3-mongo-target/)
 
 Targets concretize family abstract classes for IR nodes and add IR node kinds with no family-level counterpart. For **domain operations** (verification, hydration, future planning), each SPI is its own class hierarchy — framework SPI interface, per-SPI family abstract base, concrete target SPI implementer — and the target is a thin facade that composes one instance per SPI as a named property (`target.contractSerializer`, `target.schemaVerifier`, …). Framework consumers depend on the framework SPI interfaces, never on the concrete target SPI classes; the target itself is reached through an aggregating `Target<TContract, TSchema>` interface (also framework-defined) that exposes the SPI references. Extension/target authors who want to tweak one SPI subclass that one SPI implementer (`class CockroachContractSerializer extends PostgresContractSerializer`) and inject it into a Cockroach target, without touching the others.
 
+### Authoring surface
+
+The IR refactor unlocks new authoring surfaces for namespaces and cross-namespace foreign keys. **PSL gains a single new top-level form — the `namespace` block — and reuses the existing `@relation` mechanism for cross-namespace FKs via dot-qualified type references in the type position.** No new attribute is required.
+
+```psl
+// schema.psl
+
+namespace auth {
+  model User {
+    id    String @id @default(uuid())
+    email String
+  }
+}
+
+namespace public {
+  model Profile {
+    id     String @id @default(uuid())
+    userId String
+    user   auth.User @relation(fields: [userId], references: [id])
+  }
+}
+
+// Backward compatible: top-level models without a namespace block
+// stay valid and live in the reserved `__unspecified__` namespace.
+model LegacyThing {
+  id Int @id
+}
+```
+
+Three properties of the design are load-bearing:
+
+- **`namespace` blocks** group models, enums, composite types, and `types` blocks under a named namespace. The blocks themselves live at the top level only — namespaces do **not** recursively nest inside other namespaces (`namespace a { namespace b { … } }` is a parse error). This mirrors the database reality: Postgres schemas, MySQL databases, and Mongo databases are flat.
+- **Reopenable blocks.** Multiple `namespace foo { … }` blocks merge into one namespace, letting users split a namespace across logical sections of a contract (or across files in a multi-file contract).
+- **Cross-namespace FKs use dot-qualified type references** (`auth.User` in the type position). The `@relation` attribute is unchanged; `references:` continues to take plain column names because the parser knows which model the columns belong to from the type position.
+- **Backward compatible.** Today's flat contracts remain valid. Top-level elements declared outside any `namespace` block live in the reserved `__unspecified__` namespace. Resolution for bare names: local namespace first, then `__unspecified__`, then error. Postgres `__unspecified__` defaults to whatever `search_path` resolves it to at migration time — typically `public`, but also the per-tenant schema in multi-tenancy deployments.
+
+The TS builder surface is kept structurally parallel: `defineContract`'s config gains a `namespaces` declaration list, `model(name, config)` accepts a per-model `namespace` field, and **existing FK call sites need no new syntax** — the model handle returned by `model(...)` carries its namespace coordinate, so `constraints.foreignKey(cols.userId, User.refs.id, …)` and `rel.belongsTo(User, …)` automatically lower to cross-namespace IR when the referenced model lives in a different namespace. The asymmetry vs PSL is mechanical: TS already has variables to carry the namespace, so the dot-qualifier isn't needed; PSL needs the in-source coordinate.
+
+Cross-*contract-space* references (between contracts, not between namespaces in one contract) are out of scope for this project and deferred to follow-up work.
+
 ## Problem
 
 Five concrete pain points motivate this project:
@@ -398,9 +438,21 @@ The two tables are deliberately parallel: a developer who reads the SQL Postgres
 - **FR13.** `Namespace` is a framework-level interface with a convenience abstract base. Postgres ships `PostgresSchema extends NamespaceBase`; SQLite ships a singleton implementation; Mongo ships its analog (database name) or the singleton if its semantics warrant.
 - **FR14.** A reserved sentinel namespace id `__unspecified__` represents connection-bound binding. Targets without native namespacing use it as their default; targets with native namespacing accept it for multi-tenancy / connection-context-resolved contracts.
 - **FR15.** Every storage object in Contract IR and Schema IR belongs to a namespace. The verifier matches contract objects to schema objects via `(namespace.id, name)` rather than `name` alone.
-- **FR16.** Existing single-namespace contracts migrate to the new shape: Postgres contracts get an explicit `public` namespace by default; SQLite contracts get the singleton; Mongo contracts get their analog. The migration is mechanical and the user's authored contract semantics are preserved.
-- **FR16a.** The authoring DSL exposes namespace declarations in both PSL and the TS builder. The basic surface is: a top-level `namespaces` declaration list (PSL: equivalent block) naming the namespaces this contract space owns, plus a per-model `namespace` field naming one of the declared namespaces (defaulting to `__unspecified__` when omitted). PSL and TS builder surfaces are kept structurally parallel — moving between them is mechanical for users.
-- **FR16b.** Cross-namespace FK references within a single contract space are first-class. The FK reference IR carries a namespace coordinate on both sides; the verifier dispatches on `(namespace.id, name)` for both ends; the planner-DDL builder emits qualified `REFERENCES "<schema>"."<table>"("<col>")` clauses. The authoring surface is `m.constraints.ref(otherModel)` (or PSL-equivalent) — the namespace coordinate is inferred from the target model's `namespace` field, not declared per-reference. Cross-*contract-space* FK references remain out of scope per Non-goals.
+- **FR16.** Existing single-namespace contracts migrate to the new shape: Postgres contracts default to `__unspecified__` (the database's `search_path` resolves to `public` by default, matching today's behaviour); SQLite contracts get the singleton; Mongo contracts get their analog. The migration is mechanical and the user's authored contract semantics are preserved. Postgres users explicitly declare `public` (or any other named namespace) when they want a pinned schema; the `__unspecified__` default also enables multi-tenancy contracts where `search_path` resolves the schema per connection without any contract-level changes.
+- **FR16a.** The authoring DSL exposes namespace declarations in both PSL and the TS builder, with surfaces kept structurally parallel so moving between them is mechanical for users.
+
+  **PSL surface:** a new top-level `namespace <name> { … }` block can contain model, enum, composite type, and `types` block declarations. Namespace blocks themselves live only at the top level — they cannot recursively contain other namespace blocks (a `namespace a { namespace b { … } }` form is a parse error; this mirrors the flat-schema reality of every supported database). Blocks are **reopenable**: multiple `namespace foo { … }` blocks in the same file (or across files in a multi-file contract) merge into one namespace. Top-level elements declared outside any namespace block remain valid (backward compat) and live in the reserved `__unspecified__` namespace. Bare-name resolution within a namespace: local namespace first, then `__unspecified__`, then error. Required AST changes: `PslDocumentAst` gains `namespaces: readonly PslNamespaceBlock[]`; root-level `models` / `enums` / `compositeTypes` / `types` continue to live where they are today. `PslField` gains an optional `typeNamespace?: string` carrying the dot-qualifier for cross-namespace type references (see FR16b).
+
+  **TS builder surface:** `defineContract`'s top-level config gains a `namespaces` declaration list (e.g. `namespaces: ['public', 'auth']`) naming the namespaces this contract owns. The `model(name, config)` factory accepts a per-model `namespace` field (e.g. `model('User', { namespace: 'auth', fields: {…} })`) naming one of the declared namespaces, defaulting to `__unspecified__` when omitted. The model-handle return value (with `.refs.<field>` accessors) carries the namespace coordinate so cross-namespace FK references downstream require no new syntax (see FR16b).
+- **FR16b.** Cross-namespace FK references within a single contract space are first-class. The FK reference IR carries a namespace coordinate on both sides; the verifier dispatches on `(namespace.id, name)` for both ends.
+
+  **DDL emission rule.** Named namespaces emit qualified DDL — `ALTER TABLE "public"."profiles" ADD CONSTRAINT … FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id")`. `__unspecified__` targets emit unqualified DDL — `REFERENCES "users"("id")` — and let Postgres's `search_path` resolve the schema at migration time. This is symmetric with `__unspecified__` table-creation DDL (`CREATE TABLE "users"` rather than `CREATE TABLE "<schema>"."users"`) and supports per-tenant multi-tenancy migration runs without contract-level changes — each tenant migration anchors its own FK by OID at creation time via Postgres's standard storage.
+
+  **PSL authoring surface.** Dot-qualified type references in the existing `@relation` mechanism — `user auth.User @relation(fields: [userId], references: [id])`. No new attribute; the namespace coordinate is carried by the type position. `references:` continues to take plain column names.
+
+  **TS builder authoring surface.** No new syntax. The model handle returned by `model(name, config)` carries its namespace coordinate, so existing FK call sites — `constraints.foreignKey(cols.userId, User.refs.id, { name: … })` in the SQL-block constraints DSL, and `rel.belongsTo(User, { from: 'userId', to: 'id' })` in the relations DSL — automatically lower to cross-namespace IR when `User`'s namespace differs from the referencing model's. The namespace coordinate is inferred from the target model handle, never declared per-reference.
+
+  Cross-*contract-space* FK references remain out of scope per Non-goals.
 
 ### Mongo migration
 
@@ -435,7 +487,7 @@ The two tables are deliberately parallel: a developer who reads the SQL Postgres
 - **Cross-contract-space FK references** (`refIn(otherSpace, …)`). The IR refactor unblocks this work but the cross-space reference semantics, authoring DSL, and resolution rules are deferred to a separate project.
 - **RLS policies as first-class IR.** The Postgres-side `RlsPolicy` node, authoring DSL, migration ops, and runtime session-state injection are deferred to the Supabase project (or a dedicated RLS project).
 - **Supabase deliverables.** The `createSupabaseRuntime` factory, `auth.users` queryable surface, Supabase contract package, quickstart scaffold are all deferred. This project ships the IR foundation they need; nothing more.
-- **Richer authoring-DSL ergonomics for namespaces beyond the basic surface.** The basic authoring surface (top-level `namespaces` declaration list + per-model `namespace` field, in both PSL and the TS builder) is in scope per FR16a/AC4a. Richer ergonomics — namespace-as-module imports, namespace-scoped models, ergonomic shortcuts, qualified-name shorthand — are out of scope.
+- **Richer authoring-DSL ergonomics for namespaces beyond the basic surface.** The basic authoring surface (PSL: top-level `namespace { … }` blocks; TS: top-level `namespaces` declaration list + per-model `namespace` field; both with cross-namespace FK refs via existing `@relation` / model-handle mechanisms) is in scope per FR16a / FR16b / AC4 / AC4a. Richer ergonomics — recursive namespace nesting, namespace-as-module imports, qualified-name shorthand for in-namespace types, namespace re-exports, ergonomic shortcuts — are out of scope.
 - **Migration of `databaseDependencies.init`-installed schemas** to first-class IR. That work belongs to the contract-spaces project, not this one.
 - **Schema IR persistence on disk.** Schema IR is an in-memory artifact and stays that way. We have no current or anticipated use for persisting Schema IR. The `ContractSerializer` SPI's symmetric framing applies to Contract IR only; Schema IR's class-hierarchy shape is reached exclusively through introspection.
 
@@ -455,7 +507,13 @@ Independent / non-blocking: [TML-2458](https://linear.app/prisma-company/issue/T
 - [ ] **AC2.** Enum types are first-class IR nodes. After the enum exemplar lands, the codec-hook path for enum verification (`codecHooks.verifyType` / `expandNativeType` calls in `verify-sql-schema.ts` for the enum case) is removed; verification, planning, and contract round-trip of enums all flow through the new IR. Existing enum tests pass without semantic change.
 - [ ] **AC3.** A target adds an IR node kind with no family-level counterpart (e.g. a stub `PostgresExtension` test fixture) without modifying framework or family code. The target's `ContractSerializer` implementation handles the kind in both round-trip directions (`deserializeContract` and `serializeContract`); the target's verifier handles it during verification; framework consumers (display, hashing) round-trip it through JSON.
 - [ ] **AC4.** A Postgres contract declares two namespaces (`public` and `auth`) with tables in each. Tables in each namespace are emitted with the correct namespace qualifier (`CREATE TABLE "auth"."users" (...)`). Cross-namespace FKs from `public.profiles.user_id` to `auth.users(id)` (within the same contract space) are emitted as `ALTER TABLE "public"."profiles" ADD CONSTRAINT ... FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id")` and verification against a live database with both schemas + the FK passes.
-- [ ] **AC4a.** The authoring DSL exposes namespace declaration in both PSL and the TS builder. A contract declares its namespaces in a top-level `namespaces` list (or PSL-equivalent), each model carries a `namespace` field naming one of the declared namespaces (defaulting to `__unspecified__` when omitted), and `m.constraints.ref(otherModel)` (or PSL-equivalent) infers the cross-namespace coordinate from the target model. A round-trip authoring → contract.json → re-hydrated Contract IR preserves the declared namespaces and per-model assignments.
+- [ ] **AC4a.** The authoring DSL exposes namespace declaration in both PSL and the TS builder.
+
+  **TS builder:** `defineContract`'s config declares a `namespaces` list; each `model(...)` call carries a `namespace` field naming one of the declared namespaces (defaulting to `__unspecified__` when omitted). Cross-namespace FK references require no new syntax — the model handle carries the namespace coordinate, so existing `constraints.foreignKey(cols.x, OtherModel.refs.y, …)` (SQL-block constraints) and `rel.belongsTo(OtherModel, …)` (relations DSL) call sites lower to cross-namespace IR automatically.
+
+  **PSL:** a contract declares its namespaces via top-level `namespace <name> { … }` blocks (reopenable; multiple blocks for the same name merge; namespace blocks do not recursively contain other namespace blocks); top-level elements declared outside any namespace block live in `__unspecified__` (backward compat); cross-namespace FK references use dot-qualified type references in `@relation` (`auth.User @relation(fields: [userId], references: [id])`).
+
+  A round-trip authoring → contract.json → re-hydrated Contract IR preserves the declared namespaces and per-model assignments for both authoring surfaces.
 - [ ] **AC5.** A SQLite contract uses the singleton `__unspecified__` namespace; the SQL emitter elides namespace qualifiers; the verifier matches contract to schema correctly.
 - [ ] **AC6.** A multi-tenancy Postgres contract uses `__unspecified__` for its tables; the connection's `search_path` (or equivalent binding) resolves the namespace at runtime. Demonstrated end-to-end via a multi-tenancy integration test.
 - [ ] **AC7.** Mongo's Contract IR and Schema IR are migrated to the 3-layer split; existing Mongo tests pass; the family/target boundary is observable in code (family-mongo abstract bases consumed by target-mongo concrete classes).

@@ -83,7 +83,13 @@ export const supabase = {
   /** Extension-pack factory. Used in prisma-next.config.ts → extensionPacks. */
   pack: (options?: SupabaseOptions): ExtensionPack => { /* … */ },
 
-  /** Wrap an imported contract.json with its typed shape; required for refIn() typing. */
+  /**
+   * Wrap an imported contract.json with its typed shape. Returns a typed handle
+   * exposing `.models.<Name>.refs.<field>` accessors for cross-contract FK
+   * references. The handle is branded with `spaceId: 'supabase'` so the framework
+   * detects cross-contract usage automatically when the handle is passed to
+   * existing call sites like `constraints.foreignKey` and `rel.belongsTo`.
+   */
   contract: <C>(json: unknown): TypedContract<C> => { /* … */ },
 
   /** Typed role constants for use in RLS policies. */
