@@ -1,0 +1,56 @@
+import type { JsonObject } from '@prisma-next/utils/json';
+
+/**
+ * Framework SPI for moving a contract between its canonical on-disk JSON
+ * form and its in-memory class-hierarchy form. Both directions live on the
+ * same SPI so the conceptual seam — "the boundary where the contract
+ * crosses between persisted JSON and live class instances" — has a single
+ * named home.
+ *
+ * Both faces are needed by the framework today (round-trip property tests,
+ * drift detection, future canonicalization), not eventually. For most
+ * targets `serializeContract` is identity over JSON-clean class instances;
+ * the method exists because the seam is real, not as a convention placeholder.
+ *
+ * Implementers compose this SPI as a named property on their target
+ * descriptor (`descriptor.contractSerializer`); the descriptor itself
+ * remains the aggregator of all per-target SPIs.
+ *
+ * Test stub: see `createIdentityContractSerializer` for tests that don't
+ * exercise serialization.
+ */
+export interface ContractSerializer<TContract> {
+  /**
+   * Validate the JSON shape and construct typed class instances. Throws on
+   * structural / domain / storage validation failures. Returns the typed
+   * contract on success.
+   */
+  deserializeContract(json: unknown): TContract;
+
+  /**
+   * Serialize a typed contract to its canonical JSON shape. Returns
+   * `JsonObject` so callers can stringify, hash, or feed the result into
+   * another SPI without re-asserting JSON-cleanness. Targets whose contract
+   * fields are JSON-clean by construction return the contract unchanged
+   * (the symmetric pair to `deserializeContract`); targets that need to
+   * canonicalize on the way out (key ordering, dropping computed-only
+   * fields, normalizing numeric encodings) do that work here.
+   */
+  serializeContract(contract: TContract): JsonObject;
+}
+
+/**
+ * Identity-function `ContractSerializer` for tests that don't exercise
+ * serialization. Construct contracts in test code as plain objects, satisfy
+ * the SPI shape, and reach for a real target descriptor's serializer when
+ * a test actually walks the JSON ⇄ class-hierarchy boundary.
+ */
+export function createIdentityContractSerializer<TContract>(): ContractSerializer<TContract> {
+  return {
+    deserializeContract: (json: unknown): TContract => json as TContract,
+    // Most targets' contract class fields are JSON-clean by construction —
+    // the cast asserts that and is the same shape the family abstract
+    // bases use as the default `serializeContract` implementation.
+    serializeContract: (contract: TContract): JsonObject => contract as unknown as JsonObject,
+  };
+}
