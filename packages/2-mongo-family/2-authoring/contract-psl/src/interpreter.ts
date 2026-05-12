@@ -12,6 +12,7 @@ import type {
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   applyPolymorphicScopeToMongoIndex,
+  MongoCollection,
   MongoIndex,
   type MongoIndexKeyDirection,
 } from '@prisma-next/mongo-contract';
@@ -1040,7 +1041,30 @@ export function interpretPslDocumentToMongoContract(
 
   const target = 'mongo';
   const targetFamily = 'mongo';
-  const storageWithoutHash = { collections: resolvedCollections };
+  const collectionsAsClasses: Record<string, MongoCollection> = {};
+  for (const [name, coll] of Object.entries(resolvedCollections)) {
+    const input: {
+      indexes?: ReadonlyArray<MongoIndex>;
+      validator?: unknown;
+      options?: unknown;
+    } = {};
+    if (coll['indexes'] !== undefined) {
+      input.indexes = coll['indexes'] as ReadonlyArray<MongoIndex>;
+    }
+    if (coll['validator'] !== undefined) {
+      input.validator = coll['validator'];
+    }
+    if (coll['options'] !== undefined) {
+      input.options = coll['options'];
+    }
+    // input.validator/options are arktype-validated JSON shapes; MongoCollection
+    // constructor normalises them into MongoValidator / MongoCollectionOptions
+    // instances. The narrow cast is bounded to the field-typed input record.
+    collectionsAsClasses[name] = new MongoCollection(
+      input as ConstructorParameters<typeof MongoCollection>[0],
+    );
+  }
+  const storageWithoutHash = { collections: collectionsAsClasses };
   const storageHash = computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
   const capabilities: Record<string, Record<string, boolean>> = {};
 

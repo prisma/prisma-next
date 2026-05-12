@@ -1,6 +1,6 @@
 import type { ContractField, ContractReferenceRelation } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import { MongoValidator } from '@prisma-next/mongo-contract';
+import { MongoCollection, MongoValidator } from '@prisma-next/mongo-contract';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import {
@@ -782,7 +782,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         storage: {
           storageHash: expect.stringMatching(/^sha256:/),
           collections: {
-            users: {
+            users: new MongoCollection({
               validator: new MongoValidator({
                 jsonSchema: {
                   bsonType: 'object',
@@ -797,8 +797,8 @@ describe('interpretPslDocumentToMongoContract', () => {
                 validationLevel: 'strict',
                 validationAction: 'error',
               }),
-            },
-            posts: {
+            }),
+            posts: new MongoCollection({
               validator: new MongoValidator({
                 jsonSchema: {
                   bsonType: 'object',
@@ -814,7 +814,7 @@ describe('interpretPslDocumentToMongoContract', () => {
                 validationLevel: 'strict',
                 validationAction: 'error',
               }),
-            },
+            }),
           },
         },
         extensionPacks: {},

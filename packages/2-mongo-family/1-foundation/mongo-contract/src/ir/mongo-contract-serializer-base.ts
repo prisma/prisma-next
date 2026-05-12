@@ -5,6 +5,7 @@ import { type as arktypeType } from 'arktype';
 import { MongoContractSchema } from '../contract-schema';
 import type { MongoContract } from '../contract-types';
 import { validateMongoStorage } from '../validate-storage';
+import { MongoCollection, type MongoCollectionInput } from './mongo-collection';
 
 /**
  * Mongo family `ContractSerializer` abstract base. Owns the family-shared
@@ -44,13 +45,18 @@ export abstract class MongoContractSerializerBase<TContract>
   /**
    * Family-shared structural validation: parse against the Mongo
    * contract arktype schema, then run framework-shared domain + Mongo
-   * family storage checks. Targets can override to add target-specific
-   * structural checks; most targets accept the family default.
+   * family storage checks, then hydrate the validated tree into Mongo
+   * Contract IR class instances. Targets can override to add
+   * target-specific structural checks; most targets accept the family
+   * default.
    *
-   * Returns the validated value (still in flat-data JSON shape); the
-   * IR-class-flip for Contract IR leaf nodes (`MongoIndex`,
-   * `MongoIndexOptions`, …) lands in a later commit and reshapes this
-   * return value to instantiated AST classes.
+   * The returned `MongoContract` carries class instances under
+   * `storage.collections` (each value is a `MongoCollection`, with
+   * nested `MongoIndex` / `MongoValidator` / `MongoCollectionOptions`
+   * constructed by the `MongoCollection` constructor). The rest of the
+   * contract envelope (models, valueObjects, capabilities, …) remains
+   * in plain-JSON form; those IR layers are handled by sibling
+   * subsystems and don't sit behind this SPI.
    */
   protected parseMongoContractStructure(json: unknown): MongoContract {
     const parsed = MongoContractSchema(json);
@@ -63,17 +69,43 @@ export abstract class MongoContractSerializerBase<TContract>
     // envelope) but not nominally so: the arktype DSL produces a type whose
     // optional/readonly profile, narrowed string-literal positions, and
     // utility-type wrappings (`Type.infer`, `Out`, …) differ from the
-    // hand-authored `MongoContract<S, M>` generic surface that downstream
-    // consumers depend on. The schema and the type are kept in lockstep by
-    // the round-trip fixtures under `test/validate.test.ts`. The double
-    // cast is the documented escape hatch from arktype's nominal-output
-    // representation to the project's nominal-contract representation.
-    const contract = parsed as unknown as MongoContract;
+    // hand-authored `MongoContract<S, M>` generic surface. The schema and
+    // the type are kept in lockstep by the round-trip fixtures under
+    // `test/validate.test.ts`. The hydration walk below additionally
+    // re-shapes `storage.collections` from plain data into IR-class
+    // instances, so the `MongoContract` returned here carries class
+    // identity under `storage.collections.*` (and transitively under
+    // `indexes` / `validator` / `options`).
+    const validatedShape = parsed as unknown as MongoContract;
 
-    validateContractDomain(contract);
-    validateMongoStorage(contract);
+    const hydratedContract = this.hydrateMongoContract(validatedShape);
 
-    return contract;
+    validateContractDomain(hydratedContract);
+    validateMongoStorage(hydratedContract);
+
+    return hydratedContract;
+  }
+
+  /**
+   * Walk a structurally-validated Mongo contract and convert
+   * `storage.collections` entries from plain data into
+   * `MongoCollection` IR-class instances. Idempotent: already-class
+   * instances pass through unchanged.
+   */
+  protected hydrateMongoContract(contract: MongoContract): MongoContract {
+    const rawCollections = contract.storage.collections;
+    const hydrated: Record<string, MongoCollection> = {};
+    for (const [name, raw] of Object.entries(rawCollections)) {
+      hydrated[name] =
+        raw instanceof MongoCollection ? raw : new MongoCollection(raw as MongoCollectionInput);
+    }
+    return {
+      ...contract,
+      storage: {
+        ...contract.storage,
+        collections: hydrated,
+      },
+    };
   }
 
   /**

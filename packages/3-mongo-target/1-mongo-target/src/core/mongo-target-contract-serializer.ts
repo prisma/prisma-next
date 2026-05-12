@@ -15,9 +15,11 @@ import { MongoTargetStorage } from './mongo-target-storage';
  * multi-namespace support (M5a) bind to the unspecified singleton
  * without the call site declaring anything.
  *
- * Leaf shapes (collections, indexes, validators, options) remain in
- * their existing flat-data shape this round; the IR-node class flip
- * lands in M2 R2.
+ * `validated.storage.collections` already carries `MongoCollection` IR
+ * class instances by the time this method runs — the family-base
+ * `hydrateMongoContract` walks the arktype-validated tree and
+ * constructs class instances before validation. The target serializer
+ * just wraps the envelope.
  */
 export class MongoTargetContractSerializer extends MongoContractSerializerBase<MongoTargetContract> {
   protected constructTargetContract(validated: MongoContract): MongoTargetContract {
