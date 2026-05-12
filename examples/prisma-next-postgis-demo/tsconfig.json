@@ -16,7 +16,6 @@
     "app/**/*.tsx",
     "test/**/*.ts",
     "scripts/**/*.ts",
-    "prisma/**/*.ts",
     "prisma-next.config.ts",
     "next-env.d.ts",
     ".next/types/**/*.ts"

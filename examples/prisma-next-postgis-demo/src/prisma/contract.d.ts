@@ -15,7 +15,6 @@ import type { Timetz } from '@prisma-next/target-postgres/codec-types';
 import type { Interval } from '@prisma-next/target-postgres/codec-types';
 import type { CodecTypes as PostgisTypes } from '@prisma-next/extension-postgis/codec-types';
 import type { Geometry } from '@prisma-next/extension-postgis/codec-types';
-import type { OperationTypes as PostgisOperationTypes } from '@prisma-next/extension-postgis/operation-types';
 import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';
 import type { QueryOperationTypes as PostgisQueryOperationTypes } from '@prisma-next/extension-postgis/operation-types';
 
@@ -38,7 +37,6 @@ export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
 
 export type CodecTypes = PgTypes & PostgisTypes;
-export type OperationTypes = PostgisOperationTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
   PostgisQueryOperationTypes<CodecTypes>;
@@ -82,7 +80,6 @@ export type FieldInputTypes = {
 };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
-  OperationTypes,
   QueryOperationTypes,
   FieldOutputTypes,
   FieldInputTypes
@@ -309,13 +306,6 @@ type ContractBase = ContractType<
               readonly package: '@prisma-next/extension-postgis/codec-types';
             },
           ];
-        };
-        readonly operationTypes: {
-          readonly import: {
-            readonly alias: 'PostgisOperationTypes';
-            readonly named: 'OperationTypes';
-            readonly package: '@prisma-next/extension-postgis/operation-types';
-          };
         };
         readonly queryOperationTypes: {
           readonly import: {
