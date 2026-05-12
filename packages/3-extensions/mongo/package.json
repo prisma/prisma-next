@@ -54,6 +54,7 @@
     "node": ">=20"
   },
   "exports": {
+    ".": "./dist/index.mjs",
     "./config": "./dist/config.mjs",
     "./contract-builder": "./dist/contract-builder.mjs",
     "./family": "./dist/family.mjs",

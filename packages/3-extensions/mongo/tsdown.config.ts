@@ -5,6 +5,7 @@ export default defineConfig({
     'src/exports/config.ts',
     'src/exports/contract-builder.ts',
     'src/exports/family.ts',
+    'src/exports/index.ts',
     'src/exports/runtime.ts',
     'src/exports/target.ts',
   ],

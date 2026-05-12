@@ -114,7 +114,7 @@ describe.each(
         '',
       ].join('\n'),
     );
-    TML_2487_seam(ctx.project, run);
+    TML_2487_seam(run);
   });
 
   it('step 6 (user code: control import) (TML-2314 seam)', async () => {
@@ -129,7 +129,7 @@ describe.each(
         '',
       ].join('\n'),
     );
-    TML_2314_seam(ctx.project, run);
+    TML_2314_seam(run);
   });
 });
 
@@ -186,7 +186,7 @@ const TML_2486_seam = (cell: CellId, project: JourneyProject, result: StepResult
 const TML_2487_seam = seamExpectation<StepResult>({
   ticket: 'TML-2487',
   description: '@prisma-next/mongo re-exports ObjectId',
-  status: 'broken',
+  status: 'fixed',
   whenBroken: (r) => {
     expect(r.exitCode, 'TML-2487 still broken: ObjectId import must currently fail').not.toBe(0);
   },
@@ -302,7 +302,8 @@ function formatStepDiagnostic(
   ].join('\n');
 }
 
-function indent(text: string, prefix: string): string {
+function indent(text: string | undefined, prefix: string): string {
+  if (text === undefined || text.length === 0) return `${prefix}<empty>`;
   return text
     .split('\n')
     .map((line) => `${prefix}${line}`)

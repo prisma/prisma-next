@@ -14,6 +14,7 @@
  * TML-2485-class bugs in the failure surface.
  */
 
+import { Buffer } from 'node:buffer';
 import { execFile } from 'node:child_process';
 import {
   existsSync,
@@ -201,13 +202,31 @@ async function runExec(
 ): Promise<CommandRun> {
   const maxBuffer = (options.maxBufferMb ?? 16) * 1024 * 1024;
   try {
-    const { stdout, stderr } = await execFileAsync(bin, args as string[], { cwd, maxBuffer });
-    return { exitCode: 0, stdout, stderr };
+    const { stdout, stderr } = await execFileAsync(bin, args as string[], {
+      cwd,
+      maxBuffer,
+      encoding: 'utf-8',
+    });
+    return { exitCode: 0, stdout: asString(stdout), stderr: asString(stderr) };
   } catch (error) {
-    const e = error as { code?: number; stdout?: string; stderr?: string; message?: string };
+    const e = error as { code?: number; stdout?: unknown; stderr?: unknown; message?: string };
     const exitCode = typeof e.code === 'number' ? e.code : 1;
-    return { exitCode, stdout: e.stdout ?? '', stderr: e.stderr ?? e.message ?? '' };
+    return {
+      exitCode,
+      stdout: asString(e.stdout),
+      stderr: asString(e.stderr) || (e.message ?? ''),
+    };
   }
+}
+
+function asString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value === undefined || value === null) return '';
+  // execFile with the default encoding returns Buffers; convert.
+  if (value instanceof Uint8Array || Buffer.isBuffer(value)) {
+    return Buffer.from(value).toString('utf-8');
+  }
+  return String(value);
 }
 
 // --- Workspace tarball preparation -----------------------------------------
