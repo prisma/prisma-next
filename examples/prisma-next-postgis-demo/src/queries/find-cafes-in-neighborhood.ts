@@ -7,10 +7,10 @@ import { db } from '../prisma/db';
  *
  * SQL: WHERE ST_Within(location, $boundary)
  */
-export function findCafesInNeighborhood(boundary: Geometry, runtime?: Runtime) {
+export function findCafesInNeighborhood(boundary: Geometry, runtime: Runtime) {
   const plan = db.sql.cafe
     .select('id', 'name')
     .where((f, fns) => fns.within(f.location, boundary))
     .build();
-  return (runtime ?? db.runtime()).execute(plan);
+  return runtime.execute(plan);
 }

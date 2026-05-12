@@ -12,12 +12,12 @@ import { db } from '../prisma/db';
  *   ORDER BY ST_DistanceSphere(location, $point) ASC
  *   LIMIT $limit
  */
-export function findCafesNearPoint(point: Geometry, limit = 10, runtime?: Runtime) {
+export function findCafesNearPoint(point: Geometry, limit: number, runtime: Runtime) {
   const plan = db.sql.cafe
     .select('id', 'name')
     .select('meters', (f, fns) => fns.distanceSphere(f.location, point))
     .orderBy((f, fns) => fns.distanceSphere(f.location, point), { direction: 'asc' })
     .limit(limit)
     .build();
-  return (runtime ?? db.runtime()).execute(plan);
+  return runtime.execute(plan);
 }

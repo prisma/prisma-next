@@ -187,7 +187,13 @@ const downtownViewport = bboxPolygon([-122.425, 37.775, -122.4, 37.8], 4326);
 ## Query examples
 
 Every example lives in `src/queries/` and each file documents its SQL
-shape in a header comment.
+shape in a header comment. Each query takes the runtime as its last
+argument — typically obtained via `db.connect({ url })`.
+
+```typescript
+import { db } from './src/prisma/db';
+const runtime = await db.connect({ url: process.env['DATABASE_URL']! });
+```
 
 ### 1. Distance — `findCafesNearPoint`
 
@@ -200,7 +206,7 @@ import { point } from '@prisma-next/extension-postgis/geojson';
 import { findCafesNearPoint } from './src/queries/find-cafes-near-point';
 
 const ferryBuilding = point(-122.3937, 37.7955, 4326);
-const closest = await findCafesNearPoint(ferryBuilding, 5);
+const closest = await findCafesNearPoint(ferryBuilding, 5, runtime);
 // → [{ id, name: 'Blue Bottle (Mint Plaza)', meters: 1234.5 }, …]
 ```
 
@@ -210,7 +216,7 @@ Cafes within `metres` of a query point, using
 `ST_DistanceSphere(...) <= $metres`.
 
 ```typescript
-const within2km = await findCafesWithinRadius(ferryBuilding, 2_000);
+const within2km = await findCafesWithinRadius(ferryBuilding, 2_000, 50, runtime);
 ```
 
 ### 3. Containment (point-in-polygon) — `findNeighborhoodForPoint`
@@ -218,7 +224,7 @@ const within2km = await findCafesWithinRadius(ferryBuilding, 2_000);
 Reverse geocode a point against polygon boundaries with `ST_Contains`.
 
 ```typescript
-const inside = await findNeighborhoodForPoint(sightglass);
+const inside = await findNeighborhoodForPoint(sightglass, runtime);
 // → [{ id, name: 'SoMa' }]
 ```
 
@@ -227,7 +233,7 @@ const inside = await findNeighborhoodForPoint(sightglass);
 Find cafes whose `location` is inside a polygon using `ST_Within`.
 
 ```typescript
-const somaCafes = await findCafesInNeighborhood(soma);
+const somaCafes = await findCafesInNeighborhood(soma, runtime);
 ```
 
 ### 5. Intersection — `findRoutesIntersecting`
@@ -237,7 +243,7 @@ Routes whose path intersects an arbitrary geometry — typically a polygon
 
 ```typescript
 const closure = polygon(/* downtown polygon */);
-const affected = await findRoutesIntersecting(closure);
+const affected = await findRoutesIntersecting(closure, runtime);
 ```
 
 ### 6. Bounding box — `findCafesInBbox`
@@ -247,7 +253,7 @@ operator (compares 2-D bounding boxes only — the `intersectsBbox`
 operation in the extension).
 
 ```typescript
-const inViewport = await findCafesInBbox([-122.425, 37.775, -122.4, 37.8]);
+const inViewport = await findCafesInBbox([-122.425, 37.775, -122.4, 37.8], runtime);
 ```
 
 ### 7. Ordering by distance

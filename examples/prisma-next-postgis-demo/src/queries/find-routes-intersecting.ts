@@ -8,10 +8,10 @@ import { db } from '../prisma/db';
  *
  * SQL: WHERE ST_Intersects(path, $other)
  */
-export function findRoutesIntersecting(other: Geometry, runtime?: Runtime) {
+export function findRoutesIntersecting(other: Geometry, runtime: Runtime) {
   const plan = db.sql.route
     .select('id', 'name')
     .where((f, fns) => fns.intersects(f.path, other))
     .build();
-  return (runtime ?? db.runtime()).execute(plan);
+  return runtime.execute(plan);
 }

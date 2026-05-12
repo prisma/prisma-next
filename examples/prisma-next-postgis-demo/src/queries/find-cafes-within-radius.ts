@@ -14,13 +14,13 @@ import { db } from '../prisma/db';
 export function findCafesWithinRadius(
   point: Geometry,
   metres: number,
-  limit = 50,
-  runtime?: Runtime,
+  limit: number,
+  runtime: Runtime,
 ) {
   const plan = db.sql.cafe
     .select('id', 'name')
     .where((f, fns) => fns.lte(fns.distanceSphere(f.location, point), metres))
     .limit(limit)
     .build();
-  return (runtime ?? db.runtime()).execute(plan);
+  return runtime.execute(plan);
 }

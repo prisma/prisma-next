@@ -11,14 +11,11 @@ import { db } from '../prisma/db';
  *
  * @param bbox - `[minLng, minLat, maxLng, maxLat]`.
  */
-export function findCafesInBbox(
-  bbox: readonly [number, number, number, number],
-  runtime?: Runtime,
-) {
+export function findCafesInBbox(bbox: readonly [number, number, number, number], runtime: Runtime) {
   const envelope = bboxPolygon(bbox, 4326);
   const plan = db.sql.cafe
     .select('id', 'name')
     .where((f, fns) => fns.intersectsBbox(f.location, envelope))
     .build();
-  return (runtime ?? db.runtime()).execute(plan);
+  return runtime.execute(plan);
 }

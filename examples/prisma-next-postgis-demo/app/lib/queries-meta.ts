@@ -18,6 +18,9 @@ export type QueryMeta = {
   group: QueryGroup;
 };
 
+/**
+ * Query strings displayed in the UI, not executed.
+ */
 export const QUERY_META: Record<QueryId, QueryMeta> = {
   near: {
     id: 'near',

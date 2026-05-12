@@ -7,10 +7,10 @@ import { db } from '../prisma/db';
  *
  * SQL: WHERE ST_Contains(boundary, $point)
  */
-export function findNeighborhoodForPoint(point: Geometry, runtime?: Runtime) {
+export function findNeighborhoodForPoint(point: Geometry, runtime: Runtime) {
   const plan = db.sql.neighborhood
     .select('id', 'name')
     .where((f, fns) => fns.contains(f.boundary, point))
     .build();
-  return (runtime ?? db.runtime()).execute(plan);
+  return runtime.execute(plan);
 }
