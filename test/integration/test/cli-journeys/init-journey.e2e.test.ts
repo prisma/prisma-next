@@ -27,12 +27,14 @@ import {
   type CommandRun,
   cellLabel,
   createJourneyProject,
-  dbInit,
   emitContract,
   type JourneyProject,
+  migrationApply,
+  migrationPlan,
   runUserCode,
   type StepResult,
   seamExpectation,
+  selfEmitLatestMigration,
 } from './init-journey/harness';
 
 /** Per-cell journey runtime artefacts, populated once in `beforeAll`. */
@@ -40,7 +42,9 @@ interface JourneyContext {
   readonly project: JourneyProject;
   readonly database: DatabaseHandle | null;
   readonly emit: StepResult | null;
-  readonly dbInit: StepResult | null;
+  readonly migrationPlan: StepResult | null;
+  readonly migrationEmit: StepResult | null;
+  readonly migrationApply: StepResult | null;
 }
 
 describe.each(
@@ -96,9 +100,27 @@ describe.each(
     ).toBe(true);
   });
 
-  it('step 4 (db init): provisions the schema (TML-2486 seam)', () => {
-    const result = ctx.dbInit;
-    expect(result, 'db init was not run (precondition failure)').not.toBeNull();
+  it('step 4a (migration plan): materialises a create-from-scratch migration draft', () => {
+    const result = ctx.migrationPlan;
+    expect(result, 'migration plan was not run (precondition failure)').not.toBeNull();
+    if (result === null) return;
+    expect(result.exitCode, formatStepDiagnostic('migration plan', ctx.project, result)).toBe(0);
+    expect(
+      existsSync(join(ctx.project.dir, 'migrations/app')),
+      'migration plan must create migrations/app/<timestamp>_init/',
+    ).toBe(true);
+  });
+
+  it('step 4b (migration emit): self-emits ops.json next to the draft migration.ts', () => {
+    const result = ctx.migrationEmit;
+    expect(result, 'migration self-emit was not run (precondition failure)').not.toBeNull();
+    if (result === null) return;
+    expect(result.exitCode, formatStepDiagnostic('migration emit', ctx.project, result)).toBe(0);
+  });
+
+  it('step 4c (migration apply): applies the planned migration (TML-2486 seam)', () => {
+    const result = ctx.migrationApply;
+    expect(result, 'migration apply was not run (precondition failure)').not.toBeNull();
     if (result === null) return;
     TML_2486_seam(cell, ctx.project, result);
   });
@@ -130,9 +152,9 @@ describe.each(
       // user opens the runtime facade, writes a `User` row through the
       // typed ORM, reads it back by `email`, and verifies the round-trip.
       // This is the user inner loop the journey exists to backstop —
-      // everything before this (init, install, emit, db init) is
-      // pre-amble that only matters if the user can then write/read
-      // data.
+      // everything before this (init, install, emit, migration plan +
+      // apply) is pre-amble that only matters if the user can then
+      // write/read data.
       //
       // The same script also exercises the control facade
       // (`createPostgresControlClient`) — the TML-2314 seam. The runtime
@@ -172,7 +194,7 @@ describe.each(
           '  await control.connect();',
           '  const marker = await control.readMarker();',
           '  if (marker === null) {',
-          "    console.error('control readMarker returned null after db init');",
+          "    console.error('control readMarker returned null after migration apply');",
           '    process.exit(3);',
           '  }',
           '} finally {',
@@ -192,16 +214,41 @@ describe.each(
 async function runFullJourney(cell: CellId): Promise<JourneyContext> {
   const project = await createJourneyProject(cell);
   if (project.initResult.exitCode !== 0 || project.installResult?.exitCode !== 0) {
-    return { project, database: null, emit: null, dbInit: null };
+    return {
+      project,
+      database: null,
+      emit: null,
+      migrationPlan: null,
+      migrationEmit: null,
+      migrationApply: null,
+    };
   }
 
   const database = await spinUpDatabaseForCell(cell);
   attachDatabase(project, database.connectionString);
 
   const emit = await emitContract(project);
-  const dbInitResult = await dbInit(project);
 
-  return { project, database, emit, dbInit: dbInitResult };
+  // Drive the schema in via the migration path rather than `db init`,
+  // so the journey exercises the same flow the user follows in
+  // production: plan a migration, emit its ops, apply it. The mongo
+  // planner's missing-`createCollection` seam (TML-2486) surfaces in
+  // either path — the migration route additionally proves the
+  // planner-to-runner serialisation works for a real on-disk
+  // `ops.json`.
+  const planResult = await migrationPlan(project, 'init');
+  const emitResult = planResult.exitCode === 0 ? await selfEmitLatestMigration(project) : null;
+  const applyResult =
+    emitResult !== null && emitResult.exitCode === 0 ? await migrationApply(project) : null;
+
+  return {
+    project,
+    database,
+    emit,
+    migrationPlan: planResult,
+    migrationEmit: emitResult,
+    migrationApply: applyResult,
+  };
 }
 
 // --- Seam expectations -----------------------------------------------------
@@ -212,15 +259,19 @@ async function runFullJourney(cell: CellId): Promise<JourneyContext> {
 
 const TML_2486_seam = (cell: CellId, project: JourneyProject, result: StepResult): void => {
   if (cell.target !== 'mongo') {
-    expect(result.exitCode, formatStepDiagnostic('db init', project, result)).toBe(0);
+    expect(result.exitCode, formatStepDiagnostic('migration apply', project, result)).toBe(0);
     return;
   }
   seamExpectation<StepResult>({
     ticket: 'TML-2486',
-    description: 'mongo db init successfully creates the contract collections',
+    description:
+      'mongo migration apply successfully creates the contract collections (planner emits createCollection for plain collections; serializer accepts in-memory ops with undefined optionals)',
     status: 'fixed',
     whenBroken: (r) => {
-      expect(r.exitCode, 'TML-2486 still broken: mongo db init must currently fail').not.toBe(0);
+      expect(
+        r.exitCode,
+        'TML-2486 still broken: mongo migration apply must currently fail',
+      ).not.toBe(0);
       const combined = `${r.stdout}\n${r.stderr}`;
       expect(
         combined,
@@ -228,7 +279,7 @@ const TML_2486_seam = (cell: CellId, project: JourneyProject, result: StepResult
       ).toMatch(/undefined|PN-CLI-4999|createCollection|PN-RUN-3020|missing_table/);
     },
     whenFixed: (r) => {
-      expect(r.exitCode, formatStepDiagnostic('db init', project, r)).toBe(0);
+      expect(r.exitCode, formatStepDiagnostic('migration apply', project, r)).toBe(0);
     },
   })(result);
 };

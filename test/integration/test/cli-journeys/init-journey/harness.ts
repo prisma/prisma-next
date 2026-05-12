@@ -416,9 +416,30 @@ function rewritePackageJsonForTarballs(dir: string, cell: CellId, tarballs: Pack
   const facadeTarball = requireTarball(tarballs, facade);
   const prismaNextTarball = requireTarball(tarballs, 'prisma-next');
 
+  // The framework-emitted `migration.ts` imports framework packages
+  // directly (not via the user-facing facade): postgres goes through
+  // `@prisma-next/target-postgres/migration`; mongo goes through
+  // `@prisma-next/cli/migration-cli` + `@prisma-next/family-mongo/migration`
+  // + `@prisma-next/target-mongo/migration`. Under `node-linker=isolated`
+  // (the layout this journey deliberately uses to catch TML-2485-class
+  // bugs) these are only reachable when declared as direct deps. The
+  // init scaffold itself does not currently declare them, so a real
+  // user running `tsx migrations/.../migration.ts emit` under isolated
+  // linking would hit `ERR_MODULE_NOT_FOUND` — a real scaffold seam
+  // worth filing separately. Add them here so the journey can complete
+  // end-to-end; the scaffold gap is a follow-up.
+  const migrationDeps =
+    cell.target === 'mongo'
+      ? ['@prisma-next/cli', '@prisma-next/family-mongo', '@prisma-next/target-mongo']
+      : ['@prisma-next/target-postgres'];
+  const migrationDepEntries = Object.fromEntries(
+    migrationDeps.map((name) => [name, `file:${requireTarball(tarballs, name)}`]),
+  );
+
   pkg.dependencies = {
     ...(pkg.dependencies ?? {}),
     [facade]: `file:${facadeTarball}`,
+    ...migrationDepEntries,
     dotenv: '^16.4.5',
   };
   pkg.devDependencies = {
@@ -505,11 +526,82 @@ export async function emitContract(project: JourneyProject): Promise<StepResult>
 }
 
 /**
- * Runs `prisma-next db init`. This is where TML-2486 lives (sends
- * `undefined` for optional createCollection args in the Mongo path).
+ * Runs `prisma-next db init`. Retained as a primitive for callers that
+ * want the single-shot provisioning path; the journey itself drives
+ * the schema in via `migrationPlan` + `migrationApply`.
  */
 export async function dbInit(project: JourneyProject): Promise<StepResult> {
   return runStep(project, ['pnpm', 'exec', 'prisma-next', 'db', 'init']);
+}
+
+/**
+ * Runs `prisma-next migration plan --name <name>`. On a fresh scaffold
+ * this materialises `migrations/app/<timestamp>_<name>/` with a draft
+ * `migration.ts` describing the create-from-scratch operations. The
+ * caller is responsible for self-emitting that draft (via
+ * `selfEmitLatestMigration`) and then running `migrationApply`.
+ */
+export async function migrationPlan(project: JourneyProject, name: string): Promise<StepResult> {
+  return runStep(project, ['pnpm', 'exec', 'prisma-next', 'migration', 'plan', '--name', name]);
+}
+
+/**
+ * Self-emits the most recently planned migration package by executing
+ * its `migration.ts` directly via Node's native type stripping. The
+ * draft module calls `MigrationCLI.run(import.meta.url, …)`, which
+ * serialises the ops to `ops.json` and finalises `migration.json`.
+ *
+ * The CLI flow used to do this implicitly inside `migration plan`; it
+ * is now a separate user-driven step, so the journey performs it
+ * explicitly here.
+ */
+export async function selfEmitLatestMigration(project: JourneyProject): Promise<StepResult> {
+  const dir = findLatestAppMigrationDir(project);
+  if (dir === null) {
+    return {
+      command: 'self-emit latest migration',
+      exitCode: 1,
+      stdout: '',
+      stderr: `No migration directory found under ${join(project.dir, 'migrations/app')}`,
+    };
+  }
+  // Running the migration.ts module *is* the emit step — the
+  // `MigrationCLI.run(import.meta.url, M)` call serializes the class's
+  // operations into `ops.json` next to the file. The CLI only accepts
+  // `--help`, `--dry-run`, `--config`; no positional verb.
+  const migrationTs = join(dir, 'migration.ts');
+  return runStep(project, [
+    'node',
+    '--env-file-if-exists=.env',
+    '--experimental-strip-types',
+    '--no-warnings=ExperimentalWarning',
+    migrationTs,
+  ]);
+}
+
+/**
+ * Runs `prisma-next migration apply`. Applies every pending migration
+ * to the live database — the mongo planner's missing-`createCollection`
+ * seam (TML-2486) surfaces here when the bug is present.
+ */
+export async function migrationApply(project: JourneyProject): Promise<StepResult> {
+  return runStep(project, ['pnpm', 'exec', 'prisma-next', 'migration', 'apply']);
+}
+
+/**
+ * Returns the absolute path of the newest migration directory under
+ * `migrations/app/` in the project, or `null` if none exists.
+ */
+function findLatestAppMigrationDir(project: JourneyProject): string | null {
+  const appDir = join(project.dir, 'migrations/app');
+  if (!existsSync(appDir)) return null;
+  const entries = readdirSync(appDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((name) => name !== 'refs')
+    .sort();
+  const latest = entries[entries.length - 1];
+  return latest === undefined ? null : join(appDir, latest);
 }
 
 /**
