@@ -452,7 +452,7 @@ The two tables are deliberately parallel: a developer who reads the SQL Postgres
 
   **TS builder authoring surface.** No new syntax. The model handle returned by `model(name, config)` carries its namespace coordinate, so existing FK call sites — `constraints.foreignKey(cols.userId, User.refs.id, { name: … })` in the SQL-block constraints DSL, and `rel.belongsTo(User, { from: 'userId', to: 'id' })` in the relations DSL — automatically lower to cross-namespace IR when `User`'s namespace differs from the referencing model's. The namespace coordinate is inferred from the target model handle, never declared per-reference.
 
-  Cross-*contract-space* FK references remain out of scope per Non-goals.
+  Cross-*contract-space* FK references remain out of scope per Non-goals. The `(namespace.id, name)` reference shape introduced here is deliberately structured to admit a leading `spaceId` coordinate when cross-contract refs land — extending the reference to `(spaceId, namespace.id, name)` is an additive change to the FK reference IR + planner DDL + verifier dispatch, with no rework of this project's deliverables. Implementers should keep this extension point in mind: don't fuse `namespace.id` and `name` into a single composite key, and don't bake "single contract space" assumptions into the FK reference walk.
 
 ### Mongo migration
 
@@ -484,7 +484,7 @@ The two tables are deliberately parallel: a developer who reads the SQL Postgres
 
 ## Non-goals
 
-- **Cross-contract-space FK references** (`refIn(otherSpace, …)`). The IR refactor unblocks this work but the cross-space reference semantics, authoring DSL, and resolution rules are deferred to a separate project.
+- **Cross-contract-space FK references** (`refIn(otherSpace, …)`). The IR refactor unblocks this work but the cross-space reference semantics, authoring DSL, and resolution rules are deferred to a separate project. The FK reference IR introduced here (`(namespace.id, name)`) is designed to extend additively to `(spaceId, namespace.id, name)` when that follow-up lands — see FR16b for the extension-point contract this project commits to.
 - **RLS policies as first-class IR.** The Postgres-side `RlsPolicy` node, authoring DSL, migration ops, and runtime session-state injection are deferred to the Supabase project (or a dedicated RLS project).
 - **Supabase deliverables.** The `createSupabaseRuntime` factory, `auth.users` queryable surface, Supabase contract package, quickstart scaffold are all deferred. This project ships the IR foundation they need; nothing more.
 - **Richer authoring-DSL ergonomics for namespaces beyond the basic surface.** The basic authoring surface (PSL: top-level `namespace { … }` blocks; TS: top-level `namespaces` declaration list + per-model `namespace` field; both with cross-namespace FK refs via existing `@relation` / model-handle mechanisms) is in scope per FR16a / FR16b / AC4 / AC4a. Richer ergonomics — recursive namespace nesting, namespace-as-module imports, qualified-name shorthand for in-namespace types, namespace re-exports, ergonomic shortcuts — are out of scope.
