@@ -161,7 +161,11 @@ Three more codecs, same pattern. Ship as one task; the marginal cost of a new co
 
 #### Example app and end-to-end validation (T12)
 
-- [ ] **T12 — Example app extension + end-to-end tests.** Update `examples/cipherstash-integration` schema with one column of each new type and a sample query per type. Wire the example into the integration test suite with live Postgres + EQL coverage for all seven AC-E2E criteria (Number, BigInt, Date, Boolean, Json, String-range, Mixed-query SDK round-trip count). _(satisfies: TC-E2E1–7, TC-EX1, TC-OPT1)_
+- [ ] **T12 — Example app extension + end-to-end tests.** Update `examples/cipherstash-integration` schema with one column of each new type and a sample query per type. Wire the example into the integration test suite with live Postgres + EQL coverage for all seven AC-E2E criteria (Number, BigInt, Date, Boolean, Json, String-range, Mixed-query SDK round-trip count).
+
+  **Pre-T12 cleanup absorbed here** (surfaced in m1 R2): regenerate the cipherstash example baseline at `examples/cipherstash-integration/migrations/20260509T1658_migration/{ops.json,migration.json}` — currently drifted from the canonical emitter output (label string + key ordering + migrationHash differences pre-existing from prior `call-classes.ts` label changes). Add `examples/cipherstash-integration/` to the `fixtures:check` glob in the root `package.json` so future drift is caught earlier.
+
+  _(satisfies: TC-E2E1–7, TC-EX1, TC-OPT1)_
 
 #### Documentation and close-out (T13)
 
