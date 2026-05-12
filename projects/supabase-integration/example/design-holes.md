@@ -419,19 +419,33 @@ Touches: `cross-contract-refs.md`'s "What's the typed handle returned by `supaba
 
 Currently `projects/supabase-integration/example/`. Migrates to `examples/supabase/` at project close-out. Codify in the eventual project plan as a close-out task.
 
-### 🔴 #19 — RLS verifier check semantics
+### ✅ #19 — RLS verifier check semantics — **DECIDED: content-addressed wire names**
 
-The example declares 8 RLS policies across 2 tables. The verifier introspects `pg_policies` and compares. The comparison rules need concrete definitions:
+**Resolution:** wire-level `policyname` carries an 8-hex SHA-256 suffix over the canonical content tuple `(canonical(using), canonical(withCheck), sort(roles), operation, as)`. Predicate equivalence collapses to a name match; the verifier never compares bodies for equivalence. One body-level check remains — the per-row tamper check that catches manual `ALTER POLICY` outside the framework.
 
-- **Policy identity:** match by `(schema, table, policy_name)`?
-- **Predicate equivalence:** verbatim string match? AST-normalized? Postgres-side `pg_get_expr` round-trip?
-- **Role-list ordering:** roles list order-significant?
-- **Missing policy:** error or warning?
-- **Extra policy on the table that the contract doesn't declare:** error, warning, or silent?
+This dissolves three earlier-open items into one mechanism:
 
-**Recommendation for v0.1:** identity by `(schema, table, policy_name)`; predicate compared verbatim (with a normalize-whitespace pass); roles list as a set, not a sequence; missing policy → verifier error; extra policy → diagnostic only, governed by table-level `control` policy (`managed` → error, `tolerated` → warn, `external` → ignored, `observed` → silent). See [`projects/control-policy/spec.md`](../../control-policy/spec.md).
+- **Predicate equivalence noise** (the dominant concern when this hole was opened) → zero false positives by construction.
+- **Policy rename detection** → free. Matching hash + different prefix is a structural signal; the planner emits `ALTER POLICY ... RENAME TO`.
+- **Per-row body comparison** → reduced to one cheap hash recomputation per introspected row.
 
-Touches: [`rls.md`](../rls.md) §"Verifier behaviour" — needs these rules concretized.
+Three new target-side `SchemaIssue` kinds:
+
+- `rls_policy_renamed` — matching hash, different prefix.
+- `rls_policy_tampered` — suffix doesn't match a recomputed hash of the introspected body.
+- `rls_not_enabled` — table has declared policies but `pg_class.relrowsecurity = false`.
+
+Settled fields of the verifier loop:
+
+- **Identity:** full wire name.
+- **Body equivalence:** implicit in the suffix; no separate comparison.
+- **Role-list ordering:** sorted before hashing; set semantics.
+- **Missing policy:** error under `managed`, severity dispatched via control policy.
+- **Extra policy:** governed by table's control policy (managed → error, tolerated → warn, external → ignored, observed → silent).
+
+See [`decisions.md` C9 + C10](../decisions.md) and the design rationale in [`specs/adr-content-addressed-policy-names.md`](../specs/adr-content-addressed-policy-names.md).
+
+Touches: [`rls.md`](../rls.md) §"Verifier behaviour" — rewritten to use the content-addressed model.
 
 ### 🟡 #20 — `supabase.pack()` vs `supabase()` shorthand
 
@@ -457,6 +471,6 @@ Touches: [`extension-package.md`](../extension-package.md) — remove the `supab
 | 14 | Implicit transaction for SET LOCAL | 🔴 Open | Every role-bound execute is in a txn |
 | 15 | Function IR shape | ✅ Closed | Out of scope for v0.1; functions not contract elements (see decisions C4) |
 | 17 | `TypedContract<T>` accessor shape | ✅ Closed | Superseded by C5+C6+C7; extensions ship pre-built `/contract` with concrete typed handles |
-| 19 | RLS verifier check semantics | 🔴 Open | Identity by name, predicate verbatim+normalized |
+| 19 | RLS verifier check semantics | ✅ Decided | Content-addressed wire names (decisions C9 + C10); rename + tamper + equivalence all dissolve into name diff |
 
 The remaining holes (🟡 / 🟢) are either default-able with working assumptions or pure cosmetics.
