@@ -138,11 +138,14 @@ Lift the `length !== 1` rejection. Iterate per-space. Generalise `projectSchemaT
 
 **Validation gate:** same as Phase 1, plus: synthetic fixture's two-space aggregate test passes locally before phase ends (lifted out of the strict gate so the fixture work in P4 can land coherently).
 
-**End-of-P3 checkpoint — CKPT-3 (split-or-push reassessment):**
+**End-of-P3 checkpoint — CKPT-3 (split-or-push reassessment): DECIDED.**
 
-- **Before starting:** agent prompts operator: *"Reaching CKPT-3 (end-of-P3 reassessment: do we land P4 + P5 in this PR, or split?). Please upgrade reasoning effort to high before I continue."* Wait for confirmation.
-- **Activity:** walk the three triggers from § Reassessment checkpoints (schema-prune invasiveness, .d.ts renderer recon outlook, current diff size); record the decision in the PR description draft; if splitting, draft the follow-up issue scope; hand control back.
-- **On completion:** agent prompts operator: *"CKPT-3 complete. Decision: [push through to P4 / split P5 to follow-up]. Please downgrade reasoning effort back to medium before P4."* Wait for confirmation before resuming.
+- **Verdict (recorded post-P3 R3 SATISFIED, branch tip `095070bd3`):** **push through P4 + P5 in this PR.**
+- **Trigger 1 (schema-prune invasiveness):** NOT TRIPPED. Option B localised the projector change to ~219 LOC inside `migration-tools`; zero SQL-side call-site changes (the plan's threshold was ≥ 8 under Option A).
+- **Trigger 2 (`.d.ts` renderer recon):** NOT TRIPPED. Recon found the framework's `contract-space-seed-phase.ts` emits a placeholder `.d.ts` (`export {};`) for *all* families' extension spaces today — no Mongo-specific renderer authoring needed. T4.1 simplifies to a smoke-test of the existing target-agnostic seed phase against a Mongo aggregate. See T4.1 amendment below.
+- **Trigger 3 (LOC > ~1500):** TRIPPED on raw LOC (~2587/+431 at P3 tip) but NOT on mechanism LOC. Raw breakdown: ~422 lines of project artefacts (spec/plan, one-time read), ~329 lines of skill-maintenance commits orthogonal to TML-2408 (`36d22bc7c`, `770fdf083`), ~1400 lines of mechanism + tests under the 1500 budget. P5 expected to add ~600–1000 LOC of fixture + e2e + doc, mostly self-contained.
+- **Why not split P5:** would leave AC7 (full happy path), AC8 (baseline preserved), AC9 (subsystem doc) unverified in the mechanism PR; contradicts spec's acceptance bar and "complete the project" framing.
+- See `wip/unattended-decisions.md § 2` for the full rationale; reasoning recorded post-checkpoint while the operator was unavailable.
 
 ### Phase 4 — On-disk pinned artefacts
 
@@ -150,7 +153,7 @@ Wire Mongo's `contract.d.ts` renderer through `emitContractSpaceArtefacts`. Aggr
 
 **Tasks:**
 
-- [ ] **T4.1** Locate the Mongo `.d.ts` renderer (recon during implementation; likely under `@prisma-next/family-mongo` or `@prisma-next/target-mongo`). Wire it through whatever pass `emitContractSpaceArtefacts` calls today for the SQL family. (TC-12)
+- [ ] **T4.1** **REFRAMED (recon post-P3, see `wip/unattended-decisions.md § 3`).** The framework's extension-space seed phase at [`packages/1-framework/3-tooling/cli/src/utils/contract-space-seed-phase.ts`](../../packages/1-framework/3-tooling/cli/src/utils/contract-space-seed-phase.ts) L147 calls `emitContractSpaceArtefacts(..., contractDts: buildPlaceholderContractDts(spaceId), ...)`. The helper `buildPlaceholderContractDts` at L187 returns an `export {};` stub for *all* families — a typed `.d.ts` renderer for extension contracts is a separately-tracked concern, not a Mongo gap. T4.1 therefore reduces to a smoke test: a Mongo aggregate with one extension descriptor flows through `contract-space-seed-phase` cleanly and produces the expected three files (`contract.json`, `contract.d.ts` stub, `refs/head.json`) under `<projectMigrationsDir>/<spaceId>/`. The verification path is end-to-end via the CLI (or an integration-level harness); no new code, just a confirming test. Spec AC6 ("pinned files exist with byte-equivalent content") is unchanged — the placeholder is deterministic and byte-stable on re-emit. (TC-12)
 - [ ] **T4.2** Verify aggregate-loader pinned-contract reads work for Mongo contracts (`readContractSpaceContract`, `readContractSpaceHeadRef`, `listContractSpaceDirectories`); these are target-agnostic but worth a smoke test against a Mongo-shaped contract.
 - [ ] **T4.3** Idempotency test: rerunning `migration apply` with no contract change rewrites pinned files byte-equivalently. (TC-13)
 
