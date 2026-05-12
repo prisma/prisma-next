@@ -18,7 +18,7 @@ export default defineConfig({
   driver: postgresDriver,
   adapter: postgresAdapter,
   extensionPacks: [postgis],
-  contract: prismaContract('./prisma/schema.prisma', {
+  contract: prismaContract('./src/prisma/schema.prisma', {
     output: 'src/prisma/contract.json',
     target: postgres,
   }),

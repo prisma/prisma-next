@@ -324,13 +324,6 @@
             }
           ]
         },
-        "operationTypes": {
-          "import": {
-            "alias": "PostgisOperationTypes",
-            "named": "OperationTypes",
-            "package": "@prisma-next/extension-postgis/operation-types"
-          }
-        },
         "queryOperationTypes": {
           "import": {
             "alias": "PostgisQueryOperationTypes",

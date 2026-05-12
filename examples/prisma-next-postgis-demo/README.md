@@ -20,7 +20,7 @@ relationships in the queries actually hold.
 | Path | Purpose |
 | --- | --- |
 | `docker-compose.yml` | PostgreSQL 16 + PostGIS 3.4 on port `5435`. |
-| `prisma/schema.prisma` | Three models — `Cafe` (Point), `Route` (LineString), `Neighborhood` (Polygon). |
+| `src/prisma/schema.prisma` | Three models — `Cafe` (Point), `Route` (LineString), `Neighborhood` (Polygon). |
 | `prisma-next.config.ts` | Wires the postgis extension pack into the contract emitter and CLI. |
 | `src/seed-data.ts` | Hand-curated cafes, neighborhoods, and routes. |
 | `src/queries/` | One file per query example. |
@@ -54,7 +54,7 @@ cp .env.example .env
 # 4. Bring up PostgreSQL+PostGIS via Docker (port 5435)
 pnpm db:up
 
-# 5. Generate the contract from prisma/schema.prisma
+# 5. Generate the contract from src/prisma/schema.prisma
 pnpm emit
 
 # 6. Apply the schema (including `CREATE EXTENSION postgis`)
