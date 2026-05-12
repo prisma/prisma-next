@@ -33,16 +33,19 @@ This project keeps the on-disk JSON shape canonical but flips the in-memory IR t
 ```text
 Framework (1-framework/)
   interface SchemaNode                          // bare alphabet: { kind: string }
+  abstract class SchemaNodeBase                 // centralised freeze() helper for subclasses
+    implements SchemaNode
   interface Namespace                           // first-class building block
   abstract class NamespaceBase                  // convenience for implementers
+  interface Storage { namespaces: Record<...> } // framework promise: every IR has namespaces
   interface SchemaVerifier<TContract, TSchema>  // domain operation SPI
   interface ContractSerializer<TContract>       // round-trip SPI: deserializeContract + serializeContract
-  interface Target<TContract, TSchema>          // aggregates SPI references
 
 Family (2-sql/, 2-mongo-family/)
-  abstract class SqlNode extends SchemaNode               // SQL alphabet shape (IR node base)
+  abstract class SqlNode extends SchemaNodeBase           // SQL alphabet shape (IR node base)
   abstract class SqlTable extends SqlNode                 // family abstract base for IR nodes
-  abstract class SqlContractSerializerBase              // family abstract base per SPI
+  abstract class SqlStorage implements Storage           // adds family-shape fields (tables, …)
+  abstract class SqlContractSerializerBase                // family abstract base per SPI
     implements ContractSerializer<…>
   abstract class SqlSchemaVerifierBase                    // family abstract base per SPI
     implements SchemaVerifier<…, …>
@@ -50,20 +53,25 @@ Family (2-sql/, 2-mongo-family/)
 Target (3-targets/postgres/, 3-targets/sqlite/, 3-mongo-target/)
   class PostgresSchema extends NamespaceBase              // target concretion of framework concept
   class PostgresTable extends SqlTable                    // target concretion of family abstract
-  class PostgresRlsPolicy extends SchemaNode              // target-only kind, no family parent
-  class PostgresContractSerializer                      // concrete SPI implementer
+  class PostgresRlsPolicy extends SchemaNodeBase          // target-only kind, no family parent
+  class PostgresContractSerializer                        // concrete SPI implementer
     extends SqlContractSerializerBase
   class PostgresSchemaVerifier                            // concrete SPI implementer
     extends SqlSchemaVerifierBase
-  class PostgresTarget                                    // target HAS-A composed SPI implementers
-    implements Target<PostgresContract, SqlSchemaIR> {
-    readonly contractSerializer = new PostgresContractSerializer(…);
-    readonly schemaVerifier = new PostgresSchemaVerifier(…);
-    /* future SPI properties */
-  }
+
+  // The existing target descriptor pattern (today's `SqlControlTargetDescriptor`,
+  // `RuntimeTargetDescriptor`, etc.) grows new properties carrying the IR-time SPI
+  // instances. There is no separate `Target<TContract, TSchema>` aggregator — the
+  // descriptor IS the aggregator.
+  const postgresControlTargetDescriptor: SqlControlTargetDescriptor<'postgres', …> = {
+    ...postgresTargetDescriptorMeta,
+    migrations:         { createPlanner, createRunner, contractToSchema },  // existing
+    contractSerializer: new PostgresContractSerializer(…),                  // new (this project)
+    schemaVerifier:     new PostgresSchemaVerifier(…),                      // new (this project)
+  };
 ```
 
-Targets concretize family abstract classes for IR nodes and add IR node kinds with no family-level counterpart. For **domain operations** (verification, hydration, future planning), each SPI is its own class hierarchy — framework SPI interface, per-SPI family abstract base, concrete target SPI implementer — and the target is a thin facade that composes one instance per SPI as a named property (`target.contractSerializer`, `target.schemaVerifier`, …). Framework consumers depend on the framework SPI interfaces, never on the concrete target SPI classes; the target itself is reached through an aggregating `Target<TContract, TSchema>` interface (also framework-defined) that exposes the SPI references. Extension/target authors who want to tweak one SPI subclass that one SPI implementer (`class CockroachContractSerializer extends PostgresContractSerializer`) and inject it into a Cockroach target, without touching the others.
+Targets concretize family abstract classes for IR nodes and add IR node kinds with no family-level counterpart. For **domain operations** (verification, hydration, future planning), each SPI is its own class hierarchy — framework SPI interface, per-SPI family abstract base, concrete target SPI implementer. Implementer instances are exposed as named properties on the **existing target descriptor** (`postgresControlTargetDescriptor.contractSerializer`, `…schemaVerifier`, alongside the existing `…migrations.*`). The IR-time SPIs introduced by this project slot in next to the control-plane SPIs already there; no new aggregator interface is invented. Framework consumers depend on the framework SPI interfaces (`ContractSerializer<TContract>`, `SchemaVerifier<TContract, TSchema>`), never on the concrete target SPI classes. Extension/target authors who want to tweak one SPI subclass that one SPI implementer (`class CockroachContractSerializer extends PostgresContractSerializer`) and inject it into their descriptor, without touching the others.
 
 ### Authoring surface
 
@@ -147,27 +155,24 @@ Both Contract IR and Schema IR adopt the following layering, applied to every IR
 
 - **Target layer** (Postgres, SQLite, Mongo, …): ships concrete classes specializing family abstract bases (`PostgresColumn extends SqlColumn` carrying `nativeType` and default-rendering specifics; `SqlitePragmaIndex extends SqlIndex` carrying SQLite-specific WHERE clause shape) **plus target-only kinds with no family parent** (`PostgresSchema`, `PostgresFunction`, `PostgresEnum`, future `PostgresRlsPolicy`). Owns the verifier, planner, introspector — they walk the target's concrete classes natively, no framework-imposed abstraction barrier inside the target.
 
-Each layer extends the previous via interfaces + (where useful) abstract base classes. Interfaces are the consumer contract; **consumers always depend on framework SPI interfaces, never on concrete target classes**. For IR nodes (tables, columns, foreign keys, etc.), family abstract base classes carry shared structural fields and kind discriminants — the IR-tree shape benefits from inheritance. For domain operations (verification, hydration, future planning), each SPI is its own class hierarchy: the framework declares the SPI interface, the family ships a per-SPI abstract base (`SqlContractSerializerBase`, `SqlSchemaVerifierBase`) carrying SQL-shared walk logic and exposing protected hooks, and the target ships a concrete SPI implementer per SPI. The target is a HAS-A facade composing one instance per SPI as a named property — keeping each SPI implementer focused (single inheritance, one concern) and keeping the target itself thin as the framework adds new SPIs. Targets that don't fit the family scaffolding for a given SPI can implement the framework interface directly and skip the abstract base entirely.
+Each layer extends the previous via interfaces + (where useful) abstract base classes. Interfaces are the consumer contract; **consumers always depend on framework SPI interfaces, never on concrete target classes**. For IR nodes (tables, columns, foreign keys, etc.), family abstract base classes carry shared structural fields and kind discriminants — the IR-tree shape benefits from inheritance, and an abstract `SchemaNodeBase implements SchemaNode` in the framework centralises the freeze-and-assign pattern that every concrete IR node uses today (already proven on the AST hierarchies in `OpFactoryCall` and `MongoSchemaNode`). For domain operations (verification, hydration, future planning), each SPI is its own class hierarchy: the framework declares the SPI interface, the family ships a per-SPI abstract base (`SqlContractSerializerBase`, `SqlSchemaVerifierBase`) carrying SQL-shared walk logic and exposing protected hooks, and the target ships a concrete SPI implementer per SPI. Implementer instances are exposed as named properties on the **existing target descriptor** — keeping each SPI implementer focused (single inheritance, one concern) and the descriptor itself thin as the framework adds new SPIs (one new descriptor property per SPI). Targets that don't fit the family scaffolding for a given SPI can implement the framework interface directly and skip the abstract base entirely.
 
 ### Domain interfaces follow the same layering
 
-Verification, hydration, planning, and any other operation that walks the IR follow the same recipe: the framework defines the SPI interface; the family ships a per-SPI abstract base carrying shared walk logic and protected hooks; the target ships a concrete SPI implementer extending the family base; the target itself composes one instance per SPI as a named property and exposes them through an aggregating `Target<TContract, TSchema>` interface. Consumers depend on the framework SPI interface they need, never on the concrete target SPI class.
+Verification, hydration, planning, and any other operation that walks the IR follow the same recipe: the framework defines the SPI interface; the family ships a per-SPI abstract base carrying shared walk logic and protected hooks; the target ships a concrete SPI implementer extending the family base. Implementer instances are exposed as **named properties on the existing target descriptor** (today's `SqlControlTargetDescriptor`, `RuntimeTargetDescriptor`, etc.) — the descriptor pattern that already aggregates control-plane SPIs is the seam new SPIs slot into. Consumers depend on the framework SPI interface they need, never on the concrete target SPI class.
+
+The existing target descriptor (read [`packages/3-targets/3-targets/postgres/src/exports/control.ts`](../../packages/3-targets/3-targets/postgres/src/exports/control.ts) and [`packages/1-framework/1-core/framework-components/src/control/control-instances.ts`](../../packages/1-framework/1-core/framework-components/src/control/control-instances.ts) before writing code) carries `migrations: { createPlanner, createRunner, contractToSchema }` today. This project adds two more named properties next to `migrations`: `contractSerializer` and `schemaVerifier`. No new aggregator interface, no `Target<TContract, TSchema>` type — the descriptor IS the aggregator.
 
 > _Illustrative — exact method shapes and generic parameters are up to the implementer:_
 >
 > ```ts
-> // 1-framework/...
+> // 1-framework/... (new SPI interfaces only; no new aggregator)
 > interface SchemaVerifier<TContract, TSchema> {
 >   verifySchema(opts: { contract: TContract; schema: TSchema; ... }): VerifyResult;
 > }
 > interface ContractSerializer<TContract> {
 >   deserializeContract(json: unknown): TContract;
->   serializeContract(contract: TContract): unknown;  // canonical JSON shape (typed as `unknown`; structurally JSON-clean)
-> }
-> interface Target<TContract, TSchema> {
->   readonly contractSerializer: ContractSerializer<TContract>;
->   readonly schemaVerifier: SchemaVerifier<TContract, TSchema>;
->   // future SPI references
+>   serializeContract(contract: TContract): JsonObject;  // canonical JSON shape
 > }
 >
 > // 2-sql/... (per-SPI family abstract bases + utility helpers)
@@ -177,8 +182,8 @@ Verification, hydration, planning, and any other operation that walks the IR fol
 >     const validated = this.parseSqlContractStructure(json);  // shared SQL arktype validation
 >     return this.constructTargetContract(validated);          // protected abstract hook
 >   }
->   serializeContract(contract: TContract): unknown {
->     return contract;  // class fields are JSON-clean; targets override only if a transform is needed
+>   serializeContract(contract: TContract): JsonObject {
+>     return contract as unknown as JsonObject;  // class fields are JSON-clean; targets override if a transform is needed
 >   }
 >   protected abstract constructTargetContract(validated: …): TContract;
 > }
@@ -193,7 +198,7 @@ Verification, hydration, planning, and any other operation that walks the IR fol
 >   protected abstract verifyTargetExtensions(opts): SchemaIssue[];
 > }
 >
-> // 3-targets/postgres/... (concrete SPI implementers + target facade)
+> // 3-targets/postgres/... (concrete SPI implementers + descriptor extension)
 > class PostgresContractSerializer extends SqlContractSerializerBase<PostgresContract> {
 >   protected constructTargetContract(validated): PostgresContract { … }
 > }
@@ -204,32 +209,39 @@ Verification, hydration, planning, and any other operation that walks the IR fol
 >   }
 > }
 >
-> class PostgresTarget implements Target<PostgresContract, SqlSchemaIR> {
->   readonly contractSerializer: ContractSerializer<PostgresContract>;
->   readonly schemaVerifier: SchemaVerifier<PostgresContract, SqlSchemaIR>;
->   constructor(opts) {
->     this.contractSerializer = new PostgresContractSerializer(opts);
->     this.schemaVerifier = new PostgresSchemaVerifier(opts);
->   }
-> }
+> // The existing target descriptor grows two new named properties next to `migrations`.
+> const postgresControlTargetDescriptor: SqlControlTargetDescriptor<'postgres', …> = {
+>   ...postgresTargetDescriptorMeta,
+>   migrations: { createPlanner, createRunner, contractToSchema },  // existing
+>   contractSerializer: new PostgresContractSerializer(…),          // new (this project)
+>   schemaVerifier: new PostgresSchemaVerifier(…),                  // new (this project)
+> };
 > ```
 
-Domain operations are target-owned because target-specific IR demands target-specific consumers — the family layer cannot meaningfully verify or hydrate a node kind it does not know exists. The framework's role drops to: declare the SPI interfaces and the aggregating `Target` interface, aggregate the contract spaces into a multi-space input, dispatch to the right SPI instance via the target's named SPI property, format the result. Target-specific schema issues (e.g. an RLS policy mismatch) carry target-specific `kind` values in the resulting `SchemaIssue`; the issue taxonomy is extensible the same way the IR is.
+Domain operations are target-owned because target-specific IR demands target-specific consumers — the family layer cannot meaningfully verify or hydrate a node kind it does not know exists. The framework's role drops to: declare the SPI interfaces, aggregate the contract spaces into a multi-space input, dispatch to the right SPI instance via the descriptor's named property, format the result. Target-specific issue kinds are widened target-side; the existing framework `SchemaIssue` type (in `framework-components/control/control-result-types.ts`) stays as-is for this project. (See § "Forward note: `SchemaIssue` layering" below.)
 
-The HAS-A composition is what keeps the target thin as the framework grows. As new SPIs land (planner, introspector, telemetry probe, …), the target gains one new property per SPI rather than accumulating methods on a single class. Each SPI implementer remains small, single-concerned, and independently testable. Extension authors who want to swap one SPI's behaviour subclass just that SPI's concrete class (`class CockroachContractSerializer extends PostgresContractSerializer`) and inject the override into their target's facade — no need to absorb the rest of the system to make a focused change. Consumers continue to type against the framework SPI interfaces, so the dependency arrows point exactly where they should.
+Adding new SPIs in future projects (planner, introspector, telemetry probe, …) grows the descriptor by one new named property per SPI — no new top-level types, no inheritance shifts. Each SPI implementer remains small, single-concerned, and independently testable. Extension authors who want to swap one SPI's behaviour subclass just that SPI's concrete class (`class CockroachContractSerializer extends PostgresContractSerializer`) and inject the override into their descriptor — no need to absorb the rest of the system to make a focused change.
+
+### Forward note: `SchemaIssue` layering
+
+`SchemaIssue` already exists at [`packages/1-framework/1-core/framework-components/src/control/control-result-types.ts`](../../packages/1-framework/1-core/framework-components/src/control/control-result-types.ts) as a closed union of 21 SQL-shape kinds (`missing_table`, `missing_column`, `type_mismatch`, …). It sits in `framework-components/` but its vocabulary is SQL-flavoured — `missing_collection` doesn't fit, and Mongo verification today works around this. The type is mis-layered: framework-level by package, family-level by content.
+
+This project **does not refactor `SchemaIssue`.** Target-specific issue kinds (RLS-policy-mismatch, namespace-mismatch, future function-shape-mismatch) extend the union target-side; framework consumers continue to see today's shape; target-aware consumers cast. The verifier SPI's framework-level return type does not get a generic over target kinds.
+
+The layering observation is captured here so the implementer of a follow-up project (probably the same person who lands Supabase RLS as an IR kind) knows the issue type's layering is a known forward concern. Out of scope for this project.
 
 ### JSON canonical, classes canonical in-memory
 
 Per ADR 192, the on-disk JSON form (`contract.json`, `ops.json`, future `schema.json` if persistence becomes useful) is the canonical artifact. Identity, attestation, auditability, and replay all key off the JSON form. This project does not change that.
 
-What this project does change: the **in-memory** IR becomes a class hierarchy that round-trips through JSON without ceremony. Class fields are JSON-clean by construction (plain readonly properties, kind discriminant, no methods on properties, no `Map`/`Set`, no `Date` objects). `JSON.stringify(contract)` produces canonical contract.json directly; no `toJSON()` method needed. Round-trip in both directions is reached through the target's composed `ContractSerializer` SPI (see § "Round-trip via `ContractSerializer` SPI" below): the target's serializer deserializes JSON into target-typed class instances and serializes class instances back to canonical JSON shape.
+What this project does change: the **in-memory** IR becomes a class hierarchy that round-trips through JSON without ceremony. Class fields are JSON-clean by construction (plain readonly properties, kind discriminant, no methods on properties, no `Map`/`Set`, no `Date` objects). `JSON.stringify(contract)` produces canonical contract.json directly; no `toJSON()` method needed. Round-trip in both directions is reached through the descriptor's `ContractSerializer` SPI (see § "Round-trip via `ContractSerializer` SPI" below): the target's serializer deserializes JSON into target-typed class instances and serializes class instances back to canonical JSON shape.
 
 > _Illustrative — exact API surface up to the implementer:_
 >
 > ```ts
 > // round-trip
-> const contract: Contract = target.contractSerializer.deserializeContract(json);
-> const json: unknown = target.contractSerializer.serializeContract(contract);
+> const contract: Contract = descriptor.contractSerializer.deserializeContract(json);
+> const json: JsonObject = descriptor.contractSerializer.serializeContract(contract);
 > // structurally identical to the original; JSON.stringify reads the class fields directly
 >
 > // Class fields are plain — JSON.stringify reads them directly
@@ -256,31 +268,35 @@ What this project does change: the **in-memory** IR becomes a class hierarchy th
 > // framework
 > interface ContractSerializer<TContract> {
 >   deserializeContract(json: unknown): TContract;
->   serializeContract(contract: TContract): unknown;
+>   serializeContract(contract: TContract): JsonObject;
 > }
 >
-> // target HAS-A serializer (composed instance)
-> class PostgresTarget implements Target<PostgresContract, SqlSchemaIR> {
->   readonly contractSerializer: ContractSerializer<PostgresContract> = new PostgresContractSerializer(…);
->   // …other SPI references
-> }
+> // existing target descriptor grows a new named property
+> const postgresControlTargetDescriptor: SqlControlTargetDescriptor<'postgres', …> = {
+>   ...postgresTargetDescriptorMeta,
+>   migrations: { createPlanner, createRunner, contractToSchema },
+>   contractSerializer: new PostgresContractSerializer(…),
+>   schemaVerifier:     new PostgresSchemaVerifier(…),
+> };
 >
 > // framework-internal call site
-> const contract = target.contractSerializer.deserializeContract(json);
-> const json = target.contractSerializer.serializeContract(contract);
+> const contract = descriptor.contractSerializer.deserializeContract(json);
+> const json     = descriptor.contractSerializer.serializeContract(contract);
 > ```
 
 Four properties of this shape are load-bearing:
 
-- **One serializer, both directions.** Deserialization (validate-and-construct) and serialization (canonical JSON shape) are two faces of the same boundary. Naming them as one SPI is honest about that — and preserves a hook in the symmetric direction in case future targets need to canonicalise on the way out (e.g. ordering keys, dropping computed-only fields). For most targets `serializeContract` is identity over JSON-clean class instances; the method exists to lock in the symmetry, not because today's targets need rewriting.
+- **One serializer, both directions.** Deserialization (validate-and-construct) and serialization (canonical JSON shape) are two faces of the same boundary. Naming them as one SPI is honest about that — and the framework needs both faces today, not eventually. Round-trip test infrastructure (every IR refactor relies on `JSON.parse(JSON.stringify(deserialize(json))) ≡ json` to attest equivalence) calls both methods. Future canonicalization needs (ordering keys, dropping computed-only fields, normalizing numeric encodings) land on `serializeContract` without re-plumbing call sites. And the framework's contract-equality story (used by drift detection and contract-vs-introspected diffing) reads canonical JSON, not class instances. For most targets `serializeContract` is identity over JSON-clean class instances today; the method exists because the seam is real, not as a convention placeholder.
 
-- **No standalone `validateContract` function.** The previous `validateContract(json)` (and its proposed `validateContract(target, json)` variant) is removed. The name was a misnomer — it performed structural integrity checks, not logical validation, and the misnomer kept tempting contributors to encode logical semantics into it. The post-refactor surface is the SPI method directly: `target.contractSerializer.deserializeContract(json)`. The user-facing facade (`postgres<Contract>(...)`) continues to wrap this so end-users never see the SPI; framework-internal callers reach through the named SPI property explicitly.
+- **`serializeContract` returns `JsonObject`.** The framework reaches the SPI's output as opaque JSON-shaped data — it stringifies, hashes, or feeds it back into another SPI. `JsonObject` (the shared workspace type for "structurally JSON-clean object") communicates that contract precisely. Each target then types its own concretion as its specific contract type, narrowing `JsonObject` to the target shape internally.
 
-- **Typed against the SPI, not the concrete `Target` class.** Framework consumers depend on `ContractSerializer<TContract>` (or on `Target<TContract, TSchema>` when they need the full set of SPIs). Tests that don't exercise serialization satisfy the SPI with stub implementations whose `deserializeContract` is the identity function and whose `serializeContract` returns the input unchanged. This preserves the ergonomic floor of the test suite — most existing tests construct a contract literal and never round-trip it, and the SPI shape ensures they don't have to acquire serialization logic.
+- **No standalone `validateContract` function.** The previous `validateContract(json)` (and its proposed `validateContract(target, json)` variant) is removed. The name was a misnomer — it performed structural integrity checks, not logical validation, and the misnomer kept tempting contributors to encode logical semantics into it. The post-refactor surface is the SPI method directly: `descriptor.contractSerializer.deserializeContract(json)`. The user-facing facade (`postgres<Contract>(...)`) continues to wrap this so end-users never see the SPI; framework-internal callers reach through the named SPI property explicitly.
 
-- **Currying-friendly via property capture.** Partial application on the SPI side reads as `const deserialize = target.contractSerializer.deserializeContract.bind(target.contractSerializer)` (or, more idiomatically, `const deserialize = (json) => target.contractSerializer.deserializeContract(json)`). The named-property access is the natural curry boundary; no helper function is needed to expose it.
+- **Typed against the SPI, not the descriptor.** Framework consumers depend on `ContractSerializer<TContract>` directly. Tests that don't exercise serialization satisfy the SPI with stub implementations whose `deserializeContract` is the identity function and whose `serializeContract` returns the input unchanged. The framework ships a `createIdentityContractSerializer<TContract>()` helper for this case so tests don't reinvent the stub. This preserves the ergonomic floor of the test suite — most existing tests construct a contract literal and never round-trip it, and the SPI shape ensures they don't have to acquire serialization logic.
 
-Every existing `validateContract` call site is migrated to `target.contractSerializer.deserializeContract(json)`. Framework-internal callers usually have a `target` in scope already (or can accept one); the migration is mechanical there. Tests pay the largest single share of the cost — most tests construct a contract literal and call `validateContract`, so each test acquires either a real target import or a small `ContractSerializer` stub. Type inference also improves: the SPI carries `<TContract>` in its static type, so `target.contractSerializer.deserializeContract(json)` infers `TContract` without an explicit type parameter at most call sites; the current `validateContract<Contract>(json)` ceremony — forced because JSON imports lose literal types — drops out.
+- **Currying-friendly via property capture.** Partial application on the SPI side reads as `const deserialize = descriptor.contractSerializer.deserializeContract.bind(descriptor.contractSerializer)` (or, more idiomatically, `const deserialize = (json) => descriptor.contractSerializer.deserializeContract(json)`). The named-property access is the natural curry boundary; no helper function is needed to expose it.
+
+Every existing `validateContract` call site is migrated to `descriptor.contractSerializer.deserializeContract(json)`. Framework-internal callers usually have a target descriptor in scope already (or can accept one); the migration is mechanical there. Tests pay the largest single share of the cost — most tests construct a contract literal and call `validateContract`, so each test acquires either a real target descriptor import or `createIdentityContractSerializer<TContract>()`. Type inference also improves: the SPI carries `<TContract>` in its static type, so `descriptor.contractSerializer.deserializeContract(json)` infers `TContract` without an explicit type parameter at most call sites; the current `validateContract<Contract>(json)` ceremony — forced because JSON imports lose literal types — drops out.
 
 ### Visitor pattern reserved for narrow structural ops
 
@@ -312,8 +328,9 @@ Enums are the *low-risk first* exemplar because they don't introduce a new conce
 - `abstract class NamespaceBase implements Namespace` — convenience for implementers.
 - `class PostgresSchema extends NamespaceBase` — target concretion. Carries Postgres-specific fields (search-path semantics, owner role, etc.) and renders to SQL as `"<schema>"`.
 - A reserved sentinel `id: '__unspecified__'` represents "no namespace bound at authoring time; resolve from connection context." Targets without native namespacing use it as their default. Targets with native namespacing accept it for multi-tenancy contracts where the same schema is applied across multiple namespaces, with the connection's `search_path` (or equivalent) doing the binding.
-- SQLite uses the singleton `__unspecified__` namespace; the SQL emitter elides namespace qualifiers when the namespace is the singleton.
-- Mongo's analog (database name, if Mongo's binding semantics warrant it as a `Namespace`) or the singleton, decided in execution.
+- **`__unspecified__` is a target-specific singleton subclass, not a call-site branch.** Each target owning a Namespace concretion ships a singleton subclass — e.g. `class PostgresUnspecifiedSchema extends PostgresSchema` with `readonly id = '__unspecified__' as const`. The subclass overrides the namespace's serialization methods (qualified-name rendering, FK-reference DDL emission) to elide the namespace qualifier. Call sites stay polymorphic: `namespace.renderQualified(name)` returns `"users"` for the singleton and `"auth"."users"` for a named schema, with no `if (namespace.id === '__unspecified__')` branches anywhere. The framework promises only that every target ships exactly one instance of its `__unspecified__` subclass, accessed via a stable static reference (`PostgresSchema.unspecified`).
+- SQLite uses its `__unspecified__` singleton subclass; emitted SQL has no qualifier in any path.
+- Mongo's Namespace maps to the **database** (the connection's `db` field provides the binding). The default is `__unspecified__` — concretion is `class MongoTargetUnspecifiedDatabase extends MongoTargetDatabase`. Implementing Mongo's namespace semantics is part of M2 so all families share the same shape from the start; bolting it on later would require rework of the family-level Storage shape after consumers have begun depending on it.
 
 In Contract IR, every storage object (table, enum, function, …) belongs to a namespace. In Schema IR, every introspected object is namespace-scoped. The verifier walks two parallel trees of namespace-scoped objects and matches them up; `__unspecified__` collapses to whatever the connection's bind context resolved. FK references carry a namespace coordinate on both sides, so cross-namespace FKs within a single contract space (e.g. `public.profiles.user_id REFERENCES auth.users(id)`) are first-class; the FK reference IR is `(namespace.id, name)` rather than just `name`, and the planner-DDL emit qualifies the `REFERENCES` clause.
 
@@ -379,31 +396,31 @@ The illustrative names below pin shape, not exact identifiers — implementers m
 
 | Concept                    | Framework layer                              | Family layer (SQL)                          | Target layer (Postgres)                                 |
 |----------------------------|----------------------------------------------|---------------------------------------------|---------------------------------------------------------|
-| IR node base               | `interface SchemaNode { kind }`              | `abstract class SqlNode extends SchemaNode` | (target-specific concrete classes)                      |
-| Storage / contract root    | `interface Storage`                          | `abstract class SqlStorage`                 | `class PostgresStorage extends SqlStorage`              |
+| IR node base               | `interface SchemaNode { kind }`, `abstract class SchemaNodeBase implements SchemaNode` (centralised `freeze()` helper) | `abstract class SqlNode extends SchemaNodeBase` | (target-specific concrete classes)                      |
+| Storage / contract root    | `interface Storage { namespaces: Record<string, Namespace> }` | `abstract class SqlStorage implements Storage` | `class PostgresStorage extends SqlStorage`         |
 | Tables / collections       | —                                            | `abstract class SqlTable extends SqlNode`   | `class PostgresTable extends SqlTable`                  |
 | Columns / fields           | —                                            | `abstract class SqlColumn extends SqlNode`  | `class PostgresColumn extends SqlColumn`                |
 | Foreign keys               | —                                            | `abstract class SqlForeignKey`              | `class PostgresForeignKey extends SqlForeignKey`        |
-| Namespace                  | `interface Namespace`, `abstract class NamespaceBase` | (passes through; SQL uses `NamespaceBase`)        | `class PostgresSchema extends NamespaceBase`            |
+| Namespace                  | `interface Namespace`, `abstract class NamespaceBase` | (passes through; SQL uses `NamespaceBase`) | `class PostgresSchema extends NamespaceBase`; `class PostgresUnspecifiedSchema extends PostgresSchema` (singleton, `id = '__unspecified__'`, overrides qualifier emission) |
 | Enum (refactor exemplar)   | (none required — family-shape concept)       | `abstract class SqlEnumType extends SqlNode` | `class PostgresEnumType extends SqlEnumType`           |
-| Target-only kinds          | (must extend `SchemaNode`)                   | (none)                                      | `PostgresFunction`, future `PostgresRlsPolicy`, etc.   |
-| Verifier                   | `interface SchemaVerifier<TContract, TSchema>` | `abstract class SqlSchemaVerifierBase` + utility helpers | `class PostgresSchemaVerifier extends SqlSchemaVerifierBase`, exposed as `PostgresTarget.schemaVerifier` |
-| Serializer (round-trip)    | `interface ContractSerializer<TContract>` (`deserializeContract` + `serializeContract`); reached via `target.contractSerializer.<method>(…)` — no standalone `validateContract` function | `abstract class SqlContractSerializerBase` carrying SQL-shared arktype validation + protected hooks | `class PostgresContractSerializer extends SqlContractSerializerBase`, exposed as `PostgresTarget.contractSerializer` |
-| Target facade              | `interface Target<TContract, TSchema>` (aggregates SPI references) | (none — composition lives at the target) | `class PostgresTarget implements Target<PostgresContract, SqlSchemaIR>` (HAS-A composed SPI implementers) |
+| Target-only kinds          | (must extend `SchemaNodeBase`)               | (none)                                      | `PostgresFunction`, future `PostgresRlsPolicy`, etc.   |
+| Verifier                   | `interface SchemaVerifier<TContract, TSchema>` | `abstract class SqlSchemaVerifierBase` + utility helpers | `class PostgresSchemaVerifier extends SqlSchemaVerifierBase`, exposed as `descriptor.schemaVerifier` |
+| Serializer (round-trip)    | `interface ContractSerializer<TContract>` (`deserializeContract` + `serializeContract(): JsonObject`); reached via `descriptor.contractSerializer.<method>(…)` — no standalone `validateContract` function | `abstract class SqlContractSerializerBase` carrying SQL-shared arktype validation + protected hooks | `class PostgresContractSerializer extends SqlContractSerializerBase`, exposed as `descriptor.contractSerializer` |
+| SPI aggregation            | (none — no new aggregator interface)         | (none)                                      | The existing `SqlControlTargetDescriptor` grows two new named properties (`contractSerializer`, `schemaVerifier`) next to `migrations` |
 | Visitor (narrow ops)       | (none — visitor scope is domain-specific)    | `interface SqlSchemaVisitor<R>` for family-known kinds | Optional target-extended visitor `PostgresSchemaVisitor<R>` |
 
 **Mongo family example** (lifted from today's family-level AST + new family/target split):
 
 | Concept                    | Framework layer                              | Family layer (Mongo)                            | Target layer (Mongo)                                  |
 |----------------------------|----------------------------------------------|-------------------------------------------------|-------------------------------------------------------|
-| IR node base               | `interface SchemaNode { kind }`              | `abstract class MongoSchemaNode extends SchemaNode` (today's `MongoSchemaNode`, lifted to extend the framework interface) | (target-specific concrete classes)         |
-| Storage / contract root    | `interface Storage`                          | `abstract class MongoStorage`                    | `class MongoTargetStorage extends MongoStorage`        |
+| IR node base               | `interface SchemaNode { kind }`, `abstract class SchemaNodeBase` | `abstract class MongoSchemaNode extends SchemaNodeBase` (today's `MongoSchemaNode`, lifted to extend the framework base) | (target-specific concrete classes) |
+| Storage / contract root    | `interface Storage { namespaces: Record<string, Namespace> }` | `abstract class MongoStorage implements Storage` | `class MongoTargetStorage extends MongoStorage`        |
 | Collections                | —                                            | `abstract class MongoCollection extends MongoSchemaNode` | `class MongoTargetCollection extends MongoCollection` |
 | Indexes / validators       | —                                            | `abstract class MongoIndex`, `abstract class MongoValidator` | `class MongoTargetIndex extends MongoIndex`, etc.    |
-| Namespace                  | `interface Namespace`, `abstract class NamespaceBase` | (passes through)                          | Mongo's analog (database name) or `NamespaceBase` singleton, depending on Mongo's binding semantics |
-| Verifier                   | `interface SchemaVerifier<TContract, TSchema>` | `abstract class MongoSchemaVerifierBase` + utility helpers | `class MongoTargetSchemaVerifier extends MongoSchemaVerifierBase`, exposed as `MongoTarget.schemaVerifier` |
-| Serializer (round-trip)    | `interface ContractSerializer<TContract>` (`deserializeContract` + `serializeContract`); reached via `target.contractSerializer.<method>(…)` — no standalone `validateContract` function | `abstract class MongoContractSerializerBase` carrying Mongo-shared arktype validation + protected hooks | `class MongoTargetContractSerializer extends MongoContractSerializerBase`, exposed as `MongoTarget.contractSerializer` |
-| Target facade              | `interface Target<TContract, TSchema>` (aggregates SPI references) | (none — composition lives at the target) | `class MongoTarget implements Target<MongoContract, MongoSchemaIR>` (HAS-A composed SPI implementers) |
+| Namespace                  | `interface Namespace`, `abstract class NamespaceBase` | (passes through) | `class MongoTargetDatabase extends NamespaceBase` (Namespace = the connection's `db`); `class MongoTargetUnspecifiedDatabase extends MongoTargetDatabase` (singleton default) |
+| Verifier                   | `interface SchemaVerifier<TContract, TSchema>` | `abstract class MongoSchemaVerifierBase` + utility helpers | `class MongoTargetSchemaVerifier extends MongoSchemaVerifierBase`, exposed as `descriptor.schemaVerifier` |
+| Serializer (round-trip)    | `interface ContractSerializer<TContract>` (`deserializeContract` + `serializeContract(): JsonObject`); reached via `descriptor.contractSerializer.<method>(…)` — no standalone `validateContract` function | `abstract class MongoContractSerializerBase` carrying Mongo-shared arktype validation + protected hooks | `class MongoTargetContractSerializer extends MongoContractSerializerBase`, exposed as `descriptor.contractSerializer` |
+| SPI aggregation            | (none — no new aggregator interface)         | (none)                                          | The existing Mongo target descriptor grows two new named properties (`contractSerializer`, `schemaVerifier`) next to today's migration SPIs |
 | Visitor (narrow ops)       | (none — visitor scope is domain-specific)    | `interface MongoSchemaVisitor<R>` (today's, lifted into the family-only role) | Optional target-extended visitor                       |
 
 The two tables are deliberately parallel: a developer who reads the SQL Postgres column reads the Mongo column the same way. This is the cross-target consistency promise the architectural principles encode (see § "Codifying the convention" below).
@@ -421,10 +438,10 @@ The two tables are deliberately parallel: a developer who reads the SQL Postgres
 
 ### Domain operations
 
-- **FR5.** Verification follows the 3-layer pattern: framework `SchemaVerifier<TContract, TSchema>` interface; per-SPI family abstract base (`SqlSchemaVerifierBase`, `MongoSchemaVerifierBase`) carrying SQL/Mongo-shared walk logic and exposing protected hooks; concrete target SPI implementer (`PostgresSchemaVerifier extends SqlSchemaVerifierBase`, `MongoTargetSchemaVerifier extends MongoSchemaVerifierBase`). The implementer instance is exposed as a named property on the target facade (`target.schemaVerifier`).
-- **FR6.** The framework verifier walks the contract-space aggregate, dispatches to the right target's verifier (via `target.schemaVerifier`) per space, and returns a unified `VerifyResult`. Target-specific issue kinds are valid and propagate through the framework.
-- **FR7.** Round-trip is performed via a framework-level SPI: `interface ContractSerializer<TContract> { deserializeContract(json): TContract; serializeContract(contract): unknown }`. The interface covers both directions; the symmetric framing locks in the JSON ⇄ classes seam at the SPI boundary. Per-SPI family abstract bases (`SqlContractSerializerBase`, `MongoContractSerializerBase`) carry family-shared arktype validation and expose protected hooks for target-specific class construction. Concrete target SPI implementers (`PostgresContractSerializer`, `MongoTargetContractSerializer`) extend the family base; the target facade composes them as `target.contractSerializer`.
-- **FR8.** The standalone `validateContract` function is removed. Hydration call sites become `target.contractSerializer.deserializeContract(json)` (and serialization, where needed, becomes `target.contractSerializer.serializeContract(contract)`). Every existing `validateContract` call site is migrated. Framework-internal callers depend on the framework SPI interfaces (`ContractSerializer<TContract>` directly, or `Target<TContract, TSchema>` when the full SPI set is needed), never on a concrete target class. Tests that don't exercise serialization satisfy the SPI with stub implementations whose `deserializeContract` is the identity function and whose `serializeContract` returns the input unchanged. The user-facing facade (`postgres<Contract>(...)`) wraps this primitive and hides the SPI from end-users.
+- **FR5.** Verification follows the 3-layer pattern: framework `SchemaVerifier<TContract, TSchema>` interface; per-SPI family abstract base (`SqlSchemaVerifierBase`, `MongoSchemaVerifierBase`) carrying SQL/Mongo-shared walk logic and exposing protected hooks; concrete target SPI implementer (`PostgresSchemaVerifier extends SqlSchemaVerifierBase`, `MongoTargetSchemaVerifier extends MongoSchemaVerifierBase`). The implementer instance is exposed as a named property on the **existing target descriptor** (`descriptor.schemaVerifier`), alongside today's `migrations` property. No new aggregator interface is introduced.
+- **FR6.** The framework verifier walks the contract-space aggregate, dispatches to the right target's verifier (via `descriptor.schemaVerifier`) per space, and returns a unified `VerifyResult`. Target-specific issue kinds are widened target-side; the existing framework `SchemaIssue` type (in `framework-components/control/control-result-types.ts`) stays as-is for this project. The mis-layering of that type (SQL-flavoured vocabulary in a framework-level package) is documented as a forward concern in § "Forward note: `SchemaIssue` layering" but out of scope.
+- **FR7.** Round-trip is performed via a framework-level SPI: `interface ContractSerializer<TContract> { deserializeContract(json: unknown): TContract; serializeContract(contract: TContract): JsonObject }`. The interface covers both directions; the symmetric framing locks in the JSON ⇄ classes seam at the SPI boundary and is the single named API surface the round-trip invariant, test infrastructure, and future canonicalization key off. Per-SPI family abstract bases (`SqlContractSerializerBase`, `MongoContractSerializerBase`) carry family-shared arktype validation and expose protected hooks for target-specific class construction. Concrete target SPI implementers (`PostgresContractSerializer`, `MongoTargetContractSerializer`) extend the family base; the existing target descriptor composes them as `descriptor.contractSerializer`.
+- **FR8.** The standalone `validateContract` function is removed. Hydration call sites become `descriptor.contractSerializer.deserializeContract(json)` (and serialization, where needed, becomes `descriptor.contractSerializer.serializeContract(contract)`). Every existing `validateContract` call site is migrated. Framework-internal callers depend on the framework SPI interfaces (`ContractSerializer<TContract>`), never on a concrete target class or descriptor instance type. Tests that don't exercise serialization satisfy the SPI with a `createIdentityContractSerializer<TContract>()` helper the framework ships. The user-facing facade (`postgres<Contract>(...)`) wraps this primitive and hides the SPI from end-users.
 
 ### Enums (refactor exemplar)
 
@@ -435,8 +452,8 @@ The two tables are deliberately parallel: a developer who reads the SQL Postgres
 
 ### Namespace (new concept)
 
-- **FR13.** `Namespace` is a framework-level interface with a convenience abstract base. Postgres ships `PostgresSchema extends NamespaceBase`; SQLite ships a singleton implementation; Mongo ships its analog (database name) or the singleton if its semantics warrant.
-- **FR14.** A reserved sentinel namespace id `__unspecified__` represents connection-bound binding. Targets without native namespacing use it as their default; targets with native namespacing accept it for multi-tenancy / connection-context-resolved contracts.
+- **FR13.** `Namespace` is a framework-level interface with a convenience abstract base. The framework `Storage` interface carries `readonly namespaces: Record<string, Namespace>` so the FR15 invariant ("every storage object belongs to a namespace") is enforced at the type level for every family. Postgres ships `PostgresSchema extends NamespaceBase` (the named-schema concretion); SQLite ships its singleton concretion; Mongo ships `MongoTargetDatabase extends NamespaceBase` mapping to the connection's `db` field.
+- **FR14.** A reserved sentinel namespace id `__unspecified__` represents connection-bound binding. The sentinel is realised per-target as a **singleton subclass** of that target's Namespace concretion (e.g. `class PostgresUnspecifiedSchema extends PostgresSchema` with `readonly id = '__unspecified__' as const`, exposed via a stable static reference `PostgresSchema.unspecified`). The subclass overrides the namespace's serialization methods to elide the namespace qualifier in emitted DDL; call sites stay polymorphic (no `if (namespace.id === '__unspecified__')` branches anywhere). Targets without native namespacing use the singleton as their default. Targets with native namespacing accept the singleton for multi-tenancy / connection-context-resolved contracts.
 - **FR15.** Every storage object in Contract IR and Schema IR belongs to a namespace. The verifier matches contract objects to schema objects via `(namespace.id, name)` rather than `name` alone.
 - **FR16.** Existing single-namespace contracts migrate to the new shape: Postgres contracts default to `__unspecified__` (the database's `search_path` resolves to `public` by default, matching today's behaviour); SQLite contracts get the singleton; Mongo contracts get their analog. The migration is mechanical and the user's authored contract semantics are preserved. Postgres users explicitly declare `public` (or any other named namespace) when they want a pinned schema; the `__unspecified__` default also enables multi-tenancy contracts where `search_path` resolves the schema per connection without any contract-level changes.
 - **FR16a.** The authoring DSL exposes namespace declarations in both PSL and the TS builder, with surfaces kept structurally parallel so moving between them is mechanical for users.
@@ -475,7 +492,7 @@ The two tables are deliberately parallel: a developer who reads the SQL Postgres
 ## Non-Functional Requirements
 
 - **NFR1.** The on-disk JSON shape changes only to accommodate the new IR (notably namespace; minor field additions for kind discriminants where they're not already implicit). Breaking changes to existing contracts are acceptable (pure 0.x mindset); existing fixtures and examples are migrated big-bang alongside the IR shape change in the same PR — no dual-shape transition window. Mongo fixtures migrate in M2 alongside the Mongo IR flip; SQL fixtures migrate in M3 alongside the Postgres SPI shells PR.
-- **NFR2.** Round-trip fidelity: for any target, `target.contractSerializer.deserializeContract(JSON.parse(JSON.stringify(target.contractSerializer.serializeContract(contract))))` produces a contract structurally equivalent to the original. Tested for Postgres, SQLite, and Mongo.
+- **NFR2.** Round-trip fidelity: for any target, `descriptor.contractSerializer.deserializeContract(JSON.parse(JSON.stringify(descriptor.contractSerializer.serializeContract(contract))))` produces a contract structurally equivalent to the original. Tested for Postgres, SQLite, and Mongo.
 - **NFR3.** No regression in the existing verifier's behaviour for cases the new IR can express. Tests for verification (existing `verifySqlSchema` test suite) pass after migration to the new architecture.
 - **NFR4.** No silent loss of information. Anything previously stored in `annotations: SqlAnnotations` that becomes a first-class IR concept (currently: nothing planned beyond namespace; future: RLS) keeps working through the migration; anything that stays in `annotations` keeps round-tripping.
 - **NFR5.** The pattern is documented as a project-wide convention — every domain interface that crosses the framework/target boundary follows the recipe (interface in framework, optional abstract base in family, concrete in target, target-can-skip-family escape valve). The convention is captured as an ADR at project close-out.
@@ -517,11 +534,11 @@ Independent / non-blocking: [TML-2458](https://linear.app/prisma-company/issue/T
 - [ ] **AC5.** A SQLite contract uses the singleton `__unspecified__` namespace; the SQL emitter elides namespace qualifiers; the verifier matches contract to schema correctly.
 - [ ] **AC6.** A multi-tenancy Postgres contract uses `__unspecified__` for its tables; the connection's `search_path` (or equivalent binding) resolves the namespace at runtime. Demonstrated end-to-end via a multi-tenancy integration test.
 - [ ] **AC7.** Mongo's Contract IR and Schema IR are migrated to the 3-layer split; existing Mongo tests pass; the family/target boundary is observable in code (family-mongo abstract bases consumed by target-mongo concrete classes).
-- [ ] **AC8.** Round-trip fidelity: for any target, `target.contractSerializer.deserializeContract(JSON.parse(JSON.stringify(target.contractSerializer.serializeContract(contract))))` yields a structurally equivalent class hierarchy. `JSON.stringify` over the class instance also produces the same canonical JSON shape as `serializeContract`. Verified via property tests.
+- [ ] **AC8.** Round-trip fidelity: for any target, `descriptor.contractSerializer.deserializeContract(JSON.parse(JSON.stringify(descriptor.contractSerializer.serializeContract(contract))))` yields a structurally equivalent class hierarchy. `JSON.stringify` over the class instance also produces the same canonical JSON shape as `serializeContract`. Verified via property tests.
 - [ ] **AC9.** `AGENTS.md` / `CLAUDE.md` rule is updated; `docs/reference/typescript-patterns.md` gains the AST/IR class-hierarchy section; `docs/Architecture Overview.md` surfaces the two architectural principles. Reviewable as docs diffs in the project's PRs.
 - [ ] **AC10.** ADR drafts capturing (a) the 3-layer polymorphic IR convention and (b) the architectural principles underwriting it exist under `projects/target-extensible-ir/specs/` (to be promoted to `docs/architecture docs/adrs/` at project close-out).
 - [ ] **AC11.** `pnpm lint:deps` passes; no new layering violations are introduced. Layering rules are tightened where the new structure permits.
-- [ ] **AC12.** Every `validateContract` call site is migrated to `target.contractSerializer.deserializeContract(json)` (or, for tests, the same call against a `ContractSerializer` stub). The standalone `validateContract` function is removed from the codebase; the user-facing facade (`postgres<Contract>(...)`) wraps the SPI call so end-users do not see it directly. Framework-internal call sites depend on the framework SPI interfaces (`ContractSerializer<TContract>` or `Target<TContract, TSchema>`), never on a concrete target class — verified by inspection of the migrated call sites and the absence of `validateContract` from the public exports.
+- [ ] **AC12.** Every `validateContract` call site is migrated to `descriptor.contractSerializer.deserializeContract(json)` (or, for tests, the same call against `createIdentityContractSerializer<TContract>()`). The standalone `validateContract` function is removed from the codebase; the user-facing facade (`postgres<Contract>(...)`) wraps the SPI call so end-users do not see it directly. Framework-internal call sites depend on the framework SPI interface (`ContractSerializer<TContract>`), never on a concrete target descriptor type — verified by inspection of the migrated call sites and the absence of `validateContract` from the public exports.
 
 # Other Considerations
 
@@ -533,7 +550,7 @@ This project is an internal architecture refactor; no new user data flows or ext
 
 No infrastructure cost. Internal engineering effort is the only cost — a sizeable refactor across the framework, sql-family, mongo-family, and three targets (postgres, sqlite, mongo). Cost ledger to be sized by the principal-engineer pass.
 
-The largest single touchpoint is the `validateContract` removal (FR8): every existing call site migrates to `target.contractSerializer.deserializeContract(json)`. Framework-internal callers are mechanical. Tests dominate the labour — most tests construct a contract literal and call `validateContract`, so each test acquires either a real target import or a small `ContractSerializer` stub (identity `deserializeContract`, identity `serializeContract`). The plan sequences this work so the test-migration cost shakes out against a stable IR shape: M1 establishes the SPI interfaces, M2 commits Mongo to them, M3 lands the `validateContract` → SPI migration alongside the Postgres + SQLite IR class flip — rather than compounding the test migration with the structural changes in a single pass.
+The largest single touchpoint is the `validateContract` removal (FR8): every existing call site migrates to `descriptor.contractSerializer.deserializeContract(json)`. Framework-internal callers are mechanical. Tests dominate the labour — most tests construct a contract literal and call `validateContract`, so each test acquires either a real target descriptor import or the framework-provided `createIdentityContractSerializer<TContract>()` helper. The plan sequences this work so the test-migration cost shakes out against a stable IR shape: M1 establishes the SPI interfaces and the identity helper, M2 commits Mongo to them, M3 lands the `validateContract` → SPI migration alongside the Postgres + SQLite IR class flip — rather than compounding the test migration with the structural changes in a single pass. Postgres and SQLite share family-level abstract bases (`SqlTable`, `SqlColumn`, `SqlForeignKey`, …), so flipping one to the new class shape without the other would leave the family abstract bases in a dual-shape state — incompatible with NFR1 ("no dual-shape transition window"). M3 therefore lands as a single PR covering both targets.
 
 ## Observability
 
