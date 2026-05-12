@@ -1,5 +1,6 @@
 import type { CodecCallContext } from '../shared/codec-types';
 import { AsyncIterableResult } from './async-iterable-result';
+import { runBeforeExecuteChain } from './before-execute-chain';
 import type { ExecutionPlan, QueryPlan } from './query-plan';
 import { checkAborted } from './race-against-abort';
 import { runWithMiddleware } from './run-with-middleware';
@@ -31,9 +32,16 @@ export interface RuntimeCoreOptions<TMiddleware extends RuntimeMiddleware<Execut
  *    this to run its `beforeCompile` middleware-hook chain.
  * 2. `lower(plan)` — abstract. Each family produces its `*ExecutionPlan`
  *    (SQL via `lowerSqlPlan`, Mongo via `adapter.lower`).
- * 3. `runWithMiddleware(exec, this.middleware, this.ctx,
- *    () => runDriver(exec))` — concrete; lifts the middleware lifecycle
- *    out of the family runtimes into the canonical helper.
+ * 3. `runBeforeExecuteChain(exec, this.middleware, this.ctx)` — concrete;
+ *    runs every middleware's `beforeExecute` hook after lowering but
+ *    before the row source is opened. Family runtimes that need a
+ *    params mutator visible to a downstream encode step (SQL) override
+ *    `execute` and call this helper themselves at the equivalent
+ *    pre-encode point.
+ * 4. `runWithMiddleware(exec, this.middleware, this.ctx,
+ *    () => runDriver(exec))` — concrete; runs the intercept chain,
+ *    drives the row source, fires `onRow` / `afterExecute`. Does
+ *    **not** fire `beforeExecute` — see step 3.
  *
  * Concrete subclasses must implement `lower`, `runDriver`, and `close`.
  *
@@ -118,6 +126,11 @@ export abstract class RuntimeCore<
 
       const compiled = await self.runBeforeCompile(plan);
       const exec = await self.lower(compiled, codecCtx);
+      // Fire the framework-level `beforeExecute` chain on the lowered
+      // plan before opening the row source. Families that need
+      // pre-encode mutator visibility (SQL) override `execute` to
+      // inject the same chain at the equivalent point.
+      await runBeforeExecuteChain<TExec>(exec, self.middleware, self.ctx);
       // The driver yields raw `Record<string, unknown>`; we cast to `Row` here.
       // The Row contract is enforced by the caller via `plan._row`.
       yield* runWithMiddleware<TExec, Row>(

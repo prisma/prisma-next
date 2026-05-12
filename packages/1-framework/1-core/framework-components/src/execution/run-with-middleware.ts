@@ -1,14 +1,10 @@
 import { AsyncIterableResult } from './async-iterable-result';
 import type { ExecutionPlan } from './query-plan';
-import { checkAborted, raceAgainstAbort } from './race-against-abort';
-import type {
-  ParamRefMutator,
-  RuntimeMiddleware,
-  RuntimeMiddlewareContext,
-} from './runtime-middleware';
+import type { RuntimeMiddleware, RuntimeMiddlewareContext } from './runtime-middleware';
 
 /**
- * Drives a single execution of `runDriver()` through the middleware lifecycle.
+ * Drives a single execution of `runDriver()` through the middleware
+ * lifecycle's intercept + row-source + termination phases.
  *
  * Lifecycle, in order:
  *  1. For each middleware in registration order: `intercept(exec, ctx)`. The
@@ -18,40 +14,42 @@ import type {
  *     the intercepted rows, and proceeds with `source: 'middleware'`. On
  *     all-passthrough (every `intercept` returns `undefined` or is omitted),
  *     `source: 'driver'` is used and the row source is `runDriver()`.
- *  2. If `source === 'driver'`: for each middleware in registration order,
- *     `beforeExecute(exec, ctx)`. Skipped on the intercepted hit path —
- *     `beforeExecute` semantically means "about to hit the driver".
- *  3. Iterate the row source. On the driver path, for each row, for each
+ *  2. Iterate the row source. On the driver path, for each row, for each
  *     middleware in registration order: `onRow(row, exec, ctx)`; then yield
  *     the row. On the intercepted hit path, `onRow` is skipped — intercepted
  *     rows did not originate from a driver row stream — but rows are still
  *     yielded to the consumer in order.
- *  4. On successful completion: for each middleware in registration order:
+ *  3. On successful completion: for each middleware in registration order:
  *     `afterExecute(exec, { rowCount, latencyMs, completed: true, source },
  *     ctx)`.
- *  5. On any error thrown during steps 1–3: for each middleware in
+ *  4. On any error thrown during steps 1–2: for each middleware in
  *     registration order: `afterExecute(exec, { rowCount, latencyMs,
  *     completed: false, source }, ctx)`. Errors thrown by `afterExecute`
  *     during the error path are swallowed so they do not mask the original
  *     error. The original error is then rethrown.
  *
+ * `beforeExecute` is **not** fired here — see
+ * {@link runBeforeExecuteChain} in `before-execute-chain.ts`. Family
+ * runtimes call that helper between the AST → plan lowering step and
+ * the parameter encode step so middleware that mutates ParamRef
+ * values (e.g. cipherstash bulk-encrypt) can have its mutations
+ * visible to encode. `runWithMiddleware` operates on the fully-
+ * encoded plan; interceptors therefore observe a fully-mutated,
+ * encoded plan.
+ *
  * The `source` field on `AfterExecuteResult` lets observers (telemetry,
  * lints, budgets) distinguish driver-served from middleware-served
  * executions without needing their own out-of-band signal.
  *
- * This helper is the single canonical implementation of the middleware
- * orchestration loop; family runtimes should not reimplement it.
+ * This helper is the single canonical implementation of the
+ * intercept-and-row-source loop; family runtimes should not
+ * reimplement it.
  */
-export function runWithMiddleware<
-  TExec extends ExecutionPlan,
-  Row,
-  TMutator extends ParamRefMutator = ParamRefMutator,
->(
+export function runWithMiddleware<TExec extends ExecutionPlan, Row>(
   exec: TExec,
-  middleware: ReadonlyArray<RuntimeMiddleware<TExec, TMutator>>,
+  middleware: ReadonlyArray<RuntimeMiddleware<TExec>>,
   ctx: RuntimeMiddlewareContext,
   runDriver: () => AsyncIterable<Row>,
-  paramsMutator?: TMutator,
 ): AsyncIterableResult<Row> {
   const iterator = async function* (): AsyncGenerator<Row, void, unknown> {
     const startedAt = Date.now();
@@ -91,22 +89,6 @@ export function runWithMiddleware<
       }
 
       if (source === 'driver') {
-        for (const mw of middleware) {
-          if (mw.beforeExecute) {
-            checkAborted(ctx, 'beforeExecute');
-            // The framework only forwards the mutator the caller supplied; a
-            // pass-through `undefined` for non-mutating families is safe — the
-            // base `RuntimeMiddleware` declares the third parameter, and
-            // existing `(plan, ctx)` bodies that ignore it stay unchanged.
-            // The cast below is the single point at which the framework's
-            // generic mutator slot meets the (possibly absent) caller value;
-            // `runWithMiddleware` cannot synthesize a TMutator instance.
-            const work = mw.beforeExecute(exec, ctx, paramsMutator as TMutator);
-            if (work !== undefined) {
-              await raceAgainstAbort(Promise.resolve(work), ctx.signal, 'beforeExecute');
-            }
-          }
-        }
         rowSource = runDriver();
       }
 

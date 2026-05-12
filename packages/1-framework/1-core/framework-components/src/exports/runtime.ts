@@ -1,4 +1,5 @@
 export { AsyncIterableResult } from '../execution/async-iterable-result';
+export { runBeforeExecuteChain } from '../execution/before-execute-chain';
 export type { ExecutionPlan, QueryPlan, ResultType } from '../execution/query-plan';
 export { checkAborted, raceAgainstAbort } from '../execution/race-against-abort';
 export { runWithMiddleware } from '../execution/run-with-middleware';

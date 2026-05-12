@@ -46,18 +46,15 @@ describe('runWithMiddleware', () => {
     expect(out).toEqual(rows);
   });
 
-  it('single middleware sees beforeExecute, onRow per row, then afterExecute(completed: true)', async () => {
+  it('single middleware sees onRow per row, then afterExecute(completed: true)', async () => {
     const rows = [{ id: 1 }, { id: 2 }];
     const events: string[] = [];
     let observedResult: AfterExecuteResult | undefined;
 
     const mw: RuntimeMiddleware<MockExec> = {
       name: 'observer',
-      async beforeExecute(plan, ctx) {
-        expect(plan).toBe(mockExec);
-        expect(ctx).toBe(mockCtx);
-        events.push('beforeExecute');
-      },
+      // beforeExecute fires from `runBeforeExecuteChain`, not from
+      // `runWithMiddleware`. Asserted in `before-execute-chain.test.ts`.
       async onRow(row) {
         events.push(`onRow:${(row as { id: number }).id}`);
       },
@@ -79,7 +76,7 @@ describe('runWithMiddleware', () => {
     const out = await result.toArray();
 
     expect(out).toEqual(rows);
-    expect(events).toEqual(['beforeExecute', 'onRow:1', 'onRow:2', 'afterExecute']);
+    expect(events).toEqual(['onRow:1', 'onRow:2', 'afterExecute']);
     expect(observedResult).toMatchObject({ rowCount: 2, completed: true, source: 'driver' });
     expect(observedResult?.latencyMs).toBeGreaterThanOrEqual(0);
   });
@@ -91,9 +88,6 @@ describe('runWithMiddleware', () => {
     function mw(label: string): RuntimeMiddleware<MockExec> {
       return {
         name: label,
-        async beforeExecute() {
-          events.push(`${label}:beforeExecute`);
-        },
         async onRow() {
           events.push(`${label}:onRow`);
         },
@@ -113,9 +107,6 @@ describe('runWithMiddleware', () => {
     await result.toArray();
 
     expect(events).toEqual([
-      'A:beforeExecute',
-      'B:beforeExecute',
-      'C:beforeExecute',
       'A:onRow',
       'B:onRow',
       'C:onRow',
@@ -133,9 +124,6 @@ describe('runWithMiddleware', () => {
     function mw(label: string): RuntimeMiddleware<MockExec> {
       return {
         name: label,
-        async beforeExecute() {
-          events.push(`${label}:beforeExecute`);
-        },
         async afterExecute(_plan, result) {
           observed.push({ label, completed: result.completed, rowCount: result.rowCount });
           events.push(`${label}:afterExecute`);
@@ -161,12 +149,7 @@ describe('runWithMiddleware', () => {
 
     await expect(result.toArray()).rejects.toBe(driverError);
 
-    expect(events).toEqual([
-      'A:beforeExecute',
-      'B:beforeExecute',
-      'A:afterExecute',
-      'B:afterExecute',
-    ]);
+    expect(events).toEqual(['A:afterExecute', 'B:afterExecute']);
     expect(observed).toEqual([
       { label: 'A', completed: false, rowCount: 1 },
       { label: 'B', completed: false, rowCount: 1 },
