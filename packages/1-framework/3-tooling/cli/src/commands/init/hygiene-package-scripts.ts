@@ -148,6 +148,11 @@ export function ensureEsmModuleType(existing: string): EsmModuleTypeResult {
   const next: Record<string, unknown> = {};
   let inserted = false;
   for (const [key, value] of Object.entries(parsed)) {
+    // A non-string `type` slipped past the early-return guards above
+    // (those only fire for `'module'` and other strings). Skip it so the
+    // normalised `'module'` we inject below cannot be overwritten when
+    // `type` appears after `name` in key order.
+    if (key === 'type') continue;
     next[key] = value;
     if (!inserted && key === 'name') {
       next['type'] = 'module';
