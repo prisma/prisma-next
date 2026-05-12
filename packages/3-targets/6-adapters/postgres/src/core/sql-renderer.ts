@@ -1,4 +1,5 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import {
   type AggregateExpr,
   type AnyExpression,
@@ -519,7 +520,16 @@ function renderParamRef(ref: ParamRef, pim: ParamIndexMap): string {
   if (index === undefined) {
     throw new Error('ParamRef not found in index map');
   }
-  return renderTypedParam(index, ref.codec?.codecId, pim.codecLookup);
+  if (ref.codec === undefined) {
+    throw runtimeError(
+      'RUNTIME.PARAM_REF_MISSING_CODEC',
+      'Postgres renderer: ParamRef reached lowering without a bound CodecRef. ' +
+        'Every column-bound ParamRef must carry a codec under the AST-bound codec contract. ' +
+        'This usually indicates a builder path that constructed a ParamRef without threading the column codec.',
+      { paramIndex: index, ...(ref.name !== undefined ? { name: ref.name } : {}) },
+    );
+  }
+  return renderTypedParam(index, ref.codec.codecId, pim.codecLookup);
 }
 
 function renderLiteral(expr: LiteralExpr): string {
