@@ -1,5 +1,4 @@
 import type { CodecControlHooks, ExpandNativeTypeInput } from '@prisma-next/family-sql/control';
-import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 import {
   buildOperation,
   type CodecExpression,
@@ -39,6 +38,7 @@ import {
   SQL_VARCHAR_CODEC_ID,
 } from '@prisma-next/target-postgres/codec-ids';
 import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
+import type { QueryOperationTypes } from '../types/operation-types';
 import { pgEnumControlHooks } from './enum-control-hooks';
 
 // ============================================================================ Helper functions for reducing boilerplate ============================================================================
@@ -134,12 +134,9 @@ const identityHooks: CodecControlHooks = { expandNativeType: ({ nativeType }) =>
 
 type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
 
-export function postgresQueryOperations<
-  CT extends CodecTypesBase,
->(): readonly SqlOperationDescriptor[] {
-  return [
-    {
-      method: 'ilike',
+export function postgresQueryOperations<CT extends CodecTypesBase>(): QueryOperationTypes<CT> {
+  return {
+    ilike: {
       self: { traits: ['textual'] },
       impl: (
         self: TraitExpression<readonly ['textual'], false, CT>,
@@ -153,7 +150,7 @@ export function postgresQueryOperations<
         });
       },
     },
-  ];
+  };
 }
 
 export const postgresAdapterDescriptorMeta = {

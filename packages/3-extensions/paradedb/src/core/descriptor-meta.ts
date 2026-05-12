@@ -12,6 +12,9 @@ const BOOL = 'pg/bool@1' as const;
 const FLOAT4 = 'pg/float4@1' as const;
 const INT4 = 'pg/int4@1' as const;
 
+const TEXT_REF = { codecId: TEXT } as const;
+const INT4_REF = { codecId: INT4 } as const;
+
 export function paradedbQueryOperations<CT extends CodecTypesBase>(): QueryOperationTypes<CT> {
   return {
     // `@@@` accepts both text and structured query types on its RHS.
@@ -21,7 +24,7 @@ export function paradedbQueryOperations<CT extends CodecTypesBase>(): QueryOpera
       impl: (self, query) =>
         buildOperation({
           method: 'paradeDbMatch',
-          args: [toExpr(self, TEXT), toExpr(query, TEXT)],
+          args: [toExpr(self, TEXT_REF), toExpr(query, TEXT_REF)],
           returns: { codecId: BOOL, nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -35,7 +38,7 @@ export function paradedbQueryOperations<CT extends CodecTypesBase>(): QueryOpera
       impl: (self, query) =>
         buildOperation({
           method: 'paradeDbMatchAny',
-          args: [toExpr(self, TEXT), toExpr(query, TEXT)],
+          args: [toExpr(self, TEXT_REF), toExpr(query, TEXT_REF)],
           returns: { codecId: BOOL, nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -49,7 +52,7 @@ export function paradedbQueryOperations<CT extends CodecTypesBase>(): QueryOpera
       impl: (self, query) =>
         buildOperation({
           method: 'paradeDbMatchAll',
-          args: [toExpr(self, TEXT), toExpr(query, TEXT)],
+          args: [toExpr(self, TEXT_REF), toExpr(query, TEXT_REF)],
           returns: { codecId: BOOL, nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -64,7 +67,7 @@ export function paradedbQueryOperations<CT extends CodecTypesBase>(): QueryOpera
       impl: (self, query) =>
         buildOperation({
           method: 'paradeDbTerm',
-          args: [toExpr(self, TEXT), toExpr(query, TEXT)],
+          args: [toExpr(self, TEXT_REF), toExpr(query, TEXT_REF)],
           returns: { codecId: BOOL, nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -79,7 +82,7 @@ export function paradedbQueryOperations<CT extends CodecTypesBase>(): QueryOpera
       impl: (self, query) =>
         buildOperation({
           method: 'paradeDbPhrase',
-          args: [toExpr(self, TEXT), toExpr(query, TEXT)],
+          args: [toExpr(self, TEXT_REF), toExpr(query, TEXT_REF)],
           returns: { codecId: BOOL, nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -94,7 +97,7 @@ export function paradedbQueryOperations<CT extends CodecTypesBase>(): QueryOpera
       impl: (self) =>
         buildOperation({
           method: 'paradeDbScore',
-          args: [toExpr(self, INT4)],
+          args: [toExpr(self, INT4_REF)],
           returns: { codecId: FLOAT4, nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -115,7 +118,7 @@ export function paradedbQueryOperations<CT extends CodecTypesBase>(): QueryOpera
         }
         return buildOperation({
           method: 'paradeDbFuzzy',
-          args: [toExpr(self, TEXT), LiteralExpr.of(distance)],
+          args: [toExpr(self, TEXT_REF), LiteralExpr.of(distance)],
           returns: { codecId: TEXT, nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -136,7 +139,7 @@ export function paradedbQueryOperations<CT extends CodecTypesBase>(): QueryOpera
         }
         return buildOperation({
           method: 'paradeDbBoost',
-          args: [toExpr(self, TEXT), LiteralExpr.of(weight)],
+          args: [toExpr(self, TEXT_REF), LiteralExpr.of(weight)],
           returns: { codecId: TEXT, nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -154,7 +157,7 @@ export function paradedbQueryOperations<CT extends CodecTypesBase>(): QueryOpera
         }
         return buildOperation({
           method: 'paradeDbConst',
-          args: [toExpr(self, TEXT), LiteralExpr.of(value)],
+          args: [toExpr(self, TEXT_REF), LiteralExpr.of(value)],
           returns: { codecId: TEXT, nullable: false },
           lowering: {
             targetFamily: 'sql',
@@ -172,7 +175,7 @@ export function paradedbQueryOperations<CT extends CodecTypesBase>(): QueryOpera
         }
         return buildOperation({
           method: 'paradeDbSlop',
-          args: [toExpr(self, TEXT), LiteralExpr.of(slop)],
+          args: [toExpr(self, TEXT_REF), LiteralExpr.of(slop)],
           returns: { codecId: TEXT, nullable: false },
           lowering: {
             targetFamily: 'sql',
