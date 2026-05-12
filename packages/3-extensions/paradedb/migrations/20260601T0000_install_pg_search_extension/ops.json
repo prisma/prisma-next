@@ -21,7 +21,7 @@
     "execute": [
       {
         "description": "create extension \"pg_search\"",
-        "sql": "CREATE EXTENSION IF NOT EXISTS pg_search"
+        "sql": "CREATE EXTENSION IF NOT EXISTS \"pg_search\""
       }
     ],
     "postcheck": [

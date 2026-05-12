@@ -90,7 +90,7 @@ describe('pgvector extension descriptor (contract-space package layout)', () => 
         }
       | undefined;
     expect(installOp).toBeDefined();
-    expect(installOp!.execute?.[0]?.sql).toBe('CREATE EXTENSION IF NOT EXISTS vector');
+    expect(installOp!.execute?.[0]?.sql).toBe('CREATE EXTENSION IF NOT EXISTS "vector"');
     expect(installOp!.postcheck?.[0]?.sql).toContain("extname = 'vector'");
     expect(installOp!.precheck?.[0]?.sql).toContain("extname = 'vector'");
   });

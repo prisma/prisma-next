@@ -22,7 +22,7 @@
  * by hand; `pnpm tsx migrations/<dirName>/migration.ts` then
  * re-emits `ops.json` + `migration.json` deterministically.
  */
-import { Migration, MigrationCLI, rawSql } from '@prisma-next/target-postgres/migration';
+import { installExtension, Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
 import { PARADEDB_INVARIANTS } from '../../src/core/constants';
 
 export default class M extends Migration {
@@ -35,37 +35,10 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      rawSql({
+      installExtension({
         id: 'paradedb.install-pg-search-extension',
-        label: 'Enable extension "pg_search"',
-        operationClass: 'additive',
+        extensionName: 'pg_search',
         invariantId: PARADEDB_INVARIANTS.installPgSearch,
-        target: {
-          id: 'postgres',
-          details: {
-            schema: 'public',
-            objectType: 'extension',
-            name: 'pg_search',
-          },
-        },
-        precheck: [
-          {
-            description: 'verify extension "pg_search" is not already enabled',
-            sql: "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_search')",
-          },
-        ],
-        execute: [
-          {
-            description: 'create extension "pg_search"',
-            sql: 'CREATE EXTENSION IF NOT EXISTS pg_search',
-          },
-        ],
-        postcheck: [
-          {
-            description: 'confirm extension "pg_search" is enabled',
-            sql: "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_search')",
-          },
-        ],
       }),
     ];
   }

@@ -21,7 +21,7 @@
     "execute": [
       {
         "description": "create extension \"vector\"",
-        "sql": "CREATE EXTENSION IF NOT EXISTS vector"
+        "sql": "CREATE EXTENSION IF NOT EXISTS \"vector\""
       }
     ],
     "postcheck": [
