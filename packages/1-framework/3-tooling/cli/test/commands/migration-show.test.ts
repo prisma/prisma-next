@@ -464,9 +464,9 @@ describe('formatMigrationShowOutput', () => {
 
     expect(stripped).toContain('├');
     expect(stripped).toContain('└');
-    // M6 (T6.6 / AC8): operationClass tags no longer inlined in the
-    // human-readable line. Destructive ops still render a "(destructive)"
-    // marker (replaces the old "[destructive]" tag); additive/widening/
+    // Operation-class tags are no longer inlined in the human-readable
+    // line. Destructive ops still render a "(destructive)" marker
+    // (replacing the old "[destructive]" tag); additive/widening/
     // mutative/data render bare.
     expect(stripped).not.toContain('[additive]');
     expect(stripped).not.toContain('[destructive]');
