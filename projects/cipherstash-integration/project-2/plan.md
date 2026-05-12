@@ -165,11 +165,15 @@ Three more codecs, same pattern. Ship as one task; the marginal cost of a new co
 
   **Pre-T12 cleanup absorbed here** (surfaced in m1 R2): regenerate the cipherstash example baseline at `examples/cipherstash-integration/migrations/20260509T1658_migration/{ops.json,migration.json}` — currently drifted from the canonical emitter output (label string + key ordering + migrationHash differences pre-existing from prior `call-classes.ts` label changes). Add `examples/cipherstash-integration/` to the `fixtures:check` glob in the root `package.json` so future drift is caught earlier.
 
+  **Parity-fixture harness scaffolding absorbed here** (surfaced in m1 R3): no `test/integration/parity/` harness currently exists for any cipherstash codec, so the AC-AUTH3 "byte-identical contract.json" pin lives at the unit-test level today. Scaffold a parity harness covering all six codecs (string + five new) — directory shape per the existing string docblock at `src/exports/column-types.ts:5-8`, with PSL and TS authoring round-tripped through the emitter and the resulting `contract.json` files diffed for byte-identity. Once landed, AC-AUTH3 promotes to PASS for all six codecs at once.
+
+  **Codec-types augmentation absorbed here** (surfaced in m1 R6): the example app's emitted `contract.d.ts` resolves `CodecTypes = PgTypes` only — none of the six cipherstash codec ids are registered with their `cipherstash:*` traits in the consumer-side `CodecTypes` table. R6's trait-dispatched operators (`cipherstashGt/Gte/Lt/Lte/Between/NotBetween`, `cipherstashNe/InArray/NotInArray`) won't surface on real-world model accessors until the augmentation exists. The single-codec-id operators (`cipherstashEq/Ilike/NotIlike/JsonbPathExists`) bypass the CT lookup and already surface. Land the augmentation alongside the example app extension since that's where it first matters at the consumer level.
+
   _(satisfies: TC-E2E1–7, TC-EX1, TC-OPT1)_
 
 #### Documentation and close-out (T13)
 
-- [ ] **T13 — Documentation + close-out.**
+- [ ] **T13 — Documentation + close-out.** Includes (surfaced in m1 R3): updating the dead-link docblock in `packages/3-extensions/cipherstash/src/exports/column-types.ts:5-8` that references the non-existent `test/integration/test/authoring/parity/cipherstash-encrypted-string/` fixture path. PSL/TS parity is verified through mirrored unit assertions in `test/psl-interpretation.test.ts` and `test/column-types.test.ts`; the docblock should either point at those or drop the reference.
   - Update `packages/3-extensions/cipherstash/README.md` with all five new types, the predicate-vs-helper operator split, the EQL search-config index types in use, and a "Known limitations" section enumerating the explicitly-deferred surfaces (encrypted timestamp/datetime, non-bigint integer variants, re-encryption migration, per-column key-id override).
   - Migrate the design decisions captured in `projects/cipherstash-integration/project-2/spec.md` to a durable location. Likely shape: an amendment to ADR 211 (extension operator surface) capturing the predicate-vs-helper split, plus updates to `packages/3-extensions/cipherstash/DEVELOPING.md` for the per-codec wiring template. New ADR if scope warrants.
   - Strip repo-wide references to `projects/cipherstash-integration/project-2/**` (replace with canonical `docs/` links or remove).
