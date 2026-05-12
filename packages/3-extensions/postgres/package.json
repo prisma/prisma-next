@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/cli": "workspace:*",
     "@prisma-next/config": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
@@ -58,6 +59,7 @@
   "exports": {
     "./config": "./dist/config.mjs",
     "./contract-builder": "./dist/contract-builder.mjs",
+    "./control": "./dist/control.mjs",
     "./family": "./dist/family.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./serverless": "./dist/serverless.mjs",

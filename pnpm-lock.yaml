@@ -2980,6 +2980,9 @@ importers:
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
         version: link:../../3-targets/6-adapters/postgres
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../../1-framework/3-tooling/cli
       '@prisma-next/config':
         specifier: workspace:*
         version: link:../../1-framework/1-core/config
