@@ -112,7 +112,7 @@ function buildInsertPlan(
   const astRows = rows.map((row) => {
     const out: Record<string, ParamRef> = {};
     for (const [column, value] of Object.entries(row)) {
-      const ref = ParamRef.of(value, { codecId: CIPHERSTASH_STRING_CODEC_ID });
+      const ref = ParamRef.of(value, { codec: { codecId: CIPHERSTASH_STRING_CODEC_ID } });
       out[column] = ref;
       params.push(value);
     }
@@ -131,7 +131,7 @@ function buildUpdatePlan(table: string, set: Record<string, unknown>): SqlExecut
   const params: unknown[] = [];
   const astSet: Record<string, ParamRef | ColumnRef> = {};
   for (const [column, value] of Object.entries(set)) {
-    const ref = ParamRef.of(value, { codecId: CIPHERSTASH_STRING_CODEC_ID });
+    const ref = ParamRef.of(value, { codec: { codecId: CIPHERSTASH_STRING_CODEC_ID } });
     astSet[column] = ref;
     params.push(value);
   }

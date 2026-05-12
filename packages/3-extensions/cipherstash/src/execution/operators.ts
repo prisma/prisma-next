@@ -111,7 +111,7 @@ function asEncryptedParam(selfAst: AnyExpression, value: unknown): ParamRef {
   if (columnRef !== undefined) {
     setHandleRoutingKey(envelope, columnRef.table, columnRef.column);
   }
-  return ParamRef.of(envelope, { codecId: CIPHERSTASH_STRING_CODEC_ID });
+  return ParamRef.of(envelope, { codec: { codecId: CIPHERSTASH_STRING_CODEC_ID } });
 }
 
 function coerceToEnvelope(value: unknown): EncryptedString {

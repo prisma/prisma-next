@@ -124,7 +124,7 @@ function makeMiddlewareCtx(signal: AbortSignal | undefined): SqlMiddlewareContex
 function buildInsertPlan(envelopes: ReadonlyArray<EncryptedString>): SqlExecutionPlan {
   const params: unknown[] = [];
   const astRows = envelopes.map((envelope) => {
-    const ref = ParamRef.of(envelope, { codecId: CIPHERSTASH_STRING_CODEC_ID });
+    const ref = ParamRef.of(envelope, { codec: { codecId: CIPHERSTASH_STRING_CODEC_ID } });
     params.push(envelope);
     return { email: ref };
   });
