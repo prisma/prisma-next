@@ -26,6 +26,20 @@ describe('stripYamlComment', () => {
   it('does not strip a # inside a double-quoted string', () => {
     strictEqual(stripYamlComment('title: "this # is data"'), 'title: "this # is data"');
   });
+
+  it('treats \\" as an escaped quote (does not close the string)', () => {
+    const input = 'title: "value with \\" still inside # not a comment"';
+    strictEqual(stripYamlComment(input), input);
+  });
+
+  it('treats \\\\" as a closed string preceded by a literal backslash', () => {
+    strictEqual(stripYamlComment('title: "value\\\\" # comment'), 'title: "value\\\\" ');
+  });
+
+  it('treats \\\\\\" as an escaped quote after a literal backslash', () => {
+    const input = 'title: "value\\\\\\" still inside # not a comment"';
+    strictEqual(stripYamlComment(input), input);
+  });
 });
 
 describe('findViolations', () => {

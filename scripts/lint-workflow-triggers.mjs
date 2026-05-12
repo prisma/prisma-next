@@ -50,8 +50,15 @@ export function stripYamlComment(line) {
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
     if (ch === "'" && !inDouble) inSingle = !inSingle;
-    else if (ch === '"' && !inSingle) inDouble = !inDouble;
-    else if (ch === '#' && !inSingle && !inDouble) {
+    else if (ch === '"' && !inSingle) {
+      // YAML double-quoted scalars allow `\"` as an escaped quote. An odd run
+      // of consecutive backslashes immediately before this `"` means the quote
+      // is escaped (data, not a terminator); an even run (including zero)
+      // means it terminates / opens a scalar.
+      let backslashes = 0;
+      for (let j = i - 1; j >= 0 && line[j] === '\\'; j--) backslashes++;
+      if (backslashes % 2 === 0) inDouble = !inDouble;
+    } else if (ch === '#' && !inSingle && !inDouble) {
       const prev = i === 0 ? ' ' : line[i - 1];
       if (prev === ' ' || prev === '\t' || i === 0) {
         return line.slice(0, i);
