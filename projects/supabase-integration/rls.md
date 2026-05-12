@@ -181,17 +181,42 @@ TS authors use `supabase.roles.authenticated`; plain string role names also work
 
 ### Implicit `ENABLE ROW LEVEL SECURITY`
 
-If a model declares at least one RLS policy, the planner implicitly emits `ALTER TABLE … ENABLE ROW LEVEL SECURITY` for that table. The user doesn't declare it separately. This avoids the easy-to-make mistake of writing policies that aren't enforced because RLS isn't enabled.
+Model-level `rls?: 'auto' | 'enabled' | 'disabled'`, default `'auto'` (per decision [C11](decisions.md)):
 
-For models that want RLS enabled but no policies declared yet (defensive default), a model-level toggle:
+- **`'auto'`** (default) — infer from policy presence. Any declared policy on the model → `ENABLE ROW LEVEL SECURITY` at migration time. This avoids the easy mistake of writing policies that don't run because RLS isn't enabled.
+- **`'enabled'`** — explicit defensive default. RLS on, no policies declared yet (denies all access). Useful for new tables that should never be readable until policies are added.
+- **`'disabled'`** — explicit override. RLS off, even if policies are declared on the model. Useful for test fixtures and tables the framework deliberately leaves open.
 
 ```ts
 m.model('Profile', {
-  rls: 'enabled',  // explicit; default is 'auto' which infers from policy presence
+  rls: 'enabled',
 });
 ```
 
-Working assumption: default = `auto` (infer from policy presence), with `enabled` / `disabled` overrides available.
+The planner emits `ALTER TABLE ... ENABLE/DISABLE ROW LEVEL SECURITY` based on the resolved state; the verifier checks `pg_class.relrowsecurity` matches and emits `rls_not_enabled` on mismatch (see § "Verifier behaviour").
+
+### Content-addressed wire names
+
+Postgres reparses policy predicates at `CREATE POLICY` time and stores them via its expression printer, so introspected predicate bodies rarely match the authored body byte-for-byte even when the predicate is semantically unchanged — parens, whitespace, keyword casing, and cast forms (`auth.uid()::uuid` vs `(auth.uid())::uuid`) all drift through Postgres's renderer. The naive "match by `(schema, table, policy_name)` and compare bodies" verifier loop would surface false-positive `policy_mismatch` errors on nearly every real Supabase contract.
+
+Decision [C9](decisions.md): **wire names carry a content hash.** Wire-level `policyname` in `pg_policies` has the form `<user_prefix>_<8 hex chars>`. The user types only the prefix; the framework computes the suffix as `SHA-256(canonical content tuple)[:8 hex]` at lowering time.
+
+The canonical content tuple feeds five inputs:
+
+1. `canonical(using)` — normalized `USING` body (whitespace collapsed, outer parens trimmed, keywords lowercased). Empty string if absent.
+2. `canonical(withCheck)` — same normalization on the `WITH CHECK` body. Empty if absent.
+3. `sort(roles)` — sorted, deduplicated. Postgres treats roles as a set.
+4. `operation` — closed-set literal.
+5. `as` — `'permissive' | 'restrictive'`.
+
+Excluded: schema and table identity (orthogonal — `pg_policies.schemaname` / `tablename` carry them independently), and the user's prefix itself (it's a human label, not equivalence-bearing). Full design and consequences in [`specs/adr-content-addressed-policy-names.md`](specs/adr-content-addressed-policy-names.md).
+
+Two structural properties fall out cheaply:
+
+- **Equivalence is a name match.** The verifier never compares bodies for equivalence purposes; the suffix carries the equivalence relation by construction. Predicate-equivalence noise is eliminated.
+- **Rename detection is free.** Matching hash with a different prefix is a structural signal that lets the planner emit `ALTER POLICY ... RENAME TO` instead of drop+create.
+
+Duplicate prefixes within `(schema, table)` are a **lowering error**, even though wire names would be distinct by hash. This preserves the user's mental model that the prefix is the policy's logical identity.
 
 ### IR shape
 
@@ -200,15 +225,18 @@ A new target-only IR kind:
 ```ts
 class PostgresRlsPolicy {
   readonly kind = 'PostgresRlsPolicy';
-  readonly name: string;
+  readonly name: string;             // full wire name, e.g. 'profiles_select_anon_a3f1c8b2'
+  readonly prefix: string;           // user-typed prefix, e.g. 'profiles_select_anon' (round-trip + diagnostics)
   readonly table: PostgresTableRef;
   readonly operation: 'select' | 'insert' | 'update' | 'delete' | 'all';
   readonly roles: readonly string[];
   readonly using: string | undefined;
   readonly withCheck: string | undefined;
-  readonly permissive: boolean;  // default true; restrictive is rare but supported
+  readonly permissive: boolean;      // 'as' = permissive (true) | restrictive (false); default true
 }
 ```
+
+`name` is the full wire name (carries the content suffix). `prefix` is the user-typed label, retained for diagnostics (`'extra_rls_policy: …'` messages name the prefix, not the cryptic suffix) and for rename detection (matching hash + different prefix → ALTER RENAME).
 
 The policy hangs off `PostgresTable` (target-only IR class). It does not appear on the framework or family IR — there's no `Mongo*RlsPolicy`.
 
@@ -241,15 +269,55 @@ The diff algorithm compares declared policies (by name) against introspected pol
 
 ### Verifier behaviour
 
-The Postgres schema verifier queries `pg_policies` for each table in scope, builds an IR-shape representation of the existing policies, and diffs against the declared policies. Diff outcomes feed the framework's control-policy dispatch (see [`projects/control-policy/spec.md`](../control-policy/spec.md)):
+The Postgres schema verifier queries `pg_policies` (and `pg_class.relrowsecurity`) for each table in scope and diffs against the declared policies. Equivalence is decided by full-wire-name match (per the content-addressed naming above); only one body-level check is still performed — the tamper check.
 
-- `managed` policies must exactly match.
-- `tolerated` policies must match the declared set; extra policies on the introspected side are allowed.
-- `external` policies are checked for presence + compatible shape only.
+Algorithm:
+
+```text
+For each (schema, table) in scope:
+  declared      = lookup PostgresRlsPolicy[] from contract by table
+  introspected  = SELECT * FROM pg_policies WHERE schemaname = ? AND tablename = ?
+
+  // RLS-enabled state
+  if declared has policies but pg_class.relrowsecurity = false:
+    emit rls_not_enabled
+
+  // Tamper check (one body-level inspection)
+  for row in introspected:
+    recomputed = hash(canonical(qual), canonical(with_check), sort(roles), cmd, permissive)
+    if row.policyname.suffix != recomputed:
+      emit rls_policy_tampered  // manual ALTER POLICY outside the framework
+
+  // Name diff
+  declared_names = set of declared.full_name
+  introspected_names = set of introspected.policyname
+  declared_only      = declared_names - introspected_names
+  introspected_only  = introspected_names - declared_names
+
+  // Rename detection: matching suffix, different prefix
+  for d in declared_only:
+    for i in introspected_only:
+      if d.suffix == i.suffix and d.prefix != i.prefix:
+        emit rls_policy_renamed  // planner: ALTER POLICY i.full RENAME TO d.full
+        remove d, i from their sets
+
+  // What's left after rename matching is genuine drift
+  for d in declared_only:    emit missing_rls_policy
+  for i in introspected_only: emit extra_rls_policy
+```
+
+Severity of `missing_rls_policy` and `extra_rls_policy` is governed by the table's [control policy](../control-policy/spec.md):
+
+- **`managed`** — missing and extras are both errors. Exact match required.
+- **`tolerated`** — missing is an error; extras warn.
+- **`external`** — both are ignored. Used for tables the Supabase extension itself ships.
+- **`observed`** — both are silent diagnostics surfaced only on explicit query.
+
+`rls_policy_tampered`, `rls_policy_renamed`, and `rls_not_enabled` always surface as issues; their planner-side response is dispatch-driven (`ALTER POLICY ... RENAME TO`, `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`, or a re-CREATE for tampered policies under `managed`).
 
 The Supabase extension's own contract declares the policies it ships (if any) with `control: 'external'` at the contract level. App-author policies are `managed` by default.
 
-The detailed semantics of "exactly match" (predicate equivalence, role-list ordering, missing/extra policy responses) is captured as an open hole — see [`example/design-holes.md` #19](example/design-holes.md).
+This collapses three earlier open questions ([`example/design-holes.md` #19](example/design-holes.md), the policy-rename heuristic, and predicate-equivalence noise) into one decision recorded in [`decisions.md` C9 + C10](decisions.md). The full design rationale lives in [`specs/adr-content-addressed-policy-names.md`](specs/adr-content-addressed-policy-names.md).
 
 ### Runtime interaction
 
@@ -257,9 +325,16 @@ The runtime side of RLS is in [`extension-package.md`](extension-package.md). Th
 
 ## Open questions
 
-- **Restrictive policies.** Postgres distinguishes `PERMISSIVE` (default) and `RESTRICTIVE` policies. Decided: ship `as: 'permissive' | 'restrictive'` (TS) / `as = permissive|restrictive` (PSL) with default `permissive`. One enum field.
-- **Policy renames.** Postgres supports `ALTER POLICY … RENAME TO`. The diff algorithm needs to detect rename intent (same predicate + roles, different name) to avoid drop+create. This is the same general problem as detecting column renames; existing migration heuristics likely apply. **Defer the heuristic; ship drop+create for v0.1.**
-- **Pre-defined Supabase policy patterns.** Things like "owner can read/write, anon can read public flag = true" are extremely common. Should the extension ship a "policy pack" of pre-canned policies? Working assumption: **no for v0.1 — keep the API surface minimal; revisit after user feedback.**
-- **Cross-table policies (subqueries that reference other tables).** Allowed by Postgres; supported in v0.1 via the `ref()` helper (TS) or verbatim qualified names (PSL). The verifier doesn't need to know — diff is by name + canonical SQL string.
-- **PSL `${...}` interpolation.** Stretch goal. See [`decisions.md` OC3](decisions.md).
-- **Verifier semantics for predicate equivalence.** See [`example/design-holes.md` #19](example/design-holes.md).
+All blocking RLS design questions are settled. Remaining items below are either roadmap (capture-and-defer) or genuinely open in adjacent surfaces:
+
+- **Pre-defined Supabase policy patterns** (roadmap). Things like "owner can read/write, anon can read public flag = true" are extremely common. Should the extension ship a "policy pack" of pre-canned policies? Working assumption: **no for v0.1 — keep the API surface minimal; revisit after user feedback.**
+- **PSL `${...}` interpolation** (stretch goal). The PSL equivalent of TS's `ref(model)` helper. Tracked as [`decisions.md` OC3](decisions.md).
+- **`policyGroup` for shared-target policies** (roadmap). Tracked as [`decisions.md` OC2](decisions.md).
+- **Backport of content-addressed naming to indexes / functions / views** (roadmap). Tracked as [`decisions.md` OC4](decisions.md).
+
+Closed during shaping:
+
+- ~~**Restrictive policies.**~~ Settled as decisions [A8](decisions.md) (TS) + [B2](decisions.md) (PSL): `as` field, default `permissive`. Single enum.
+- ~~**Policy renames.**~~ Closed by [C10](decisions.md): rename detection is structurally free under content-addressed naming. The verifier emits `rls_policy_renamed` when hash matches and prefix differs; the planner emits `ALTER POLICY ... RENAME TO`. The earlier "defer to v0.1; ship drop+create" working assumption is moot.
+- ~~**Cross-table policies (subqueries that reference other tables).**~~ Supported via the `ref()` helper (TS) or verbatim qualified names (PSL). The verifier never inspects predicate structure — equivalence is hash-based per [C9](decisions.md).
+- ~~**Verifier semantics for predicate equivalence.**~~ Closed by [C9 + C10](decisions.md). Predicate equivalence is decided by the content hash; no body comparison is performed except the per-row tamper check.
