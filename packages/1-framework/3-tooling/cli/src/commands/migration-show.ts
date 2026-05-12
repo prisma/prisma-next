@@ -13,6 +13,7 @@ import {
 } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { spaceMigrationDirectory } from '@prisma-next/migration-tools/spaces';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -266,7 +267,7 @@ async function executeMigrationShowCommand(
     family: config.family,
     target: config.target,
     adapter: config.adapter,
-    ...(config.driver ? { driver: config.driver } : {}),
+    ...ifDefined('driver', config.driver),
     extensionPacks: config.extensionPacks ?? [],
   });
 
