@@ -3,6 +3,8 @@
 > **Status:** Draft (lives under `projects/target-extensible-ir/specs/` while the project executes; promoted to `docs/architecture docs/adrs/` with a permanent ADR number at close-out per the M6 plan task).
 >
 > **Project:** [target-extensible IR (TML-2459)](../spec.md). Refined throughout M2–M5b as the convention is exercised against a second family (Mongo, M2), the SQL targets (M3), enums (M4), and the namespace exemplar (M5a/b).
+>
+> **Companion ADR:** [Architectural principles: affordances and cross-target consistency](architectural-principles.md). This ADR codifies a convention; the companion states the two principles the convention operationalises — "the framework provides affordances; targets implement specifics" and "familiar with one target, fluent in another". The framework alphabet (`SchemaNode`, `Namespace`, `Storage`, the SPI shapes) is principle 1 at work; the cross-target consistency the 3-layer split produces is principle 2 at work.
 
 ## At a glance
 
