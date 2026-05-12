@@ -358,10 +358,27 @@ async function packIfStale(pkg: WorkspacePackage): Promise<string> {
   // Snapshot the raw bytes, restore them after pack.
   const pkgJsonPath = join(pkg.dir, 'package.json');
   const original = readFileSync(pkgJsonPath);
+  let packResult: CommandRun;
   try {
-    await runExec('pnpm', ['pack', '--pack-destination', TARBALL_CACHE_DIR], pkg.dir);
+    // `runExec` does not throw on non-zero exit; capture the result so
+    // pack failures surface here with full stdout/stderr instead of
+    // manifesting later as a confusing install error against a missing
+    // tarball.
+    packResult = await runExec('pnpm', ['pack', '--pack-destination', TARBALL_CACHE_DIR], pkg.dir);
   } finally {
     writeFileSync(pkgJsonPath, original);
+  }
+  if (packResult.exitCode !== 0) {
+    throw new Error(
+      [
+        `pnpm pack failed for ${pkg.name} (exit ${packResult.exitCode})`,
+        `  cwd: ${pkg.dir}`,
+        '  stdout:',
+        packResult.stdout,
+        '  stderr:',
+        packResult.stderr,
+      ].join('\n'),
+    );
   }
 
   // pnpm pack uses its own filename convention (`<scope>-<name>-<version>.tgz`);
@@ -372,6 +389,11 @@ async function packIfStale(pkg: WorkspacePackage): Promise<string> {
     rmSync(tarballPath, { force: true });
     writeFileSync(tarballPath, readFileSync(expectedPath));
     rmSync(expectedPath, { force: true });
+  }
+  if (!existsSync(tarballPath)) {
+    throw new Error(
+      `pnpm pack reported success for ${pkg.name} but no tarball exists at ${tarballPath} (expected pnpm output at ${expectedPath}).`,
+    );
   }
   return tarballPath;
 }
