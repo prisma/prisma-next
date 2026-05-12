@@ -1,21 +1,30 @@
+import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import type { JsonObject } from '@prisma-next/utils/json';
+import { type as arktypeType } from 'arktype';
+import { MongoContractSchema } from '../contract-schema';
+import type { MongoContract } from '../contract-types';
+import { validateMongoStorage } from '../validate-storage';
 
 /**
- * Mongo family `ContractSerializer` abstract base. Carries Mongo-shared
- * deserialization scaffolding (structural arktype validation against the
- * Mongo-shaped contract envelope, family-level domain checks) and exposes
- * a protected hook for target-specific class construction.
+ * Mongo family `ContractSerializer` abstract base. Owns the family-shared
+ * deserialization pipeline:
+ *
+ * 1. Structural validation against the Mongo contract arktype schema
+ *    (`MongoContractSchema`).
+ * 2. Framework-shared domain validation (`validateContractDomain`).
+ * 3. Family-shared storage validation (`validateMongoStorage`).
+ *
+ * The validated value is handed to the target via the
+ * `constructTargetContract` hook, which wraps the plain-JSON shape in
+ * the target's class hierarchy (e.g. `MongoTargetStorage` with
+ * `namespaces`). Targets that need to add structural checks beyond the
+ * family default can override `parseMongoContractStructure`.
  *
  * Default `serializeContract` is identity over the contract — Mongo
- * target ships JSON-clean class instances, so the contract value can be
- * stringified directly. Targets that need to canonicalize on the way out
- * override `serializeContract`.
- *
- * M1 ships only the abstract shell. Mongo-shared validation logic lands
- * as the `parseMongoContractStructure` body in M2 alongside the Mongo
- * target's concrete IR class flip; the protected hook is declared here
- * so `MongoTargetContractSerializer` compiles against a stable base API.
+ * target classes carry JSON-clean fields by construction, so the value
+ * can be `JSON.stringify`'d directly. Targets that need on-the-way-out
+ * canonicalization override `serializeContract`.
  */
 export abstract class MongoContractSerializerBase<TContract>
   implements ContractSerializer<TContract>
@@ -33,16 +42,36 @@ export abstract class MongoContractSerializerBase<TContract>
   }
 
   /**
-   * Family-shared structural validation (arktype). Subclasses can
-   * override to carry target-specific structural checks but most should
-   * rely on the family default (M2 commit will provide).
+   * Family-shared structural validation: parse against the Mongo
+   * contract arktype schema, then run framework-shared domain + Mongo
+   * family storage checks. Targets can override to add target-specific
+   * structural checks; most targets accept the family default.
+   *
+   * Returns the validated value (still in flat-data JSON shape); the
+   * IR-class-flip for Contract IR leaf nodes (`MongoIndex`,
+   * `MongoIndexOptions`, …) lands in a later commit and reshapes this
+   * return value to instantiated AST classes.
    */
-  protected abstract parseMongoContractStructure(json: unknown): unknown;
+  protected parseMongoContractStructure(json: unknown): MongoContract {
+    const parsed = MongoContractSchema(json);
+    if (parsed instanceof arktypeType.errors) {
+      throw new Error(`Contract structural validation failed: ${parsed.summary}`);
+    }
+
+    const contract = parsed as unknown as MongoContract;
+
+    validateContractDomain(contract);
+    validateMongoStorage(contract);
+
+    return contract;
+  }
 
   /**
-   * Target-specific class construction from validated structural data.
-   * The target subclass walks the validated value and builds its own
-   * `MongoTargetStorage` class instances.
+   * Target-specific class construction from the validated structural
+   * data. The target wraps the contract envelope in its own
+   * `MongoTargetStorage` class instance (`namespaces` field, target
+   * concretions, …); the leaf collection / index shapes remain plain
+   * data until the IR-node class flip lands.
    */
-  protected abstract constructTargetContract(validated: unknown): TContract;
+  protected abstract constructTargetContract(validated: MongoContract): TContract;
 }

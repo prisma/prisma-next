@@ -4,25 +4,34 @@ import type {
   SchemaVerifyOptions,
   SchemaVerifyResult,
 } from '@prisma-next/framework-components/control';
+import type { Namespace } from '@prisma-next/framework-components/ir';
+import type { MongoStorageBase } from './mongo-storage';
 
 /**
- * Mongo family `SchemaVerifier` abstract base. Centralises the Mongo-
- * shared walk (collection-by-collection matching keyed by
- * `(namespace.id, name)`, validator / index comparisons) and exposes a
- * protected hook for target extensions (Atlas-specific kinds, future
- * Mongo-target-only kinds).
+ * Mongo family `SchemaVerifier` abstract base. Commits the Mongo family
+ * to namespace-keyed verification: the family-shared walk iterates
+ * `storage.namespaces` in sorted order and dispatches per-namespace
+ * through the protected `verifyNamespace` hook, then aggregates
+ * target-extension issues from `verifyTargetExtensions`.
  *
- * The base accumulates issues in a single buffer and returns the
- * combined result; the family abstract handles the result envelope so
- * concrete subclasses focus on target-specific verification logic.
+ * Per-element diff work (collection / index / validator comparisons)
+ * lives on the target inside `verifyNamespace`. The family's structural
+ * commitment is "verification is namespaced"; the target's commitment is
+ * "verification of a given namespace's collections is the existing
+ * diff/canonicalize pipeline". The split keeps target-mongo's
+ * introspection-side helpers (`contractToMongoSchemaIR`,
+ * `canonicalizeSchemasForVerification`, `diffMongoSchemas`) in the target
+ * layer where they belong, while the family base owns the iteration
+ * scaffolding that makes namespaces a first-class verifier concept.
  *
- * M1 ships only the shell. The Mongo-shared walk lands in M2 alongside
- * Mongo's concrete contract IR class flip; the protected hooks are
- * declared here so `MongoTargetSchemaVerifier` compiles against a
- * stable base API.
+ * Target-specific issue kinds (Atlas-only, future RLS-equivalents)
+ * surface through `verifyTargetExtensions`; that hook returns the empty
+ * list when no extensions exist over the Mongo family alphabet.
  */
-export abstract class MongoSchemaVerifierBase<TContract, TSchema>
-  implements SchemaVerifier<TContract, TSchema>
+export abstract class MongoSchemaVerifierBase<
+  TContract extends { readonly storage: MongoStorageBase },
+  TSchema,
+> implements SchemaVerifier<TContract, TSchema>
 {
   verifySchema(options: SchemaVerifyOptions<TContract, TSchema>): SchemaVerifyResult {
     const issues: SchemaIssue[] = [];
@@ -31,19 +40,46 @@ export abstract class MongoSchemaVerifierBase<TContract, TSchema>
     return { ok: issues.length === 0, issues };
   }
 
-  /**
-   * Mongo-shared verification — collection/validator/index walks keyed by
-   * `(namespace.id, name)`. M1 ships the abstract hook; the M2 commit
-   * provides the family-shared implementation.
-   */
-  protected abstract verifyCommonMongoSchema(
+  protected verifyCommonMongoSchema(
     options: SchemaVerifyOptions<TContract, TSchema>,
-  ): readonly SchemaIssue[];
+  ): readonly SchemaIssue[] {
+    const issues: SchemaIssue[] = [];
+    const { namespaces } = options.contract.storage;
+    const namespaceIds = Object.keys(namespaces).sort();
+    for (const namespaceId of namespaceIds) {
+      const namespace = namespaces[namespaceId];
+      if (!namespace) continue;
+      issues.push(
+        ...this.verifyNamespace({
+          contract: options.contract,
+          schema: options.schema,
+          namespaceId,
+          namespace,
+        }),
+      );
+    }
+    return issues;
+  }
 
   /**
-   * Target-specific extensions — e.g. Atlas-only kinds, future
-   * namespace-mismatch issues. Returns the empty list when the target
-   * ships no extensions over the Mongo family alphabet.
+   * Per-namespace verification hook. Receives the namespace metadata plus
+   * the full contract + schema pair; the target's implementation owns the
+   * per-collection diff using its existing introspection-side helpers.
+   * Slice the schema by namespace at the call site (or compute the full
+   * diff once and dispatch per namespace) — the family base does not
+   * prescribe the per-namespace shape.
+   */
+  protected abstract verifyNamespace(options: {
+    readonly contract: TContract;
+    readonly schema: TSchema;
+    readonly namespaceId: string;
+    readonly namespace: Namespace;
+  }): readonly SchemaIssue[];
+
+  /**
+   * Target-specific extensions — Atlas-only kinds, target-only
+   * namespace-mismatch issues that don't fit the family-shared walk.
+   * Returns the empty list when the target ships no extensions.
    */
   protected abstract verifyTargetExtensions(
     options: SchemaVerifyOptions<TContract, TSchema>,

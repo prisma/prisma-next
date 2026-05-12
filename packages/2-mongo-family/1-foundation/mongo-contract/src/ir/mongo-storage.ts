@@ -1,18 +1,24 @@
 import type { Namespace, Storage } from '@prisma-next/framework-components/ir';
 
 /**
- * Mongo family storage IR base. Refines the framework `Storage` interface
- * for collection-shaped persistence. The concrete element types of
- * `collections` and any future Mongo-shape maps live on the target
- * concretion (`MongoTargetStorage`), keeping family generics out of the
- * framework consumer surface.
+ * Mongo family storage IR abstract base. Refines the framework `Storage`
+ * interface for collection-shaped persistence. The framework promise
+ * (`namespaces: Readonly<Record<string, Namespace>>`) lives here; concrete
+ * family/target storage classes (`MongoTargetStorage`) add `collections`
+ * and any other family/target-specific maps on top.
  *
  * Mongo's namespace concept maps to the connection's `db` field —
  * concretized in M2 as `MongoTargetDatabase` (a `NamespaceBase` subclass)
  * with the singleton subclass `MongoTargetUnspecifiedDatabase` for
  * connection-bound binding. The default storage carries
  * `namespaces: { __unspecified__: MongoTargetUnspecifiedDatabase.instance }`.
+ *
+ * Named `MongoStorageBase` (rather than `MongoStorage`) to avoid a
+ * package-internal naming collision with the existing `type MongoStorage`
+ * data shape in `contract-types`, and to follow the codebase's `*Base`
+ * convention for abstract IR-side bases (`SchemaNodeBase`, `NamespaceBase`,
+ * `MongoContractSerializerBase`, `MongoSchemaVerifierBase`).
  */
-export abstract class MongoStorage implements Storage {
+export abstract class MongoStorageBase implements Storage {
   abstract readonly namespaces: Readonly<Record<string, Namespace>>;
 }
