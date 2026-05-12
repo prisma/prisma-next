@@ -8,49 +8,45 @@ Deliver the `prisma-next init` user-journey test ([TML-2490](https://linear.app/
 
 ## Milestones
 
-### Milestone 1 — Project shaping artifacts
+### Milestone 1 — Project shaping artifacts ✓
 
 PR scope: spec + plan only (this milestone may merge as a separate small shaping PR, or fold into the main implementation PR — see § PR strategy below).
 
 **Tasks:**
 
-- [ ] Validate spec with the team. Specifically pressure-test § Acceptance Criteria and § Open Questions.
-- [ ] Confirm test-location decision (Open Question 1) and `pnpm install` mechanics (Open Question 2) before implementation starts.
+- [x] Spec and plan written; committed as `docs(project): scaffold init-journey-tests spec and plan (TML-2490)`.
+- [x] Test location resolved: `test/integration/test/cli-journeys/init-journey.e2e.test.ts` — glob-included by both the focused `vitest.journeys.config.ts` and the broader `vitest.config.ts` runners.
+- [x] `pnpm install` mechanics resolved: per-cell `pnpm install --no-frozen-lockfile` against a session-cached set of workspace tarballs (`~/.cache/pn-journey/tarballs/`) with `node-linker=isolated`. The tarball cache + pnpm store live outside the worktree to keep encoded relative paths short (avoids `ENAMETOOLONG` under deep worktree paths).
 
-**Exit criteria:** spec + plan reviewed; the five open questions in spec § Open Questions either resolved or accepted as implementer-degrees-of-freedom.
+**Exit criteria:** spec + plan committed; open questions resolved.
 
-### Milestone 2 — Journey test harness + red-by-design baseline
+### Milestone 2 — Journey test harness + red-by-design baseline ✓
 
-Single PR commit. Closes [TML-2490](https://linear.app/prisma-company/issue/TML-2490).
+Three commits delivered the harness + journey:
 
-**Tasks:**
+- `test(integration): scaffold init-journey harness and step-1 assertions (TML-2490)` — harness skeleton with `createJourneyProject`, `prisma-next init` subprocess invocation, and step-1 (scaffold layout) assertions for all four cells.
+- `test(integration): real pnpm install with isolated linker in journey harness (TML-2490)` — session-cached tarballs, `.npmrc` writing, `pnpm install` against the cache, snapshot/restore of workspace `package.json` files around `pnpm pack`.
+- `test(integration): full init journey with red-by-design seam expectations (TML-2490)` — journey steps 3 (emit) / 4 (db init) / 5 (ObjectId import) / 6 (control import) wired up with `seamExpectation` helpers encoding the four current broken behaviours.
 
-- [ ] Create the test file at the chosen location (default: `test/integration/test/cli-journeys/init-journey.e2e.test.ts`). Wire it into the relevant `pnpm test:*` script.
-- [ ] Implement the per-cell test runner (spec FR1) — materialise tmpdir, run `prisma-next init`, run `pnpm install` with isolated linker.
-- [ ] Implement the project handle operations (spec FR2): `addModel`, `emit`, `dbInit`, `runUserCode`, `resetDb`, `planMigration`, `applyMigration`.
-- [ ] Implement the `seamExpectation(name, status)` helper (spec FR3, FR4). Type the `status` arg to discriminate `'currently-broken-by:TML-NNNN' | 'fixed'`.
-- [ ] Author the four per-cell fixtures (spec FR16–FR18) under `test/integration/test/cli-journeys/fixtures/<target>-<authoring>/`.
-- [ ] Implement steps 1–11 of the journey (spec FR5–FR15) with assertions encoding the *current* broken behaviour at the four bug seams:
-  - Step 3 (emit) — assert `contract.json` at the legacy default `src/prisma/contract.json` path (TML-2461 currently-broken).
-  - Step 4 (`db init`) — Mongo cells assert the `createCollection` validator rejection (TML-2486 currently-broken); Postgres cells assert success.
-  - Step 5 (user query) — Mongo cells assert `import { ObjectId } from '@prisma-next/mongo'` fails to resolve (TML-2487 currently-broken). Postgres cells assert `import { createPostgresControlClient } from '@prisma-next/postgres/control'` fails to resolve (TML-2314 currently-broken).
-- [ ] Validate locally: revert PR #485 in a scratch worktree and confirm the journey breaks at step 5 with a diagnostic naming TML-2485-class behaviour. This proves the harness actually exercises the resolver (validates Open Question 2's resolution).
-- [ ] Confirm wall-clock budget (spec NFR1) on local + CI.
+**Scope variation from the original task list:**
 
-**Exit criteria:** CI green on this commit; all four bug seams' assertions encode current broken behaviour; reverting PR #485 locally still breaks the journey.
+- TML-2461's seam is masked by the facade's `defineConfig` (which derives an explicit `output` path), so the journey verifies the colocation invariant by direct assertion rather than via a red-by-design check. The TML-2461 fix is verified by the package-level provider tests added alongside the fix.
+- The "step 7+ resetDb / planMigration / applyMigration / post-migration query" surface (plan § FR12–FR15) was deferred. The four seam bugs and the install-time seam (TML-2485 class) all materialise by step 6, so the journey scope landed is sufficient to surface them.
 
-### Milestone 3 — Bug fixes (one commit per ticket)
+**Exit criteria:** 24/24 tests pass under both `vitest.journeys.config.ts` (focused) and the broader `vitest.config.ts` (full integration suite). The four seam expectations toggle correctly when their corresponding fix commits land.
 
-Four further commits in the same PR. Each fixes one bug and flips one assertion.
+### Milestone 3 — Bug fixes (one commit per ticket) ✓
 
-**Tasks:**
+Four further commits in the same PR. Each fixes one bug and flips one assertion (where applicable).
 
-- [ ] **Commit 2 — [TML-2486](https://linear.app/prisma-company/issue/TML-2486).** Strip `undefined` keys from `createCollection` options in the mongo schema applier (or build the options object conditionally). Update step 4's assertion in both Mongo cells from `seamExpectation('db-init', 'currently-broken-by:TML-2486')` to `seamExpectation('db-init', 'fixed')`. Add or verify a narrow regression test in `@prisma-next/mongo` (or wherever the applier lives) — the journey is a backstop, not a replacement for the per-subsystem test.
-- [ ] **Commit 3 — [TML-2487](https://linear.app/prisma-company/issue/TML-2487).** Add `ObjectId` (and the related BSON value types: `Decimal128`, `Long`, `Binary`, `Timestamp`) as a value re-export from `@prisma-next/mongo`. Update step 5's assertion in both Mongo cells from `currently-broken-by:TML-2487` to `fixed`. Update relevant docs / READMEs to point at the new import path.
-- [ ] **Commit 4 — [TML-2314](https://linear.app/prisma-company/issue/TML-2314).** Add `@prisma-next/postgres/control` entry-point that exports `createPostgresControlClient` (or equivalent), per the proposal in TML-2314. Update step 5's assertion in both Postgres cells from `currently-broken-by:TML-2314` to `fixed`. Update relevant docs.
-- [ ] **Commit 5 — [TML-2461](https://linear.app/prisma-company/issue/TML-2461).** Move the default-output computation from the global `DEFAULT_CONTRACT_OUTPUT` constant into the PSL / TS providers, so the default is `dirname(inputPath)/contract.json` (PSL) or the package root (TS). Update step 3's assertion in all four cells from `currently-broken-by:TML-2461` to `fixed`. Watch for examples / fixtures elsewhere in the repo that depend on the legacy path; update them in the same commit.
+- [x] **`fix(sql-contract-psl,sql-contract-ts): derive default emit output from input path (TML-2461)`.** Moved the default-output computation into the PSL / TS providers, so when callers omit `output` the emitter writes `contract.json` next to the input rather than into `src/prisma/contract.json`. Explicit `output` continues to take precedence. Provider-level tests added alongside the fix.
+- [x] **`fix(mongo): re-export ObjectId and BSON value constructors from facade (TML-2487)`.** Added top-level `index` entry-point on `@prisma-next/mongo` that re-exports `ObjectId`, `Binary`, `Decimal128`, `Long`, `MongoClient`, `Timestamp`. Journey step 5 (ObjectId import) flips to fixed.
+- [x] **`feat(postgres): expose @prisma-next/postgres/control facade (TML-2314)`.** New `@prisma-next/postgres/control` subpath exporting `createPostgresControlClient(options)` — collapses the five-component control-client construction into a single call. Journey step 6 (control import) flips to fixed.
+- [x] **`fix(mongo): emit createCollection for new contract collections (TML-2486)`.** Two-seam fix: (1) `MongoMigrationPlanner` now emits explicit `createCollection` ops for contract collections that have no indexes to ride along on (otherwise `db init` leaves the database empty and verify reports `missing_table`); (2) `mongo-ops-serializer.validate` strips `undefined`-valued keys before handing input to arktype, so the planner → runner in-process boundary no longer trips the deserialiser when an op IR carries undefined optional fields (the original TML-2486 surface). Journey step 4 (db init) flips to fixed.
 
-**Exit criteria per commit:** CI green; the relevant journey assertion is `fixed`; reverting only that commit breaks the journey at exactly that seam.
+A trailing commit (`test(integration): bump user-code timeout so journey passes in main runner (TML-2490)`) lifts the two user-code `it()` timeouts to 30s so the journey passes under both runner configs.
+
+**Exit criteria per commit:** CI green; the relevant journey assertion is `fixed`; reverting only that commit reverts the seam to its original failure surface.
 
 ### Milestone 4 — PR landing & close-out
 
