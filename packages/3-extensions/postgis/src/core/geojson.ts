@@ -59,6 +59,9 @@ export type Geometry =
  *   point(-122.4194, 37.7749, 4326)
  */
 export function point(longitude: number, latitude: number, srid?: number): GeometryPoint {
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+    throw new RangeError('point: coordinates must be finite numbers');
+  }
   return srid !== undefined
     ? { type: 'Point', coordinates: [longitude, latitude], srid }
     : { type: 'Point', coordinates: [longitude, latitude] };
@@ -76,6 +79,11 @@ export function polygon(ring: ReadonlyArray<Position>, srid?: number): GeometryP
   const last = ring[ring.length - 1];
   if (!first || !last) {
     throw new Error('polygon: ring positions cannot be undefined');
+  }
+  for (const position of ring) {
+    if (!Number.isFinite(position[0]) || !Number.isFinite(position[1])) {
+      throw new RangeError('polygon: coordinates must be finite numbers');
+    }
   }
   const closed = first[0] === last[0] && first[1] === last[1] ? ring : [...ring, first];
   const distinct = new Set(closed.slice(0, -1).map(([x, y]) => `${x},${y}`));
@@ -97,6 +105,14 @@ export function bboxPolygon(
   srid?: number,
 ): GeometryPolygon {
   const [minX, minY, maxX, maxY] = bbox;
+  if (
+    !Number.isFinite(minX) ||
+    !Number.isFinite(minY) ||
+    !Number.isFinite(maxX) ||
+    !Number.isFinite(maxY)
+  ) {
+    throw new RangeError('bboxPolygon: coordinates must be finite numbers');
+  }
   if (minX > maxX || minY > maxY) {
     throw new Error(
       `bboxPolygon: inverted bbox [${minX}, ${minY}, ${maxX}, ${maxY}] (expected minX <= maxX and minY <= maxY)`,

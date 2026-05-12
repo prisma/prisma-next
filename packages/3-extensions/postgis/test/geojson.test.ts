@@ -14,6 +14,16 @@ describe('postgis geojson constructors', () => {
         srid: 4326,
       });
     });
+
+    it('rejects NaN coordinates', () => {
+      expect(() => point(Number.NaN, 0)).toThrow(RangeError);
+      expect(() => point(0, Number.NaN)).toThrow('finite');
+    });
+
+    it('rejects Infinity coordinates', () => {
+      expect(() => point(Number.POSITIVE_INFINITY, 0)).toThrow(RangeError);
+      expect(() => point(0, Number.NEGATIVE_INFINITY)).toThrow('finite');
+    });
   });
 
   describe('polygon', () => {
@@ -73,6 +83,28 @@ describe('postgis geojson constructors', () => {
         ]),
       ).toThrow('at least 3 distinct positions');
     });
+
+    it('rejects NaN coordinates', () => {
+      expect(() =>
+        polygon([
+          [0, 0],
+          [Number.NaN, 1],
+          [1, 1],
+          [0, 0],
+        ]),
+      ).toThrow(RangeError);
+    });
+
+    it('rejects Infinity coordinates', () => {
+      expect(() =>
+        polygon([
+          [0, 0],
+          [1, 0],
+          [Number.POSITIVE_INFINITY, 1],
+          [0, 0],
+        ]),
+      ).toThrow('finite');
+    });
   });
 
   describe('bboxPolygon', () => {
@@ -99,6 +131,16 @@ describe('postgis geojson constructors', () => {
 
     it('rejects an inverted bbox (minY > maxY)', () => {
       expect(() => bboxPolygon([0, 10, 10, 0])).toThrow('inverted bbox');
+    });
+
+    it('rejects NaN coordinates', () => {
+      expect(() => bboxPolygon([Number.NaN, 0, 10, 10])).toThrow(RangeError);
+      expect(() => bboxPolygon([0, 0, 10, Number.NaN])).toThrow('finite');
+    });
+
+    it('rejects Infinity coordinates', () => {
+      expect(() => bboxPolygon([Number.NEGATIVE_INFINITY, 0, 10, 10])).toThrow(RangeError);
+      expect(() => bboxPolygon([0, 0, Number.POSITIVE_INFINITY, 10])).toThrow('finite');
     });
   });
 });
