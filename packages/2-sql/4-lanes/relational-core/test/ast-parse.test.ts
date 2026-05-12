@@ -1,6 +1,3 @@
-import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
-import { isRuntimeError } from '@prisma-next/framework-components/runtime';
-import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { describe, expect, it } from 'vitest';
 import { parseAnyQueryAst } from '../src/ast/parse';
 import {
@@ -35,38 +32,10 @@ import {
   TableSource,
   UpdateAst,
 } from '../src/ast/types';
-import type { CodecDescriptorRegistry } from '../src/query-lane-context';
 
-function makeRegistry(
-  descriptors: Record<string, Partial<CodecDescriptor<unknown>>> = {},
-): CodecDescriptorRegistry {
-  return {
-    descriptorFor(codecId: string) {
-      const partial = descriptors[codecId];
-      if (!partial) return undefined;
-      return {
-        codecId,
-        isParameterized: false,
-        targetTypes: [],
-        ...partial,
-      } as CodecDescriptor<unknown>;
-    },
-    codecRefForColumn() {
-      return undefined;
-    },
-    *values() {},
-    byTargetType() {
-      return [];
-    },
-  };
-}
-
-function roundTrip(
-  ast: SelectAst | InsertAst | UpdateAst | DeleteAst,
-  registry?: CodecDescriptorRegistry,
-) {
+function roundTrip(ast: SelectAst | InsertAst | UpdateAst | DeleteAst) {
   const json = JSON.parse(JSON.stringify(ast));
-  return parseAnyQueryAst(json, registry ?? makeRegistry());
+  return parseAnyQueryAst(json);
 }
 
 describe('parseAnyQueryAst', () => {
@@ -248,99 +217,6 @@ describe('parseAnyQueryAst', () => {
       const parsed = roundTrip(ast) as UpdateAst;
       const paramRef = parsed.set['embedding'] as ParamRef;
       expect(paramRef.codec).toEqual(codec);
-    });
-  });
-
-  describe('typeParams validation', () => {
-    it('throws RUNTIME.TYPE_PARAMS_INVALID for malformed typeParams', () => {
-      const voidSchema: StandardSchemaV1 = {
-        '~standard': {
-          version: 1,
-          vendor: 'test',
-          validate(value) {
-            return value === undefined
-              ? { value: undefined }
-              : { issues: [{ message: 'expected void' }] };
-          },
-        },
-      };
-      const registry = makeRegistry({
-        'pg/text@1': {
-          isParameterized: false,
-          paramsSchema: voidSchema,
-        },
-      });
-
-      const ast = UpdateAst.table(TableSource.named('user')).withSet({
-        name: ParamRef.of('x', { codec: { codecId: 'pg/text@1', typeParams: { bad: true } } }),
-      });
-
-      expect(() => roundTrip(ast, registry)).toThrow();
-      try {
-        roundTrip(ast, registry);
-      } catch (e) {
-        expect(isRuntimeError(e)).toBe(true);
-        expect((e as { code: string }).code).toBe('RUNTIME.TYPE_PARAMS_INVALID');
-      }
-    });
-
-    it('does not throw when typeParams are valid', () => {
-      const vectorSchema: StandardSchemaV1 = {
-        '~standard': {
-          version: 1,
-          vendor: 'test',
-          validate(value) {
-            if (typeof value === 'object' && value !== null && 'length' in value) {
-              return { value };
-            }
-            return { issues: [{ message: 'expected {length: number}' }] };
-          },
-        },
-      };
-      const registry = makeRegistry({
-        'pg/vector@1': {
-          isParameterized: true,
-          paramsSchema: vectorSchema,
-        },
-      });
-
-      const ast = UpdateAst.table(TableSource.named('doc')).withSet({
-        embedding: ParamRef.of([1, 2, 3], {
-          codec: { codecId: 'pg/vector@1', typeParams: { length: 3 } },
-        }),
-      });
-
-      expect(() => roundTrip(ast, registry)).not.toThrow();
-    });
-
-    it('throws RUNTIME.TYPE_PARAMS_INVALID when validator returns a Promise', () => {
-      const asyncSchema: StandardSchemaV1 = {
-        '~standard': {
-          version: 1,
-          vendor: 'test',
-          validate() {
-            return Promise.resolve({ value: undefined });
-          },
-        },
-      };
-      const registry = makeRegistry({
-        'pg/text@1': {
-          isParameterized: false,
-          paramsSchema: asyncSchema,
-        },
-      });
-
-      const ast = UpdateAst.table(TableSource.named('user')).withSet({
-        name: ParamRef.of('x', { codec: { codecId: 'pg/text@1', typeParams: {} } }),
-      });
-
-      try {
-        roundTrip(ast, registry);
-        expect.fail('expected RUNTIME.TYPE_PARAMS_INVALID');
-      } catch (e) {
-        expect(isRuntimeError(e)).toBe(true);
-        expect((e as { code: string }).code).toBe('RUNTIME.TYPE_PARAMS_INVALID');
-      }
     });
   });
 

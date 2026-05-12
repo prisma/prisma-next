@@ -1,5 +1,3 @@
-import { runtimeError } from '@prisma-next/framework-components/runtime';
-import type { CodecDescriptorRegistry } from '../query-lane-context';
 import type { CodecRef } from './codec-types';
 import {
   AggregateExpr,
@@ -52,110 +50,90 @@ function asObject(json: unknown, context: string): JsonObject {
   return json as JsonObject;
 }
 
-export function parseAnyQueryAst(json: unknown, registry: CodecDescriptorRegistry): AnyQueryAst {
+export function parseAnyQueryAst(json: unknown): AnyQueryAst {
   const obj = asObject(json, 'root');
   switch (obj['kind']) {
     case 'select':
-      return parseSelect(obj, registry);
+      return parseSelect(obj);
     case 'insert':
-      return parseInsert(obj, registry);
+      return parseInsert(obj);
     case 'update':
-      return parseUpdate(obj, registry);
+      return parseUpdate(obj);
     case 'delete':
-      return parseDelete(obj, registry);
+      return parseDelete(obj);
     default:
       throw new Error(`Unknown query AST kind: ${String(obj['kind'])}`);
   }
 }
 
-function parseSelect(obj: JsonObject, registry: CodecDescriptorRegistry): SelectAst {
+function parseSelect(obj: JsonObject): SelectAst {
   return new SelectAst({
-    from: parseFromSource(asObject(obj['from'], 'select.from'), registry),
+    from: parseFromSource(asObject(obj['from'], 'select.from')),
     joins: obj['joins']
-      ? (obj['joins'] as JsonValue[]).map((j) => parseJoin(asObject(j, 'join'), registry))
+      ? (obj['joins'] as JsonValue[]).map((j) => parseJoin(asObject(j, 'join')))
       : undefined,
     projection: (obj['projection'] as JsonValue[]).map((p) =>
-      parseProjectionItem(asObject(p, 'projection'), registry),
+      parseProjectionItem(asObject(p, 'projection')),
     ),
-    where: obj['where']
-      ? parseExpression(asObject(obj['where'], 'select.where'), registry)
-      : undefined,
+    where: obj['where'] ? parseExpression(asObject(obj['where'], 'select.where')) : undefined,
     orderBy: obj['orderBy']
-      ? (obj['orderBy'] as JsonValue[]).map((o) =>
-          parseOrderByItem(asObject(o, 'orderBy'), registry),
-        )
+      ? (obj['orderBy'] as JsonValue[]).map((o) => parseOrderByItem(asObject(o, 'orderBy')))
       : undefined,
     distinct: obj['distinct'] === true ? true : undefined,
     distinctOn: obj['distinctOn']
-      ? (obj['distinctOn'] as JsonValue[]).map((e) =>
-          parseExpression(asObject(e, 'distinctOn'), registry),
-        )
+      ? (obj['distinctOn'] as JsonValue[]).map((e) => parseExpression(asObject(e, 'distinctOn')))
       : undefined,
     groupBy: obj['groupBy']
-      ? (obj['groupBy'] as JsonValue[]).map((e) =>
-          parseExpression(asObject(e, 'groupBy'), registry),
-        )
+      ? (obj['groupBy'] as JsonValue[]).map((e) => parseExpression(asObject(e, 'groupBy')))
       : undefined,
-    having: obj['having']
-      ? parseExpression(asObject(obj['having'], 'select.having'), registry)
-      : undefined,
+    having: obj['having'] ? parseExpression(asObject(obj['having'], 'select.having')) : undefined,
     limit: obj['limit'] as number | undefined,
     offset: obj['offset'] as number | undefined,
     selectAllIntent: obj['selectAllIntent'] as { readonly table?: string } | undefined,
   });
 }
 
-function parseInsert(obj: JsonObject, registry: CodecDescriptorRegistry): InsertAst {
+function parseInsert(obj: JsonObject): InsertAst {
   const table = parseTableSource(asObject(obj['table'], 'insert.table'));
   const rows = (obj['rows'] as JsonValue[]).map((row) =>
-    parseInsertRow(asObject(row, 'insert.row'), registry),
+    parseInsertRow(asObject(row, 'insert.row')),
   );
   const onConflict = obj['onConflict']
-    ? parseOnConflict(asObject(obj['onConflict'], 'insert.onConflict'), registry)
+    ? parseOnConflict(asObject(obj['onConflict'], 'insert.onConflict'))
     : undefined;
   const returning = obj['returning']
-    ? (obj['returning'] as JsonValue[]).map((p) =>
-        parseProjectionItem(asObject(p, 'returning'), registry),
-      )
+    ? (obj['returning'] as JsonValue[]).map((p) => parseProjectionItem(asObject(p, 'returning')))
     : undefined;
   return new InsertAst(table, rows, onConflict, returning);
 }
 
-function parseUpdate(obj: JsonObject, registry: CodecDescriptorRegistry): UpdateAst {
+function parseUpdate(obj: JsonObject): UpdateAst {
   const table = parseTableSource(asObject(obj['table'], 'update.table'));
-  const set = parseUpdateSet(asObject(obj['set'], 'update.set'), registry);
-  const where = obj['where']
-    ? parseExpression(asObject(obj['where'], 'update.where'), registry)
-    : undefined;
+  const set = parseUpdateSet(asObject(obj['set'], 'update.set'));
+  const where = obj['where'] ? parseExpression(asObject(obj['where'], 'update.where')) : undefined;
   const returning = obj['returning']
-    ? (obj['returning'] as JsonValue[]).map((p) =>
-        parseProjectionItem(asObject(p, 'returning'), registry),
-      )
+    ? (obj['returning'] as JsonValue[]).map((p) => parseProjectionItem(asObject(p, 'returning')))
     : undefined;
   return new UpdateAst(table, set, where, returning);
 }
 
-function parseDelete(obj: JsonObject, registry: CodecDescriptorRegistry): DeleteAst {
+function parseDelete(obj: JsonObject): DeleteAst {
   const table = parseTableSource(asObject(obj['table'], 'delete.table'));
-  const where = obj['where']
-    ? parseExpression(asObject(obj['where'], 'delete.where'), registry)
-    : undefined;
+  const where = obj['where'] ? parseExpression(asObject(obj['where'], 'delete.where')) : undefined;
   const returning = obj['returning']
-    ? (obj['returning'] as JsonValue[]).map((p) =>
-        parseProjectionItem(asObject(p, 'returning'), registry),
-      )
+    ? (obj['returning'] as JsonValue[]).map((p) => parseProjectionItem(asObject(p, 'returning')))
     : undefined;
   return new DeleteAst(table, where, returning);
 }
 
-function parseFromSource(obj: JsonObject, registry: CodecDescriptorRegistry): AnyFromSource {
+function parseFromSource(obj: JsonObject): AnyFromSource {
   switch (obj['kind']) {
     case 'table-source':
       return parseTableSource(obj);
     case 'derived-table-source':
       return new DerivedTableSource(
         obj['alias'] as string,
-        parseSelect(asObject(obj['query'], 'derived-table.query'), registry),
+        parseSelect(asObject(obj['query'], 'derived-table.query')),
       );
     default:
       throw new Error(`Unknown from-source kind: ${String(obj['kind'])}`);
@@ -166,70 +144,63 @@ function parseTableSource(obj: JsonObject): TableSource {
   return new TableSource(obj['name'] as string, obj['alias'] as string | undefined);
 }
 
-function parseExpression(obj: JsonObject, registry: CodecDescriptorRegistry): AnyExpression {
+function parseExpression(obj: JsonObject): AnyExpression {
   switch (obj['kind']) {
     case 'column-ref':
       return new ColumnRef(obj['table'] as string, obj['column'] as string);
     case 'identifier-ref':
       return new IdentifierRef(obj['name'] as string);
     case 'param-ref':
-      return parseParamRef(obj, registry);
+      return parseParamRef(obj);
     case 'literal':
       return new LiteralExpr(obj['value']);
     case 'subquery':
-      return new SubqueryExpr(parseSelect(asObject(obj['query'], 'subquery.query'), registry));
+      return new SubqueryExpr(parseSelect(asObject(obj['query'], 'subquery.query')));
     case 'operation':
-      return parseOperation(obj, registry);
+      return parseOperation(obj);
     case 'aggregate':
-      return parseAggregate(obj, registry);
+      return parseAggregate(obj);
     case 'json-object':
-      return parseJsonObject(obj, registry);
+      return parseJsonObject(obj);
     case 'json-array-agg':
-      return parseJsonArrayAgg(obj, registry);
+      return parseJsonArrayAgg(obj);
     case 'list':
       return new ListExpression(
-        (obj['values'] as JsonValue[]).map((v) =>
-          parseExpression(asObject(v, 'list.value'), registry),
-        ),
+        (obj['values'] as JsonValue[]).map((v) => parseExpression(asObject(v, 'list.value'))),
       );
     case 'binary':
       return new BinaryExpr(
         obj['op'] as BinaryOp,
-        parseExpression(asObject(obj['left'], 'binary.left'), registry),
-        parseExpression(asObject(obj['right'], 'binary.right'), registry),
+        parseExpression(asObject(obj['left'], 'binary.left')),
+        parseExpression(asObject(obj['right'], 'binary.right')),
       );
     case 'and':
       return new AndExpr(
-        (obj['exprs'] as JsonValue[]).map((e) =>
-          parseExpression(asObject(e, 'and.expr'), registry),
-        ),
+        (obj['exprs'] as JsonValue[]).map((e) => parseExpression(asObject(e, 'and.expr'))),
       );
     case 'or':
       return new OrExpr(
-        (obj['exprs'] as JsonValue[]).map((e) => parseExpression(asObject(e, 'or.expr'), registry)),
+        (obj['exprs'] as JsonValue[]).map((e) => parseExpression(asObject(e, 'or.expr'))),
       );
     case 'exists':
       return new ExistsExpr(
-        parseSelect(asObject(obj['subquery'], 'exists.subquery'), registry),
+        parseSelect(asObject(obj['subquery'], 'exists.subquery')),
         obj['notExists'] as boolean,
       );
     case 'null-check':
       return new NullCheckExpr(
-        parseExpression(asObject(obj['expr'], 'null-check.expr'), registry),
+        parseExpression(asObject(obj['expr'], 'null-check.expr')),
         obj['isNull'] as boolean,
       );
     case 'not':
-      return new NotExpr(parseExpression(asObject(obj['expr'], 'not.expr'), registry));
+      return new NotExpr(parseExpression(asObject(obj['expr'], 'not.expr')));
     default:
       throw new Error(`Unknown expression kind: ${String(obj['kind'])}`);
   }
 }
 
-function parseParamRef(obj: JsonObject, registry: CodecDescriptorRegistry): ParamRef {
+function parseParamRef(obj: JsonObject): ParamRef {
   const codec = obj['codec'] ? parseCodecRef(asObject(obj['codec'], 'paramRef.codec')) : undefined;
-  if (codec) {
-    validateTypeParams(codec, registry);
-  }
   const name = obj['name'] as string | undefined;
   return ParamRef.of(obj['value'], {
     ...(name !== undefined ? { name } : {}),
@@ -243,38 +214,15 @@ function parseCodecRef(obj: JsonObject): CodecRef {
   return typeParams !== undefined ? { codecId, typeParams } : { codecId };
 }
 
-function validateTypeParams(codec: CodecRef, registry: CodecDescriptorRegistry): void {
-  const descriptor = registry.descriptorFor(codec.codecId);
-  if (!descriptor) return;
-  if (!descriptor.paramsSchema) return;
-  const result = descriptor.paramsSchema['~standard'].validate(codec.typeParams);
-  if (typeof (result as { then?: unknown }).then === 'function' || result instanceof Promise) {
-    throw runtimeError(
-      'RUNTIME.TYPE_PARAMS_INVALID',
-      `Async typeParams validator is not supported at parse time for codec '${codec.codecId}'`,
-      { codecId: codec.codecId, typeParams: codec.typeParams },
-    );
-  }
-  if ('issues' in result && result.issues) {
-    throw runtimeError(
-      'RUNTIME.TYPE_PARAMS_INVALID',
-      `Invalid typeParams for codec '${codec.codecId}': ${result.issues.map((i) => i.message).join('; ')}`,
-      { codecId: codec.codecId, typeParams: codec.typeParams },
-    );
-  }
-}
-
-function parseOperation(obj: JsonObject, registry: CodecDescriptorRegistry): OperationExpr {
+function parseOperation(obj: JsonObject): OperationExpr {
   const args = obj['args']
-    ? (obj['args'] as JsonValue[]).map((a) =>
-        parseExpression(asObject(a, 'operation.arg'), registry),
-      )
+    ? (obj['args'] as JsonValue[]).map((a) => parseExpression(asObject(a, 'operation.arg')))
     : undefined;
   const returnsObj = asObject(obj['returns'], 'operation.returns');
   const loweringObj = asObject(obj['lowering'], 'operation.lowering');
   return new OperationExpr({
     method: obj['method'] as string,
-    self: parseExpression(asObject(obj['self'], 'operation.self'), registry),
+    self: parseExpression(asObject(obj['self'], 'operation.self')),
     args,
     returns: {
       codecId: returnsObj['codecId'] as string,
@@ -288,67 +236,62 @@ function parseOperation(obj: JsonObject, registry: CodecDescriptorRegistry): Ope
   });
 }
 
-function parseAggregate(obj: JsonObject, registry: CodecDescriptorRegistry): AggregateExpr {
-  const expr = obj['expr']
-    ? parseExpression(asObject(obj['expr'], 'aggregate.expr'), registry)
-    : undefined;
+function parseAggregate(obj: JsonObject): AggregateExpr {
+  const expr = obj['expr'] ? parseExpression(asObject(obj['expr'], 'aggregate.expr')) : undefined;
   return new AggregateExpr(obj['fn'] as AggregateFn, expr);
 }
 
-function parseJsonObject(obj: JsonObject, registry: CodecDescriptorRegistry): JsonObjectExpr {
+function parseJsonObject(obj: JsonObject): JsonObjectExpr {
   const entries = (obj['entries'] as JsonValue[]).map((entry) => {
     const e = asObject(entry, 'json-object.entry');
     return {
       key: e['key'] as string,
-      value: parseExpression(asObject(e['value'], 'json-object.value'), registry),
+      value: parseExpression(asObject(e['value'], 'json-object.value')),
     };
   });
   return new JsonObjectExpr(entries);
 }
 
-function parseJsonArrayAgg(obj: JsonObject, registry: CodecDescriptorRegistry): JsonArrayAggExpr {
-  const expr = parseExpression(asObject(obj['expr'], 'json-array-agg.expr'), registry);
+function parseJsonArrayAgg(obj: JsonObject): JsonArrayAggExpr {
+  const expr = parseExpression(asObject(obj['expr'], 'json-array-agg.expr'));
   const orderBy = obj['orderBy']
     ? (obj['orderBy'] as JsonValue[]).map((o) =>
-        parseOrderByItem(asObject(o, 'json-array-agg.orderBy'), registry),
+        parseOrderByItem(asObject(o, 'json-array-agg.orderBy')),
       )
     : undefined;
   return new JsonArrayAggExpr(expr, obj['onEmpty'] as 'null' | 'emptyArray', orderBy);
 }
 
-function parseOrderByItem(obj: JsonObject, registry: CodecDescriptorRegistry): OrderByItem {
+function parseOrderByItem(obj: JsonObject): OrderByItem {
   return new OrderByItem(
-    parseExpression(asObject(obj['expr'], 'orderBy.expr'), registry),
+    parseExpression(asObject(obj['expr'], 'orderBy.expr')),
     obj['dir'] as 'asc' | 'desc',
   );
 }
 
-function parseProjectionItem(obj: JsonObject, registry: CodecDescriptorRegistry): ProjectionItem {
+function parseProjectionItem(obj: JsonObject): ProjectionItem {
   const codec = obj['codec']
     ? parseCodecRef(asObject(obj['codec'], 'projection.codec'))
     : undefined;
   return new ProjectionItem(
     obj['alias'] as string,
-    parseExpression(asObject(obj['expr'], 'projection.expr'), registry),
+    parseExpression(asObject(obj['expr'], 'projection.expr')),
     codec,
   );
 }
 
-function parseInsertRow(
-  obj: JsonObject,
-  registry: CodecDescriptorRegistry,
-): Record<string, InsertValue> {
+function parseInsertRow(obj: JsonObject): Record<string, InsertValue> {
   const row: Record<string, InsertValue> = {};
   for (const [key, value] of Object.entries(obj)) {
-    row[key] = parseInsertValue(asObject(value, `insert.row.${key}`), registry);
+    row[key] = parseInsertValue(asObject(value, `insert.row.${key}`));
   }
   return row;
 }
 
-function parseInsertValue(obj: JsonObject, registry: CodecDescriptorRegistry): InsertValue {
+function parseInsertValue(obj: JsonObject): InsertValue {
   switch (obj['kind']) {
     case 'param-ref':
-      return parseParamRef(obj, registry);
+      return parseParamRef(obj);
     case 'column-ref':
       return new ColumnRef(obj['table'] as string, obj['column'] as string);
     case 'default-value':
@@ -358,17 +301,14 @@ function parseInsertValue(obj: JsonObject, registry: CodecDescriptorRegistry): I
   }
 }
 
-function parseUpdateSet(
-  obj: JsonObject,
-  registry: CodecDescriptorRegistry,
-): Record<string, ColumnRef | ParamRef> {
+function parseUpdateSet(obj: JsonObject): Record<string, ColumnRef | ParamRef> {
   const set: Record<string, ColumnRef | ParamRef> = {};
   for (const [key, value] of Object.entries(obj)) {
     const v = asObject(value, `update.set.${key}`);
     if (v['kind'] === 'column-ref') {
       set[key] = new ColumnRef(v['table'] as string, v['column'] as string);
     } else if (v['kind'] === 'param-ref') {
-      set[key] = parseParamRef(v, registry);
+      set[key] = parseParamRef(v);
     } else {
       throw new Error(`Unknown update set value kind: ${String(v['kind'])}`);
     }
@@ -376,34 +316,29 @@ function parseUpdateSet(
   return set;
 }
 
-function parseOnConflict(obj: JsonObject, registry: CodecDescriptorRegistry): InsertOnConflict {
+function parseOnConflict(obj: JsonObject): InsertOnConflict {
   const columns = (obj['columns'] as JsonValue[]).map((c) => {
     const col = asObject(c, 'onConflict.column');
     return new ColumnRef(col['table'] as string, col['column'] as string);
   });
-  const action = parseOnConflictAction(asObject(obj['action'], 'onConflict.action'), registry);
+  const action = parseOnConflictAction(asObject(obj['action'], 'onConflict.action'));
   return new InsertOnConflict(columns, action);
 }
 
-function parseOnConflictAction(
-  obj: JsonObject,
-  registry: CodecDescriptorRegistry,
-): AnyInsertOnConflictAction {
+function parseOnConflictAction(obj: JsonObject): AnyInsertOnConflictAction {
   switch (obj['kind']) {
     case 'do-nothing':
       return new DoNothingConflictAction();
     case 'do-update-set':
-      return new DoUpdateSetConflictAction(
-        parseUpdateSet(asObject(obj['set'], 'doUpdateSet.set'), registry),
-      );
+      return new DoUpdateSetConflictAction(parseUpdateSet(asObject(obj['set'], 'doUpdateSet.set')));
     default:
       throw new Error(`Unknown on-conflict action kind: ${String(obj['kind'])}`);
   }
 }
 
-function parseJoin(obj: JsonObject, registry: CodecDescriptorRegistry): JoinAst {
-  const source = parseFromSource(asObject(obj['source'], 'join.source'), registry);
-  const on = parseJoinOn(obj['on'], registry);
+function parseJoin(obj: JsonObject): JoinAst {
+  const source = parseFromSource(asObject(obj['source'], 'join.source'));
+  const on = parseJoinOn(obj['on']);
   return new JoinAst(
     obj['joinType'] as 'inner' | 'left' | 'right' | 'full',
     source,
@@ -412,7 +347,7 @@ function parseJoin(obj: JsonObject, registry: CodecDescriptorRegistry): JoinAst 
   );
 }
 
-function parseJoinOn(json: unknown, registry: CodecDescriptorRegistry): JoinOnExpr {
+function parseJoinOn(json: unknown): JoinOnExpr {
   const obj = asObject(json, 'join.on');
   if (obj['kind'] === 'eq-col-join-on') {
     return new EqColJoinOn(
@@ -426,5 +361,5 @@ function parseJoinOn(json: unknown, registry: CodecDescriptorRegistry): JoinOnEx
       ),
     );
   }
-  return parseExpression(obj, registry);
+  return parseExpression(obj);
 }

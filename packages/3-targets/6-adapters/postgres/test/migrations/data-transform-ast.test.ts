@@ -12,7 +12,6 @@ import {
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { dataTransformAst } from '@prisma-next/target-postgres/data-transform';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -29,21 +28,6 @@ function makeContract(storageHash: string = CONTRACT_HASH): Contract<SqlStorage>
     storage: { storageHash, tables: {}, extensions: {}, schemas: [], types: {} },
     profile: { profileHash: 'sha256:profile', lanes: {} },
   } as unknown as Contract<SqlStorage>;
-}
-
-function makeRegistry(): CodecDescriptorRegistry {
-  return {
-    descriptorFor() {
-      return undefined;
-    },
-    codecRefForColumn() {
-      return undefined;
-    },
-    *values() {},
-    byTargetType() {
-      return [];
-    },
-  };
 }
 
 describe('dataTransformAst factory', () => {
@@ -82,7 +66,7 @@ describe('dataTransformAst factory', () => {
     expect(step.meta).toBeDefined();
     expect(step.meta!['ast']).toBeDefined();
 
-    const parsedAst = parseAnyQueryAst(step.meta!['ast'], makeRegistry());
+    const parsedAst = parseAnyQueryAst(step.meta!['ast']);
     expect(parsedAst).toBeInstanceOf(UpdateAst);
     const update = parsedAst as UpdateAst;
     expect((update.set['name'] as ParamRef).codec).toEqual({ codecId: 'pg/text@1' });
@@ -112,7 +96,7 @@ describe('dataTransformAst factory', () => {
     );
 
     const opsJson = JSON.parse(JSON.stringify(op));
-    const roundTripped = parseAnyQueryAst(opsJson.execute[0].meta.ast, makeRegistry());
+    const roundTripped = parseAnyQueryAst(opsJson.execute[0].meta.ast);
     expect(roundTripped).toBeInstanceOf(UpdateAst);
     const update = roundTripped as UpdateAst;
     expect((update.set['embedding'] as ParamRef).codec).toEqual(codec);

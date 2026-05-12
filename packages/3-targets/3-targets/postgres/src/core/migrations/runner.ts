@@ -19,7 +19,6 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { parseAnyQueryAst } from '@prisma-next/sql-relational-core/ast';
-import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
@@ -50,19 +49,6 @@ const DEFAULT_CONFIG: RunnerConfig = {
 };
 
 const LOCK_DOMAIN = 'prisma_next.contract.marker';
-
-const APPLY_TIME_REGISTRY: CodecDescriptorRegistry = {
-  descriptorFor() {
-    return undefined;
-  },
-  codecRefForColumn() {
-    return undefined;
-  },
-  *values() {},
-  byTargetType() {
-    return [];
-  },
-};
 
 /**
  * Deep clones and freezes a record object to prevent mutation.
@@ -512,7 +498,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         'AST-bound migration step requires a destination contract for apply-time lowering',
       );
     }
-    const ast = parseAnyQueryAst(step.meta['ast'], APPLY_TIME_REGISTRY);
+    const ast = parseAnyQueryAst(step.meta['ast']);
     const lowered = this.family.lowerAst(ast, { contract });
     return { sql: lowered.sql, params: lowered.params };
   }
