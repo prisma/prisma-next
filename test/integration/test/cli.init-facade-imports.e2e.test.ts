@@ -70,8 +70,8 @@ function readFacadeExports(packageJsonPath: string): FacadeExports {
 }
 
 function extractPrismaNextImports(source: string): readonly string[] {
-  const matches = source.matchAll(/from ['"](@prisma-next\/[^'"]+)['"]/g);
-  return Array.from(matches, (m) => m[1] as string);
+  const matches = source.matchAll(/(?:\bfrom\s+|\bimport\s+)['"](@prisma-next\/[^'"]+)['"]/g);
+  return Array.from(new Set(Array.from(matches, (m) => m[1] as string)));
 }
 
 function templateSources(target: TargetId, authoring: AuthoringId): readonly string[] {
@@ -80,6 +80,26 @@ function templateSources(target: TargetId, authoring: AuthoringId): readonly str
 }
 
 describe('init templates only depend on the facade package (TML-2485)', () => {
+  describe('extractPrismaNextImports', () => {
+    it('captures `import x from "pkg"` (named-binding form)', () => {
+      const source = "import postgres from '@prisma-next/postgres/runtime';\n";
+      expect(extractPrismaNextImports(source)).toEqual(['@prisma-next/postgres/runtime']);
+    });
+
+    it('captures `import "pkg"` (side-effect form)', () => {
+      const source = "import '@prisma-next/postgres/runtime';\n";
+      expect(extractPrismaNextImports(source)).toEqual(['@prisma-next/postgres/runtime']);
+    });
+
+    it('deduplicates repeated specifiers', () => {
+      const source = [
+        "import postgres from '@prisma-next/postgres/runtime';",
+        "import type { Foo } from '@prisma-next/postgres/runtime';",
+      ].join('\n');
+      expect(extractPrismaNextImports(source)).toEqual(['@prisma-next/postgres/runtime']);
+    });
+  });
+
   for (const { target, authoring } of CELLS) {
     const facade = FACADE_FOR_TARGET[target];
 
