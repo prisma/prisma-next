@@ -5,12 +5,8 @@ import type {
   ContractValueObject,
   StorageBase,
 } from '@prisma-next/contract/types';
-import type { MongoChangeStreamPreAndPostImagesOptionsInput } from './ir/mongo-change-stream-pre-and-post-images-options';
-import type { MongoClusteredCollectionOptionsInput } from './ir/mongo-clustered-collection-options';
-import type { MongoCollationOptionsInput } from './ir/mongo-collation-options';
-import type { MongoIndexOptionDefaultsInput } from './ir/mongo-index-option-defaults';
+import type { MongoCollectionOptions } from './ir/mongo-collection-options';
 import type { MongoIndexOptionsInput } from './ir/mongo-index-options';
-import type { MongoTimeSeriesCollectionOptionsInput } from './ir/mongo-time-series-collection-options';
 import type { MongoValidator } from './ir/mongo-validator';
 
 export type MongoIndexFieldValue = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
@@ -30,19 +26,6 @@ export type MongoWildcardProjection = Readonly<Record<string, 0 | 1>>;
 export type MongoIndex = {
   readonly fields: MongoIndexFields;
   readonly options?: MongoIndexOptionsInput;
-};
-
-export type MongoCollectionOptions = {
-  readonly capped?: boolean;
-  readonly size?: number;
-  readonly max?: number;
-  readonly storageEngine?: MongoJsonObject;
-  readonly indexOptionDefaults?: MongoIndexOptionDefaultsInput;
-  readonly collation?: MongoCollationOptionsInput;
-  readonly timeseries?: MongoTimeSeriesCollectionOptionsInput;
-  readonly clusteredIndex?: MongoClusteredCollectionOptionsInput;
-  readonly expireAfterSeconds?: number;
-  readonly changeStreamPreAndPostImages?: MongoChangeStreamPreAndPostImagesOptionsInput;
 };
 
 export type MongoIndexKeyDirection = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
@@ -65,22 +48,10 @@ export interface MongoStorageIndex {
   readonly language_override?: string;
 }
 
-export interface MongoStorageCollectionOptions {
-  readonly capped?: { size: number; max?: number };
-  readonly timeseries?: {
-    timeField: string;
-    metaField?: string;
-    granularity?: 'seconds' | 'minutes' | 'hours';
-  };
-  readonly collation?: Record<string, unknown>;
-  readonly changeStreamPreAndPostImages?: { enabled: boolean };
-  readonly clusteredIndex?: { name?: string };
-}
-
 export interface MongoStorageCollection {
   readonly indexes?: ReadonlyArray<MongoStorageIndex>;
   readonly validator?: MongoValidator;
-  readonly options?: MongoStorageCollectionOptions;
+  readonly options?: MongoCollectionOptions;
 }
 
 export type MongoStorage<THash extends string = string> = StorageBase<THash> & {

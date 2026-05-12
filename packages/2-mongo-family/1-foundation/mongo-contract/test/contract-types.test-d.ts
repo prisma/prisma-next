@@ -4,10 +4,10 @@ import type {
   ExtractMongoFieldInputTypes,
   ExtractMongoFieldOutputTypes,
   InferModelRow,
-  MongoCollectionOptions,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '../src/contract-types';
+import type { MongoCollectionOptionsAuthoringInput } from '../src/ir/mongo-collection-options';
 import type { MongoIndexOptionsInput } from '../src/ir/mongo-index-options';
 
 type TestCodecTypes = {
@@ -191,7 +191,7 @@ test('Mongo index and collection option input types stay specific', () => {
     collation: { locale: 'en', strength: 2 },
     wildcardProjection: { internal: 0, title: 1 },
   };
-  const typedCollectionOptions: MongoCollectionOptions = {
+  const typedCollectionOptions: MongoCollectionOptionsAuthoringInput = {
     capped: true,
     collation: { locale: 'en', strength: 2 },
     timeseries: { timeField: 'createdAt', granularity: 'hours' },
@@ -214,6 +214,6 @@ test('Mongo option input types reject unsupported keys', () => {
   _invalidIndexOptions;
 
   // @ts-expect-error unknown Mongo collection option
-  const _invalidCollectionOptions: MongoCollectionOptions = { unsupported: true };
+  const _invalidCollectionOptions: MongoCollectionOptionsAuthoringInput = { unsupported: true };
   _invalidCollectionOptions;
 });

@@ -15,7 +15,9 @@ import type {
 } from '@prisma-next/framework-components/components';
 import {
   applyPolymorphicScopeToMongoIndex,
-  type MongoCollectionOptions,
+  MongoCollectionOptions,
+  type MongoCollectionOptionsAuthoringInput,
+  type MongoCollectionOptionsInput,
   type MongoContract,
   type MongoContractWithTypeMaps,
   type MongoIndex,
@@ -23,7 +25,6 @@ import {
   type MongoIndexOptionsInput,
   type MongoStorage,
   type MongoStorageCollection,
-  type MongoStorageCollectionOptions,
   type MongoStorageIndex,
   type MongoTypeMaps,
   validateMongoContract,
@@ -159,7 +160,7 @@ export interface ModelBuilder<
   readonly __fields: Fields;
   readonly __relations: Relations;
   readonly __indexes: readonly MongoIndex[] | undefined;
-  readonly __collectionOptions: MongoCollectionOptions | undefined;
+  readonly __collectionOptions: MongoCollectionOptionsAuthoringInput | undefined;
   readonly __collection: Collection;
   readonly __owner: Owner;
   readonly __base: Base;
@@ -913,7 +914,7 @@ type ModelInput<
 > = {
   readonly collection?: Collection;
   readonly indexes?: Indexes;
-  readonly collectionOptions?: StrictShape<CollectionOptions, MongoCollectionOptions>;
+  readonly collectionOptions?: StrictShape<CollectionOptions, MongoCollectionOptionsAuthoringInput>;
   readonly storageRelations?: StorageRelations;
   readonly fields: Fields;
   readonly relations?: Relations;
@@ -1197,17 +1198,29 @@ function toStorageIndex(index: MongoIndex): MongoStorageIndex {
   return result as unknown as MongoStorageIndex;
 }
 
-function toStorageCollectionOptions(opts: MongoCollectionOptions): MongoStorageCollectionOptions {
-  const result: Record<string, unknown> = {};
-  if (opts.capped) {
-    result['capped'] = { size: opts.size ?? 0, ...(opts.max != null ? { max: opts.max } : {}) };
-  }
-  if (opts.timeseries) result['timeseries'] = opts.timeseries;
-  if (opts.collation) result['collation'] = opts.collation;
-  if (opts.changeStreamPreAndPostImages)
-    result['changeStreamPreAndPostImages'] = opts.changeStreamPreAndPostImages;
-  if (opts.clusteredIndex) result['clusteredIndex'] = { name: opts.clusteredIndex.name };
-  return result as unknown as MongoStorageCollectionOptions;
+function toStorageCollectionOptions(
+  opts: MongoCollectionOptionsAuthoringInput,
+): MongoCollectionOptions {
+  const input: MongoCollectionOptionsInput = {
+    ...(opts.capped
+      ? { capped: { size: opts.size ?? 0, ...(opts.max != null && { max: opts.max }) } }
+      : {}),
+    ...(opts.storageEngine !== undefined && { storageEngine: opts.storageEngine }),
+    ...(opts.indexOptionDefaults !== undefined && {
+      indexOptionDefaults: opts.indexOptionDefaults,
+    }),
+    ...(opts.collation !== undefined && { collation: opts.collation }),
+    ...(opts.timeseries !== undefined && { timeseries: opts.timeseries }),
+    ...(opts.clusteredIndex !== undefined && {
+      clusteredIndex:
+        opts.clusteredIndex.name !== undefined ? { name: opts.clusteredIndex.name } : {},
+    }),
+    ...(opts.expireAfterSeconds !== undefined && { expireAfterSeconds: opts.expireAfterSeconds }),
+    ...(opts.changeStreamPreAndPostImages !== undefined && {
+      changeStreamPreAndPostImages: opts.changeStreamPreAndPostImages,
+    }),
+  };
+  return new MongoCollectionOptions(input);
 }
 
 function findMissingIndexField(

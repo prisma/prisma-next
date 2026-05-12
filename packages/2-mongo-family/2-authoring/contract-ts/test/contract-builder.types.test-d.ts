@@ -1,7 +1,7 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   InferModelRow,
-  MongoCollectionOptions,
+  MongoCollectionOptionsAuthoringInput,
   MongoIndexOptionsInput,
 } from '@prisma-next/mongo-contract';
 import { expectTypeOf, test } from 'vitest';
@@ -188,8 +188,10 @@ test('Mongo option types reject unsupported authoring shapes', () => {
   const _invalidTtlIndexOptions = { expireAfterSeconds: '3600' } satisfies MongoIndexOptionsInput;
   _invalidTtlIndexOptions;
 
-  // @ts-expect-error unknown Mongo collection option
-  const _invalidCollectionOptionKey = { unsupported: true } satisfies MongoCollectionOptions;
+  const _invalidCollectionOptionKey = {
+    // @ts-expect-error unknown Mongo collection option
+    unsupported: true,
+  } satisfies MongoCollectionOptionsAuthoringInput;
   _invalidCollectionOptionKey;
 
   const _invalidCollectionOptionValue = {
@@ -198,6 +200,6 @@ test('Mongo option types reject unsupported authoring shapes', () => {
       // @ts-expect-error invalid timeseries granularity
       granularity: 'days',
     },
-  } satisfies MongoCollectionOptions;
+  } satisfies MongoCollectionOptionsAuthoringInput;
   _invalidCollectionOptionValue;
 });

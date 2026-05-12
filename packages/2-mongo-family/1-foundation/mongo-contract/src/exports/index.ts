@@ -4,7 +4,6 @@ export type {
   ExtractMongoFieldOutputTypes,
   ExtractMongoTypeMaps,
   InferModelRow,
-  MongoCollectionOptions,
   MongoContract,
   MongoContractWithTypeMaps,
   MongoIndex,
@@ -19,7 +18,6 @@ export type {
   MongoModelStorage,
   MongoStorage,
   MongoStorageCollection,
-  MongoStorageCollectionOptions,
   MongoStorageIndex,
   MongoTypeMaps,
   MongoTypeMapsPhantomKey,
@@ -40,6 +38,13 @@ export type {
   MongoCollationStrength,
 } from '../ir/mongo-collation-options';
 export { MongoCollationOptions } from '../ir/mongo-collation-options';
+export type {
+  MongoCollectionOptionsAuthoringInput,
+  MongoCollectionOptionsInput,
+  MongoStorageCappedShape,
+  MongoStorageClusteredIndexShape,
+} from '../ir/mongo-collection-options';
+export { MongoCollectionOptions } from '../ir/mongo-collection-options';
 export type { MongoIndexOptionDefaultsInput } from '../ir/mongo-index-option-defaults';
 export { MongoIndexOptionDefaults } from '../ir/mongo-index-option-defaults';
 export type { MongoIndexOptionsInput } from '../ir/mongo-index-options';

@@ -1,7 +1,7 @@
 import type {
+  MongoCollectionOptions,
   MongoContract,
   MongoStorageCollection,
-  MongoStorageCollectionOptions,
   MongoStorageIndex,
   MongoValidator,
 } from '@prisma-next/mongo-contract';
@@ -36,7 +36,7 @@ function convertValidator(v: MongoValidator): MongoSchemaValidator {
   });
 }
 
-function convertOptions(o: MongoStorageCollectionOptions): MongoSchemaCollectionOptions {
+function convertOptions(o: MongoCollectionOptions): MongoSchemaCollectionOptions {
   return new MongoSchemaCollectionOptions(o);
 }
 
