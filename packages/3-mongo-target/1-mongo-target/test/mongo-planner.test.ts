@@ -880,6 +880,34 @@ describe('MongoMigrationPlanner', () => {
       expect(cmd.size).toBe(1048576);
     });
 
+    // TML-2486: bare collections (no validator/options/indexes) must still
+    // round-trip through `db init`. MongoDB creates collections implicitly
+    // on first insert, but Prisma Next's schema verifier treats a contract-
+    // declared collection that is absent from the live database as a
+    // `missing_table` issue. The planner therefore has to emit an explicit
+    // createCollection op so the runner provisions the collection before
+    // verify runs.
+    it('emits createCollection for new collections without options or indexes', () => {
+      const contract = makeContract({
+        users: {},
+        posts: {},
+      });
+      const plan = planSuccess(planner, contract, emptyIR());
+      const createOps = (plan.operations as MongoMigrationPlanOperation[]).filter(
+        (op) => op.execute[0]?.command.kind === 'createCollection',
+      );
+      const createdNames = createOps
+        .map((op) => (op.execute[0]!.command as CreateCollectionCommand).collection)
+        .sort();
+      expect(createdNames).toEqual(['posts', 'users']);
+      for (const op of createOps) {
+        expect(op.operationClass).toBe('additive');
+        const cmd = op.execute[0]!.command as CreateCollectionCommand;
+        expect(cmd.capped).toBeUndefined();
+        expect(cmd.validator).toBeUndefined();
+      }
+    });
+
     it('emits dropCollection for removed collections', () => {
       const contract = makeContract({});
       const origin = new MongoSchemaIR([

@@ -132,9 +132,28 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
       const destColl = destinationIR.collection(collName);
 
       if (!originColl) {
-        if (destColl && collectionHasOptions(destColl)) {
-          const opts = schemaCollectionToCreateCollectionOptions(destColl);
-          collCreates.push(new CreateCollectionCall(collName, opts));
+        if (destColl) {
+          // Provision contract-declared collections that are absent from
+          // the live database. MongoDB lazily materialises a collection
+          // on first write, so subsequent `createIndex` calls in the same
+          // plan would create the collection for us implicitly — but the
+          // schema verifier treats an unmaterialised contract collection
+          // as a `missing_table` issue, so a plan that lacks both options
+          // and indexes (e.g. a plain `users` collection from the init
+          // scaffold) ends up provisioning nothing and failing verify.
+          // The planner therefore emits an explicit createCollection for
+          // any contract collection that has options/validator OR no
+          // indexes to ride along on. Collections that have indexes
+          // continue to rely on createIndex for materialisation, keeping
+          // existing plans byte-stable.
+          const hasOptions = collectionHasOptions(destColl);
+          const hasIndexes = destColl.indexes.length > 0;
+          if (hasOptions || !hasIndexes) {
+            const opts = hasOptions
+              ? schemaCollectionToCreateCollectionOptions(destColl)
+              : undefined;
+            collCreates.push(new CreateCollectionCall(collName, opts));
+          }
         }
       } else if (!destColl) {
         collDrops.push(new DropCollectionCall(collName));

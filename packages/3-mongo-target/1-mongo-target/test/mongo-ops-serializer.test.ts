@@ -511,6 +511,41 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
     expect(cmd.wildcardProjection).toEqual({ name: 1, email: 1 });
   });
 
+  // TML-2486: planner → runner ops are passed in-process (no JSON round-trip)
+  // between `MongoMigrationPlanner.plan()` and `MongoMigrationRunner.execute()`.
+  // The deserializer's arktype schemas treat `{ capped?: 'boolean' }` as
+  // "key may be absent, but if present must be boolean"; the bare op IRs
+  // assign every optional field on every instance, so deserialization fails
+  // unless the boundary strips undefined keys.
+  it('deserialises an in-memory createCollection op without JSON round-trip', () => {
+    const op: MongoMigrationPlanOperation = {
+      id: 'coll.users.create',
+      label: 'Create collection users',
+      operationClass: 'additive',
+      precheck: [
+        {
+          description: 'collection does not exist',
+          source: new ListCollectionsCommand(),
+          filter: MongoFieldFilter.eq('name', 'users'),
+          expect: 'notExists',
+        },
+      ],
+      execute: [
+        {
+          description: 'create users collection',
+          command: new CreateCollectionCommand('users'),
+        },
+      ],
+      postcheck: [],
+    };
+    const [deserialized] = deserializeMongoOps([op]);
+    const cmd = asDdlOp(deserialized!).execute[0]!.command as CreateCollectionCommand;
+    expect(cmd.kind).toBe('createCollection');
+    expect(cmd.collection).toBe('users');
+    expect(cmd.capped).toBeUndefined();
+    expect(cmd.validator).toBeUndefined();
+  });
+
   it('round-trips createCollection command', () => {
     const op: MongoMigrationPlanOperation = {
       id: 'coll.events.create',
