@@ -29,12 +29,7 @@
 
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
-import type {
-  ContractSpace,
-  MigrationPackage,
-  MigrationPlanOperation,
-} from '@prisma-next/framework-components/control';
-import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import { contractSpaceFromJson } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import baselineMetadata from '../../migrations/20260601T0000_install_pg_search_extension/migration.json' with {
   type: 'json',
@@ -49,24 +44,17 @@ import { paradedbPackMeta, paradedbQueryOperations } from '../core/descriptor-me
 
 const BASELINE_DIR_NAME = '20260601T0000_install_pg_search_extension';
 
-// JSON-imported values lose the workspace's branded types
-// (e.g. `StorageHashBase<string>`, `MigrationPlanOperation` discriminants),
-// so we cast through `unknown` here. The values themselves are the same
-// canonical artefacts the application's contract / migration runners
-// produce and re-validate at runtime — the descriptor is just a
-// pass-through wiring layer between the on-disk JSON and the framework's
-// typed surface.
-const baselinePackage: MigrationPackage = {
-  dirName: BASELINE_DIR_NAME,
-  metadata: baselineMetadata as unknown as MigrationMetadata,
-  ops: baselineOps as unknown as readonly MigrationPlanOperation[],
-};
-
-const paradedbContractSpace: ContractSpace<Contract<SqlStorage>> = {
-  contractJson: contractJson as unknown as Contract<SqlStorage>,
-  migrations: [baselinePackage],
+const paradedbContractSpace = contractSpaceFromJson<Contract<SqlStorage>>({
+  contractJson,
+  migrations: [
+    {
+      dirName: BASELINE_DIR_NAME,
+      metadata: baselineMetadata,
+      ops: baselineOps,
+    },
+  ],
   headRef,
-};
+});
 
 const paradedbExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
   ...paradedbPackMeta,
