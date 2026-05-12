@@ -38,6 +38,14 @@ The user runs the orchestrator at Opus 4.7 Medium by default for quick execution
 - Reading reviewer/implementer reports for routing decisions.
 - Confirming narrative-artifact refresh (verifying `system-design-review.md` and `walkthrough.md` reflect HEAD).
 
+## Pattern: cross-target consistency check is part of intent-validation
+
+**Shape.** When a foundation milestone introduces SPI bases / family abstract bases / shared interfaces, the orchestrator's intent-validation pass MUST include a per-target reachability check: for each (target, family-base) pair the foundation introduces, can the target's package actually `extends <FamilyBase>` without producing a circular workspace dependency?
+
+**Why it matters.** Foundation milestones look correct in isolation (each base is well-shaped; layering in `architecture.config.json` looks fine). The check that fails late is the package-direction one: `family-X` may already depend on `target-X`, in which case `target-X` cannot extend `family-X`'s bases. Surfaced for Mongo in M2 R1 reconnaissance — neither the M1 R1 reviewer nor the M1 R2 orchestrator caught it; the implementer caught it on first read because they were about to author the `extends` clauses. See `wip/unattended-decisions.md § 2`.
+
+**Action.** During intent-validation of any foundation-milestone SATISFIED verdict, run `cat packages/<target-pkg>/package.json | rg '"<family-pkg>"'` for every (target, family-base) pair the milestone introduces. If absent, verify the target CAN add the dependency (no circular path). If a circular path exists, the family base is in the wrong package layer and a placement fix is needed before downstream milestones can consume the foundation.
+
 ## M2 R1 reviewer watch-points (from m1 R2 intent-validation)
 
 These are not findings (M1 closed clean) but design choices the M2 reviewer should hold the SPI shape to as the first real consumer exercises it. Surface in the m2 R1 reviewer delegation prompt.
