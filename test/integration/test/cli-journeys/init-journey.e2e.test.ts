@@ -16,6 +16,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
+import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type DatabaseHandle, spinUpDatabaseForCell } from './init-journey/database-handles';
@@ -33,16 +34,6 @@ import {
   type StepResult,
   seamExpectation,
 } from './init-journey/harness';
-
-/**
- * User-code steps spawn a child Node process running `node
- * --experimental-strip-types` against a freshly installed project. The
- * default integration `testTimeout` is short (100ms) so that lifecycle-
- * focused tests fail fast; that is too aggressive for these subprocess-
- * heavy steps. Bump to 30s so the journey passes under both the focused
- * `vitest.journeys.config.ts` runner and the broad integration runner.
- */
-const USER_CODE_TIMEOUT_MS = 30_000;
 
 /** Per-cell journey runtime artefacts, populated once in `beforeAll`. */
 interface JourneyContext {
@@ -128,26 +119,46 @@ describe.each(
       );
       TML_2487_seam(run);
     },
-    USER_CODE_TIMEOUT_MS,
+    timeouts.coldTransformImport,
   );
 
   it(
-    'step 6 (user code: control import) (TML-2314 seam)',
+    'step 6 (user code: control readMarker query) (TML-2314 seam)',
     async () => {
       if (cell.target !== 'postgres') return;
+      // Real end-to-end control-plane query: the user instantiates the
+      // facade-composed client, connects to the live DB (DATABASE_URL is
+      // injected via `--env-file-if-exists=.env` in the subprocess) and
+      // reads the contract marker that step 4's `db init` wrote. This
+      // proves the facade composes a working family + target + adapter +
+      // driver stack and round-trips a real query, not just that the
+      // export is importable.
       const run = await runUserCode(
         ctx.project,
         'check-control.ts',
         [
           "import { createPostgresControlClient } from '@prisma-next/postgres/control';",
-          'const client = createPostgresControlClient();',
-          "console.log(typeof client === 'object' ? 'ok' : 'unexpected');",
+          '',
+          'const url = process.env.DATABASE_URL;',
+          'if (url === undefined) {',
+          "  console.error('DATABASE_URL missing');",
+          '  process.exit(2);',
+          '}',
+          '',
+          'const client = createPostgresControlClient({ connection: url });',
+          'await client.connect();',
+          'try {',
+          '  const marker = await client.readMarker();',
+          "  console.log(marker !== null ? 'ok' : 'no-marker');",
+          '} finally {',
+          '  await client.close();',
+          '}',
           '',
         ].join('\n'),
       );
       TML_2314_seam(run);
     },
-    USER_CODE_TIMEOUT_MS,
+    timeouts.coldTransformImport,
   );
 });
 
@@ -210,14 +221,17 @@ const TML_2487_seam = seamExpectation<StepResult>({
 
 const TML_2314_seam = seamExpectation<StepResult>({
   ticket: 'TML-2314',
-  description: '@prisma-next/postgres exposes a control subpath',
+  description: '@prisma-next/postgres/control composes a working control stack',
   status: 'fixed',
   whenBroken: (r) => {
     expect(r.exitCode, 'TML-2314 still broken: control import must currently fail').not.toBe(0);
   },
   whenFixed: (r) => {
-    expect(r.exitCode, formatStepDiagnostic('control import', null, r)).toBe(0);
-    expect(r.stdout.trim(), 'control import should produce a control client').toBe('ok');
+    expect(r.exitCode, formatStepDiagnostic('control readMarker', null, r)).toBe(0);
+    expect(
+      r.stdout.trim(),
+      'control client must connect and read the marker written by db init',
+    ).toBe('ok');
   },
 });
 

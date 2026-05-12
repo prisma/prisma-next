@@ -528,6 +528,7 @@ export async function runUserCode(
   writeFileSync(target, source, 'utf-8');
   return runStep(project, [
     'node',
+    '--env-file-if-exists=.env',
     '--experimental-strip-types',
     '--no-warnings=ExperimentalWarning',
     relativePath,
