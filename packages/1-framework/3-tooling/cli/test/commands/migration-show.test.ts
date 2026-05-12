@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
@@ -17,7 +17,7 @@ import {
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import stripAnsi from 'strip-ansi';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { MigrationShowSpaceResult } from '../../src/commands/migration-show';
 import {
   resolveAppTargetPath,
@@ -27,14 +27,25 @@ import {
 import { formatMigrationShowOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 
+// Track every temp dir handed out by `createTempDir` so the suite-wide
+// `afterEach` can remove them — even when an assertion fails — keeping
+// ephemeral state out of the shared `tmpdir()` between runs.
+const createdTempDirs: string[] = [];
+
 async function createTempDir(prefix: string): Promise<string> {
   const dir = join(
     tmpdir(),
     `test-migration-show-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   await mkdir(dir, { recursive: true });
+  createdTempDirs.push(dir);
   return dir;
 }
+
+afterEach(async () => {
+  const dirs = createdTempDirs.splice(0);
+  await Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true })));
+});
 
 function createOp(
   id: string,
