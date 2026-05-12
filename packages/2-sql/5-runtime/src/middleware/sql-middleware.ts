@@ -45,17 +45,29 @@ export interface SqlMiddleware<TCodecMap extends Record<string, unknown> = Recor
    */
   beforeCompile?(draft: DraftPlan, ctx: SqlMiddlewareContext): Promise<DraftPlan | undefined>;
   /**
-   * Mutate `ParamRef.value` slots before encode runs. The third `params`
-   * argument is a {@link SqlParamRefMutator} scoped to value slots only —
-   * SQL strings, projections, and `ParamRef` membership are not mutable.
-   * Existing `(plan)` and `(plan, ctx)` middleware bodies that ignore the
-   * additional argument continue to compile and run unchanged.
+   * Mutate `ParamRef.value` slots before encode runs. The third
+   * `params` argument is a {@link SqlParamRefMutator} scoped to value
+   * slots only — SQL strings, projections, and `ParamRef` membership
+   * are not mutable. Existing `(plan)` and `(plan, ctx)` middleware
+   * bodies that ignore the additional argument continue to compile
+   * and run unchanged.
    *
-   * `ctx.signal` carries the per-query `AbortSignal` (ADR 207); middleware
-   * that wraps a network SDK forwards `ctx.signal` to that SDK.
-   * Cooperative cancellation: a body that ignores the signal still
-   * surfaces `RUNTIME.ABORTED { phase: 'beforeExecute' }` promptly via
-   * the runtime's race against the signal.
+   * Lifecycle position:
+   *   `beforeCompile → lowerSqlPlan → beforeExecute → encodeParams → intercept → driver`.
+   *
+   * The plan handed in is the SQL execution plan after lowering but
+   * *before* parameter encoding: `plan.params[i]` is the user-domain
+   * value the mutator's `entries()` iterator surfaces (e.g. an
+   * `EncryptedEnvelopeBase` for a cipherstash-codec'd column, or a
+   * plain JS value for non-codec'd ParamRefs). Mutations applied via
+   * `params.replaceValue` / `replaceValues` are visible to encode,
+   * which then renders the mutated value through the column's codec.
+   *
+   * `ctx.signal` carries the per-query `AbortSignal` (ADR 207);
+   * middleware that wraps a network SDK forwards `ctx.signal` to
+   * that SDK. Cooperative cancellation: a body that ignores the
+   * signal still surfaces `RUNTIME.ABORTED { phase: 'beforeExecute' }`
+   * promptly via the runtime's race against the signal.
    */
   beforeExecute?(
     plan: SqlExecutionPlan,

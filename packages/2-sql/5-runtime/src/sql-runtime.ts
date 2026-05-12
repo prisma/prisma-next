@@ -10,6 +10,7 @@ import {
   RuntimeCore,
   type RuntimeExecuteOptions,
   type RuntimeLog,
+  runBeforeExecuteChain,
   runtimeError,
   runWithMiddleware,
 } from '@prisma-next/framework-components/runtime';
@@ -185,18 +186,57 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   }
 
   /**
-   * Lower a `SqlQueryPlan` (AST + meta) into a `SqlExecutionPlan` with encoded parameters ready for the driver. This is the single point at which params transition from app-layer values to driver wire-format.
+   * Lower a `SqlQueryPlan` (AST + meta) into a `SqlExecutionPlan`
+   * with encoded parameters ready for the driver.
    *
-   * `ctx: SqlCodecCallContext` is forwarded to `encodeParams` so per-query cancellation reaches every codec body during parameter encoding. The framework abstract typed this as `CodecCallContext`; the SQL family narrows it to the SQL-specific extension. SQL params do not populate `ctx.column` — encode-side column metadata is the middleware's domain.
+   * Implementation note: SQL splits lower-then-encode across
+   * {@link lowerToDraft} + {@link encodeDraftParams} so the runtime
+   * can fire the `beforeExecute` middleware chain between them
+   * (cipherstash bulk-encrypt, for example, mutates pre-encode
+   * `ParamRef.value` slots). This protected hook composes the two
+   * back into the cross-family `lower()` shape `RuntimeCore.execute`
+   * expects, and is called from the no-middleware fast paths /
+   * fixtures that hit `RuntimeCore`'s default template directly.
+   * `execute()` overrides the template and uses the split form so
+   * `beforeExecute` lands between the two halves.
+   *
+   * `ctx: SqlCodecCallContext` is forwarded to `encodeParams` so
+   * per-query cancellation reaches every codec body during parameter
+   * encoding. SQL params do not populate `ctx.column` — encode-side
+   * column metadata is the middleware's domain.
    */
   protected override async lower(
     plan: SqlQueryPlan,
     ctx: SqlCodecCallContext,
   ): Promise<SqlExecutionPlan> {
-    const lowered = lowerSqlPlan(this.adapter, this.contract, plan);
+    const draft = this.lowerToDraft(plan);
+    return await this.encodeDraftParams(draft, ctx);
+  }
+
+  /**
+   * AST → pre-encode draft. The returned plan has `sql` rendered and
+   * `params` populated with the user-domain values the lowering site
+   * collected from `ParamRef` nodes. No codec encode has happened
+   * yet; consumers can mutate `params` via the `SqlParamRefMutator`
+   * before {@link encodeDraftParams} runs.
+   */
+  private lowerToDraft(plan: SqlQueryPlan): SqlExecutionPlan {
+    return lowerSqlPlan(this.adapter, this.contract, plan);
+  }
+
+  /**
+   * Encode a draft plan's params through the per-column codecs and
+   * freeze the result into the final `SqlExecutionPlan` the driver
+   * sees. Errors surface as `RUNTIME.ENCODE_FAILED` envelopes from
+   * {@link encodeParams}.
+   */
+  private async encodeDraftParams(
+    draft: SqlExecutionPlan,
+    ctx: SqlCodecCallContext,
+  ): Promise<SqlExecutionPlan> {
     return Object.freeze({
-      ...lowered,
-      params: await encodeParams(lowered, ctx, this.contractCodecs),
+      ...draft,
+      params: await encodeParams(draft, ctx, this.contractCodecs),
     });
   }
 
@@ -255,12 +295,44 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 
       let exec: SqlExecutionPlan;
       if (isExecutionPlan(plan)) {
+        // Pre-lowered fixture path. The plan's params are typically
+        // already encoded; we still fire `beforeExecute` so middleware
+        // that mutates ParamRef values (e.g. cipherstash bulk-encrypt)
+        // gets a chance to run, then re-encode so any mutations land.
+        const preEncodeMutator: SqlParamRefMutatorInternal = createSqlParamRefMutator(plan);
+        await runBeforeExecuteChain<SqlExecutionPlan, SqlParamRefMutator>(
+          plan,
+          self.middleware,
+          execMiddlewareCtx,
+          preEncodeMutator,
+        );
         exec = Object.freeze({
           ...plan,
-          params: await encodeParams(plan, codecCtx, self.contractCodecs),
+          params: await encodeParams(
+            { ...plan, params: preEncodeMutator.currentParams() },
+            codecCtx,
+            self.contractCodecs,
+          ),
         });
       } else {
-        exec = await self.lower(await self.runBeforeCompile(plan), codecCtx);
+        // Standard AST → exec path. Split lower from encode so the
+        // `beforeExecute` chain fires between them with a mutator built
+        // over the pre-encode draft params; encode then renders the
+        // (possibly mutated) values through the column codecs.
+        const compiled = await self.runBeforeCompile(plan);
+        const draft = self.lowerToDraft(compiled);
+        const preEncodeMutator: SqlParamRefMutatorInternal = createSqlParamRefMutator(draft);
+        await runBeforeExecuteChain<SqlExecutionPlan, SqlParamRefMutator>(
+          draft,
+          self.middleware,
+          execMiddlewareCtx,
+          preEncodeMutator,
+        );
+        const draftWithMutations: SqlExecutionPlan = Object.freeze({
+          ...draft,
+          params: preEncodeMutator.currentParams(),
+        });
+        exec = await self.encodeDraftParams(draftWithMutations, codecCtx);
       }
 
       self.familyAdapter.validatePlan(exec, self.contract);
@@ -282,25 +354,18 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
           await self.verifyMarker();
         }
 
-        const paramsMutator: SqlParamRefMutatorInternal = createSqlParamRefMutator(exec);
-        const stream = runWithMiddleware<
-          SqlExecutionPlan,
-          Record<string, unknown>,
-          SqlParamRefMutator
-        >(
+        const stream = runWithMiddleware<SqlExecutionPlan, Record<string, unknown>>(
           exec,
           self.middleware,
           execMiddlewareCtx,
           () =>
             queryable.execute<Record<string, unknown>>({
               sql: exec.sql,
-              // Read params after the `beforeExecute` middleware chain has
-              // run so that any `mutator.replaceValue(...)` calls land in
-              // the driver-bound params array. When no middleware mutated,
-              // `currentParams()` returns `exec.params` by reference identity.
-              params: paramsMutator.currentParams(),
+              // `beforeExecute` ran on the pre-encode draft (see
+              // generator setup above); `exec.params` already carries
+              // any mutator-driven replacements through `encodeParams`.
+              params: exec.params,
             }),
-          paramsMutator,
         );
 
         // Manually drive the driver's async iterator so the between-row abort check fires *before* requesting the next row. With a `for await...of` loop the runtime would await `iterator.next()` first, leaving a window where one extra row is pulled through the driver after the signal aborted.
