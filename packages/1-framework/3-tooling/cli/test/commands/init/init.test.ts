@@ -709,6 +709,45 @@ describe('runInit hygiene + tsconfig (FR2 / FR3)', { timeout: timeouts.databaseO
     }
   });
 
+  it('adds "type": "module" to package.json so the ESM-only db.ts loads cleanly (TML-2494)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      type?: string;
+    };
+    expect(pkg.type).toBe('module');
+  });
+
+  it('warns and preserves an explicit "type": "commonjs" rather than overwriting it (TML-2494)', async () => {
+    writeFileSync(
+      join(tmpDir, 'package.json'),
+      JSON.stringify({ name: 'test-app', type: 'commonjs' }, null, 2),
+    );
+
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', install: false },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
+      expect(parsed.warnings.join('\n')).toMatch(/"type": "commonjs"/);
+      const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+        type?: string;
+      };
+      expect(pkg.type).toBe('commonjs');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('is idempotent across re-init: second run does not mutate hygiene files (FR9.3)', async () => {
     await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', install: false },

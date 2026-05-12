@@ -33,7 +33,11 @@ import {
 } from './exit-codes';
 import { mergeGitattributes, requiredGitattributesLines } from './hygiene-gitattributes';
 import { mergeGitignore } from './hygiene-gitignore';
-import { mergePackageScripts, REQUIRED_SCRIPTS } from './hygiene-package-scripts';
+import {
+  ensureEsmModuleType,
+  mergePackageScripts,
+  REQUIRED_SCRIPTS,
+} from './hygiene-package-scripts';
 import { type InitFlagOptions, type ResolvedInitInputs, resolveInitInputs } from './inputs';
 import {
   buildNextSteps,
@@ -268,9 +272,12 @@ export async function runInit(
     }
 
     // package.json edits are chained: FR9.2 facade-dep removal first
-    // (so the script merge sees the cleaned `dependencies` and rounds
+    // (so the later passes see the cleaned `dependencies` and we round
     // out a single re-stringification), then FR3.5 / FR9.3 idempotent
-    // scripts merge with collision detection.
+    // scripts merge with collision detection, then `"type": "module"`
+    // alignment so the ESM-only `with { type: 'json' }` import attribute
+    // in the scaffolded `prisma/db.ts` loads cleanly under Node's
+    // loader (TML-2494).
     let workingPkg = pkgRaw;
     // A synthesised manifest is always a write — the file does not
     // exist on disk yet.
@@ -290,10 +297,18 @@ export async function runInit(
       workingPkg = nextPkg;
       pkgChanged = true;
     }
+    const { content: typedPkg, warning: typeWarning } = ensureEsmModuleType(workingPkg);
+    if (typedPkg !== null) {
+      workingPkg = typedPkg;
+      pkgChanged = true;
+    }
     if (pkgChanged) {
       filesToWrite.push({ path: 'package.json', content: workingPkg });
     }
     warnings.push(...scriptWarnings);
+    if (typeWarning !== null) {
+      warnings.push(typeWarning);
+    }
     if (synthesisePackageJson) {
       warnings.push(
         'No package.json found in the target directory; created a minimal one. Edit `name` / `version` to taste.',

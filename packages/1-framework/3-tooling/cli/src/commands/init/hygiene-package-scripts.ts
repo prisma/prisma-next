@@ -89,3 +89,75 @@ export function mergePackageScripts(
   const trailingNewline = existing.endsWith('\n') ? '\n' : '';
   return { content: `${JSON.stringify(parsed, null, 2)}${trailingNewline}`, warnings };
 }
+
+export interface EsmModuleTypeResult {
+  /**
+   * The new package.json content. `null` when no change is required —
+   * either `"type": "module"` is already set, or the user has explicitly
+   * opted into a different module type (in which case `warning` is set).
+   */
+  readonly content: string | null;
+  /**
+   * Structured warning raised when `"type"` is already set to a value
+   * other than `"module"`. The user's explicit choice is preserved, but
+   * the scaffolded `db.ts` uses the ESM-only `with { type: 'json' }`
+   * import attribute and will not load under CJS resolution.
+   */
+  readonly warning: string | null;
+}
+
+/**
+ * Idempotently sets `"type": "module"` on a `package.json` so the
+ * scaffolded `prisma/db.ts` — which uses the ESM-only `with { type: 'json' }`
+ * import attribute — loads as ES module under Node's loader (TML-2494).
+ *
+ * Without this field Node either:
+ *
+ * - emits `MODULE_TYPELESS_PACKAGE_JSON` and reparses the file as ESM
+ *   with a perf penalty (Node 22+ with `--experimental-strip-types`), or
+ * - hard-fails with `ERR_*` because the CJS loader cannot parse the
+ *   import-attribute syntax (older Node, or any tool that doesn't
+ *   reparse).
+ *
+ * Behaviour:
+ *
+ * - **Field missing** → set to `"module"`. New entry is inserted right
+ *   after `"name"` (when present) so the diff lands in a conventional
+ *   spot for human review; falls through to the natural append position
+ *   otherwise.
+ * - **Field already `"module"`** → no-op (idempotent).
+ * - **Field set to anything else** (e.g. `"commonjs"`) → leave it alone
+ *   and surface a structured warning. The user explicitly opted out of
+ *   ESM and we don't silently overwrite that.
+ */
+export function ensureEsmModuleType(existing: string): EsmModuleTypeResult {
+  const parsed = JSON.parse(existing) as Record<string, unknown>;
+  const currentType = parsed['type'];
+
+  if (currentType === 'module') {
+    return { content: null, warning: null };
+  }
+
+  if (typeof currentType === 'string' && currentType !== 'module') {
+    return {
+      content: null,
+      warning: `package.json declares "type": "${currentType}" — keeping yours, but the scaffolded prisma/db.ts uses an ESM-only import attribute (\`with { type: 'json' }\`) and will not load under that module type.\nIf you want the default, set "type": "module" in package.json.`,
+    };
+  }
+
+  const next: Record<string, unknown> = {};
+  let inserted = false;
+  for (const [key, value] of Object.entries(parsed)) {
+    next[key] = value;
+    if (!inserted && key === 'name') {
+      next['type'] = 'module';
+      inserted = true;
+    }
+  }
+  if (!inserted) {
+    next['type'] = 'module';
+  }
+
+  const trailingNewline = existing.endsWith('\n') ? '\n' : '';
+  return { content: `${JSON.stringify(next, null, 2)}${trailingNewline}`, warning: null };
+}
