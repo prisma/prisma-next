@@ -52,7 +52,7 @@ function toParamAssignments(
   }
 
   for (const [column, value] of Object.entries(values)) {
-    if (!table.columns[column]) {
+    if (!Object.hasOwn(table.columns, column)) {
       throw new Error(`Unknown column "${column}" in table "${tableName}"`);
     }
     const codec = codecRefForStorageColumn(contract.storage, tableName, column);
@@ -102,7 +102,7 @@ function normalizeInsertRows(
     const normalizedRow: Record<string, ParamRef | DefaultValueExpr> = {};
     for (const column of orderedColumns) {
       if (Object.hasOwn(row, column)) {
-        if (!table.columns[column]) {
+        if (!Object.hasOwn(table.columns, column)) {
           throw new Error(`Unknown column "${column}" in table "${tableName}"`);
         }
         const codec = codecRefForStorageColumn(contract.storage, tableName, column);
