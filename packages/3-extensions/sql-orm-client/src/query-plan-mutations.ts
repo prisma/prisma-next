@@ -14,6 +14,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import { combineWhereExprs } from './where-utils';
 
@@ -57,7 +58,7 @@ function toParamAssignments(
     const codec = codecRefForStorageColumn(contract.storage, tableName, column);
     assignments[column] = ParamRef.of(value, {
       name: column,
-      ...(codec ? { codec } : {}),
+      ...ifDefined('codec', codec),
     });
   }
 
@@ -107,7 +108,7 @@ function normalizeInsertRows(
         const codec = codecRefForStorageColumn(contract.storage, tableName, column);
         normalizedRow[column] = ParamRef.of(row[column], {
           name: column,
-          ...(codec ? { codec } : {}),
+          ...ifDefined('codec', codec),
         });
         continue;
       }
