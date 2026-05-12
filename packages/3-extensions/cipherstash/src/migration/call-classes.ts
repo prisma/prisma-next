@@ -42,14 +42,23 @@ const CIPHERSTASH_MIGRATION_MODULE = '@prisma-next/extension-cipherstash/migrati
 const DEFAULT_CAST_AS = 'text';
 
 /**
- * Two-valued enumeration matching the EQL search-config indices the
- * cipherstash codec emits — one per enabled flag in
- * `Encrypted<string>`'s `typeParams`:
+ * EQL search-config indices the cipherstash codecs emit — one per
+ * enabled `typeParams` flag, across every cipherstash-encrypted column
+ * type:
  *
- *   - `equality: true`        → `'unique'` index
- *   - `freeTextSearch: true`  → `'match'`  index
+ *   - `'unique'`   — equality lookup (every codec).
+ *   - `'match'`    — free-text search (`Encrypted<string>` only).
+ *   - `'ore'`      — order-and-range comparisons (`Encrypted<string>` /
+ *                    `Encrypted<number>` / `Encrypted<bigint>` /
+ *                    `Encrypted<Date>`).
+ *   - `'ste_vec'`  — searchable JSON path/value queries
+ *                    (`Encrypted<JSON>`).
+ *
+ * Mirrors the full EQL `add_search_config` index vocabulary; the
+ * `cipherstashAddSearchConfig` / `cipherstashRemoveSearchConfig`
+ * factories accept any of the four without further changes.
  */
-export type CipherstashSearchIndex = 'unique' | 'match';
+export type CipherstashSearchIndex = 'unique' | 'match' | 'ore' | 'ste_vec';
 
 /**
  * Args shape accepted by the public `cipherstashAddSearchConfig` /
