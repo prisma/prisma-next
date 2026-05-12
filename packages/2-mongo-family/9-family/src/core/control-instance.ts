@@ -64,6 +64,26 @@ function deserializeMongoContract(contractJson: unknown): MongoTargetContract {
   return mongoTargetDescriptor.contractSerializer.deserializeContract(contractJson);
 }
 
+/**
+ * Family-method contract input. By the time control-plane methods
+ * (`verify`, `schemaVerify`, `sign`, …) are invoked through the CLI
+ * control client (`client.ts`), the input has already been threaded
+ * through `familyInstance.validateContract` (which delegates to
+ * `mongoTargetDescriptor.contractSerializer.deserializeContract`). The
+ * value is therefore a class-form `MongoTargetContract` carrying a
+ * `MongoTargetStorage` envelope with `namespaces` populated, and must
+ * NOT be re-fed through `deserializeContract` (arktype rejects the
+ * extra `namespaces` key on the JSON envelope shape).
+ *
+ * The parameter type on the framework SPI is `unknown` for variance
+ * reasons (so the family can express its own contract type without
+ * leaking it to the framework). This helper recovers the validated
+ * shape with a single narrow cast.
+ */
+function asValidatedMongoContract(contract: unknown): MongoTargetContract {
+  return contract as MongoTargetContract;
+}
+
 class MongoFamilyInstance implements MongoControlFamilyInstance {
   readonly familyId = 'mongo' as const;
 
@@ -84,7 +104,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     const { driver, contract: rawContract, expectedTargetId, contractPath, configPath } = options;
     const startTime = Date.now();
 
-    const contract = deserializeMongoContract(rawContract);
+    const contract = asValidatedMongoContract(rawContract);
 
     const contractStorageHash = contract.storage.storageHash;
     const contractProfileHash = contract.profileHash;
@@ -163,7 +183,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
   }): Promise<VerifyDatabaseSchemaResult> {
     const { driver, contract: rawContract, strict, contractPath, configPath } = options;
 
-    const contract = deserializeMongoContract(rawContract);
+    const contract = asValidatedMongoContract(rawContract);
 
     const db = extractDb(driver);
     const liveIR = await introspectSchema(db);
@@ -186,7 +206,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     readonly strict: boolean;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', string>>;
   }): VerifyDatabaseSchemaResult {
-    const contract = deserializeMongoContract(options.contract);
+    const contract = asValidatedMongoContract(options.contract);
     return verifyMongoSchema({
       contract,
       schema: options.schema,
@@ -204,7 +224,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     const { driver, contract: rawContract, contractPath, configPath } = options;
     const startTime = Date.now();
 
-    const contract = deserializeMongoContract(rawContract);
+    const contract = asValidatedMongoContract(rawContract);
 
     const contractStorageHash = contract.storage.storageHash;
     const contractProfileHash = contract.profileHash;
