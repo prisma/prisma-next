@@ -1,4 +1,5 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import {
   RawAggregateCommand,
   RawFindOneAndUpdateCommand,
@@ -8,6 +9,28 @@ import { type } from 'arktype';
 import type { Db, Document, UpdateFilter } from 'mongodb';
 
 const COLLECTION = '_prisma_migrations';
+
+/**
+ * `_id` value used by pre-port code that wrote a single marker doc
+ * (no `space` field). Post-port code keys docs by their space id, so
+ * this constant is referenced only by the legacy-shape upgrade path
+ * inside {@link readMarker}. New writes never produce this `_id`.
+ *
+ * The legacy discriminator is `_id === LEGACY_MARKER_ID` AND the doc
+ * has no `space` field — a hypothetical extension whose space id
+ * happens to be `'marker'` would write `{_id: 'marker', space: 'marker'}`
+ * and is correctly identified as canonical, not legacy.
+ */
+const LEGACY_MARKER_ID = 'marker';
+
+/**
+ * MongoDB duplicate-key error code (`E11000`). Surfaced by `insertOne`
+ * when another connection has already inserted a doc with the same
+ * `_id`. The legacy-upgrade path catches it as a benign "race lost"
+ * signal: the other process finished the upgrade insert first, and
+ * we proceed to the (idempotent) sweep step instead.
+ */
+const MONGO_DUPLICATE_KEY_CODE = 11000;
 
 /**
  * Same shape as the SQL marker row but camelCase + Mongo-native types:
@@ -82,14 +105,137 @@ async function executeFindOneAndUpdate(
  * `null` if no marker has been written for that space yet. The marker doc
  * is keyed by `_id: <space>` so each loaded contract space owns one row
  * — see ADR 212 for the per-space mechanism this enables.
+ *
+ * For the app space (`'app'`), this also detects pre-port marker docs
+ * keyed by `_id: 'marker'` (no `space` field) and upgrades them in
+ * place to the canonical `{_id: 'app', space: 'app', ...}` shape. The
+ * upgrade is idempotent and concurrent-safe: parallel readers all
+ * converge to the canonical doc with the legacy doc swept. Partial
+ * writes from a previous run (canonical inserted, legacy not yet
+ * deleted) are detected on the next read and the sweep is retried.
  */
 export async function readMarker(db: Db, space: string): Promise<ContractMarkerRecord | null> {
+  if (space === APP_SPACE_ID) {
+    return readAppMarker(db);
+  }
+  return readNonAppMarker(db, space);
+}
+
+async function readAppMarker(db: Db): Promise<ContractMarkerRecord | null> {
+  const cmd = new RawAggregateCommand(COLLECTION, [
+    { $match: { _id: { $in: [APP_SPACE_ID, LEGACY_MARKER_ID] } } },
+  ]);
+  const docs = await executeAggregate(db, cmd);
+  const canonical = docs.find((d) => d['_id'] === APP_SPACE_ID);
+  const legacyCandidate = docs.find((d) => d['_id'] === LEGACY_MARKER_ID);
+  // A doc at `_id: 'marker'` is only treated as legacy when it lacks
+  // the post-port `space` field. This preserves namespace headroom for
+  // a hypothetical extension whose space id is `'marker'` — its doc
+  // would carry `space: 'marker'` and would not be touched here.
+  const legacy = legacyCandidate && legacyCandidate['space'] === undefined ? legacyCandidate : null;
+
+  if (canonical && legacy) {
+    // Mid-upgrade or partial-write recovery: canonical already exists,
+    // sweep the leftover legacy doc and return canonical.
+    await sweepLegacyAppMarker(db);
+    return parseMongoMarkerDoc(canonical);
+  }
+  if (canonical) return parseMongoMarkerDoc(canonical);
+  if (legacy) return upgradeLegacyAppMarker(db, legacy);
+  return null;
+}
+
+async function readNonAppMarker(db: Db, space: string): Promise<ContractMarkerRecord | null> {
   const cmd = new RawAggregateCommand(COLLECTION, [{ $match: { _id: space } }, { $limit: 1 }]);
   const docs = await executeAggregate(db, cmd);
   const doc = docs[0];
   if (!doc) return null;
+  // Defense-in-depth: a pre-port DB has a single doc at `_id: 'marker'`
+  // with no `space` field. If a non-app caller's space id happens to
+  // collide ('marker'), we must not parse the legacy doc as that
+  // space's marker — return null and let the next app-space read
+  // upgrade or sweep it.
+  if (doc['space'] === undefined) return null;
   return parseMongoMarkerDoc(doc);
 }
+
+/**
+ * Copies legacy fields into a canonical-shaped doc and writes it,
+ * then sweeps the legacy doc. Both writes are idempotent under
+ * concurrent execution: a `DuplicateKey` error from `insertOne`
+ * means another process already finished the upgrade insert; we
+ * fall through to the sweep, which is itself a no-op when the
+ * legacy doc is already gone.
+ */
+async function upgradeLegacyAppMarker(db: Db, legacy: Document): Promise<ContractMarkerRecord> {
+  const canonicalDoc: { _id: string; space: string; [key: string]: unknown } = {
+    _id: APP_SPACE_ID,
+    space: APP_SPACE_ID,
+  };
+  for (const field of LEGACY_PORTABLE_FIELDS) {
+    if (legacy[field] !== undefined) canonicalDoc[field] = legacy[field];
+  }
+  // Validate the synthesised canonical doc before writing. If the
+  // legacy doc carried malformed optional fields (e.g. invariants
+  // that aren't a string array), surface the corruption error here
+  // rather than persisting an invalid doc at the canonical id.
+  const parsed = parseMongoMarkerDoc(canonicalDoc);
+
+  try {
+    await markerCollection(db).insertOne(canonicalDoc);
+  } catch (err) {
+    if (!isDuplicateKeyError(err)) throw err;
+    // Another connection inserted canonical first — fall through to
+    // the sweep so the legacy doc is cleaned up regardless of which
+    // racer wrote it.
+  }
+  await sweepLegacyAppMarker(db);
+  return parsed;
+}
+
+async function sweepLegacyAppMarker(db: Db): Promise<void> {
+  await markerCollection(db).deleteOne({
+    _id: LEGACY_MARKER_ID,
+    space: { $exists: false },
+  });
+}
+
+/**
+ * Marker docs use string `_id` values (the space id, or the legacy
+ * `'marker'` literal). The driver's default collection type assumes
+ * `ObjectId` for `_id`; widening here lets the legacy-upgrade path
+ * filter and write by string id without casts at every call site.
+ */
+function markerCollection(db: Db) {
+  return db.collection<{ _id: string; [key: string]: unknown }>(COLLECTION);
+}
+
+function isDuplicateKeyError(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    (err as { code?: number }).code === MONGO_DUPLICATE_KEY_CODE
+  );
+}
+
+/**
+ * Fields that may be carried from a pre-port marker doc into the
+ * canonical post-port doc. `_id` is omitted (legacy uses `'marker'`,
+ * canonical uses the space id) and `space` is omitted (legacy lacks
+ * it; canonical stamps it explicitly). Required fields (`storageHash`,
+ * `profileHash`) are listed first; if either is missing the synthesised
+ * doc fails canonical validation and the upgrade aborts cleanly.
+ */
+const LEGACY_PORTABLE_FIELDS = [
+  'storageHash',
+  'profileHash',
+  'contractJson',
+  'canonicalVersion',
+  'updatedAt',
+  'appTag',
+  'meta',
+  'invariants',
+] as const;
 
 export async function initMarker(
   db: Db,

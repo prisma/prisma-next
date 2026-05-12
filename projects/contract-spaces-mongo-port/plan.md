@@ -95,8 +95,8 @@ Make the Mongo marker collection space-keyed without yet enabling multi-space (t
 
 **Tasks:**
 
-- [ ] **T1.1** Marker collection schema change: `marker-ledger.ts` keys docs by `_id: <spaceId>`, with `space: <spaceId>` carried alongside. `readMarker(space)` / `initMarker(space, ...)` / `updateMarker(space, expectedFrom, ...)` / `writeLedgerEntry(space, entry)` all take a `space` parameter. Ledger doc shape gains `space` too. (TC-3)
-- [ ] **T1.2** `[checkpoint: high reasoning — CKPT-1]` Legacy-shape detection: a non-mutating precheck in `readMarker` that detects `{_id: 'marker', ...}` and rewrites it to `{_id: 'app', space: 'app', ...}` idempotently on next read. Unit + integration tests covering fresh / legacy / already-upgraded states. (TC-4, TC-5)
+- [x] **T1.1** Marker collection schema change: `marker-ledger.ts` keys docs by `_id: <spaceId>`, with `space: <spaceId>` carried alongside. `readMarker(space)` / `initMarker(space, ...)` / `updateMarker(space, expectedFrom, ...)` / `writeLedgerEntry(space, entry)` all take a `space` parameter. Ledger doc shape gains `space` too. (TC-3)
+- [x] **T1.2** `[checkpoint: high reasoning — CKPT-1]` Legacy-shape detection: a non-mutating precheck in `readMarker` that detects `{_id: 'marker', ...}` and rewrites it to `{_id: 'app', space: 'app', ...}` idempotently on next read. Unit + integration tests covering fresh / legacy / already-upgraded states. (TC-4, TC-5)
   - **Before starting:** agent prompts operator: *"Reaching CKPT-1 (legacy-upgrade idempotency). Please upgrade reasoning effort to high before I continue."* Wait for confirmation.
   - **On completion:** agent prompts operator: *"CKPT-1 complete. Please downgrade reasoning effort back to medium before T1.3."* Wait for confirmation before resuming.
 - [ ] **T1.3** `MarkerOperations` interface (`mongo-runner.ts`) threads `space` through. `MongoMigrationRunner.execute` reads `options.plan.spaceId` and passes it to every marker op. Per-space ledger entries. (TC-6)
