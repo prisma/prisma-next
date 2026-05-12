@@ -3,6 +3,9 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { initMarker, readMarker, updateMarker, writeLedgerEntry } from '../src/core/marker-ledger';
 
+const APP = 'app';
+const EXT = 'cipherstash';
+
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;
 let db: Db;
@@ -28,43 +31,46 @@ beforeEach(async () => {
 
 describe('readMarker', () => {
   it('returns null from empty collection', async () => {
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker).toBeNull();
   });
 
   it('defaults meta to empty object when absent from document', async () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
-      _id: 'marker',
+      _id: APP,
+      space: APP,
       storageHash: 'sha256:abc',
       profileHash: 'sha256:def',
       updatedAt: new Date(),
     });
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker).not.toBeNull();
     expect(marker?.meta).toEqual({});
   });
 
   it('defaults invariants to empty array when the field is absent (natural schemaless behaviour)', async () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
-      _id: 'marker',
+      _id: APP,
+      space: APP,
       storageHash: 'sha256:abc',
       profileHash: 'sha256:def',
       updatedAt: new Date(),
     });
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker?.invariants).toEqual([]);
   });
 
   it('defaults updatedAt to a fresh Date when absent from document', async () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
-      _id: 'marker',
+      _id: APP,
+      space: APP,
       storageHash: 'sha256:abc',
       profileHash: 'sha256:def',
     });
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker?.updatedAt).toBeInstanceOf(Date);
   });
 
@@ -72,37 +78,64 @@ describe('readMarker', () => {
     // Absent is fine (schemaless default); present-but-malformed is a
     // hard error — corruption shouldn't be silently coerced.
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
-      _id: 'marker',
+      _id: APP,
+      space: APP,
       storageHash: 'sha256:abc',
       profileHash: 'sha256:def',
       updatedAt: new Date(),
-      invariants: [1, 2, 3], // numbers, not strings
+      invariants: [1, 2, 3],
     });
 
-    await expect(readMarker(db)).rejects.toThrow(/Invalid marker doc.*invariants/);
+    await expect(readMarker(db, APP)).rejects.toThrow(/Invalid marker doc.*invariants/);
   });
 
   it('throws when invariants is present but not an array (storage corruption)', async () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
-      _id: 'marker',
+      _id: APP,
+      space: APP,
       storageHash: 'sha256:abc',
       profileHash: 'sha256:def',
       updatedAt: new Date(),
       invariants: 'not-an-array',
     });
 
-    await expect(readMarker(db)).rejects.toThrow(/Invalid marker doc.*invariants/);
+    await expect(readMarker(db, APP)).rejects.toThrow(/Invalid marker doc.*invariants/);
+  });
+
+  it('partitions reads by space — a marker for one space is invisible to another', async () => {
+    await initMarker(db, APP, { storageHash: 'sha256:app1', profileHash: 'sha256:appp1' });
+    await initMarker(db, EXT, { storageHash: 'sha256:ext1', profileHash: 'sha256:extp1' });
+
+    const appMarker = await readMarker(db, APP);
+    const extMarker = await readMarker(db, EXT);
+    const otherMarker = await readMarker(db, 'unknown-space');
+
+    expect(appMarker?.storageHash).toBe('sha256:app1');
+    expect(extMarker?.storageHash).toBe('sha256:ext1');
+    expect(otherMarker).toBeNull();
   });
 });
 
 describe('initMarker', () => {
+  it('writes a doc keyed by space (TC-3): _id and space both equal the supplied space id', async () => {
+    await initMarker(db, APP, { storageHash: 'sha256:abc', profileHash: 'sha256:def' });
+
+    const raw = await db
+      .collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations')
+      .findOne({ _id: APP });
+    expect(raw?.['_id']).toBe(APP);
+    expect(raw?.['space']).toBe(APP);
+    expect(raw?.['storageHash']).toBe('sha256:abc');
+    expect(raw?.['profileHash']).toBe('sha256:def');
+  });
+
   it('initializes a marker that can be read back', async () => {
-    await initMarker(db, {
+    await initMarker(db, APP, {
       storageHash: 'sha256:abc',
       profileHash: 'sha256:def',
     });
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker).not.toBeNull();
     expect(marker?.storageHash).toBe('sha256:abc');
     expect(marker?.profileHash).toBe('sha256:def');
@@ -115,137 +148,162 @@ describe('initMarker', () => {
   });
 
   it('writes invariants to the marker document', async () => {
-    await initMarker(db, {
+    await initMarker(db, APP, {
       storageHash: 'sha256:abc',
       profileHash: 'sha256:def',
       invariants: ['alpha', 'beta'],
     });
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker?.invariants).toEqual(['alpha', 'beta']);
+  });
+
+  it('co-existing markers for different spaces do not collide', async () => {
+    await initMarker(db, APP, { storageHash: 'sha256:app1', profileHash: 'sha256:appp1' });
+    await initMarker(db, EXT, { storageHash: 'sha256:ext1', profileHash: 'sha256:extp1' });
+
+    const docs = await db.collection('_prisma_migrations').find({}).sort({ _id: 1 }).toArray();
+    expect(docs).toHaveLength(2);
+    expect(docs.map((d) => d['_id'])).toEqual([APP, EXT]);
   });
 });
 
 describe('updateMarker', () => {
   it('succeeds with correct expected hash (CAS)', async () => {
-    await initMarker(db, {
+    await initMarker(db, APP, {
       storageHash: 'sha256:v1',
       profileHash: 'sha256:p1',
     });
 
-    const updated = await updateMarker(db, 'sha256:v1', {
+    const updated = await updateMarker(db, APP, 'sha256:v1', {
       storageHash: 'sha256:v2',
       profileHash: 'sha256:p2',
     });
 
     expect(updated).toBe(true);
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker?.storageHash).toBe('sha256:v2');
     expect(marker?.profileHash).toBe('sha256:p2');
   });
 
   it('fails with wrong expected hash (CAS failure)', async () => {
-    await initMarker(db, {
+    await initMarker(db, APP, {
       storageHash: 'sha256:v1',
       profileHash: 'sha256:p1',
     });
 
-    const updated = await updateMarker(db, 'sha256:wrong', {
+    const updated = await updateMarker(db, APP, 'sha256:wrong', {
       storageHash: 'sha256:v2',
       profileHash: 'sha256:p2',
     });
 
     expect(updated).toBe(false);
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker?.storageHash).toBe('sha256:v1');
   });
 
+  it('does not cross-update a different space (CAS is per-space)', async () => {
+    await initMarker(db, APP, { storageHash: 'sha256:v1', profileHash: 'sha256:p1' });
+    await initMarker(db, EXT, { storageHash: 'sha256:v1', profileHash: 'sha256:p1' });
+
+    const updated = await updateMarker(db, APP, 'sha256:v1', {
+      storageHash: 'sha256:v2',
+      profileHash: 'sha256:p2',
+    });
+
+    expect(updated).toBe(true);
+    const appMarker = await readMarker(db, APP);
+    const extMarker = await readMarker(db, EXT);
+    expect(appMarker?.storageHash).toBe('sha256:v2');
+    expect(extMarker?.storageHash).toBe('sha256:v1');
+  });
+
   it('merges caller-supplied invariants into the existing field server-side', async () => {
-    await initMarker(db, {
+    await initMarker(db, APP, {
       storageHash: 'sha256:v1',
       profileHash: 'sha256:p1',
       invariants: ['alpha'],
     });
 
-    const updated = await updateMarker(db, 'sha256:v1', {
+    const updated = await updateMarker(db, APP, 'sha256:v1', {
       storageHash: 'sha256:v2',
       profileHash: 'sha256:p2',
       invariants: ['beta', 'gamma'],
     });
 
     expect(updated).toBe(true);
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker?.invariants).toEqual(['alpha', 'beta', 'gamma']);
   });
 
   it('dedupes and sorts the merged set', async () => {
-    await initMarker(db, {
+    await initMarker(db, APP, {
       storageHash: 'sha256:v1',
       profileHash: 'sha256:p1',
       invariants: ['gamma', 'alpha'],
     });
 
-    await updateMarker(db, 'sha256:v1', {
+    await updateMarker(db, APP, 'sha256:v1', {
       storageHash: 'sha256:v2',
       profileHash: 'sha256:p2',
       invariants: ['delta', 'alpha', 'beta'],
     });
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker?.invariants).toEqual(['alpha', 'beta', 'delta', 'gamma']);
   });
 
   it('leaves existing invariants untouched when the caller omits the field', async () => {
-    await initMarker(db, {
+    await initMarker(db, APP, {
       storageHash: 'sha256:v1',
       profileHash: 'sha256:p1',
       invariants: ['alpha'],
     });
 
-    await updateMarker(db, 'sha256:v1', {
+    await updateMarker(db, APP, 'sha256:v1', {
       storageHash: 'sha256:v2',
       profileHash: 'sha256:p2',
     });
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker?.invariants).toEqual(['alpha']);
   });
 
   it('treats [] as a no-op merge (does not clobber existing invariants)', async () => {
-    await initMarker(db, {
+    await initMarker(db, APP, {
       storageHash: 'sha256:v1',
       profileHash: 'sha256:p1',
       invariants: ['alpha', 'beta'],
     });
 
-    await updateMarker(db, 'sha256:v1', {
+    await updateMarker(db, APP, 'sha256:v1', {
       storageHash: 'sha256:v2',
       profileHash: 'sha256:p2',
       invariants: [],
     });
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker?.invariants).toEqual(['alpha', 'beta']);
   });
 
   it('preserves both writers invariants under interleaved updates (server-side merge)', async () => {
     // Each `findOneAndUpdate` runs its `$setUnion` against the doc's
     // current value, so concurrent updates accumulate atomically.
-    await initMarker(db, {
+    await initMarker(db, APP, {
       storageHash: 'sha256:v1',
       profileHash: 'sha256:p1',
       invariants: [],
     });
 
     const [updatedA, updatedB] = await Promise.all([
-      updateMarker(db, 'sha256:v1', {
+      updateMarker(db, APP, 'sha256:v1', {
         storageHash: 'sha256:v1',
         profileHash: 'sha256:p1',
         invariants: ['alpha'],
       }),
-      updateMarker(db, 'sha256:v1', {
+      updateMarker(db, APP, 'sha256:v1', {
         storageHash: 'sha256:v1',
         profileHash: 'sha256:p1',
         invariants: ['beta'],
@@ -254,14 +312,14 @@ describe('updateMarker', () => {
 
     expect(updatedA).toBe(true);
     expect(updatedB).toBe(true);
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP);
     expect(marker?.invariants).toEqual(['alpha', 'beta']);
   });
 });
 
 describe('writeLedgerEntry', () => {
-  it('writes a ledger entry that exists in collection', async () => {
-    await writeLedgerEntry(db, {
+  it('writes a ledger entry that exists in collection, tagged with space', async () => {
+    await writeLedgerEntry(db, APP, {
       edgeId: 'edge-1',
       from: 'sha256:v1',
       to: 'sha256:v2',
@@ -271,6 +329,7 @@ describe('writeLedgerEntry', () => {
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
       type: 'ledger',
+      space: APP,
       edgeId: 'edge-1',
       from: 'sha256:v1',
       to: 'sha256:v2',
@@ -279,12 +338,12 @@ describe('writeLedgerEntry', () => {
   });
 
   it('appends multiple ledger entries (append-only)', async () => {
-    await writeLedgerEntry(db, {
+    await writeLedgerEntry(db, APP, {
       edgeId: 'edge-1',
       from: 'sha256:v1',
       to: 'sha256:v2',
     });
-    await writeLedgerEntry(db, {
+    await writeLedgerEntry(db, APP, {
       edgeId: 'edge-2',
       from: 'sha256:v2',
       to: 'sha256:v3',
@@ -298,5 +357,18 @@ describe('writeLedgerEntry', () => {
     expect(entries).toHaveLength(2);
     expect(entries[0]?.['edgeId']).toBe('edge-1');
     expect(entries[1]?.['edgeId']).toBe('edge-2');
+  });
+
+  it('records the same edgeId across different spaces without collision (key is (space, edgeId))', async () => {
+    await writeLedgerEntry(db, APP, { edgeId: 'edge-1', from: '', to: 'sha256:v1' });
+    await writeLedgerEntry(db, EXT, { edgeId: 'edge-1', from: '', to: 'sha256:v1' });
+
+    const entries = await db
+      .collection('_prisma_migrations')
+      .find({ type: 'ledger' })
+      .sort({ space: 1 })
+      .toArray();
+    expect(entries).toHaveLength(2);
+    expect(entries.map((e) => e['space'])).toEqual([APP, EXT]);
   });
 });

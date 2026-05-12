@@ -223,7 +223,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
           frameworkComponents: [],
         });
 
-        const marker = await readMarker(db);
+        const marker = await readMarker(db, 'app');
         expect(marker).not.toBeNull();
         expect(marker!.storageHash).toBe(indexedContract.storage.storageHash);
       } finally {
@@ -360,7 +360,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
         expect(emailIndex).toBeUndefined();
 
         // Verify marker updated
-        const marker = await readMarker(db);
+        const marker = await readMarker(db, 'app');
         expect(marker!.storageHash).toBe(emptyContract.storage.storageHash);
 
         // Verify second ledger entry with correct target hash

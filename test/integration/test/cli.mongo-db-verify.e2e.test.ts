@@ -141,7 +141,7 @@ describe('mongo db verify command (e2e)', { timeout: timeouts.spinUpMongoMemoryS
     it('verifies matching marker and schema', async () => {
       await db.createCollection('users');
       await db.collection('users').createIndex({ email: 1 }, { unique: true });
-      await initMarker(db, {
+      await initMarker(db, 'app', {
         storageHash: testContract.storage.storageHash,
         profileHash: testContract.profileHash!,
       });
@@ -239,7 +239,7 @@ describe('mongo db verify command (e2e)', { timeout: timeouts.spinUpMongoMemoryS
     });
 
     it('runs marker-only verification with matching marker', async () => {
-      await initMarker(db, {
+      await initMarker(db, 'app', {
         storageHash: testContract.storage.storageHash,
         profileHash: testContract.profileHash!,
       });

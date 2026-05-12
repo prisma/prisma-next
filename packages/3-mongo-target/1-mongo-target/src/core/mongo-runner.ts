@@ -1,14 +1,15 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import { errorRunnerFailed } from '@prisma-next/errors/execution';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
-import type {
-  MigrationOperationPolicy,
-  MigrationPlan,
-  MigrationPlanOperation,
-  MigrationRunnerExecutionChecks,
-  MigrationRunnerFailure,
-  MigrationRunnerResult,
-  OperationContext,
+import {
+  APP_SPACE_ID,
+  type MigrationOperationPolicy,
+  type MigrationPlan,
+  type MigrationPlanOperation,
+  type MigrationRunnerExecutionChecks,
+  type MigrationRunnerFailure,
+  type MigrationRunnerResult,
+  type OperationContext,
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
@@ -29,14 +30,24 @@ import { verifyMongoSchema } from './schema-verify/verify-mongo-schema';
 
 const READ_ONLY_CHECK_COMMAND_KINDS: ReadonlySet<string> = new Set(['aggregate', 'rawAggregate']);
 
+/**
+ * Marker / ledger operations the Mongo runner depends on. Every method
+ * takes a `space` parameter so each loaded contract space addresses its
+ * own marker row independently — see ADR 212 for the per-space
+ * mechanism.
+ */
 export interface MarkerOperations {
-  readMarker(): Promise<ContractMarkerRecord | null>;
-  initMarker(destination: {
-    readonly storageHash: string;
-    readonly profileHash: string;
-    readonly invariants?: readonly string[];
-  }): Promise<void>;
+  readMarker(space: string): Promise<ContractMarkerRecord | null>;
+  initMarker(
+    space: string,
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
+  ): Promise<void>;
   updateMarker(
+    space: string,
     expectedFrom: string,
     destination: {
       readonly storageHash: string;
@@ -44,11 +55,14 @@ export interface MarkerOperations {
       readonly invariants?: readonly string[];
     },
   ): Promise<boolean>;
-  writeLedgerEntry(entry: {
-    readonly edgeId: string;
-    readonly from: string;
-    readonly to: string;
-  }): Promise<void>;
+  writeLedgerEntry(
+    space: string,
+    entry: {
+      readonly edgeId: string;
+      readonly from: string;
+      readonly to: string;
+    },
+  ): Promise<void>;
 }
 
 export interface MongoRunnerDependencies {
@@ -92,11 +106,15 @@ export class MongoMigrationRunner {
   async execute(options: MongoMigrationRunnerExecuteOptions): Promise<MigrationRunnerResult> {
     const { commandExecutor, inspectionExecutor, adapter, driver, markerOps } = this.deps;
     const operations = deserializeMongoOps(options.plan.operations as readonly unknown[]);
+    // Plans produced by the contract-space-aware planner stamp `spaceId`
+    // onto the plan; pre-port single-space callers leave it absent and
+    // fall through to the application's well-known space.
+    const space = options.plan.spaceId ?? APP_SPACE_ID;
 
     const policyCheck = this.enforcePolicyCompatibility(options.policy, operations);
     if (policyCheck) return policyCheck;
 
-    const existingMarker = await markerOps.readMarker();
+    const existingMarker = await markerOps.readMarker(space);
 
     const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);
     if (markerCheck) return markerCheck;
@@ -225,7 +243,7 @@ export class MongoMigrationRunner {
       }
 
       if (existingMarker) {
-        const updated = await markerOps.updateMarker(existingMarker.storageHash, {
+        const updated = await markerOps.updateMarker(space, existingMarker.storageHash, {
           storageHash: destination.storageHash,
           profileHash,
           invariants: incomingInvariants,
@@ -236,6 +254,7 @@ export class MongoMigrationRunner {
             'Marker was modified by another process during migration execution.',
             {
               meta: {
+                space,
                 expectedStorageHash: existingMarker.storageHash,
                 destinationStorageHash: destination.storageHash,
               },
@@ -243,7 +262,7 @@ export class MongoMigrationRunner {
           );
         }
       } else {
-        await markerOps.initMarker({
+        await markerOps.initMarker(space, {
           storageHash: destination.storageHash,
           profileHash,
           invariants: incomingInvariants,
@@ -251,7 +270,7 @@ export class MongoMigrationRunner {
       }
 
       const originHash = existingMarker?.storageHash ?? '';
-      await markerOps.writeLedgerEntry({
+      await markerOps.writeLedgerEntry(space, {
         edgeId: `${originHash}->${destination.storageHash}`,
         from: originHash,
         to: destination.storageHash,

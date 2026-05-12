@@ -139,7 +139,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
 
     expect(result.ok).toBe(true);
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, 'app');
     expect(marker?.storageHash).toBe('sha256:dest');
 
     const ledgerEntries = await db
@@ -178,7 +178,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
       expect((issues as readonly unknown[]).length).toBeGreaterThan(0);
     }
 
-    const markerAfterFailure = await readMarker(db);
+    const markerAfterFailure = await readMarker(db, 'app');
     expect(markerAfterFailure).toBeNull();
 
     const ledgerAfterFailure = await db
@@ -201,7 +201,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
       expect(recoveryResult.value.operationsExecuted).toBe(0);
     }
 
-    const markerAfterRecovery = await readMarker(db);
+    const markerAfterRecovery = await readMarker(db, 'app');
     expect(markerAfterRecovery?.storageHash).toBe('sha256:dest');
 
     const ledgerAfterRecovery = await db
@@ -231,7 +231,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
 
     expect(result.ok).toBe(true);
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, 'app');
     expect(marker?.storageHash).toBe('sha256:dest');
 
     const ledgerEntries = await db

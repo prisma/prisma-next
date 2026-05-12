@@ -292,7 +292,7 @@ describe('MongoMigrationRunner', () => {
   });
 
   it('returns MARKER_ORIGIN_MISMATCH when marker hash differs', async () => {
-    await initMarker(db, { storageHash: 'sha256:different', profileHash: 'sha256:p1' });
+    await initMarker(db, 'app', { storageHash: 'sha256:different', profileHash: 'sha256:p1' });
 
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
@@ -319,7 +319,7 @@ describe('MongoMigrationRunner', () => {
     // `plan.origin == null` skips origin validation: the caller (`db update`)
     // does its own correctness check via live-schema introspection, so
     // marker continuity is not required.
-    await initMarker(db, { storageHash: 'sha256:existing', profileHash: 'sha256:p1' });
+    await initMarker(db, 'app', { storageHash: 'sha256:existing', profileHash: 'sha256:p1' });
 
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
@@ -362,7 +362,7 @@ describe('MongoMigrationRunner', () => {
   });
 
   it('returns MARKER_CAS_FAILURE when concurrent marker change causes CAS miss', async () => {
-    await initMarker(db, { storageHash: 'sha256:origin', profileHash: 'sha256:profile' });
+    await initMarker(db, 'app', { storageHash: 'sha256:origin', profileHash: 'sha256:profile' });
 
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
@@ -381,7 +381,7 @@ describe('MongoMigrationRunner', () => {
           await db
             .collection('_prisma_migrations')
             .updateOne(
-              { _id: 'marker' as never },
+              { _id: 'app' as never },
               { $set: { storageHash: 'sha256:tampered-by-other-process' } },
             );
         },
@@ -433,7 +433,7 @@ describe('MongoMigrationRunner', () => {
       frameworkComponents: [],
     });
 
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, 'app');
     expect(marker).not.toBeNull();
     expect(marker?.storageHash).toBe('sha256:dest');
 

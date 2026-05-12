@@ -8,13 +8,20 @@ import { type } from 'arktype';
 import type { Db, Document, UpdateFilter } from 'mongodb';
 
 const COLLECTION = '_prisma_migrations';
-const MARKER_ID = 'marker';
 
-// Same shape as the SQL marker row but camelCase + Mongo-native types:
-// `Date` is BSON-hydrated, `meta` is a native object (not JSON-stringified),
-// `_id` and any extension fields are tolerated. `invariants?` is optional —
-// absent reads as `[]` (schemaless default); present-but-malformed throws.
+/**
+ * Same shape as the SQL marker row but camelCase + Mongo-native types:
+ * `Date` is BSON-hydrated, `meta` is a native object (not JSON-stringified),
+ * `_id` and any extension fields are tolerated. `invariants?` is optional —
+ * absent reads as `[]` (schemaless default); present-but-malformed throws.
+ *
+ * `space` is required on the canonical post-port shape — every marker doc
+ * is keyed by its space. Pre-port docs (`{_id: 'marker', ...}` with no
+ * `space`) are upgraded by the legacy-shape detector before reaching this
+ * parser; see {@link readMarker}'s caller-side upgrade pass (T1.2).
+ */
 const MongoMarkerDocSchema = type({
+  space: 'string',
   storageHash: 'string',
   profileHash: 'string',
   'contractJson?': 'unknown | null',
@@ -70,8 +77,14 @@ async function executeFindOneAndUpdate(
     });
 }
 
-export async function readMarker(db: Db): Promise<ContractMarkerRecord | null> {
-  const cmd = new RawAggregateCommand(COLLECTION, [{ $match: { _id: MARKER_ID } }, { $limit: 1 }]);
+/**
+ * Reads the marker document for the given contract space, or returns
+ * `null` if no marker has been written for that space yet. The marker doc
+ * is keyed by `_id: <space>` so each loaded contract space owns one row
+ * — see ADR 212 for the per-space mechanism this enables.
+ */
+export async function readMarker(db: Db, space: string): Promise<ContractMarkerRecord | null> {
+  const cmd = new RawAggregateCommand(COLLECTION, [{ $match: { _id: space } }, { $limit: 1 }]);
   const docs = await executeAggregate(db, cmd);
   const doc = docs[0];
   if (!doc) return null;
@@ -80,6 +93,7 @@ export async function readMarker(db: Db): Promise<ContractMarkerRecord | null> {
 
 export async function initMarker(
   db: Db,
+  space: string,
   destination: {
     readonly storageHash: string;
     readonly profileHash: string;
@@ -87,7 +101,8 @@ export async function initMarker(
   },
 ): Promise<void> {
   const cmd = new RawInsertOneCommand(COLLECTION, {
-    _id: MARKER_ID,
+    _id: space,
+    space,
     storageHash: destination.storageHash,
     profileHash: destination.profileHash,
     contractJson: null,
@@ -101,7 +116,8 @@ export async function initMarker(
 }
 
 /**
- * Updates the marker doc atomically (CAS on `expectedFrom`).
+ * Updates the marker doc for the given space atomically (CAS on
+ * `expectedFrom`).
  *
  * `destination.invariants`:
  * - `undefined` → existing field left untouched.
@@ -111,6 +127,7 @@ export async function initMarker(
  */
 export async function updateMarker(
   db: Db,
+  space: string,
   expectedFrom: string,
   destination: {
     readonly storageHash: string;
@@ -145,7 +162,7 @@ export async function updateMarker(
         ];
   const cmd = new RawFindOneAndUpdateCommand(
     COLLECTION,
-    { _id: MARKER_ID, storageHash: expectedFrom },
+    { _id: space, storageHash: expectedFrom },
     update,
     false,
   );
@@ -153,12 +170,24 @@ export async function updateMarker(
   return result !== null;
 }
 
+/**
+ * Appends a ledger entry for the given space. Ledger entries co-exist
+ * with marker docs in the same collection; marker docs use `_id: <space>`
+ * (string), ledger entries use `type: 'ledger'` plus a driver-generated
+ * ObjectId. Reads partition the two by filter shape.
+ *
+ * The same `edgeId` may legitimately recur across different spaces (e.g.
+ * a synthetic ∅→head edge on first apply), so the ledger key is
+ * `(space, edgeId)` — the doc carries `space` for partitioned reads.
+ */
 export async function writeLedgerEntry(
   db: Db,
+  space: string,
   entry: { readonly edgeId: string; readonly from: string; readonly to: string },
 ): Promise<void> {
   const cmd = new RawInsertOneCommand(COLLECTION, {
     type: 'ledger',
+    space,
     edgeId: entry.edgeId,
     from: entry.from,
     to: entry.to,

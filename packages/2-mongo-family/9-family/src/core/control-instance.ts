@@ -99,7 +99,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     }
 
     const db = extractDb(driver);
-    const marker = await readMarker(db);
+    const marker = await readMarker(db, APP_SPACE_ID);
 
     if (!marker) {
       return buildVerifyResult({
@@ -202,14 +202,14 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
 
     const db = extractDb(driver);
 
-    const existingMarker = await readMarker(db);
+    const existingMarker = await readMarker(db, APP_SPACE_ID);
 
     let markerCreated = false;
     let markerUpdated = false;
     let previousHashes: { storageHash?: string; profileHash?: string } | undefined;
 
     if (!existingMarker) {
-      await initMarker(db, {
+      await initMarker(db, APP_SPACE_ID, {
         storageHash: contractStorageHash,
         profileHash: contractProfileHash,
       });
@@ -223,7 +223,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
           storageHash: existingMarker.storageHash,
           profileHash: existingMarker.profileHash,
         };
-        const updated = await updateMarker(db, existingMarker.storageHash, {
+        const updated = await updateMarker(db, APP_SPACE_ID, existingMarker.storageHash, {
           storageHash: contractStorageHash,
           profileHash: contractProfileHash,
         });
@@ -281,7 +281,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
       );
     }
     const db = extractDb(options.driver);
-    return readMarker(db);
+    return readMarker(db, options.space);
   }
 
   // Mongo does not yet participate in the per-space mechanism — the

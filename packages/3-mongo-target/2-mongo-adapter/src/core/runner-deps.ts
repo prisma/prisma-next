@@ -38,10 +38,10 @@ export function createMongoRunnerDeps(
     adapter: createMongoAdapter(),
     driver,
     markerOps: {
-      readMarker: () => readMarker(db),
-      initMarker: (dest) => initMarker(db, dest),
-      updateMarker: (expectedFrom, dest) => updateMarker(db, expectedFrom, dest),
-      writeLedgerEntry: (entry) => writeLedgerEntry(db, entry),
+      readMarker: (space) => readMarker(db, space),
+      initMarker: (space, dest) => initMarker(db, space, dest),
+      updateMarker: (space, expectedFrom, dest) => updateMarker(db, space, expectedFrom, dest),
+      writeLedgerEntry: (space, entry) => writeLedgerEntry(db, space, entry),
     },
     introspectSchema: () => family.introspect({ driver: controlDriver }),
   };

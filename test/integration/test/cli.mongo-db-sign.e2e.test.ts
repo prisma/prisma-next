@@ -139,7 +139,7 @@ describe('mongo db sign command (e2e)', { timeout: timeouts.spinUpMongoMemorySer
         marker: { created: true, updated: false },
       });
 
-      const marker = await readMarker(db);
+      const marker = await readMarker(db, 'app');
       expect(marker).not.toBeNull();
       expect(marker!.storageHash).toBe(testContract.storage.storageHash);
     });
@@ -235,7 +235,7 @@ describe('mongo db sign command (e2e)', { timeout: timeouts.spinUpMongoMemorySer
         marker: { created: false, updated: true },
       });
 
-      const marker = await readMarker(db);
+      const marker = await readMarker(db, 'app');
       expect(marker!.storageHash).toBe(updatedContract.storage.storageHash);
     });
   });

@@ -99,7 +99,7 @@ describe(
       });
 
       it('returns ok when marker matches', async () => {
-        await initMarker(db, {
+        await initMarker(db, 'app', {
           storageHash: baseContract.storage.storageHash,
           profileHash: baseContract.profileHash,
         });
@@ -117,7 +117,7 @@ describe(
       });
 
       it('returns PN-RUN-3002 when storage hash differs', async () => {
-        await initMarker(db, {
+        await initMarker(db, 'app', {
           storageHash: coreHash('sha256:old-hash'),
           profileHash: baseContract.profileHash,
         });
@@ -135,7 +135,7 @@ describe(
       });
 
       it('returns PN-RUN-3002 when profile hash differs', async () => {
-        await initMarker(db, {
+        await initMarker(db, 'app', {
           storageHash: baseContract.storage.storageHash,
           profileHash: profileHash('sha256:old-profile'),
         });
@@ -307,7 +307,7 @@ describe(
         // Sign re-anchors the marker hashes; it must not clobber the
         // applied-invariants set. `updateMarker` called without
         // `invariants` leaves the field untouched.
-        await initMarker(db, {
+        await initMarker(db, 'app', {
           storageHash: baseContract.storage.storageHash,
           profileHash: baseContract.profileHash,
           invariants: ['email-verified', 'phone-backfill'],
@@ -331,7 +331,7 @@ describe(
 
         const markerDoc = await db
           .collection<{ invariants?: readonly string[] }>('_prisma_migrations')
-          .findOne({ _id: 'marker' as unknown as never });
+          .findOne({ _id: 'app' as unknown as never });
         expect(markerDoc?.invariants).toEqual(['email-verified', 'phone-backfill']);
       });
     });
