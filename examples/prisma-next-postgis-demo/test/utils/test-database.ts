@@ -57,7 +57,13 @@ function createPostgisControlClient(connection: string): ControlClient {
 
 /**
  * Drop+recreate the public schema, then run `dbInit` to apply the contract
- * (which also re-creates the postgis extension dependency declaration).
+ * (which also installs the postgis extension via the descriptor-bundled
+ * contract-space baseline).
+ *
+ * `dbInit` requires an on-disk `migrationsDir` so the per-space flow has a
+ * root to read user-owned migrations from. The demo ships no user
+ * migrations, so we point it at an empty temp directory; the postgis
+ * baseline reaches the planner through the bundled extension descriptor.
  */
 export async function resetTestDatabase(contract: unknown): Promise<void> {
   const client = new pg.Client({ connectionString: TEST_DATABASE_URL });
@@ -70,9 +76,10 @@ export async function resetTestDatabase(contract: unknown): Promise<void> {
     await client.end();
   }
 
+  const migrationsDir = mkdtempSync(join(tmpdir(), 'postgis-demo-test-migrations-'));
   const controlClient = createPostgisControlClient(TEST_DATABASE_URL);
   try {
-    const result = await controlClient.dbInit({ contract, mode: 'apply' });
+    const result = await controlClient.dbInit({ contract, mode: 'apply', migrationsDir });
     if (!result.ok) {
       throw new Error(
         `dbInit failed: ${result.failure.summary}\n\n${JSON.stringify(result.failure, null, 2)}`,
@@ -80,6 +87,7 @@ export async function resetTestDatabase(contract: unknown): Promise<void> {
     }
   } finally {
     await controlClient.close();
+    rmSync(migrationsDir, { recursive: true, force: true });
   }
 }
 
