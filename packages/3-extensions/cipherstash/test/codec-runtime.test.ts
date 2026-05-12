@@ -13,22 +13,34 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CIPHERSTASH_STRING_CODEC_ID,
   createCipherstashBigIntCodec,
+  createCipherstashBooleanCodec,
+  createCipherstashDateCodec,
   createCipherstashDoubleCodec,
+  createCipherstashJsonCodec,
   createCipherstashStringCodec,
 } from '../src/execution/codec-runtime';
 import { EncryptedString, setHandleCiphertext } from '../src/execution/envelope';
 import { EncryptedBigInt } from '../src/execution/envelope-bigint';
+import { EncryptedBoolean } from '../src/execution/envelope-boolean';
+import { EncryptedDate } from '../src/execution/envelope-date';
 import { EncryptedDouble } from '../src/execution/envelope-double';
+import { EncryptedJson } from '../src/execution/envelope-json';
 import {
   createParameterizedCodecDescriptors,
   encryptedBigIntParamsSchema,
+  encryptedBooleanParamsSchema,
+  encryptedDateParamsSchema,
   encryptedDoubleParamsSchema,
+  encryptedJsonParamsSchema,
   encryptedStringParamsSchema,
 } from '../src/execution/parameterized';
 import type { CipherstashSdk } from '../src/execution/sdk';
 import {
   CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_DATE_CODEC_ID,
   CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_JSON_CODEC_ID,
 } from '../src/extension-metadata/constants';
 
 function emptySdk(): CipherstashSdk {
@@ -176,17 +188,18 @@ describe('eql_v2_encrypted wire-format round-trip — wire-format fix', () => {
 });
 
 describe('createParameterizedCodecDescriptors', () => {
-  // R3 wires three descriptors (string + double + bigint). R4 will
-  // grow this to six (adds date / boolean / json). The full-six
-  // assertion (AC-CODEC2) lands with R4; for now we pin the
-  // current-state count + ordering so a missed wiring surfaces here.
-  it('exposes the cipherstash/{string,double,bigint}@1 descriptors in stable order', () => {
+  // R4 wires the full six-descriptor surface — string + double +
+  // bigint + date + boolean + json — pinning AC-CODEC2.
+  it('exposes the cipherstash/{string,double,bigint,date,boolean,json}@1 descriptors in stable order', () => {
     const descriptors = createParameterizedCodecDescriptors(emptySdk());
-    expect(descriptors).toHaveLength(3);
+    expect(descriptors).toHaveLength(6);
     expect(descriptors.map((d) => d.codecId)).toEqual([
       CIPHERSTASH_STRING_CODEC_ID,
       CIPHERSTASH_DOUBLE_CODEC_ID,
       CIPHERSTASH_BIGINT_CODEC_ID,
+      CIPHERSTASH_DATE_CODEC_ID,
+      CIPHERSTASH_BOOLEAN_CODEC_ID,
+      CIPHERSTASH_JSON_CODEC_ID,
     ]);
     for (const descriptor of descriptors) {
       expect(descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
@@ -197,8 +210,14 @@ describe('createParameterizedCodecDescriptors', () => {
   });
 
   it('renderOutputType returns the per-codec envelope class name', () => {
-    const [stringDescriptor, doubleDescriptor, bigIntDescriptor] =
-      createParameterizedCodecDescriptors(emptySdk());
+    const [
+      stringDescriptor,
+      doubleDescriptor,
+      bigIntDescriptor,
+      dateDescriptor,
+      booleanDescriptor,
+      jsonDescriptor,
+    ] = createParameterizedCodecDescriptors(emptySdk());
     expect(stringDescriptor?.renderOutputType?.({ equality: true, freeTextSearch: true })).toBe(
       'EncryptedString',
     );
@@ -208,6 +227,11 @@ describe('createParameterizedCodecDescriptors', () => {
     expect(bigIntDescriptor?.renderOutputType?.({ equality: true, orderAndRange: true })).toBe(
       'EncryptedBigInt',
     );
+    expect(dateDescriptor?.renderOutputType?.({ equality: true, orderAndRange: true })).toBe(
+      'EncryptedDate',
+    );
+    expect(booleanDescriptor?.renderOutputType?.({ equality: true })).toBe('EncryptedBoolean');
+    expect(jsonDescriptor?.renderOutputType?.({ searchableJson: true })).toBe('EncryptedJson');
   });
 
   it('paramsSchema accepts { equality, freeTextSearch } booleans via Standard Schema', () => {
@@ -299,5 +323,101 @@ describe('createCipherstashBigIntCodec — registration shape', () => {
     const decoded = await codec.decode(wire as string, ctxWithColumn('ledger', 'amount'));
     expect(decoded).toBeInstanceOf(EncryptedBigInt);
     expect(decoded.expose().ciphertext).toEqual(payload);
+  });
+});
+
+describe('createCipherstashDateCodec — registration shape + round-trip', () => {
+  it('uses cipherstash/date@1 as the codec id and targets eql_v2_encrypted', () => {
+    const codec = createCipherstashDateCodec(emptySdk());
+    expect(codec.id).toBe(CIPHERSTASH_DATE_CODEC_ID);
+    expect(codec.descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
+    expect(codec.descriptor.traits).toEqual([]);
+    expect(codec.descriptor.renderOutputType?.({})).toBe('EncryptedDate');
+  });
+
+  it('encode → decode round-trip preserves the ciphertext', async () => {
+    const sdk = emptySdk();
+    const codec = createCipherstashDateCodec(sdk);
+    const payload = { c: 'date-cipher', i: { t: 'event', c: 'occurred_on' } };
+    const envelope = EncryptedDate.from(new Date('2024-01-01'));
+    setHandleCiphertext(envelope, payload);
+    const wire = await codec.encode(envelope, ctxWithoutColumn);
+    const decoded = await codec.decode(wire as string, ctxWithColumn('event', 'occurred_on'));
+    expect(decoded).toBeInstanceOf(EncryptedDate);
+    expect(decoded.expose().ciphertext).toEqual(payload);
+  });
+});
+
+describe('createCipherstashBooleanCodec — registration shape + round-trip', () => {
+  it('uses cipherstash/boolean@1 as the codec id and targets eql_v2_encrypted', () => {
+    const codec = createCipherstashBooleanCodec(emptySdk());
+    expect(codec.id).toBe(CIPHERSTASH_BOOLEAN_CODEC_ID);
+    expect(codec.descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
+    expect(codec.descriptor.traits).toEqual([]);
+    expect(codec.descriptor.renderOutputType?.({})).toBe('EncryptedBoolean');
+  });
+
+  it('encode → decode round-trip preserves the ciphertext', async () => {
+    const sdk = emptySdk();
+    const codec = createCipherstashBooleanCodec(sdk);
+    const payload = { c: 'bool-cipher', i: { t: 'feature', c: 'enabled' } };
+    const envelope = EncryptedBoolean.from(true);
+    setHandleCiphertext(envelope, payload);
+    const wire = await codec.encode(envelope, ctxWithoutColumn);
+    const decoded = await codec.decode(wire as string, ctxWithColumn('feature', 'enabled'));
+    expect(decoded).toBeInstanceOf(EncryptedBoolean);
+    expect(decoded.expose().ciphertext).toEqual(payload);
+  });
+});
+
+describe('createCipherstashJsonCodec — registration shape + round-trip', () => {
+  it('uses cipherstash/json@1 as the codec id and targets eql_v2_encrypted', () => {
+    const codec = createCipherstashJsonCodec(emptySdk());
+    expect(codec.id).toBe(CIPHERSTASH_JSON_CODEC_ID);
+    expect(codec.descriptor.targetTypes).toEqual(['eql_v2_encrypted']);
+    expect(codec.descriptor.traits).toEqual([]);
+    expect(codec.descriptor.renderOutputType?.({})).toBe('EncryptedJson');
+  });
+
+  it('encode → decode round-trip preserves the ciphertext for arbitrary JSON', async () => {
+    const sdk = emptySdk();
+    const codec = createCipherstashJsonCodec(sdk);
+    const payload = { c: 'json-cipher', i: { t: 'audit', c: 'payload' } };
+    const envelope = EncryptedJson.from({ event: 'login', userId: 42 });
+    setHandleCiphertext(envelope, payload);
+    const wire = await codec.encode(envelope, ctxWithoutColumn);
+    const decoded = await codec.decode(wire as string, ctxWithColumn('audit', 'payload'));
+    expect(decoded).toBeInstanceOf(EncryptedJson);
+    expect(decoded.expose().ciphertext).toEqual(payload);
+  });
+});
+
+describe('paramsSchemas for date / boolean / json', () => {
+  it('encryptedDateParamsSchema accepts { equality, orderAndRange } booleans', () => {
+    const ok = encryptedDateParamsSchema['~standard'].validate({
+      equality: true,
+      orderAndRange: false,
+    });
+    if (ok instanceof Promise) throw new Error('expected synchronous validation');
+    if (ok.issues) throw new Error(`expected success, got: ${JSON.stringify(ok.issues)}`);
+    expect(ok.value).toEqual({ equality: true, orderAndRange: false });
+  });
+
+  it('encryptedBooleanParamsSchema accepts { equality } and rejects extras of wrong type', () => {
+    const ok = encryptedBooleanParamsSchema['~standard'].validate({ equality: true });
+    if (ok instanceof Promise) throw new Error('expected synchronous validation');
+    if (ok.issues) throw new Error(`expected success, got: ${JSON.stringify(ok.issues)}`);
+    expect(ok.value).toEqual({ equality: true });
+
+    const bad = encryptedBooleanParamsSchema['~standard'].validate({ equality: 'yes' });
+    if (bad instanceof Promise) throw new Error('expected synchronous validation');
+    expect(bad.issues?.length).toBeGreaterThan(0);
+  });
+
+  it('encryptedJsonParamsSchema accepts { searchableJson } booleans', () => {
+    const ok = encryptedJsonParamsSchema['~standard'].validate({ searchableJson: false });
+    if (ok instanceof Promise) throw new Error('expected synchronous validation');
+    if (ok.issues) throw new Error(`expected success, got: ${JSON.stringify(ok.issues)}`);
+    expect(ok.value).toEqual({ searchableJson: false });
   });
 });

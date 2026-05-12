@@ -386,3 +386,114 @@ describe('PSL interpretation: cipherstash.EncryptedBigInt constructor', () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe('PSL interpretation: cipherstash.EncryptedDate constructor', () => {
+  it('lowers full args to a column with cipherstash/date@1 codec, eql_v2_encrypted nativeType', () => {
+    const result = interpret(`model Event {
+  id Int @id
+  occurredOn cipherstash.EncryptedDate({ equality: true, orderAndRange: true })
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['event']?.columns['occurredOn']).toMatchObject({
+      codecId: 'cipherstash/date@1',
+      nativeType: 'eql_v2_encrypted',
+      typeParams: { equality: true, orderAndRange: true },
+    });
+  });
+
+  it('defaults both flags to true with no arguments', () => {
+    const result = interpret(`model Event {
+  id Int @id
+  occurredOn cipherstash.EncryptedDate()
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['event']?.columns['occurredOn']).toMatchObject({
+      codecId: 'cipherstash/date@1',
+      typeParams: { equality: true, orderAndRange: true },
+    });
+  });
+});
+
+describe('PSL interpretation: cipherstash.EncryptedBoolean constructor', () => {
+  it('lowers full args to a column with cipherstash/boolean@1 codec, equality typeParam', () => {
+    const result = interpret(`model Feature {
+  id Int @id
+  enabled cipherstash.EncryptedBoolean({ equality: true })
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['feature']?.columns['enabled']).toMatchObject({
+      codecId: 'cipherstash/boolean@1',
+      nativeType: 'eql_v2_encrypted',
+      typeParams: { equality: true },
+    });
+  });
+
+  it('defaults equality to true with no arguments', () => {
+    const result = interpret(`model Feature {
+  id Int @id
+  enabled cipherstash.EncryptedBoolean()
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['feature']?.columns['enabled']).toMatchObject({
+      codecId: 'cipherstash/boolean@1',
+      typeParams: { equality: true },
+    });
+  });
+
+  it('rejects orderAndRange (not a boolean codec flag)', () => {
+    const result = interpret(`model Feature {
+  id Int @id
+  enabled cipherstash.EncryptedBoolean({ orderAndRange: true })
+}
+`);
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe('PSL interpretation: cipherstash.EncryptedJson constructor', () => {
+  it('lowers full args to a column with cipherstash/json@1 codec, searchableJson typeParam', () => {
+    const result = interpret(`model Audit {
+  id Int @id
+  payload cipherstash.EncryptedJson({ searchableJson: true })
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['audit']?.columns['payload']).toMatchObject({
+      codecId: 'cipherstash/json@1',
+      nativeType: 'eql_v2_encrypted',
+      typeParams: { searchableJson: true },
+    });
+  });
+
+  it('defaults searchableJson to true with no arguments', () => {
+    const result = interpret(`model Audit {
+  id Int @id
+  payload cipherstash.EncryptedJson()
+}
+`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(asStorage(result.value.storage).tables['audit']?.columns['payload']).toMatchObject({
+      codecId: 'cipherstash/json@1',
+      typeParams: { searchableJson: true },
+    });
+  });
+
+  it('rejects equality (not a json codec flag)', () => {
+    const result = interpret(`model Audit {
+  id Int @id
+  payload cipherstash.EncryptedJson({ equality: true })
+}
+`);
+    expect(result.ok).toBe(false);
+  });
+});

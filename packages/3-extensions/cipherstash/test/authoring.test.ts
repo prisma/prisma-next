@@ -142,4 +142,86 @@ describe('cipherstash pack authoring contributions', () => {
       });
     });
   });
+
+  describe('cipherstash.EncryptedDate', () => {
+    it('exposes EncryptedDate as a namespaced type constructor', () => {
+      expect(cipherstashPack.authoring?.type).toMatchObject({
+        cipherstash: { EncryptedDate: { kind: 'typeConstructor' } },
+      });
+    });
+
+    it('lowers to ColumnTypeDescriptor with codecId cipherstash/date@1, defaulting both flags to true', () => {
+      expect(cipherstashAuthoringTypes.cipherstash.EncryptedDate.output).toMatchObject({
+        codecId: 'cipherstash/date@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: {
+          equality: { kind: 'arg', index: 0, path: ['equality'], default: true },
+          orderAndRange: { kind: 'arg', index: 0, path: ['orderAndRange'], default: true },
+        },
+      });
+    });
+
+    it('registers the cipherstash/date@1 storage type', () => {
+      expect(cipherstashPack.types?.storage).toContainEqual({
+        typeId: 'cipherstash/date@1',
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: 'eql_v2_encrypted',
+      });
+    });
+  });
+
+  describe('cipherstash.EncryptedBoolean', () => {
+    it('exposes EncryptedBoolean as a namespaced type constructor', () => {
+      expect(cipherstashPack.authoring?.type).toMatchObject({
+        cipherstash: { EncryptedBoolean: { kind: 'typeConstructor' } },
+      });
+    });
+
+    it('lowers to ColumnTypeDescriptor with codecId cipherstash/boolean@1, defaulting equality to true', () => {
+      expect(cipherstashAuthoringTypes.cipherstash.EncryptedBoolean.output).toMatchObject({
+        codecId: 'cipherstash/boolean@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: {
+          equality: { kind: 'arg', index: 0, path: ['equality'], default: true },
+        },
+      });
+    });
+
+    it('registers the cipherstash/boolean@1 storage type', () => {
+      expect(cipherstashPack.types?.storage).toContainEqual({
+        typeId: 'cipherstash/boolean@1',
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: 'eql_v2_encrypted',
+      });
+    });
+  });
+
+  describe('cipherstash.EncryptedJson', () => {
+    it('exposes EncryptedJson as a namespaced type constructor', () => {
+      expect(cipherstashPack.authoring?.type).toMatchObject({
+        cipherstash: { EncryptedJson: { kind: 'typeConstructor' } },
+      });
+    });
+
+    it('lowers to ColumnTypeDescriptor with codecId cipherstash/json@1, defaulting searchableJson to true', () => {
+      expect(cipherstashAuthoringTypes.cipherstash.EncryptedJson.output).toMatchObject({
+        codecId: 'cipherstash/json@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: {
+          searchableJson: { kind: 'arg', index: 0, path: ['searchableJson'], default: true },
+        },
+      });
+    });
+
+    it('registers the cipherstash/json@1 storage type', () => {
+      expect(cipherstashPack.types?.storage).toContainEqual({
+        typeId: 'cipherstash/json@1',
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: 'eql_v2_encrypted',
+      });
+    });
+  });
 });

@@ -33,7 +33,10 @@
 
 import {
   CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_DATE_CODEC_ID,
   CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_JSON_CODEC_ID,
   CIPHERSTASH_STRING_CODEC_ID,
 } from '../extension-metadata/constants';
 import { makeCipherstashCodecHooks } from './codec-hooks-factory';
@@ -69,5 +72,51 @@ export const cipherstashBigIntCodecHooks = makeCipherstashCodecHooks({
   castAs: 'big_int',
 });
 
+/**
+ * Codec lifecycle hooks for `cipherstash/date@1`. Calendar-date plaintext
+ * (no time component) — flag set mirrors the numeric codecs because EQL
+ * supports both equality (unique-index) and order/range (ORE-index)
+ * predicates over dates.
+ */
+export const cipherstashDateCodecHooks = makeCipherstashCodecHooks({
+  flagToIndex: {
+    equality: 'unique',
+    orderAndRange: 'ore',
+  },
+  castAs: 'date',
+});
+
+/**
+ * Codec lifecycle hooks for `cipherstash/boolean@1`. Booleans only
+ * support equality search (a 2-value domain has no meaningful range
+ * predicate), so the flag set collapses to `{ equality }`.
+ */
+export const cipherstashBooleanCodecHooks = makeCipherstashCodecHooks({
+  flagToIndex: {
+    equality: 'unique',
+  },
+  castAs: 'boolean',
+});
+
+/**
+ * Codec lifecycle hooks for `cipherstash/json@1`. EQL exposes structured
+ * JSON predicates through the `ste_vec` (Structured Encryption Vector)
+ * index family — a single flag (`searchableJson`) gates the entire
+ * suite of containment / path-extraction operators.
+ */
+export const cipherstashJsonCodecHooks = makeCipherstashCodecHooks({
+  flagToIndex: {
+    searchableJson: 'ste_vec',
+  },
+  castAs: 'jsonb',
+});
+
 /** Re-export the codec ids alongside the hooks so wiring sites import them together. */
-export { CIPHERSTASH_BIGINT_CODEC_ID, CIPHERSTASH_DOUBLE_CODEC_ID, CIPHERSTASH_STRING_CODEC_ID };
+export {
+  CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_DATE_CODEC_ID,
+  CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_JSON_CODEC_ID,
+  CIPHERSTASH_STRING_CODEC_ID,
+};

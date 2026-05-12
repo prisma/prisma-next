@@ -56,12 +56,18 @@ const CONTROL_FORBIDDEN = [
   'EncryptedString',
   'EncryptedDouble',
   'EncryptedBigInt',
+  'EncryptedDate',
+  'EncryptedBoolean',
+  'EncryptedJson',
   'setHandleCiphertext',
   'CipherstashSdk',
   'bulkEncryptMiddleware',
   'createCipherstashStringCodec',
   'createCipherstashDoubleCodec',
   'createCipherstashBigIntCodec',
+  'createCipherstashDateCodec',
+  'createCipherstashBooleanCodec',
+  'createCipherstashJsonCodec',
   'createCipherstashRuntimeDescriptor',
 ] as const;
 
@@ -80,6 +86,9 @@ const RUNTIME_FORBIDDEN = [
   'cipherstashStringCodecHooks',
   'cipherstashDoubleCodecHooks',
   'cipherstashBigIntCodecHooks',
+  'cipherstashDateCodecHooks',
+  'cipherstashBooleanCodecHooks',
+  'cipherstashJsonCodecHooks',
   'add_search_config',
   'remove_search_config',
 ] as const;

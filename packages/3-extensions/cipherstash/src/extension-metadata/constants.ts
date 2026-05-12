@@ -47,6 +47,27 @@ export const CIPHERSTASH_DOUBLE_CODEC_ID = 'cipherstash/double@1';
  */
 export const CIPHERSTASH_BIGINT_CODEC_ID = 'cipherstash/bigint@1';
 
+/**
+ * Codec id for the `cipherstash/date@1` codec — `Date` plaintext
+ * (calendar date) lowering to `eql_v2_encrypted` with EQL
+ * `cast_as = 'date'`. See spec D2.
+ */
+export const CIPHERSTASH_DATE_CODEC_ID = 'cipherstash/date@1';
+
+/**
+ * Codec id for the `cipherstash/boolean@1` codec — `boolean`
+ * plaintext lowering to `eql_v2_encrypted` with EQL
+ * `cast_as = 'boolean'`. See spec D2.
+ */
+export const CIPHERSTASH_BOOLEAN_CODEC_ID = 'cipherstash/boolean@1';
+
+/**
+ * Codec id for the `cipherstash/json@1` codec — JSON-serialisable
+ * `unknown` plaintext lowering to `eql_v2_encrypted` with EQL
+ * `cast_as = 'jsonb'`. See spec D2.
+ */
+export const CIPHERSTASH_JSON_CODEC_ID = 'cipherstash/json@1';
+
 /** Schema CipherStash installs its functions/operators/casts/types into. */
 export const EQL_V2_SCHEMA = 'eql_v2';
 

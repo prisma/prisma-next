@@ -43,13 +43,19 @@ import contractJson from '../contract.json' with { type: 'json' };
 import {
   CIPHERSTASH_BASELINE_MIGRATION_NAME,
   CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_DATE_CODEC_ID,
   CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_JSON_CODEC_ID,
   CIPHERSTASH_STRING_CODEC_ID,
 } from '../extension-metadata/constants';
 import { cipherstashPackMeta } from '../extension-metadata/descriptor-meta';
 import {
   cipherstashBigIntCodecHooks,
+  cipherstashBooleanCodecHooks,
+  cipherstashDateCodecHooks,
   cipherstashDoubleCodecHooks,
+  cipherstashJsonCodecHooks,
   cipherstashStringCodecHooks,
 } from '../migration/cipherstash-codec';
 
@@ -89,6 +95,9 @@ const cipherstashExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> 
         [CIPHERSTASH_STRING_CODEC_ID]: cipherstashStringCodecHooks,
         [CIPHERSTASH_DOUBLE_CODEC_ID]: cipherstashDoubleCodecHooks,
         [CIPHERSTASH_BIGINT_CODEC_ID]: cipherstashBigIntCodecHooks,
+        [CIPHERSTASH_DATE_CODEC_ID]: cipherstashDateCodecHooks,
+        [CIPHERSTASH_BOOLEAN_CODEC_ID]: cipherstashBooleanCodecHooks,
+        [CIPHERSTASH_JSON_CODEC_ID]: cipherstashJsonCodecHooks,
       },
     },
   },

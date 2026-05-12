@@ -26,7 +26,10 @@ import type { JsonValue } from '@prisma-next/contract/types';
 import { type AnyCodecDescriptor, CodecImpl } from '@prisma-next/framework-components/codec';
 import {
   CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_DATE_CODEC_ID,
   CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_JSON_CODEC_ID,
   CIPHERSTASH_STRING_CODEC_ID,
   EQL_V2_ENCRYPTED_TYPE,
 } from './constants';
@@ -99,4 +102,19 @@ export const cipherstashDoubleCodecMetadata = new CipherstashCodecMetadata(
 export const cipherstashBigIntCodecMetadata = new CipherstashCodecMetadata(
   makeMetadataDescriptor(CIPHERSTASH_BIGINT_CODEC_ID, 'EncryptedBigInt'),
   'EncryptedBigInt',
+);
+
+export const cipherstashDateCodecMetadata = new CipherstashCodecMetadata(
+  makeMetadataDescriptor(CIPHERSTASH_DATE_CODEC_ID, 'EncryptedDate'),
+  'EncryptedDate',
+);
+
+export const cipherstashBooleanCodecMetadata = new CipherstashCodecMetadata(
+  makeMetadataDescriptor(CIPHERSTASH_BOOLEAN_CODEC_ID, 'EncryptedBoolean'),
+  'EncryptedBoolean',
+);
+
+export const cipherstashJsonCodecMetadata = new CipherstashCodecMetadata(
+  makeMetadataDescriptor(CIPHERSTASH_JSON_CODEC_ID, 'EncryptedJson'),
+  'EncryptedJson',
 );

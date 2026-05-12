@@ -9,7 +9,14 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { encryptedBigInt, encryptedDouble, encryptedString } from '../src/exports/column-types';
+import {
+  encryptedBigInt,
+  encryptedBoolean,
+  encryptedDate,
+  encryptedDouble,
+  encryptedJson,
+  encryptedString,
+} from '../src/exports/column-types';
 
 describe('cipherstash column-types', () => {
   describe('encryptedString({...}) factory', () => {
@@ -126,6 +133,79 @@ describe('cipherstash column-types', () => {
         codecId: 'cipherstash/bigint@1',
         nativeType: 'eql_v2_encrypted',
         typeParams: { equality: false, orderAndRange: false },
+      });
+    });
+  });
+
+  describe('encryptedDate({...}) factory', () => {
+    it('produces a ColumnTypeDescriptor with cipherstash/date@1 codec id', () => {
+      expect(encryptedDate()).toMatchObject({
+        codecId: 'cipherstash/date@1',
+        nativeType: 'eql_v2_encrypted',
+      });
+    });
+
+    it('defaults both flags to true when called with no arguments', () => {
+      expect(encryptedDate()).toMatchObject({
+        typeParams: { equality: true, orderAndRange: true },
+      });
+    });
+
+    it('lets both flags be explicitly disabled', () => {
+      expect(encryptedDate({ equality: false, orderAndRange: false })).toEqual({
+        codecId: 'cipherstash/date@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: { equality: false, orderAndRange: false },
+      });
+    });
+  });
+
+  describe('encryptedBoolean({...}) factory', () => {
+    it('produces a ColumnTypeDescriptor with cipherstash/boolean@1 codec id', () => {
+      expect(encryptedBoolean()).toMatchObject({
+        codecId: 'cipherstash/boolean@1',
+        nativeType: 'eql_v2_encrypted',
+      });
+    });
+
+    it('defaults equality to true when called with no arguments', () => {
+      expect(encryptedBoolean()).toEqual({
+        codecId: 'cipherstash/boolean@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: { equality: true },
+      });
+    });
+
+    it('lets equality be explicitly disabled', () => {
+      expect(encryptedBoolean({ equality: false })).toEqual({
+        codecId: 'cipherstash/boolean@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: { equality: false },
+      });
+    });
+  });
+
+  describe('encryptedJson({...}) factory', () => {
+    it('produces a ColumnTypeDescriptor with cipherstash/json@1 codec id', () => {
+      expect(encryptedJson()).toMatchObject({
+        codecId: 'cipherstash/json@1',
+        nativeType: 'eql_v2_encrypted',
+      });
+    });
+
+    it('defaults searchableJson to true when called with no arguments', () => {
+      expect(encryptedJson()).toEqual({
+        codecId: 'cipherstash/json@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: { searchableJson: true },
+      });
+    });
+
+    it('lets searchableJson be explicitly disabled (storage-only encryption)', () => {
+      expect(encryptedJson({ searchableJson: false })).toEqual({
+        codecId: 'cipherstash/json@1',
+        nativeType: 'eql_v2_encrypted',
+        typeParams: { searchableJson: false },
       });
     });
   });

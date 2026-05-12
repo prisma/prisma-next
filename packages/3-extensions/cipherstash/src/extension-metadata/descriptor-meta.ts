@@ -24,13 +24,19 @@
 import { cipherstashAuthoringTypes } from '../contract-authoring';
 import {
   cipherstashBigIntCodecMetadata,
+  cipherstashBooleanCodecMetadata,
+  cipherstashDateCodecMetadata,
   cipherstashDoubleCodecMetadata,
+  cipherstashJsonCodecMetadata,
   cipherstashStringCodecMetadata,
 } from './codec-metadata';
 import {
   CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_DATE_CODEC_ID,
   CIPHERSTASH_DOUBLE_CODEC_ID,
   CIPHERSTASH_EXTENSION_VERSION,
+  CIPHERSTASH_JSON_CODEC_ID,
   CIPHERSTASH_SPACE_ID,
   CIPHERSTASH_STRING_CODEC_ID,
   EQL_V2_ENCRYPTED_TYPE,
@@ -53,6 +59,9 @@ export const cipherstashPackMeta = {
         cipherstashStringCodecMetadata,
         cipherstashDoubleCodecMetadata,
         cipherstashBigIntCodecMetadata,
+        cipherstashDateCodecMetadata,
+        cipherstashBooleanCodecMetadata,
+        cipherstashJsonCodecMetadata,
       ],
       // `renderOutputType` returns the bare envelope type name (e.g.
       // `EncryptedString`, `EncryptedDouble`) for parameterized
@@ -75,6 +84,21 @@ export const cipherstashPackMeta = {
           package: '@prisma-next/extension-cipherstash/runtime',
           named: 'EncryptedBigInt',
           alias: 'EncryptedBigInt',
+        },
+        {
+          package: '@prisma-next/extension-cipherstash/runtime',
+          named: 'EncryptedDate',
+          alias: 'EncryptedDate',
+        },
+        {
+          package: '@prisma-next/extension-cipherstash/runtime',
+          named: 'EncryptedBoolean',
+          alias: 'EncryptedBoolean',
+        },
+        {
+          package: '@prisma-next/extension-cipherstash/runtime',
+          named: 'EncryptedJson',
+          alias: 'EncryptedJson',
         },
       ],
     },
@@ -100,6 +124,24 @@ export const cipherstashPackMeta = {
       },
       {
         typeId: CIPHERSTASH_BIGINT_CODEC_ID,
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: EQL_V2_ENCRYPTED_TYPE,
+      },
+      {
+        typeId: CIPHERSTASH_DATE_CODEC_ID,
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: EQL_V2_ENCRYPTED_TYPE,
+      },
+      {
+        typeId: CIPHERSTASH_BOOLEAN_CODEC_ID,
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: EQL_V2_ENCRYPTED_TYPE,
+      },
+      {
+        typeId: CIPHERSTASH_JSON_CODEC_ID,
         familyId: 'sql',
         targetId: 'postgres',
         nativeType: EQL_V2_ENCRYPTED_TYPE,

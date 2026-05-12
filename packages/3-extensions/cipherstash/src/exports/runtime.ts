@@ -38,7 +38,10 @@ export {
   CIPHERSTASH_STRING_CODEC_ID,
   CipherstashCellCodec,
   createCipherstashBigIntCodec,
+  createCipherstashBooleanCodec,
+  createCipherstashDateCodec,
   createCipherstashDoubleCodec,
+  createCipherstashJsonCodec,
   createCipherstashStringCodec,
 } from '../execution/codec-runtime';
 export type { DecryptAllOptions } from '../execution/decrypt-all';
@@ -54,22 +57,46 @@ export type {
 } from '../execution/envelope-bigint';
 export { EncryptedBigInt } from '../execution/envelope-bigint';
 export type {
+  EncryptedBooleanFromInternalArgs,
+  EncryptedBooleanHandle,
+} from '../execution/envelope-boolean';
+export { EncryptedBoolean } from '../execution/envelope-boolean';
+export type {
+  EncryptedDateFromInternalArgs,
+  EncryptedDateHandle,
+} from '../execution/envelope-date';
+export { EncryptedDate } from '../execution/envelope-date';
+export type {
   EncryptedDoubleFromInternalArgs,
   EncryptedDoubleHandle,
 } from '../execution/envelope-double';
 export { EncryptedDouble } from '../execution/envelope-double';
 export type {
+  EncryptedJsonFromInternalArgs,
+  EncryptedJsonHandle,
+} from '../execution/envelope-json';
+export { EncryptedJson } from '../execution/envelope-json';
+export type {
   CipherstashAnyParams,
+  CipherstashBooleanParams,
+  CipherstashDateParams,
+  CipherstashJsonParams,
   CipherstashNumericParams,
   CipherstashStringParams,
 } from '../execution/parameterized';
 export {
   createParameterizedCodecDescriptors,
   encryptedBigIntParamsSchema,
+  encryptedBooleanParamsSchema,
+  encryptedDateParamsSchema,
   encryptedDoubleParamsSchema,
+  encryptedJsonParamsSchema,
   encryptedStringParamsSchema,
   renderEncryptedBigIntOutputType,
+  renderEncryptedBooleanOutputType,
+  renderEncryptedDateOutputType,
   renderEncryptedDoubleOutputType,
+  renderEncryptedJsonOutputType,
   renderEncryptedStringOutputType,
 } from '../execution/parameterized';
 export type {
@@ -81,7 +108,10 @@ export type {
 } from '../execution/sdk';
 export {
   CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_DATE_CODEC_ID,
   CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_JSON_CODEC_ID,
 } from '../extension-metadata/constants';
 
 export { CIPHERSTASH_EXTENSION_VERSION };

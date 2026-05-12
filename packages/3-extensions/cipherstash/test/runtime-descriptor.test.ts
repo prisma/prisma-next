@@ -43,16 +43,19 @@ describe('createCipherstashRuntimeDescriptor — descriptor shape', () => {
   });
 
   it('exposes the cipherstash codec descriptors under types.codecTypes.codecDescriptors', () => {
-    // R3 wires three (string + double + bigint); R4 will grow this to
-    // six. The current-state count + ordering is pinned here so a
-    // missed wiring surfaces during R3 → R4 instead of leaking
-    // through e2e.
+    // R4 wires the full six-codec surface (string + double + bigint +
+    // date + boolean + json). The current-state count + ordering is
+    // pinned here so a missed wiring surfaces in unit tests instead
+    // of leaking through e2e.
     const descriptor = createCipherstashRuntimeDescriptor({ sdk: emptySdk() });
     const codecDescriptors = descriptor.types?.codecTypes?.codecDescriptors ?? [];
-    expect(codecDescriptors).toHaveLength(3);
+    expect(codecDescriptors).toHaveLength(6);
     expect(codecDescriptors[0]?.codecId).toBe(CIPHERSTASH_STRING_CODEC_ID);
     expect(codecDescriptors[1]?.codecId).toBe('cipherstash/double@1');
     expect(codecDescriptors[2]?.codecId).toBe('cipherstash/bigint@1');
+    expect(codecDescriptors[3]?.codecId).toBe('cipherstash/date@1');
+    expect(codecDescriptors[4]?.codecId).toBe('cipherstash/boolean@1');
+    expect(codecDescriptors[5]?.codecId).toBe('cipherstash/json@1');
   });
 });
 
@@ -60,11 +63,14 @@ describe('createCipherstashRuntimeDescriptor — codecs()', () => {
   it('returns the parameterized codec descriptors in stable order', () => {
     const descriptor = createCipherstashRuntimeDescriptor({ sdk: emptySdk() });
     const codecs = descriptor.codecs?.() ?? [];
-    expect(codecs).toHaveLength(3);
+    expect(codecs).toHaveLength(6);
     expect(codecs.map((c) => c.codecId)).toEqual([
       CIPHERSTASH_STRING_CODEC_ID,
       'cipherstash/double@1',
       'cipherstash/bigint@1',
+      'cipherstash/date@1',
+      'cipherstash/boolean@1',
+      'cipherstash/json@1',
     ]);
     for (const c of codecs) {
       expect(c.targetTypes).toEqual(['eql_v2_encrypted']);

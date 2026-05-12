@@ -38,12 +38,18 @@ import { describe, expect, it } from 'vitest';
 import cipherstashExtensionDescriptor from '../src/exports/control';
 import {
   CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_DATE_CODEC_ID,
   CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_JSON_CODEC_ID,
   CIPHERSTASH_STRING_CODEC_ID,
 } from '../src/extension-metadata/constants';
 import {
   cipherstashBigIntCodecHooks,
+  cipherstashBooleanCodecHooks,
+  cipherstashDateCodecHooks,
   cipherstashDoubleCodecHooks,
+  cipherstashJsonCodecHooks,
   cipherstashStringCodecHooks,
 } from '../src/migration/cipherstash-codec';
 
@@ -334,6 +340,9 @@ describe('cipherstash descriptor wiring', () => {
     expect(hooks?.[CIPHERSTASH_STRING_CODEC_ID]).toBe(cipherstashStringCodecHooks);
     expect(hooks?.[CIPHERSTASH_DOUBLE_CODEC_ID]).toBe(cipherstashDoubleCodecHooks);
     expect(hooks?.[CIPHERSTASH_BIGINT_CODEC_ID]).toBe(cipherstashBigIntCodecHooks);
+    expect(hooks?.[CIPHERSTASH_DATE_CODEC_ID]).toBe(cipherstashDateCodecHooks);
+    expect(hooks?.[CIPHERSTASH_BOOLEAN_CODEC_ID]).toBe(cipherstashBooleanCodecHooks);
+    expect(hooks?.[CIPHERSTASH_JSON_CODEC_ID]).toBe(cipherstashJsonCodecHooks);
   });
 
   it('extractCodecControlHooks finds every cipherstash hook on the descriptor', () => {
@@ -343,6 +352,9 @@ describe('cipherstash descriptor wiring', () => {
     expect(map.get(CIPHERSTASH_STRING_CODEC_ID)).toBe(cipherstashStringCodecHooks);
     expect(map.get(CIPHERSTASH_DOUBLE_CODEC_ID)).toBe(cipherstashDoubleCodecHooks);
     expect(map.get(CIPHERSTASH_BIGINT_CODEC_ID)).toBe(cipherstashBigIntCodecHooks);
+    expect(map.get(CIPHERSTASH_DATE_CODEC_ID)).toBe(cipherstashDateCodecHooks);
+    expect(map.get(CIPHERSTASH_BOOLEAN_CODEC_ID)).toBe(cipherstashBooleanCodecHooks);
+    expect(map.get(CIPHERSTASH_JSON_CODEC_ID)).toBe(cipherstashJsonCodecHooks);
   });
 });
 
@@ -453,6 +465,108 @@ describe('cipherstashBigIntCodecHooks — cast_as=big_int', () => {
     expect(ops).toHaveLength(1);
     expect(ops[0]!.execute[0]!.sql).toContain(`'unique'`);
     expect(ops[0]!.execute[0]!.sql).toContain(`'big_int'`);
+  });
+});
+
+describe('cipherstashDateCodecHooks — cast_as=date', () => {
+  it("emits add_search_config(unique) with cast_as='date' when equality flips on", () => {
+    const ctxArg = {
+      tableName: TABLE,
+      fieldName: FIELD,
+      newField: {
+        codecId: CIPHERSTASH_DATE_CODEC_ID,
+        nativeType: 'eql_v2_encrypted',
+        nullable: false,
+        typeParams: { equality: true, orderAndRange: true },
+      } as StorageColumn,
+    };
+    const ops = cipherstashDateCodecHooks.onFieldEvent!('added', ctxArg).map(
+      (c) => c.toOp() as SqlMigrationPlanOperation<unknown>,
+    );
+    expect(ops).toHaveLength(2);
+    const sqls = ops.map((o) => o.execute[0]!.sql);
+    expect(sqls.some((s) => s.includes(`'unique'`))).toBe(true);
+    expect(sqls.some((s) => s.includes(`'ore'`))).toBe(true);
+    for (const s of sqls) expect(s).toContain(`'date'`);
+  });
+});
+
+describe('cipherstashBooleanCodecHooks — equality-only, cast_as=boolean', () => {
+  it('emits a single add_search_config(unique) with cast_as=boolean when equality flips on', () => {
+    const ctxArg = {
+      tableName: TABLE,
+      fieldName: FIELD,
+      newField: {
+        codecId: CIPHERSTASH_BOOLEAN_CODEC_ID,
+        nativeType: 'eql_v2_encrypted',
+        nullable: false,
+        typeParams: { equality: true },
+      } as StorageColumn,
+    };
+    const ops = cipherstashBooleanCodecHooks.onFieldEvent!('added', ctxArg).map(
+      (c) => c.toOp() as SqlMigrationPlanOperation<unknown>,
+    );
+    expect(ops).toHaveLength(1);
+    expect(ops[0]!.execute[0]!.sql).toContain(`'unique'`);
+    expect(ops[0]!.execute[0]!.sql).toContain(`'boolean'`);
+  });
+
+  it('does not emit ore ops — booleans have no orderAndRange flag', () => {
+    const ctxArg = {
+      tableName: TABLE,
+      fieldName: FIELD,
+      newField: {
+        codecId: CIPHERSTASH_BOOLEAN_CODEC_ID,
+        nativeType: 'eql_v2_encrypted',
+        nullable: false,
+        typeParams: { equality: true, orderAndRange: true },
+      } as StorageColumn,
+    };
+    const ops = cipherstashBooleanCodecHooks.onFieldEvent!('added', ctxArg).map(
+      (c) => c.toOp() as SqlMigrationPlanOperation<unknown>,
+    );
+    expect(ops).toHaveLength(1);
+    expect(ops[0]!.execute[0]!.sql).not.toContain(`'ore'`);
+  });
+});
+
+describe('cipherstashJsonCodecHooks — searchableJson → ste_vec, cast_as=jsonb', () => {
+  it('emits add_search_config(ste_vec) with cast_as=jsonb when searchableJson flips on', () => {
+    const ctxArg = {
+      tableName: TABLE,
+      fieldName: FIELD,
+      newField: {
+        codecId: CIPHERSTASH_JSON_CODEC_ID,
+        nativeType: 'eql_v2_encrypted',
+        nullable: false,
+        typeParams: { searchableJson: true },
+      } as StorageColumn,
+    };
+    const ops = cipherstashJsonCodecHooks.onFieldEvent!('added', ctxArg).map(
+      (c) => c.toOp() as SqlMigrationPlanOperation<unknown>,
+    );
+    expect(ops).toHaveLength(1);
+    expect(ops[0]!.execute[0]!.sql).toContain(`'ste_vec'`);
+    expect(ops[0]!.execute[0]!.sql).toContain(`'jsonb'`);
+  });
+
+  it('emits remove_search_config(ste_vec) on drop when searchableJson was previously enabled', () => {
+    const ctxArg = {
+      tableName: TABLE,
+      fieldName: FIELD,
+      priorField: {
+        codecId: CIPHERSTASH_JSON_CODEC_ID,
+        nativeType: 'eql_v2_encrypted',
+        nullable: false,
+        typeParams: { searchableJson: true },
+      } as StorageColumn,
+    };
+    const ops = cipherstashJsonCodecHooks.onFieldEvent!('dropped', ctxArg).map(
+      (c) => c.toOp() as SqlMigrationPlanOperation<unknown>,
+    );
+    expect(ops).toHaveLength(1);
+    expect(ops[0]!.execute[0]!.sql).toContain('eql_v2.remove_search_config');
+    expect(ops[0]!.execute[0]!.sql).toContain(`'ste_vec'`);
   });
 });
 

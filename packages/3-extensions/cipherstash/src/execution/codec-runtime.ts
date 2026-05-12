@@ -24,13 +24,19 @@
 
 import {
   CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_DATE_CODEC_ID,
   CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_JSON_CODEC_ID,
   CIPHERSTASH_STRING_CODEC_ID,
 } from '../extension-metadata/constants';
 import { CipherstashCellCodec, makeCipherstashCellCodec } from './cell-codec-factory';
 import { EncryptedString } from './envelope';
 import { EncryptedBigInt } from './envelope-bigint';
+import { EncryptedBoolean } from './envelope-boolean';
+import { EncryptedDate } from './envelope-date';
 import { EncryptedDouble } from './envelope-double';
+import { EncryptedJson } from './envelope-json';
 import type { CipherstashSdk } from './sdk';
 
 export { CIPHERSTASH_STRING_CODEC_ID };
@@ -65,6 +71,36 @@ export function createCipherstashBigIntCodec(
     codecId: CIPHERSTASH_BIGINT_CODEC_ID,
     typeName: 'EncryptedBigInt',
     fromInternal: EncryptedBigInt.fromInternal,
+  });
+}
+
+export function createCipherstashDateCodec(
+  sdk: CipherstashSdk,
+): CipherstashCellCodec<EncryptedDate> {
+  return makeCipherstashCellCodec(sdk, {
+    codecId: CIPHERSTASH_DATE_CODEC_ID,
+    typeName: 'EncryptedDate',
+    fromInternal: EncryptedDate.fromInternal,
+  });
+}
+
+export function createCipherstashBooleanCodec(
+  sdk: CipherstashSdk,
+): CipherstashCellCodec<EncryptedBoolean> {
+  return makeCipherstashCellCodec(sdk, {
+    codecId: CIPHERSTASH_BOOLEAN_CODEC_ID,
+    typeName: 'EncryptedBoolean',
+    fromInternal: EncryptedBoolean.fromInternal,
+  });
+}
+
+export function createCipherstashJsonCodec(
+  sdk: CipherstashSdk,
+): CipherstashCellCodec<EncryptedJson> {
+  return makeCipherstashCellCodec(sdk, {
+    codecId: CIPHERSTASH_JSON_CODEC_ID,
+    typeName: 'EncryptedJson',
+    fromInternal: EncryptedJson.fromInternal,
   });
 }
 
