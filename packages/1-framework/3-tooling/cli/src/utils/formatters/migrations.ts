@@ -7,9 +7,9 @@ import { createColorFormatter, formatDim, isVerbose } from './helpers';
 
 /**
  * Render a single statement of an `OperationPreview` for the human-readable
- * preview block. SQL statements get a trailing `;` if missing — matches the
- * legacy `string[]`-based renderer byte-for-byte (per spec OQ-4). Other
- * languages (`'mongodb-shell'`) render verbatim.
+ * preview block. SQL statements get a trailing `;` if missing so the rendered
+ * preview is byte-identical to the legacy `string[]`-based renderer for SQL
+ * targets. Other languages (`'mongodb-shell'`) render verbatim.
  */
 function renderPreviewStatement(text: string, language: string): string | undefined {
   const trimmed = text.trim();
@@ -22,9 +22,10 @@ function renderPreviewStatement(text: string, language: string): string | undefi
 
 /**
  * Choose the header label for a preview block. SQL-only previews keep the
- * legacy `DDL preview` label (preserves CLI byte-identity for SQL targets per
- * spec OQ-4); previews from any other family — or a mix that includes any
- * non-SQL language — use the family-agnostic `Operation preview` label.
+ * legacy `DDL preview` label so the rendered output is byte-identical to the
+ * pre-aggregate SQL CLI; previews from any other family — or a mix that
+ * includes any non-SQL language — use the family-agnostic `Operation preview`
+ * label.
  *
  * An empty `statements` array deliberately renders as `Operation preview`
  * rather than `DDL preview`: `Array.prototype.every` is vacuously true for
