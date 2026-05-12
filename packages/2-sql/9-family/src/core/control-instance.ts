@@ -258,7 +258,9 @@ function isSqlControlAdapter<TTargetId extends string>(
     'readMarker' in value &&
     typeof (value as { readMarker: unknown }).readMarker === 'function' &&
     'readAllMarkers' in value &&
-    typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function'
+    typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function' &&
+    'lower' in value &&
+    typeof (value as { lower: unknown }).lower === 'function'
   );
 }
 
