@@ -5,7 +5,11 @@ import type {
   DescriptorMigrationPackage,
   ExtensionPackInput,
 } from '../../src/utils/extension-pack-inputs';
-import { toDeclaredExtensions, toExtensionInputs } from '../../src/utils/extension-pack-inputs';
+import {
+  toDeclaredExtensions,
+  toDeclaredExtensionsFromRaw,
+  toExtensionInputs,
+} from '../../src/utils/extension-pack-inputs';
 
 const contractJsonA = { kind: 'sql-contract', tables: { a: {} } } as const;
 const contractJsonB = { kind: 'sql-contract', tables: { b: {} } } as const;
@@ -95,5 +99,46 @@ describe('toDeclaredExtensions', () => {
       },
     ];
     expect(toDeclaredExtensions(inputs)).toEqual([{ id: 'ext-with-space', targetId: 'postgres' }]);
+  });
+});
+
+describe('toDeclaredExtensionsFromRaw', () => {
+  it('skips packs whose contractSpace own-property value is explicitly undefined', () => {
+    const raw = { id: 'ext-undefined-space', targetId: 'postgres', contractSpace: undefined };
+    expect(toDeclaredExtensionsFromRaw([raw])).toEqual([]);
+  });
+
+  it('skips packs with no own contractSpace property', () => {
+    expect(toDeclaredExtensionsFromRaw([packWithoutSpace])).toEqual([]);
+  });
+
+  it('skips non-object entries (null and primitives)', () => {
+    expect(toDeclaredExtensionsFromRaw([null, 0, 'x'])).toEqual([]);
+  });
+
+  it('emits entries for data-property contractSpace declarations', () => {
+    expect(toDeclaredExtensionsFromRaw([packWithSpace])).toEqual([
+      { id: 'ext-with-space', targetId: 'postgres' },
+    ]);
+  });
+
+  it('includes packs whose contractSpace is a getter without invoking it', () => {
+    let invoked = false;
+    const pack = Object.defineProperty(
+      { id: 'ext-getter', targetId: 'postgres' },
+      'contractSpace',
+      {
+        get() {
+          invoked = true;
+          throw new Error('contractSpace getter must not be invoked');
+        },
+        enumerable: true,
+        configurable: true,
+      },
+    );
+    expect(toDeclaredExtensionsFromRaw([pack])).toEqual([
+      { id: 'ext-getter', targetId: 'postgres' },
+    ]);
+    expect(invoked).toBe(false);
   });
 });

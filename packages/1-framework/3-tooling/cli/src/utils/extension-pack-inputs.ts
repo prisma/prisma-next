@@ -129,15 +129,20 @@ export function toDeclaredExtensions(
 
 /**
  * Minimal aggregate-loader projection that extracts `id` + `targetId`
- * from raw extension pack descriptors **without reading any nested
- * `contractSpace` property**. Uses `Object.hasOwn(pack, 'contractSpace')`
- * to check presence — does not invoke the property accessor and does
- * not match prototype getters, so a descriptor that synthesises
- * `contractSpace` only on access (or inherits one via the prototype
- * chain) is correctly skipped here.
+ * from raw extension pack descriptors **without invoking any
+ * `contractSpace` accessor**. Inspects the own-property descriptor so
+ * that getter-backed `contractSpace` declarations are detected but
+ * never called.
  *
- * This variant must be used by `buildContractSpaceAggregate` so that the
- * aggregate path (including `db verify`) never reads
+ * Inclusion semantics match {@link toDeclaredExtensions}: a data
+ * property whose value is explicitly `undefined` is treated as "no
+ * contract-space declaration" and skipped, mirroring the
+ * `pack.contractSpace === undefined` check used on canonicalised
+ * inputs. Prototype-chain `contractSpace` properties (no own
+ * descriptor) are also skipped.
+ *
+ * This variant must be used by `buildContractSpaceAggregate` so that
+ * the aggregate path (including `db verify`) never reads
  * `contractSpace.contractJson` from extension descriptors — the loader
  * always reads the contract from on-disk artefacts instead.
  */
@@ -146,10 +151,12 @@ export function toDeclaredExtensionsFromRaw(
 ): readonly DeclaredExtensionEntry[] {
   const entries: DeclaredExtensionEntry[] = [];
   for (const raw of extensionPacks) {
-    if (typeof raw === 'object' && raw !== null && Object.hasOwn(raw, 'contractSpace')) {
-      const pack = raw as { readonly id: string; readonly targetId: string };
-      entries.push({ id: pack.id, targetId: pack.targetId });
-    }
+    if (typeof raw !== 'object' || raw === null) continue;
+    const descriptor = Object.getOwnPropertyDescriptor(raw, 'contractSpace');
+    if (descriptor === undefined) continue;
+    if ('value' in descriptor && descriptor.value === undefined) continue;
+    const pack = raw as { readonly id: string; readonly targetId: string };
+    entries.push({ id: pack.id, targetId: pack.targetId });
   }
   return entries;
 }
