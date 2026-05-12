@@ -5,14 +5,14 @@
  * query against a real DB, across all four `(target × authoring)` cells.
  * Asserts the contract one subsystem hands to the next at every seam.
  *
- * Initial state: this file lands "red-by-design". Each known seam bug
- * (TML-2461, TML-2486, TML-2487, TML-2314) is encoded as a `seamExpectation`
- * with `status: 'broken'`, so the test passes precisely *because* the bug
- * is still present. Each subsequent bug-fix commit in this PR flips one
- * status from `'broken'` to `'fixed'` alongside the implementation change,
- * proving the seam was the thing the test was actually watching.
- *
- * See `projects/init-journey-tests/spec.md` for the design.
+ * Each known seam bug (TML-2461, TML-2486, TML-2487, TML-2314) is expressed
+ * as a `seamExpectation` whose `status` records whether the seam is still
+ * `'broken'` or already `'fixed'`. While a seam is `'broken'` the test
+ * passes precisely *because* the bug is still present (the
+ * `whenBroken` assertion holds); when the fix lands, the maintainer flips
+ * the status to `'fixed'` and the `whenFixed` assertion takes over. This
+ * keeps the test honest as a regression backstop without forcing the
+ * journey to be temporarily disabled around an in-flight fix.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
