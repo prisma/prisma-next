@@ -1,12 +1,12 @@
 /**
  * Structural verification for the CipherStash extension descriptor.
  *
- * **On-disk-in-package authoring.** The descriptor's
+ * **Contract-space package layout.** The descriptor's
  * contract / migrations / head ref now flow through JSON-import
  * declarations from the package's emitted artefacts:
  *
  *   - `<package>/contract.json`
- *   - `<package>/migrations/cipherstash/<dirName>/{migration,ops}.json`
+ *   - `<package>/migrations/<dirName>/{migration,ops}.json`
  *   - `<package>/refs/head.json`
  *
  * These assertions lock down the wiring: the descriptor exposes
@@ -33,7 +33,7 @@ import {
 } from '../src/extension-metadata/constants';
 import { EQL_BUNDLE_SQL } from '../src/migration/eql-bundle';
 
-describe('cipherstash extension descriptor (on-disk-in-package authoring)', () => {
+describe('cipherstash extension descriptor (contract-space package layout)', () => {
   it('identifies as a SQL extension targeted at postgres', () => {
     expect(cipherstashExtensionDescriptor).toMatchObject({
       kind: 'extension',

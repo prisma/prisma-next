@@ -11,7 +11,7 @@ export const PARADEDB_EXTENSION_ID = 'paradedb' as const;
  * (`../exports/control`) all reference the same values without typos.
  *
  * The space identifier `'paradedb'` is what the framework writes to
- * `migrations/paradedb/` in the user's repo and what the marker table's
+ * `migrations/` in the user's repo and what the marker table's
  * `space` column carries for paradedb-owned rows.
  *
  * The `paradedb:*` invariantId namespace is locked here — once

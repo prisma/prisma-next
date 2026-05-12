@@ -1,11 +1,11 @@
 /**
  * Control-plane descriptor for the CipherStash extension.
  *
- * **On-disk-in-package authoring.** The extension's contract +
+ * **Contract-space package layout.** The extension's contract +
  * migrations are emitted by the same pipeline application authors use:
  *
- *   `prisma-next contract emit` → `<package>/src/contract/contract.{json,d.ts}`
- *   `prisma-next migration plan` → `<package>/migrations/cipherstash/<dir>/...`
+ *   `prisma-next contract emit` → `<package>/src/contract.{json,d.ts}`
+ *   `prisma-next migration plan` → `<package>/migrations/<dir>/...`
  *
  * The descriptor wires those JSON artefacts via JSON-import declarations
  * so they flow through the consuming application's module resolver
@@ -25,9 +25,7 @@
  *     for `searchable: true` `Encrypted<string>` columns.
  *
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
- *   (on-disk-in-package authoring convention).
- * @see packages/3-extensions/test-contract-space/src/exports/control.ts
- *   (reference model).
+ *   (contract-space package layout convention).
  */
 
 import type { Contract } from '@prisma-next/contract/types';
@@ -39,14 +37,14 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import baselineMetadata from '../../migrations/cipherstash/20260601T0000_install_eql_bundle/migration.json' with {
+import baselineMetadata from '../../migrations/20260601T0000_install_eql_bundle/migration.json' with {
   type: 'json',
 };
-import baselineOps from '../../migrations/cipherstash/20260601T0000_install_eql_bundle/ops.json' with {
+import baselineOps from '../../migrations/20260601T0000_install_eql_bundle/ops.json' with {
   type: 'json',
 };
-import headRef from '../../migrations/cipherstash/refs/head.json' with { type: 'json' };
-import contractJson from '../contract/contract.json' with { type: 'json' };
+import headRef from '../../migrations/refs/head.json' with { type: 'json' };
+import contractJson from '../contract.json' with { type: 'json' };
 import {
   CIPHERSTASH_BASELINE_MIGRATION_NAME,
   CIPHERSTASH_STRING_CODEC_ID,

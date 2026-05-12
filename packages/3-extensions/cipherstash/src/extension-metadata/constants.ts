@@ -9,7 +9,7 @@
  *     (once published, an invariantId cannot be renamed).
  *
  * The space identifier `'cipherstash'` is what the framework writes to
- * `migrations/cipherstash/` in the user's repo and what the marker table's
+ * the consuming app's `migrations/cipherstash/` directory and what the marker table's
  * `space` column carries for CipherStash-owned rows.
  */
 

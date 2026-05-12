@@ -1,13 +1,13 @@
 /**
  * Structural verification for the pgvector extension descriptor.
  *
- * **On-disk-in-package authoring.** The descriptor's
+ * **Contract-space package layout.** The descriptor's
  * contract / migrations / head ref now flow through JSON-import
  * declarations from the package's emitted artefacts:
  *
- *   - `<package>/contract.json`
- *   - `<package>/migrations/pgvector/<dirName>/{migration,ops}.json`
- *   - `<package>/refs/head.json`
+ *   - `<package>/src/contract.json`
+ *   - `<package>/migrations/<dirName>/{migration,ops}.json`
+ *   - `<package>/migrations/refs/head.json`
  *
  * These assertions lock down the wiring: the descriptor exposes
  * structurally correct values; the parameterised `vector` native type
@@ -33,7 +33,7 @@ import {
 } from '../src/core/contract-space-constants';
 import pgvectorExtensionDescriptor from '../src/exports/control';
 
-describe('pgvector extension descriptor (on-disk-in-package authoring)', () => {
+describe('pgvector extension descriptor (contract-space package layout)', () => {
   it('identifies as a SQL extension targeted at postgres', () => {
     expect(pgvectorExtensionDescriptor).toMatchObject({
       kind: 'extension',

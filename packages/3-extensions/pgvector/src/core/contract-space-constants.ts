@@ -6,7 +6,7 @@
  * (`../exports/control`) all reference the same values without typos.
  *
  * The space identifier `'pgvector'` is what the framework writes to
- * `migrations/pgvector/` in the user's repo and what the marker table's
+ * `migrations/` in the user's repo and what the marker table's
  * `space` column carries for pgvector-owned rows.
  *
  * The `pgvector:*` invariantId namespace is locked here — once

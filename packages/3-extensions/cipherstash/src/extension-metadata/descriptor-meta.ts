@@ -21,7 +21,7 @@
  * by the codec lifecycle hook block.
  */
 
-import { cipherstashAuthoringTypes } from '../contract/authoring';
+import { cipherstashAuthoringTypes } from '../contract-authoring';
 import { cipherstashStringCodecMetadata } from './codec-metadata';
 import {
   CIPHERSTASH_EXTENSION_VERSION,
