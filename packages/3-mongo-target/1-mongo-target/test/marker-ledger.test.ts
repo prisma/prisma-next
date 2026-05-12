@@ -1,7 +1,13 @@
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { initMarker, readMarker, updateMarker, writeLedgerEntry } from '../src/core/marker-ledger';
+import {
+  initMarker,
+  readAllMarkers,
+  readMarker,
+  updateMarker,
+  writeLedgerEntry,
+} from '../src/core/marker-ledger';
 
 const APP = 'app';
 const EXT = 'cipherstash';
@@ -523,5 +529,63 @@ describe('writeLedgerEntry', () => {
       .toArray();
     expect(entries).toHaveLength(2);
     expect(entries.map((e) => e['space'])).toEqual([APP, EXT]);
+  });
+});
+
+describe('readAllMarkers', () => {
+  it('returns an empty map when no marker docs exist', async () => {
+    const markers = await readAllMarkers(db);
+    expect(markers.size).toBe(0);
+  });
+
+  it('returns one entry per space, keyed by space id', async () => {
+    await initMarker(db, APP, { storageHash: 'sha256:app1', profileHash: 'sha256:p1' });
+    await initMarker(db, EXT, { storageHash: 'sha256:ext1', profileHash: 'sha256:p2' });
+
+    const markers = await readAllMarkers(db);
+    expect(markers.size).toBe(2);
+    expect(markers.get(APP)?.storageHash).toBe('sha256:app1');
+    expect(markers.get(EXT)?.storageHash).toBe('sha256:ext1');
+  });
+
+  it('excludes ledger entries (filter keys on string _id with a space field)', async () => {
+    await initMarker(db, APP, { storageHash: 'sha256:app1', profileHash: 'sha256:p1' });
+    await writeLedgerEntry(db, APP, { edgeId: 'edge-1', from: '', to: 'sha256:app1' });
+
+    const markers = await readAllMarkers(db);
+    expect(markers.size).toBe(1);
+    expect(markers.has(APP)).toBe(true);
+  });
+
+  it('skips legacy pre-port docs that lack a space field (left for the next app-space read to upgrade)', async () => {
+    await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
+      _id: 'marker',
+      storageHash: 'sha256:legacy',
+      profileHash: 'sha256:legacy',
+      updatedAt: new Date(),
+    });
+    await initMarker(db, EXT, { storageHash: 'sha256:ext1', profileHash: 'sha256:p2' });
+
+    const markers = await readAllMarkers(db);
+    expect(markers.size).toBe(1);
+    expect(markers.has(EXT)).toBe(true);
+    expect(markers.has('marker')).toBe(false);
+  });
+
+  it('a non-app `readMarker(space)` for a space id colliding with the legacy `_id: "marker"` returns null rather than parsing the legacy doc as that space', async () => {
+    // A hypothetical extension whose space id happens to be `'marker'`
+    // must not have its (still-unwritten) marker fabricated from a
+    // pre-port legacy doc. The next app-space read will upgrade or
+    // sweep the legacy doc; until then the colliding non-app read
+    // observes null and the caller treats the space as not-yet-applied.
+    await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
+      _id: 'marker',
+      storageHash: 'sha256:legacy',
+      profileHash: 'sha256:legacy',
+      updatedAt: new Date(),
+    });
+
+    const marker = await readMarker(db, 'marker');
+    expect(marker).toBeNull();
   });
 });

@@ -167,6 +167,7 @@ export async function readAllMarkers(db: Db): Promise<ReadonlyMap<string, Contra
   const out = new Map<string, ContractMarkerRecord>();
   for (const doc of docs) {
     const space = doc['space'];
+    /* v8 ignore next -- @preserve type-narrowing guard: the $match stage above filters on `space: { $type: 'string' }`, so this branch is unreachable at runtime. The check exists so the `out.set(space, ...)` call below can accept `string`. */
     if (typeof space !== 'string') continue;
     out.set(space, parseMongoMarkerDoc(doc));
   }
@@ -212,6 +213,7 @@ async function upgradeLegacyAppMarker(db: Db, legacy: Document): Promise<Contrac
   try {
     await markerCollection(db).insertOne(canonicalDoc);
   } catch (err) {
+    /* v8 ignore next -- @preserve genuine but-unreachable-in-tests defence: the only writes against this collection are marker / ledger inserts and updates managed by this module; the canonical id is owned by the upgrade write itself, so the only realistic `insertOne` failure here is a duplicate-key race with another upgrader. Other write errors (network blip mid-write, write-concern timeout, collection-level concurrent drop) are real but cannot be reproduced against `mongodb-memory-server` without mocking the driver — out of scope for a unit test. */
     if (!isDuplicateKeyError(err)) throw err;
     // Another connection inserted canonical first — fall through to
     // the sweep so the legacy doc is cleaned up regardless of which
