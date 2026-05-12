@@ -1,22 +1,6 @@
 import { CliStructuredError } from '../../utils/cli-errors';
 
 /**
- * No `package.json` / `deno.json` / `deno.jsonc` in the target directory.
- *
- * `init` cannot bootstrap a fresh project from a bare directory (NG1) — that
- * gap is tracked separately. The fix is for the user to run `npm init` (or
- * the equivalent for their package manager) first.
- */
-export function errorInitMissingManifest(): CliStructuredError {
-  return new CliStructuredError('5001', 'No project manifest found', {
-    domain: 'CLI',
-    why: 'No package.json or deno.json found in the target directory. `prisma-next init` requires an existing project to attach to.',
-    fix: 'Initialize your project first (e.g. `npm init -y` or `deno init`), then re-run `prisma-next init`.',
-    docsUrl: 'https://prisma-next.dev/docs/cli/init',
-  });
-}
-
-/**
  * Re-init in non-interactive mode without `--force`. Distinct from the
  * decline-the-prompt path (which is `errorInitUserAborted`) because here
  * the user was never given the choice — `--force` is the contract.
