@@ -58,6 +58,16 @@ export abstract class MongoContractSerializerBase<TContract>
       throw new Error(`Contract structural validation failed: ${parsed.summary}`);
     }
 
+    // arktype's `infer`d type for `MongoContractSchema` is structurally
+    // equivalent to `MongoContract` (both describe the same on-disk JSON
+    // envelope) but not nominally so: the arktype DSL produces a type whose
+    // optional/readonly profile, narrowed string-literal positions, and
+    // utility-type wrappings (`Type.infer`, `Out`, …) differ from the
+    // hand-authored `MongoContract<S, M>` generic surface that downstream
+    // consumers depend on. The schema and the type are kept in lockstep by
+    // the round-trip fixtures under `test/validate.test.ts`. The double
+    // cast is the documented escape hatch from arktype's nominal-output
+    // representation to the project's nominal-contract representation.
     const contract = parsed as unknown as MongoContract;
 
     validateContractDomain(contract);
