@@ -1,11 +1,10 @@
 /**
  * Behavioural tests for the `EncryptedDate` envelope.
  *
- * Pins AC-ENV3 / AC-ENV4 / AC-ENV5 for the `cipherstash/date@1`
- * codec, plus the per-type `parseDecryptedValue` narrowing path
- * mandated by spec D3 (the SDK returns `unknown`; the envelope
- * coerces ISO strings / numeric epoch ms / `Date` instances into
- * a single `Date` shape for the user).
+ * Pins the per-type `parseDecryptedValue` narrowing path for the
+ * `cipherstash/date@1` codec (the SDK returns `unknown`; the
+ * envelope coerces ISO strings / numeric epoch ms / `Date`
+ * instances into a single `Date` shape for the user).
  */
 
 import { inspect } from 'node:util';

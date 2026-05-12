@@ -29,12 +29,12 @@
  *   - an EQL-side overload that accepts plaintext paths and hashes
  *     them server-side.
  *
- * Both routes are out of scope for project-2 (operator-surface
- * widening) and tracked as a follow-up. The test below pins the
- * round-trip + decrypt behaviour (which works today) and the JSON
- * SELECT-expression helpers' availability; the predicate side is
- * marked as a known limitation with a `.skip` and a pointer to this
- * comment, so the regression status is visible at a glance.
+ * Both routes are tracked as a follow-up at
+ * https://linear.app/prisma-company/issue/TML-2504. The test below
+ * pins the round-trip + decrypt behaviour (which works today) and
+ * the JSON SELECT-expression helpers' availability; the predicate
+ * side is marked as a known limitation with a `.skip` and a pointer
+ * to this comment, so the regression status is visible at a glance.
  */
 
 import {

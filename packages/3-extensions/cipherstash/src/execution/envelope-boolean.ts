@@ -1,11 +1,11 @@
 /**
  * `EncryptedBoolean` envelope — the user-facing input/output type for
  * `cipherstash/boolean@1` columns. Concrete subclass of
- * {@link EncryptedEnvelopeBase} parameterised on `boolean` (per spec
- * D2; EQL `cast_as = 'boolean'`).
+ * {@link EncryptedEnvelopeBase} parameterised on `boolean` (EQL
+ * `cast_as = 'boolean'`).
  *
  * No `parseDecryptedValue` override is needed: the SDK's polymorphic
- * decrypt path returns `boolean` plaintexts unchanged per spec D1.
+ * decrypt path returns `boolean` plaintexts unchanged.
  */
 
 import {

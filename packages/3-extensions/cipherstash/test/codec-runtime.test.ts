@@ -197,8 +197,8 @@ describe('eql_v2_encrypted wire-format round-trip — wire-format fix', () => {
 });
 
 describe('createParameterizedCodecDescriptors', () => {
-  // R4 wires the full six-descriptor surface — string + double +
-  // bigint + date + boolean + json — pinning AC-CODEC2.
+  // Pins the full six-descriptor surface — string + double +
+  // bigint + date + boolean + json — in stable order.
   it('exposes the cipherstash/{string,double,bigint,date,boolean,json}@1 descriptors in stable order', () => {
     const descriptors = createParameterizedCodecDescriptors(emptySdk());
     expect(descriptors).toHaveLength(6);

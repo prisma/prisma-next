@@ -14,10 +14,10 @@
  * (one per encrypted column type) which all share the same
  * `eql_v2_encrypted` Postgres native type.
  *
- * Per-codec params shape (per spec FR6 — every flag defaults to `true`
- * because searchable encryption is the legitimate default for an
- * extension whose entire reason for existing is to make encrypted
- * columns queryable):
+ * Per-codec params shape (every flag defaults to `true` because
+ * searchable encryption is the legitimate default for an extension
+ * whose entire reason for existing is to make encrypted columns
+ * queryable):
  *
  * | Codec               | Params                              |
  * |---------------------|-------------------------------------|

@@ -112,7 +112,7 @@ export const contract = defineContract({
 
 PSL- and TS-authored contracts emit byte-identical `contract.json` for every codec — pinned by the parity fixtures at `test/integration/test/authoring/parity/cipherstash-encrypted-{string,double,bigint,date,boolean,json}/`.
 
-Per-codec search-mode flags default to `true` per [Project 2 spec FR6](#references). Opt out explicitly when you want storage-only encryption (`cipherstash.EncryptedString({ equality: false, freeTextSearch: false, orderAndRange: false })`) or to disable a single mode.
+Per-codec search-mode flags default to `true` — searchable encryption is the legitimate default for an extension whose entire reason for existing is to make encrypted columns queryable. Opt out explicitly when you want storage-only encryption (`cipherstash.EncryptedString({ equality: false, freeTextSearch: false, orderAndRange: false })`) or to disable a single mode.
 
 ## The operator surface
 

@@ -1,10 +1,10 @@
 /**
  * Behavioural tests for the `EncryptedDouble` envelope.
  *
- * Pins AC-ENV3 (subclass + `from` + `fromInternal` + decrypt round-trip),
- * AC-ENV4 (the four non-toJSON redaction overrides return `[REDACTED]`),
- * and AC-ENV5 (`JSON.stringify(envelope)` returns the per-type
- * placeholder shape `{ "$encryptedDouble": "<opaque>" }`).
+ * Pins the subclass surface (`from` + `fromInternal` + decrypt
+ * round-trip), the four non-`toJSON` redaction overrides (return
+ * `[REDACTED]`), and the `JSON.stringify(envelope)` placeholder
+ * shape `{ "$encryptedDouble": "<opaque>" }`.
  */
 
 import { inspect } from 'node:util';
@@ -71,8 +71,8 @@ describe('EncryptedDouble.fromInternal(...) — read-side round-trip', () => {
 });
 
 describe('EncryptedDouble — accidental-exposure overrides', () => {
-  // AC-ENV4: the four non-toJSON coercion paths return `[REDACTED]`.
-  // AC-ENV5: `toJSON` returns the per-type placeholder object.
+  // The four non-`toJSON` coercion paths return `[REDACTED]`;
+  // `toJSON` returns the per-type placeholder object.
   it('toString() returns [REDACTED] regardless of plaintext value', () => {
     expect(EncryptedDouble.from(42).toString()).toBe('[REDACTED]');
   });

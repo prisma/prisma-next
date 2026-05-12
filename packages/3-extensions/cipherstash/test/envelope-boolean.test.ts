@@ -1,8 +1,8 @@
 /**
  * Behavioural tests for the `EncryptedBoolean` envelope.
  *
- * Pins AC-ENV3 / AC-ENV4 / AC-ENV5 for the `cipherstash/boolean@1`
- * codec.
+ * Pins the subclass surface, redaction overrides, and `toJSON`
+ * placeholder shape for the `cipherstash/boolean@1` codec.
  */
 
 import { inspect } from 'node:util';

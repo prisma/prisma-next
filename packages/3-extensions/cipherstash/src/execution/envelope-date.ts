@@ -2,10 +2,10 @@
  * `EncryptedDate` envelope — the user-facing input/output type for
  * `cipherstash/date@1` columns. Concrete subclass of
  * {@link EncryptedEnvelopeBase} parameterised on `Date` (calendar
- * date per spec D2; EQL `cast_as = 'date'`).
+ * date; EQL `cast_as = 'date'`).
  *
  * Unlike the other envelopes, `EncryptedDate` is the one codec whose
- * `parseDecryptedValue` actually does runtime narrowing per spec D3:
+ * `parseDecryptedValue` actually does runtime narrowing:
  * the SDK's polymorphic `decrypt` returns `unknown`, and the EQL
  * surface accepts an ISO date string on encrypt
  * (`'2023-01-01'::date::text::jsonb` per the inline example in

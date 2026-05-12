@@ -1,109 +1,41 @@
-# Live PG + EQL + ZeroKMS e2e harness (scaffold)
+# Live PG + EQL + ZeroKMS e2e harness
 
-This directory will host the live-Postgres + EQL bundle + ZeroKMS
-end-to-end harness covering the seven `AC-E2E-*` acceptance criteria
-from the cipherstash-integration project-2 spec
-(`AC-E2E-NUM` / `BIGINT` / `DATE` / `BOOL` / `JSON` / `STR-RANGE` /
-`MIXED`).
+This directory hosts the live-Postgres + EQL bundle + ZeroKMS end-to-end harness for the cipherstash-integration example app. Seven `*.e2e.test.ts` files cover one acceptance criterion each:
 
-## Status
+- `ac-e2e-num.e2e.test.ts` — `EncryptedDouble` round-trip; `Gt`/`Gte`/`Lt`/`Lte`/`Between`/`Asc`/`Desc`.
+- `ac-e2e-bigint.e2e.test.ts` — `EncryptedBigInt` round-trip; equality + range + sort.
+- `ac-e2e-date.e2e.test.ts` — `EncryptedDate` round-trip; date range + sort.
+- `ac-e2e-bool.e2e.test.ts` — `EncryptedBoolean` round-trip; `Eq` / `Ne` / `InArray`.
+- `ac-e2e-json.e2e.test.ts` — `EncryptedJson` round-trip + `cipherstashJsonbPathQueryFirst` / `cipherstashJsonbGet` SELECT-expression helpers. The `cipherstashJsonbPathExists` predicate clause is skipped per the known limitation tracked at [TML-2504](https://linear.app/prisma-company/issue/TML-2504).
+- `ac-e2e-str-range.e2e.test.ts` — `EncryptedString({ orderAndRange: true })` supports `Gt` + `Asc` + `Ilike` coexistence.
+- `ac-e2e-mixed.e2e.test.ts` — mixed-codec query issues the minimum SDK round-trips (one per `(table, column)`).
 
-**Scaffolded; not yet executable end-to-end.**
+## Local setup
 
-The Docker-based Postgres + EQL bundle pieces below are in place and
-verified to apply cleanly. The actual test files are blocked on a
-runtime middleware lifecycle issue surfaced while wiring the harness
-— see "Blocker" below.
+```bash
+pnpm --filter cipherstash-integration-example test:e2e
+```
 
-## What's here
+The harness's Vitest global setup (`global-setup.ts`):
 
-- `docker-compose.yml` — single-service `postgres:16-alpine` on host
-  port `54329` (non-standard to dodge a developer's locally installed
-  Postgres on `5432`). `tmpfs` data volume so every boot starts from
-  an empty cluster. Container name `cipherstash-e2e-postgres` to
-  avoid colliding with the workspace-root `docker-compose.yaml`
-  (port `5433`, used by the framework's own e2e suite).
+1. `docker compose up -d` and waits for `pg_isready`.
+2. Sets `DATABASE_URL` to the harness's local Postgres URL.
+3. Runs `prisma-next migration apply` against the example app (installs the cipherstash baseline migration + the `users` table).
+4. Skips cleanly (logging the missing env var) when `CS_WORKSPACE_CRN` / `CS_CLIENT_ID` / `CS_CLIENT_KEY` / `CS_DEFAULT_KEY_ID` are unset, so PRs without secrets configured don't fail the suite.
 
-## What's verified
+`vitest.config.ts` wires the global setup, scopes the run to `*.e2e.test.ts`, and pins `pool: 'forks'` + `isolate: false` + `singleFork: true` so the SDK connection is memoised across files. Each test file truncates `users` in its `beforeAll` for clean-slate isolation.
 
-1. `docker compose up -d` with this file produces a reachable
-   Postgres 16 cluster (`pg_isready` passes within ~3 s).
-2. With `DATABASE_URL=postgres://cipherstash:cipherstash@localhost:54329/cipherstash_e2e`,
-   `prisma-next migration apply` against the example app applies
-   cleanly: the cipherstash baseline migration installs the EQL
-   bundle (eql-2.2.1) and the app migration creates `users`. The
-   `eql_v2_configuration` table ends up populated with active
-   search-config entries for every column.
-3. `docker compose down` tears the container down cleanly.
+## Container
 
-## Blocker (out of harness scope)
+The `docker-compose.yml` runs `postgres:16-alpine` on host port `54329` (non-standard to dodge a developer's locally installed Postgres on `5432`). `tmpfs` data volume so every boot starts from an empty cluster. Container name `cipherstash-e2e-postgres` avoids colliding with the workspace-root `docker-compose.yaml` (port `5433`, used by the framework's own e2e suite).
 
-Runtime middleware lifecycle ordering means the
-`bulkEncryptMiddleware.beforeExecute` hook runs **after** `lower()`
-has already encoded params, but the cipherstash codec's
-`encode(envelope)` reads `handle.ciphertext` which is filled in by
-that very middleware. Result: every write through the example app
-fails with
+## Known limitations covered by skips
 
-> Failed to encode parameter <X> with codec 'cipherstash/<codec>@1':
-> cipherstash codec: envelope has no ciphertext at encode time.
+- **`cipherstashJsonbPathExists` predicate clause.** The EQL bundle's `jsonb_path_exists` function expects a hashed STE-VEC selector computed client-side by the CipherStash SDK's `selector(...)` API; the framework currently binds the JSONpath as a plain `pg/text@1` `ParamRef`. Predicate queries return zero rows. Tracked at [TML-2504](https://linear.app/prisma-company/issue/TML-2504); the round-trip and the two SELECT-expression helpers work correctly against the same column.
+- **`EncryptedBigInt` capped at `Number.MAX_SAFE_INTEGER`.** `@cipherstash/stack`'s SDK and ZeroKMS only accept `JsPlaintext = string | number | boolean | object | array` for plaintexts (no `bigint`); the example app's SDK adapter at `src/sdk.ts` converts `bigint → Number` with an eager `Number.MAX_SAFE_INTEGER` bounds check. Values beyond the safe-integer range cannot be encrypted today.
 
-Reference points:
+## EQL bundle quoted-identifier workaround
 
-- `packages/2-sql/5-runtime/src/sql-runtime.ts` —
-  `executeAgainstQueryable` does
-  `runBeforeCompile -> lower(encode) -> runWithMiddleware(beforeExecute)`.
-- `packages/1-framework/1-core/framework-components/src/execution/run-with-middleware.ts`
-  — `beforeExecute` chain runs immediately before `runDriver()`,
-  after `lower()`.
-- `packages/3-extensions/cipherstash/src/middleware/bulk-encrypt.ts` —
-  middleware design assumes pre-encode invocation.
-- `packages/3-extensions/cipherstash/src/execution/cell-codec-factory.ts`
-  — `encode()` throws if `handle.ciphertext === undefined`.
+`eql_v2.add_encrypted_constraint(table, column)` interpolates `%I` for both the constraint-name prefix **and** the (already double-quoted) identifier suffix, producing invalid SQL like `CONSTRAINT eql_v2_encrypted_constraint_"users"_"accountId"` whenever either name needs quoting (mixed case, reserved word, etc.).
 
-The unit tests in `bulk-encrypt-middleware.test.ts` pass because they
-drive the middleware directly against a synthesized `InsertAst` /
-`UpdateAst` rather than going through the runtime; the runtime path
-isn't covered.
-
-This needs a framework-runtime fix (either run cipherstash-aware
-`beforeExecute` before `lower`, or restructure the codec so encode
-emits a placeholder and the middleware mutates wire-form bytes).
-Filing under TML follow-up; out of scope for the harness round.
-
-## Also discovered: EQL bundle camelCase bug
-
-Independently surfaced while bringing the schema online:
-
-`eql_v2.add_encrypted_constraint(table, column)` interpolates `%I`
-for both the constraint-name prefix **and** the (already
-double-quoted) identifier suffix, producing invalid SQL like
-`CONSTRAINT eql_v2_encrypted_constraint_"users"_"accountId"` whenever
-either name needs quoting (mixed case, reserved word, etc.).
-
-Worked around in the example schema by `@map`-ing `accountId` →
-`accountid` and `emailVerified` → `emailverified` (matching the
-existing `@@map("users")` workaround for the reserved-word case).
-File upstream + drop the workaround when the bundle is fixed.
-
-## Resuming the harness
-
-When the runtime-middleware blocker is resolved, this directory
-should grow:
-
-- `setup.ts` — Vitest global-setup that:
-  1. `docker compose up -d` and waits for `pg_isready`.
-  2. Sets `DATABASE_URL` to the harness's PG URL (overriding the
-     example app's `.env`).
-  3. Runs `prisma-next migration apply`.
-  4. Skips cleanly (logging the missing env var) when
-     `CS_WORKSPACE_CRN` is unset, so PRs without secrets configured
-     don't fail the suite.
-- `vitest.config.ts` — wires `setup.ts` and scopes to `*.e2e.test.ts`.
-- One `<ac>.e2e.test.ts` per acceptance criterion, building on the
-  example app's `db` + `createCipherstashSdk()`.
-
-The bare-column `ORDER BY` D8 bet (cipherstashAsc/Desc) gets
-verified the first time `AC-E2E-NUM` runs end-to-end; if it breaks,
-the documented fallback is `eql_v2.order_by_<index>(col)` wrapping
-in `src/execution/helpers.ts`.
+Worked around in the example schema by `@map`-ing `accountId` → `accountid` and `emailVerified` → `emailverified` (matching the existing `@@map("users")` workaround for the reserved-word case). File upstream + drop the workaround when the bundle is fixed.

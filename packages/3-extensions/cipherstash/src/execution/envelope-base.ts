@@ -73,12 +73,12 @@ const REDACTED = '[REDACTED]';
  * `EncryptedDouble` → `$encryptedDouble`) so each codec carries a
  * distinct, machine-recognisable signature in serialised payloads.
  *
- * Resolves the AC-ENV4 vs AC-ENV5 tension: the four other coercion
- * paths (`toString` / `valueOf` / `[Symbol.toPrimitive]` /
- * `[Symbol.for('nodejs.util.inspect.custom')]`) keep returning the
- * literal `[REDACTED]` string for AC-ENV4; only `toJSON` returns the
- * per-type placeholder object so `JSON.stringify` renders the
- * marker shape AC-ENV5 mandates.
+ * The four other coercion paths (`toString` / `valueOf` /
+ * `[Symbol.toPrimitive]` / `[Symbol.for('nodejs.util.inspect.custom')]`)
+ * keep returning the literal `[REDACTED]` string; only `toJSON`
+ * returns the per-type placeholder object so `JSON.stringify`
+ * renders the marker shape that downstream serialisers and
+ * `decryptAll` use to recognise an opaque envelope.
  */
 export interface EncryptedEnvelopePlaceholder {
   readonly [marker: `$${string}`]: '<opaque>';

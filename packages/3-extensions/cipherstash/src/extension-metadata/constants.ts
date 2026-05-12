@@ -36,35 +36,37 @@ export const CIPHERSTASH_STRING_CODEC_ID = 'cipherstash/string@1';
 /**
  * Codec id for the `cipherstash/double@1` codec — IEEE-754 double
  * plaintext (`number`) lowering to `eql_v2_encrypted` with EQL
- * `cast_as = 'double'`. See spec D2 for the codec id naming rationale.
+ * `cast_as = 'double'`. The id encodes plaintext shape (not storage
+ * type) so each cipherstash envelope class binds 1:1 with a codec
+ * id.
  */
 export const CIPHERSTASH_DOUBLE_CODEC_ID = 'cipherstash/double@1';
 
 /**
  * Codec id for the `cipherstash/bigint@1` codec — JS `bigint`
  * plaintext lowering to `eql_v2_encrypted` with EQL
- * `cast_as = 'big_int'`. See spec D2.
+ * `cast_as = 'big_int'`.
  */
 export const CIPHERSTASH_BIGINT_CODEC_ID = 'cipherstash/bigint@1';
 
 /**
  * Codec id for the `cipherstash/date@1` codec — `Date` plaintext
  * (calendar date) lowering to `eql_v2_encrypted` with EQL
- * `cast_as = 'date'`. See spec D2.
+ * `cast_as = 'date'`.
  */
 export const CIPHERSTASH_DATE_CODEC_ID = 'cipherstash/date@1';
 
 /**
  * Codec id for the `cipherstash/boolean@1` codec — `boolean`
  * plaintext lowering to `eql_v2_encrypted` with EQL
- * `cast_as = 'boolean'`. See spec D2.
+ * `cast_as = 'boolean'`.
  */
 export const CIPHERSTASH_BOOLEAN_CODEC_ID = 'cipherstash/boolean@1';
 
 /**
  * Codec id for the `cipherstash/json@1` codec — JSON-serialisable
  * `unknown` plaintext lowering to `eql_v2_encrypted` with EQL
- * `cast_as = 'jsonb'`. See spec D2.
+ * `cast_as = 'jsonb'`.
  */
 export const CIPHERSTASH_JSON_CODEC_ID = 'cipherstash/json@1';
 
@@ -134,7 +136,7 @@ export function isCipherstashCodecId(codecId: string): codecId is CipherstashCod
  * its namespace; collisions with a future framework trait are not
  * possible.
  *
- * Per spec D7, codec ↔ trait mapping:
+ * Codec ↔ trait mapping (see ADR 214):
  *
  *   - `cipherstash:equality`         — string, double, bigint, date, boolean
  *   - `cipherstash:order-and-range`  — string, double, bigint, date

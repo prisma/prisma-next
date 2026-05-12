@@ -1,5 +1,5 @@
 /**
- * Type-level tests for the free-standing helpers (T11).
+ * Type-level tests for the free-standing helpers.
  *
  * The helpers are typed at their declaration site (no
  * `QueryOperationTypes` entry). These assertions pin:

@@ -123,8 +123,8 @@ export async function decryptAll(rows: unknown, opts?: DecryptAllOptions): Promi
       const target = group[i];
       const plaintext = plaintexts[i];
       if (!target || plaintext === undefined) continue;
-      // The SDK's `bulkDecrypt` returns `ReadonlyArray<unknown>` per
-      // spec D1 — narrowing to each envelope's `T` is the per-subclass
+      // The SDK's `bulkDecrypt` returns `ReadonlyArray<unknown>`;
+      // narrowing to each envelope's `T` is the per-subclass
       // responsibility. `applyDecryptedSdkResult` is a static member
       // on the base class (TS's class-bounded-friend convention) that
       // dispatches through the envelope's own `parseDecryptedValue`

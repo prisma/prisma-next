@@ -196,13 +196,13 @@ This is a known limitation — lifting requires upstream SDK / ZeroKMS work.
 
 ### Polymorphic `CipherstashSdk.decrypt` return type
 
-`CipherstashSdk.bulkDecrypt(...)` returns `Promise<ReadonlyArray<unknown>>` per spec FR1. The polymorphic return type is deliberate — the SDK round-trips a heterogeneous mix of plaintext shapes (`string | number | boolean | object | array`) and the example app's adapter mirrors that.
+`CipherstashSdk.bulkDecrypt(...)` returns `Promise<ReadonlyArray<unknown>>`. The polymorphic return type is deliberate — the SDK round-trips a heterogeneous mix of plaintext shapes (`string | number | boolean | object | array`) and the example app's adapter mirrors that.
 
-One small follow-up: the single-cell `CipherstashSdk.decrypt(...)` return type is currently typed `Promise<string>` from Project 1's string-only contract. A widening to `Promise<unknown>` would match the bulk shape and remove a runtime narrowing cast in `EncryptedEnvelopeBase.decrypt`. Filed as a one-line interface follow-up; tracked at the project's umbrella plan.
+One small follow-up: the single-cell `CipherstashSdk.decrypt(...)` return type is currently typed `Promise<string>` from the original string-only contract. A widening to `Promise<unknown>` would match the bulk shape and remove a runtime narrowing cast in `EncryptedEnvelopeBase.decrypt`. Filed as a one-line interface follow-up; tracked under the cipherstash-integration umbrella.
 
-## Framework runtime middleware lifecycle reorder (T11.5)
+## Framework runtime middleware lifecycle reorder
 
-The cipherstash bulk-encrypt middleware depends on `RuntimeMiddleware.beforeExecute` firing **before** the SQL family runtime encodes parameters to wire format. The framework's runtime middleware lifecycle was reordered under [TML-2375 T11.5](https://linear.app/prisma-company/issue/TML-2375) to make this position correct by construction — see [ADR 215 — Runtime middleware lifecycle](../../../docs/architecture%20docs/adrs/ADR%20215%20-%20Runtime%20middleware%20lifecycle%20beforeExecute%20before%20encodeParams.md) for the full design.
+The cipherstash bulk-encrypt middleware depends on `RuntimeMiddleware.beforeExecute` firing **before** the SQL family runtime encodes parameters to wire format. The framework's runtime middleware lifecycle was reordered under [TML-2375](https://linear.app/prisma-company/issue/TML-2375) to make this position correct by construction — see [ADR 215 — Runtime middleware lifecycle](../../../docs/architecture%20docs/adrs/ADR%20215%20-%20Runtime%20middleware%20lifecycle%20beforeExecute%20before%20encodeParams.md) for the full design.
 
 What this means for cipherstash-extension contributors: when the bulk-encrypt middleware's `beforeExecute(plan, ctx, paramsMutator)` body runs, `plan.params` carries cipherstash envelopes (the user-domain values from the AST → draft-lowering step) — *not* their wire-format ciphertext payloads. The middleware walks `plan.ast` to find envelope `ParamRef`s, groups them by `(table, column)`, calls `sdk.bulkEncrypt(...)`, and writes the resulting ciphertexts back onto the envelope handles via `setHandleCiphertext`. The subsequent `encodeDraftParams` step then reads `handle.ciphertext` successfully — no race with the codec's strict `encode` guard.
 
@@ -230,7 +230,7 @@ The factory `createParameterizedCodecDescriptors(sdk)` is called per tenant — 
 
 ### `CipherstashSdk` is framework-native, not the upstream SDK shape
 
-The interface declares three async methods (`decrypt`, `bulkEncrypt`, `bulkDecrypt`), each accepting an optional `AbortSignal`. The values are typed polymorphically (`unknown` for the bulk paths) per Project 2 spec FR1. This is deliberately smaller than CipherStash's upstream `EncryptionClient` (rich `EncryptOperation` / `LockContext` / lazy-init machinery) so real-world usage wraps the upstream client behind a thin adapter satisfying `CipherstashSdk`. Keeps the framework-side surface free of upstream-specific types.
+The interface declares three async methods (`decrypt`, `bulkEncrypt`, `bulkDecrypt`), each accepting an optional `AbortSignal`. The values are typed polymorphically (`unknown` for the bulk paths). This is deliberately smaller than CipherStash's upstream `EncryptionClient` (rich `EncryptOperation` / `LockContext` / lazy-init machinery) so real-world usage wraps the upstream client behind a thin adapter satisfying `CipherstashSdk`. Keeps the framework-side surface free of upstream-specific types.
 
 ### `decryptAll(rows, opts?)` — opt-in read-side amortisation
 

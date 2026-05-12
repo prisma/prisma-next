@@ -25,10 +25,11 @@
  *     Static per codec (e.g. string → `'text'`, double → `'double'`).
  *
  * The factory's `onFieldEvent` body is otherwise identical across
- * codecs — collapsing the ~80-line per-flag walk into one place. See
- * spec D4 for the rationale and the per-codec config table.
- *
- * @see ../../../../projects/cipherstash-integration/project-2/spec.md (D4)
+ * codecs — collapsing the ~80-line per-flag walk into one place. The
+ * shared shape is the natural shape for any future cipherstash codec
+ * that has a per-flag → per-EQL-index mapping; the contributor-facing
+ * per-codec wiring template at `../../DEVELOPING.md` references this
+ * factory as one of the substrate calls a new codec invocation needs.
  */
 
 import type { CodecControlHooks, FieldEventContext } from '@prisma-next/family-sql/control';
@@ -50,7 +51,8 @@ export interface MakeCipherstashCodecHooksOptions {
   readonly flagToIndex: Readonly<Record<string, CipherstashSearchIndex>>;
   /**
    * EQL `cast_as` argument for every `add_search_config` call this
-   * codec emits. Static per codec — see spec D4.
+   * codec emits. Static per codec (`'text'` for string, `'double'` for
+   * IEEE-754, `'big_int'`, `'date'`, `'boolean'`, `'jsonb'`).
    */
   readonly castAs: string;
 }

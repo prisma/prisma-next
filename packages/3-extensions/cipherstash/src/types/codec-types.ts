@@ -16,7 +16,7 @@
  * `'order'`, `'numeric'`, `'boolean'`, `'textual'`); the cipherstash
  * trait strings (`'cipherstash:equality'`, `'cipherstash:order-and-range'`,
  * `'cipherstash:free-text-search'`, `'cipherstash:searchable-json'`)
- * deliberately sit outside that union (per spec D7 + the
+ * deliberately sit outside that union (see ADR 214 + the
  * `equality-trait-removal.test.ts` regression — namespacing isolates
  * the cipherstash dispatch surface from framework built-in operators
  * like `eq` that would lower to standard SQL `=`, which is wrong for

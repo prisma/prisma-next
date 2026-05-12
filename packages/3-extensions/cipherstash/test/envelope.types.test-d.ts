@@ -31,10 +31,10 @@ const _expose: () => EncryptedStringHandle = envelope.expose.bind(envelope);
 
 const _decrypt: (opts?: { signal?: AbortSignal }) => Promise<string> =
   envelope.decrypt.bind(envelope);
-// `toJSON` returns the per-type placeholder object (resolved AC-ENV4 vs
-// AC-ENV5 tension; see envelope-base for the rationale). Pinning the
-// shape here catches a regression that would re-flatten it back to a
-// bare string and re-introduce the AC-ENV5 mismatch.
+// `toJSON` returns the per-type placeholder object (see envelope-base
+// for the rationale). Pinning the shape here catches a regression
+// that would re-flatten it back to a bare string and lose the
+// machine-readable marker.
 const _toJson: () => EncryptedEnvelopePlaceholder = envelope.toJSON.bind(envelope);
 
 void _expose;
