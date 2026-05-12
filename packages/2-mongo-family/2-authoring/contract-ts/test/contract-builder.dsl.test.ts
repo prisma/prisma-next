@@ -389,8 +389,12 @@ describe('mongo contract builder', () => {
     expect(contract.storage.collections).toEqual({
       users: {
         options: {
-          collation: { locale: 'en', strength: 2 },
-          changeStreamPreAndPostImages: { enabled: true },
+          kind: 'mongo-collection-options',
+          collation: { kind: 'mongo-collation-options', locale: 'en', strength: 2 },
+          changeStreamPreAndPostImages: {
+            kind: 'mongo-change-stream-pre-and-post-images-options',
+            enabled: true,
+          },
         },
       },
     });

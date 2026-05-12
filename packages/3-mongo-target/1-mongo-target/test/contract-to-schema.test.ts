@@ -1,8 +1,44 @@
-import type { MongoContract, MongoStorageCollection } from '@prisma-next/mongo-contract';
+import {
+  MongoCollectionOptions,
+  type MongoCollectionOptionsInput,
+  type MongoContract,
+  type MongoStorageCollection,
+  type MongoStorageIndex,
+  MongoValidator,
+  type MongoValidatorInput,
+} from '@prisma-next/mongo-contract';
 import { describe, expect, it } from 'vitest';
 import { contractToMongoSchemaIR } from '../src/core/contract-to-schema';
 
-function makeContract(collections: Record<string, MongoStorageCollection>): MongoContract {
+type MongoStorageCollectionData = {
+  readonly indexes?: readonly MongoStorageIndex[];
+  readonly validator?: MongoValidator | MongoValidatorInput;
+  readonly options?: MongoCollectionOptions | MongoCollectionOptionsInput;
+};
+
+function makeStorageCollection(data: MongoStorageCollectionData): MongoStorageCollection {
+  const collection: Record<string, unknown> = {};
+  if (data.indexes) collection['indexes'] = data.indexes;
+  if (data.validator !== undefined) {
+    collection['validator'] =
+      data.validator instanceof MongoValidator
+        ? data.validator
+        : new MongoValidator(data.validator);
+  }
+  if (data.options !== undefined) {
+    collection['options'] =
+      data.options instanceof MongoCollectionOptions
+        ? data.options
+        : new MongoCollectionOptions(data.options);
+  }
+  return collection as MongoStorageCollection;
+}
+
+function makeContract(collections: Record<string, MongoStorageCollectionData>): MongoContract {
+  const builtCollections: Record<string, MongoStorageCollection> = {};
+  for (const [name, data] of Object.entries(collections)) {
+    builtCollections[name] = makeStorageCollection(data);
+  }
   return {
     target: 'mongo',
     targetFamily: 'mongo',
@@ -14,7 +50,7 @@ function makeContract(collections: Record<string, MongoStorageCollection>): Mong
     models: {},
     storage: {
       storageHash: 'sha256:test-storage',
-      collections,
+      collections: builtCollections,
     },
   } as unknown as MongoContract;
 }

@@ -1,4 +1,12 @@
-import type { MongoContract, MongoStorageCollection } from '@prisma-next/mongo-contract';
+import {
+  MongoCollectionOptions,
+  type MongoCollectionOptionsInput,
+  type MongoContract,
+  type MongoStorageCollection,
+  type MongoStorageIndex,
+  MongoValidator,
+  type MongoValidatorInput,
+} from '@prisma-next/mongo-contract';
 import {
   MongoSchemaCollection,
   MongoSchemaCollectionOptions,
@@ -9,10 +17,38 @@ import {
 import { describe, expect, it } from 'vitest';
 import { verifyMongoSchema } from '../src/core/schema-verify/verify-mongo-schema';
 
+type MongoStorageCollectionData = {
+  readonly indexes?: readonly MongoStorageIndex[];
+  readonly validator?: MongoValidator | MongoValidatorInput;
+  readonly options?: MongoCollectionOptions | MongoCollectionOptionsInput;
+};
+
+function makeStorageCollection(data: MongoStorageCollectionData): MongoStorageCollection {
+  const collection: Record<string, unknown> = {};
+  if (data.indexes) collection['indexes'] = data.indexes;
+  if (data.validator !== undefined) {
+    collection['validator'] =
+      data.validator instanceof MongoValidator
+        ? data.validator
+        : new MongoValidator(data.validator);
+  }
+  if (data.options !== undefined) {
+    collection['options'] =
+      data.options instanceof MongoCollectionOptions
+        ? data.options
+        : new MongoCollectionOptions(data.options);
+  }
+  return collection as MongoStorageCollection;
+}
+
 function buildContract(
-  collections: Record<string, MongoStorageCollection>,
+  collections: Record<string, MongoStorageCollectionData>,
   overrides?: Partial<MongoContract>,
 ): MongoContract {
+  const builtCollections: Record<string, MongoStorageCollection> = {};
+  for (const [name, data] of Object.entries(collections)) {
+    builtCollections[name] = makeStorageCollection(data);
+  }
   // String → branded hash casts: MongoContract uses branded `StorageHashBase` and
   // `ProfileHashBase` types that this fixture supplies as plain strings.
   return {
@@ -22,7 +58,7 @@ function buildContract(
     models: {},
     storage: {
       storageHash: 'sha256:test',
-      collections,
+      collections: builtCollections,
     },
     capabilities: {},
     extensionPacks: {},

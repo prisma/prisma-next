@@ -1,5 +1,13 @@
 import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
-import type { MongoContract, MongoStorageCollection } from '@prisma-next/mongo-contract';
+import {
+  MongoCollectionOptions,
+  type MongoCollectionOptionsInput,
+  type MongoContract,
+  type MongoStorageCollection,
+  type MongoStorageIndex,
+  MongoValidator,
+  type MongoValidatorInput,
+} from '@prisma-next/mongo-contract';
 import type {
   CollModCommand,
   CreateCollectionCommand,
@@ -27,10 +35,38 @@ const ADDITIVE_ONLY_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive'],
 };
 
+type MongoStorageCollectionData = {
+  readonly indexes?: readonly MongoStorageIndex[];
+  readonly validator?: MongoValidator | MongoValidatorInput;
+  readonly options?: MongoCollectionOptions | MongoCollectionOptionsInput;
+};
+
+function makeStorageCollection(data: MongoStorageCollectionData): MongoStorageCollection {
+  const collection: Record<string, unknown> = {};
+  if (data.indexes) collection['indexes'] = data.indexes;
+  if (data.validator !== undefined) {
+    collection['validator'] =
+      data.validator instanceof MongoValidator
+        ? data.validator
+        : new MongoValidator(data.validator);
+  }
+  if (data.options !== undefined) {
+    collection['options'] =
+      data.options instanceof MongoCollectionOptions
+        ? data.options
+        : new MongoCollectionOptions(data.options);
+  }
+  return collection as MongoStorageCollection;
+}
+
 function makeContract(
-  collections: Record<string, MongoStorageCollection>,
+  collections: Record<string, MongoStorageCollectionData>,
   storageHash = 'sha256:test-storage',
 ): MongoContract {
+  const builtCollections: Record<string, MongoStorageCollection> = {};
+  for (const [name, data] of Object.entries(collections)) {
+    builtCollections[name] = makeStorageCollection(data);
+  }
   return {
     target: 'mongo',
     targetFamily: 'mongo',
@@ -42,7 +78,7 @@ function makeContract(
     models: {},
     storage: {
       storageHash,
-      collections,
+      collections: builtCollections,
     },
   } as unknown as MongoContract;
 }

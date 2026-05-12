@@ -13,6 +13,11 @@ import {
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 
+function stripIrKind(node: object): Record<string, unknown> {
+  const { kind: _kind, ...rest } = node as Record<string, unknown>;
+  return rest;
+}
+
 function convertIndex(index: MongoStorageIndex): MongoSchemaIndex {
   return new MongoSchemaIndex({
     keys: index.keys,
@@ -37,7 +42,23 @@ function convertValidator(v: MongoValidator): MongoSchemaValidator {
 }
 
 function convertOptions(o: MongoCollectionOptions): MongoSchemaCollectionOptions {
-  return new MongoSchemaCollectionOptions(o);
+  return new MongoSchemaCollectionOptions({
+    ...(o.capped !== undefined && { capped: o.capped }),
+    ...(o.timeseries !== undefined && {
+      timeseries: {
+        timeField: o.timeseries.timeField,
+        ...(o.timeseries.metaField !== undefined && { metaField: o.timeseries.metaField }),
+        ...(o.timeseries.granularity !== undefined && { granularity: o.timeseries.granularity }),
+      },
+    }),
+    ...(o.collation !== undefined && {
+      collation: stripIrKind(o.collation),
+    }),
+    ...(o.changeStreamPreAndPostImages !== undefined && {
+      changeStreamPreAndPostImages: { enabled: o.changeStreamPreAndPostImages.enabled },
+    }),
+    ...(o.clusteredIndex !== undefined && { clusteredIndex: o.clusteredIndex }),
+  });
 }
 
 function convertCollection(name: string, def: MongoStorageCollection): MongoSchemaCollection {
