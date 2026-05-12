@@ -25,6 +25,7 @@
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/extension-arktype-json": "workspace:*",
+    "@prisma-next/extension-cipherstash": "workspace:*",
     "@prisma-next/extension-paradedb": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",

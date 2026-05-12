@@ -4081,6 +4081,9 @@ importers:
       '@prisma-next/extension-arktype-json':
         specifier: workspace:*
         version: link:../../packages/3-extensions/arktype-json
+      '@prisma-next/extension-cipherstash':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/cipherstash
       '@prisma-next/extension-paradedb':
         specifier: workspace:*
         version: link:../../packages/3-extensions/paradedb
