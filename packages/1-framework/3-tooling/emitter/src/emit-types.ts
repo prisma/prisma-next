@@ -8,7 +8,6 @@ import type { TypesImportSpec } from '@prisma-next/framework-components/emission
  */
 export interface EmitStackInput {
   readonly codecTypeImports?: ReadonlyArray<TypesImportSpec>;
-  readonly operationTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly queryOperationTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds?: ReadonlyArray<string>;
   readonly codecLookup?: CodecLookup;

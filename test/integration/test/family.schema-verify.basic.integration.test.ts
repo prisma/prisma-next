@@ -75,7 +75,7 @@ describe('family instance schemaVerify', () => {
           },
         }).sql(({ cols, constraints }) => ({
           table: 'post',
-          indexes: [constraints.index(cols.userId)],
+          indexes: [constraints.index([cols.userId])],
           foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
         }));
 

@@ -16,7 +16,8 @@ This package provides SQL-specific operation types that extend the generic `Oper
 
 - **SQL Operation Types**: SQL-specific operation entry and descriptor types
   - `SqlOperationEntry`: Extends `OperationEntry` with a `lowering` field (`SqlLoweringSpec`)
-  - `SqlOperationDescriptor`: Extends `OperationDescriptor<SqlOperationEntry>` (entry plus `method` name)
+  - `SqlOperationDescriptor`: Alias for `SqlOperationEntry` used at registration sites
+  - `SqlOperationDescriptors`: `Readonly<Record<string, SqlOperationDescriptor>>` — the keyed-record shape adapter/extension `queryOperations()` factories return
   - `SqlLoweringSpec`: SQL-specific lowering specification (`targetFamily`, `strategy`, `template`)
   - `SqlOperationRegistry`: Typed registry alias (`OperationRegistry<SqlOperationEntry>`)
 
@@ -72,17 +73,11 @@ import {
 const registry = createSqlOperationRegistry();
 
 const descriptor: SqlOperationDescriptor = {
-  method: 'cosineDistance',
-  args: [{ codecId: 'pg/vector@1', nullable: false }],
-  returns: { codecId: 'pg/float8@1', nullable: false },
-  lowering: {
-    targetFamily: 'sql',
-    strategy: 'infix',
-    template: '{{self}} <=> {{arg0}}',
-  },
+  self: { codecId: 'pg/vector@1' },
+  impl: () => ({ returnType: { codecId: 'pg/float8@1', nullable: false } }),
 };
 
-registry.register(descriptor);
+registry.register('cosineDistance', descriptor);
 
 const entries = registry.entries(); // Record<string, SqlOperationEntry>
 ```

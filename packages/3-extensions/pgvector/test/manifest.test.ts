@@ -24,14 +24,6 @@ describe('pgvector descriptor', () => {
     });
   });
 
-  it('has operation types import', () => {
-    expect(pgvectorExtensionDescriptor.types?.operationTypes?.import).toEqual({
-      package: '@prisma-next/extension-pgvector/operation-types',
-      named: 'OperationTypes',
-      alias: 'PgVectorOperationTypes',
-    });
-  });
-
   it(
     'codec types are importable',
     async () => {

@@ -7,9 +7,8 @@ import type {
 } from '../../src/utils/extension-pack-inputs';
 import {
   toDeclaredExtensions,
+  toDeclaredExtensionsFromRaw,
   toExtensionInputs,
-  toExtensionMigrationsInputs,
-  toMigratePassInputs,
 } from '../../src/utils/extension-pack-inputs';
 
 const contractJsonA = { kind: 'sql-contract', tables: { a: {} } } as const;
@@ -82,14 +81,12 @@ describe('toExtensionInputs', () => {
 });
 
 describe('toDeclaredExtensions', () => {
-  it('emits entries without contractSpace for non-contributing packs', () => {
+  it('filters out packs without a contractSpace declaration', () => {
     const inputs: ExtensionPackInput[] = [{ id: 'plain', targetId: 'postgres' }];
-    const { entries, hashByContractJson } = toDeclaredExtensions(inputs);
-    expect(entries).toEqual([{ id: 'plain', targetId: 'postgres' }]);
-    expect(hashByContractJson.size).toBe(0);
+    expect(toDeclaredExtensions(inputs)).toEqual([]);
   });
 
-  it('emits entries with contractSpace and keys the hash map by contractJson identity', () => {
+  it('emits entries with id + targetId only for contract-space-bearing packs', () => {
     const inputs: ExtensionPackInput[] = [
       {
         id: 'ext-with-space',
@@ -101,75 +98,47 @@ describe('toDeclaredExtensions', () => {
         },
       },
     ];
-    const { entries, hashByContractJson } = toDeclaredExtensions(inputs);
-    expect(entries).toEqual([
-      {
-        id: 'ext-with-space',
-        targetId: 'postgres',
-        contractSpace: { contractJson: contractJsonA },
-      },
-    ]);
-    expect(hashByContractJson.get(contractJsonA)).toBe('sha256:c1');
+    expect(toDeclaredExtensions(inputs)).toEqual([{ id: 'ext-with-space', targetId: 'postgres' }]);
   });
 });
 
-describe('toMigratePassInputs', () => {
-  it('passes packs without contractSpace as { id } only', () => {
-    expect(toMigratePassInputs([{ id: 'plain', targetId: 'postgres' }])).toEqual([{ id: 'plain' }]);
+describe('toDeclaredExtensionsFromRaw', () => {
+  it('skips packs whose contractSpace own-property value is explicitly undefined', () => {
+    const raw = { id: 'ext-undefined-space', targetId: 'postgres', contractSpace: undefined };
+    expect(toDeclaredExtensionsFromRaw([raw])).toEqual([]);
   });
 
-  it('projects contractJson + headRef for packs that declare a contractSpace', () => {
-    const inputs: ExtensionPackInput[] = [
-      {
-        id: 'ext-with-space',
-        targetId: 'postgres',
-        contractSpace: {
-          contractJson: contractJsonA,
-          headRef: { hash: 'sha256:c1', invariants: ['inv-1'] },
-          migrations: [],
-        },
-      },
-    ];
-    expect(toMigratePassInputs(inputs)).toEqual([
-      {
-        id: 'ext-with-space',
-        contractSpace: {
-          contractJson: contractJsonA,
-          headRef: { hash: 'sha256:c1', invariants: ['inv-1'] },
-        },
-      },
-    ]);
+  it('skips packs with no own contractSpace property', () => {
+    expect(toDeclaredExtensionsFromRaw([packWithoutSpace])).toEqual([]);
   });
-});
 
-describe('toExtensionMigrationsInputs', () => {
-  it('passes packs without contractSpace as { id } only', () => {
-    expect(toExtensionMigrationsInputs([{ id: 'plain', targetId: 'postgres' }])).toEqual([
-      { id: 'plain' },
+  it('skips non-object entries (null and primitives)', () => {
+    expect(toDeclaredExtensionsFromRaw([null, 0, 'x'])).toEqual([]);
+  });
+
+  it('emits entries for data-property contractSpace declarations', () => {
+    expect(toDeclaredExtensionsFromRaw([packWithSpace])).toEqual([
+      { id: 'ext-with-space', targetId: 'postgres' },
     ]);
   });
 
-  it('projects contractJson + headRef + migrations for packs that declare a contractSpace', () => {
-    const inputs: ExtensionPackInput[] = [
+  it('includes packs whose contractSpace is a getter without invoking it', () => {
+    let invoked = false;
+    const pack = Object.defineProperty(
+      { id: 'ext-getter', targetId: 'postgres' },
+      'contractSpace',
       {
-        id: 'ext-with-space',
-        targetId: 'postgres',
-        contractSpace: {
-          contractJson: contractJsonA,
-          headRef: { hash: 'sha256:c1', invariants: [] },
-          migrations: [migrationPkg],
+        get() {
+          invoked = true;
+          throw new Error('contractSpace getter must not be invoked');
         },
+        enumerable: true,
+        configurable: true,
       },
-    ];
-    expect(toExtensionMigrationsInputs(inputs)).toEqual([
-      {
-        id: 'ext-with-space',
-        contractSpace: {
-          contractJson: contractJsonA,
-          headRef: { hash: 'sha256:c1', invariants: [] },
-          migrations: [migrationPkg],
-        },
-      },
+    );
+    expect(toDeclaredExtensionsFromRaw([pack])).toEqual([
+      { id: 'ext-getter', targetId: 'postgres' },
     ]);
+    expect(invoked).toBe(false);
   });
 });

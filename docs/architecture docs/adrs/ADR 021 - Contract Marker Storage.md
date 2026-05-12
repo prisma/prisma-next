@@ -19,7 +19,7 @@ Store the current contract identity in a small, reserved table called prisma_con
 create schema if not exists prisma_contract;
 
 create table if not exists prisma_contract.marker (
-  id smallint primary key default 1,
+  space text not null default 'app',
   core_hash text not null,
   profile_hash text not null,
   contract_json jsonb,
@@ -27,12 +27,31 @@ create table if not exists prisma_contract.marker (
   invariants text[] not null default '{}',
   updated_at timestamptz not null default now(),
   app_tag text,
-  meta jsonb not null default '{}'
+  meta jsonb not null default '{}',
+  primary key (space)
 );
 ```
 
+### Schema evolution (TML-2397)
+
+The marker was originally a singleton — one row keyed by `id smallint primary key default 1`. [ADR 212 — Contract spaces](./ADR%20212%20-%20Contract%20spaces.md) made each contract space (the application plus every loaded schema-contributing extension) own its own marker row, so the schema gained a `space text not null` column and re-keyed by `(space)`:
+
+- The application's row uses `space = 'app'`.
+- Each extension's row uses its declared space identifier (e.g. `'cipherstash'`, `'pgvector'`).
+- Space identifiers are constrained to `[a-z][a-z0-9_-]{0,63}`.
+
+The migration is **idempotent** across three states (verified by dedicated integration tests on both Postgres and SQLite drivers):
+
+- **Fresh** — table doesn't exist; created at the new shape.
+- **Legacy single-row** — the old `id`-keyed shape, with one row. The migration adds the `space` column with `'app'` default, drops the old `marker_pkey`, recreates it on `(space)`, and drops the `id` column.
+- **Already migrated** — no-op.
+
+The migration runs inside `ensureControlTables` (one-shot framework-internal migration applied before any user / extension migrations on framework boot). Concurrency is handled by Postgres's transactional DDL (concurrent runs serialize on the table lock); SQLite uses `BEGIN EXCLUSIVE`.
+
+Note that ADR 029's shadow-DB preflight is user-DDL-scoped and does not cover `ensureControlTables`; the three-state idempotency tests are the validation gate for this transition.
+
 ### Notes
-- Single row keyed by id = 1 keeps reads cheap and avoids accidental fan-out
+- One row per loaded contract space, primary-keyed by `space`. The application has one row (`space = 'app'`); each loaded extension has one row.
 - core_hash is the canonical hash of contract.json after canonicalization
 - profile_hash mirrors the contract-pinned capability profile and is used to enforce equality at verification time
 - contract_json is optional complete contract JSON for drift analysis and PPg features
@@ -43,8 +62,8 @@ create table if not exists prisma_contract.marker (
 
 ### Other targets
 - **MySQL**: same table in prisma_contract database or current schema
-- **SQLite**: prisma_contract_marker table with the same columns; the runner merges the `invariants` set inside `BEGIN EXCLUSIVE` (no native text-array merge in SQL)
-- **Mongo**: prisma_contract.marker collection with a single document keyed by _id: 1; `invariants` is read as `doc.invariants ?? []` so older docs without the field transparently report the empty set (natural schemaless behaviour, not a compat shim)
+- **SQLite**: `prisma_contract_marker` table with the same columns (including the `space` PK); the runner merges the `invariants` set inside `BEGIN EXCLUSIVE` (no native text-array merge in SQL). Same three-state idempotent migration as Postgres.
+- **Mongo**: `prisma_contract.marker` collection — per-space contract spaces are out of scope for the Mongo family today (see [ADR 212](./ADR%20212%20-%20Contract%20spaces.md)). The Mongo bridge surfaces the legacy single-row marker as the `'app'` space's row when read through cross-family interfaces. `invariants` is read as `doc.invariants ?? []` so older docs without the field transparently report the empty set (natural schemaless behaviour, not a compat shim).
 - Adapters must provide DDL for creating and reading the marker consistently
 
 ## Ownership and lifecycle
@@ -181,3 +200,8 @@ createRunner({
 - Optional replication of the marker to read replicas and how verification should behave on replicas
 - Standardizing a minor drift whitelist beyond comments for specific adapters under strict guarantees
 - PPg-specific UI for visualizing current marker, proposed edges, and promotion gates
+
+## Related
+
+- [ADR 212 — Contract spaces](./ADR%20212%20-%20Contract%20spaces.md) — promotes the marker from singleton to one-row-per-loaded-space.
+- [ADR 208 — Invariant-aware migration routing](./ADR%20208%20-%20Invariant-aware%20migration%20routing.md) — `invariants` semantics on the marker.

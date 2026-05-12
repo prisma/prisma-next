@@ -9,7 +9,6 @@ import type {
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type {
-  DependencyIR,
   PrimaryKey,
   SqlColumnIR,
   SqlForeignKeyIR,
@@ -181,7 +180,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * and returns the schema structure without type mapping or contract enrichment.
    * Type mapping and enrichment are handled separately by enrichment helpers.
    *
-   * Uses batched queries to minimize database round trips (7 queries instead of 5T+3).
+   * Uses batched queries to minimize database round trips (6 queries instead of 5T+1).
    *
    * @param driver - ControlDriverInstance<'sql', 'postgres'> instance for executing queries
    * @param contract - Optional contract for contract-guided introspection (filtering, optimization)
@@ -193,39 +192,32 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     _contract?: unknown,
     schema = 'public',
   ): Promise<SqlSchemaIR> {
-    // Execute all queries in parallel for efficiency (7 queries instead of 5T+3)
-    const [
-      tablesResult,
-      columnsResult,
-      pkResult,
-      fkResult,
-      uniqueResult,
-      indexResult,
-      extensionsResult,
-    ] = await Promise.all([
-      // Query all tables
-      driver.query<{ table_name: string }>(
-        `SELECT table_name
+    // Execute all queries in parallel for efficiency (6 queries instead of 5T+1)
+    const [tablesResult, columnsResult, pkResult, fkResult, uniqueResult, indexResult] =
+      await Promise.all([
+        // Query all tables
+        driver.query<{ table_name: string }>(
+          `SELECT table_name
          FROM information_schema.tables
          WHERE table_schema = $1
            AND table_type = 'BASE TABLE'
          ORDER BY table_name`,
-        [schema],
-      ),
-      // Query all columns for all tables in schema
-      driver.query<{
-        table_name: string;
-        column_name: string;
-        data_type: string;
-        udt_name: string;
-        is_nullable: string;
-        character_maximum_length: number | null;
-        numeric_precision: number | null;
-        numeric_scale: number | null;
-        column_default: string | null;
-        formatted_type: string | null;
-      }>(
-        `SELECT
+          [schema],
+        ),
+        // Query all columns for all tables in schema
+        driver.query<{
+          table_name: string;
+          column_name: string;
+          data_type: string;
+          udt_name: string;
+          is_nullable: string;
+          character_maximum_length: number | null;
+          numeric_precision: number | null;
+          numeric_scale: number | null;
+          column_default: string | null;
+          formatted_type: string | null;
+        }>(
+          `SELECT
            c.table_name,
            column_name,
            data_type,
@@ -249,16 +241,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            AND NOT a.attisdropped
          WHERE c.table_schema = $1
          ORDER BY c.table_name, c.ordinal_position`,
-        [schema],
-      ),
-      // Query all primary keys for all tables in schema
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-      }>(
-        `SELECT
+          [schema],
+        ),
+        // Query all primary keys for all tables in schema
+        driver.query<{
+          table_name: string;
+          constraint_name: string;
+          column_name: string;
+          ordinal_position: number;
+        }>(
+          `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -271,24 +263,24 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'PRIMARY KEY'
          ORDER BY tc.table_name, kcu.ordinal_position`,
-        [schema],
-      ),
-      // Query all foreign keys for all tables in schema, including referential actions.
-      // Uses pg_catalog for correct positional pairing of composite FK columns
-      // (information_schema.constraint_column_usage lacks ordinal_position,
-      // which causes Cartesian products for multi-column FKs).
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-        referenced_table_schema: string;
-        referenced_table_name: string;
-        referenced_column_name: string;
-        delete_rule: string;
-        update_rule: string;
-      }>(
-        `SELECT
+          [schema],
+        ),
+        // Query all foreign keys for all tables in schema, including referential actions.
+        // Uses pg_catalog for correct positional pairing of composite FK columns
+        // (information_schema.constraint_column_usage lacks ordinal_position,
+        // which causes Cartesian products for multi-column FKs).
+        driver.query<{
+          table_name: string;
+          constraint_name: string;
+          column_name: string;
+          ordinal_position: number;
+          referenced_table_schema: string;
+          referenced_table_name: string;
+          referenced_column_name: string;
+          delete_rule: string;
+          update_rule: string;
+        }>(
+          `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -321,16 +313,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'FOREIGN KEY'
          ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
-        [schema],
-      ),
-      // Query all unique constraints for all tables in schema (excluding PKs)
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-      }>(
-        `SELECT
+          [schema],
+        ),
+        // Query all unique constraints for all tables in schema (excluding PKs)
+        driver.query<{
+          table_name: string;
+          constraint_name: string;
+          column_name: string;
+          ordinal_position: number;
+        }>(
+          `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -343,26 +335,31 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'UNIQUE'
          ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
-        [schema],
-      ),
-      // Query all indexes for all tables in schema (excluding constraints)
-      driver.query<{
-        tablename: string;
-        indexname: string;
-        indisunique: boolean;
-        attname: string;
-        attnum: number;
-      }>(
-        `SELECT
+          [schema],
+        ),
+        // Query all indexes for all tables in schema (excluding constraints)
+        driver.query<{
+          tablename: string;
+          indexname: string;
+          indisunique: boolean;
+          attname: string;
+          attnum: number;
+          amname: string | null;
+          reloptions: string[] | null;
+        }>(
+          `SELECT
            i.tablename,
            i.indexname,
            ix.indisunique,
            a.attname,
-           a.attnum
+           a.attnum,
+           am.amname,
+           ic.reloptions
          FROM pg_indexes i
          JOIN pg_class ic ON ic.relname = i.indexname
          JOIN pg_namespace ins ON ins.oid = ic.relnamespace AND ins.nspname = $1
          JOIN pg_index ix ON ix.indexrelid = ic.oid
+         JOIN pg_am am ON am.oid = ic.relam
          JOIN pg_class t ON t.oid = ix.indrelid
          JOIN pg_namespace tn ON tn.oid = t.relnamespace AND tn.nspname = $1
          LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey) AND a.attnum > 0
@@ -375,16 +372,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
                AND tc.constraint_name = i.indexname
            )
          ORDER BY i.tablename, i.indexname, a.attnum`,
-        [schema],
-      ),
-      // Query extensions
-      driver.query<{ extname: string }>(
-        `SELECT extname
-         FROM pg_extension
-         ORDER BY extname`,
-        [],
-      ),
-    ]);
+          [schema],
+        ),
+      ]);
 
     // Group results by table name for efficient lookup
     const columnsByTable = groupBy(columnsResult.rows, 'table_name');
@@ -520,7 +510,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       }));
 
       // Process indexes
-      const indexesMap = new Map<string, { columns: string[]; name: string; unique: boolean }>();
+      const indexesMap = new Map<
+        string,
+        {
+          columns: string[];
+          name: string;
+          unique: boolean;
+          type: string | undefined;
+          options: Record<string, string> | undefined;
+        }
+      >();
       for (const idxRow of indexesByTable.get(tableName) ?? []) {
         if (!idxRow.attname) {
           continue;
@@ -529,10 +528,17 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         if (existing) {
           existing.columns.push(idxRow.attname);
         } else {
+          // Drop btree (the Postgres default) so a contract index without an
+          // explicit type matches a default-method introspected index without
+          // forcing DROP+CREATE on every plan.
+          const indexType = idxRow.amname && idxRow.amname !== 'btree' ? idxRow.amname : undefined;
+          const indexOptions = parsePgReloptions(idxRow.reloptions, idxRow.indexname);
           indexesMap.set(idxRow.indexname, {
             columns: [idxRow.attname],
             name: idxRow.indexname,
             unique: idxRow.indisunique,
+            type: indexType,
+            options: indexOptions,
           });
         }
       }
@@ -540,6 +546,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         columns: Object.freeze([...idx.columns]) as readonly string[],
         name: idx.name,
         unique: idx.unique,
+        ...(idx.type !== undefined && { type: idx.type }),
+        ...(idx.options !== undefined && { options: idx.options }),
       }));
 
       tables[tableName] = {
@@ -551,10 +559,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         indexes,
       };
     }
-
-    const dependencies: readonly DependencyIR[] = extensionsResult.rows.map((row) => ({
-      id: `postgres.extension.${row.extname}`,
-    }));
 
     const storageTypes =
       (await pgEnumControlHooks.introspectTypes?.({ driver, schemaName: schema })) ?? {};
@@ -572,7 +576,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
     return {
       tables,
-      dependencies,
       annotations,
     };
   }
@@ -673,6 +676,39 @@ function mapReferentialAction(rule: string): SqlReferentialAction | undefined {
  * Groups an array of objects by a specified key.
  * Returns a Map for O(1) lookup by group key.
  */
+/**
+ * Parses a `pg_class.reloptions` array into a `Record<string, string>`.
+ *
+ * Postgres returns reloptions as a `text[]` whose entries are `key=value`
+ * strings; the value side is always a string regardless of the underlying
+ * scalar type. The verifier compares contract options to introspected
+ * options after coercing both sides to strings, so keeping the raw text
+ * here is correct.
+ *
+ * Returns `undefined` when the input is null/empty (no WITH clause).
+ */
+export function parsePgReloptions(
+  reloptions: readonly string[] | null,
+  indexName: string,
+): Record<string, string> | undefined {
+  if (!reloptions || reloptions.length === 0) {
+    return undefined;
+  }
+  const result: Record<string, string> = {};
+  for (const entry of reloptions) {
+    const eq = entry.indexOf('=');
+    if (eq === -1) {
+      throw new Error(
+        `Postgres introspection: malformed reloption entry "${entry}" on index "${indexName}" (expected "key=value")`,
+      );
+    }
+    const key = entry.slice(0, eq);
+    const value = entry.slice(eq + 1);
+    result[key] = value;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 function groupBy<T, K extends keyof T>(items: readonly T[], key: K): Map<T[K], T[]> {
   const map = new Map<T[K], T[]>();
   for (const item of items) {

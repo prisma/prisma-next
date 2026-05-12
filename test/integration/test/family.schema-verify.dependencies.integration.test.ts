@@ -15,7 +15,6 @@ import postgres from '@prisma-next/target-postgres/control';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { legacyDatabaseDependencyExtension } from './family.schema-verify.extensions';
 
 describe('family instance schemaVerify', () => {
   let connectionString: string | undefined;
@@ -27,88 +26,6 @@ describe('family instance schemaVerify', () => {
       await database.close();
     };
   }, timeouts.spinUpPpgDev);
-
-  describe('dependency missing', () => {
-    beforeEach(async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
-      await withClient(connectionString, async (client) => {
-        await client.query('DROP TABLE IF EXISTS "user"');
-        await client.query(`
-          CREATE TABLE "user" (
-            id SERIAL PRIMARY KEY,
-            email TEXT NOT NULL
-          )
-        `);
-      });
-    }, timeouts.spinUpPpgDev);
-
-    it(
-      'returns ok=false with dependency_missing issue',
-      async () => {
-        if (!connectionString) {
-          throw new Error('Connection string not set');
-        }
-
-        // Build contract with extension pack declared. We use a synthetic
-        // legacy `databaseDependencies` extension here because pgvector itself
-        // moved to the contract-space mechanism (see TML-2397); the
-        // databaseDependencies dependency_missing path still exists and this
-        // test exercises that path with a stand-in extension.
-        const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
-          extensionPacks: { 'legacy-vector': legacyDatabaseDependencyExtension },
-          models: {
-            User: model('User', {
-              fields: {
-                id: field.column(int4Column).id(),
-                email: field.column(textColumn),
-              },
-            }).sql({ table: 'user' }),
-          },
-        });
-
-        const driver = await postgresDriver.create(connectionString);
-        try {
-          const familyInstance = sql.create(
-            createControlStack({
-              family: sql,
-              target: postgres,
-              adapter: postgresAdapter,
-              driver: postgresDriver,
-              extensionPacks: [legacyDatabaseDependencyExtension],
-            }),
-          );
-
-          const validatedContract = validateContract<Contract<SqlStorage>>(
-            contract,
-            emptyCodecLookup,
-          );
-          // Include the synthetic extension in frameworkComponents so its
-          // verifyDatabaseDependencies hook is invoked.
-          const frameworkComponents: ReadonlyArray<
-            TargetBoundComponentDescriptor<'sql', 'postgres'>
-          > = [postgres, postgresAdapter, legacyDatabaseDependencyExtension];
-          const result = await familyInstance.schemaVerify({
-            driver,
-            contract: validatedContract,
-            strict: false,
-            context: { contractPath: './contract.json' },
-            frameworkComponents,
-          });
-
-          expect(result.ok).toBe(false);
-          expect(result.schema.counts.fail).toBeGreaterThan(0);
-          expect(result.schema.issues.some((i) => i.kind === 'dependency_missing')).toBe(true);
-        } finally {
-          await driver.close();
-        }
-      },
-      timeouts.spinUpPpgDev,
-    );
-  });
 
   describe('strict mode: extra columns', () => {
     beforeEach(async () => {

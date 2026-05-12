@@ -82,7 +82,7 @@ function createTestDb() {
 }
 
 const CONTROL_TABLES = new Set(['_prisma_marker', '_prisma_ledger']);
-const emptySchema: SqlSchemaIR = { tables: {}, dependencies: [] };
+const emptySchema: SqlSchemaIR = { tables: {} };
 
 export interface MigrationResult {
   readonly driver: Driver;

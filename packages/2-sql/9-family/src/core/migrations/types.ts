@@ -25,43 +25,12 @@ import type {
   StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
-import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
+import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlFamilyInstance } from '../control-instance';
 
 export type AnyRecord = Readonly<Record<string, unknown>>;
-
-export interface ComponentDatabaseDependency<TTargetDetails> {
-  readonly id: string;
-  readonly label: string;
-  readonly install: readonly SqlMigrationPlanOperation<TTargetDetails>[];
-}
-
-export interface ComponentDatabaseDependencies<TTargetDetails> {
-  readonly init?: readonly ComponentDatabaseDependency<TTargetDetails>[];
-}
-
-export interface DatabaseDependencyProvider {
-  readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
-}
-
-export function isDatabaseDependencyProvider(value: unknown): value is DatabaseDependencyProvider {
-  return typeof value === 'object' && value !== null && 'databaseDependencies' in value;
-}
-
-export function collectInitDependencies(
-  components: ReadonlyArray<unknown>,
-): readonly ComponentDatabaseDependency<unknown>[] {
-  const result: ComponentDatabaseDependency<unknown>[] = [];
-  for (const component of components) {
-    if (!isDatabaseDependencyProvider(component)) continue;
-    const deps = component.databaseDependencies?.init;
-    if (!deps) continue;
-    result.push(...deps);
-  }
-  return result;
-}
 
 export interface StorageTypePlanResult<TTargetDetails> {
   readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
@@ -93,7 +62,9 @@ export interface ResolveIdentityValueInput {
  * Per-field lifecycle event a codec hook can react to.
  *
  * Fired during app-space migration emission as the SQL family diffs the
- * prior contract against the new contract.
+ * prior contract against the new contract. See
+ * `docs/architecture docs/adrs/ADR 213 - Codec lifecycle hooks.md`
+ * for the wiring contract.
  *
  * - `'added'`     — the field is present in the new contract but not the prior.
  * - `'dropped'`   — the field is present in the prior contract but not the new.
@@ -174,14 +145,16 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
    * are dispatched per `(table, field)` based on the field's `codecId`
    * (the new field's codec for `'added'` / `'altered'`; the prior field's
    * codec for `'dropped'`).
+   *
+   * See `docs/architecture docs/adrs/ADR 213 - Codec lifecycle hooks.md`
+   * for the wiring contract and the deterministic ordering rule.
    */
   onFieldEvent?: (event: FieldEvent, ctx: FieldEventContext) => readonly OpFactoryCall[];
 }
 
 export interface SqlControlExtensionDescriptor<TTargetId extends string>
   extends ControlExtensionDescriptor<'sql', TTargetId> {
-  readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
-  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
+  readonly queryOperations?: () => SqlOperationDescriptors;
   /**
    * Schema-contributing extensions opt into the per-space planner / runner /
    * verifier by setting this field. Extensions without it are codec-only or
@@ -192,15 +165,13 @@ export interface SqlControlExtensionDescriptor<TTargetId extends string>
    * not a SQL-specific one. The SQL family specialises the generic to
    * `Contract<SqlStorage>` so descriptor authors continue to see a
    * typed contract value.
-   *
-   * @see specs/framework-mechanism.spec.md § 1.
    */
   readonly contractSpace?: ContractSpace<Contract<SqlStorage>>;
 }
 
 export interface SqlControlAdapterDescriptor<TTargetId extends string>
   extends ControlAdapterDescriptor<'sql', TTargetId> {
-  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
+  readonly queryOperations?: () => SqlOperationDescriptors;
 }
 
 export interface SqlMigrationPlanOperationStep {
@@ -355,7 +326,8 @@ export interface SqlMigrationPlannerPlanOptions {
   readonly fromContract: Contract<SqlStorage> | null;
   /**
    * Active framework components participating in this composition.
-   * SQL targets can interpret this list to derive database dependencies.
+   * Each component is target-bound so SQL targets can dispatch
+   * component-owned planning behaviour from the same descriptor list.
    * All components must have matching familyId ('sql') and targetId.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
@@ -402,7 +374,8 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
   readonly executionChecks?: MigrationRunnerExecutionChecks;
   /**
    * Active framework components participating in this composition.
-   * SQL targets can interpret this list to derive database dependencies.
+   * Each component is target-bound so SQL targets can dispatch
+   * component-owned execution behaviour from the same descriptor list.
    * All components must have matching familyId ('sql') and targetId.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
@@ -492,7 +465,7 @@ export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiS
 
 export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDetails>
   extends MigratableTargetDescriptor<'sql', TTargetId, SqlControlFamilyInstance> {
-  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
+  readonly queryOperations?: () => SqlOperationDescriptors;
   createPlanner(family: SqlControlFamilyInstance): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }

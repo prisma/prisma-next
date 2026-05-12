@@ -248,46 +248,4 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
       'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."geo" = $1::geography',
     );
   });
-
-  it('emits $1::vector when pgvector is installed via stack.extensionPacks', async () => {
-    // Smoke test for the M2 wiring fix: `pgvectorRuntimeDescriptor` exposes its codecs via `types.codecTypes.codecDescriptors`, so the adapter's runtime-plane lookup picks up `pg/vector@1` and the renderer emits the cast. Without the wiring fix this regresses to `$1`.
-    const pgvectorRuntime = (await import('@prisma-next/extension-pgvector/runtime')).default;
-
-    const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
-
-    const vectorContract = validateContract<PostgresContract>(
-      {
-        target: 'postgres',
-        targetFamily: 'sql',
-        profileHash: 'sha256:vector-cast-policy',
-        roots: {},
-        capabilities: {},
-        extensionPacks: {},
-        meta: {},
-        storage: {
-          storageHash: 'sha256:vector-cast-policy',
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                vec: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
-              },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-          },
-        },
-        models: {},
-      },
-      emptyLookup,
-    );
-
-    const ast = selectWithParam('vec', 'pg/vector@1', [1, 2, 3]);
-    const lowered = adapter.lower(ast, { contract: vectorContract });
-
-    expect(lowered.sql).toBe(
-      'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."vec" = $1::vector',
-    );
-  });
 });

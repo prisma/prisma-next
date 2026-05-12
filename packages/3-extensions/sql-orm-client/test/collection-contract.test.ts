@@ -7,6 +7,7 @@ import {
   resolveModelTableName,
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
+  resolveRowIdentityColumns,
   resolveUpsertConflictColumns,
 } from '../src/collection-contract';
 import { buildMixedPolyContract, getTestContract } from './helpers';
@@ -234,6 +235,63 @@ describe('collection-contract capability detection', () => {
     expect(isToOneCardinality('1:N')).toBe(false);
     expect(isToOneCardinality('M:N')).toBe(false);
     expect(isToOneCardinality(undefined)).toBe(false);
+  });
+
+  describe('resolveRowIdentityColumns()', () => {
+    const buildContract = (table: {
+      primaryKey?: { columns: readonly string[] };
+      uniques?: ReadonlyArray<{ columns: readonly string[] }>;
+    }) =>
+      ({
+        storage: {
+          tables: {
+            t: {
+              primaryKey: table.primaryKey,
+              uniques: table.uniques ?? [],
+            },
+          },
+        },
+      }) as unknown as Parameters<typeof resolveRowIdentityColumns>[0];
+
+    it('returns primary key columns when present', () => {
+      expect(
+        resolveRowIdentityColumns(buildContract({ primaryKey: { columns: ['id'] } }), 't'),
+      ).toEqual(['id']);
+    });
+
+    it('returns composite primary key columns when present', () => {
+      expect(
+        resolveRowIdentityColumns(buildContract({ primaryKey: { columns: ['a', 'b'] } }), 't'),
+      ).toEqual(['a', 'b']);
+    });
+
+    it('falls back to first unique constraint when no primary key', () => {
+      expect(
+        resolveRowIdentityColumns(
+          buildContract({ uniques: [{ columns: ['email'] }, { columns: ['handle'] }] }),
+          't',
+        ),
+      ).toEqual(['email']);
+    });
+
+    it('returns composite unique columns when no primary key', () => {
+      expect(
+        resolveRowIdentityColumns(
+          buildContract({ uniques: [{ columns: ['tenant_id', 'slug'] }] }),
+          't',
+        ),
+      ).toEqual(['tenant_id', 'slug']);
+    });
+
+    it('returns empty array when neither primary key nor uniques are defined', () => {
+      expect(resolveRowIdentityColumns(buildContract({}), 't')).toEqual([]);
+    });
+
+    it('returns empty array for unknown tables', () => {
+      expect(
+        resolveRowIdentityColumns(buildContract({ primaryKey: { columns: ['id'] } }), 'missing'),
+      ).toEqual([]);
+    });
   });
 });
 

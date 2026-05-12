@@ -30,6 +30,18 @@ Simplified `defineConfig` that pre-wires all MongoDB internals (family, target, 
 
 Re-exports `createMongoRuntime` from `@prisma-next/mongo-runtime` for composing the MongoDB execution pipeline.
 
+### `@prisma-next/mongo/contract-builder`
+
+Re-exports the TypeScript contract authoring DSL (`defineContract`, `field`, `model`, `rel`, ...) so a generated `prisma/contract.ts` can author its contract using only this facade package.
+
+### `@prisma-next/mongo/family`
+
+Re-exports the MongoDB family pack (the value passed as `family:` to `defineContract`).
+
+### `@prisma-next/mongo/target`
+
+Re-exports the MongoDB target pack (the value passed as `target:` to `defineContract`).
+
 ## Dependencies
 
 This package bundles all the transitive dependencies needed for a MongoDB Prisma Next project, including those referenced in the emitted `contract.d.ts`:

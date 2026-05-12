@@ -1,0 +1,4 @@
+{
+  "hash": "sha256:382dae5bb1548e62cbc449530ea08a9ce0a0dbb280401e9588642223f33783ae",
+  "invariants": ["pgvector:install-vector-v1"]
+}

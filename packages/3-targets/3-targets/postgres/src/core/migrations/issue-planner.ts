@@ -15,6 +15,7 @@ import type {
   SqlPlannerConflict,
   SqlPlannerConflictLocation,
 } from '@prisma-next/family-sql/control';
+import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type {
@@ -32,9 +33,7 @@ import {
   AddUniqueCall,
   AlterColumnTypeCall,
   CreateEnumTypeCall,
-  CreateExtensionCall,
   CreateIndexCall,
-  CreateSchemaCall,
   CreateTableCall,
   DropColumnCall,
   DropConstraintCall,
@@ -62,8 +61,7 @@ export type { CallMigrationStrategy, StrategyContext };
 // ============================================================================
 
 const ISSUE_KIND_ORDER: Record<string, number> = {
-  // Dependencies and types first
-  dependency_missing: 1,
+  // Types first
   type_missing: 2,
   type_values_mismatch: 3,
   enum_values_changed: 3,
@@ -149,9 +147,8 @@ export interface IssuePlannerOptions {
    */
   readonly policy?: MigrationOperationPolicy;
   /**
-   * Framework components participating in this composition. Used by the
-   * dependency-install strategy to dispatch `databaseDependencies.init` at
-   * plan time.
+   * Framework components participating in this composition. Available to
+   * future strategies that may consult component metadata at plan time.
    */
   readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   readonly strategies?: readonly CallMigrationStrategy[];
@@ -211,7 +208,12 @@ function mapIssueToCall(
       ];
       for (const index of contractTable.indexes) {
         const indexName = index.name ?? `${issue.table}_${index.columns.join('_')}_idx`;
-        calls.push(new CreateIndexCall(schemaName, issue.table, indexName, [...index.columns]));
+        const extras: { type?: string; options?: Record<string, unknown> } = {};
+        if (index.type !== undefined) extras.type = index.type;
+        if (index.options !== undefined) extras.options = index.options;
+        calls.push(
+          new CreateIndexCall(schemaName, issue.table, indexName, [...index.columns], extras),
+        );
       }
       const explicitIndexColumnSets = new Set(
         contractTable.indexes.map((idx) => idx.columns.join(',')),
@@ -446,8 +448,14 @@ function mapIssueToCall(
         return notOk(issueConflict('indexIncompatible', 'Index issue has no table name'));
       if (isMissing(issue) && issue.expected) {
         const columns = issue.expected.split(', ');
-        const indexName = `${issue.table}_${columns.join('_')}_idx`;
-        return ok([new CreateIndexCall(schemaName, issue.table, indexName, columns)]);
+        const contractIndex = ctx.toContract.storage.tables[issue.table]?.indexes.find((idx) =>
+          arraysEqual(idx.columns, columns),
+        );
+        const indexName = contractIndex?.name ?? `${issue.table}_${columns.join('_')}_idx`;
+        const extras: { type?: string; options?: Record<string, unknown> } = {};
+        if (contractIndex?.type !== undefined) extras.type = contractIndex.type;
+        if (contractIndex?.options !== undefined) extras.options = contractIndex.options;
+        return ok([new CreateIndexCall(schemaName, issue.table, indexName, columns, extras)]);
       }
       return notOk(
         issueConflict(
@@ -527,21 +535,6 @@ function mapIssueToCall(
         ),
       );
 
-    case 'dependency_missing':
-      if (!issue.dependencyId)
-        return notOk(
-          issueConflict('unsupportedOperation', 'Dependency missing issue has no dependencyId'),
-        );
-      if (issue.dependencyId.startsWith('ext:')) {
-        return ok([new CreateExtensionCall(issue.dependencyId.slice(4))]);
-      }
-      if (issue.dependencyId.startsWith('schema:')) {
-        return ok([new CreateSchemaCall(issue.dependencyId.slice(7))]);
-      }
-      return notOk(
-        issueConflict('unsupportedOperation', `Unknown dependency type: ${issue.dependencyId}`),
-      );
-
     default:
       return notOk(
         issueConflict(
@@ -605,24 +598,19 @@ function classifyCall(call: PostgresOpFactoryCall): CallCategory {
     case 'addForeignKey':
       return 'foreignKey';
     case 'rawSql': {
-      // Install ops (`dependencyInstallCallStrategy`) and type ops
-      // (`storageTypePlanCallStrategy`) both lift raw `SqlMigrationPlanOperation`s
-      // through `RawSqlCall` to preserve the component-declared label and
-      // precheck/postcheck. Classification falls back to inspecting the
-      // underlying op's target details (`objectType: 'type'`) and id prefix
-      // (`extension.*` / `schema.*`).
+      // Type ops lifted through `RawSqlCall` by `storageTypePlanCallStrategy`
+      // to preserve the codec-emitted label and precheck/postcheck.
+      // Classification falls back to inspecting the underlying op's target
+      // details (`objectType: 'type'`).
       const op = (
         call as {
           op?: {
-            id?: string;
             target?: { details?: { objectType?: string } };
           };
         }
       ).op;
       const objectType = op?.target?.details?.objectType;
       if (objectType === 'type') return 'dep';
-      const id = typeof op?.id === 'string' ? op.id : '';
-      if (id.startsWith('extension.') || id.startsWith('schema.')) return 'dep';
       return 'alter';
     }
     default:
@@ -651,7 +639,7 @@ const DEFAULT_POLICY: MigrationOperationPolicy = {
 };
 
 function emptySchemaIR(): SqlSchemaIR {
-  return { tables: {}, dependencies: [] };
+  return { tables: {} };
 }
 
 function conflictKindForCall(call: PostgresOpFactoryCall): SqlPlannerConflict['kind'] {

@@ -1,9 +1,11 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, it } from 'vitest';
-import { field, model, rel } from '../src/contract-builder';
+import { createComposedAuthoringHelpers } from '../src/composed-authoring-helpers';
+import { field, rel } from '../src/contract-builder';
 import { ContractModelBuilder, ScalarFieldBuilder } from '../src/contract-dsl';
 import { buildContractDefinition } from '../src/contract-lowering';
 import { columnDescriptor } from './helpers/column-descriptor';
+import { testIndexPack } from './helpers/test-index-pack';
 
 const bareFamilyPack: FamilyPackRef<'sql'> = {
   kind: 'family',
@@ -22,6 +24,12 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
+
+const { model } = createComposedAuthoringHelpers({
+  family: bareFamilyPack,
+  target: postgresTargetPack,
+  extensionPacks: { testIndexes: testIndexPack },
+});
 
 function buildDefinition(
   definition: Omit<Parameters<typeof buildContractDefinition>[0], 'target' | 'family'>,
@@ -409,10 +417,10 @@ describe('contract definition lowering runtime checks', () => {
       },
     }).sql(({ cols, constraints }) => ({
       indexes: [
-        constraints.index(cols.userId, {
+        constraints.index([cols.userId], {
           name: 'membership_user_id_idx',
-          using: 'hash',
-          config: { fillfactor: 70 },
+          type: 'hash',
+          options: { fillfactor: 70 },
         }),
       ],
     }));
@@ -432,8 +440,8 @@ describe('contract definition lowering runtime checks', () => {
       {
         columns: ['userId'],
         name: 'membership_user_id_idx',
-        using: 'hash',
-        config: { fillfactor: 70 },
+        type: 'hash',
+        options: { fillfactor: 70 },
       },
     ]);
     expect(membership?.foreignKeys).toEqual([

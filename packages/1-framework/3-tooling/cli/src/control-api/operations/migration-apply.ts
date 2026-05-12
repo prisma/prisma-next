@@ -216,7 +216,13 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
       // (the error rendering pipeline maps it to meta.code +
       // meta.required + meta.missing + meta.structuralPath that the
       // cli-journeys invariant suite asserts on).
-      const fromHash = liveMarker?.storageHash ?? '';
+      // Greenfield runs (no marker yet) use the canonical empty-hash
+      // sentinel so the structural path stays attached to the
+      // `MIGRATION.NO_INVARIANT_PATH` error envelope. Using an empty
+      // string here would leave the structural lookup with a hash that
+      // is never a graph node, producing an empty `structuralPath` and
+      // a less actionable diagnostic.
+      const fromHash = liveMarker?.storageHash ?? EMPTY_CONTRACT_HASH;
       const structural = findPathWithDecision(targetMember.migrations.graph, fromHash, targetHash, {
         required: new Set<string>(),
       });

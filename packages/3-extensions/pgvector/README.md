@@ -13,7 +13,7 @@ This extension pack adds support for the `vector` data type and vector similarit
 - **CLI Integration**: Provides extension descriptor for `prisma-next.config.ts` configuration
 - **Runtime Extension**: Registers codecs and operations at runtime for vector column operations
 - **Pack Ref Export**: Ships a pure `/pack` entrypoint for TypeScript contract authoring without runtime filesystem access
-- **Database Dependencies**: Declares the `vector` Postgres extension as a database dependency, which the migration planner emits as a `CREATE EXTENSION IF NOT EXISTS vector` operation and the verifier checks against the schema IR
+- **Baseline Migration**: Ships an on-disk baseline migration in its contract space that installs the `vector` Postgres extension (`CREATE EXTENSION IF NOT EXISTS vector`) when the extension is composed into an application
 
 ## Dependencies
 
@@ -30,15 +30,15 @@ pnpm add @prisma-next/extension-pgvector
 
 ## Database Setup
 
-The pgvector extension declares its database requirements as component-owned database dependencies. When using the `prisma-next db init` command, the migration planner automatically includes a `CREATE EXTENSION IF NOT EXISTS vector` operation.
+The pgvector extension ships an on-disk baseline migration in its contract space; applying that migration installs pgvector with `CREATE EXTENSION IF NOT EXISTS vector`. When the extension is composed into an application via `extensionPacks`, `prisma-next db init` and `prisma-next db update` apply the baseline (and any subsequent migrations) automatically.
 
-For manual database setup, ensure the pgvector extension is installed:
+For manual database setup, the equivalent DDL is:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-The verifier will check for the presence of the `vector` extension in your database schema and report an error if it's missing.
+Ensure the baseline migration (or equivalent DDL) has been applied before running workloads that use vector columns.
 
 ## Configuration
 
@@ -198,10 +198,24 @@ The extension declares the following capabilities:
 
 - `pgvector.cosine`: Indicates support for cosine distance and similarity operations
 
+## Authoring (maintainers)
+
+The extension's contract + baseline migration are emitted on-disk inside this package using the same pipeline application authors use:
+
+- `pnpm build:contract-space` — runs `prisma-next contract emit` to produce `src/contract.{json,d.ts}` from the TS source at `src/contract.ts`.
+- `pnpm exec prisma-next migration plan --name <slug>` (run from this package directory) — scaffolds a new migration directory under `migrations/<dirName>/` for schema changes that touch tables / models. **Not chained into `pnpm build`**: `migration plan` is non-idempotent (each invocation generates a new timestamped directory), so it runs manually when the contract source changes. Note: pgvector's contract declares only the parameterised `vector` native type under `storage.types` (no tables / models), so the planner currently refuses to scaffold the baseline migration with `PN-CLI-4020 Contract changed but planner produced no operations` (this is **Path B** authoring per [ADR 212](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md#contract-space-package-layout)). That directory was hand-authored once (Migration subclass + seed `migration.json` preserving the full `toContract`) and `pnpm tsx migrations/<dirName>/migration.ts` re-emits `ops.json` + `migration.json` deterministically. Future migrations that add tables / models can use `migration plan` directly (Path A).
+- `pnpm tsx migrations/<dirName>/migration.ts` (run from this package directory) — re-emits `ops.json` + `migration.json` from the hand-edited subclass. Use `tsx`, not bare `node`, because the Migration subclass imports relative TypeScript siblings which Node's native loader can't resolve without a TS-aware loader.
+- `migrations/refs/head.json` is hand-pinned with the latest migration's `to` hash + `providedInvariants`.
+
+The descriptor at `src/exports/control.ts` then JSON-imports those artefacts and synthesises the framework's `MigrationPackage` shape.
+
+See [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md) ("Contract-space package layout") for the canonical layout and rationale.
+
 ## References
 
 - [pgvector documentation](https://github.com/pgvector/pgvector)
 - [Prisma Next Architecture Overview](../../../docs/Architecture%20Overview.md)
 - [Extension Packs Guide](../../../docs/reference/Extension-Packs-Naming-and-Layout.md)
+- [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md)
 
 Pack refs (`@prisma-next/extension-pgvector/pack`) are pure data objects generated from the hydrated manifest (`src/core/manifest.ts`), so TypeScript contract builders can enable the pgvector namespace in both emit and no-emit workflows without touching the filesystem.

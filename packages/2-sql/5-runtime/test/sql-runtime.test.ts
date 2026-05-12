@@ -20,7 +20,6 @@ import {
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { parseContractMarkerRow } from '../src/marker';
 import type { SqlMiddleware } from '../src/middleware/sql-middleware';
 import type {
   SqlRuntimeAdapterDescriptor,
@@ -84,13 +83,7 @@ function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
       id: 'test-profile',
       target: 'postgres',
       capabilities: {},
-      readMarkerStatement() {
-        return {
-          sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
-          params: ['app'],
-        };
-      },
-      parseMarkerRow: parseContractMarkerRow,
+      readMarker: async () => ({ kind: 'absent' as const }),
     },
     lower(ast: SelectAst) {
       const params = [...new Set(ast.collectParamRefs())].map((ref) => ref.value);

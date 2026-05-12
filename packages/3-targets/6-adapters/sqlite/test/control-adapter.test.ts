@@ -28,7 +28,6 @@ describe('SqliteControlAdapter.introspect', () => {
     const adapter = new SqliteControlAdapter();
     const schema = await adapter.introspect(driver);
     expect(schema.tables).toEqual({});
-    expect(schema.dependencies).toEqual([]);
     await driver.close();
   });
 

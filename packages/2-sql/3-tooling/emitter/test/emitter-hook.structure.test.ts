@@ -821,8 +821,8 @@ describe('sql-target-family-hook', () => {
             indexes: [
               {
                 columns: ['description'],
-                using: 'bm25',
-                config: {
+                type: 'bm25',
+                options: {
                   keyField: 'id',
                   fields: [{ column: 'description', tokenizer: 'simple' }],
                 },
@@ -839,7 +839,7 @@ describe('sql-target-family-hook', () => {
     }).not.toThrow();
   });
 
-  it('still validates index column references independent of extension config', () => {
+  it('still validates index column references independent of extension options', () => {
     const ir = createContract({
       storage: {
         tables: {
@@ -853,8 +853,8 @@ describe('sql-target-family-hook', () => {
             indexes: [
               {
                 columns: ['nonexistent'],
-                using: 'bm25',
-                config: {
+                type: 'bm25',
+                options: {
                   keyField: 'id',
                   fields: [{ expression: "description || ' ' || category", tokenizer: 'simple' }],
                 },

@@ -13,7 +13,7 @@ This package provides the SQL-specific emitter hook implementation for the Prism
   - `validateStructure()`: Validates SQL-specific logical consistency (foreign key references, model-to-table mappings, constraint consistency). **Note**: Structural properties (required fields, types) are validated by Arktype schema validation - this function focuses on logical validation that schema validators can't perform.
 
 - **Type Generation**: Generates TypeScript type definitions for SQL contracts
-  - `generateContractTypes()`: Generates `contract.d.ts` file content (receives separate `codecTypeImports` and `operationTypeImports` arrays)
+  - `generateContractTypes()`: Generates `contract.d.ts` file content (receives a `codecTypeImports` array)
 
 ## Dependencies
 

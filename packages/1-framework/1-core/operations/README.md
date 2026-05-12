@@ -9,10 +9,11 @@ This package provides a generic, target-neutral operation registry. It's part of
 ## Responsibilities
 
 - **Operation Registry**: Generic operation registry interface and implementation
-  - `OperationRegistry<T>`: Generic interface for registering and iterating operations, parameterized by entry type
+  - `OperationRegistry<T>`: Generic interface for registering and iterating operations, parameterized by entry type. `register(name, descriptor)` keys each entry by an explicit method name supplied at the call site.
   - `createOperationRegistry<T>()`: Factory function to create operation registries
-  - `OperationEntry`: Base entry type with `args` and `returns`
-  - `OperationDescriptor<T>`: Entry plus a `method` name, used for registration
+  - `OperationEntry`: Base entry type with `self` and `impl`
+  - `OperationDescriptor<T>`: Alias for the entry shape used at registration sites
+  - `OperationDescriptors<T>`: `Readonly<Record<string, OperationDescriptor<T>>>` — the natural shape contributors return, where the record key IS the method name
   - `ParamSpec`: Describes an operation parameter (`codecId`, `nullable`), used for both arguments and return values
 
 ## Dependencies
@@ -59,19 +60,18 @@ import { createOperationRegistry, type OperationDescriptor } from '@prisma-next/
 const registry = createOperationRegistry();
 
 const descriptor: OperationDescriptor = {
-  method: 'cosineDistance',
-  args: [{ codecId: 'pg/vector@1', nullable: false }],
-  returns: { codecId: 'pg/float8@1', nullable: false },
+  self: { codecId: 'pg/vector@1' },
+  impl: () => ({ returnType: { codecId: 'pg/float8@1', nullable: false } }),
 };
 
-registry.register(descriptor);
+registry.register('cosineDistance', descriptor);
 const entries = registry.entries(); // Record<string, OperationEntry>
 ```
 
 ### Using a Custom Entry Type
 
 ```typescript
-import { createOperationRegistry, type OperationEntry, type OperationDescriptor } from '@prisma-next/operations';
+import { createOperationRegistry, type OperationEntry } from '@prisma-next/operations';
 
 interface MyEntry extends OperationEntry {
   readonly extra: string;
@@ -79,10 +79,9 @@ interface MyEntry extends OperationEntry {
 
 const registry = createOperationRegistry<MyEntry>();
 
-registry.register({
-  method: 'myMethod',
-  args: [],
-  returns: { codecId: 'pg/int4@1', nullable: false },
+registry.register('myMethod', {
+  self: { codecId: 'pg/int4@1' },
+  impl: () => undefined as never,
   extra: 'custom data',
 });
 ```

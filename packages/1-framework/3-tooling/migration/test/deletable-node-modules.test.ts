@@ -1,5 +1,5 @@
 /**
- * "Deletable `node_modules`" fixture (TML-2397).
+ * "Deletable `node_modules`" fixture.
  *
  * Locks in the property that the per-space verifier and runner **read
  * only the user's repo** — on-disk `contract.json` / `contract.d.ts` /
@@ -15,8 +15,11 @@
  * `test-contract-space` fixture (today hosted under
  * `test/integration/test/contract-space-fixture/`) — that is the
  * point. The test invents a `'test-contract-space'` space id inline
- * and runs the helpers against on-disk artefacts plus a fake set of
+ * and runs the helpers against on-disk artefacts on disk plus a fake set of
  * marker rows.
+ *
+ * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
+ *   — "Pinned per-space artefacts" / verifier reads only the user repo.
  */
 
 import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
@@ -63,9 +66,9 @@ async function setupProjectWithTestSpace(): Promise<ProjectFixture> {
 
   // Stand-in for an installed extension package — the descriptor module
   // would normally live under `node_modules/<pkg>/...`. The test deletes
-  // this directory before invoking the verifier to model the AC-15 case
-  // ("verifier + runner succeed when extension descriptor not
-  // importable, e.g. node_modules removed").
+  // this directory before invoking the verifier to confirm the verifier
+  // + runner succeed when the extension descriptor is not importable
+  // (e.g. node_modules removed).
   await mkdir(join(nodeModulesPath, '@prisma-next', 'synthetic-extension-stand-in'), {
     recursive: true,
   });
@@ -79,7 +82,7 @@ async function setupProjectWithTestSpace(): Promise<ProjectFixture> {
   return { projectRoot, projectMigrationsDir, nodeModulesPath };
 }
 
-describe('per-space verifier + runner against a project with deleted node_modules (AC-15 / TC-26)', () => {
+describe('per-space verifier + runner against a project with deleted node_modules', () => {
   let fixture: ProjectFixture;
 
   beforeEach(async () => {
@@ -176,30 +179,25 @@ describe('per-space verifier + runner against a project with deleted node_module
 });
 
 /**
- * Locks the loader → verifier path against the deleted-`node_modules`
- * scenario (TML-2397).
+ * Lock for the loader → planner → verifier pipeline.
  *
- * The aggregate refactor makes the loader the single descriptor-import
- * boundary for `db init` / `db update` / `db verify`: once
- * `loadContractSpaceAggregate` returns, the verifier operates purely on
- * the in-memory aggregate. This test exercises that property end-to-end:
- * with `node_modules` deleted, declared extension entries supplied
- * **inline** (the same shape
- * `cli/control-api/utils/contract-space-aggregate-loader` builds from
- * `Config.extensionPacks`), `loadContractSpaceAggregate` followed by
- * `verifyAggregate` succeeds. Planner coverage is owned by the
- * dedicated planner tests; this test intentionally does not exercise
- * `planContractSpaceAggregate`.
+ * The aggregate refactor makes the loader the single
+ * descriptor-import boundary for `db init` / `db update` / `db verify`:
+ * once `loadContractSpaceAggregate` returns, the planner and verifier
+ * operate purely on the in-memory aggregate. This test exercises that
+ * property end-to-end: with `node_modules` deleted, declared extension
+ * entries supplied **inline** (the same shape `cli/control-api/utils/contract-space-aggregate-loader`
+ * builds from `Config.extensionPacks`), the full pipeline succeeds.
  *
  * The test deliberately constructs `DeclaredExtensionEntry` values
  * directly — no descriptor module is imported. If the post-load
  * pipeline ever silently re-touches a descriptor module, this test
  * does not catch it on its own (descriptor modules are imported
  * eagerly by their consumers); but combined with the fact that the
- * loader is the only place that calls `validateContract` / `hashContract`,
- * the property is locked at the API surface.
+ * loader's only descriptor-shaped input is `id` / `targetId`, the
+ * property is locked at the API surface.
  */
-describe('aggregate loader → verifier against deleted node_modules', () => {
+describe('aggregate pipeline (loader → planner → verifier) against deleted node_modules', () => {
   const HEAD_HASH = 'sha256:abc123';
   let projectRoot: string;
   let migrationsDir: string;
@@ -217,9 +215,7 @@ describe('aggregate loader → verifier against deleted node_modules', () => {
     );
 
     // Pin the contract-space artefacts the loader reads. The contract
-    // value here is the same shape the validator will return; the
-    // hashContract callback hashes it to HEAD_HASH so drift detection
-    // sees no drift.
+    // value here is the same shape the validator will return.
     const spaceContract = createSqlContract({
       target: 'postgres',
       storage: { tables: { test_box: { columns: { x: {}, y: {} } } } },
@@ -248,26 +244,14 @@ describe('aggregate loader → verifier against deleted node_modules', () => {
     await rm(projectRoot, { recursive: true, force: true });
   });
 
-  it('loader → verifier walks to completion with node_modules removed', async () => {
-    // Reconstruct the same on-disk contract value the writer used (the
-    // emitter rounds it through the canonical-JSON pipeline; the test
-    // hands the validator back an identity value structurally identical
-    // to what was written).
-    const spaceContract = createSqlContract({
-      target: 'postgres',
-      storage: { tables: { test_box: { columns: { x: {}, y: {} } } } },
-    });
+  it('loader → verifier walk to completion with node_modules removed', async () => {
     const appContract = createSqlContract({
       target: 'postgres',
       storage: { tables: { user: { columns: { id: {} } } } },
     });
 
     const declaredExtensions: ReadonlyArray<DeclaredExtensionEntry> = [
-      {
-        id: TEST_SPACE_ID,
-        targetId: 'postgres',
-        contractSpace: { contractJson: spaceContract as unknown as Record<string, unknown> },
-      },
+      { id: TEST_SPACE_ID, targetId: 'postgres' },
     ];
 
     const loaded = await loadContractSpaceAggregate({
@@ -276,7 +260,6 @@ describe('aggregate loader → verifier against deleted node_modules', () => {
       appContract,
       declaredExtensions,
       validateContract: (json: unknown): Contract => json as Contract,
-      hashContract: () => HEAD_HASH,
       appMigrationPackages: [],
     });
     expect(loaded.ok).toBe(true);

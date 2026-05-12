@@ -2,6 +2,7 @@ import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-compon
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
+import { testIndexPack } from './helpers/test-index-pack';
 
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
@@ -166,83 +167,41 @@ describe('contract builder normalization', () => {
     expect(contract.storage.tables.user.columns.email.nullable).toBe(false);
   });
 
-  it('passes through extension-owned index fields (using, config)', () => {
-    const contract = defineContract({
-      family: bareFamilyPack,
-      target: postgresTargetPack,
-      models: {
-        Item: model('Item', {
-          fields: {
-            id: field.column(int4Column).id(),
-            description: field.column(textColumn),
-          },
-        }).sql(({ cols, constraints }) => ({
-          table: 'items',
-          indexes: [
-            constraints.index(cols.description, {
-              name: 'search_idx',
-              using: 'bm25',
-              config: {
-                keyField: 'id',
-                fields: [{ column: 'description', tokenizer: 'simple' }],
-              },
-            }),
-          ],
-        })),
+  it('passes type and options on indexes through to storage IR', () => {
+    const contract = defineContract(
+      {
+        family: bareFamilyPack,
+        target: postgresTargetPack,
+        extensionPacks: { testIndexes: testIndexPack },
       },
-    });
+      ({ model, field }) => ({
+        models: {
+          Item: model('Item', {
+            fields: {
+              id: field.column(int4Column).id(),
+              description: field.column(textColumn),
+            },
+          }).sql(({ cols, constraints }) => ({
+            table: 'items',
+            indexes: [
+              constraints.index([cols.description], {
+                name: 'search_idx',
+                type: 'bm25',
+                options: { key_field: 'id' },
+              }),
+            ],
+          })),
+        },
+      }),
+    );
 
     const indexes = contract.storage.tables.items.indexes;
     expect(indexes).toHaveLength(1);
-    expect(indexes[0]).toMatchObject({
+    expect(indexes[0]).toEqual({
       columns: ['description'],
-      using: 'bm25',
+      type: 'bm25',
       name: 'search_idx',
-      config: {
-        keyField: 'id',
-        fields: [{ column: 'description', tokenizer: 'simple' }],
-      },
-    });
-  });
-
-  it('passes through extension index config with expression fields', () => {
-    const contract = defineContract({
-      family: bareFamilyPack,
-      target: postgresTargetPack,
-      models: {
-        Item: model('Item', {
-          fields: {
-            id: field.column(int4Column).id(),
-            description: field.column(textColumn),
-          },
-        }).sql(({ cols, constraints }) => ({
-          table: 'items',
-          indexes: [
-            constraints.index(cols.description, {
-              using: 'bm25',
-              config: {
-                keyField: 'id',
-                fields: [
-                  { column: 'description' },
-                  {
-                    expression: "description || ' ' || category",
-                    alias: 'concat',
-                    tokenizer: 'simple',
-                  },
-                ],
-              },
-            }),
-          ],
-        })),
-      },
-    });
-
-    const idx = contract.storage.tables.items.indexes[0]!;
-    expect(idx.using).toBe('bm25');
-    expect((idx.config as { fields: readonly unknown[] }).fields).toHaveLength(2);
-    expect((idx.config as { fields: readonly unknown[] }).fields[1]).toMatchObject({
-      expression: "description || ' ' || category",
-      alias: 'concat',
+      options: { key_field: 'id' },
     });
   });
 
@@ -258,7 +217,7 @@ describe('contract builder normalization', () => {
           },
         }).sql(({ cols, constraints }) => ({
           table: 'user',
-          indexes: [constraints.index(cols.email)],
+          indexes: [constraints.index([cols.email])],
         })),
       },
     });

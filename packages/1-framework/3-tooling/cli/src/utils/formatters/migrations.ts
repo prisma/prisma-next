@@ -7,9 +7,9 @@ import { createColorFormatter, formatDim, isVerbose } from './helpers';
 
 /**
  * Render a single statement of an `OperationPreview` for the human-readable
- * preview block. SQL statements get a trailing `;` if missing — matches the
- * legacy `string[]`-based renderer byte-for-byte (per spec OQ-4). Other
- * languages (`'mongodb-shell'`) render verbatim.
+ * preview block. SQL statements get a trailing `;` if missing so the rendered
+ * preview is byte-identical to the legacy `string[]`-based renderer for SQL
+ * targets. Other languages (`'mongodb-shell'`) render verbatim.
  */
 function renderPreviewStatement(text: string, language: string): string | undefined {
   const trimmed = text.trim();
@@ -22,9 +22,10 @@ function renderPreviewStatement(text: string, language: string): string | undefi
 
 /**
  * Choose the header label for a preview block. SQL-only previews keep the
- * legacy `DDL preview` label (preserves CLI byte-identity for SQL targets per
- * spec OQ-4); previews from any other family — or a mix that includes any
- * non-SQL language — use the family-agnostic `Operation preview` label.
+ * legacy `DDL preview` label so the rendered output is byte-identical to the
+ * pre-aggregate SQL CLI; previews from any other family — or a mix that
+ * includes any non-SQL language — use the family-agnostic `Operation preview`
+ * label.
  *
  * An empty `statements` array deliberately renders as `Operation preview`
  * rather than `DDL preview`: `Array.prototype.every` is vacuously true for
@@ -76,8 +77,9 @@ export interface MigrationCommandResult {
   /**
    * Per-space execution breakdown in canonical schedule order
    * (extensions alphabetically, then app). Surfaces per-space markers
-   * + ops grouped by space; closes F1 / F4 / F7 from the M6
-   * verification doc. See {@link AggregatePerSpaceExecutionEntry}.
+   * and the ops grouped by space, so the CLI summary can name which
+   * space each op and marker belongs to instead of flattening them
+   * into a single ambiguous list. See {@link AggregatePerSpaceExecutionEntry}.
    */
   readonly perSpace?: ReadonlyArray<AggregatePerSpaceExecutionEntry>;
   readonly summary: string;
@@ -88,10 +90,9 @@ export interface MigrationCommandResult {
 
 /**
  * Render the shared per-space execution block consumed by the `db init`
- * / `db update` / `migration apply` summaries (M6 sub-spec § Output
- * shape contract). Always shows: space label (`Extension space: <id>`
- * or `App space`) → per-op lines under each space → per-space marker
- * hash (when known).
+ * / `db update` / `migration apply` summaries. Always shows: space
+ * label (`Extension space: <id>` or `App space`) → per-op lines under
+ * each space → per-space marker hash (when known).
  *
  * `mode` controls the marker label phrasing — `'apply'` shows
  * `marker → <hash>` (post-apply), `'plan'` omits the marker line
@@ -165,7 +166,7 @@ export function formatMigrationPlanOutput(
   const formatYellow = createColorFormatter(useColor, yellow);
 
   // Per-space breakdown takes precedence over the flat ops tree when
-  // the aggregate flow surfaced one (M6 sub-spec § Output shape contract).
+  // the aggregate flow surfaced one.
   if (result.perSpace && result.perSpace.length > 0) {
     lines.push('');
     lines.push(...formatPerSpaceBlock(result.perSpace, 'plan', useColor));
@@ -294,7 +295,9 @@ export function formatMigrationApplyCommandOutput(
   return lines.join('\n');
 }
 
-interface MigrationShowResult {
+interface MigrationShowSpacePresent {
+  readonly kind: 'present';
+  readonly spaceId: string;
   readonly dirName: string;
   readonly dirPath: string;
   readonly from: string | null;
@@ -310,39 +313,48 @@ interface MigrationShowResult {
   readonly summary: string;
 }
 
-export function formatMigrationShowOutput(result: MigrationShowResult, flags: GlobalFlags): string {
-  if (flags.quiet) {
-    return '';
-  }
+interface MigrationShowSpaceMissing {
+  readonly kind: 'missing';
+  readonly spaceId: string;
+  readonly summary: string;
+}
 
-  const lines: string[] = [];
+type MigrationShowSpaceResult = MigrationShowSpacePresent | MigrationShowSpaceMissing;
 
-  const useColor = flags.color !== false;
+interface MigrationShowResult {
+  readonly spaces: readonly MigrationShowSpaceResult[];
+}
+
+function formatSpaceShowBlock(
+  space: MigrationShowSpacePresent,
+  useColor: boolean,
+): readonly string[] {
   const formatGreen = createColorFormatter(useColor, green);
   const formatYellow = createColorFormatter(useColor, yellow);
   const formatDimText = (text: string) => formatDim(useColor, text);
 
-  lines.push(`${formatGreen('✔')} ${result.dirName}`);
-  lines.push(`${formatDimText(`  from: ${result.from ?? '(baseline)'}`)}`);
-  lines.push(`${formatDimText(`  to:   ${result.to}`)}`);
-  lines.push(`${formatDimText(`  migrationHash: ${result.migrationHash}`)}`);
-  lines.push(`${formatDimText(`  created: ${result.createdAt}`)}`);
+  const lines: string[] = [];
+  lines.push(`${formatGreen('✔')} ${space.dirName}`);
+  lines.push(`${formatDimText(`  from: ${space.from ?? '(baseline)'}`)}`);
+  lines.push(`${formatDimText(`  to:   ${space.to}`)}`);
+  lines.push(`${formatDimText(`  migrationHash: ${space.migrationHash}`)}`);
+  lines.push(`${formatDimText(`  created: ${space.createdAt}`)}`);
 
   lines.push('');
-  lines.push(`${result.operations.length} operation(s)`);
+  lines.push(`${space.operations.length} operation(s)`);
 
-  if (result.operations.length > 0) {
+  if (space.operations.length > 0) {
     lines.push(`${formatDimText('│')}`);
-    for (let i = 0; i < result.operations.length; i++) {
-      const op = result.operations[i]!;
-      const isLast = i === result.operations.length - 1;
+    for (let i = 0; i < space.operations.length; i++) {
+      const op = space.operations[i]!;
+      const isLast = i === space.operations.length - 1;
       const treeChar = isLast ? '└' : '├';
       const destructiveMarker =
         op.operationClass === 'destructive' ? ` ${formatYellow('(destructive)')}` : '';
       lines.push(`${formatDimText(treeChar)}─ ${op.label}${destructiveMarker}`);
     }
 
-    const hasDestructive = result.operations.some((op) => op.operationClass === 'destructive');
+    const hasDestructive = space.operations.some((op) => op.operationClass === 'destructive');
     if (hasDestructive) {
       lines.push('');
       lines.push(
@@ -351,15 +363,45 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
     }
   }
 
-  if (result.preview.statements.length > 0) {
+  if (space.preview.statements.length > 0) {
     lines.push('');
-    lines.push(`${formatDimText(previewBlockHeader(result.preview))}`);
+    lines.push(`${formatDimText(previewBlockHeader(space.preview))}`);
     lines.push('');
-    for (const statement of result.preview.statements) {
+    for (const statement of space.preview.statements) {
       const rendered = renderPreviewStatement(statement.text, statement.language);
       if (rendered) {
         lines.push(rendered);
       }
+    }
+  }
+
+  return lines;
+}
+
+export function formatMigrationShowOutput(result: MigrationShowResult, flags: GlobalFlags): string {
+  if (flags.quiet) {
+    return '';
+  }
+
+  const useColor = flags.color !== false;
+  const formatDimText = (text: string) => formatDim(useColor, text);
+  const multipleSpaces = result.spaces.length > 1;
+  const lines: string[] = [];
+
+  for (let i = 0; i < result.spaces.length; i++) {
+    const space = result.spaces[i]!;
+    if (multipleSpaces) {
+      lines.push(formatDimText(`── ${space.spaceId} ──`));
+    }
+    if (space.kind === 'missing') {
+      lines.push(formatDimText(`  ${space.summary}`));
+    } else {
+      for (const line of formatSpaceShowBlock(space, useColor)) {
+        lines.push(line);
+      }
+    }
+    if (i < result.spaces.length - 1) {
+      lines.push('');
     }
   }
 
@@ -401,7 +443,7 @@ export function formatMigrationApplyOutput(
     }
 
     // Per-space breakdown — replaces the single ambiguous `Signature:`
-    // line per M6 sub-spec § Output shape contract / AC4 / AC5.
+    // line with a per-space marker + ops listing.
     if (result.perSpace && result.perSpace.length > 0) {
       lines.push('');
       lines.push(...formatPerSpaceBlock(result.perSpace, 'apply', useColor));
@@ -415,9 +457,9 @@ export function formatMigrationApplyOutput(
       );
     } else if (result.marker) {
       // Single-space fallback (no aggregate breakdown surfaced — e.g.
-      // older callers / non-aggregate code paths). Renamed from
-      // `Signature` to `App-space marker` per AC4 — when only one
-      // marker is observable, name what it covers explicitly.
+      // older callers / non-aggregate code paths). The label is
+      // `App-space marker` (not `Signature`) so that when only one
+      // marker is observable we still name what it covers explicitly.
       lines.push(`${formatDimText(`  App-space marker: ${result.marker.storageHash}`)}`);
       if (result.marker.profileHash) {
         lines.push(`${formatDimText(`  Profile hash: ${result.marker.profileHash}`)}`);

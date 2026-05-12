@@ -28,7 +28,6 @@ describe('emitter', () => {
       const ir = createTestContract();
       const options: EmitStackInput = {
         codecTypeImports: [],
-        operationTypeImports: [],
       };
 
       await expect(
@@ -83,11 +82,9 @@ describe('emitter', () => {
       });
 
       const codecTypeImports: TypesImportSpec[] = [];
-      const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitStackInput = {
         codecTypeImports,
-        operationTypeImports,
         extensionIds,
       };
 
@@ -122,7 +119,6 @@ describe('emitter', () => {
 
     const options: EmitStackInput = {
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -150,7 +146,6 @@ describe('emitter', () => {
 
     const options: EmitStackInput = {
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: ['some-other-extension'],
     };
 
@@ -177,7 +172,6 @@ describe('emitter', () => {
 
     const options: EmitStackInput = {
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -204,7 +198,6 @@ describe('emitter', () => {
 
     const options: EmitStackInput = {
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -224,7 +217,6 @@ describe('emitter', () => {
 
       const options: EmitStackInput = {
         codecTypeImports: [],
-        operationTypeImports: [],
         extensionIds: [],
       };
 
@@ -246,7 +238,6 @@ describe('emitter', () => {
 
     const options: EmitStackInput = {
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -280,7 +271,6 @@ describe('emitter', () => {
 
     const options: EmitStackInput = {
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -301,7 +291,6 @@ describe('emitter', () => {
 
     const options: EmitStackInput = {
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: ['postgres'],
     };
 
@@ -310,7 +299,7 @@ describe('emitter', () => {
     expect(result.contractDts).toBeDefined();
   });
 
-  it('defaults codecTypeImports and operationTypeImports to empty arrays when omitted', async () => {
+  it('defaults codecTypeImports to empty array when omitted', async () => {
     const ir = createTestContract({
       storage: { tables: {} },
     });
@@ -321,7 +310,6 @@ describe('emitter', () => {
 
     const result = await emit(ir, options, mockSqlHook);
     expect(result.contractDts).toContain('export type CodecTypes');
-    expect(result.contractDts).toContain('export type OperationTypes');
   });
 
   it('passes parameterizedTypeImports and queryOperationTypeImports to generateContractDts', async () => {
@@ -335,7 +323,6 @@ describe('emitter', () => {
 
     const options: EmitStackInput = {
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: [],
       queryOperationTypeImports,
     };
@@ -389,7 +376,6 @@ describe('emitter', () => {
 
     const options: EmitStackInput = {
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -424,7 +410,6 @@ describe('emitter', () => {
 
     const options: EmitStackInput = {
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -455,7 +440,6 @@ describe('emitter', () => {
 
     const options: EmitStackInput = {
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: [],
     };
 
@@ -474,7 +458,6 @@ describe('emitter', () => {
 
     const options: EmitStackInput = {
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: [],
     };
 

@@ -5,6 +5,7 @@
   "type": "module",
   "sideEffects": false,
   "scripts": {
+    "build:contract-space": "prisma-next contract emit",
     "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -29,14 +30,25 @@
     "arktype": "^2.1.29"
   },
   "devDependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/cli": "workspace:*",
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@prisma-next/adapter-postgres": {
+      "optional": true
+    }
   },
   "files": [
     "dist",

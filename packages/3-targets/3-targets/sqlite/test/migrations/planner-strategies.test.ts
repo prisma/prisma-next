@@ -36,7 +36,7 @@ function makeContext(overrides: Partial<StrategyContext> = {}): StrategyContext 
     fromContract: null,
     codecHooks: new Map(),
     storageTypes: {},
-    schema: { tables: {}, dependencies: [] },
+    schema: { tables: {} },
     policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
     frameworkComponents: [],
     ...overrides,
@@ -85,7 +85,7 @@ describe('recreateTableStrategy', () => {
       },
     });
 
-    const schema: SqlSchemaIR = { tables: { user: baseTable }, dependencies: [] };
+    const schema: SqlSchemaIR = { tables: { user: baseTable } };
 
     const issues: SchemaIssue[] = [
       { kind: 'default_mismatch', table: 'user', column: 'email', message: 'differ' },
@@ -120,7 +120,7 @@ describe('recreateTableStrategy', () => {
       },
     });
 
-    const schema: SqlSchemaIR = { tables: { user: baseTable }, dependencies: [] };
+    const schema: SqlSchemaIR = { tables: { user: baseTable } };
 
     const issues: SchemaIssue[] = [
       {
@@ -161,7 +161,7 @@ describe('recreateTableStrategy', () => {
       },
     });
 
-    const schema: SqlSchemaIR = { tables: { user: baseTable }, dependencies: [] };
+    const schema: SqlSchemaIR = { tables: { user: baseTable } };
 
     const issues: SchemaIssue[] = [
       { kind: 'default_mismatch', table: 'user', column: 'email', message: 'd' },
@@ -200,7 +200,7 @@ describe('recreateTableStrategy', () => {
       },
     });
 
-    const schema: SqlSchemaIR = { tables: { user: baseTable }, dependencies: [] };
+    const schema: SqlSchemaIR = { tables: { user: baseTable } };
 
     const widening = recreateTableStrategy(
       [
@@ -262,7 +262,6 @@ describe('recreateTableStrategy', () => {
         a: { ...baseTable, name: 'a' },
         b: { ...baseTable, name: 'b' },
       },
-      dependencies: [],
     };
 
     const issues: SchemaIssue[] = [

@@ -71,7 +71,7 @@
  * regardless of codec — pinned by `test/operator-lowering.test.ts`.
  */
 
-import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
+import type { SqlOperationDescriptor, SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import { type AnyExpression, type ColumnRef, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import {
   buildOperation,
@@ -165,7 +165,6 @@ function extractColumnRef(selfAst: AnyExpression): ColumnRef | undefined {
  */
 function eqlOperator(publicMethod: string, eqlFunction: 'eq' | 'ilike'): SqlOperationDescriptor {
   return {
-    method: publicMethod,
     self: { codecId: CIPHERSTASH_STRING_CODEC_ID },
     impl: (self: Expression<ScopeField>, value: unknown): Expression<PgBoolReturn> => {
       const selfAst = toExpr(self);
@@ -204,6 +203,9 @@ function eqlOperator(publicMethod: string, eqlFunction: 'eq' | 'ilike'): SqlOper
  * them — see the `Why unique method names` section in this file`s
  * top-level docblock.
  */
-export function cipherstashQueryOperations(): readonly SqlOperationDescriptor[] {
-  return [eqlOperator('cipherstashEq', 'eq'), eqlOperator('cipherstashIlike', 'ilike')];
+export function cipherstashQueryOperations(): SqlOperationDescriptors {
+  return {
+    cipherstashEq: eqlOperator('cipherstashEq', 'eq'),
+    cipherstashIlike: eqlOperator('cipherstashIlike', 'ilike'),
+  };
 }

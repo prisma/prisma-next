@@ -16,8 +16,6 @@
 import type { DeclaredExtensionEntry } from '@prisma-next/migration-tools/aggregate';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { MigrationOps } from '@prisma-next/migration-tools/package';
-import type { ExtensionMigrationsExtensionInput } from './contract-space-extension-migrations-pass';
-import type { MigrateExtensionInput } from './contract-space-migrate-pass';
 
 /**
  * In-memory authored migration package shipped by an extension descriptor.
@@ -108,63 +106,57 @@ export function toExtensionInputs(
 // ---------------------------------------------------------------------------
 
 /**
- * Aggregate-loader projection: surfaces `targetId` + `contractSpace.contractJson`
- * to {@link import('./contract-space-aggregate-loader').buildContractSpaceAggregate}
- * and a `hashByContractJson` map keyed by the same `contractJson` reference
- * the loader hands to its hash callback.
+ * Aggregate-loader projection. Surfaces `id` + `targetId` per
+ * contract-space-bearing extension to
+ * {@link import('./contract-space-aggregate-loader').buildContractSpaceAggregate}.
+ *
+ * Codec-only extensions (no `contractSpace` declaration) are filtered
+ * out: they are not contract-space members, so the aggregate loader
+ * has nothing to do with them. Filtering happens at this descriptor-
+ * import boundary so the loader stays oblivious to that distinction —
+ * every entry it sees expects an on-disk `migrations/<id>/` directory.
  */
-export function toDeclaredExtensions(inputs: ReadonlyArray<ExtensionPackInput>): {
-  readonly entries: ReadonlyArray<DeclaredExtensionEntry>;
-  readonly hashByContractJson: Map<unknown, string>;
-} {
+export function toDeclaredExtensions(
+  inputs: ReadonlyArray<ExtensionPackInput>,
+): readonly DeclaredExtensionEntry[] {
   const entries: DeclaredExtensionEntry[] = [];
-  const hashByContractJson = new Map<unknown, string>();
   for (const pack of inputs) {
-    if (pack.contractSpace) {
-      entries.push({
-        id: pack.id,
-        targetId: pack.targetId,
-        contractSpace: { contractJson: pack.contractSpace.contractJson },
-      });
-      hashByContractJson.set(pack.contractSpace.contractJson, pack.contractSpace.headRef.hash);
-    } else {
-      entries.push({ id: pack.id, targetId: pack.targetId });
-    }
+    if (pack.contractSpace === undefined) continue;
+    entries.push({ id: pack.id, targetId: pack.targetId });
   }
-  return { entries, hashByContractJson };
+  return entries;
 }
 
-/** Migrate-time per-space pass projection. */
-export function toMigratePassInputs(
-  inputs: ReadonlyArray<ExtensionPackInput>,
-): readonly MigrateExtensionInput[] {
-  return inputs.map((pack) =>
-    pack.contractSpace
-      ? {
-          id: pack.id,
-          contractSpace: {
-            contractJson: pack.contractSpace.contractJson,
-            headRef: pack.contractSpace.headRef,
-          },
-        }
-      : { id: pack.id },
-  );
-}
-
-/** Extension-migrations materialisation pass projection. */
-export function toExtensionMigrationsInputs(
-  inputs: ReadonlyArray<ExtensionPackInput>,
-): readonly ExtensionMigrationsExtensionInput[] {
-  return inputs.map((pack) =>
-    pack.contractSpace
-      ? {
-          id: pack.id,
-          contractSpace: {
-            contractJson: pack.contractSpace.contractJson,
-            headRef: pack.contractSpace.headRef,
-            migrations: pack.contractSpace.migrations,
-          },
-        }
-      : { id: pack.id },
-  );
+/**
+ * Minimal aggregate-loader projection that extracts `id` + `targetId`
+ * from raw extension pack descriptors **without invoking any
+ * `contractSpace` accessor**. Inspects the own-property descriptor so
+ * that getter-backed `contractSpace` declarations are detected but
+ * never called.
+ *
+ * Inclusion semantics match {@link toDeclaredExtensions}: a data
+ * property whose value is explicitly `undefined` is treated as "no
+ * contract-space declaration" and skipped, mirroring the
+ * `pack.contractSpace === undefined` check used on canonicalised
+ * inputs. Prototype-chain `contractSpace` properties (no own
+ * descriptor) are also skipped.
+ *
+ * This variant must be used by `buildContractSpaceAggregate` so that
+ * the aggregate path (including `db verify`) never reads
+ * `contractSpace.contractJson` from extension descriptors — the loader
+ * always reads the contract from on-disk artefacts instead.
+ */
+export function toDeclaredExtensionsFromRaw(
+  extensionPacks: ReadonlyArray<unknown>,
+): readonly DeclaredExtensionEntry[] {
+  const entries: DeclaredExtensionEntry[] = [];
+  for (const raw of extensionPacks) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const descriptor = Object.getOwnPropertyDescriptor(raw, 'contractSpace');
+    if (descriptor === undefined) continue;
+    if ('value' in descriptor && descriptor.value === undefined) continue;
+    const pack = raw as { readonly id: string; readonly targetId: string };
+    entries.push({ id: pack.id, targetId: pack.targetId });
+  }
+  return entries;
 }

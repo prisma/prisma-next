@@ -129,7 +129,6 @@ const schemaIR = {
       indexes: [],
     },
   },
-  dependencies: [],
 } as const;
 
 describe('createContractInferCommand', () => {

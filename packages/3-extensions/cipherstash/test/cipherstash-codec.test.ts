@@ -228,7 +228,7 @@ describe('cipherstashStringCodecHooks.onFieldEvent — flag → index mapping', 
     });
   });
 
-  describe('operation labels (AC7 — first-time-user-readable)', () => {
+  describe('operation labels (first-time-user-readable)', () => {
     it('add op label is action-first / column-first and free of extension jargon', () => {
       const [op] = onFieldEvent('added', ctx({ next: { typeParams: { equality: true } } }));
       expect(op!.label).toBe(`Enable cipherstash search on ${TABLE}.${FIELD}`);

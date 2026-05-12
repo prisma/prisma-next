@@ -1,23 +1,33 @@
 /**
  * Control-plane descriptor for the pgvector extension.
  *
- * Exposes a `contractSpace` so the framework's per-space planner /
- * runner / verifier (project: extension-contract-spaces, M1+M2)
- * manages the pgvector extension's database scaffolding the same way
- * it manages an application's own schema. The descriptor is consumed
- * by the framework only at authoring time (`migrate`); apply / verify
- * paths read the user's repo (`migrations/pgvector/...`) instead — see
- * project spec NFR3 / FR2 / FR10.
+ * **Contract-space package layout.** The extension's contract
+ * + migrations are emitted by the same pipeline application authors use:
  *
- * `databaseDependencies` is intentionally absent — pgvector was
- * migrated off the legacy `databaseDependencies.init` mechanism in M4
- * (project spec FR13). The `CREATE EXTENSION IF NOT EXISTS vector`
- * DDL the legacy entry carried now lives as the body of the
- * `installVectorExtension` op inside the baseline migration package
- * (`../core/migrations.ts`). Presence of `contractSpace` is the
- * shipping-strategy gate: the framework loads the contract space and
- * ignores any `databaseDependencies` block (project plan §
- * "Shipping Strategy"). M5 removes the field at the framework level.
+ *   `prisma-next contract emit` → `<package>/src/contract.{json,d.ts}`
+ *   `prisma-next migration plan` → `<package>/migrations/<dir>/...`
+ *
+ * The descriptor wires those JSON artefacts via JSON-import declarations
+ * so they flow through the consuming application's module resolver
+ * without filesystem assumptions, and synthesises the canonical
+ * {@link import('@prisma-next/framework-components/control').MigrationPackage}
+ * shape for the framework's runner / verifier to consume. Readers in
+ * `@prisma-next/migration-tools` add `dirPath` when loading from disk
+ * (`OnDiskMigrationPackage`); descriptor-bundled packages do not need
+ * it because the framework reads them directly from the descriptor.
+ *
+ * Wired surfaces:
+ *
+ *   - `contractSpace.{contractJson,migrations,headRef}` — sourced from
+ *     the on-disk artefacts emitted by `build:contract-space`.
+ *   - `types.codecTypes.controlPlaneHooks[PGVECTOR_CODEC_ID]` — codec
+ *     control hooks (`expandNativeType`, `resolveIdentityValue`) the
+ *     SQL planner extracts via `extractCodecControlHooks` and uses to
+ *     render `vector(N)` column types and the canonical zero-vector
+ *     identity literal.
+ *
+ * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
+ *   (contract-space package layout convention).
  */
 
 import type { Contract } from '@prisma-next/contract/types';
@@ -25,14 +35,21 @@ import type {
   CodecControlHooks,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
-import type { ContractSpace } from '@prisma-next/framework-components/control';
+import { contractSpaceFromJson } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { pgvectorContract } from '../core/contract';
+import baselineMetadata from '../../migrations/20260601T0000_install_vector_extension/migration.json' with {
+  type: 'json',
+};
+import baselineOps from '../../migrations/20260601T0000_install_vector_extension/ops.json' with {
+  type: 'json',
+};
+import headRef from '../../migrations/refs/head.json' with { type: 'json' };
+import contractJson from '../contract.json' with { type: 'json' };
 import { PGVECTOR_SPACE_ID } from '../core/contract-space-constants';
 import { pgvectorPackMeta, pgvectorQueryOperations } from '../core/descriptor-meta';
-import { pgvectorBaselineMigration, pgvectorHeadRef } from '../core/migrations';
 
 const PGVECTOR_CODEC_ID = 'pg/vector@1' as const;
+const BASELINE_DIR_NAME = '20260601T0000_install_vector_extension';
 
 function buildVectorIdentityValue(typeParams: Record<string, unknown> | undefined): string | null {
   const length = typeParams?.['length'];
@@ -55,11 +72,17 @@ const vectorControlPlaneHooks: CodecControlHooks = {
   resolveIdentityValue: ({ typeParams }) => buildVectorIdentityValue(typeParams),
 };
 
-const pgvectorContractSpace: ContractSpace<Contract<SqlStorage>> = {
-  contractJson: pgvectorContract,
-  migrations: [pgvectorBaselineMigration],
-  headRef: pgvectorHeadRef,
-};
+const pgvectorContractSpace = contractSpaceFromJson<Contract<SqlStorage>>({
+  contractJson,
+  migrations: [
+    {
+      dirName: BASELINE_DIR_NAME,
+      metadata: baselineMetadata,
+      ops: baselineOps,
+    },
+  ],
+  headRef,
+});
 
 const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
   ...pgvectorPackMeta,

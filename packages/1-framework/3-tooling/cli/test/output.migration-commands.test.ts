@@ -20,7 +20,7 @@ describe('formatMigrationApplyCommandOutput', () => {
     const stripped = stripAnsi(output);
     expect(stripped).toContain('Already up to date');
     // No-op apply still mentions the canonical next-step hint so the
-    // user knows where to verify state. M6 sub-spec § Output shape § footer.
+    // user knows where to verify state.
     expect(stripped).toContain('Next: prisma-next migration status');
   });
 
@@ -54,14 +54,15 @@ describe('formatMigrationApplyCommandOutput', () => {
     );
 
     const stripped = stripAnsi(output);
-    // Top line names the cross-space totals (M6 AC1 / AC4 / AC5).
+    // Top line names the cross-space totals (operation count + space count).
     expect(stripped).toContain('Applied 2 operation(s) across 2 contract space(s)');
     // Both spaces are observable, in canonical order (extension first).
     const extensionIdx = stripped.indexOf('pgvector');
     const appIdx = stripped.indexOf('App space');
     expect(extensionIdx).toBeGreaterThanOrEqual(0);
     expect(appIdx).toBeGreaterThan(extensionIdx);
-    // Per-space markers are observable (M6 AC4).
+    // Per-space markers are observable so consumers can confirm each
+    // space landed on the expected hash.
     expect(stripped).toContain('sha256:ext');
     expect(stripped).toContain('sha256:app-marker');
   });

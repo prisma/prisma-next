@@ -1,9 +1,12 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
-import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import type {
+  MigrationOperationClass,
+  MigrationPlanOperation,
+} from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
@@ -14,10 +17,20 @@ import {
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import stripAnsi from 'strip-ansi';
-import { describe, expect, it } from 'vitest';
-import { resolveByHashPrefix } from '../../src/commands/migration-show';
+import { afterEach, describe, expect, it } from 'vitest';
+import type { MigrationShowSpaceResult } from '../../src/commands/migration-show';
+import {
+  resolveAppTargetPath,
+  resolveByHashPrefix,
+  resolveLatestFromDir,
+} from '../../src/commands/migration-show';
 import { formatMigrationShowOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
+
+// Track every temp dir handed out by `createTempDir` so the suite-wide
+// `afterEach` can remove them — even when an assertion fails — keeping
+// ephemeral state out of the shared `tmpdir()` between runs.
+const createdTempDirs: string[] = [];
 
 async function createTempDir(prefix: string): Promise<string> {
   const dir = join(
@@ -25,13 +38,19 @@ async function createTempDir(prefix: string): Promise<string> {
     `test-migration-show-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   await mkdir(dir, { recursive: true });
+  createdTempDirs.push(dir);
   return dir;
 }
+
+afterEach(async () => {
+  const dirs = createdTempDirs.splice(0);
+  await Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true })));
+});
 
 function createOp(
   id: string,
   label: string,
-  operationClass: 'additive' | 'widening' | 'destructive',
+  operationClass: MigrationOperationClass,
   sql?: string[],
 ): MigrationPlanOperation {
   const op: Record<string, unknown> = { id, label, operationClass };
@@ -275,11 +294,122 @@ describe('resolveByHashPrefix', () => {
   });
 });
 
+describe('resolveLatestFromDir', () => {
+  it('returns ok(null) for an empty migrations directory', async () => {
+    const tempDir = await createTempDir('latest-empty');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    const result = await resolveLatestFromDir(migrationsDir);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBeNull();
+    }
+  });
+
+  it('returns notOk when on-disk packages exist but no latest can be resolved', async () => {
+    const tempDir = await createTempDir('latest-corrupt');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    // Construct a corrupt history: a single self-loop migration whose
+    // from === to === EMPTY_CONTRACT_HASH leaves the reconstructed graph
+    // with no reachable leaf, so findLatestMigration() returns null.
+    await setupMigrationDir(
+      migrationsDir,
+      'self-loop',
+      createMetadata(EMPTY_CONTRACT_HASH, EMPTY_CONTRACT_HASH, createContract()),
+      [createOp('data.backfill', 'Backfill data', 'data')],
+    );
+
+    const result = await resolveLatestFromDir(migrationsDir);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.message).toContain('Could not resolve latest migration');
+      expect(result.failure.why ?? '').toContain('No latest migration found');
+    }
+  });
+});
+
+describe('resolveAppTargetPath', () => {
+  // Mirror the on-disk layout: <migrationsDir>/<spaceId>/.
+  const migrationsDir = '/tmp/proj/migrations';
+  const appMigrationsDir = `${migrationsDir}/app`;
+  const appMigrationsRelative = 'migrations/app';
+
+  it('returns the resolved path when the target is inside the app migrations dir', () => {
+    const target = `${appMigrationsDir}/20260101_000000_init`;
+
+    const result = resolveAppTargetPath(target, appMigrationsDir, appMigrationsRelative);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBe(target);
+    }
+  });
+
+  it('rejects an extension-space package path (sibling of the app dir)', () => {
+    const extensionPackage = `${migrationsDir}/cipherstash/0000000001-init`;
+
+    const result = resolveAppTargetPath(extensionPackage, appMigrationsDir, appMigrationsRelative);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.message).toContain('app-space migration');
+      expect(result.failure.why ?? '').toContain(`Expected a path under ${appMigrationsRelative}`);
+    }
+  });
+
+  it('rejects an unrelated path outside the migrations tree', () => {
+    const outsideTarget = '/tmp/other/extensions/cipherstash/0000000001-init';
+
+    const result = resolveAppTargetPath(outsideTarget, appMigrationsDir, appMigrationsRelative);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.message).toContain('app-space migration');
+    }
+  });
+
+  it('rejects the app migrations dir itself as a target', () => {
+    const result = resolveAppTargetPath(appMigrationsDir, appMigrationsDir, appMigrationsRelative);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.message).toContain('app-space migration');
+    }
+  });
+
+  it('rejects a cross-drive target where pathe.relative returns an absolute path', () => {
+    // On Windows, comparing a target on a different drive than the app
+    // migrations dir makes pathe.relative return an absolute Windows path
+    // (e.g. "D:/elsewhere/foo"), which does not start with "..". The guard
+    // must reject this case via isAbsolute(relativeToApp) rather than
+    // mislabeling it as app-space.
+    const windowsAppMigrationsDir = 'C:/app/migrations/app';
+    const crossDriveTarget = 'D:/elsewhere/foo';
+
+    const result = resolveAppTargetPath(
+      crossDriveTarget,
+      windowsAppMigrationsDir,
+      'migrations/app',
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.message).toContain('app-space migration');
+    }
+  });
+});
+
+function singleSpace(space: MigrationShowSpaceResult): {
+  spaces: readonly MigrationShowSpaceResult[];
+} {
+  return { spaces: [space] };
+}
+
 describe('formatMigrationShowOutput', () => {
   it('shows migration metadata', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
-      {
+      singleSpace({
+        kind: 'present',
+        spaceId: 'app',
         dirName: '20260101_100000_add_user',
         dirPath: 'migrations/20260101_100000_add_user',
         from: null,
@@ -293,7 +423,7 @@ describe('formatMigrationShowOutput', () => {
           statements: [{ text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' }],
         },
         summary: '1 operation(s)',
-      },
+      }),
       flags,
     );
     const stripped = stripAnsi(output);
@@ -308,7 +438,9 @@ describe('formatMigrationShowOutput', () => {
   it('shows operations tree with class labels', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
-      {
+      singleSpace({
+        kind: 'present',
+        spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
         from: null,
@@ -325,16 +457,16 @@ describe('formatMigrationShowOutput', () => {
         ],
         preview: { statements: [] },
         summary: '2 operation(s)',
-      },
+      }),
       flags,
     );
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain('├');
     expect(stripped).toContain('└');
-    // M6 (T6.6 / AC8): operationClass tags no longer inlined in the
-    // human-readable line. Destructive ops still render a "(destructive)"
-    // marker (replaces the old "[destructive]" tag); additive/widening/
+    // Operation-class tags are no longer inlined in the human-readable
+    // line. Destructive ops still render a "(destructive)" marker
+    // (replacing the old "[destructive]" tag); additive/widening/
     // mutative/data render bare.
     expect(stripped).not.toContain('[additive]');
     expect(stripped).not.toContain('[destructive]');
@@ -344,7 +476,9 @@ describe('formatMigrationShowOutput', () => {
   it('shows destructive warning when operations include destructive', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
-      {
+      singleSpace({
+        kind: 'present',
+        spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
         from: null,
@@ -362,7 +496,7 @@ describe('formatMigrationShowOutput', () => {
           statements: [{ text: 'ALTER TABLE "post" DROP COLUMN "legacy"', language: 'sql' }],
         },
         summary: '1 operation(s)',
-      },
+      }),
       flags,
     );
     const stripped = stripAnsi(output);
@@ -375,7 +509,9 @@ describe('formatMigrationShowOutput', () => {
   it('omits destructive warning when all additive', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
-      {
+      singleSpace({
+        kind: 'present',
+        spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
         from: null,
@@ -389,7 +525,7 @@ describe('formatMigrationShowOutput', () => {
           statements: [{ text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' }],
         },
         summary: '1 operation(s)',
-      },
+      }),
       flags,
     );
     const stripped = stripAnsi(output);
@@ -401,7 +537,9 @@ describe('formatMigrationShowOutput', () => {
   it('shows DDL preview', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationShowOutput(
-      {
+      singleSpace({
+        kind: 'present',
+        spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
         from: null,
@@ -415,7 +553,7 @@ describe('formatMigrationShowOutput', () => {
           statements: [{ text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' }],
         },
         summary: '1 operation(s)',
-      },
+      }),
       flags,
     );
     const stripped = stripAnsi(output);
@@ -427,7 +565,9 @@ describe('formatMigrationShowOutput', () => {
   it('returns empty string in quiet mode', () => {
     const flags = parseGlobalFlags({ quiet: true });
     const output = formatMigrationShowOutput(
-      {
+      singleSpace({
+        kind: 'present',
+        spaceId: 'app',
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
         from: null,
@@ -437,10 +577,96 @@ describe('formatMigrationShowOutput', () => {
         operations: [],
         preview: { statements: [] },
         summary: '0 operation(s)',
-      },
+      }),
       flags,
     );
 
     expect(output).toBe('');
+  });
+
+  it('renders per-space section headings when multiple spaces are present', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationShowOutput(
+      {
+        spaces: [
+          {
+            kind: 'present',
+            spaceId: 'app',
+            dirName: '20260101_100000_app_init',
+            dirPath: 'migrations/app/20260101_100000_app_init',
+            from: null,
+            to: 'sha256:hash-app',
+            migrationHash: 'sha256:mhash-app',
+            createdAt: '2026-01-01T10:00:00.000Z',
+            operations: [],
+            preview: { statements: [] },
+            summary: '0 operation(s)',
+          },
+          {
+            kind: 'present',
+            spaceId: 'cipherstash',
+            dirName: '0000000001-init',
+            dirPath: 'migrations/cipherstash/0000000001-init',
+            from: null,
+            to: 'sha256:hash-cs',
+            migrationHash: 'sha256:mhash-cs',
+            createdAt: '2026-01-01T10:00:00.000Z',
+            operations: [],
+            preview: { statements: [] },
+            summary: '0 operation(s)',
+          },
+        ],
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('── app ──');
+    expect(stripped).toContain('── cipherstash ──');
+    expect(stripped).toContain('20260101_100000_app_init');
+    expect(stripped).toContain('0000000001-init');
+
+    // Ordering matters: the app section must precede the extension section
+    // in the rendered output so reordering the spaces array (or accidentally
+    // alphabetising) is caught.
+    const appHeadingIdx = stripped.indexOf('── app ──');
+    const cipherstashHeadingIdx = stripped.indexOf('── cipherstash ──');
+    expect(appHeadingIdx).toBeLessThan(cipherstashHeadingIdx);
+    expect(stripped.indexOf('20260101_100000_app_init')).toBeLessThan(
+      stripped.indexOf('0000000001-init'),
+    );
+  });
+
+  it('renders a placeholder block for an extension space with no on-disk package', () => {
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const output = formatMigrationShowOutput(
+      {
+        spaces: [
+          {
+            kind: 'present',
+            spaceId: 'app',
+            dirName: '20260101_100000_app_init',
+            dirPath: 'migrations/app/20260101_100000_app_init',
+            from: null,
+            to: 'sha256:hash-app',
+            migrationHash: 'sha256:mhash-app',
+            createdAt: '2026-01-01T10:00:00.000Z',
+            operations: [],
+            preview: { statements: [] },
+            summary: '0 operation(s)',
+          },
+          {
+            kind: 'missing',
+            spaceId: 'cipherstash',
+            summary: 'No on-disk migration package for this space',
+          },
+        ],
+      },
+      flags,
+    );
+    const stripped = stripAnsi(output);
+
+    expect(stripped).toContain('── cipherstash ──');
+    expect(stripped).toContain('No on-disk migration package for this space');
   });
 });

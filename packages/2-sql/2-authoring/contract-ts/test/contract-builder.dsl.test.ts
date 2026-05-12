@@ -123,7 +123,7 @@ describe('contract DSL authoring surface', () => {
       },
     }).sql(({ cols, constraints }) => ({
       table: 'blog_post',
-      indexes: [constraints.index(cols.userId, { name: 'blog_post_user_id_idx' })],
+      indexes: [constraints.index([cols.userId], { name: 'blog_post_user_id_idx' })],
       foreignKeys: [
         constraints.foreignKey([cols.userId], [UserBase.refs['id']!], {
           name: 'blog_post_user_id_fkey',
@@ -396,7 +396,7 @@ describe('contract DSL authoring surface', () => {
       },
     }).sql(({ cols, constraints }) => ({
       table: 'app_user',
-      indexes: [constraints.index(cols.id, { name: 'app_user_pkey' })],
+      indexes: [constraints.index([cols.id], { name: 'app_user_pkey' })],
     }));
 
     expect(() =>
@@ -560,7 +560,7 @@ describe('contract DSL authoring surface', () => {
         authorId: field.column(textColumn).column('author_identifier'),
       },
     }).sql(({ cols, constraints }) => ({
-      indexes: [constraints.index(cols.authorId, { name: 'blog_post_author_identifier_idx' })],
+      indexes: [constraints.index([cols.authorId], { name: 'blog_post_author_identifier_idx' })],
     }));
 
     const contract = defineTestContract({
@@ -799,7 +799,7 @@ describe('contract DSL authoring surface', () => {
         User.ref('posts');
 
         return {
-          indexes: [constraints.index(cols.email)],
+          indexes: [constraints.index([cols.email])],
         };
       });
 

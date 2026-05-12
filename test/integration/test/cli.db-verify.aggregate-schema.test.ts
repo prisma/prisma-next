@@ -112,7 +112,7 @@ withTempDir(({ createTempDir }) => {
           const { testDir, configPath } = testSetup;
 
           // Pre-emit pinned migrations for the test extension so the
-          // aggregate loader's layout / integrity / drift checks pass.
+          // aggregate loader's layout / integrity checks pass.
           await writePinnedExtensionDir(testDir);
 
           // Emit the app contract so `db verify` has a contract.json to

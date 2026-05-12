@@ -20,6 +20,8 @@ import {
   ParamRef,
   ProjectionItem,
   SelectAst,
+  type SqlQueryable,
+  type SqlQueryResult,
   SubqueryExpr,
   TableSource,
   UpdateAst,
@@ -287,16 +289,51 @@ describe('Postgres adapter', () => {
     expect(sql).toContain('WHERE FALSE');
   });
 
-  it('exposes profile metadata: capabilities and readMarkerStatement', () => {
+  it('exposes profile metadata: capabilities and readMarker', () => {
     expect(adapter.profile.target).toBe('postgres');
     expect(adapter.profile.id).toBe('postgres/default@1');
     expect(adapter.profile.capabilities['postgres']).toMatchObject({ lateral: true });
     expect(adapter.profile.capabilities['sql']).toMatchObject({ returning: true });
+    expect(typeof adapter.profile.readMarker).toBe('function');
+  });
 
-    const marker = adapter.profile.readMarkerStatement();
-    expect(marker.sql).toContain('from prisma_contract.marker');
-    expect(marker.sql).toMatch(/where space = \$1/i);
-    expect(marker.params).toEqual(['app']);
+  it('readMarker returns no-table when the information_schema probe yields no rows', async () => {
+    const calls: Array<{ sql: string; params: readonly unknown[] | undefined }> = [];
+    const queryable: SqlQueryable = {
+      execute() {
+        throw new Error('not used in this test');
+      },
+      async query<Row>(sql: string, params?: readonly unknown[]): Promise<SqlQueryResult<Row>> {
+        calls.push({ sql, params });
+        return { rows: [], rowCount: 0 } as SqlQueryResult<Row>;
+      },
+    };
+
+    const result = await adapter.profile.readMarker(queryable);
+
+    expect(result).toEqual({ kind: 'no-table' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.sql).toContain('from information_schema.tables');
+    expect(calls[0]?.params).toEqual(['prisma_contract', 'marker']);
+  });
+
+  it('readMarker returns absent when the table exists but holds no row for this space', async () => {
+    let call = 0;
+    const queryable: SqlQueryable = {
+      execute() {
+        throw new Error('not used in this test');
+      },
+      async query<Row>(): Promise<SqlQueryResult<Row>> {
+        call += 1;
+        const result = call === 1 ? { rows: [{ '1': 1 }], rowCount: 1 } : { rows: [], rowCount: 0 };
+        // Cast through `unknown`: the mock returns concrete row shapes, but the generic `Row` parameter on `SqlQueryable.query` is the caller's choice. The two cannot be unified structurally; the caller (adapter `readMarker`) consumes the result with its own row decoders.
+        return result as unknown as SqlQueryResult<Row>;
+      },
+    };
+
+    const result = await adapter.profile.readMarker(queryable);
+
+    expect(result).toEqual({ kind: 'absent' });
   });
 
   it('honours an overridden profile id from PostgresAdapterOptions', () => {
@@ -410,8 +447,7 @@ describe('Postgres adapter', () => {
     expect(sql).toContain('"user"."id" IN ($1, 2)');
   });
 
-  it("readMarkerStatement's parseMarkerRow round-trips a contract marker row payload", () => {
-    // `parseMarkerRow` (an arrow on `adapter.profile`) is invoked at contract-load time by the runtime's startup verify path. A focused unit test pins the function-coverage entry without needing an end-to-end Postgres driver — the parser itself lives in `@prisma-next/sql-runtime` and is fully covered there; we only need to verify the adapter-side wrapper forwards correctly.
+  it('readMarker parses a present marker row into a ContractMarkerRecord', async () => {
     const markerRow = {
       core_hash: 'sha256:test-core',
       profile_hash: 'sha256:test-profile',
@@ -422,11 +458,28 @@ describe('Postgres adapter', () => {
       meta: {},
       invariants: ['inv-1'],
     };
-    const parsed = adapter.profile.parseMarkerRow(markerRow);
-    expect(parsed.storageHash).toBe('sha256:test-core');
-    expect(parsed.profileHash).toBe('sha256:test-profile');
-    expect(parsed.appTag).toBe('app');
-    expect(parsed.invariants).toEqual(['inv-1']);
+    let call = 0;
+    const queryable: SqlQueryable = {
+      execute() {
+        throw new Error('not used in this test');
+      },
+      async query<Row>(): Promise<SqlQueryResult<Row>> {
+        call += 1;
+        const result =
+          call === 1 ? { rows: [{ '1': 1 }], rowCount: 1 } : { rows: [markerRow], rowCount: 1 };
+        // Cast through `unknown`: see note in the sibling readMarker test.
+        return result as unknown as SqlQueryResult<Row>;
+      },
+    };
+
+    const result = await adapter.profile.readMarker(queryable);
+
+    expect(result.kind).toBe('present');
+    if (result.kind !== 'present') return;
+    expect(result.record.storageHash).toBe('sha256:test-core');
+    expect(result.record.profileHash).toBe('sha256:test-profile');
+    expect(result.record.appTag).toBe('app');
+    expect(result.record.invariants).toEqual(['inv-1']);
   });
 
   it('parenthesizes composite expressions before appending IS NULL / IS NOT NULL', () => {

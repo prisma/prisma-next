@@ -1,4 +1,8 @@
-import type { OperationDescriptor, OperationRegistry } from '@prisma-next/operations';
+import type {
+  OperationDescriptor,
+  OperationDescriptors,
+  OperationRegistry,
+} from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
 import type { QueryOperationTypeEntry } from '@prisma-next/sql-contract/types';
 
@@ -18,6 +22,8 @@ export interface SqlLoweringSpec {
 export type SqlOperationEntry = QueryOperationTypeEntry;
 
 export type SqlOperationDescriptor = OperationDescriptor<SqlOperationEntry>;
+
+export type SqlOperationDescriptors = OperationDescriptors<SqlOperationEntry>;
 
 export type SqlOperationRegistry = OperationRegistry<SqlOperationEntry>;
 

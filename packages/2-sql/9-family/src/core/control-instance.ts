@@ -171,7 +171,6 @@ type SqlTypeMetadataRegistry = Map<string, SqlTypeMetadata>;
 
 interface SqlFamilyInstanceState {
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
-  readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds: ReadonlyArray<string>;
   readonly typeMetadataRegistry: SqlTypeMetadataRegistry;
 }
@@ -343,7 +342,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     }
   }
 
-  const { codecTypeImports, operationTypeImports, extensionIds } = stack;
+  const { codecTypeImports, extensionIds } = stack;
 
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
     target,
@@ -368,7 +367,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   return {
     familyId: 'sql',
     codecTypeImports,
-    operationTypeImports,
     extensionIds,
     typeMetadataRegistry,
 
@@ -774,23 +772,12 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         },
       );
 
-      const dependencyNodes: readonly SchemaTreeNode[] = schema.dependencies.map((dep) => {
-        const shortName = dep.id.split('.').pop() ?? dep.id;
-        return new SchemaTreeNode({
-          kind: 'dependency',
-          id: `dependency-${dep.id}`,
-          label: `${shortName} dependency is installed`,
-        });
-      });
-
-      const rootChildren = [...tableNodes, ...dependencyNodes];
-
       return {
         root: new SchemaTreeNode({
           kind: 'root',
           id: 'sql-schema',
           label: 'database',
-          ...(rootChildren.length > 0 ? { children: rootChildren } : {}),
+          ...(tableNodes.length > 0 ? { children: tableNodes } : {}),
         }),
       };
     },

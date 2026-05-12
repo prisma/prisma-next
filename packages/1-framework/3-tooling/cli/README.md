@@ -1245,11 +1245,11 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
     - **`capabilities`**: Feature flags the component contributes (e.g., adapter/runtime lowering requirements). Typically namespaced by target (e.g., `{ postgres: { returning: true } }`) so contracts can be validated against the active target.
     - **`types`**: Type import specs and type IDs contributed by the component. Common examples:
       - `types.codecTypes.import`: Where to import codec type mappings for `contract.d.ts`.
-      - `types.operationTypes.import`: Where to import operation type mappings for `contract.d.ts` (extensions).
+      - `types.queryOperationTypes.import`: Where to import flat query-builder operation type signatures for `contract.d.ts` (adapters/extensions).
       - `types.storage`: Storage type bindings (`typeId`, `nativeType`, etc.) used in authoring/emission.
     - **`operations`**: Operation signatures the component contributes (extensions), used for type generation and (optionally) validation/lowering.
     - **Component-specific metadata**:
-      - Extensions may also include control-plane-only metadata like `databaseDependencies` (used by verify and schema verification flows and not required at runtime).
+      - Extensions may also include control-plane-only metadata like `contractSpace` (used by verify, planning, and migration flows and not required at runtime).
 
 Unlike the older **manifest-based IR** approach (separate JSON manifests + a parsing/validation step to build an IR), descriptors are imported directly from packages (e.g., `@prisma-next/*/control`). This removes a file-format boundary and keeps the data and its types co-located.
 - Benefits: fewer moving parts (no JSON parsing), easier refactors (TypeScript catches drift), and clearer ownership (the package exports the canonical descriptor object).
@@ -1268,11 +1268,11 @@ const exampleExtension: SqlControlExtensionDescriptor<'postgres'> = {
   targetId: 'postgres',
   capabilities: { postgres: { 'example/feature': true } },
   types: {
-    operationTypes: {
+    queryOperationTypes: {
       import: {
         package: '@prisma-next/extension-example/operation-types',
-        named: 'OperationTypes',
-        alias: 'ExampleOperationTypes',
+        named: 'QueryOperationTypes',
+        alias: 'ExampleQueryOperationTypes',
       },
     },
   },

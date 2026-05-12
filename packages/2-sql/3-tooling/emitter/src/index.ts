@@ -244,11 +244,12 @@ export const sqlEmission = {
       const indexes = table.indexes
         .map((i) => {
           const cols = i.columns.map((c: string) => serializeValue(c)).join(', ');
-          const name = i.name ? `; readonly name: ${serializeValue(i.name)}` : '';
-          const using = i.using !== undefined ? `; readonly using: ${serializeValue(i.using)}` : '';
-          const config =
-            i.config !== undefined ? `; readonly config: ${serializeValue(i.config)}` : '';
-          return `{ readonly columns: readonly [${cols}]${name}${using}${config} }`;
+          const name = i.name !== undefined ? `; readonly name: ${serializeValue(i.name)}` : '';
+          const indexType =
+            i.type !== undefined ? `; readonly type: ${serializeValue(i.type)}` : '';
+          const indexOptions =
+            i.options !== undefined ? `; readonly options: ${serializeValue(i.options)}` : '';
+          return `{ readonly columns: readonly [${cols}]${name}${indexType}${indexOptions} }`;
         })
         .join(', ');
       tableParts.push(`indexes: readonly [${indexes}]`);
@@ -347,7 +348,7 @@ export const sqlEmission = {
   },
 
   getTypeMapsExpression(): string {
-    return 'TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes, FieldInputTypes>';
+    return 'TypeMapsType<CodecTypes, QueryOperationTypes, FieldOutputTypes, FieldInputTypes>';
   },
 
   getContractWrapper(contractBaseName: string, typeMapsName: string): string {

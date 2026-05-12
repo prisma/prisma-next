@@ -43,11 +43,13 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import {
   findDuplicateFieldName,
   getAttribute,
+  getNamedArgument,
   getPositionalArgument,
   mapFieldNamesToColumns,
   parseAttributeFieldList,
   parseConstraintMapArgument,
   parseMapName,
+  parseObjectLiteralStringMap,
   parseQuotedStringLiteral,
 } from './psl-attribute-parsing';
 import type { ColumnDescriptor } from './psl-column-resolution';
@@ -697,9 +699,51 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
           ...ifDefined('name', constraintName),
         });
       } else {
+        const indexEntityLabel = `Model "${model.name}" @@index`;
+        const rawTypeArg = getNamedArgument(modelAttribute, 'type');
+        let indexType: string | undefined;
+        if (rawTypeArg !== undefined) {
+          const parsed = parseQuotedStringLiteral(rawTypeArg);
+          if (parsed === undefined) {
+            diagnostics.push({
+              code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+              message: `${indexEntityLabel} type argument must be a quoted string literal`,
+              sourceId,
+              span: modelAttribute.span,
+            });
+            continue;
+          }
+          indexType = parsed;
+        }
+        const rawOptionsArg = getNamedArgument(modelAttribute, 'options');
+        let indexOptions: Record<string, string> | undefined;
+        if (rawOptionsArg !== undefined) {
+          if (indexType === undefined) {
+            diagnostics.push({
+              code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+              message: `${indexEntityLabel} options argument requires a type argument`,
+              sourceId,
+              span: modelAttribute.span,
+            });
+            continue;
+          }
+          const parsed = parseObjectLiteralStringMap({
+            raw: rawOptionsArg,
+            diagnostics,
+            sourceId,
+            span: modelAttribute.span,
+            entityLabel: indexEntityLabel,
+          });
+          if (parsed === undefined) {
+            continue;
+          }
+          indexOptions = parsed;
+        }
         indexNodes.push({
           columns: columnNames,
           ...ifDefined('name', constraintName),
+          ...ifDefined('type', indexType),
+          ...ifDefined('options', indexOptions),
         });
       }
       continue;

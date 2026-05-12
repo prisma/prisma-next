@@ -14,7 +14,7 @@
  *
  *   1. **Pinned per-space artefacts on disk.** After
  *      `emitContractSpaceArtefacts` runs for both extension spaces, the
- *      user's repo carries `migrations/audit/{contract.json,
+ *      consuming app's repo carries `migrations/audit/{contract.json,
  *      contract.d.ts, refs/head.json}` and the same triple under
  *      `migrations/feature-flags/`.
  *
@@ -40,10 +40,18 @@
  *          (proving the apply path actually ran the DDL, not just
  *          updated the marker).
  *
- *   4. **Order-independent across `extensionPacks` declaration order.**
- *      Re-running the apply path with the extensions declared in
- *      reverse order produces the same marker hashes — cross-space
- *      ordering is determined by space id, not by declaration order.
+ *   4. **Order-independent across `extensionPacks` declaration order
+ *      .** Re-running the apply path with the extensions
+ *      declared in reverse order produces the same marker hashes —
+ *      cross-space ordering is determined by space id, not by
+ *      declaration order.
+ *
+ * The fixtures (`audit*`, `featureFlags*`) are pulled from each
+ * package's descriptor `contractSpace` rather than from
+ * (now-deleted) per-package `contract.ts` / `migrations.ts` modules —
+ * each internal package now authors via the on-disk
+ * `prisma-next contract emit` / `prisma-next migration plan` pipeline,
+ * and the descriptor is the canonical reader of those artefacts.
  */
 
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -53,35 +61,67 @@ import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { executeDbInit } from '@prisma-next/cli/control-api';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
 import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import {
+  createControlStack,
+  type MigrationPackage,
+} from '@prisma-next/framework-components/control';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { APP_CONTRACT_HASH_VALUE, APP_USER_TABLE, appContract } from '../app/contract';
+import { APP_USER_TABLE } from '../app/src/constants';
+import appContractJson from '../app/src/contract.json' with { type: 'json' };
+
+// The PSL-authored app contract is materialised at emit time; we JSON-import
+// it here rather than re-deriving via `defineContract(...)`.
+const appContract = appContractJson as unknown as Parameters<typeof executeDbInit>[0]['contract'];
+const APP_CONTRACT_HASH_VALUE = appContractJson.storage.storageHash;
+
 import {
   AUDIT_BASELINE_INVARIANT_ID,
   AUDIT_EVENT_TABLE,
   AUDIT_SPACE_ID,
-} from '../packages/audit/constants';
-import { AUDIT_STORAGE_HASH, auditContract } from '../packages/audit/contract';
-import auditExtensionDescriptor from '../packages/audit/control';
-import { auditBaselineMigration, auditHeadRef } from '../packages/audit/migrations';
+} from '../packages/audit/src/constants';
+import auditExtensionDescriptor from '../packages/audit/src/control';
 import {
   FEATURE_FLAG_TABLE,
   FEATURE_FLAGS_BASELINE_INVARIANT_ID,
   FEATURE_FLAGS_SPACE_ID,
-} from '../packages/feature-flags/constants';
-import {
-  FEATURE_FLAGS_STORAGE_HASH,
-  featureFlagsContract,
-} from '../packages/feature-flags/contract';
-import featureFlagsExtensionDescriptor from '../packages/feature-flags/control';
-import {
-  featureFlagsBaselineMigration,
-  featureFlagsHeadRef,
-} from '../packages/feature-flags/migrations';
+} from '../packages/feature-flags/src/constants';
+import featureFlagsExtensionDescriptor from '../packages/feature-flags/src/control';
+
+function requireBaseline(
+  descriptor: { readonly contractSpace?: { readonly migrations: readonly MigrationPackage[] } },
+  spaceId: string,
+): MigrationPackage {
+  const baseline = descriptor.contractSpace?.migrations[0];
+  if (!baseline) {
+    throw new Error(`${spaceId} descriptor is missing its baseline migration package`);
+  }
+  return baseline;
+}
+
+const auditContractSpace = auditExtensionDescriptor.contractSpace;
+if (!auditContractSpace) {
+  throw new Error('audit descriptor is missing its contractSpace');
+}
+const auditBaselineMigration: MigrationPackage = requireBaseline(auditExtensionDescriptor, 'audit');
+const auditContract = auditContractSpace.contractJson;
+const AUDIT_STORAGE_HASH = auditContractSpace.headRef.hash;
+const auditHeadRef = auditContractSpace.headRef;
+
+const featureFlagsContractSpace = featureFlagsExtensionDescriptor.contractSpace;
+if (!featureFlagsContractSpace) {
+  throw new Error('feature-flags descriptor is missing its contractSpace');
+}
+const featureFlagsBaselineMigration: MigrationPackage = requireBaseline(
+  featureFlagsExtensionDescriptor,
+  'feature-flags',
+);
+const featureFlagsContract = featureFlagsContractSpace.contractJson;
+const FEATURE_FLAGS_STORAGE_HASH = featureFlagsContractSpace.headRef.hash;
+const featureFlagsHeadRef = featureFlagsContractSpace.headRef;
 
 function buildFamilyInstance(declarationOrder: 'natural' | 'reverse') {
   const extensionPacks =
@@ -141,7 +181,7 @@ async function setupTestProject(): Promise<TestProject> {
 }
 
 describe.sequential(
-  'multi-extension-monorepo end-to-end (PGlite, T4.4)',
+  'multi-extension-monorepo end-to-end (PGlite)',
   { timeout: timeouts.spinUpPpgDev },
   () => {
     let database: Awaited<ReturnType<typeof createDevDatabase>>;
@@ -174,7 +214,7 @@ describe.sequential(
       }
     });
 
-    it('pinned per-space artefacts land for both extension spaces (TC-8)', async () => {
+    it('pinned per-space artefacts land for both extension spaces', async () => {
       project = await setupTestProject();
 
       const auditHeadJson = JSON.parse(
@@ -251,7 +291,7 @@ describe.sequential(
       expect(appIdx).toBeGreaterThan(featureFlagsIdx);
     });
 
-    it('mode=apply: three spaces apply atomically; markers + round-trips OK (TC-8 / AC5)', async () => {
+    it('mode=apply: three spaces apply atomically; markers + round-trips OK', async () => {
       project = await setupTestProject();
 
       const result = await executeDbInit({
@@ -340,7 +380,7 @@ describe.sequential(
       expect(appRows.rows[0]?.email).toBe('alice@example.com');
     });
 
-    it('marker hashes are independent of `extensionPacks` declaration order (NFR6)', async () => {
+    it('marker hashes are independent of `extensionPacks` declaration order', async () => {
       project = await setupTestProject();
 
       const result = await executeDbInit({

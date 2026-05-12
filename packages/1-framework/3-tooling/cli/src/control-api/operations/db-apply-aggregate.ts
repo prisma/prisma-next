@@ -127,16 +127,18 @@ export async function executeAggregateApply<TFamilyId extends string, TTargetId 
   // 2. Read live DB state (markers + schema).
   const markerRows = await familyInstance.readAllMarkers({ driver });
 
-  // 2a. Orphan-marker pre-flight: refuse to apply when a marker row
-  // exists for a space that is not declared in the aggregate.
-  // Mirrors the M2 marker-check that `db init` / `db update` ran via
-  // `runContractSpaceVerifierMarkerCheck`. Runs before planning so a
-  // user with an orphaned marker (e.g. a retired extension whose
-  // migrations directory has been removed) is told to clean it up
-  // rather than silently advancing the app's marker.
-  const orphanMarkerError = detectOrphanMarkers(aggregate, markerRows);
-  if (orphanMarkerError !== null) {
-    throw orphanMarkerError;
+  // 2a. Orphan-marker pre-flight: refuse to *apply* when a marker row
+  // exists for a space that is not declared in the aggregate. Plan mode
+  // (`db init/update --dry-run`) must still be able to introspect the
+  // aggregate plan in this state — a retired extension whose marker
+  // happens to linger should not block the user from inspecting what a
+  // run would do. Apply mode tells the user to clean up the orphan
+  // before silently advancing the app's marker.
+  if (mode === 'apply') {
+    const orphanMarkerError = detectOrphanMarkers(aggregate, markerRows);
+    if (orphanMarkerError !== null) {
+      throw orphanMarkerError;
+    }
   }
 
   onProgress?.({

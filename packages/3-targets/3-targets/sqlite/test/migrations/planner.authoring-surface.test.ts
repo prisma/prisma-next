@@ -43,7 +43,7 @@ function fromContractWithHash(hash: string): Contract<SqlStorage> {
   };
 }
 
-const emptySchema: SqlSchemaIR = { tables: {}, dependencies: [] };
+const emptySchema: SqlSchemaIR = { tables: {} };
 
 describe('SqliteMigrationPlanner authoring surface', () => {
   describe('plan(...).plan', () => {

@@ -62,12 +62,12 @@ model User {
 
 function schemaSampleTsPostgres(): string {
   return `\`\`\`typescript
-import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+import { defineContract } from '@prisma-next/postgres/contract-builder';
+import sqlFamily from '@prisma-next/postgres/family';
+import postgresTarget from '@prisma-next/postgres/target';
 
 export const contract = defineContract(
-  { family: sqlFamily, target: postgresPack },
+  { family: sqlFamily, target: postgresTarget },
   ({ field, model }) => ({
     models: {
       User: model('User', {
@@ -85,9 +85,9 @@ export const contract = defineContract(
 
 function schemaSampleTsMongo(): string {
   return `\`\`\`typescript
-import mongoFamily from '@prisma-next/family-mongo/pack';
-import { defineContract } from '@prisma-next/mongo-contract-ts/contract-builder';
-import mongoTarget from '@prisma-next/target-mongo/pack';
+import { defineContract } from '@prisma-next/mongo/contract-builder';
+import mongoFamily from '@prisma-next/mongo/family';
+import mongoTarget from '@prisma-next/mongo/target';
 
 export const contract = defineContract(
   { family: mongoFamily, target: mongoTarget },
@@ -154,12 +154,12 @@ model Post {
 }
 
 function starterSchemaTsPostgres(): string {
-  return `import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
-import postgresPack from '@prisma-next/target-postgres/pack';
+  return `import { defineContract } from '@prisma-next/postgres/contract-builder';
+import sqlFamily from '@prisma-next/postgres/family';
+import postgresTarget from '@prisma-next/postgres/target';
 
 export const contract = defineContract(
-  { family: sqlFamily, target: postgresPack },
+  { family: sqlFamily, target: postgresTarget },
   ({ field, model, rel }) => ({
     models: {
       User: model('User', {
@@ -195,9 +195,9 @@ export const contract = defineContract(
 }
 
 function starterSchemaTsMongo(): string {
-  return `import mongoFamily from '@prisma-next/family-mongo/pack';
-import { defineContract } from '@prisma-next/mongo-contract-ts/contract-builder';
-import mongoTarget from '@prisma-next/target-mongo/pack';
+  return `import { defineContract } from '@prisma-next/mongo/contract-builder';
+import mongoFamily from '@prisma-next/mongo/family';
+import mongoTarget from '@prisma-next/mongo/target';
 
 export const contract = defineContract(
   { family: mongoFamily, target: mongoTarget },

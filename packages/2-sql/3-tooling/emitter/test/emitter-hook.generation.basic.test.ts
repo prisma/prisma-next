@@ -5,10 +5,7 @@ import type {
   ControlExtensionDescriptor,
   ControlTargetDescriptor,
 } from '@prisma-next/framework-components/control';
-import {
-  extractCodecTypeImports,
-  extractOperationTypeImports,
-} from '@prisma-next/framework-components/control';
+import { extractCodecTypeImports } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { sqlEmission } from '../src/index';
 
@@ -67,7 +64,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain('export type Contract');
     expect(types).toContain('CodecTypes');
     expect(types).toContain('readonly roots:');
@@ -99,24 +96,24 @@ describe('sql-target-family-hook', () => {
           },
         },
       });
-      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      const types = generateContractDts(ir, sqlEmission, [], testHashes);
       expect(types).toContain(
-        'export type TypeMaps = TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes, FieldInputTypes>',
+        'export type TypeMaps = TypeMapsType<CodecTypes, QueryOperationTypes, FieldOutputTypes, FieldInputTypes>',
       );
     });
 
-    it('TypeMaps delegates to TypeMapsType with CodecTypes and OperationTypes', () => {
+    it('TypeMaps delegates to TypeMapsType with CodecTypes', () => {
       const ir = createContract({
         models: {},
         storage: { tables: {} },
       });
-      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      const types = generateContractDts(ir, sqlEmission, [], testHashes);
       expect(types).toContain(
-        'TypeMapsType<CodecTypes, OperationTypes, QueryOperationTypes, FieldOutputTypes, FieldInputTypes>',
+        'TypeMapsType<CodecTypes, QueryOperationTypes, FieldOutputTypes, FieldInputTypes>',
       );
     });
 
-    it('Contract does not include phantom codecTypes or operationTypes keys', () => {
+    it('Contract does not include phantom codecTypes keys', () => {
       const ir = createContract({
         models: {
           User: {
@@ -141,7 +138,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       });
-      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      const types = generateContractDts(ir, sqlEmission, [], testHashes);
       expect(types).not.toContain("'__@prisma-next/sql-contract/codecTypes@__'");
       expect(types).not.toContain("'__@prisma-next/sql-contract/operationTypes@__'");
       expect(types).not.toContain("'__@prisma-next/sql-contract/typeMaps@__'");
@@ -179,7 +176,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain('Contract as ContractType,');
     expect(types).toContain('ContractWithTypeMaps,');
     expect(types).toContain('TypeMaps as TypeMapsType,');
@@ -214,7 +211,6 @@ describe('sql-target-family-hook', () => {
     ];
 
     const codecImports = extractCodecTypeImports(descriptors);
-    const operationImports = extractOperationTypeImports(descriptors);
     expect(codecImports).toEqual([
       {
         package: '@test/adapter/codec-types',
@@ -222,7 +218,6 @@ describe('sql-target-family-hook', () => {
         alias: 'TestTypes',
       },
     ]);
-    expect(operationImports).toEqual([]);
   });
 
   it('generates contract types with multiple extensions', () => {
@@ -289,7 +284,6 @@ describe('sql-target-family-hook', () => {
     ];
 
     const codecTypeImports = extractCodecTypeImports(descriptors);
-    const operationTypeImports = extractOperationTypeImports(descriptors);
     expect(codecTypeImports).toEqual([
       {
         package: '@prisma-next/target-postgres/codec-types',
@@ -298,14 +292,7 @@ describe('sql-target-family-hook', () => {
       },
       { package: '@prisma-next/pgvector/codec-types', named: 'CodecTypes', alias: 'VectorTypes' },
     ]);
-    expect(operationTypeImports).toEqual([]);
-    const types = generateContractDts(
-      ir,
-      sqlEmission,
-      codecTypeImports,
-      operationTypeImports,
-      testHashes,
-    );
+    const types = generateContractDts(ir, sqlEmission, codecTypeImports, testHashes);
     expect(types).toContain('PgTypes');
     expect(types).toContain('VectorTypes');
   });
@@ -330,7 +317,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain('uniques: readonly');
     expect(types).toContain("readonly columns: readonly ['email']");
   });
@@ -355,7 +342,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain('uniques: readonly');
     expect(types).toContain("readonly name: 'unique_email'");
   });
@@ -381,7 +368,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain('uniques: readonly');
     expect(types).toContain("readonly columns: readonly ['first_name', 'last_name']");
   });
@@ -406,7 +393,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain('indexes: readonly');
     expect(types).toContain("readonly columns: readonly ['email']");
   });
@@ -431,7 +418,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain('indexes: readonly');
     expect(types).toContain("readonly name: 'idx_email'");
   });
@@ -470,7 +457,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain('foreignKeys: readonly');
     expect(types).toContain("readonly columns: readonly ['userId']");
     expect(types).toContain("readonly table: 'user'");
@@ -512,7 +499,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain('foreignKeys: readonly');
     expect(types).toContain("readonly name: 'fk_post_user'");
   });
@@ -536,7 +523,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain("readonly name: 'pk_user'");
   });
 
@@ -577,7 +564,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain(
       "readonly name: { readonly nullable: true; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' } }",
     );
@@ -620,7 +607,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain(
       "readonly email: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' } }",
     );
@@ -657,7 +644,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain(
       "readonly id: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' } }",
     );
@@ -681,7 +668,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain('Record<string, never>');
     expect(types).not.toContain('SqlMappings');
   });
@@ -721,7 +708,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain(
       "readonly id: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' } }",
     );
@@ -768,64 +755,12 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
 
     expect(types).toContain(
       "readonly vector: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1'; readonly typeParams: { readonly length: 1536 } } }",
     );
     expect(types).not.toContain('Vector<1536>');
-  });
-
-  it('generates contract types with no operation type imports', () => {
-    const ir = createContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-
-    // Pass empty operationTypeImports array to test filter/map on lines 278-279
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
-    expect(types).toContain('export type OperationTypes = Record<string, never>');
-  });
-
-  it('filters operation type imports to only OperationTypes', () => {
-    const ir = createContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-        },
-      },
-    });
-
-    // Include operation type imports with different named values to test filter on line 278
-    const operationTypeImports = [
-      { package: '@test/ops', named: 'OperationTypes', alias: 'TestOps' },
-      { package: '@test/other', named: 'OtherTypes', alias: 'Other' },
-    ];
-
-    const types = generateContractDts(ir, sqlEmission, [], operationTypeImports, testHashes);
-    // Only OperationTypes should be included in the intersection, not OtherTypes
-    // (OtherTypes will still be imported but not used in the OperationTypes type)
-    expect(types).toContain('export type OperationTypes = TestOps');
-    expect(types).not.toContain('export type OperationTypes = TestOps & Other');
   });
 
   it('generates contract types with query operation type imports', () => {
@@ -850,7 +785,7 @@ describe('sql-target-family-hook', () => {
       { package: '@test/other', named: 'OtherTypes', alias: 'Other' },
     ];
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes, {
+    const types = generateContractDts(ir, sqlEmission, [], testHashes, {
       queryOperationTypeImports,
     });
     expect(types).toContain('export type QueryOperationTypes = TestQueryOps');
@@ -873,9 +808,9 @@ describe('sql-target-family-hook', () => {
             indexes: [
               {
                 columns: ['description'],
-                using: 'bm25',
+                type: 'bm25',
                 name: 'search_idx',
-                config: {
+                options: {
                   keyField: 'id',
                   fields: [
                     {
@@ -893,9 +828,9 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
-    expect(types).toContain("readonly using: 'bm25'");
-    expect(types).toContain("readonly config: { readonly keyField: 'id'");
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
+    expect(types).toContain("readonly type: 'bm25'");
+    expect(types).toContain("readonly options: { readonly keyField: 'id'");
     expect(types).toContain("readonly name: 'search_idx'");
     expect(types).toContain("readonly column: 'description'");
     expect(types).toContain("readonly tokenizer: 'simple'");
@@ -918,8 +853,8 @@ describe('sql-target-family-hook', () => {
             indexes: [
               {
                 columns: ['description'],
-                using: 'bm25',
-                config: {
+                type: 'bm25',
+                options: {
                   keyField: 'id',
                   fields: [
                     {
@@ -937,7 +872,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain("readonly expression: 'description || \\' \\' || category'");
     expect(types).toContain("readonly alias: 'concat'");
   });
@@ -958,8 +893,8 @@ describe('sql-target-family-hook', () => {
             indexes: [
               {
                 columns: ['description'],
-                using: 'bm25',
-                config: {
+                type: 'bm25',
+                options: {
                   keyField: 'id',
                   'min-token-size': 2,
                   fields: [{ column: 'description', tokenizerParams: { 'max-ngram': 5 } }],
@@ -972,7 +907,7 @@ describe('sql-target-family-hook', () => {
       },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).toContain("readonly 'min-token-size': 2");
     expect(types).toContain("readonly 'max-ngram': 5");
   });
@@ -1032,7 +967,7 @@ describe('sql-target-family-hook', () => {
       storage: { tables: {} },
     });
 
-    const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+    const types = generateContractDts(ir, sqlEmission, [], testHashes);
     expect(types).not.toContain('readonly execution');
   });
 
@@ -1068,7 +1003,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       });
-      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      const types = generateContractDts(ir, sqlEmission, [], testHashes);
       expect(types).toContain('export type AddressOutput =');
       expect(types).toContain('export type AddressInput =');
       expect(types).not.toMatch(/export type Address =/);
@@ -1087,7 +1022,7 @@ describe('sql-target-family-hook', () => {
         },
         storage: { tables: {} },
       });
-      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      const types = generateContractDts(ir, sqlEmission, [], testHashes);
       expect(types).toContain('readonly valueObjects:');
       expect(types).toContain('readonly Address: { readonly fields:');
     });
@@ -1135,7 +1070,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       });
-      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      const types = generateContractDts(ir, sqlEmission, [], testHashes);
       expect(types).toContain(
         "readonly homeAddress: { readonly nullable: true; readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' } }",
       );
@@ -1185,7 +1120,7 @@ describe('sql-target-family-hook', () => {
           },
         },
       });
-      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      const types = generateContractDts(ir, sqlEmission, [], testHashes);
       expect(types).toContain(
         "readonly addresses: { readonly nullable: false; readonly type: { readonly kind: 'valueObject'; readonly name: 'Address' }; readonly many: true }",
       );
@@ -1207,7 +1142,7 @@ describe('sql-target-family-hook', () => {
         },
         storage: { tables: {} },
       });
-      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      const types = generateContractDts(ir, sqlEmission, [], testHashes);
       expect(types).toContain('export type NavItemOutput =');
       expect(types).toContain('export type NavItemInput =');
       expect(types).toContain('readonly children: ReadonlyArray<NavItemOutput>');
@@ -1217,7 +1152,7 @@ describe('sql-target-family-hook', () => {
       const ir = createContract({
         storage: { tables: {} },
       });
-      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      const types = generateContractDts(ir, sqlEmission, [], testHashes);
       expect(types).not.toContain('valueObjects');
     });
 
@@ -1232,7 +1167,7 @@ describe('sql-target-family-hook', () => {
         },
         storage: { tables: {} },
       });
-      const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
+      const types = generateContractDts(ir, sqlEmission, [], testHashes);
       expect(types).toContain("readonly zip: CodecTypes['pg/text@1']['output'] | null");
     });
   });

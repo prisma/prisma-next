@@ -4,11 +4,7 @@ import { createSqlOperationRegistry, type SqlOperationDescriptor } from '../src/
 describe('SqlOperationRegistry', () => {
   const noopImpl = () => ({ returnType: { codecId: 'pg/bool@1', nullable: false } });
 
-  const descriptor = (
-    method: string,
-    overrides?: Partial<SqlOperationDescriptor>,
-  ): SqlOperationDescriptor => ({
-    method,
+  const descriptor = (overrides?: Partial<SqlOperationDescriptor>): SqlOperationDescriptor => ({
     self: { codecId: 'pg/vector@1' },
     impl: noopImpl,
     ...overrides,
@@ -16,7 +12,7 @@ describe('SqlOperationRegistry', () => {
 
   it('registers and retrieves an operation', () => {
     const registry = createSqlOperationRegistry();
-    registry.register(descriptor('cosineDistance'));
+    registry.register('cosineDistance', descriptor());
 
     const entry = registry.entries()['cosineDistance'];
     expect(entry).toEqual({
@@ -27,8 +23,8 @@ describe('SqlOperationRegistry', () => {
 
   it('registers multiple operations', () => {
     const registry = createSqlOperationRegistry();
-    registry.register(descriptor('cosineDistance'));
-    registry.register(descriptor('l2Distance', { self: { traits: ['order'] } }));
+    registry.register('cosineDistance', descriptor());
+    registry.register('l2Distance', descriptor({ self: { traits: ['order'] } }));
 
     const entries = registry.entries();
     expect(Object.keys(entries)).toEqual(['cosineDistance', 'l2Distance']);
@@ -36,9 +32,9 @@ describe('SqlOperationRegistry', () => {
 
   it('throws on duplicate method', () => {
     const registry = createSqlOperationRegistry();
-    registry.register(descriptor('cosineDistance'));
+    registry.register('cosineDistance', descriptor());
 
-    expect(() => registry.register(descriptor('cosineDistance'))).toThrow(
+    expect(() => registry.register('cosineDistance', descriptor())).toThrow(
       'Operation "cosineDistance" is already registered',
     );
   });

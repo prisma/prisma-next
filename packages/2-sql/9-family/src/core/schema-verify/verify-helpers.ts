@@ -13,13 +13,40 @@ import type {
   PrimaryKey,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
-import type {
-  SqlForeignKeyIR,
-  SqlIndexIR,
-  SqlSchemaIR,
-  SqlUniqueIR,
-} from '@prisma-next/sql-schema-ir/types';
-import type { ComponentDatabaseDependency } from '../migrations/types';
+import type { SqlForeignKeyIR, SqlIndexIR, SqlUniqueIR } from '@prisma-next/sql-schema-ir/types';
+
+function indexOptionsLooselyEqual(
+  a: Record<string, unknown> | undefined,
+  b: Record<string, unknown> | undefined,
+): boolean {
+  const aKeys = a ? Object.keys(a).sort() : [];
+  const bKeys = b ? Object.keys(b).sort() : [];
+  if (aKeys.length !== bKeys.length) return false;
+  for (let i = 0; i < aKeys.length; i += 1) {
+    if (aKeys[i] !== bKeys[i]) return false;
+  }
+  if (aKeys.length === 0) return true;
+  for (const key of aKeys) {
+    // Postgres introspection returns reloptions values as raw strings (e.g.
+    // `'70'`, `'false'`), while contract option leaves are typed (number,
+    // boolean, string). Compare via String() so a contract `fillfactor: 70`
+    // matches an introspected `fillfactor: '70'` without a spurious mismatch.
+    if (
+      String((a as Record<string, unknown>)[key]) !== String((b as Record<string, unknown>)[key])
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function indexExtrasMatch(
+  contractIndex: Index,
+  schemaIndex: { readonly type?: string; readonly options?: Record<string, unknown> },
+): boolean {
+  if ((contractIndex.type ?? null) !== (schemaIndex.type ?? null)) return false;
+  return indexOptionsLooselyEqual(contractIndex.options, schemaIndex.options);
+}
 
 /**
  * Compares two arrays of strings for equality (order-sensitive).
@@ -391,13 +418,19 @@ export function verifyIndexes(
 
     // Check for any matching index (unique or non-unique)
     // A unique index can satisfy a non-unique index requirement (stronger satisfies weaker)
-    const matchingIndex = schemaIndexes.find((idx) =>
-      arraysEqual(idx.columns, contractIndex.columns),
+    const matchingIndex = schemaIndexes.find(
+      (idx) =>
+        arraysEqual(idx.columns, contractIndex.columns) && indexExtrasMatch(contractIndex, idx),
     );
 
-    // Also check if a unique constraint satisfies the index requirement
+    // Also check if a unique constraint satisfies the index requirement.
+    // Unique constraints carry no type/options of their own, so they can only
+    // satisfy a contract index that doesn't request a specific type/options.
     const matchingUniqueConstraint =
-      !matchingIndex && schemaUniques.find((u) => arraysEqual(u.columns, contractIndex.columns));
+      !matchingIndex &&
+      contractIndex.type === undefined &&
+      contractIndex.options === undefined &&
+      schemaUniques.find((u) => arraysEqual(u.columns, contractIndex.columns));
 
     if (!matchingIndex && !matchingUniqueConstraint) {
       issues.push({
@@ -442,8 +475,9 @@ export function verifyIndexes(
         continue;
       }
 
-      const matchingIndex = contractIndexes.find((idx) =>
-        arraysEqual(idx.columns, schemaIndex.columns),
+      const matchingIndex = contractIndexes.find(
+        (idx) =>
+          arraysEqual(idx.columns, schemaIndex.columns) && indexExtrasMatch(idx, schemaIndex),
       );
 
       if (!matchingIndex) {
@@ -465,63 +499,6 @@ export function verifyIndexes(
           children: [],
         });
       }
-    }
-  }
-
-  return nodes;
-}
-
-/**
- * Verifies database dependencies are installed using component-owned verification hooks.
- * Checks whether each dependency is satisfied by verifying its id is present in
- * schema.dependencies (populated from introspection).
- *
- * Returns verification nodes for the tree.
- */
-export function verifyDatabaseDependencies(
-  dependencies: ReadonlyArray<ComponentDatabaseDependency<unknown>>,
-  schema: SqlSchemaIR,
-  issues: SchemaIssue[],
-): SchemaVerificationNode[] {
-  const nodes: SchemaVerificationNode[] = [];
-  const installedIds = new Set(schema.dependencies.map((d) => d.id));
-
-  for (const dependency of dependencies) {
-    const isSatisfied = installedIds.has(dependency.id);
-    const depPath = `dependencies.${dependency.id}`;
-
-    if (!isSatisfied) {
-      const depIssue: SchemaIssue = {
-        kind: 'dependency_missing',
-        dependencyId: dependency.id,
-        message: `Dependency "${dependency.id}" is missing from database`,
-      };
-      issues.push(depIssue);
-      const nodeMessage = depIssue.message;
-      nodes.push({
-        status: 'fail',
-        kind: 'databaseDependency',
-        name: dependency.label,
-        contractPath: depPath,
-        code: 'dependency_missing',
-        message: nodeMessage,
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      });
-    } else {
-      // Dependency is satisfied
-      nodes.push({
-        status: 'pass',
-        kind: 'databaseDependency',
-        name: dependency.label,
-        contractPath: depPath,
-        code: '',
-        message: '',
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      });
     }
   }
 

@@ -113,7 +113,7 @@ test('InferModelRow still handles scalar fields alongside value objects', () => 
 });
 
 test('MongoTypeMaps accepts a fieldOutputTypes parameter', () => {
-  type TM = MongoTypeMaps<TestCodecTypes, Record<string, never>, TestFieldOutputTypes>;
+  type TM = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes>;
   expectTypeOf<TM['fieldOutputTypes']>().toEqualTypeOf<TestFieldOutputTypes>();
 });
 
@@ -123,7 +123,7 @@ test('MongoTypeMaps defaults fieldOutputTypes to Record<string, Record<string, u
 });
 
 test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () => {
-  type TM = MongoTypeMaps<TestCodecTypes, Record<string, never>, TestFieldOutputTypes>;
+  type TM = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes>;
   type C = MongoContractWithTypeMaps<
     {
       readonly target: 'mongo';
@@ -145,13 +145,8 @@ test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () 
   expectTypeOf<ExtractMongoFieldOutputTypes<C>>().toEqualTypeOf<TestFieldOutputTypes>();
 });
 
-test('MongoTypeMaps accepts a 4th fieldInputTypes parameter', () => {
-  type TM = MongoTypeMaps<
-    TestCodecTypes,
-    Record<string, never>,
-    TestFieldOutputTypes,
-    TestFieldInputTypes
-  >;
+test('MongoTypeMaps accepts a 3rd fieldInputTypes parameter', () => {
+  type TM = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes, TestFieldInputTypes>;
   expectTypeOf<TM['fieldInputTypes']>().toEqualTypeOf<TestFieldInputTypes>();
 });
 
@@ -161,12 +156,7 @@ test('MongoTypeMaps defaults fieldInputTypes to Record<string, Record<string, un
 });
 
 test('ExtractMongoFieldInputTypes extracts fieldInputTypes from contract', () => {
-  type TM = MongoTypeMaps<
-    TestCodecTypes,
-    Record<string, never>,
-    TestFieldOutputTypes,
-    TestFieldInputTypes
-  >;
+  type TM = MongoTypeMaps<TestCodecTypes, TestFieldOutputTypes, TestFieldInputTypes>;
   type C = MongoContractWithTypeMaps<
     {
       readonly target: 'mongo';
@@ -188,8 +178,8 @@ test('ExtractMongoFieldInputTypes extracts fieldInputTypes from contract', () =>
   expectTypeOf<ExtractMongoFieldInputTypes<C>>().toEqualTypeOf<TestFieldInputTypes>();
 });
 
-test('backward compat: MongoTypeMaps with 2 params still compiles', () => {
-  type TM = MongoTypeMaps<TestCodecTypes, Record<string, never>>;
+test('MongoTypeMaps with single param compiles', () => {
+  type TM = MongoTypeMaps<TestCodecTypes>;
   expectTypeOf<TM['codecTypes']>().toEqualTypeOf<TestCodecTypes>();
   expectTypeOf<TM['fieldOutputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();
   expectTypeOf<TM['fieldInputTypes']>().toEqualTypeOf<Record<string, Record<string, unknown>>>();

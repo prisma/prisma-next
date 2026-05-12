@@ -2,7 +2,7 @@ import type { ControlDriverInstance } from '@prisma-next/framework-components/co
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { PostgresControlAdapter } from '../src/core/control-adapter';
+import { PostgresControlAdapter, parsePgReloptions } from '../src/core/control-adapter';
 
 type QueryHandler = {
   readonly match: (sql: string) => boolean;
@@ -48,7 +48,6 @@ describe('PostgresControlAdapter', () => {
 
       expect(result).toEqual({
         tables: {},
-        dependencies: [],
         annotations: {
           pg: {
             schema: 'public',
@@ -1143,38 +1142,6 @@ describe('PostgresControlAdapter', () => {
       expect(result.tables['user']?.indexes[0]?.columns).toEqual(['id']);
     });
 
-    it('handles extensions', async () => {
-      const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
-        familyId: 'sql',
-        targetId: 'postgres',
-        query: async <Row = Record<string, unknown>>(sql: string) => {
-          if (sql.includes('information_schema.tables')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_extension')) {
-            return {
-              rows: [{ extname: 'uuid-ossp' }, { extname: 'pgcrypto' }] as Row[],
-            };
-          }
-          if (sql.includes('version()')) {
-            return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
-            };
-          }
-          return { rows: [] as Row[] };
-        },
-        close: async () => {},
-      };
-
-      const result = await adapter.introspect(mockDriver);
-
-      expect(result.dependencies).toEqual([
-        { id: 'postgres.extension.uuid-ossp' },
-        { id: 'postgres.extension.pgcrypto' },
-      ]);
-    });
-
     it('handles custom schema name', async () => {
       const adapter = new PostgresControlAdapter();
       const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
@@ -1648,6 +1615,26 @@ describe('PostgresControlAdapter', () => {
       { input: 'hstore', expected: 'hstore' },
     ])('passes through extension type $input unchanged', ({ input, expected }) => {
       expect(normalizeSchemaNativeType(input)).toBe(expected);
+    });
+  });
+
+  describe('parsePgReloptions', () => {
+    it('throws when a reloption entry has no "=" separator', () => {
+      expect(() => parsePgReloptions(['no_eq_sign'], 'item_body_idx')).toThrow(
+        /malformed reloption entry "no_eq_sign" on index "item_body_idx"/,
+      );
+    });
+
+    it('parses well-formed key=value entries into a record', () => {
+      expect(parsePgReloptions(['fillfactor=70', 'fastupdate=true'], 'item_body_idx')).toEqual({
+        fillfactor: '70',
+        fastupdate: 'true',
+      });
+    });
+
+    it('returns undefined for a null or empty input', () => {
+      expect(parsePgReloptions(null, 'item_body_idx')).toBeUndefined();
+      expect(parsePgReloptions([], 'item_body_idx')).toBeUndefined();
     });
   });
 });

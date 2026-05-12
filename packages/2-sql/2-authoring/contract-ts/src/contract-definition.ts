@@ -29,8 +29,8 @@ export interface UniqueConstraintNode {
 export interface IndexNode {
   readonly columns: readonly string[];
   readonly name?: string;
-  readonly using?: string;
-  readonly config?: Record<string, unknown>;
+  readonly type?: string;
+  readonly options?: Record<string, unknown>;
 }
 
 export interface ForeignKeyNode {

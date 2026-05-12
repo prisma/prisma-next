@@ -50,6 +50,8 @@ The engineer asks to generate a plan but no spec exists.
 
 Given a spec, generate the full plan:
 
+0. **Research the codebase the plan will touch.** Before sequencing milestones, read the existing packages, test layouts, CI signal sources, and call-site count for things the plan will change. Plans depend on accurate cost / blast-radius estimation; estimates ungrounded in the codebase produce milestone boundaries that don't survive contact with the code. The agent must use Grep / Read / Glob / SemanticSearch to ground the plan's claims about diff size, affected sites, dependencies between milestones, and existing test infrastructure. **Surfacing "I'm not sure how many call sites this touches" as a planning hole is not acceptable** — run the search. Asking the user is only appropriate for decisions the codebase cannot answer (priorities, sequencing trade-offs, stakeholder availability).
+
 1. **Derive the summary.** Synthesise the spec into a concise plan summary: what is being built, why it matters, and what success looks like. Derive this from the spec's summary, description, and requirements; do not ask the engineer for it.
 
 2. **Identify collaborators.** Pull collaborators from:

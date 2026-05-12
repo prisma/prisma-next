@@ -5,6 +5,7 @@
   "type": "module",
   "sideEffects": false,
   "scripts": {
+    "build:contract-space": "prisma-next contract emit",
     "build": "tsdown",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -16,9 +17,23 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/contract-authoring": "workspace:*"
+    "@prisma-next/contract-authoring": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/migration-tools": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-operations": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "arktype": "^2.1.25"
   },
   "devDependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/operations": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
     "tsdown": "catalog:",
@@ -32,7 +47,9 @@
   "exports": {
     "./control": "./dist/control.mjs",
     "./index-types": "./dist/index-types.mjs",
+    "./operation-types": "./dist/operation-types.mjs",
     "./pack": "./dist/pack.mjs",
+    "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },
   "repository": {

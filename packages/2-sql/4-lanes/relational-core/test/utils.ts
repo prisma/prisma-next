@@ -13,10 +13,7 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
       id: 'stub-profile',
       target: 'postgres',
       capabilities: {},
-      readMarkerStatement: () => ({ sql: '', params: [] }),
-      parseMarkerRow: () => {
-        throw new Error('stub adapter does not implement parseMarkerRow');
-      },
+      readMarker: async () => ({ kind: 'absent' as const }),
     },
     lower(ast: SelectAst, ctx: { contract: Contract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);

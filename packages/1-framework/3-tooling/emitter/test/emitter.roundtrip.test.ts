@@ -33,11 +33,9 @@ describe('emitter round-trip', () => {
       });
 
       const codecTypeImports: TypesImportSpec[] = [];
-      const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitStackInput = {
         codecTypeImports,
-        operationTypeImports,
         extensionIds,
       };
 
@@ -140,11 +138,9 @@ describe('emitter round-trip', () => {
       });
 
       const codecTypeImports: TypesImportSpec[] = [];
-      const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres'];
       const options: EmitStackInput = {
         codecTypeImports,
-        operationTypeImports,
         extensionIds,
       };
 
@@ -197,11 +193,9 @@ describe('emitter round-trip', () => {
       });
 
       const codecTypeImports: TypesImportSpec[] = [];
-      const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitStackInput = {
         codecTypeImports,
-        operationTypeImports,
         extensionIds,
       };
 
@@ -268,11 +262,9 @@ describe('emitter round-trip', () => {
     });
 
     const codecTypeImports: TypesImportSpec[] = [];
-    const operationTypeImports: TypesImportSpec[] = [];
     const extensionIds = ['postgres', 'pg'];
     const options: EmitStackInput = {
       codecTypeImports,
-      operationTypeImports,
       extensionIds,
     };
 

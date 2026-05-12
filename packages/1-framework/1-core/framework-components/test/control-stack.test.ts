@@ -10,7 +10,6 @@ import {
   extractCodecLookup,
   extractCodecTypeImports,
   extractComponentIds,
-  extractOperationTypeImports,
   extractQueryOperationTypeImports,
   validateScalarTypeCodecIds,
 } from '../src/control/control-stack';
@@ -78,26 +77,6 @@ describe('extractCodecTypeImports', () => {
       }),
     ]);
     expect(result).toHaveLength(2);
-  });
-});
-
-describe('extractOperationTypeImports', () => {
-  it('returns empty array for descriptors without operation types', () => {
-    const result = extractOperationTypeImports([createDescriptor()]);
-    expect(result).toEqual([]);
-  });
-
-  it('extracts operation type import', () => {
-    const result = extractOperationTypeImports([
-      createDescriptor({
-        types: {
-          operationTypes: {
-            import: { package: '@test/ops', named: 'Ops', alias: 'O' },
-          },
-        },
-      }),
-    ]);
-    expect(result).toEqual([{ package: '@test/ops', named: 'Ops', alias: 'O' }]);
   });
 });
 
@@ -439,9 +418,6 @@ describe('createControlStack', () => {
             codecTypes: {
               typeImports: [{ package: '@test/param', named: 'P', alias: 'TP' }],
             },
-            operationTypes: {
-              import: { package: '@test/ops', named: 'O', alias: 'TO' },
-            },
             queryOperationTypes: {
               import: { package: '@test/qops', named: 'Q', alias: 'TQ' },
             },
@@ -460,7 +436,6 @@ describe('createControlStack', () => {
     );
 
     expect(state.codecTypeImports).toHaveLength(2);
-    expect(state.operationTypeImports).toHaveLength(1);
     expect(state.queryOperationTypeImports).toHaveLength(1);
     expect(state.extensionIds).toEqual(['sql', 'target', 'adapter']);
     expect(Object.keys(state.authoringContributions.type)).toEqual(['myType']);
@@ -503,7 +478,6 @@ describe('createControlStack', () => {
 
     expect(state.codecTypeImports).toHaveLength(1);
     expect(state.extensionIds).toEqual(['mongo']);
-    expect(state.operationTypeImports).toEqual([]);
   });
 
   it('returns empty state when descriptors have no types', () => {
@@ -514,7 +488,6 @@ describe('createControlStack', () => {
       }),
     );
     expect(state.codecTypeImports).toEqual([]);
-    expect(state.operationTypeImports).toEqual([]);
     expect(state.queryOperationTypeImports).toEqual([]);
     expect(state.extensionIds).toEqual(['fam', 'tgt']);
     expect(state.authoringContributions).toEqual({ field: {}, type: {} });

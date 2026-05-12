@@ -16,7 +16,6 @@ import {
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type {
-  DependencyIR,
   SqlReferentialAction,
   SqlSchemaIR,
   SqlTableIR,
@@ -57,11 +56,8 @@ export function createTestContract(
 /**
  * Creates a minimal valid SqlSchemaIR for testing.
  */
-export function createTestSchemaIR(
-  tables: Record<string, SqlTableIR>,
-  dependencies: readonly DependencyIR[] = [],
-): SqlSchemaIR {
-  return { tables, dependencies };
+export function createTestSchemaIR(tables: Record<string, SqlTableIR>): SqlSchemaIR {
+  return { tables };
 }
 
 /**
@@ -84,7 +80,12 @@ export function createContractTable(
       index?: boolean;
     }>;
     uniques?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
-    indexes?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
+    indexes?: ReadonlyArray<{
+      columns: readonly string[];
+      name?: string;
+      type?: string;
+      options?: Record<string, unknown>;
+    }>;
   },
 ): StorageTable {
   const result: StorageTable = {
@@ -130,7 +131,13 @@ export function createSchemaTable(
       onUpdate?: SqlReferentialAction;
     }>;
     uniques?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
-    indexes?: ReadonlyArray<{ columns: readonly string[]; unique: boolean; name?: string }>;
+    indexes?: ReadonlyArray<{
+      columns: readonly string[];
+      unique: boolean;
+      name?: string;
+      type?: string;
+      options?: Record<string, unknown>;
+    }>;
   },
 ): SqlTableIR {
   const result: SqlTableIR = {

@@ -18,6 +18,58 @@ export function createExtension(extensionName: string): Op {
   };
 }
 
+/**
+ * Install a Postgres extension as the baseline op for an extension-pack
+ * contract space. Layered on top of {@link createExtension}: stamps an
+ * `invariantId` (required so the per-space marker records the install),
+ * scopes the op `id` under a caller-chosen namespace (e.g. `pgvector.`),
+ * and emits pre- and postcheck SQL probing `pg_extension`. The richer
+ * shape lets the runner's idempotency probe skip the install on re-run
+ * (postcheck-pre-satisfied) without firing the precheck.
+ *
+ * Use this for hand-rolled baseline migrations in contract-space
+ * extension packages (e.g. `extension-pgvector`, `extension-paradedb`);
+ * use the bare {@link createExtension} for planner-emitted ops where the
+ * caller already controls idempotency through the surrounding plan.
+ */
+export function installExtension(options: {
+  readonly extensionName: string;
+  readonly invariantId: string;
+  readonly id: string;
+  readonly label?: string;
+}): Op {
+  const { extensionName, invariantId, id } = options;
+  const label = options.label ?? `Enable extension "${extensionName}"`;
+  return {
+    id,
+    label,
+    operationClass: 'additive',
+    invariantId,
+    target: {
+      id: 'postgres',
+      details: { schema: 'public', objectType: 'dependency', name: extensionName },
+    },
+    precheck: [
+      step(
+        `verify extension "${extensionName}" is not already enabled`,
+        `SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = '${extensionName}')`,
+      ),
+    ],
+    execute: [
+      step(
+        `create extension "${extensionName}"`,
+        `CREATE EXTENSION IF NOT EXISTS ${extensionName}`,
+      ),
+    ],
+    postcheck: [
+      step(
+        `confirm extension "${extensionName}" is enabled`,
+        `SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = '${extensionName}')`,
+      ),
+    ],
+  };
+}
+
 export function createSchema(schemaName: string): Op {
   return {
     id: `schema.${schemaName}`,

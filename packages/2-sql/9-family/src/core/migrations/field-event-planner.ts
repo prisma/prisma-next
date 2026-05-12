@@ -9,7 +9,7 @@
  * agnostic, and only ever invoked at the app-space emitter; extension-space
  * planning never reaches this helper.
  *
- * Ordering rules:
+ * Ordering rules (see ADR 213):
  *
  * - Events are grouped by phase: `'added'` → `'dropped'` → `'altered'`.
  * - Within each phase, entries are sorted alphabetically by
@@ -18,6 +18,8 @@
  *
  * `'altered'` is suppressed when only `codecId` differs (codec rotation is a
  * v1 non-goal).
+ *
+ * See: `docs/architecture docs/adrs/ADR 213 - Codec lifecycle hooks.md`.
  */
 
 import type { Contract } from '@prisma-next/contract/types';
@@ -156,9 +158,9 @@ function buildContext(event: FieldEvent, entry: FieldEntry): FieldEventContext {
  * `'altered'` predicate. Returns `false` whenever `codecId` differs —
  * any codec change suppresses the `altered` event entirely, including
  * cases where another property also differs in the same diff. Codec
- * rotation is a v1 non-goal (project spec § Non-goals); avoiding the
- * mixed event keeps the migration semantics for codec changes explicit
- * (out of scope) rather than smuggling them through as `altered`.
+ * rotation is a v1 non-goal; avoiding the mixed event keeps the
+ * migration semantics for codec changes explicit rather than smuggling
+ * them through as `altered`.
  *
  * For non-`codecId` diffs, returns `true` iff any other column property
  * differs.

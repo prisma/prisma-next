@@ -110,7 +110,6 @@ describe('SqlControlFamilyInstance OperationPreviewCapable', () => {
       },
       extensionPacks: [],
       codecTypeImports: [],
-      operationTypeImports: [],
       extensionIds: [],
       // biome-ignore lint/suspicious/noExplicitAny: minimal stub
     } as any;

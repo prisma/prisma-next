@@ -38,7 +38,6 @@ type GeneratedLikeFieldOutputTypes = {
 type GeneratedLikeTypeMaps = TypeMaps<
   GeneratedLikeCodecTypes,
   Record<string, never>,
-  Record<string, never>,
   GeneratedLikeFieldOutputTypes
 >;
 
@@ -389,12 +388,7 @@ type VOFieldOutputTypes = {
   };
 };
 
-type VOTypeMaps = TypeMaps<
-  VOCodecTypes,
-  Record<string, never>,
-  Record<string, never>,
-  VOFieldOutputTypes
->;
+type VOTypeMaps = TypeMaps<VOCodecTypes, Record<string, never>, VOFieldOutputTypes>;
 
 type VOContractBase = Contract<
   {

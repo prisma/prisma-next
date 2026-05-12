@@ -2,6 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
+  type AnyExpression,
   BinaryExpr,
   ColumnRef,
   isWhereExpr,
@@ -25,6 +26,7 @@ import {
   resolveModelTableName,
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
+  resolveRowIdentityColumns,
   resolveUpsertConflictColumns,
 } from './collection-contract';
 import { dispatchCollectionRows } from './collection-dispatch';
@@ -107,6 +109,7 @@ import {
   type RelatedModelName,
   type RelationNames,
   type ResolvedCreateInput,
+  type RuntimeQueryable,
   type ShorthandWhereFilter,
   type UniqueConstraintCriterion,
   type VariantModelRow,
@@ -1062,12 +1065,20 @@ export class Collection<
       return this.#reloadMutationRowByPrimaryKey(pkCriterion);
     }
 
-    const rows = await this.updateAll(
-      data as State['hasWhere'] extends true
-        ? Partial<DefaultModelRow<TContract, ModelName>>
-        : never,
-    );
-    return rows[0] ?? null;
+    return withMutationScope(this.ctx.runtime, async (scope) => {
+      const scoped = this.#withRuntime(scope);
+      const identityWhere = await scoped.#findFirstMatchingRowIdentityWhere();
+      if (!identityWhere) {
+        return null;
+      }
+      const narrowed = scoped.#clone({ filters: [identityWhere] });
+      const rows = await narrowed.updateAll(
+        data as State['hasWhere'] extends true
+          ? Partial<DefaultModelRow<TContract, ModelName>>
+          : never,
+      );
+      return rows[0] ?? null;
+    });
   }
 
   updateAll(
@@ -1143,15 +1154,26 @@ export class Collection<
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
   ): Promise<Row | null> {
     assertReturningCapability(this.contract, 'delete()');
-    const rows = await this.deleteAll().toArray();
-    return rows[0] ?? null;
+    return withMutationScope(this.ctx.runtime, async (scope) => {
+      const scoped = this.#withRuntime(scope);
+      const identityWhere = await scoped.#findFirstMatchingRowIdentityWhere();
+      if (!identityWhere) {
+        return null;
+      }
+      const narrowed = scoped.#clone({ filters: [identityWhere] });
+      const rows = await narrowed.#executeDeleteReturning().toArray();
+      return rows[0] ?? null;
+    });
   }
 
   deleteAll(
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
   ): AsyncIterableResult<Row> {
     assertReturningCapability(this.contract, 'deleteAll()');
+    return this.#executeDeleteReturning();
+  }
 
+  #executeDeleteReturning(): AsyncIterableResult<Row> {
     const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
     const { selectedForQuery: selectedForDelete, hiddenColumns } = augmentSelectionForJoinColumns(
       this.state.selectedFields,
@@ -1216,6 +1238,41 @@ export class Collection<
     return criterion;
   }
 
+  async #findFirstMatchingRowIdentityWhere(): Promise<AnyExpression | null> {
+    const identityColumns = resolveRowIdentityColumns(this.contract, this.tableName);
+    if (identityColumns.length === 0) {
+      throw new Error(
+        `update()/delete() on model "${this.modelName}" requires the table to have a primary key or unique constraint`,
+      );
+    }
+    const firstRow = await this.#clone({
+      selectedFields: [...identityColumns],
+      includes: [],
+    }).first();
+    if (!firstRow) {
+      return null;
+    }
+    const columnToField = getColumnToFieldMap(this.contract, this.modelName);
+    const criterion: Record<string, unknown> = {};
+    for (const column of identityColumns) {
+      const fieldName = columnToField[column] ?? column;
+      const value = (firstRow as Record<string, unknown>)[fieldName];
+      if (value === undefined) {
+        throw new Error(
+          `Missing identity field "${fieldName}" while resolving single-row scope for model "${this.modelName}"`,
+        );
+      }
+      criterion[fieldName] = value;
+    }
+    return (
+      shorthandToWhereExpr(
+        this.ctx.context,
+        this.modelName,
+        criterion as ShorthandWhereFilter<TContract, ModelName>,
+      ) ?? null
+    );
+  }
+
   async #reloadMutationRowByPrimaryKey(criterion: Record<string, unknown>): Promise<Row | null> {
     return this.#reloadMutationRowByCriterion(criterion, 'primary key');
   }
@@ -1268,6 +1325,16 @@ export class Collection<
       ...this.state,
       ...overrides,
     });
+  }
+
+  #withRuntime(runtime: RuntimeQueryable): Collection<TContract, ModelName, Row, State> {
+    const Ctor = this.constructor as CollectionConstructor<TContract>;
+    return new Ctor({ ...this.ctx, runtime }, this.modelName, {
+      tableName: this.tableName,
+      state: this.state,
+      registry: this.registry,
+      includeRefinementMode: this.includeRefinementMode,
+    }) as unknown as Collection<TContract, ModelName, Row, State>;
   }
 
   #cloneWithRow<NextRow, NextState extends CollectionTypeState = State>(

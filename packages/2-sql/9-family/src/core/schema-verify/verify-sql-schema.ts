@@ -23,11 +23,10 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extractCodecControlHooks } from '../assembly';
-import { type CodecControlHooks, collectInitDependencies } from '../migrations/types';
+import type { CodecControlHooks } from '../migrations/types';
 import {
   arraysEqual,
   computeCounts,
-  verifyDatabaseDependencies,
   verifyForeignKeys,
   verifyIndexes,
   verifyPrimaryKey,
@@ -166,10 +165,6 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
       children: typeNodes,
     });
   }
-
-  const databaseDependencies = collectInitDependencies(options.frameworkComponents);
-  const dependencyStatuses = verifyDatabaseDependencies(databaseDependencies, schema, issues);
-  rootChildren.push(...dependencyStatuses);
 
   const root = buildRootNode(rootChildren);
 

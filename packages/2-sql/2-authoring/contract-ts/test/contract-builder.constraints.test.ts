@@ -2,6 +2,7 @@ import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-compon
 import { describe, expect, it } from 'vitest';
 import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
+import { testIndexPack } from './helpers/test-index-pack';
 
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
@@ -122,7 +123,7 @@ describe('contract definition constraint support', () => {
           },
         }).sql(({ cols, constraints }) => ({
           table: 'user',
-          indexes: [constraints.index(cols.email)],
+          indexes: [constraints.index([cols.email])],
         })),
       },
     });
@@ -141,7 +142,7 @@ describe('contract definition constraint support', () => {
           },
         }).sql(({ cols, constraints }) => ({
           table: 'user',
-          indexes: [constraints.index(cols.email, { name: 'user_email_idx' })],
+          indexes: [constraints.index([cols.email], { name: 'user_email_idx' })],
         })),
       },
     });
@@ -230,11 +231,70 @@ describe('contract definition constraint support', () => {
             },
           }).sql(({ cols, constraints }) => ({
             table: 'user',
-            indexes: [constraints.index(cols.id, { name: 'user_pkey' })],
+            indexes: [constraints.index([cols.id], { name: 'user_pkey' })],
           })),
         },
       }),
     ).toThrow(/Contract semantic validation failed:.*user_pkey/);
+  });
+
+  it('throws a contextual error when an extension pack declares a malformed indexTypes value', () => {
+    const malformedIndexPack = {
+      kind: 'extension',
+      id: 'malformed-pack',
+      familyId: 'sql',
+      targetId: 'postgres',
+      version: '0.0.1',
+      indexTypes: 'oops',
+    } as const;
+
+    expect(() =>
+      defineContract({
+        family: bareFamilyPack,
+        target: postgresTargetPack,
+        // The pack is intentionally malformed for this test; the runtime
+        // shape check is what we want to exercise.
+        extensionPacks: { malformed: malformedIndexPack as unknown as typeof testIndexPack },
+        models: {
+          Doc: model('Doc', {
+            fields: {
+              id: field.column(int4Column).id(),
+            },
+          }).sql({ table: 'doc' }),
+        },
+      }),
+    ).toThrow(/malformed-pack/);
+  });
+
+  it('throws at authoring time when an index uses an unregistered type', () => {
+    expect(() =>
+      defineContract(
+        {
+          family: bareFamilyPack,
+          target: postgresTargetPack,
+          extensionPacks: { testIndexes: testIndexPack },
+        },
+        ({ model: helperModel, field: helperField }) => ({
+          models: {
+            Doc: helperModel('Doc', {
+              fields: {
+                id: helperField.column(int4Column).id(),
+                body: helperField.column(textColumn),
+              },
+            }).sql(({ cols, constraints }) => ({
+              table: 'doc',
+              indexes: [
+                constraints.index([cols.body], {
+                  // @ts-expect-error - exercise the authoring-time runtime validator on an unregistered type literal.
+                  type: 'made-up',
+                  options: {},
+                }),
+              ],
+            })),
+          },
+        }),
+      ),
+    ).toThrow(/unregistered index type "made-up"/);
   });
 
   it('supports multiple constraints on the same table', () => {
@@ -248,7 +308,7 @@ describe('contract definition constraint support', () => {
           },
         }).sql(({ cols, constraints }) => ({
           table: 'user',
-          indexes: [constraints.index(cols.email), constraints.index(cols.username)],
+          indexes: [constraints.index([cols.email]), constraints.index([cols.username])],
         })),
       },
     });

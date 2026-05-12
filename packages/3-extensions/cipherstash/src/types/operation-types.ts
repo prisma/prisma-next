@@ -29,23 +29,6 @@ const CIPHERSTASH_STRING_CODEC = 'cipherstash/string@1';
 type CipherstashStringCodec = typeof CIPHERSTASH_STRING_CODEC;
 
 /**
- * Codec-keyed operation surface. Read by the model-accessor type
- * machinery to attach `cipherstashEq` / `cipherstashIlike` onto the
- * `where(...)` filter object for `cipherstash/string@1`-typed fields
- * (e.g. `db.user.findMany({ where: { email: { cipherstashEq: 'x' } } })`).
- */
-export type OperationTypes = {
-  readonly 'cipherstash/string@1': {
-    readonly cipherstashEq: {
-      readonly self: { readonly codecId: CipherstashStringCodec };
-    };
-    readonly cipherstashIlike: {
-      readonly self: { readonly codecId: CipherstashStringCodec };
-    };
-  };
-};
-
-/**
  * Flat operation signatures consumed by the SQL query builder. Read
  * via the `queryOperations` slot on the runtime context to project
  * `t.email.cipherstashEq(...)` onto `cipherstash/string@1` column

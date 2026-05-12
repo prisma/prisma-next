@@ -128,13 +128,6 @@
             }
           ]
         },
-        "operationTypes": {
-          "import": {
-            "alias": "CipherstashOperationTypes",
-            "named": "OperationTypes",
-            "package": "@prisma-next/extension-cipherstash/operation-types"
-          }
-        },
         "queryOperationTypes": {
           "import": {
             "alias": "CipherstashQueryOperationTypes",

@@ -41,7 +41,6 @@ export interface ComponentMetadata {
        */
       readonly codecDescriptors?: ReadonlyArray<AnyCodecDescriptor>;
     };
-    readonly operationTypes?: { readonly import: TypesImportSpec };
     readonly queryOperationTypes?: { readonly import: TypesImportSpec };
     readonly storage?: ReadonlyArray<{
       readonly typeId: string;

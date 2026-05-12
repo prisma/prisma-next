@@ -66,7 +66,6 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           annotationNamespace: 'pg',
           ...ifDefined('expandNativeType', expander),
           renderDefault: postgresRenderDefault,
-          frameworkComponents: frameworkComponents ?? [],
         });
       },
     },

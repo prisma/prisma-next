@@ -19,7 +19,6 @@ export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
 
 export type CodecTypes = MongoCodecTypes;
-export type OperationTypes = Record<string, never>;
 
 export type FieldOutputTypes = {
   readonly Address: {
@@ -77,7 +76,7 @@ export type FieldInputTypes = {
     readonly email: CodecTypes['mongo/string@1']['input'];
   };
 };
-export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes, FieldInputTypes>;
+export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;
 
 type ContractBase = ContractType<
   {

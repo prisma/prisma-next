@@ -34,16 +34,18 @@ import {
  *
  * Locks the CLI-level half of:
  *
- * - AM4 (rollback semantics) — multi-space failure rolls back every
+ * - rollback semantics — a multi-space failure rolls back every
  *   space's writes and preserves pre-execution markers.
- * - AM9 (atomic init across spaces).
- * - AM10 (only the bumped extension advances on a follow-up update).
- * - AM11 (codec hooks fire through the aggregate-pipeline path —
- *   loader → `planAggregate` synth strategy → `frameworkComponents`).
+ * - atomic init across spaces.
+ * - only the bumped extension advances on a follow-up update.
+ * - codec hooks firing through the aggregate-pipeline path
+ *   (loader → `planAggregate` synth strategy → `frameworkComponents`).
  *
  * Companion to the unit-level tests in `@prisma-next/cli` that mock
- * the planner / runner. The runner-level half of AM12 is locked by
+ * the planner / runner. The runner-level multi-space coverage lives in
  * `runner.multi-space.test.ts`.
+ *
+ * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
 
 const EXT_SPACE_ID = 'test_contract_space_sqlite';
@@ -198,13 +200,14 @@ async function writeExtensionContractSpaceArtefacts(args: {
 
 /**
  * Build a structurally-valid `SqlControlExtensionDescriptor` with the
- * `contractSpace` field the aggregate loader inspects. The descriptor's
- * `contractJson` is the same reference the test will pass to the loader,
- * and `headRef.hash` matches the on-disk on-disk head ref so drift
- * detection passes. Other descriptor fields (`create`, `migrations`)
- * are unused on the `db init` / `db update` path — the loader reads
- * migrations from disk and `create()` is only invoked on the
- * `migrate` path. They are stubbed minimally to satisfy the type.
+ * `contractSpace` field the migrate-time seed pass reads. The
+ * descriptor's `contractJson` is the same reference the test will pass
+ * to the loader, and `headRef.hash` matches the on-disk head ref so
+ * the loader's integrity check passes. Other descriptor fields
+ * (`create`, `migrations`) are unused on the `db init` / `db update`
+ * path — the loader reads migrations from disk and `create()` is only
+ * invoked on the `migrate` path. They are stubbed minimally to satisfy
+ * the type.
  */
 function buildExtensionPack(args: {
   readonly contractJson: Contract<SqlStorage>;
@@ -504,6 +507,79 @@ describe(
       // frameworkComponents).
       const ids = result.value.plan.operations.map((op) => op.id);
       expect(ids).toContain('codec.added.user.email');
+    });
+
+    it('collapses cleanly to a single app member when no extensions are declared (n=1 aggregate-path regression)', async () => {
+      // Every other test in this file declares at least one extension
+      // pack; this one exercises the empty-extensionPacks path through
+      // the aggregate loader / planner / runner so a future refactor
+      // that breaks single-space SQLite does not slip past CI.
+      const tmpDir = createTmpDir();
+      const migrationsDir = join(tmpDir, 'migrations');
+      await mkdir(migrationsDir, { recursive: true });
+
+      const initResult = await executeDbInit({
+        driver: testDb!.driver,
+        familyInstance,
+        contract: appContract,
+        mode: 'apply',
+        migrations: sqliteTargetDescriptor.migrations,
+        frameworkComponents: [...frameworkComponents],
+        migrationsDir,
+        targetId: 'sqlite',
+        extensionPacks: [],
+      });
+
+      if (!initResult.ok) {
+        throw new Error(
+          `Expected ok but got failure: ${JSON.stringify(initResult.failure, null, 2)}`,
+        );
+      }
+
+      const markers = await testDb!.driver.query<{ space: string; core_hash: string }>(
+        'SELECT space, core_hash FROM _prisma_marker ORDER BY space',
+      );
+      expect(markers.rows.map((r) => r.space)).toEqual(['app']);
+      expect(markers.rows[0]!.core_hash).toBe(appContract.storage.storageHash);
+
+      const userTable = await testDb!.driver.query<{ cnt: number }>(
+        "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type = 'table' AND name = 'user'",
+      );
+      expect(userTable.rows[0]!.cnt).toBe(1);
+
+      // Per-space breakdown surfaced to the caller has exactly one
+      // entry, kind `app`, no extension entries.
+      expect(initResult.value.perSpace).toBeDefined();
+      expect(initResult.value.perSpace!.length).toBe(1);
+      expect(initResult.value.perSpace![0]).toMatchObject({ spaceId: 'app', kind: 'app' });
+
+      // Re-running `db update` against the already-applied contract is
+      // a no-op — proves the aggregate path's marker / hash check still
+      // short-circuits when n=1.
+      const updateResult = await executeDbUpdate({
+        driver: testDb!.driver,
+        familyInstance,
+        contract: appContract,
+        mode: 'apply',
+        migrations: sqliteTargetDescriptor.migrations,
+        frameworkComponents: [...frameworkComponents],
+        migrationsDir,
+        targetId: 'sqlite',
+        extensionPacks: [],
+      });
+
+      if (!updateResult.ok) {
+        throw new Error(
+          `Expected ok but got failure: ${JSON.stringify(updateResult.failure, null, 2)}`,
+        );
+      }
+      expect(updateResult.value.execution).toBeDefined();
+      expect(updateResult.value.execution!.operationsExecuted).toBe(0);
+
+      const markersAfter = await testDb!.driver.query<{ space: string }>(
+        'SELECT space FROM _prisma_marker ORDER BY space',
+      );
+      expect(markersAfter.rows.map((r) => r.space)).toEqual(['app']);
     });
 
     it('rolls back ALL spaces and preserves pre-execution markers when any space fails (locks AM4-rollback CLI half)', async () => {

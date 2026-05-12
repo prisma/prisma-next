@@ -8,11 +8,7 @@ export {
   type ExtensionSpaceApplyPathOutcome,
 } from '../compute-extension-space-apply-path';
 export type { SpaceApplyInput } from '../concatenate-space-apply-inputs';
-export {
-  type DetectSpaceContractDriftInputs,
-  detectSpaceContractDrift,
-  type SpaceContractDriftResult,
-} from '../detect-space-contract-drift';
+export { contractSpaceFromJson } from '../contract-space-from-json';
 export {
   type ContractSpaceArtefactInputs,
   emitContractSpaceArtefacts,

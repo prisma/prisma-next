@@ -1,5 +1,4 @@
 export {
-  type AggregateContractHasher,
   type DeclaredExtensionEntry,
   type LayoutViolation,
   type LoadAggregateError,
@@ -10,6 +9,7 @@ export {
 export type { ContractMarkerRecordLike } from '../aggregate/marker-types';
 export {
   type AggregateCurrentDBState,
+  type AggregateMigrationEdgeRef,
   type AggregatePerSpacePlan,
   type AggregatePlannerError,
   type AggregatePlannerInput,

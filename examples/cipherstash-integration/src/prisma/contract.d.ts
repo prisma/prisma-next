@@ -14,7 +14,6 @@ import type { Time } from '@prisma-next/target-postgres/codec-types';
 import type { Timetz } from '@prisma-next/target-postgres/codec-types';
 import type { Interval } from '@prisma-next/target-postgres/codec-types';
 import type { EncryptedString } from '@prisma-next/extension-cipherstash/runtime';
-import type { OperationTypes as CipherstashOperationTypes } from '@prisma-next/extension-cipherstash/operation-types';
 import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';
 import type { QueryOperationTypes as CipherstashQueryOperationTypes } from '@prisma-next/extension-cipherstash/operation-types';
 
@@ -36,7 +35,6 @@ export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
 
 export type CodecTypes = PgTypes;
-export type OperationTypes = CipherstashOperationTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
   CipherstashQueryOperationTypes<CodecTypes>;
@@ -58,7 +56,6 @@ export type FieldInputTypes = {
 };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
-  OperationTypes,
   QueryOperationTypes,
   FieldOutputTypes,
   FieldInputTypes
@@ -175,13 +172,6 @@ type ContractBase = ContractType<
               readonly package: '@prisma-next/extension-cipherstash/runtime';
             },
           ];
-        };
-        readonly operationTypes: {
-          readonly import: {
-            readonly alias: 'CipherstashOperationTypes';
-            readonly named: 'OperationTypes';
-            readonly package: '@prisma-next/extension-cipherstash/operation-types';
-          };
         };
         readonly queryOperationTypes: {
           readonly import: {

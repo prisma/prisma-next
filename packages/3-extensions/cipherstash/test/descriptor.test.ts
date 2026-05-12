@@ -1,12 +1,12 @@
 /**
  * Structural verification for the CipherStash extension descriptor.
  *
- * **On-disk-in-package authoring.** The descriptor's
+ * **Contract-space package layout.** The descriptor's
  * contract / migrations / head ref now flow through JSON-import
  * declarations from the package's emitted artefacts:
  *
  *   - `<package>/contract.json`
- *   - `<package>/migrations/cipherstash/<dirName>/{migration,ops}.json`
+ *   - `<package>/migrations/<dirName>/{migration,ops}.json`
  *   - `<package>/refs/head.json`
  *
  * These assertions lock down the wiring: the descriptor exposes
@@ -19,12 +19,9 @@
  * the assertions stay honest under re-emission. Mirrors the synthetic
  * extension's `test/descriptor.test.ts` reference model.
  *
- * @see docs/architecture docs/adrs/ADR 211 - Contract spaces.md
+ * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
 
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import { describe, expect, it } from 'vitest';
 import cipherstashExtensionDescriptor from '../src/exports/control';
@@ -36,7 +33,7 @@ import {
 } from '../src/extension-metadata/constants';
 import { EQL_BUNDLE_SQL } from '../src/migration/eql-bundle';
 
-describe('cipherstash extension descriptor (on-disk-in-package authoring)', () => {
+describe('cipherstash extension descriptor (contract-space package layout)', () => {
   it('identifies as a SQL extension targeted at postgres', () => {
     expect(cipherstashExtensionDescriptor).toMatchObject({
       kind: 'extension',
@@ -61,17 +58,7 @@ describe('cipherstash extension descriptor (on-disk-in-package authoring)', () =
     expect(baseline.metadata.to).toBe(space.contractJson.storage.storageHash);
   });
 
-  it("synthesises the migration package's `dirPath` from the descriptor's URL", () => {
-    // The framework `MigrationPackage` is the structural shape; this
-    // descriptor materialises the on-disk variant carrying `dirPath`.
-    const baseline = cipherstashExtensionDescriptor.contractSpace!
-      .migrations[0]! as OnDiskMigrationPackage;
-    expect(existsSync(baseline.dirPath)).toBe(true);
-    expect(existsSync(join(baseline.dirPath, 'migration.json'))).toBe(true);
-    expect(existsSync(join(baseline.dirPath, 'ops.json'))).toBe(true);
-  });
-
-  it('baseline ops list the installEqlBundle op as the sole entry', () => {
+  it('baseline ops carry the installEqlBundle op + structural create-* ops', () => {
     const space = cipherstashExtensionDescriptor.contractSpace!;
     const baseline = space.migrations[0]!;
     const opIds = baseline.ops.map((op) => op.invariantId).filter(Boolean);
