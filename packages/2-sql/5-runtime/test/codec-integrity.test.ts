@@ -57,6 +57,35 @@ describe('createExecutionContext — column codec integrity', () => {
     };
   }
 
+  function asyncParamsSchemaExtension(): SqlRuntimeExtensionDescriptor<'postgres'> {
+    const descriptor: CodecDescriptor<{ length: number }> = {
+      codecId: 'async/vector@1',
+      traits: [],
+      targetTypes: ['vector'],
+      paramsSchema: {
+        '~standard': {
+          version: 1,
+          vendor: 'test',
+          validate: () => Promise.resolve({ value: { length: 0 } }),
+        },
+      },
+      isParameterized: true,
+      factory: ((_params: { length: number }) => (_ctx: SqlCodecInstanceContext) =>
+        makeCodec()) as unknown as CodecDescriptor<{ length: number }>['factory'],
+    };
+    return {
+      kind: 'extension' as const,
+      id: 'async-paramsschema-test',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      codecs: () => [descriptor as unknown as CodecDescriptor],
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+  }
+
   function nonParameterizedExtension(): SqlRuntimeExtensionDescriptor<'postgres'> {
     const descriptor: CodecDescriptor<void> = {
       codecId: 'test/scalar@1',
@@ -203,6 +232,31 @@ describe('createExecutionContext — column codec integrity', () => {
         extensionPacks: [nonParameterizedExtension()],
       }),
     ).not.toThrow();
+  });
+
+  it('throws TYPE_PARAMS_INVALID when a parameterized column probes an async paramsSchema at the integrity check', () => {
+    const contract = contractWithColumn({
+      codecId: 'async/vector@1',
+      nativeType: 'vector',
+    });
+    expect(() =>
+      createTestContext(contract, createStubAdapter(), {
+        extensionPacks: [asyncParamsSchemaExtension()],
+      }),
+    ).toThrow(/TYPE_PARAMS_INVALID|Promise|synchronous/);
+  });
+
+  it('throws TYPE_PARAMS_INVALID when validateTypeParams encounters an async paramsSchema for a column with typeParams', () => {
+    const contract = contractWithColumn({
+      codecId: 'async/vector@1',
+      nativeType: 'vector',
+      typeParams: { length: 1536 },
+    });
+    expect(() =>
+      createTestContext(contract, createStubAdapter(), {
+        extensionPacks: [asyncParamsSchemaExtension()],
+      }),
+    ).toThrow(/TYPE_PARAMS_INVALID|Promise|synchronous/);
   });
 
   it('accepts a typeRef column whose typed instance carries typeParams', () => {

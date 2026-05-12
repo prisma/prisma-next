@@ -387,7 +387,17 @@ function assertColumnCodecIntegrity(
         // schema with an empty params object and only fail when the schema
         // rejects it (i.e. at least one field is required).
         const probe = descriptor.paramsSchema['~standard'].validate({});
-        const rejects = !(probe instanceof Promise) && 'issues' in probe && !!probe.issues;
+        if (probe instanceof Promise) {
+          // Swallow the probe Promise's rejection so Node doesn't warn about an
+          // unhandled rejection once we throw synchronously below.
+          probe.catch(() => {});
+          throw runtimeError(
+            'RUNTIME.TYPE_PARAMS_INVALID',
+            `Column '${tableName}.${columnName}' uses parameterized codec '${ref.codecId}' whose paramsSchema returned a Promise; paramsSchema must be a synchronous Standard Schema validator. Return a value/issues result directly instead of a Promise.`,
+            { table: tableName, column: columnName, codecId: ref.codecId },
+          );
+        }
+        const rejects = 'issues' in probe && !!probe.issues;
         if (rejects) {
           throw runtimeError(
             'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH',
