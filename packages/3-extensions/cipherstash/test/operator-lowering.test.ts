@@ -76,10 +76,19 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
 import { EncryptedString } from '../src/execution/envelope';
+import { EncryptedBigInt } from '../src/execution/envelope-bigint';
+import { EncryptedBoolean } from '../src/execution/envelope-boolean';
+import { EncryptedDate } from '../src/execution/envelope-date';
+import { EncryptedDouble } from '../src/execution/envelope-double';
 import { cipherstashQueryOperations } from '../src/execution/operators';
 import type { CipherstashSdk } from '../src/execution/sdk';
 import { createCipherstashRuntimeDescriptor } from '../src/exports/runtime';
 import {
+  CIPHERSTASH_BIGINT_CODEC_ID,
+  CIPHERSTASH_BOOLEAN_CODEC_ID,
+  CIPHERSTASH_DATE_CODEC_ID,
+  CIPHERSTASH_DOUBLE_CODEC_ID,
+  CIPHERSTASH_JSON_CODEC_ID,
   CIPHERSTASH_STRING_CODEC_ID,
   EQL_V2_ENCRYPTED_TYPE,
 } from '../src/extension-metadata/constants';
@@ -115,6 +124,36 @@ const contract = validateContract<PostgresContract>(
             id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             [COLUMN]: {
               codecId: CIPHERSTASH_STRING_CODEC_ID,
+              nativeType: EQL_V2_ENCRYPTED_TYPE,
+              nullable: true,
+            },
+            // Per-codec columns so the trait-dispatched operators
+            // can be exercised against each column type (the
+            // postgres renderer reads `nativeType` from the codec
+            // descriptor at lower time; the column is what gives
+            // the renderer the codec id to look up).
+            score: {
+              codecId: CIPHERSTASH_DOUBLE_CODEC_ID,
+              nativeType: EQL_V2_ENCRYPTED_TYPE,
+              nullable: true,
+            },
+            amount: {
+              codecId: CIPHERSTASH_BIGINT_CODEC_ID,
+              nativeType: EQL_V2_ENCRYPTED_TYPE,
+              nullable: true,
+            },
+            birthday: {
+              codecId: CIPHERSTASH_DATE_CODEC_ID,
+              nativeType: EQL_V2_ENCRYPTED_TYPE,
+              nullable: true,
+            },
+            enabled: {
+              codecId: CIPHERSTASH_BOOLEAN_CODEC_ID,
+              nativeType: EQL_V2_ENCRYPTED_TYPE,
+              nullable: true,
+            },
+            payload: {
+              codecId: CIPHERSTASH_JSON_CODEC_ID,
               nativeType: EQL_V2_ENCRYPTED_TYPE,
               nullable: true,
             },
@@ -198,10 +237,14 @@ function callOperator(op: SqlOperationDescriptor, ...args: unknown[]): AnyExpres
  * the column's return type metadata. The operator impls call
  * `toExpr(self)` which destructures `buildAst()` to get the AST node.
  */
-function columnAccessor(table: string, column: string) {
+function columnAccessor(
+  table: string,
+  column: string,
+  codecId: string = CIPHERSTASH_STRING_CODEC_ID,
+) {
   const ref = ColumnRef.of(table, column);
   return {
-    returnType: { codecId: CIPHERSTASH_STRING_CODEC_ID, nullable: true },
+    returnType: { codecId, nullable: true },
     buildAst: () => ref,
   };
 }
@@ -330,18 +373,301 @@ describe('cipherstash operator lowering — null short-circuit', () => {
   });
 });
 
+describe('cipherstash operator lowering — equality extensions (T9)', () => {
+  // `cipherstashNe`, `cipherstashInArray`, `cipherstashNotInArray`
+  // dispatch via the `cipherstash:equality` trait — visible on
+  // string, double, bigint, date, boolean codecs (per spec D7).
+
+  it('lowers email.cipherstashNe(plaintext) to NOT eql_v2.eq(...)', () => {
+    const op = getOperator('cipherstashNe');
+    const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), 'alice@example.com');
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE NOT eql_v2.eq("user"."email", $1::eql_v2_encrypted)"`,
+    );
+    expect(lowered.params).toHaveLength(1);
+    expect(lowered.params[0]).toBeInstanceOf(EncryptedString);
+  });
+
+  it('lowers cipherstashInArray with a single element to a one-term OR', () => {
+    const op = getOperator('cipherstashInArray');
+    const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), ['alice@example.com']);
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE (eql_v2.eq("user"."email", $1::eql_v2_encrypted))"`,
+    );
+    expect(lowered.params).toHaveLength(1);
+  });
+
+  it('lowers cipherstashInArray with two elements to a two-term OR', () => {
+    const op = getOperator('cipherstashInArray');
+    const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), ['a@x.com', 'b@x.com']);
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE (eql_v2.eq("user"."email", $1::eql_v2_encrypted) OR eql_v2.eq("user"."email", $2::eql_v2_encrypted))"`,
+    );
+    expect(lowered.params).toHaveLength(2);
+  });
+
+  it('lowers cipherstashInArray with three elements to a three-term OR', () => {
+    const op = getOperator('cipherstashInArray');
+    const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), [
+      'a@x.com',
+      'b@x.com',
+      'c@x.com',
+    ]);
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE (eql_v2.eq("user"."email", $1::eql_v2_encrypted) OR eql_v2.eq("user"."email", $2::eql_v2_encrypted) OR eql_v2.eq("user"."email", $3::eql_v2_encrypted))"`,
+    );
+    expect(lowered.params).toHaveLength(3);
+    // Every envelope shares the same `(table, column)` routing key —
+    // the bulk-encrypt grouping invariant for variable-arity ops.
+    for (const param of lowered.params) {
+      expect(param).toBeInstanceOf(EncryptedString);
+      const handle = (param as EncryptedString).expose();
+      expect(handle.table).toBe(TABLE);
+      expect(handle.column).toBe(COLUMN);
+    }
+  });
+
+  it('lowers cipherstashNotInArray to NOT-prefixed OR-of-equalities', () => {
+    const op = getOperator('cipherstashNotInArray');
+    const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), ['a@x.com', 'b@x.com']);
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE NOT (eql_v2.eq("user"."email", $1::eql_v2_encrypted) OR eql_v2.eq("user"."email", $2::eql_v2_encrypted))"`,
+    );
+  });
+
+  it('cipherstashInArray rejects empty arrays with a descriptive error', () => {
+    const op = getOperator('cipherstashInArray');
+    expect(() => callOperator(op, columnAccessor(TABLE, COLUMN), [])).toThrow(/empty array/);
+  });
+
+  it('cipherstashInArray rejects non-array arguments with a descriptive error', () => {
+    const op = getOperator('cipherstashInArray');
+    expect(() => callOperator(op, columnAccessor(TABLE, COLUMN), 'not-an-array')).toThrow(
+      /expected an array/,
+    );
+  });
+});
+
+describe('cipherstash operator lowering — free-text-search extensions (T9)', () => {
+  it('lowers cipherstashNotIlike(pattern) to NOT eql_v2.ilike(...)', () => {
+    const op = getOperator('cipherstashNotIlike');
+    const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), '%alice%');
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE NOT eql_v2.ilike("user"."email", $1::eql_v2_encrypted)"`,
+    );
+  });
+});
+
+describe('cipherstash operator lowering — order-and-range extensions (T9)', () => {
+  // `cipherstashGt/Gte/Lt/Lte/Between/NotBetween` dispatch via the
+  // `cipherstash:order-and-range` trait — visible on string,
+  // double, bigint, date codecs (per spec D7).
+
+  it('lowers cipherstashGt(plaintext) to eql_v2.gt(...)', () => {
+    const op = getOperator('cipherstashGt');
+    const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), 'm');
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE eql_v2.gt("user"."email", $1::eql_v2_encrypted)"`,
+    );
+  });
+
+  it('lowers cipherstashGte(plaintext) to eql_v2.gte(...)', () => {
+    const op = getOperator('cipherstashGte');
+    const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), 'm');
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE eql_v2.gte("user"."email", $1::eql_v2_encrypted)"`,
+    );
+  });
+
+  it('lowers cipherstashLt(plaintext) to eql_v2.lt(...)', () => {
+    const op = getOperator('cipherstashLt');
+    const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), 'm');
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE eql_v2.lt("user"."email", $1::eql_v2_encrypted)"`,
+    );
+  });
+
+  it('lowers cipherstashLte(plaintext) to eql_v2.lte(...)', () => {
+    const op = getOperator('cipherstashLte');
+    const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), 'm');
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE eql_v2.lte("user"."email", $1::eql_v2_encrypted)"`,
+    );
+  });
+
+  it('lowers cipherstashBetween(lo, hi) to gte AND lte', () => {
+    const op = getOperator('cipherstashBetween');
+    const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), 'a', 'm');
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE eql_v2.gte("user"."email", $1::eql_v2_encrypted) AND eql_v2.lte("user"."email", $2::eql_v2_encrypted)"`,
+    );
+    expect(lowered.params).toHaveLength(2);
+  });
+
+  it('lowers cipherstashNotBetween(lo, hi) to NOT (gte AND lte)', () => {
+    const op = getOperator('cipherstashNotBetween');
+    const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), 'a', 'm');
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE NOT (eql_v2.gte("user"."email", $1::eql_v2_encrypted) AND eql_v2.lte("user"."email", $2::eql_v2_encrypted))"`,
+    );
+  });
+
+  it('cipherstashBetween rejects wrong arity with a descriptive error', () => {
+    const op = getOperator('cipherstashBetween');
+    expect(() => callOperator(op, columnAccessor(TABLE, COLUMN), 'a')).toThrow(/expected 2/);
+  });
+});
+
+describe('cipherstash operator lowering — per-codec envelope dispatch (T9)', () => {
+  // Trait-dispatched operators wrap the user-supplied value in the
+  // envelope subclass that matches the column's codec id at impl
+  // time. Each row here pins the dispatch is correct for one codec.
+
+  it('cipherstashGt on a double column wraps the value in EncryptedDouble', () => {
+    const op = getOperator('cipherstashGt');
+    const predicate = callOperator(
+      op,
+      columnAccessor(TABLE, 'score', CIPHERSTASH_DOUBLE_CODEC_ID),
+      3.14,
+    );
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.params).toHaveLength(1);
+    const envelope = lowered.params[0];
+    expect(envelope).toBeInstanceOf(EncryptedDouble);
+  });
+
+  it('cipherstashGt on a bigint column wraps the value in EncryptedBigInt', () => {
+    const op = getOperator('cipherstashGt');
+    const predicate = callOperator(
+      op,
+      columnAccessor(TABLE, 'amount', CIPHERSTASH_BIGINT_CODEC_ID),
+      42n,
+    );
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.params[0]).toBeInstanceOf(EncryptedBigInt);
+  });
+
+  it('cipherstashGt on a date column wraps the value in EncryptedDate', () => {
+    const op = getOperator('cipherstashGt');
+    const predicate = callOperator(
+      op,
+      columnAccessor(TABLE, 'birthday', CIPHERSTASH_DATE_CODEC_ID),
+      new Date('2024-01-01'),
+    );
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.params[0]).toBeInstanceOf(EncryptedDate);
+  });
+
+  it('cipherstashNe on a boolean column wraps the value in EncryptedBoolean', () => {
+    const op = getOperator('cipherstashNe');
+    const predicate = callOperator(
+      op,
+      columnAccessor(TABLE, 'enabled', CIPHERSTASH_BOOLEAN_CODEC_ID),
+      true,
+    );
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.params[0]).toBeInstanceOf(EncryptedBoolean);
+  });
+
+  it('cipherstashGt rejects a non-matching plaintext type for the column codec', () => {
+    const op = getOperator('cipherstashGt');
+    // Passing a string to a double column triggers the per-codec
+    // envelope coercion's diagnostic.
+    expect(() =>
+      callOperator(op, columnAccessor(TABLE, 'score', CIPHERSTASH_DOUBLE_CODEC_ID), 'not-a-number'),
+    ).toThrow(/EncryptedDouble/);
+  });
+});
+
+describe('cipherstash operator lowering — JSON path predicate (T9)', () => {
+  it('lowers cipherstashJsonbPathExists(path) to eql_v2.jsonb_path_exists(...)', () => {
+    const op = getOperator('cipherstashJsonbPathExists');
+    const predicate = callOperator(
+      op,
+      columnAccessor(TABLE, 'payload', CIPHERSTASH_JSON_CODEC_ID),
+      '$.k',
+    );
+    const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
+    expect(lowered.sql).toMatchInlineSnapshot(
+      `"SELECT "user"."id" AS "id" FROM "user" WHERE eql_v2.jsonb_path_exists("user"."payload", $1)"`,
+    );
+    // Path is a plain text bind — no envelope wrapping.
+    expect(lowered.params).toEqual(['$.k']);
+  });
+
+  it('cipherstashJsonbPathExists rejects non-string path arguments', () => {
+    const op = getOperator('cipherstashJsonbPathExists');
+    expect(() =>
+      callOperator(op, columnAccessor(TABLE, 'payload', CIPHERSTASH_JSON_CODEC_ID), 42),
+    ).toThrow(/string path/);
+  });
+});
+
 describe('createCipherstashRuntimeDescriptor — queryOperations registration', () => {
-  it('exposes cipherstashEq + cipherstashIlike via the runtime descriptor', () => {
+  it('exposes the full cipherstash operator surface via the runtime descriptor', () => {
     // Names are cipherstash-prefixed so they coexist with the
     // framework`s built-in `eq` / `ilike` registrations rather than
     // overriding them. The trade-off is documented in
     // `src/execution/operators.ts`'s top-level docblock.
+    //
+    // Two registration shapes coexist (per spec D7):
+    //   - Single-codec: `cipherstashEq` / `cipherstashIlike` (legacy
+    //     from Project 1) target the string codec by codec id.
+    //   - Trait-namespaced: every other operator targets a
+    //     `cipherstash:*` trait. The model accessor attaches the
+    //     operator to every codec descriptor whose `traits` list
+    //     contains that identifier.
     const descriptor = createCipherstashRuntimeDescriptor({ sdk: emptySdk() });
     const ops = descriptor.queryOperations?.() ?? {};
     const methods = Object.keys(ops).sort();
-    expect(methods).toEqual(['cipherstashEq', 'cipherstashIlike']);
-    for (const op of Object.values(ops)) {
-      expect(op.self).toEqual({ codecId: CIPHERSTASH_STRING_CODEC_ID });
+    expect(methods).toEqual([
+      'cipherstashBetween',
+      'cipherstashEq',
+      'cipherstashGt',
+      'cipherstashGte',
+      'cipherstashIlike',
+      'cipherstashInArray',
+      'cipherstashJsonbPathExists',
+      'cipherstashLt',
+      'cipherstashLte',
+      'cipherstashNe',
+      'cipherstashNotBetween',
+      'cipherstashNotIlike',
+      'cipherstashNotInArray',
+    ]);
+    for (const method of ['cipherstashEq', 'cipherstashIlike']) {
+      expect(ops[method]?.self).toEqual({ codecId: CIPHERSTASH_STRING_CODEC_ID });
     }
+    for (const method of ['cipherstashNe', 'cipherstashInArray', 'cipherstashNotInArray']) {
+      expect(ops[method]?.self).toEqual({ traits: ['cipherstash:equality'] });
+    }
+    expect(ops['cipherstashNotIlike']?.self).toEqual({
+      traits: ['cipherstash:free-text-search'],
+    });
+    for (const method of [
+      'cipherstashGt',
+      'cipherstashGte',
+      'cipherstashLt',
+      'cipherstashLte',
+      'cipherstashBetween',
+      'cipherstashNotBetween',
+    ]) {
+      expect(ops[method]?.self).toEqual({ traits: ['cipherstash:order-and-range'] });
+    }
+    expect(ops['cipherstashJsonbPathExists']?.self).toEqual({
+      traits: ['cipherstash:searchable-json'],
+    });
   });
 });
