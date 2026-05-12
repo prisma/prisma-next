@@ -12,9 +12,11 @@ const { contract } = validateMongoContract<Contract>(ormContractJson);
 describeWithMongoDB('mongoOrm integration', (ctx) => {
   it('loads generated collection indexes and options', () => {
     expect(contract.storage.collections.users).toEqual({
-      indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }],
+      kind: 'mongo-collection',
+      indexes: [{ kind: 'mongo-index', keys: [{ field: 'email', direction: 1 }], unique: true }],
       options: {
-        collation: { locale: 'en', strength: 2 },
+        kind: 'mongo-collection-options',
+        collation: { kind: 'mongo-collation-options', locale: 'en', strength: 2 },
       },
     });
   });
