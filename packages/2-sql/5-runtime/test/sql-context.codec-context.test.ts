@@ -4,6 +4,7 @@ import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import type { SqlRuntimeExtensionDescriptor } from '../src/sql-context';
 import { createStubAdapter, createTestContext } from './utils';
@@ -173,8 +174,8 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
             nativeType: 'vector',
             codecId: 'pgvector/vector@1',
             nullable: false,
-            ...(spec.typeRef ? { typeRef: spec.typeRef } : {}),
-            ...(spec.typeParams ? { typeParams: spec.typeParams } : {}),
+            ...ifDefined('typeRef', spec.typeRef),
+            ...ifDefined('typeParams', spec.typeParams),
           },
         },
         primaryKey: { columns: ['embedding'] },
@@ -187,9 +188,10 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
     const storage: SqlStorage = {
       storageHash: coreHash('sha256:test'),
       tables,
-      ...(types
-        ? {
-            types: Object.fromEntries(
+      ...ifDefined(
+        'types',
+        types
+          ? Object.fromEntries(
               Object.entries(types).map(([name, params]) => [
                 name,
                 {
@@ -198,9 +200,9 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
                   typeParams: params as Record<string, unknown>,
                 },
               ]),
-            ),
-          }
-        : {}),
+            )
+          : undefined,
+      ),
     };
 
     return {
