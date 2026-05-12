@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
-import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import type {
+  MigrationOperationClass,
+  MigrationPlanOperation,
+} from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
@@ -16,7 +19,11 @@ import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/packag
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import type { MigrationShowSpaceResult } from '../../src/commands/migration-show';
-import { resolveByHashPrefix } from '../../src/commands/migration-show';
+import {
+  resolveAppTargetPath,
+  resolveByHashPrefix,
+  resolveLatestFromDir,
+} from '../../src/commands/migration-show';
 import { formatMigrationShowOutput } from '../../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../../src/utils/global-flags';
 
@@ -32,7 +39,7 @@ async function createTempDir(prefix: string): Promise<string> {
 function createOp(
   id: string,
   label: string,
-  operationClass: 'additive' | 'widening' | 'destructive',
+  operationClass: MigrationOperationClass,
   sql?: string[],
 ): MigrationPlanOperation {
   const op: Record<string, unknown> = { id, label, operationClass };
@@ -272,6 +279,89 @@ describe('resolveByHashPrefix', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure.message).toContain('No migration found');
+    }
+  });
+});
+
+describe('resolveLatestFromDir', () => {
+  it('returns ok(null) for an empty migrations directory', async () => {
+    const tempDir = await createTempDir('latest-empty');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    const result = await resolveLatestFromDir(migrationsDir);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBeNull();
+    }
+  });
+
+  it('returns notOk when on-disk packages exist but no latest can be resolved', async () => {
+    const tempDir = await createTempDir('latest-corrupt');
+    const migrationsDir = join(tempDir, 'migrations');
+    await mkdir(migrationsDir, { recursive: true });
+
+    // Construct a corrupt history: a single self-loop migration whose
+    // from === to === EMPTY_CONTRACT_HASH leaves the reconstructed graph
+    // with no reachable leaf, so findLatestMigration() returns null.
+    await setupMigrationDir(
+      migrationsDir,
+      'self-loop',
+      createMetadata(EMPTY_CONTRACT_HASH, EMPTY_CONTRACT_HASH, createContract()),
+      [createOp('data.backfill', 'Backfill data', 'data')],
+    );
+
+    const result = await resolveLatestFromDir(migrationsDir);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.message).toContain('Could not resolve latest migration');
+      expect(result.failure.why ?? '').toContain('No latest migration found');
+    }
+  });
+});
+
+describe('resolveAppTargetPath', () => {
+  // Mirror the on-disk layout: <migrationsDir>/<spaceId>/.
+  const migrationsDir = '/tmp/proj/migrations';
+  const appMigrationsDir = `${migrationsDir}/app`;
+  const appMigrationsRelative = 'migrations/app';
+
+  it('returns the resolved path when the target is inside the app migrations dir', () => {
+    const target = `${appMigrationsDir}/20260101_000000_init`;
+
+    const result = resolveAppTargetPath(target, appMigrationsDir, appMigrationsRelative);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBe(target);
+    }
+  });
+
+  it('rejects an extension-space package path (sibling of the app dir)', () => {
+    const extensionPackage = `${migrationsDir}/cipherstash/0000000001-init`;
+
+    const result = resolveAppTargetPath(extensionPackage, appMigrationsDir, appMigrationsRelative);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.message).toContain('app-space migration');
+      expect(result.failure.why ?? '').toContain(`Expected a path under ${appMigrationsRelative}`);
+    }
+  });
+
+  it('rejects an unrelated path outside the migrations tree', () => {
+    const outsideTarget = '/tmp/other/extensions/cipherstash/0000000001-init';
+
+    const result = resolveAppTargetPath(outsideTarget, appMigrationsDir, appMigrationsRelative);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.message).toContain('app-space migration');
+    }
+  });
+
+  it('rejects the app migrations dir itself as a target', () => {
+    const result = resolveAppTargetPath(appMigrationsDir, appMigrationsDir, appMigrationsRelative);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.message).toContain('app-space migration');
     }
   });
 });

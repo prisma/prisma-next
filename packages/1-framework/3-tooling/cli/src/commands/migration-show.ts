@@ -100,6 +100,33 @@ function looksLikePath(target: string): boolean {
   return target.includes('/') || target.includes('\\');
 }
 
+/**
+ * Validate that a path-like `migration show` target resolves inside the app
+ * migrations directory. The returned result is always emitted under
+ * `aggregate.app.spaceId`, so accepting an extension-space (or otherwise
+ * external) path here would silently mislabel the result. Returns the
+ * resolved absolute path on success.
+ */
+export function resolveAppTargetPath(
+  target: string,
+  appMigrationsDir: string,
+  appMigrationsRelative: string,
+): Result<string, CliStructuredError> {
+  const targetPath = resolve(target);
+  const relativeToApp = relative(appMigrationsDir, targetPath);
+  const isOutsideAppDir =
+    relativeToApp === '' || relativeToApp === '.' || relativeToApp.startsWith('..');
+  if (isOutsideAppDir) {
+    return notOk(
+      errorRuntime('Target must point to an app-space migration', {
+        why: `Expected a path under ${appMigrationsRelative}, got ${target}`,
+        fix: 'Pass an app-space migration directory or use a hash prefix.',
+      }),
+    );
+  }
+  return ok(targetPath);
+}
+
 export function resolveByHashPrefix(
   packages: readonly OnDiskMigrationPackage[],
   prefix: string,
@@ -130,10 +157,15 @@ export function resolveByHashPrefix(
 }
 
 /**
- * Resolve the latest migration from a space directory. Returns `null` if the
- * directory is empty or does not exist (ENOENT is absorbed by `readMigrationsDir`).
+ * Resolve the latest migration from a space directory.
+ *
+ * Returns `ok(null)` only when the directory is empty or absent (ENOENT is
+ * absorbed by `readMigrationsDir`). If `readMigrationsDir` returned packages
+ * but `findLatestMigration` cannot pick a leaf, the on-disk history is
+ * corrupt — return a runtime error rather than collapsing it to a `missing`
+ * placeholder, which would hide the corruption from the caller.
  */
-async function resolveLatestFromDir(
+export async function resolveLatestFromDir(
   spaceDir: string,
 ): Promise<Result<OnDiskMigrationPackage | null, CliStructuredError>> {
   try {
@@ -141,7 +173,14 @@ async function resolveLatestFromDir(
     if (allPackages.length === 0) return ok(null);
     const graph = reconstructGraph(allPackages);
     const latestMigration = findLatestMigration(graph);
-    if (!latestMigration) return ok(null);
+    if (!latestMigration) {
+      return notOk(
+        errorRuntime('Could not resolve latest migration', {
+          why: `No latest migration found in ${relative(process.cwd(), spaceDir)}`,
+          fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
+        }),
+      );
+    }
     const leafPkg = allPackages.find(
       (p) => p.metadata.migrationHash === latestMigration.migrationHash,
     );
@@ -277,7 +316,9 @@ async function executeMigrationShowCommand(
   try {
     let appPkg: OnDiskMigrationPackage;
     if (target && looksLikePath(target)) {
-      appPkg = await readMigrationPackage(resolve(target));
+      const resolved = resolveAppTargetPath(target, appMigrationsDir, appMigrationsRelative);
+      if (!resolved.ok) return resolved;
+      appPkg = await readMigrationPackage(resolved.value);
     } else {
       const allPackages = await readMigrationsDir(appMigrationsDir);
       if (allPackages.length === 0) {
