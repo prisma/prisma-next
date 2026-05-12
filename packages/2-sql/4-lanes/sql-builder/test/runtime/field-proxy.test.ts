@@ -1,3 +1,4 @@
+import { coreHash } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { ColumnRef, IdentifierRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
@@ -59,8 +60,14 @@ describe('createFieldProxy', () => {
   it('tableToScope resolves codec by storage table name when alias differs', () => {
     const table: StorageTable = {
       columns: {
-        embedding: { codecId: 'pgvector/vector@1', nullable: false, typeRef: 'Embedding1536' },
+        embedding: {
+          codecId: 'pgvector/vector@1',
+          nativeType: 'vector',
+          nullable: false,
+          typeRef: 'Embedding1536',
+        },
       },
+      primaryKey: { columns: ['embedding'] },
       uniques: [],
       indexes: [],
       foreignKeys: [],
@@ -68,12 +75,16 @@ describe('createFieldProxy', () => {
     const storage: SqlStorage = {
       tables: { Post: table },
       types: {
-        Embedding1536: { codecId: 'pgvector/vector@1', typeParams: { length: 1536 } },
+        Embedding1536: {
+          codecId: 'pgvector/vector@1',
+          nativeType: 'vector',
+          typeParams: { length: 1536 },
+        },
       },
-      storageHash: 'h',
+      storageHash: coreHash('sha256:h'),
     };
     const scope = tableToScope('post_alias', table, { storage, tableName: 'Post' });
-    expect(scope.namespaces['post_alias']?.embedding?.codec).toEqual({
+    expect(scope.namespaces['post_alias']?.['embedding']?.codec).toEqual({
       codecId: 'pgvector/vector@1',
       typeParams: { length: 1536 },
     });
