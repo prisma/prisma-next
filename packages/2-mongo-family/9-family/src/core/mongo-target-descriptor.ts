@@ -4,16 +4,25 @@ import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import type {
   MigratableTargetDescriptor,
   MigrationRunner,
+  MigrationRunnerResult,
   MigrationRunnerSuccessValue,
   MultiSpaceCapableRunner,
   MultiSpaceRunnerFailure,
+  MultiSpaceRunnerPerSpaceOptions,
   MultiSpaceRunnerResult,
 } from '@prisma-next/framework-components/control';
+import {
+  type ContractSpaceMember,
+  projectSchemaToSpace,
+} from '@prisma-next/migration-tools/aggregate';
 import type { MongoContract } from '@prisma-next/mongo-contract';
+import type { MongoSchemaCollection } from '@prisma-next/mongo-schema-ir';
+import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import {
   contractToMongoSchemaIR,
   MongoMigrationPlanner,
   MongoMigrationRunner,
+  type MongoMigrationRunnerExecuteOptions,
   type MongoRunnerDependencies,
 } from '@prisma-next/target-mongo/control';
 import mongoTargetDescriptorMeta from '@prisma-next/target-mongo/pack';
@@ -44,27 +53,35 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
       // Deps are bound to the first driver passed to execute() and cached for
       // subsequent calls. Callers must not change the driver between calls.
       let cachedDeps: MongoRunnerDependencies | undefined;
+
+      const runMongo = async (
+        driver: Parameters<MigrationRunner<'mongo', 'mongo'>['execute']>[0]['driver'],
+        runnerOptions: Omit<MongoMigrationRunnerExecuteOptions, 'destinationContract'> & {
+          readonly destinationContract: unknown;
+        },
+      ): Promise<MigrationRunnerResult> => {
+        cachedDeps ??= createMongoRunnerDeps(
+          driver,
+          MongoDriverImpl.fromDb(extractDb(driver)),
+          family,
+        );
+        // The framework `MigrationRunner` interface types `destinationContract`
+        // as `unknown`; the Mongo runner narrows to `MongoContract`. Validation
+        // happens upstream — `migration apply` calls
+        // `familyInstance.validateContract(migration.toContract)` before
+        // routing the contract here, so this cast preserves the framework
+        // signature without weakening the runner's typed surface.
+        return new MongoMigrationRunner(cachedDeps).execute({
+          ...runnerOptions,
+          destinationContract: runnerOptions.destinationContract as MongoContract,
+        });
+      };
+
       const runner: MigrationRunner<'mongo', 'mongo'> & MultiSpaceCapableRunner<'mongo', 'mongo'> =
         {
           async execute(options) {
-            cachedDeps ??= createMongoRunnerDeps(
-              options.driver,
-              MongoDriverImpl.fromDb(extractDb(options.driver)),
-              family,
-            );
-            const { driver: _, ...runnerOptions } = options;
-            // The framework `MigrationRunner` interface types `destinationContract`
-            // as `unknown`; the Mongo runner narrows to `MongoContract`. Validation
-            // happens upstream — `migration apply` calls
-            // `familyInstance.validateContract(migration.toContract)` before
-            // routing the contract here (see
-            // `packages/1-framework/3-tooling/cli/src/control-api/operations/migration-apply.ts`),
-            // so this cast simply preserves the framework signature without
-            // weakening the runner's typed surface or duplicating validation.
-            return new MongoMigrationRunner(cachedDeps).execute({
-              ...runnerOptions,
-              destinationContract: runnerOptions.destinationContract as MongoContract,
-            });
+            const { driver, ...runnerOptions } = options;
+            return runMongo(driver, runnerOptions);
           },
           // Mongo cannot wrap DDL ops in a session transaction (createCollection,
           // createIndex, collMod, setValidation all bypass transactions even on
@@ -75,16 +92,42 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
           // composes that guarantee across spaces — earlier-advanced markers are
           // not rolled back when a later space fails. Re-running reads each
           // marker, finds spaces 1..N−1 at-head (no-op skip), retries N onward.
+          //
+          // Per-space verify is sliced via `projectSchemaToSpace`: the live DB
+          // holds collections owned by sibling spaces, but each space's verify
+          // only sees the slice that space's contract actually claims. Without
+          // the projection an aggregate of two spaces could not pass strict
+          // verify (every other-space collection would look like an extra).
+          //
           // See `projects/contract-spaces-mongo-port/spec.md` § Approach and
           // `docs/architecture docs/subsystems/10. MongoDB Family.md` § Contract
           // spaces.
           async executeAcrossSpaces({ driver, perSpaceOptions }): Promise<MultiSpaceRunnerResult> {
+            const members = perSpaceOptions.map(toSpaceMember);
             const perSpaceResults: Array<{
               space: string;
               value: MigrationRunnerSuccessValue;
             }> = [];
-            for (const spaceOptions of perSpaceOptions) {
-              const result = await runner.execute({ ...spaceOptions, driver });
+            for (let i = 0; i < perSpaceOptions.length; i++) {
+              const spaceOptions = perSpaceOptions[i];
+              if (!spaceOptions) continue;
+              const member = members[i];
+              if (!member) continue;
+              const others = members.filter((_, j) => j !== i);
+              const projectSchema = (schema: MongoSchemaIR): MongoSchemaIR => {
+                // `projectSchemaToSpace` returns a plain object
+                // `{...schemaIR, collections: prunedArray}` (not a
+                // `MongoSchemaIR` instance), so the descriptor rewraps
+                // the pruned collections into a fresh `MongoSchemaIR`
+                // before handing it to `verifyMongoSchema` (which
+                // depends on the class's `collectionNames` /
+                // `collection(name)` accessors).
+                const projected = projectSchemaToSpace(schema, member, others) as {
+                  readonly collections: ReadonlyArray<MongoSchemaCollection>;
+                };
+                return new MongoSchemaIR(projected.collections);
+              };
+              const result = await runMongo(driver, { ...spaceOptions, projectSchema });
               if (!result.ok) {
                 return notOk<MultiSpaceRunnerFailure>({
                   ...result.failure,
@@ -106,3 +149,33 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
     return { familyId: 'mongo' as const, targetId: 'mongo' as const };
   },
 };
+
+/**
+ * Synthesise the minimum {@link projectSchemaToSpace}-compatible
+ * `ContractSpaceMember` shape from a per-space option entry. The
+ * projector only reads `spaceId` and `contract.storage`; the rest of
+ * `ContractSpaceMember` (head ref invariants, hydrated migration
+ * graph) is irrelevant at runner time and stubbed with sentinels.
+ *
+ * The `as unknown as ContractSpaceMember` cast is the load-bearing bit
+ * — the projector duck-types its members so a sentinel-shaped graph
+ * never gets read, but the framework type carries a richer shape.
+ */
+function toSpaceMember(
+  opts: MultiSpaceRunnerPerSpaceOptions<'mongo', 'mongo'>,
+): ContractSpaceMember {
+  return {
+    spaceId: opts.space,
+    contract: opts.destinationContract as Contract,
+    headRef: { hash: '', invariants: [] },
+    migrations: {
+      graph: {
+        nodes: new Set<string>(),
+        forwardChain: new Map(),
+        reverseChain: new Map(),
+        migrationByHash: new Map(),
+      },
+      packagesByMigrationHash: new Map(),
+    },
+  } as unknown as ContractSpaceMember;
+}

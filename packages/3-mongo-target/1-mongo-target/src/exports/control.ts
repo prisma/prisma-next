@@ -16,7 +16,10 @@ export {
 export type { PlanCallsResult } from '../core/mongo-planner';
 export { MongoMigrationPlanner } from '../core/mongo-planner';
 export type { MarkerOperations, MongoRunnerDependencies } from '../core/mongo-runner';
-export { MongoMigrationRunner } from '../core/mongo-runner';
+export {
+  MongoMigrationRunner,
+  type MongoMigrationRunnerExecuteOptions,
+} from '../core/mongo-runner';
 export type { CollModMeta, OpFactoryCall } from '../core/op-factory-call';
 export {
   CollModCall,

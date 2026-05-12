@@ -86,6 +86,18 @@ export interface MongoMigrationRunnerExecuteOptions {
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
   readonly strictVerification?: boolean;
   readonly context?: OperationContext;
+  /**
+   * Per-space schema projection. When set, the runner applies this
+   * function to the introspected schema before invoking
+   * `verifyMongoSchema`, so per-space verification only sees the slice
+   * the destination contract actually claims.
+   *
+   * The descriptor's `executeAcrossSpaces` injects this callback,
+   * derived from the sibling spaces in the aggregate. Single-space
+   * callers leave it unset and verify against the whole introspected
+   * schema (the pre-aggregate behaviour).
+   */
+  readonly projectSchema?: (schema: MongoSchemaIR) => MongoSchemaIR;
 }
 
 function runnerFailure(
@@ -228,9 +240,15 @@ export class MongoMigrationRunner {
 
     if (!isNoOp) {
       const liveSchema = await this.deps.introspectSchema();
+      // In a multi-space aggregate the live database holds collections
+      // owned by sibling spaces; the descriptor's `executeAcrossSpaces`
+      // injects a `projectSchema` that strips them so per-space verify
+      // only checks the slice this contract claims. Single-space
+      // callers leave the projection identity (no-op).
+      const verifySchema = options.projectSchema ? options.projectSchema(liveSchema) : liveSchema;
       const verifyResult = verifyMongoSchema({
         contract: options.destinationContract,
-        schema: liveSchema,
+        schema: verifySchema,
         strict: options.strictVerification ?? true,
         frameworkComponents: options.frameworkComponents,
         ...(options.context ? { context: options.context } : {}),

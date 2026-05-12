@@ -48,6 +48,55 @@ function buildAppContract(): MongoContract {
   return {
     target: 'mongo',
     targetFamily: 'mongo',
+    roots: { users: 'User', posts: 'Post' },
+    models: {
+      User: {
+        fields: {
+          _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          email: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        },
+        relations: {},
+        storage: { collection: 'users' },
+      },
+      Post: {
+        fields: {
+          _id: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/objectId@1' } },
+          slug: { nullable: false, type: { kind: 'scalar', codecId: 'mongo/string@1' } },
+        },
+        relations: {},
+        storage: { collection: 'posts' },
+      },
+    },
+    storage: {
+      collections: {
+        users: {
+          indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
+        },
+        posts: {
+          indexes: [{ keys: [{ field: 'slug', direction: 1 as const }], unique: true }],
+        },
+      },
+      storageHash: coreHash('sha256:app-contract-multi-space'),
+    },
+    capabilities: {},
+    extensionPacks: {},
+    profileHash: profileHash('sha256:app-profile'),
+    meta: {},
+  };
+}
+
+/**
+ * Trimmed app contract claiming only `users` (no `posts`). Used by
+ * TC-8 to manufacture a per-space verify violation: the runner applies
+ * a plan generated against this trimmed contract, but the
+ * `destinationContract` it verifies against is the full app contract
+ * (which also claims `posts`). The post-apply live schema is missing
+ * `posts`, so per-space verify fails.
+ */
+function buildAppContractMissingPosts(): MongoContract {
+  return {
+    target: 'mongo',
+    targetFamily: 'mongo',
     roots: { users: 'User' },
     models: {
       User: {
@@ -65,7 +114,7 @@ function buildAppContract(): MongoContract {
           indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
         },
       },
-      storageHash: coreHash('sha256:app-contract-multi-space'),
+      storageHash: coreHash('sha256:app-contract-trimmed'),
     },
     capabilities: {},
     extensionPacks: {},
@@ -145,7 +194,11 @@ describe(
       await db.dropDatabase();
     });
 
-    it('runs both spaces in caller order with verify non-strict (TC-7)', async () => {
+    it('runs both spaces in caller order under strict per-space verify (TC-7)', async () => {
+      // With per-space verify projection wired in T3.4, strict-mode
+      // verify (the default) succeeds across the aggregate even though
+      // the live database holds collections owned by sibling spaces:
+      // each space's verify only sees the slice its contract claims.
       const runner = makeRunner();
       const appContract = buildAppContract();
       const extContract = buildExtContract();
@@ -167,7 +220,6 @@ describe(
             destinationContract: extContract,
             policy: ALL_POLICY,
             frameworkComponents: [],
-            strictVerification: false,
           },
           {
             space: APP_SPACE_ID,
@@ -181,7 +233,6 @@ describe(
             destinationContract: appContract,
             policy: ALL_POLICY,
             frameworkComponents: [],
-            strictVerification: false,
           },
         ];
 
@@ -248,19 +299,23 @@ describe(
       }
     });
 
-    it('mid-run failure surfaces failingSpace and leaves earlier markers advanced (TC-8); resume retries failed space and skips already-at-head spaces (TC-9)', async () => {
+    it('mid-run failure surfaces failingSpace and leaves earlier markers advanced (TC-8); resume re-applies the failed space and skips already-at-head spaces (TC-9)', async () => {
+      // The TC-8 contract under test: per-space verify projects the live
+      // schema to the slice the destination contract claims, then verifies.
+      // We manufacture a per-space contract violation by applying a plan
+      // generated from a *trimmed* app contract (claims only `users`) but
+      // verifying against the *full* app contract (claims `users` + `posts`).
+      // The trimmed plan creates `users`; per-space verify against the full
+      // contract finds `posts` missing → SCHEMA_VERIFY_FAILED.
       const runner = makeRunner();
-      const appContract = buildAppContract();
+      const appContractFull = buildAppContract();
+      const appContractTrimmed = buildAppContractMissingPosts();
       const extContract = buildExtContract();
       const extOps = planFor(extContract, null);
-      const appOps = planFor(appContract, null);
+      const appOpsTrimmed = planFor(appContractTrimmed, null);
 
       const driver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
-        // TC-8: ext (default strict=true verify) sees only its own collection,
-        // passes. App with strict=true sees the ext collection as an extra and
-        // fails. Failure surfaces failingSpace='app'; ext marker remains
-        // advanced; app marker is never written.
         const failingPerSpaceOptions: readonly PerSpaceOptions[] = [
           {
             space: EXT_SPACE,
@@ -280,11 +335,11 @@ describe(
             plan: {
               targetId: 'mongo',
               spaceId: APP_SPACE_ID,
-              destination: { storageHash: appContract.storage.storageHash },
-              operations: appOps,
+              destination: { storageHash: appContractFull.storage.storageHash },
+              operations: appOpsTrimmed,
             },
             driver,
-            destinationContract: appContract,
+            destinationContract: appContractFull,
             policy: ALL_POLICY,
             frameworkComponents: [],
           },
@@ -305,10 +360,12 @@ describe(
         const appMarkerAfterFail = await readMarker(db, APP_SPACE_ID);
         expect(appMarkerAfterFail).toBeNull();
 
-        // TC-9: re-run with non-strict app verify so the apply succeeds.
-        // ext is already at head, so the runner's no-op-skip path leaves
-        // its marker untouched (writes neither marker nor ledger). App
-        // applies its ops, advances its marker.
+        // TC-9: re-run with the corrected app plan (covers both
+        // collections). ext is already at head — the runner's no-op
+        // path skips it. App applies its full plan: `users` is
+        // postcheck-idempotent-skipped, `posts` is created. Per-space
+        // verify against the full contract passes; app marker advances.
+        const appOpsFull = planFor(appContractFull, null);
         const resumePerSpaceOptions: readonly PerSpaceOptions[] = [
           {
             space: EXT_SPACE,
@@ -328,14 +385,13 @@ describe(
             plan: {
               targetId: 'mongo',
               spaceId: APP_SPACE_ID,
-              destination: { storageHash: appContract.storage.storageHash },
-              operations: appOps,
+              destination: { storageHash: appContractFull.storage.storageHash },
+              operations: appOpsFull,
             },
             driver,
-            destinationContract: appContract,
+            destinationContract: appContractFull,
             policy: ALL_POLICY,
             frameworkComponents: [],
-            strictVerification: false,
           },
         ];
 
@@ -353,7 +409,7 @@ describe(
 
         const markers = await readAllMarkers(db);
         expect(markers.size).toBe(2);
-        expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(appContract.storage.storageHash);
+        expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(appContractFull.storage.storageHash);
         expect(markers.get(EXT_SPACE)?.storageHash).toBe(extContract.storage.storageHash);
       } finally {
         await driver.close();
