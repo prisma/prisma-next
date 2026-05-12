@@ -21,7 +21,7 @@
     "execute": [
       {
         "description": "create table \"users\"",
-        "sql": "CREATE TABLE \"public\".\"users\" (\n  \"accountId\" eql_v2_encrypted NOT NULL,\n  \"birthday\" eql_v2_encrypted NOT NULL,\n  \"email\" eql_v2_encrypted NOT NULL,\n  \"emailVerified\" eql_v2_encrypted NOT NULL,\n  \"id\" text NOT NULL,\n  \"preferences\" eql_v2_encrypted NOT NULL,\n  \"salary\" eql_v2_encrypted NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+        "sql": "CREATE TABLE \"public\".\"users\" (\n  \"accountid\" eql_v2_encrypted NOT NULL,\n  \"birthday\" eql_v2_encrypted NOT NULL,\n  \"email\" eql_v2_encrypted NOT NULL,\n  \"emailverified\" eql_v2_encrypted NOT NULL,\n  \"id\" text NOT NULL,\n  \"preferences\" eql_v2_encrypted NOT NULL,\n  \"salary\" eql_v2_encrypted NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
       }
     ],
     "postcheck": [
@@ -32,35 +32,35 @@
     ]
   },
   {
-    "id": "cipherstash-codec.users.accountId.add-search-config.unique",
-    "label": "Enable cipherstash search on users.accountId",
+    "id": "cipherstash-codec.users.accountid.add-search-config.unique",
+    "label": "Enable cipherstash search on users.accountid",
     "operationClass": "additive",
-    "invariantId": "cipherstash-codec:users.accountId:add-search-config:unique@v1",
+    "invariantId": "cipherstash-codec:users.accountid:add-search-config:unique@v1",
     "target": {
       "id": "postgres"
     },
     "precheck": [],
     "execute": [
       {
-        "description": "Register cipherstash unique search config for users.accountId",
-        "sql": "SELECT eql_v2.add_search_config('users', 'accountId', 'unique', 'big_int');"
+        "description": "Register cipherstash unique search config for users.accountid",
+        "sql": "SELECT eql_v2.add_search_config('users', 'accountid', 'unique', 'big_int');"
       }
     ],
     "postcheck": []
   },
   {
-    "id": "cipherstash-codec.users.accountId.add-search-config.ore",
-    "label": "Enable cipherstash search on users.accountId",
+    "id": "cipherstash-codec.users.accountid.add-search-config.ore",
+    "label": "Enable cipherstash search on users.accountid",
     "operationClass": "additive",
-    "invariantId": "cipherstash-codec:users.accountId:add-search-config:ore@v1",
+    "invariantId": "cipherstash-codec:users.accountid:add-search-config:ore@v1",
     "target": {
       "id": "postgres"
     },
     "precheck": [],
     "execute": [
       {
-        "description": "Register cipherstash ore search config for users.accountId",
-        "sql": "SELECT eql_v2.add_search_config('users', 'accountId', 'ore', 'big_int');"
+        "description": "Register cipherstash ore search config for users.accountid",
+        "sql": "SELECT eql_v2.add_search_config('users', 'accountid', 'ore', 'big_int');"
       }
     ],
     "postcheck": []
@@ -151,18 +151,18 @@
     "postcheck": []
   },
   {
-    "id": "cipherstash-codec.users.emailVerified.add-search-config.unique",
-    "label": "Enable cipherstash search on users.emailVerified",
+    "id": "cipherstash-codec.users.emailverified.add-search-config.unique",
+    "label": "Enable cipherstash search on users.emailverified",
     "operationClass": "additive",
-    "invariantId": "cipherstash-codec:users.emailVerified:add-search-config:unique@v1",
+    "invariantId": "cipherstash-codec:users.emailverified:add-search-config:unique@v1",
     "target": {
       "id": "postgres"
     },
     "precheck": [],
     "execute": [
       {
-        "description": "Register cipherstash unique search config for users.emailVerified",
-        "sql": "SELECT eql_v2.add_search_config('users', 'emailVerified', 'unique', 'boolean');"
+        "description": "Register cipherstash unique search config for users.emailverified",
+        "sql": "SELECT eql_v2.add_search_config('users', 'emailverified', 'unique', 'boolean');"
       }
     ],
     "postcheck": []

@@ -28,15 +28,22 @@ model User {
   id            String @id
   email         cipherstash.EncryptedString()
   salary        cipherstash.EncryptedDouble()
-  accountId     cipherstash.EncryptedBigInt()
+  accountId     cipherstash.EncryptedBigInt()     @map("accountid")
   birthday      cipherstash.EncryptedDate()
-  emailVerified cipherstash.EncryptedBoolean()
+  emailVerified cipherstash.EncryptedBoolean()    @map("emailverified")
   preferences   cipherstash.EncryptedJson()
 
   // The CipherStash EQL bundle (eql-2.2.1) hits a SQL-injection-style bug
-  // in `eql_v2.add_encrypted_constraint` when the table name needs quoting
-  // (reserved words, mixed case, etc.). `user` is reserved in Postgres,
-  // so we map to `users` instead. Filed upstream — drop this comment +
-  // `@@map` once the bundle is fixed and we re-vendor.
+  // in `eql_v2.add_encrypted_constraint` when the table or column name needs
+  // quoting (reserved words, mixed case, etc.) — the constraint-name format
+  // string interpolates `%I` for both the prefix and the (already
+  // double-quoted) identifier, producing invalid SQL like
+  // `CONSTRAINT eql_v2_encrypted_constraint_"users"_"accountId"`.
+  //
+  // `user` is reserved in Postgres, so we map the table to `users`; the
+  // mixed-case columns (`accountId`, `emailVerified`) are mapped to
+  // lowercase column names so `%I` renders them unquoted. Filed upstream —
+  // drop these `@map` / `@@map` overrides once the bundle is fixed and we
+  // re-vendor.
   @@map("users")
 }
