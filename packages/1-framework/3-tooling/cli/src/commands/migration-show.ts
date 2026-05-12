@@ -16,7 +16,7 @@ import { spaceMigrationDirectory } from '@prisma-next/migration-tools/spaces';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { relative, resolve } from 'pathe';
+import { isAbsolute, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
@@ -106,6 +106,12 @@ function looksLikePath(target: string): boolean {
  * `aggregate.app.spaceId`, so accepting an extension-space (or otherwise
  * external) path here would silently mislabel the result. Returns the
  * resolved absolute path on success.
+ *
+ * `pathe.relative` can return an absolute path when the target cannot be
+ * expressed relative to the base (e.g. on Windows when `target` is on a
+ * different drive than `appMigrationsDir`). That case does not start with
+ * `..`, so the absolute-check below is required to reject cross-drive
+ * targets rather than mislabeling them as app-space.
  */
 export function resolveAppTargetPath(
   target: string,
@@ -115,7 +121,10 @@ export function resolveAppTargetPath(
   const targetPath = resolve(target);
   const relativeToApp = relative(appMigrationsDir, targetPath);
   const isOutsideAppDir =
-    relativeToApp === '' || relativeToApp === '.' || relativeToApp.startsWith('..');
+    relativeToApp === '' ||
+    relativeToApp === '.' ||
+    relativeToApp.startsWith('..') ||
+    isAbsolute(relativeToApp);
   if (isOutsideAppDir) {
     return notOk(
       errorRuntime('Target must point to an app-space migration', {

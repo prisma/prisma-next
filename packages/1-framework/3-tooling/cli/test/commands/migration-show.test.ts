@@ -364,6 +364,26 @@ describe('resolveAppTargetPath', () => {
       expect(result.failure.message).toContain('app-space migration');
     }
   });
+
+  it('rejects a cross-drive target where pathe.relative returns an absolute path', () => {
+    // On Windows, comparing a target on a different drive than the app
+    // migrations dir makes pathe.relative return an absolute Windows path
+    // (e.g. "D:/elsewhere/foo"), which does not start with "..". The guard
+    // must reject this case via isAbsolute(relativeToApp) rather than
+    // mislabeling it as app-space.
+    const windowsAppMigrationsDir = 'C:/app/migrations/app';
+    const crossDriveTarget = 'D:/elsewhere/foo';
+
+    const result = resolveAppTargetPath(
+      crossDriveTarget,
+      windowsAppMigrationsDir,
+      'migrations/app',
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.message).toContain('app-space migration');
+    }
+  });
 });
 
 function singleSpace(space: MigrationShowSpaceResult): {
