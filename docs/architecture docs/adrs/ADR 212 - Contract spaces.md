@@ -142,7 +142,7 @@ A handful of extensions need **Path B** — hand-scaffolding the migration direc
 1. Creates `migrations/<space>/<timestamp>_<name>/` by hand.
 2. Seeds `migration.json` with `from: null`, `to: <storageHash from contract.json>`, and `toContract` set to the emitted `<package>/contract.json` byte-for-byte.
 3. Hand-authors `migration.ts` as a `Migration` subclass returning the production op list (typically a single `rawSql` op installing the underlying database extension) via the `operations` getter.
-4. Runs `pnpm tsx migrations/<space>/<dirName>/migration.ts` to canonicalise `ops.json` + `migration.json` from the subclass output.
+4. Runs `pnpm tsx migrations/<space>/<dirName>/migration.ts` to canonicalize `ops.json` + `migration.json` from the subclass output.
 
 pgvector (whose contract declares only `vector(N)` under `storage.types`) is the exemplar. Future migrations on a Path-B-bootstrapped extension that *do* add tables / models can use `migration plan` (Path A) directly — the path choice is per-migration, not per-extension.
 
