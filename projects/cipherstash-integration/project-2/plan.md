@@ -159,6 +159,21 @@ Three more codecs, same pattern. Ship as one task; the marginal cost of a new co
 
   Tests: AST-shape unit tests + SQL-snapshot tests + error-path tests. _(satisfies: TC-OPH1, TC-OPH2, TC-OPH3)_
 
+#### Framework runtime middleware lifecycle reorder (T11.5)
+
+- [ ] **T11.5 — Reorder `beforeExecute` to fire before `encodeParams`.** Surfaced in m1 R8 piece 5 (live e2e wiring). The cipherstash bulk-encrypt middleware's design intent is to mutate envelope `ParamRef` values before encode reads `handle.ciphertext`, but the SQL runtime fires `beforeExecute` after `lower()` has already run `encodeParams` — every write through the example app throws `cipherstash codec: envelope has no ciphertext at encode time` at encode time, never reaching the middleware. The only param-mutating middleware in the codebase is cipherstash; the three other `beforeExecute` users (`telemetry`, `budgets`, `lints`) inspect `plan.ast` / `plan.meta` and don't depend on params being post-encode. Reorder is safe.
+
+  **Changes:**
+  - In `packages/2-sql/5-runtime/src/sql-runtime.ts`, split the `lower → runWithMiddleware` flow so `beforeExecute` fires between `lowerSqlPlan` (which produces a draft plan with pre-encode params) and `encodeParams` (which renders to wire format). The mutator passed to `beforeExecute` operates on pre-encode user-domain values (envelope objects for cipherstash; raw values for everything else). After the chain returns, `encodeParams` consumes the mutated values.
+  - In `packages/1-framework/1-core/framework-components/src/execution/run-with-middleware.ts`, remove the `beforeExecute` chain — `runWithMiddleware` keeps `intercept`, `onRow`, `afterExecute`, and the row source loop. (Alternative: keep `runWithMiddleware` as-is and add a separate `runBeforeExecuteChain` helper that the SQL runtime calls explicitly before `lower`'s encode pass. Pick whichever yields the smaller diff at implementation time.)
+  - Update the jsdoc on `RuntimeMiddleware.beforeExecute` in `runtime-middleware.ts` to document the new contract: "Fires after the runtime produced a draft plan but before parameter encoding. Mutations applied via `params` are visible to subsequent encode."
+  - Update `packages/1-framework/1-core/framework-components/test/run-with-middleware.test.ts` and `run-with-middleware.intercept.test.ts` to reflect the new orchestration. `beforeExecute` coverage moves to wherever the chain now lives.
+  - The three non-cipherstash `beforeExecute` implementations (`telemetry-middleware.ts`, `budgets.ts`, `lints.ts`) require no changes — they don't inspect params.
+
+  **Validation gate addition:** the cipherstash e2e harness scaffolded in piece 5 (`examples/cipherstash-integration/test/e2e/`) becomes the load-bearing pin. Once T11.5 lands, the seven `AC-E2E-*` test files run against live PG + EQL + ZeroKMS.
+
+  _(satisfies: enables TC-E2E1–7)_
+
 #### Example app and end-to-end validation (T12)
 
 - [ ] **T12 — Example app extension + end-to-end tests.** Update `examples/cipherstash-integration` schema with one column of each new type and a sample query per type. Wire the example into the integration test suite with live Postgres + EQL coverage for all seven AC-E2E criteria (Number, BigInt, Date, Boolean, Json, String-range, Mixed-query SDK round-trip count).
