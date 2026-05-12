@@ -1,6 +1,6 @@
 # Supabase example app — design-time sketch
 
-This directory is a **design-time sketch** of the runnable Supabase example app that will eventually live at `examples/supabase/`. The code does **not** typecheck today — most of the framework surface it depends on (namespace authoring, cross-contract refs, RLS DSL, `supabase()` runtime facade, externally-managed function IR) doesn't exist yet.
+This directory is a **design-time sketch** of the runnable Supabase example app that will eventually live at `examples/supabase/`. The code does **not** typecheck today — most of the framework surface it depends on (namespace authoring, cross-contract refs, RLS DSL, `SupabaseRuntime` subclass extending `PostgresRuntime`) doesn't exist yet.
 
 ## Why this exists
 
@@ -15,12 +15,12 @@ The sketch also doubles as:
 
 | File | What it exercises |
 |------|-------------------|
-| [`src/prisma/contract.ts`](./src/prisma/contract.ts) | Namespaces (`public`), cross-contract FK to `auth.User`, within-contract FK to `Profile`, RLS policies, externally-managed function references (`auth.uid()`), role constants |
-| [`src/prisma/db.ts`](./src/prisma/db.ts) | `supabase()` runtime facade, JWT secret config, middleware composition with the role-binding stack |
-| [`src/handlers.ts`](./src/handlers.ts) | `asUser(jwt)`, `asAnon()`, `asServiceRole()` request-handler patterns; multi-statement flows; transaction scoping |
-| [`migrations/supabase/contract.json`](./migrations/supabase/contract.json) | Pinned mirror of the Supabase extension contract (the bit the user imports) |
-| [`migrations/supabase/contract.d.ts`](./migrations/supabase/contract.d.ts) | Typed mirror exposing `.models.<Name>.refs.<field>` accessors |
-| [`prisma-next.config.ts`](./prisma-next.config.ts) | `extensionPacks: [supabase.pack()]`, contract source, DB connection |
+| [`src/prisma/contract.ts`](./src/prisma/contract.ts) | Namespaces (`public`), cross-contract FK to `AuthUser` (imported from `@prisma-next/extension-supabase/contract`), within-contract FK to `Profile`, RLS policies, opaque `auth.uid()` references in predicates, role constants |
+| [`src/prisma/db.ts`](./src/prisma/db.ts) | `SupabaseRuntime` factory (default-export `supabase({...})` from `/runtime`), JWT secret config, optional user middleware |
+| [`src/handlers.ts`](./src/handlers.ts) | `asUser(jwt)`, `asAnon()`, `asServiceRole()` request-handler patterns; multi-statement flows via `.transaction(...)`; structural `SET LOCAL` guarantee |
+| [`migrations/supabase/contract.json`](./migrations/supabase/contract.json) | Pinned mirror of the Supabase extension contract (used by the planner; authoring uses the subpath import directly) |
+| [`migrations/supabase/contract.d.ts`](./migrations/supabase/contract.d.ts) | Typed mirror used by the framework for verifier/planner type lookups |
+| [`prisma-next.config.ts`](./prisma-next.config.ts) | `extensionPacks: [supabasePack]` (value-imported from `/pack`), contract source, DB connection |
 | [`.env.example`](./.env.example) | `DATABASE_URL`, `SUPABASE_JWT_SECRET` (or `SUPABASE_JWKS_URL`) |
 | [`design-holes.md`](./design-holes.md) | Every concrete decision the design doesn't yet cover, indexed by file |
 

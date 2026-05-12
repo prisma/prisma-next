@@ -7,20 +7,17 @@ A Prisma Next app using Supabase is one where the app contract references Supaba
 ```ts
 // app/contract.ts (the user's code)
 import { defineContract, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import { supabase } from '@prisma-next/extension-supabase';
-import supabaseContractJson from '../migrations/supabase/contract.json' with { type: 'json' };
-import type { Contract as SupabaseContract } from '../migrations/supabase/contract.d';
+import { AuthUser, roles as supabaseRoles } from '@prisma-next/extension-supabase/contract';
+import supabasePack from '@prisma-next/extension-supabase/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import postgresPack from '@prisma-next/target-postgres/pack';
-
-const supabaseContract = supabase.contract<SupabaseContract>(supabaseContractJson);
 
 export const contract = defineContract(
   {
     family: sqlFamily,
     target: postgresPack,
     namespaces: ['public'],
-    extensionPacks: { supabase: supabase.pack() },
+    extensionPacks: [supabasePack],
   },
   ({ field, model }) => {
     const Profile = model('Profile', {
@@ -37,7 +34,7 @@ export const contract = defineContract(
         Profile: Profile.relations({
           // Cross-contract FK — model handle's brand tells the framework this
           // reference targets another contract space (no new TS syntax).
-          user: rel.belongsTo(supabaseContract.models.AuthUser, { from: 'userId', to: 'id' }),
+          user: rel.belongsTo(AuthUser, { from: 'userId', to: 'id' }),
         })
           .attributes(({ fields, constraints }) => ({
             uniques: [ constraints.unique(fields.userId, { name: 'profile_userId_unique' }) ],
@@ -45,7 +42,7 @@ export const contract = defineContract(
           .sql(({ cols, constraints }) => ({
             table: 'profile',
             foreignKeys: [
-              constraints.foreignKey(cols.userId, supabaseContract.models.AuthUser.refs.id, {
+              constraints.foreignKey(cols.userId, AuthUser.refs.id, {
                 name: 'profile_userId_fkey',
                 onDelete: 'cascade',
               }),
@@ -58,13 +55,13 @@ export const contract = defineContract(
             {
               name: 'profiles_select_own',
               operation: 'select',
-              roles: [supabase.roles.authenticated],
+              roles: [supabaseRoles.authenticated],
               using: 'user_id = (auth.uid())::uuid',
             },
             {
               name: 'profiles_update_own',
               operation: 'update',
-              roles: [supabase.roles.authenticated],
+              roles: [supabaseRoles.authenticated],
               using:     'user_id = (auth.uid())::uuid',
               withCheck: 'user_id = (auth.uid())::uuid',
             },
@@ -79,11 +76,11 @@ export const contract = defineContract(
 // prisma-next.config.ts
 import { defineConfig } from '@prisma-next/config';
 import { typescriptContract } from '@prisma-next/contract-ts';
-import { supabase } from '@prisma-next/extension-supabase';
+import supabasePack from '@prisma-next/extension-supabase/pack';
 
 export default defineConfig({
   contract: typescriptContract('./app/contract.ts'),
-  extensionPacks: [supabase.pack()],
+  extensionPacks: [supabasePack],
 });
 ```
 
@@ -119,13 +116,13 @@ We deliver six capabilities. Each has its own design note; this list is the map.
 
 3. **RLS policies as first-class Postgres IR.** `PostgresRlsPolicy` as a target-only IR kind hanging off `PostgresTable`. TS authoring: `.rls([...])` — a fourth staged-builder method alongside `.attributes(...)` and `.sql(...)`, target-gated by pack-aware typing (no capability flag). Array of named descriptors, each carrying `{ name, operation, roles, using?, withCheck?, as? }`. PSL authoring: top-level `policy <name> { target, operation, roles, using, withCheck, ... }` named-block declarations. Both surfaces are lenient on multiplicity (Postgres ORs permissive policies for the same op). TS predicates accept `string | ((ctx) => string)` with `ref(modelHandle)` for canonical quoted identifiers; PSL predicates are verbatim strings in v0.1 (interpolation is a stretch goal). Migration ops via `OpFactoryCall`. Verifier diffs against `pg_policies`. See [`rls.md`](rls.md) and [`decisions.md`](decisions.md).
 
-4. **The `@prisma-next/extension-supabase` package.** A hand-authored `contract.json` describing the `auth`, `storage`, `realtime`, `extensions` schemas with `defaultControl: 'external'`. A `supabase()` runtime facade that composes the Postgres runtime internally and exposes `asUser` / `asAnon` / `asServiceRole` role helpers as top-level methods. RLS session-state injection (the request user's JWT becomes a session-scoped role + claim set). Typed role constants. Use `supabase.pack()` for the extension-pack ref and `supabase.contract<C>(json)` for the typed contract handle — there is no `supabase()` shorthand at the contract-side. See [`extension-package.md`](extension-package.md).
+4. **The `@prisma-next/extension-supabase` package.** Subpath-only entrypoints: `/pack` (value-imported `ExtensionPack`), `/contract` (hand-authored typed handles — `AuthUser`, `roles`, etc.), `/runtime` (default-export `supabase({...})` factory returning a `SupabaseRuntime` that extends `PostgresRuntime`). The shipped `contract.json` declares `auth`, `storage`, `realtime`, `extensions` schemas with `defaultControl: 'external'`. The runtime exposes `asUser` / `asAnon` / `asServiceRole` role helpers; each issues `SET LOCAL role` / `SET LOCAL request.jwt.claims` below the user-middleware chain (structurally non-bypassable). See [`extension-package.md`](extension-package.md).
 
 5. **Authoring DSL surface from TML-2459 (assumed).** Namespace declaration in PSL/TS, per-model namespace, cross-namespace FKs within a single contract. **This is already in scope of TML-2459 and is assumed available.** We're listing it here only because the Supabase example wouldn't make sense without it.
 
 6. **Developer experience.** Scaffold (`prisma-next init --supabase` or equivalent), getting-started docs, a migration guide for users coming from the Supabase JS client. See [`developer-experience.md`](developer-experience.md).
 
-7. **Working example app (`examples/supabase/`).** A committed, runnable example app that exercises cross-contract FK references to `auth.User`, RLS policies, the `supabase()` runtime facade, and all three role helpers. **Must-have** — this is the proof that the integration works end-to-end and the primary onboarding artifact.
+7. **Working example app (`examples/supabase/`).** A committed, runnable example app that exercises cross-contract FK references to `AuthUser`, RLS policies, the `SupabaseRuntime` factory (`supabase({...})`), and all three role helpers (`asUser` / `asAnon` / `asServiceRole`). **Must-have** — this is the proof that the integration works end-to-end and the primary onboarding artifact.
 
 ### Stretch goals
 
@@ -165,6 +162,6 @@ Three things show up in multiple component docs and are worth surfacing here:
 
 ## Open questions (project-level)
 
-- **Where does the Supabase contract live on disk?** Inside the `@prisma-next/extension-supabase` package (shipped to npm)? In a generated `node_modules/.prisma-next-supabase/` directory? In the app's `migrations/supabase/`? This affects how the user imports it to construct the typed handle (`supabase.contract<SupabaseContract>(json)`). *(Working assumption: pinned mirror under `migrations/supabase/`, generated on `prisma-next install` or equivalent, mirroring how app contracts already live under `migrations/<space>/`.)*
+- **Where does the Supabase contract live on disk in the consuming app?** The extension package ships its source-of-truth `contract.json` under its `/contract` subpath. Under [C6](decisions.md), authoring imports typed handles directly from `@prisma-next/extension-supabase/contract` — no manual JSON import. For *migration planning*, the framework needs a pinned mirror of the extension's contract in the consuming app's `migrations/` tree so the planner has a stable, versioned view; working assumption is `migrations/<spaceName>/contract.json`, generated on `prisma-next install` or equivalent. Defer the exact pin/refresh mechanics to implementation.
 - **Does `supabase()` in `extensionPacks` take options for project-level choices (e.g., schemas to include, role names if non-default)?** Probably yes; sketched in [`extension-package.md`](extension-package.md), not settled.
 - **What does the migration story look like for a user already running Supabase with hand-rolled SQL migrations?** Some kind of "adopt existing schema" workflow; details in [`developer-experience.md`](developer-experience.md), not settled.

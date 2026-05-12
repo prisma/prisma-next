@@ -31,7 +31,7 @@ To prevent confusion about where work lives:
 - Polymorphic 3-layer IR (framework / family / target).
 - `Namespace` as a first-class framework concept.
 - Authoring DSL for namespace declarations and per-model namespace assignment.
-- Cross-namespace FKs **within a single contract space** (`m.constraints.ref(otherModel)`).
+- Cross-namespace FKs **within a single contract space** (via `constraints.foreignKey(cols.x, OtherModel.refs.y, …)` / `rel.belongsTo(OtherModel, …)`).
 - `ContractSerializer` SPI; removal of `validateContract`.
 - The `Target<TContract, TSchema>` aggregator interface.
 

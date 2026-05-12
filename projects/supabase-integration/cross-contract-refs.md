@@ -17,22 +17,17 @@ import {
   defineContract,
   rel,
 } from '@prisma-next/sql-contract-ts/contract-builder';
-import { supabase } from '@prisma-next/extension-supabase';
-import supabaseContractJson from '../migrations/supabase/contract.json' with { type: 'json' };
-import type { Contract as SupabaseContract } from '../migrations/supabase/contract.d';
+import supabasePack from '@prisma-next/extension-supabase/pack';
+import { AuthUser } from '@prisma-next/extension-supabase/contract';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import postgresPack from '@prisma-next/target-postgres/pack';
-
-// Typed handle to the Supabase contract space. Carries `spaceId: 'supabase'`
-// at runtime and provides typed `.models.<Name>.refs.<field>` accessors.
-const supabaseContract = supabase.contract<SupabaseContract>(supabaseContractJson);
 
 export const contract = defineContract(
   {
     family: sqlFamily,
     target: postgresPack,
     namespaces: ['public'],
-    extensionPacks: { supabase: supabase.pack() },
+    extensionPacks: [supabasePack],
   },
   ({ field, model }) => {
     const Profile = model('Profile', {
@@ -49,18 +44,13 @@ export const contract = defineContract(
         Profile: Profile.relations({
           // rel.belongsTo accepts a model handle from any registered contract
           // space; the cross-contract case is inferred from the handle's brand.
-          user: rel.belongsTo(supabaseContract.models.AuthUser, {
-            from: 'userId',
-            to: 'id',
-          }),
+          user: rel.belongsTo(AuthUser, { from: 'userId', to: 'id' }),
         }).sql(({ cols, constraints }) => ({
           table: 'profile',
           foreignKeys: [
-            constraints.foreignKey(
-              cols.userId,
-              supabaseContract.models.AuthUser.refs.id,
-              { name: 'profile_userId_fkey' },
-            ),
+            constraints.foreignKey(cols.userId, AuthUser.refs.id, {
+              name: 'profile_userId_fkey',
+            }),
           ],
         })),
       },
@@ -71,9 +61,9 @@ export const contract = defineContract(
 
 Three properties of the design:
 
-- **Cross-contract-ness is implicit at the call site.** No `refIn` / `refExt` / `belongsToExternal`. Both local and cross-contract references use the same call shape; the model handle's brand tells the framework which contract space it came from. The visual signal is the **import statement** — the reader sees `import { supabase } from '@prisma-next/extension-supabase'` at the top of the file and `supabaseContract.models.AuthUser` at the call site, and infers cross-contract from those.
-- **Typed completion all the way through.** `supabaseContract.models.<Tab>` lists the Supabase models; `.refs.<Tab>` lists their columns. No string literals.
-- **Implicit resolution via `extensionPacks`.** The framework knows the contract space is `supabase` because the user added `extensionPacks: { supabase: supabase.pack() }` to `defineContract`'s config. If the user references `supabaseContract.models.AuthUser` without declaring `supabase` in `extensionPacks`, contract loading fails fast with a clear diagnostic ("model `AuthUser` from contract space `supabase` is referenced but `supabase` is not in `extensionPacks`").
+- **Cross-contract-ness is implicit at the call site.** No `refIn` / `refExt` / `belongsToExternal`. Both local and cross-contract references use the same call shape; the model handle's brand tells the framework which contract space it came from. The visual signal is the **import statement** — the reader sees `import { AuthUser } from '@prisma-next/extension-supabase/contract'` at the top of the file and `AuthUser.refs.id` at the call site, and infers cross-contract from those. The handles are pre-built by the extension, value-imported by the app — no `supabase.contract<C>(json)` factory dance ([C6, C7](decisions.md)).
+- **Typed completion all the way through.** `import { <Tab> } from '@prisma-next/extension-supabase/contract'` lists the Supabase models and roles; `AuthUser.refs.<Tab>` lists `AuthUser`'s columns. No string literals.
+- **Implicit resolution via `extensionPacks`.** The framework knows the contract space is `supabase` because the user added `extensionPacks: [supabasePack]` to `defineContract`'s config. If the user references `AuthUser` (or any branded handle from a contract space) without declaring that space in `extensionPacks`, contract loading fails fast with a clear diagnostic ("model `AuthUser` from contract space `supabase` is referenced but `supabase` is not in `extensionPacks`").
 
 ### Authoring surface — PSL
 
@@ -125,7 +115,7 @@ Cross-contract references are constrained by a **directional, acyclic dependency
 
 The dependency graph is inferred from the contract aggregate's construction order, which today is driven by `extensionPacks`:
 
-- `defineContract({ extensionPacks: { supabase: supabase.pack() }, … })` declares that this app contract depends on the `supabase` contract space.
+- `defineContract({ extensionPacks: [supabasePack], … })` declares that this app contract depends on the `supabase` contract space. The pack value is value-imported from `@prisma-next/extension-supabase/pack` per [C6](decisions.md).
 - `extensionPacks` is therefore doing double duty for v0.1 — it's both **the import declaration** (which extensions' models are reachable) **and the dependency declaration** (this contract depends on those extensions).
 - Extensions can declare their own `extensionPacks` in their bundled contract (e.g. a future Supabase variant that depends on a base auth extension). The aggregate construction enforces "depended-on contracts load first" and rejects cycles at load time.
 
@@ -205,7 +195,7 @@ The lowering pass:
 
 1. For each `source: 'local'` FK ref: resolve within the current contract (existing behaviour).
 2. For each `source: 'space'` FK ref: look up the named space in the aggregate, then look up the model, then look up the field. Materialise the resolved namespace + table + column coordinates into the Schema IR FK constraint.
-3. If the named space isn't in the aggregate, or the model/field doesn't exist there, lowering errors out with a clear diagnostic — "FK references space `supabase` model `AuthUser`, but no such contract space is registered; add `supabase: supabase.pack()` to `extensionPacks` in `defineContract`."
+3. If the named space isn't in the aggregate, or the model/field doesn't exist there, lowering errors out with a clear diagnostic — "FK references space `supabase` model `AuthUser`, but no such contract space is registered; add `supabasePack` (imported from `@prisma-next/extension-supabase/pack`) to `extensionPacks` in `defineContract`."
 
 ### Verifier behaviour
 
@@ -253,6 +243,3 @@ This is the same publish/consume shape TML-2459 sets up for the IR refactor, so 
 ## Open questions
 
 - **What's the canonical path for the pinned mirror?** `migrations/<spaceName>/contract.json` is the working assumption (matches the app's own contract location). Some teams may want `node_modules/.cache/...` or a configurable location. Defer until we have user feedback.
-- **Cascading actions across spaces.** PostgreSQL supports `ON DELETE CASCADE` etc. across schemas. Do we permit them across contract spaces? Probably yes — the DDL is fine, it's just the verifier that needs to be a little more careful (a cross-space `ON DELETE CASCADE` from a `managed` table to an `external` table makes the externally-managed table's lifecycle leak into our planner's awareness). Working assumption: **permit, document the implication.**
-- **What's the typed handle returned by `supabase.contract<SupabaseContract>(json)`?** Is it the same shape as `validateContract`'s replacement (the SPI-based `target.contractSerializer.deserializeContract`)? Probably yes — same machinery, with the extension package providing a thin convenience wrapper that ties the contract type to its `spaceId` and exposes `.models.<Name>.refs.<field>` accessors. Specifics to settle when implementing.
-- **Should the extension package's typed handle be auto-bound at install time, removing the user's manual `supabase.contract<SupabaseContract>(json)` call?** The pinned-mirror story today requires the user to import the JSON and instantiate the handle. We could have the install step emit a thin wrapper module (`migrations/supabase/contract-handle.ts`) that does this once. Cleaner DX, slightly more codegen surface. Defer to user feedback.

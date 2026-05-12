@@ -15,20 +15,25 @@ This is the user-visible npm package they install.
 
 ### Shape on disk
 
+Subpath-only entrypoints per [`decisions.md` C6](decisions.md). Each subpath ships only what its name implies; no umbrella export from the package root.
+
 ```
 @prisma-next/extension-supabase/
-├── package.json
+├── package.json                # exports field declares /pack, /contract, /runtime subpaths
 ├── src/
-│   ├── index.ts                # the `supabase` namespace export (contract helper, role consts, pack factory)
-│   ├── runtime.ts              # the supabase() runtime facade factory
-│   ├── pack.ts                 # extension pack descriptor
-│   └── roles.ts                # role constants
-├── contract/
-│   ├── contract.json           # hand-authored, ~50 lines
-│   ├── contract.d.ts           # emitted from contract.json (same pipeline as app contracts)
-│   └── schema.psl              # optional: a PSL source the contract.json was emitted from (for human reading)
+│   ├── pack/                   # → '@prisma-next/extension-supabase/pack'
+│   │   └── index.ts            # ExtensionPack value (with optional factory wrapper for options)
+│   ├── contract/               # → '@prisma-next/extension-supabase/contract'
+│   │   ├── index.ts            # hand-authored typed authoring handles: `AuthUser`, `roles.anon`, …
+│   │   ├── contract.json       # hand-authored, ~50 lines (the source-of-truth IR)
+│   │   └── contract.d.ts       # emitted from contract.json (same pipeline as app contracts)
+│   ├── runtime/                # → '@prisma-next/extension-supabase/runtime'
+│   │   └── index.ts            # default-export `supabase({...})` factory + SupabaseRuntime class
+│   └── schema.psl              # optional: PSL source the contract.json was emitted from (for human reading)
 └── README.md
 ```
+
+Tree-shaking discipline (C6): `/pack` must not transitively import runtime code; `/contract` must not transitively import SDK or runtime code. An app that only authors a contract pays for nothing else.
 
 ### The shipped contract
 
@@ -68,10 +73,13 @@ Notes:
 
 ### Public API surface
 
+Three subpaths, three concerns. None of them is the package root — `import 'something' from '@prisma-next/extension-supabase'` deliberately resolves nothing.
+
+#### `/pack` — extension-pack descriptor (consumed by `prisma-next.config.ts`)
+
 ```ts
-// @prisma-next/extension-supabase
+// @prisma-next/extension-supabase/pack
 import type { ExtensionPack } from '@prisma-next/config';
-import type { TypedContract } from '@prisma-next/contract-core';
 
 export interface SupabaseOptions {
   /** Override the contract.json shipped in this package (e.g., to add custom auth.* tables). */
@@ -79,29 +87,69 @@ export interface SupabaseOptions {
   // … other knobs as we discover need
 }
 
-export const supabase = {
-  /** Extension-pack factory. Used in prisma-next.config.ts → extensionPacks. */
-  pack: (options?: SupabaseOptions): ExtensionPack => { /* … */ },
+/** No-options form: value-imported. */
+declare const supabasePack: ExtensionPack;
+export default supabasePack;
 
-  /**
-   * Wrap an imported contract.json with its typed shape. Returns a typed handle
-   * exposing `.models.<Name>.refs.<field>` accessors for cross-contract FK
-   * references. The handle is branded with `spaceId: 'supabase'` so the framework
-   * detects cross-contract usage automatically when the handle is passed to
-   * existing call sites like `constraints.foreignKey` and `rel.belongsTo`.
-   */
-  contract: <C>(json: unknown): TypedContract<C> => { /* … */ },
+/** With-options form: factory invoked at config time. */
+export function supabasePackWith(options: SupabaseOptions): ExtensionPack;
+```
 
-  /** Typed role constants for use in RLS policies. */
-  roles: {
-    authenticated: 'authenticated',
-    anon: 'anon',
-    serviceRole: 'service_role',
-  },
+Usage:
+
+```ts
+// prisma-next.config.ts
+import supabasePack from '@prisma-next/extension-supabase/pack';
+
+export default {
+  extensionPacks: [supabasePack],   // value form
+  // or: extensionPacks: [supabasePackWith({ contractOverride })],
 };
 ```
 
-The `supabase()` shorthand used in `extensionPacks: [supabase()]` is sugar for `supabase.pack()`.
+#### `/contract` — typed authoring handles (consumed by `contract.ts`)
+
+Pre-built typed handles for every model + role the extension ships. Hand-written for v0.1 (extension authors write this submodule themselves); emitter-generated as a roadmap item ([C7](decisions.md)).
+
+```ts
+// @prisma-next/extension-supabase/contract
+import type { ModelHandle, RoleRef } from '@prisma-next/contract-core/authoring';
+
+export const AuthUser: ModelHandle<'supabase', { id: string; email: string; /* … */ }>;
+export const AuthIdentity: ModelHandle<'supabase', { /* … */ }>;
+export const StorageBucket: ModelHandle<'supabase', { /* … */ }>;
+// …
+
+export const roles: {
+  authenticated: RoleRef<'supabase'>;
+  anon:          RoleRef<'supabase'>;
+  serviceRole:   RoleRef<'supabase'>;
+};
+```
+
+Usage:
+
+```ts
+// app/contract.ts
+import { AuthUser, roles as supabaseRoles } from '@prisma-next/extension-supabase/contract';
+
+const Profile = model('Profile', { /* fields */ })
+  .relations({ user: rel.belongsTo(AuthUser, { from: 'userId', to: 'id' }) })
+  .sql(({ cols, constraints }) => ({
+    foreignKeys: [
+      constraints.foreignKey(cols.userId, AuthUser.refs.id, { onDelete: 'cascade' }),
+    ],
+  }))
+  .rls([
+    { name: 'profiles_select', operation: 'select', roles: [supabaseRoles.anon], using: 'true' },
+  ]);
+```
+
+The handles are branded by `spaceId: 'supabase'`. Cross-contract refs are detected at the call site by handle brand — no separate `refIn` method, no consumer-side mapped-type machinery. ([C5, C6, C7](decisions.md), closes [`example/design-holes.md` #17](example/design-holes.md).)
+
+#### `/runtime` — the `SupabaseRuntime` factory
+
+See the next section.
 
 ### Runtime facade
 
@@ -211,8 +259,7 @@ Loading happens at `prisma-next` CLI invocation time. The pack contributes its c
 
 ## Open questions
 
-- **JWT claim mapping into `auth.uid()` etc.** Postgres-side `auth.uid()` is a function defined in Supabase's `auth` schema that reads from the `request.jwt.claims` session var. We rely on Supabase's standard SQL functions; we don't reimplement them. They are not declared in the Supabase contract — predicate strings are opaque to the framework, and a missing function surfaces as a Postgres error at migration / query time. See [`decisions.md` C4](decisions.md).
 - **What about Supabase storage?** The `storage.*` tables exist but app code rarely references them directly. We declare them in the shipped contract with `control: 'external'` and don't add any custom DSL for them. If user feedback pushes towards "ergonomic storage uploads," that's a future iteration.
 - **Migration path for a user already running Supabase migrations.** They probably have hand-rolled `auth.*` modifications, custom roles, custom policies. The "adopt existing schema" workflow is broader than this project; cross-link to [`developer-experience.md`](developer-experience.md).
 - **Custom auth schemas.** Some Supabase users extend `auth.*` with extra columns or tables. `contractOverride` is the v0.1 escape hatch; an introspection-based emit is the future polish.
-- **Multi-extension composition.** The `supabase()` facade composes one Postgres runtime with one extension middleware stack. Apps that need to stack additional Postgres extensions (Supabase + observability + caching, say) currently fall back to the lower-level `postgres()` factory from `@prisma-next/postgres/runtime`, which accepts an explicit extension list. Whether to grow `supabase()` to accept extra middleware, or whether the lower-level fallback is the documented escape hatch, is unresolved. Working assumption: **document the lower-level fallback for v0.1; don't grow `supabase()`'s surface.** The risk is users who actually need the composed shape have to construct it themselves and lose the `asUser`/`asAnon`/`asServiceRole` ergonomics — acceptable v0.1 trade.
+- **Multi-extension stacking.** The Supabase runtime is itself an extension (a `PostgresRuntime` subclass). Apps that want to compose **additional** runtime-layer behaviour beyond Supabase (telemetry, query caching, custom retry policies) reach for the `middleware` option — that's the supported escape hatch for cross-cutting concerns. Apps that need *another* target-layer subclass on top of Supabase (rare) fall back to the lower-level `postgres()` factory and lose the `asUser`/`asAnon`/`asServiceRole` ergonomics. Working assumption: **middleware covers 95% of stacking needs; document the fallback for the 5% case.**

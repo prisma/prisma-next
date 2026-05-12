@@ -47,7 +47,7 @@ Lives in `docs/` (canonical) or in the package's `README.md` (entry-point friend
 
 1. **At a glance.** The same canonical code sample from [`overview.md`](overview.md), so users see the surface immediately.
 2. **Setup.** `prisma-next init --supabase`; what env vars to populate; one paragraph on how the Supabase project's database connection URL maps to `DATABASE_URL`.
-3. **Your first model.** Walk through the scaffolded `Profile` model. Explain the cross-contract FK (model handle from `supabaseContract.models.AuthUser`), `control` (implicit via Supabase contract; see [`projects/control-policy/spec.md`](../control-policy/spec.md)), `c.rlsPolicy`.
+3. **Your first model.** Walk through the scaffolded `Profile` model. Explain the cross-contract FK (model handle `AuthUser` value-imported from `@prisma-next/extension-supabase/contract`), `control` (implicit via Supabase contract; see [`projects/control-policy/spec.md`](../control-policy/spec.md)), and the `.rls([...])` policy stage.
 4. **Your first migration.** Run the planner; show the generated DDL; explain what's *not* in it (no `CREATE TABLE auth.users` because it's externally-managed).
 5. **Your first query.** Show `db.asUser(jwt).sql.from(Profile)...`. Show what RLS enforcement looks like (a query that would return another user's row returns empty).
 6. **What's next.** Link to ref docs (Postgres target, contract authoring, RLS, etc.).
@@ -63,7 +63,7 @@ We need an "adopt existing schema" workflow. Sketch:
 
 1. `prisma-next adopt --from-database <DATABASE_URL>` introspects the live database and emits an initial `contract.ts` for the user's `public.*` schema.
    - Tables → `model(...)` declarations with `namespace: '<schema>'`.
-   - FKs → `constraints.foreignKey(cols.x, OtherModel.refs.y, …)` — local model handle for in-contract refs, extension contract model handle (e.g. `supabaseContract.models.AuthUser`) for cross-contract refs. Same call shape either way.
+   - FKs → `constraints.foreignKey(cols.x, OtherModel.refs.y, …)` — local model handle for in-contract refs, extension model handle (e.g. `AuthUser`, value-imported from `@prisma-next/extension-supabase/contract`) for cross-contract refs. Same call shape either way; the handle's brand drives resolution.
    - RLS policies → `c.rlsPolicy({ ... })` with predicates copied verbatim as strings.
    - `control` → `tolerated` for all introspected objects by default (let extras through; don't generate `ALTER` ops).
 2. The user reviews the emitted `contract.ts`, deletes or moves what they don't want, commits it.
@@ -78,9 +78,9 @@ We need an "adopt existing schema" workflow. Sketch:
 
 Beyond scaffold and docs, three small things matter for daily use:
 
-- **Editor completions on `supabaseContract.models.<TAB>.refs.<TAB>`.** Navigating the typed extension-contract handle must autocomplete to known model names then field names. This is a type-level concern in `@prisma-next/sql-contract-ts`; the surface is already designed in [`cross-contract-refs.md`](cross-contract-refs.md).
-- **Editor completions on `c.rlsPolicy({ roles: [supabase.roles.<TAB>] })`.** The role-constants object is `as const`, so completion works naturally; no extra work.
-- **Diagnostic clarity.** When a cross-contract reference fails to resolve, the error message should say *which extension is expected* and *how to add it* (e.g., "model `AuthUser` from contract space `supabase` is referenced but `supabase` is not in `extensionPacks`; add `supabase: supabase.pack()` to `defineContract`'s config"). When an RLS predicate fails Postgres validation at migration time, the error should attach the policy name and the line in the user's contract that declared it.
+- **Editor completions on extension model handles.** `import { <TAB> } from '@prisma-next/extension-supabase/contract'` should autocomplete to known model and role names. `AuthUser.refs.<TAB>` should autocomplete to its column names. This is a type-level concern carried by the hand-authored typed handles the extension ships; the surface is described in [`cross-contract-refs.md`](cross-contract-refs.md).
+- **Editor completions on `roles: [supabaseRoles.<TAB>]`.** The `roles` export from `@prisma-next/extension-supabase/contract` is a typed `as const` object, so completion works naturally; no extra work.
+- **Diagnostic clarity.** When a cross-contract reference fails to resolve, the error message should say *which extension is expected* and *how to add it* (e.g., "model `AuthUser` from contract space `supabase` is referenced but `supabase` is not in `extensionPacks`; add `supabasePack` (from `@prisma-next/extension-supabase/pack`) to `defineContract`'s config"). When an RLS predicate fails Postgres validation at migration time, the error should attach the policy name and the line in the user's contract that declared it.
 
 ### Documentation deliverables
 

@@ -1,24 +1,19 @@
-import { supabase } from '@prisma-next/extension-supabase';
+// Subpath-only imports per decisions C6:
+//   - /pack    → ExtensionPack value, used in `extensionPacks`
+//   - /contract → hand-authored typed handles (AuthUser, roles, …) branded with spaceId='supabase'
+//   - /runtime → SupabaseRuntime factory (used in db.ts, not here)
+import { AuthUser, roles as supabaseRoles } from '@prisma-next/extension-supabase/contract';
+import supabasePack from '@prisma-next/extension-supabase/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
-import {
-  defineContract,
-  rel,
-} from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
-import type { Contract as SupabaseContract } from '../../migrations/supabase/contract.d';
-import supabaseContractJson from '../../migrations/supabase/contract.json' with { type: 'json' };
-
-// The typed handle to Supabase's `auth`/`storage`/... contract space.
-// The handle is branded with spaceId='supabase' so the framework distinguishes
-// cross-contract refs from local refs at lowering time.
-const supabaseContract = supabase.contract<SupabaseContract>(supabaseContractJson);
 
 export const contract = defineContract(
   {
     family: sqlFamily,
     target: postgresPack,
     namespaces: ['public'],
-    extensionPacks: { supabase: supabase.pack() },
+    extensionPacks: [supabasePack],
     capabilities: {
       postgres: {
         returning: true,
@@ -63,7 +58,7 @@ export const contract = defineContract(
           // Cross-contract: rel.belongsTo accepts a model handle from any
           // contract space registered in `extensionPacks`. The handle's brand
           // tells the framework this targets contract space 'supabase'.
-          user: rel.belongsTo(supabaseContract.models.AuthUser, {
+          user: rel.belongsTo(AuthUser, {
             from: 'userId',
             to: 'id',
           }),
@@ -75,7 +70,7 @@ export const contract = defineContract(
           // following the existing DSL split between `.attributes()` and `.sql()`.
           .attributes(({ fields, constraints }) => ({
             uniques: [
-              constraints.unique(fields.userId,   { name: 'profile_userId_unique' }),
+              constraints.unique(fields.userId, { name: 'profile_userId_unique' }),
               constraints.unique(fields.username, { name: 'profile_username_unique' }),
             ],
           }))
@@ -83,17 +78,13 @@ export const contract = defineContract(
           .sql(({ cols, constraints }) => ({
             table: 'profile',
             foreignKeys: [
-              constraints.foreignKey(
-                cols.userId,
-                supabaseContract.models.AuthUser.refs.id,
-                {
-                  name: 'profile_userId_fkey',
-                  // Cascade across the contract-space boundary is the developer's
-                  // explicit opt-in. No diagnostic — see
-                  // `.agents/rules/explicit-opt-in-over-diagnostics.mdc`.
-                  onDelete: 'cascade',
-                },
-              ),
+              constraints.foreignKey(cols.userId, AuthUser.refs.id, {
+                name: 'profile_userId_fkey',
+                // Cascade across the contract-space boundary is the developer's
+                // explicit opt-in. No diagnostic — see
+                // `.agents/rules/explicit-opt-in-over-diagnostics.mdc`.
+                onDelete: 'cascade',
+              }),
             ],
           }))
           // Postgres-only stage; only typed when the target carries RLS support.
@@ -105,28 +96,30 @@ export const contract = defineContract(
             {
               name: 'profiles_select_anon_and_authed',
               operation: 'select',
-              roles: [supabase.roles.anon, supabase.roles.authenticated],
+              roles: [supabaseRoles.anon, supabaseRoles.authenticated],
               using: 'true',
             },
-            // auth.uid() is declared in the Supabase contract as an externally-managed
-            // function (see migrations/supabase/contract.json).
+            // auth.uid() / auth.role() / auth.jwt() are Postgres functions Supabase
+            // installs in the auth schema. They are NOT contract elements in v0.1
+            // (see decisions C4) — predicate strings are opaque to the framework,
+            // and missing functions surface as Postgres errors at migration time.
             {
               name: 'profiles_insert_own',
               operation: 'insert',
-              roles: [supabase.roles.authenticated],
+              roles: [supabaseRoles.authenticated],
               withCheck: 'user_id = (auth.uid())::uuid',
             },
             {
               name: 'profiles_update_own',
               operation: 'update',
-              roles: [supabase.roles.authenticated],
-              using:     'user_id = (auth.uid())::uuid',
+              roles: [supabaseRoles.authenticated],
+              using: 'user_id = (auth.uid())::uuid',
               withCheck: 'user_id = (auth.uid())::uuid',
             },
             {
               name: 'profiles_delete_own',
               operation: 'delete',
-              roles: [supabase.roles.authenticated],
+              roles: [supabaseRoles.authenticated],
               using: 'user_id = (auth.uid())::uuid',
             },
           ]),
@@ -153,20 +146,20 @@ export const contract = defineContract(
             {
               name: 'posts_select_published',
               operation: 'select',
-              roles: [supabase.roles.anon, supabase.roles.authenticated],
+              roles: [supabaseRoles.anon, supabaseRoles.authenticated],
               using: 'published_at IS NOT NULL',
             },
             {
               name: 'posts_insert_own',
               operation: 'insert',
-              roles: [supabase.roles.authenticated],
+              roles: [supabaseRoles.authenticated],
               withCheck: ({ ref }) =>
                 `author_id IN (SELECT id FROM ${ref(Profile)} WHERE user_id = (auth.uid())::uuid)`,
             },
             {
               name: 'posts_update_own',
               operation: 'update',
-              roles: [supabase.roles.authenticated],
+              roles: [supabaseRoles.authenticated],
               using: ({ ref }) =>
                 `author_id IN (SELECT id FROM ${ref(Profile)} WHERE user_id = (auth.uid())::uuid)`,
               withCheck: ({ ref }) =>
@@ -175,7 +168,7 @@ export const contract = defineContract(
             {
               name: 'posts_delete_own',
               operation: 'delete',
-              roles: [supabase.roles.authenticated],
+              roles: [supabaseRoles.authenticated],
               using: ({ ref }) =>
                 `author_id IN (SELECT id FROM ${ref(Profile)} WHERE user_id = (auth.uid())::uuid)`,
             },
