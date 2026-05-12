@@ -1,0 +1,52 @@
+{
+  "$schema": "https://prisma-next.io/contract.schema.json",
+  "spaceId": "supabase",
+  "target": "postgres",
+  "defaultPosture": "externally-managed",
+  "namespaces": ["auth", "storage"],
+  "models": {
+    "AuthUser": {
+      "namespace": "auth",
+      "tableName": "users",
+      "fields": {
+        "id":         { "type": "uuid",        "primary": true },
+        "email":      { "type": "text",        "nullable": true },
+        "phone":      { "type": "text",        "nullable": true },
+        "emailConfirmedAt": { "type": "timestamptz", "columnName": "email_confirmed_at", "nullable": true },
+        "createdAt":  { "type": "timestamptz", "columnName": "created_at" },
+        "updatedAt":  { "type": "timestamptz", "columnName": "updated_at" }
+      }
+    },
+    "StorageBucket": {
+      "namespace": "storage",
+      "tableName": "buckets",
+      "fields": {
+        "id":        { "type": "text",        "primary": true },
+        "name":      { "type": "text" },
+        "public":    { "type": "boolean" },
+        "createdAt": { "type": "timestamptz", "columnName": "created_at" },
+        "updatedAt": { "type": "timestamptz", "columnName": "updated_at" }
+      }
+    }
+  },
+  "functions": {
+    "uid": {
+      "namespace": "auth",
+      "posture": "externally-managed",
+      "returns": { "type": "uuid" },
+      "args": []
+    },
+    "jwt": {
+      "namespace": "auth",
+      "posture": "externally-managed",
+      "returns": { "type": "jsonb" },
+      "args": []
+    },
+    "role": {
+      "namespace": "auth",
+      "posture": "externally-managed",
+      "returns": { "type": "text" },
+      "args": []
+    }
+  }
+}

@@ -13,6 +13,7 @@
 | [`extension-package.md`](extension-package.md) | The `@prisma-next/extension-supabase` package shape. Hand-authored `contract.json`, single `supabase()` runtime facade composing Postgres internally, `asUser` / `asAnon` / `asServiceRole` role helpers, RLS session-state injection, typed role constants. |
 | [`developer-experience.md`](developer-experience.md) | Scaffold (`prisma-next init --supabase` or equivalent), getting-started docs, working example app (must-have). |
 | [`deferred.md`](deferred.md) | Things we've explicitly decided to defer or rule out (visibility/encapsulation, introspection-based emit, realtime, etc.). |
+| [`example/`](example/) | **Design-time sketch of the runnable example app.** TypeScript written against the design as it stands today, intentionally not implementation-ready. Surfaces concrete design holes the topic-by-topic notes don't cover; see [`example/design-holes.md`](example/design-holes.md). |
 
 ## Foundation that's already settled
 
@@ -36,6 +37,7 @@ If you're reading this without TML-2459 context, read its [spec](../target-exten
 ## How to read these as a fresh contributor
 
 1. Read [`overview.md`](overview.md) first — it carries the end-to-end story and the canonical code sample.
-2. Then read whichever component doc is closest to your task.
-3. [`deferred.md`](deferred.md) is short and worth skimming so you don't propose deferred work.
-4. Each doc has an "Open questions" section at the bottom. Answers go in the doc as we settle them; questions stay until they're resolved.
+2. Skim [`example/`](example/) next — the example app sketch makes the design concrete in a way the topic docs don't.
+3. Then read whichever component doc is closest to your task.
+4. [`deferred.md`](deferred.md) is short and worth skimming so you don't propose deferred work.
+5. Each doc has an "Open questions" section at the bottom; [`example/design-holes.md`](example/design-holes.md) is the canonical list of unresolved design questions discovered by exercising the example.
