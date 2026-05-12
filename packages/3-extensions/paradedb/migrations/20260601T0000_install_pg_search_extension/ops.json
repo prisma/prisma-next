@@ -8,7 +8,7 @@
       "id": "postgres",
       "details": {
         "schema": "public",
-        "objectType": "extension",
+        "objectType": "dependency",
         "name": "pg_search"
       }
     },
@@ -21,7 +21,7 @@
     "execute": [
       {
         "description": "create extension \"pg_search\"",
-        "sql": "CREATE EXTENSION IF NOT EXISTS \"pg_search\""
+        "sql": "CREATE EXTENSION IF NOT EXISTS pg_search"
       }
     ],
     "postcheck": [
