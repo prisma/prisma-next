@@ -67,6 +67,7 @@ describe.each(
     expectScaffoldedFiles(ctx.project);
     expectSchemaFile(ctx.project, cell);
     expectConfigFile(ctx.project, cell);
+    expectPackageJsonIsEsm(ctx.project);
   });
 
   it('step 2 (install): pnpm install succeeds with isolated linker', () => {
@@ -350,6 +351,22 @@ function expectScaffoldedFiles(project: JourneyProject): void {
   for (const rel of required) {
     expect(existsSync(join(project.dir, rel)), `expected scaffold to include ${rel}`).toBe(true);
   }
+}
+
+/**
+ * TML-2494 — the scaffolded `prisma/db.ts` uses the ESM-only
+ * `with { type: 'json' }` import attribute, so the emitted `package.json`
+ * must opt into ESM. Without this, Node either prints the
+ * `MODULE_TYPELESS_PACKAGE_JSON` warning (Node 22+ with strip-types) or
+ * hard-fails on older loaders trying to read `db.ts` as CommonJS.
+ */
+function expectPackageJsonIsEsm(project: JourneyProject): void {
+  const pkg = JSON.parse(readFileSync(join(project.dir, 'package.json'), 'utf-8')) as {
+    type?: string;
+  };
+  expect(pkg.type, 'init must scaffold "type": "module" so the ESM-only db.ts loads').toBe(
+    'module',
+  );
 }
 
 function expectSchemaFile(project: JourneyProject, cell: CellId): void {
