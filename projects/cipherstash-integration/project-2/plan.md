@@ -88,6 +88,15 @@ Spec FR1–FR10. All five new codecs, all 17 new operators (13 predicate + 4 hel
 
 **Tasks** (sequenced; each task lands as one or more commits with a coherent diff; commits follow the repo's commit-as-you-go convention):
 
+#### Pre-existing failure cleanup (T0)
+
+Surfaced during m1 R1 reviewer round; routed to early-R2 to restore per-round gate signal before substrate refactors land. Both failures are present at `2a5e13d7c^` (the commit before T1) and are inherited from the project-1 port.
+
+- [ ] **T0 — Restore per-round gate cleanliness.** Two pre-existing failures block the per-round package-scoped validation gate for R2–R7:
+  - `test/descriptor.test.ts > points the head ref at the latest migration's destination hash` — asserts the cipherstash head ref carries 11 invariants but it currently carries one (`'cipherstash:install-eql-bundle-v1'`). Likely fixed by completing the migration `providedInvariants` registration in `src/exports/migration.ts` or aligning the head ref via the canonical regeneration path. If the fix is non-trivial (turns out to require a real architectural decision), pause and surface to the orchestrator.
+  - `src/exports/control.ts:52 — CIPHERSTASH_SPACE_ID is declared but its value is never read` — drop the unused import (the binding may become live later in R2/R3 when codec-hook configurations are wired; if so, leave it and use it).
+  Land as a single commit titled `chore(cipherstash): clear pre-existing failures inherited from project-1 port`. _(no AC mapping — pure gate cleanup)_
+
 #### Substrate refactors — behavior-preserving (T1–T4)
 
 These four tasks land before any new types or operators. Each is verified by the existing test suite passing without modification, plus the byte-identical baseline-migration regeneration check.
