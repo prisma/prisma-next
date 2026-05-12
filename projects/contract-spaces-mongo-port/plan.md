@@ -115,9 +115,10 @@ Lift the non-app rejection in the family instance. Add the descriptor field. Add
 
 **Tasks:**
 
-- [ ] **T2.1** `MongoControlExtensionDescriptor.contractSpace?: ContractSpace<MongoContract<MongoStorage>>`. (TC-1)
-- [ ] **T2.2** `MongoFamilyInstance.readMarker(space)` accepts any space id; remove the non-app rejection. `readAllMarkers` returns the full multi-space map (queries the marker collection with no `_id` filter). (TC-6)
-- [ ] **T2.3** `assertDescriptorSelfConsistency` wired into `createMongoFamilyInstance` over each extension's `(contractSpace.contractJson, contractSpace.headRef.hash)`. Mirrors SQL family. (TC-2)
+- [x] **T2.1** `MongoControlExtensionDescriptor.contractSpace?: ContractSpace<MongoContract<MongoStorage>>`. (TC-1)
+- [x] **T2.2** `MongoFamilyInstance.readMarker(space)` accepts any space id; remove the non-app rejection. `readAllMarkers` returns the full multi-space map (queries the marker collection with no `_id` filter). (TC-6)
+- [x] **T2.3** `assertDescriptorSelfConsistency` wired into `createMongoFamilyInstance` over each extension's `(contractSpace.contractJson, contractSpace.headRef.hash)`. Mirrors SQL family. (TC-2)
+- [ ] **T2.4** Add `packages/2-mongo-family/9-family/vitest.config.ts` so the new TC-1 / TC-2 unit tests actually run through the package gate. Plan amendment surfaced during P2 R1 — `family-mongo` has no `vitest.config.ts` (a pre-existing gap from the projects-mode vitest migration), and the descriptor self-consistency tests added in T2.3 typecheck but don't execute today. Mirror the config from a sibling Mongo package (e.g. `packages/2-mongo-family/7-runtime/vitest.config.ts` or `packages/3-mongo-target/1-mongo-target/vitest.config.ts`).
 
 **Validation gate:** same as Phase 1.
 
