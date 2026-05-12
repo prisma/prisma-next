@@ -14,7 +14,7 @@
  *
  *   1. **Pinned per-space artefacts on disk.** After
  *      `emitContractSpaceArtefacts` runs for both extension spaces, the
- *      user's repo carries `migrations/audit/{contract.json,
+ *      consuming app's repo carries `migrations/audit/{contract.json,
  *      contract.d.ts, refs/head.json}` and the same triple under
  *      `migrations/feature-flags/`.
  *
@@ -70,7 +70,7 @@ import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces'
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { APP_USER_TABLE, contract as appContract } from '../app/contract-source';
+import { APP_USER_TABLE, contract as appContract } from '../app/src/contract';
 
 const APP_CONTRACT_HASH_VALUE = appContract.storage.storageHash;
 
@@ -78,14 +78,14 @@ import {
   AUDIT_BASELINE_INVARIANT_ID,
   AUDIT_EVENT_TABLE,
   AUDIT_SPACE_ID,
-} from '../packages/audit/constants';
-import auditExtensionDescriptor from '../packages/audit/control';
+} from '../packages/audit/src/constants';
+import auditExtensionDescriptor from '../packages/audit/src/control';
 import {
   FEATURE_FLAG_TABLE,
   FEATURE_FLAGS_BASELINE_INVARIANT_ID,
   FEATURE_FLAGS_SPACE_ID,
-} from '../packages/feature-flags/constants';
-import featureFlagsExtensionDescriptor from '../packages/feature-flags/control';
+} from '../packages/feature-flags/src/constants';
+import featureFlagsExtensionDescriptor from '../packages/feature-flags/src/control';
 
 function requireBaseline(
   descriptor: { readonly contractSpace?: { readonly migrations: readonly MigrationPackage[] } },

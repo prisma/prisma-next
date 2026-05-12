@@ -80,69 +80,74 @@ export interface SqlControlExtensionDescriptor<TTargetId extends string>
 
 There is **one** migration package shape across the workspace: `MigrationPackage` from `@prisma-next/migration-tools/package` (`{ dirName, dirPath, metadata, ops }`). The SQL family, the migration-tools I/O helpers, and the CLI's `runContractSpaceExtensionMigrationsPass` all consume that single shape — earlier parallel types (`ExtensionMigrationPackage`, `MigrationPackageContents`, `DescriptorMigrationPackage`) whose only difference was the absence of `dirPath` have been collapsed onto `MigrationPackage`.
 
-The descriptor's `migrations` are the same artefacts the framework's emitter writes for application authors. The expected authoring convention is **on-disk-in-package** (see below): the extension's package contains its own emitted `contract.json` and `migrations/<space-id>/<dirName>/...` directories, and the descriptor module wires them via JSON-import declarations, synthesising each `MigrationPackage` value with a `dirPath` resolved from `import.meta.url`. The framework reads these values only at `migrate` time and materialises them into the consuming application's repo, where they become indistinguishable from app-authored migrations.
+The descriptor's `migrations` are the same artefacts the framework's emitter writes for application authors. The expected authoring convention is the **contract-space package layout** (see below): the extension's package contains its own emitted `src/contract.json` and `migrations/<dirName>/...` directories, and the descriptor module wires them via JSON-import declarations. The framework reads these values only at `migrate` time and materialises them into the consuming application's repo, where they become indistinguishable from app-authored migrations.
 
-### On-disk-in-package authoring convention
+### Contract-space package layout
 
-Extension authors use the **same emit pipeline** application authors use: TS or PSL schema → `prisma-next contract emit` → `<package>/contract.{json,d.ts}`; `prisma-next migration plan` → `<package>/migrations/<space-id>/<dirName>/{migration.json, ops.json, end-contract.{json,d.ts}, migration.ts}`. The emitted `migration.ts` extends the same `Migration` abstract class app authors extend (from `@prisma-next/<target>/migration`).
-
-Each extension package is treated as a self-contained "project" by the CLI: it ships its own `prisma-next.config.ts` whose `migrations.dir` points at `migrations/<space-id>/`. No new CLI surface was required — `prisma-next contract emit` and `prisma-next migration plan` honour the in-package config the same way they honour an application's. (The package layout below shows the result.)
+Every package that exposes a contract space — published extensions (`packages/3-extensions/<extension>/`), internal monorepo extension packages (`examples/multi-extension-monorepo/packages/<pkg>/`), and an aggregate-root application that emits its own contract (`examples/multi-extension-monorepo/app/`) — uses the same on-disk shape:
 
 ```text
-packages/3-extensions/<extension>/
-├── prisma-next.config.ts            ← extension-as-project config
-├── src/contract-source.ts           ← TS schema (input to `contract emit`)
-├── contract.json                    ← emitted
-├── contract.d.ts                    ← emitted
-├── refs/head.json                   ← hand-pinned (cf. "Open work" below)
-├── migrations/<space-id>/
-│   └── <timestamp>_<name>/          ← emitted by `migration plan`
+<package>/
+├── prisma-next.config.ts            ← contract-space-as-project config
+├── migrations/
+│   ├── refs/head.json               ← hand-pinned (cf. "Open work" below)
+│   └── <timestamp>_<name>/          ← emitted by `migration plan` (one dir per migration)
 │       ├── migration.json
 │       ├── ops.json
 │       ├── end-contract.json        ← bookend snapshot
 │       ├── end-contract.d.ts
 │       └── migration.ts             ← `Migration` subclass
-└── src/exports/control.ts           ← descriptor; JSON-imports the artefacts
+└── src/
+    ├── contract.ts                  ← TS schema source (or `contract.prisma` for PSL)
+    ├── contract.json                ← emitted (do not edit)
+    ├── contract.d.ts                ← emitted (do not edit)
+    └── exports/control.ts           ← descriptor; JSON-imports the artefacts
+                                       (alternatively `src/control.ts` for
+                                        internal/monorepo packages)
 ```
+
+Key rules (these are the spots where mistakes recur, so the convention spells them out explicitly):
+
+- **No `<space-id>` subdirectory inside `migrations/`.** A package owns exactly one contract space, so the space-id directory adds no information. Migration directories sit *directly* under `migrations/`, and `refs/` sits at `migrations/refs/`. Configure this with `migrations.dir: 'migrations'` (not `migrations/<space-id>`).
+- **No `src/contract/` subdirectory.** The contract source, emitted `contract.json`, and emitted `contract.d.ts` sit *directly* in `src/`. Configure the emit output with `typescriptContract(contract, 'src/contract.json')` / `prismaContract('./src/contract.prisma', { output: 'src/contract.json', target })`.
+- **`prisma-next.config.ts` is at the package root.** The CLI treats each contract-space package as a self-contained "project"; the in-package config is the source of truth for that project's emit and migration paths.
+
+The contrast with the consuming app's on-disk layout: when an application composes multiple contract spaces, *its* `migrations/` directory ends up with one subdirectory per space (`migrations/<space-id>/`) because there are multiple spaces. That's an emergent shape from composition, not a per-package authoring convention. Inside a contract-space package, the space-id subdirectory does not belong.
+
+Extension authors use the **same emit pipeline** application authors use: TS or PSL schema → `prisma-next contract emit` → `<package>/src/contract.{json,d.ts}`; `prisma-next migration plan` → `<package>/migrations/<dirName>/{migration.json, ops.json, end-contract.{json,d.ts}, migration.ts}`. The emitted `migration.ts` extends the same `Migration` abstract class app authors extend (from `@prisma-next/<target>/migration`).
 
 The descriptor module is the only TypeScript code that has to be hand-written:
 
 ```ts
 // packages/3-extensions/<extension>/src/exports/control.ts
-import { fileURLToPath } from 'node:url';
-import contractJson from '../../contract.json' with { type: 'json' };
-import headRef from '../../refs/head.json' with { type: 'json' };
-import baselineMetadata from '../../migrations/<space-id>/<dirName>/migration.json' with {
+import contractJson from '../contract.json' with { type: 'json' };
+import headRef from '../../migrations/refs/head.json' with { type: 'json' };
+import baselineMetadata from '../../migrations/<dirName>/migration.json' with {
   type: 'json',
 };
-import baselineOps from '../../migrations/<space-id>/<dirName>/ops.json' with {
+import baselineOps from '../../migrations/<dirName>/ops.json' with {
   type: 'json',
 };
 
 const baseline: MigrationPackage = {
   dirName: '<dirName>',
-  dirPath: fileURLToPath(
-    new URL('../../migrations/<space-id>/<dirName>/', import.meta.url),
-  ),
   metadata: baselineMetadata as unknown as MigrationMetadata,
   ops: baselineOps as unknown as readonly MigrationPlanOperation[],
 };
 ```
 
-Resolving `dirPath` from `import.meta.url` keeps the value correct regardless of where the consuming application installs the package (workspace, `node_modules`, bundled). The synthetic `test-contract-space` extension at `packages/3-extensions/test-contract-space/` is the canonical reference model — cipherstash, pgvector, and any future schema-contributing extension follow the same shape.
-
-The package's `build` script chains `prisma-next contract emit` ahead of `tsdown` so the emitted artefacts stay in sync with the TS schema source. `prisma-next migration plan` is **not** part of the build script — it is non-idempotent (each invocation generates a new timestamped directory) and is run manually when the contract source changes, exactly the way application authors run it.
+The build pipeline emits the contract artefacts under `src/contract.{json,d.ts}` and `tsdown` bundles them into `dist/`. `prisma-next migration plan` is **not** part of the build script — it is non-idempotent (each invocation generates a new timestamped directory) and is run manually when the contract source changes, exactly the way application authors run it.
 
 #### Two authoring paths: planner-emitted (A) vs hand-scaffolded (B)
 
-Most extensions use **Path A**: `prisma-next migration plan` scaffolds the migration directory from the contract diff (cipherstash + the audit / feature-flags monorepo packages all follow this), and the resulting `migration.ts` is hand-edited to carry the extension's stable invariantIds and any non-derivable ops (e.g. cipherstash's `installEqlBundle` op + structural `cipherstash:create-*-v1` no-ops). `pnpm tsx migrations/<space>/<dirName>/migration.ts` then re-emits `ops.json` + `migration.json` deterministically.
+Most extensions use **Path A**: `prisma-next migration plan` scaffolds the migration directory from the contract diff (cipherstash + the audit / feature-flags monorepo packages all follow this), and the resulting `migration.ts` is hand-edited to carry the extension's stable invariantIds and any non-derivable ops (e.g. cipherstash's `installEqlBundle` op + structural `cipherstash:create-*-v1` no-ops). `pnpm tsx migrations/<dirName>/migration.ts` then re-emits `ops.json` + `migration.json` deterministically.
 
 A handful of extensions need **Path B** — hand-scaffolding the migration directory — when the contract declares only `storage.types` (no tables / models). For such contracts the planner returns `PN-CLI-4020 Contract changed but planner produced no operations`, so `migration plan` cannot scaffold the baseline. The author instead:
 
-1. Creates `migrations/<space>/<timestamp>_<name>/` by hand.
-2. Seeds `migration.json` with `from: null`, `to: <storageHash from contract.json>`, and `toContract` set to the emitted `<package>/contract.json` byte-for-byte.
+1. Creates `migrations/<timestamp>_<name>/` by hand.
+2. Seeds `migration.json` with `from: null`, `to: <storageHash from contract.json>`, and `toContract` set to the emitted `<package>/src/contract.json` byte-for-byte.
 3. Hand-authors `migration.ts` as a `Migration` subclass returning the production op list (typically a single `rawSql` op installing the underlying database extension) via the `operations` getter.
-4. Runs `pnpm tsx migrations/<space>/<dirName>/migration.ts` to canonicalize `ops.json` + `migration.json` from the subclass output.
+4. Runs `pnpm tsx migrations/<dirName>/migration.ts` to canonicalize `ops.json` + `migration.json` from the subclass output.
 
 pgvector (whose contract declares only `vector(N)` under `storage.types`) is the exemplar. Future migrations on a Path-B-bootstrapped extension that *do* add tables / models can use `migration plan` (Path A) directly — the path choice is per-migration, not per-extension.
 
@@ -343,7 +348,7 @@ The asymmetry between `migrate` (authoring) and the apply/verify path is what ma
 
 ### Trade-offs
 
-- **Extension authors must ship a contract + migration graph**, not just an init-SQL string. The on-disk-in-package authoring convention reuses the same CLI pipeline app authors use, so the authoring story is symmetrical: write a TS or PSL schema, run `prisma-next contract emit` + `prisma-next migration plan`, and the descriptor module JSON-imports the resulting artefacts. The framework helpers `emitPinnedSpaceArtefacts` / `materialiseExtensionMigrationPackageIfMissing` cover the consuming application's repo half; the synthetic `test-contract-space` extension demonstrates the in-package half end-to-end. cipherstash and pgvector both ship this convention.
+- **Extension authors must ship a contract + migration graph**, not just an init-SQL string. The contract-space package layout convention reuses the same CLI pipeline app authors use, so the authoring story is symmetrical: write a TS or PSL schema, run `prisma-next contract emit` + `prisma-next migration plan`, and the descriptor module JSON-imports the resulting artefacts. The framework helpers `emitPinnedSpaceArtefacts` / `materialiseExtensionMigrationPackageIfMissing` cover the consuming application's repo half; cipherstash, pgvector, and paradedb all ship this convention.
 - **`migrate` becomes the canonical way to materialise extension bumps.** Bumping an extension in `node_modules` without running `migrate` produces stale pinned artefacts; the drift-detection helper surfaces a non-fatal warning at the next `migrate` invocation.
 - **One outer transaction across spaces** is a stronger correctness guarantee than the per-extension `databaseDependencies.init` path provided. The framework inherits the constraint that all SQL across all spaces in a single emit must be transactionally compatible (which is already true of the existing single-space path).
 
@@ -353,7 +358,7 @@ The asymmetry between `migrate` (authoring) and the apply/verify path is what ma
 - **Codec-id-changed lifecycle event.** When a user upgrades an extension in a way that changes a codec ID (`cipherstash:string@1` → `@2`), the codec needs a way to emit a "rotate" migration op. Cleanly extends the existing event vocabulary; deferred until needed.
 - **Cross-space dependencies as a first-class concept.** Convention-based ordering (extensions first, app-space second) is sufficient for v1 given the single-transaction property.
 - **Cross-space codec hooks.** Codec-emitted ops are app-space-bound by API shape — the hook signature has no parameter for cross-space context. See [ADR 213](./ADR%20213%20-%20Codec%20lifecycle%20hooks.md).
-- **`refs/head.json` ergonomics.** Today the extension author hand-pins `refs/head.json` after running `migration plan` (copy `to` from the latest migration's metadata; copy `providedInvariants` from the same). Adding a `prisma-next refs update` (or equivalent) command that emits/refreshes head pins from the latest migration is a small follow-up; until it ships, the `test-contract-space` reference model documents the manual step.
+- **`migrations/refs/head.json` ergonomics.** Today the extension author hand-pins `migrations/refs/head.json` after running `migration plan` (copy `to` from the latest migration's metadata; copy `providedInvariants` from the same). Adding a `prisma-next refs update` (or equivalent) command that emits/refreshes head pins from the latest migration is a small follow-up.
 
 ## Related
 
