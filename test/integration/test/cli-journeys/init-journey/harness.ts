@@ -3,8 +3,7 @@
  *
  * A "seam verifier" — exercises the full user inner loop from `prisma-next
  * init` through to a working query against a real DB, asserting the contract
- * at each seam between subsystems. See `projects/init-journey-tests/spec.md`
- * for the design rationale.
+ * at each seam between subsystems.
  *
  * This harness is deliberately separate from `journey-test-helpers.ts`. The
  * existing helpers invoke CLI commands in-process (faster, suitable for
@@ -166,7 +165,7 @@ export async function createJourneyProject(
   };
 }
 
-/** Minimal `package.json` that satisfies init's precondition (FR2.1 in init's spec). */
+/** Minimal `package.json` that satisfies init's precondition: a project root must already exist before init can attach to it. */
 function writeMinimalPackageJson(dir: string): void {
   const pkg = {
     name: 'prisma-next-journey-fixture',
