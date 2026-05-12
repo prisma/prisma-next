@@ -470,7 +470,7 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
     expect(outroCall).toContain('prisma-next.md');
   });
 
-  it('exits with PRECONDITION when no package.json exists', async () => {
+  it('auto-creates a minimal package.json when no manifest exists (TML-2496)', async () => {
     rmSync(join(tmpDir, 'package.json'));
 
     const exit = await runInitTest(tmpDir, {
@@ -478,17 +478,36 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
       flags: interactiveFlags(),
     });
 
-    expect(exit).toBe(INIT_EXIT_PRECONDITION);
-    expect(clack.select).not.toHaveBeenCalled();
+    expect(exit).toBe(INIT_EXIT_OK);
+    expect(existsSync(join(tmpDir, 'package.json'))).toBe(true);
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      name: string;
+      private: boolean;
+      type: string;
+      scripts: Record<string, string>;
+    };
+    expect(pkg.name).toBeTypeOf('string');
+    expect(pkg.name.length).toBeGreaterThan(0);
+    expect(pkg.private).toBe(true);
+    expect(pkg.type).toBe('module');
+    // The newly-created package.json still flows through the FR3.5 scripts
+    // merge, so the contract:emit script lands in one shot.
+    expect(pkg.scripts['contract:emit']).toBe('prisma-next contract emit');
+    expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(true);
   });
 
-  it('does not write any files when no package.json exists', async () => {
+  it('does not auto-create package.json when a deno manifest exists', async () => {
     rmSync(join(tmpDir, 'package.json'));
+    writeFileSync(join(tmpDir, 'deno.json'), '{}');
+    writeFileSync(join(tmpDir, 'deno.lock'), '{}');
 
-    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    const exit = await runInitTest(tmpDir, {
+      options: { install: false },
+      flags: interactiveFlags(),
+    });
 
-    expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(false);
-    expect(existsSync(join(tmpDir, 'prisma'))).toBe(false);
+    expect(exit).toBe(INIT_EXIT_OK);
+    expect(existsSync(join(tmpDir, 'package.json'))).toBe(false);
   });
 
   it('accepts deno.json as project manifest', async () => {
@@ -2195,7 +2214,7 @@ describe('exitCodeForError', () => {
   });
 
   it('maps user-facing precondition codes to PRECONDITION', () => {
-    for (const code of ['5001', '5002', '5003', '5004', '5005', '5010', '5011', '5012']) {
+    for (const code of ['5002', '5003', '5004', '5005', '5010', '5011', '5012']) {
       expect(exitCodeForError({ code })).toBe(INIT_EXIT_PRECONDITION);
     }
   });

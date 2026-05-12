@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import * as clack from '@clack/prompts';
-import { dirname, isAbsolute, join } from 'pathe';
+import { basename, dirname, isAbsolute, join } from 'pathe';
 import { CliStructuredError } from '../../utils/cli-errors';
 import { formatErrorJson, formatErrorOutput } from '../../utils/formatters/errors';
 import type { GlobalFlags } from '../../utils/global-flags';
@@ -21,7 +21,6 @@ import {
   errorInitInstallFailed,
   errorInitInvalidManifest,
   errorInitInvalidTsconfig,
-  errorInitMissingManifest,
   errorInitProbeFailed,
 } from './errors';
 import {
@@ -113,10 +112,6 @@ export async function runInit(
 
   if (!flags.json && !flags.quiet) {
     clack.intro('prisma-next init', { output: process.stderr });
-  }
-
-  if (!hasProjectManifest(baseDir)) {
-    return emitError(ui, flags, errorInitMissingManifest());
   }
 
   let inputs: ResolvedInitInputs;
@@ -244,10 +239,21 @@ export async function runInit(
   // the FR2.1 `@types/node`-presence check. A malformed manifest is
   // mapped to a structured precondition error (5010) rather than the
   // generic INTERNAL_ERROR fallback so CI/agents can branch on it.
+  //
+  // When neither `package.json` nor a `deno.json[c]` is present, init
+  // synthesises a minimal `package.json` (TML-2496) — running
+  // `npm init -y` first was friction with no upside, since we always
+  // edit the file anyway. A `deno.json[c]` project is left alone:
+  // creating a `package.json` next to it would fork the project's
+  // dependency graph.
   const packageJsonPath = join(baseDir, 'package.json');
+  const packageJsonExisted = existsSync(packageJsonPath);
+  const synthesisePackageJson = !packageJsonExisted && !hasProjectManifest(baseDir);
   let parsedPackageJson: Record<string, unknown> | null = null;
-  if (existsSync(packageJsonPath)) {
-    const pkgRaw = readFileSync(packageJsonPath, 'utf-8');
+  if (packageJsonExisted || synthesisePackageJson) {
+    const pkgRaw = packageJsonExisted
+      ? readFileSync(packageJsonPath, 'utf-8')
+      : defaultPackageJsonContent(basename(baseDir));
     try {
       parsedPackageJson = JSON.parse(pkgRaw) as Record<string, unknown>;
     } catch (err) {
@@ -266,7 +272,9 @@ export async function runInit(
     // out a single re-stringification), then FR3.5 / FR9.3 idempotent
     // scripts merge with collision detection.
     let workingPkg = pkgRaw;
-    let pkgChanged = false;
+    // A synthesised manifest is always a write — the file does not
+    // exist on disk yet.
+    let pkgChanged = synthesisePackageJson;
     if (inputs.removePreviousFacade !== null) {
       const next = removeDependency(workingPkg, inputs.removePreviousFacade);
       if (next !== null) {
@@ -286,6 +294,11 @@ export async function runInit(
       filesToWrite.push({ path: 'package.json', content: workingPkg });
     }
     warnings.push(...scriptWarnings);
+    if (synthesisePackageJson) {
+      warnings.push(
+        'No package.json found in the target directory; created a minimal one. Edit `name` / `version` to taste.',
+      );
+    }
   }
 
   // -----------------------------------------------------------------
@@ -481,7 +494,6 @@ function emitError(ui: TerminalUI, flags: GlobalFlags, error: CliStructuredError
  */
 export function exitCodeForError(error: { readonly code: string }): number {
   switch (error.code) {
-    case '5001': // missing manifest — precondition
     case '5002': // re-init needs --force — precondition
     case '5003': // missing flags — precondition
     case '5004': // invalid flag value — precondition
@@ -822,4 +834,45 @@ async function runEmit(ctx: {
 function causeMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+/**
+ * Minimal `package.json` content used when init runs in a directory
+ * that has no project manifest (TML-2496). Mirrors the npm 11 `init -y`
+ * defaults, with two deliberate deviations:
+ *
+ * - `"private": true` so a stray `npm publish` cannot leak the
+ *   placeholder. Users who want to publish have to opt in by removing
+ *   the field.
+ * - `"type": "module"` so the scaffolded ESM imports in
+ *   `prisma-next.config.ts` and `db.ts` typecheck and run without
+ *   additional tsconfig coercion.
+ *
+ * Exported for unit tests so the canonical shape is asserted in one
+ * place rather than re-derived at every call site.
+ */
+export function defaultPackageJsonContent(rawName: string): string {
+  return `${JSON.stringify(
+    {
+      name: sanitisePackageName(rawName),
+      version: '0.0.0',
+      private: true,
+      type: 'module',
+    },
+    null,
+    2,
+  )}\n`;
+}
+
+/**
+ * npm package names are restricted to lowercase, no leading dot/underscore,
+ * and a small URL-safe character set. `basename(cwd)` happily returns
+ * "My Project" or ".hidden" — both rejected by `npm install` validation.
+ * Coerce to a safe fallback rather than emit a manifest npm refuses to
+ * read.
+ */
+function sanitisePackageName(raw: string): string {
+  const lowered = raw.toLowerCase().replace(/[^a-z0-9._~-]/g, '-');
+  const trimmed = lowered.replace(/^[._-]+/, '').replace(/-+/g, '-');
+  return trimmed.length > 0 ? trimmed : 'my-app';
 }

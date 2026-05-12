@@ -27,9 +27,9 @@ export const INIT_EXIT_INTERNAL_ERROR = 1;
 /**
  * Preconditions not met. The caller asked for something we cannot do
  * without more input or a different environment. Examples:
- *   - missing `package.json` / `deno.json`
  *   - non-interactive mode without enough flags to proceed
  *   - re-init without `--force` in non-interactive mode
+ *   - malformed `package.json` / `tsconfig.json`
  */
 export const INIT_EXIT_PRECONDITION = 2;
 
