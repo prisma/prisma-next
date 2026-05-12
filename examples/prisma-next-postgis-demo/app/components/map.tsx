@@ -99,7 +99,7 @@ export function PostgisMap(props: Props) {
     const next = new URLSearchParams(searchParams.toString());
     next.set('lng', lng.toFixed(5));
     next.set('lat', lat.toFixed(5));
-    router.push(`/?${next.toString()}`);
+    router.push(`?${next.toString()}`);
   };
 
   const showQueryPoint = queryPointActive(activeQuery);
