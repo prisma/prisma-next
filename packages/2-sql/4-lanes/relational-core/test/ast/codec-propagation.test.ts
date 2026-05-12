@@ -82,21 +82,21 @@ describe('ParamRef codec — AST rewriter propagation', () => {
   });
 
   it('ParamRef deep-clones codec.typeParams so caller mutations after construction do not leak in', () => {
-    const mutableTypeParams: Record<string, unknown> = { length: 1536 };
+    const mutableTypeParams: { length: number } = { length: 1536 };
     const ref = ParamRef.of([0], {
       codec: { codecId: 'pg/vector@1', typeParams: mutableTypeParams },
     });
-    mutableTypeParams['length'] = 99;
+    mutableTypeParams.length = 99;
     expect((ref.codec?.typeParams as { length: number }).length).toBe(1536);
   });
 
   it('ProjectionItem deep-clones codec.typeParams so caller mutations after construction do not leak in', () => {
-    const mutableTypeParams: Record<string, unknown> = { length: 1536 };
+    const mutableTypeParams: { length: number } = { length: 1536 };
     const item = ProjectionItem.of('embedding', ColumnRef.of('doc', 'embedding'), {
       codecId: 'pg/vector@1',
       typeParams: mutableTypeParams,
     });
-    mutableTypeParams['length'] = 99;
+    mutableTypeParams.length = 99;
     expect((item.codec?.typeParams as { length: number }).length).toBe(1536);
   });
 
