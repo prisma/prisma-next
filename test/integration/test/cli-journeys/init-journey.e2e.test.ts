@@ -228,31 +228,49 @@ async function runFullJourney(cell: CellId): Promise<JourneyContext> {
     };
   }
 
-  const database = await spinUpDatabaseForCell(cell);
-  attachDatabase(project, database.connectionString);
+  // After this point we own a database handle and a temp project
+  // directory. If any awaited setup step throws before we return the
+  // populated context, `beforeAll` rejects with `ctx` still undefined,
+  // which means `afterAll` cannot release them. Tear them down here
+  // before rethrowing to keep matrix runs hermetic in CI.
+  let database: DatabaseHandle | null = null;
+  try {
+    database = await spinUpDatabaseForCell(cell);
+    attachDatabase(project, database.connectionString);
 
-  const emit = await emitContract(project);
+    const emit = await emitContract(project);
 
-  // Drive the schema in via the migration path rather than `db init`,
-  // so the journey exercises the same flow the user follows in
-  // production: plan a migration, emit its ops, apply it. The mongo
-  // planner's missing-`createCollection` seam (TML-2486) surfaces in
-  // either path — the migration route additionally proves the
-  // planner-to-runner serialisation works for a real on-disk
-  // `ops.json`.
-  const planResult = await migrationPlan(project, 'init');
-  const emitResult = planResult.exitCode === 0 ? await selfEmitLatestMigration(project) : null;
-  const applyResult =
-    emitResult !== null && emitResult.exitCode === 0 ? await migrationApply(project) : null;
+    // Drive the schema in via the migration path rather than `db init`,
+    // so the journey exercises the same flow the user follows in
+    // production: plan a migration, emit its ops, apply it. The mongo
+    // planner's missing-`createCollection` seam (TML-2486) surfaces in
+    // either path — the migration route additionally proves the
+    // planner-to-runner serialisation works for a real on-disk
+    // `ops.json`.
+    const planResult = await migrationPlan(project, 'init');
+    const emitResult = planResult.exitCode === 0 ? await selfEmitLatestMigration(project) : null;
+    const applyResult =
+      emitResult !== null && emitResult.exitCode === 0 ? await migrationApply(project) : null;
 
-  return {
-    project,
-    database,
-    emit,
-    migrationPlan: planResult,
-    migrationEmit: emitResult,
-    migrationApply: applyResult,
-  };
+    return {
+      project,
+      database,
+      emit,
+      migrationPlan: planResult,
+      migrationEmit: emitResult,
+      migrationApply: applyResult,
+    };
+  } catch (error) {
+    if (database !== null) {
+      try {
+        await database.close();
+      } catch {}
+    }
+    try {
+      project.cleanup();
+    } catch {}
+    throw error;
+  }
 }
 
 // --- Seam expectations -----------------------------------------------------
