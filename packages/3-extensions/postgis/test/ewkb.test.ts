@@ -223,5 +223,114 @@ describe('postgis EWKB / EWKT', () => {
       const hex = '01' + '01000000' + '0000000000000000' + '0000000000000000' + '00';
       expect(() => decodeEWKBHex(hex)).toThrow('trailing data after geometry');
     });
+
+    it('decodes a MultiLineString without SRID', () => {
+      // MultiLineString LE with 1 line of 2 points: (0,0) → (1,1)
+      const hex =
+        '01' +
+        '05000000' + // type MultiLineString
+        '01000000' + // numLines = 1
+        '01' +
+        '02000000' + // sub LineString LE
+        '02000000' + // 2 points
+        '0000000000000000' +
+        '0000000000000000' +
+        '000000000000F03F' +
+        '000000000000F03F';
+      expect(decodeEWKBHex(hex)).toEqual({
+        type: 'MultiLineString',
+        coordinates: [
+          [
+            [0, 0],
+            [1, 1],
+          ],
+        ],
+      });
+    });
+
+    it('decodes a MultiPolygon with SRID', () => {
+      // MultiPolygon LE | SRID, 1 polygon with 1 ring of 4 points.
+      const hex =
+        '01' +
+        '06000020' + // type MultiPolygon | SRID
+        'E6100000' + // srid 4326
+        '01000000' + // numPolygons = 1
+        '01' +
+        '03000000' + // sub Polygon LE
+        '01000000' + // numRings = 1
+        '04000000' + // numPoints = 4
+        '0000000000000000' +
+        '0000000000000000' +
+        '000000000000F03F' +
+        '0000000000000000' +
+        '000000000000F03F' +
+        '000000000000F03F' +
+        '0000000000000000' +
+        '0000000000000000';
+      expect(decodeEWKBHex(hex)).toEqual({
+        type: 'MultiPolygon',
+        coordinates: [
+          [
+            [
+              [0, 0],
+              [1, 0],
+              [1, 1],
+              [0, 0],
+            ],
+          ],
+        ],
+        srid: 4326,
+      });
+    });
+
+    it('throws when a MultiPoint contains a non-Point sub-geometry', () => {
+      // MultiPoint LE, n=1, sub = LineString (mismatched type).
+      const hex =
+        '01' +
+        '04000000' + // type MultiPoint
+        '01000000' + // 1 sub-geometry
+        '01' +
+        '02000000' + // sub LineString
+        '00000000'; // numPoints = 0 (parser throws on type mismatch first)
+      expect(() => decodeEWKBHex(hex)).toThrow('MultiPoint contains non-Point');
+    });
+
+    it('throws when a MultiLineString contains a non-LineString sub-geometry', () => {
+      // MultiLineString LE, n=1, sub = Point.
+      const hex =
+        '01' +
+        '05000000' + // type MultiLineString
+        '01000000' + // 1 sub-geometry
+        '01' +
+        '01000000' + // sub Point
+        '0000000000000000' +
+        '0000000000000000';
+      expect(() => decodeEWKBHex(hex)).toThrow('MultiLineString contains non-LineString');
+    });
+
+    it('throws when a MultiPolygon contains a non-Polygon sub-geometry', () => {
+      // MultiPolygon LE, n=1, sub = Point.
+      const hex =
+        '01' +
+        '06000000' + // type MultiPolygon
+        '01000000' + // 1 sub-geometry
+        '01' +
+        '01000000' + // sub Point
+        '0000000000000000' +
+        '0000000000000000';
+      expect(() => decodeEWKBHex(hex)).toThrow('MultiPolygon contains non-Polygon');
+    });
+
+    it('throws when a Multi* sub-geometry has an unsupported type', () => {
+      // MultiPoint LE, n=1, sub = GeometryCollection (type 7) — not a leaf
+      // sub-type the parser handles.
+      const hex =
+        '01' +
+        '04000000' + // type MultiPoint
+        '01000000' + // 1 sub-geometry
+        '01' +
+        '07000000'; // sub GeometryCollection (unsupported)
+      expect(() => decodeEWKBHex(hex)).toThrow('unsupported sub-type');
+    });
   });
 });

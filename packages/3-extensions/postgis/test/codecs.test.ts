@@ -155,6 +155,30 @@ describe('postgis codecs', () => {
     });
   });
 
+  describe('encodeJson / decodeJson', () => {
+    it('round-trips a Geometry through JSON form', () => {
+      const c = asAsyncCodec();
+      const value: Geometry = { type: 'Point', coordinates: [1, 2], srid: 4326 };
+      const encoded = c.encodeJson(value);
+      expect(encoded).toEqual(value);
+      expect(c.decodeJson(encoded)).toEqual(value);
+    });
+
+    it('encodeJson rejects non-Geometry input', () => {
+      const c = asAsyncCodec();
+      expect(() => c.encodeJson(null as unknown as Geometry)).toThrow(
+        'Geometry value must be a GeoJSON-shaped object',
+      );
+    });
+
+    it('decodeJson rejects unsupported geometry type', () => {
+      const c = asAsyncCodec();
+      expect(() =>
+        c.decodeJson({ type: 'Sphere', coordinates: [0, 0] } as unknown as JsonValue),
+      ).toThrow(/unsupported type/);
+    });
+  });
+
   describe('pgGeometryColumn helper', () => {
     it('produces a ColumnSpec with the codec id, geometry nativeType, and srid typeParams', () => {
       const spec = pgGeometryColumn({ srid: 4326 });
