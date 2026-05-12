@@ -36,7 +36,7 @@ function columnProjection(
   column: string,
   codecId: string,
 ): ProjectionItem {
-  return ProjectionItem.of(alias, ColumnRef.of(table, column), codecId);
+  return ProjectionItem.of(alias, ColumnRef.of(table, column), { codecId });
 }
 
 function deferred<T>(): {
@@ -158,7 +158,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
     const p = buildPlan([
       // Aggregate (count) projections are not single-column refs, so the runtime cannot project a `{ table, name }` for them.
-      ProjectionItem.of('agg', AggregateExpr.count(), 'test/observe-undef@1'),
+      ProjectionItem.of('agg', AggregateExpr.count(), { codecId: 'test/observe-undef@1' }),
     ]);
 
     // Seed the row ctx with a stale `column` to confirm unresolved cells explicitly clear inherited `column` rather than passing `rowCtx` through unchanged.
@@ -188,7 +188,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     ];
 
     const p = buildPlan([
-      ProjectionItem.of('computed', LiteralExpr.of(1), 'test/observe-no-ref@1'),
+      ProjectionItem.of('computed', LiteralExpr.of(1), { codecId: 'test/observe-no-ref@1' }),
     ]);
 
     const rowCtx: SqlCodecCallContext = {

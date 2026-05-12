@@ -413,7 +413,10 @@ describe('SQLite adapter', () => {
         .withWhere(
           BinaryExpr.eq(
             ColumnRef.of('user', 'metadata'),
-            ParamRef.of({ active: true }, { name: 'metadata', codecId: 'sqlite/json@1' }),
+            ParamRef.of(
+              { active: true },
+              { name: 'metadata', codec: { codecId: 'sqlite/json@1' } },
+            ),
           ),
         );
 

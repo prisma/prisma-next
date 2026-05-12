@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalizeJson } from '../src/canonicalize-json';
+import { canonicalizeJson } from '../src/exports/utils';
 
 describe('canonicalizeJson', () => {
   it('sorts object keys lexicographically', () => {
@@ -46,5 +46,20 @@ describe('canonicalizeJson', () => {
   it('is deterministic across invocations', () => {
     const input = { z: [{ b: 1, a: 2 }], m: { y: 3, x: 4 } };
     expect(canonicalizeJson(input)).toBe(canonicalizeJson(input));
+  });
+
+  it('preserves a __proto__ input key without mutating Object.prototype', () => {
+    const protoBefore = Object.getPrototypeOf({});
+    const polluted = Object.prototype as unknown as { polluted?: unknown };
+    const sentinel = { polluted: 'yes' };
+    const input = JSON.parse('{"__proto__": {"polluted": "yes"}, "a": 1}') as Record<
+      string,
+      unknown
+    >;
+    input['__proto__'] = sentinel;
+    const result = canonicalizeJson(input);
+    expect(result).toBe('{"__proto__":{"polluted":"yes"},"a":1}');
+    expect(Object.getPrototypeOf({})).toBe(protoBefore);
+    expect(polluted.polluted).toBeUndefined();
   });
 });

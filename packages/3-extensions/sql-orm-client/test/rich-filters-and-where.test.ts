@@ -43,8 +43,7 @@ describe('SQL ORM rich AST filters', () => {
       op: 'eq',
       left: ColumnRef.of('users', 'name'),
       right: ParamRef.of('Alice', {
-        codecId: 'pg/text@1',
-        refs: { table: 'users', column: 'name' },
+        codec: { codecId: 'pg/text@1' },
       }),
     });
 
@@ -61,7 +60,7 @@ describe('SQL ORM rich AST filters', () => {
         toWhereExpr: () =>
           BinaryExpr.eq(
             ColumnRef.of('users', 'id'),
-            ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+            ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
           ),
       },
       { contract },
@@ -74,7 +73,7 @@ describe('SQL ORM rich AST filters', () => {
       BinaryExpr.eq(ColumnRef.of('users', 'name'), LiteralExpr.of('Alice')),
       BinaryExpr.eq(
         ColumnRef.of('users', 'id'),
-        ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
       ),
     ]);
     expect(combined?.kind).toBe('and');

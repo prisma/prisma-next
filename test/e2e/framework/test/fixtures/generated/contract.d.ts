@@ -961,6 +961,13 @@ type ContractBase = ContractType<
             },
           ];
         };
+        readonly operationTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorOperationTypes';
+            readonly named: 'OperationTypes';
+            readonly package: '@prisma-next/extension-pgvector/operation-types';
+          };
+        };
         readonly queryOperationTypes: {
           readonly import: {
             readonly alias: 'PgVectorQueryOperationTypes';

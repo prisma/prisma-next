@@ -1,8 +1,8 @@
 import { ColumnRef, SelectAst, TableSource } from '@prisma-next/sql-relational-core/ast';
 import type { ScopeField } from '../../src/scope';
 
-const int4: ScopeField = { codecId: 'pg/int4@1', nullable: false };
-const text: ScopeField = { codecId: 'pg/text@1', nullable: false };
+const int4: ScopeField = { codecId: 'pg/int4@1', nullable: false, codec: { codecId: 'pg/int4@1' } };
+const text: ScopeField = { codecId: 'pg/text@1', nullable: false, codec: { codecId: 'pg/text@1' } };
 
 export const usersScope = {
   topLevel: { id: int4, name: text, email: text },

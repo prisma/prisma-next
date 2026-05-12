@@ -74,14 +74,14 @@ describe('ast/update', () => {
     const updateAst = UpdateAst.table(table('user'))
       .withSet({ email: param(0, 'email') })
       .withWhere(BinaryExpr.eq(col('user', 'id'), param(1, 'userId')))
-      .withReturning([ProjectionItem.of('email', col('user', 'email'), 'pg/text@1')]);
+      .withReturning([ProjectionItem.of('email', col('user', 'email'), { codecId: 'pg/text@1' })]);
 
     const rewritten = updateAst.rewrite({
       columnRef: (ref) => ColumnRef.of(ref.table, `${ref.column}_v2`),
     });
 
     expect(rewritten.returning).toEqual([
-      ProjectionItem.of('email', ColumnRef.of('user', 'email_v2'), 'pg/text@1'),
+      ProjectionItem.of('email', ColumnRef.of('user', 'email_v2'), { codecId: 'pg/text@1' }),
     ]);
   });
 });

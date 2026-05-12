@@ -74,7 +74,7 @@ describe('lints middleware', () => {
     async () => {
       const plan = createPlan({
         ast: UpdateAst.table(userTable).withSet({
-          email: ParamRef.of('new@example.com', { name: 'email', codecId: 'pg/text@1' }),
+          email: ParamRef.of('new@example.com', { name: 'email', codec: { codecId: 'pg/text@1' } }),
         }),
       });
       const mw = lints();
@@ -140,15 +140,20 @@ describe('lints middleware', () => {
       const selectPlan = createPlan({
         ast: SelectAst.from(userTable)
           .withProjection([ProjectionItem.of('id', idCol)])
-          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(42, { codecId: 'pg/int4@1' })))
+          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(42, { codec: { codecId: 'pg/int4@1' } })))
           .withLimit(10),
       });
       const updatePlan = createPlan({
         ast: UpdateAst.table(userTable)
           .withSet({
-            email: ParamRef.of('new@example.com', { name: 'email', codecId: 'pg/text@1' }),
+            email: ParamRef.of('new@example.com', {
+              name: 'email',
+              codec: { codecId: 'pg/text@1' },
+            }),
           })
-          .withWhere(BinaryExpr.eq(idCol, ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }))),
+          .withWhere(
+            BinaryExpr.eq(idCol, ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } })),
+          ),
       });
       const mw = lints();
       const ctx = createMiddlewareContext();
@@ -174,7 +179,7 @@ describe('lints middleware', () => {
           plan: () =>
             createPlan({
               ast: UpdateAst.table(userTable).withSet({
-                email: ParamRef.of('x', { name: 'email', codecId: 'pg/text@1' }),
+                email: ParamRef.of('x', { name: 'email', codec: { codecId: 'pg/text@1' } }),
               }),
             }),
           severities: { updateWithoutWhere: 'warn' as const },

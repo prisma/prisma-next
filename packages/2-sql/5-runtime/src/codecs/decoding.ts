@@ -12,7 +12,6 @@ import type {
   SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
-import { makeAliasResolver } from './alias-resolver';
 
 type ColumnRef = { table: string; column: string };
 
@@ -42,36 +41,12 @@ function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> 
   return ast.returning;
 }
 
-/**
- * Resolve the per-cell codec for a projection item.
- *
- * When a `(table, column)` ref is available — either implicit on a `column-ref` expression or carried explicitly via `item.refs` for column-bound non-`column-ref` projections — prefer `contractCodecs.forColumn(table, column)`: that returns the per-instance codec materialized from the descriptor's factory for that column, encoding any per-instance state (typeParams like vector length, schema validators, etc.).
- *
- * The wrong-instance risk for parameterized codecs is closed off structurally:
- *
- * 1. `buildContractCodecRegistry` pre-populates `byCodecId` with one canonical instance per non-parameterized descriptor; parameterized descriptors are intentionally absent. 2. `forCodecId` rejects ambiguous parameterized fallbacks (`ambiguousCodecIds`). 3. The non-ambiguous parameterized case stores the column-correct per-instance codec under `byCodecId`, so the fall-through still resolves to the right instance.
- *
- * The `forCodecId` fallback otherwise covers projections that are *not* column-bound (computed projections, raw SQL aliases) but still carry a `codecId` (ADR 205 stamps every `ProjectionItem` with the producer's codec id).
- *
- * Codec-registry-unification spec § AC-4 / AC-5.
- */
 function resolveProjectionCodec(
   item: ProjectionItem,
   contractCodecs: ContractCodecRegistry | undefined,
-  aliasResolver: (alias: string) => string,
 ): Codec | undefined {
-  if (contractCodecs) {
-    if (item.expr.kind === 'column-ref') {
-      const byColumn = contractCodecs.forColumn(aliasResolver(item.expr.table), item.expr.column);
-      // Only honour `byColumn` when its codec id agrees with `item.codecId`. They can legitimately disagree when an `OperationExpr`-shaped projection carries a single inner column-ref but transforms the value's codec (e.g. `cosineDistance(col, x)` projects `pg/float8@1` while the inner column-ref points at a `pg/vector@1` column).
-      if (byColumn && (item.codecId === undefined || byColumn.id === item.codecId)) return byColumn;
-    } else if (item.refs) {
-      const byColumn = contractCodecs.forColumn(aliasResolver(item.refs.table), item.refs.column);
-      if (byColumn && (item.codecId === undefined || byColumn.id === item.codecId)) return byColumn;
-    }
-  }
-  if (item.codecId) {
-    return contractCodecs?.forCodecId(item.codecId);
+  if (item.codec && contractCodecs) {
+    return contractCodecs.forCodecRef(item.codec);
   }
   return undefined;
 }
@@ -103,25 +78,19 @@ function buildDecodeContext(
   const codecs = new Map<string, Codec>();
   const columnRefs = new Map<string, ColumnRef>();
   const includeAliases = new Set<string>();
-  const aliasResolver = makeAliasResolver(plan.ast);
 
   for (const item of projection) {
     aliases.push(item.alias);
 
-    const codec = resolveProjectionCodec(item, contractCodecs, aliasResolver);
+    const codec = resolveProjectionCodec(item, contractCodecs);
     if (codec) {
       codecs.set(item.alias, codec);
     }
 
     if (item.expr.kind === 'column-ref') {
       columnRefs.set(item.alias, {
-        table: aliasResolver(item.expr.table),
+        table: item.expr.table,
         column: item.expr.column,
-      });
-    } else if (item.refs) {
-      columnRefs.set(item.alias, {
-        table: aliasResolver(item.refs.table),
-        column: item.refs.column,
       });
     } else if (item.expr.kind === 'subquery' || item.expr.kind === 'json-array-agg') {
       includeAliases.add(item.alias);
@@ -225,8 +194,6 @@ async function decodeField(
 
   const ref = decodeCtx.columnRefs.get(alias);
 
-  // Per-cell ctx: the cell-level `column` is a `SqlColumnRef = { table, name }` projection of the resolved `ColumnRef = { table, column }` (same resolution `wrapDecodeFailure` uses below — no double work). Cells the runtime cannot resolve (aggregate aliases, computed projections without a simple ref) drop the `column` field entirely — explicitly cleared so a previously-populated `rowCtx.column` cannot leak through to
-  // unrelated cells. Destructuring (rather than `column: undefined`) is required because `SqlCodecCallContext.column` is declared `column?: SqlColumnRef` under `exactOptionalPropertyTypes`.
   let cellCtx: SqlCodecCallContext;
   if (ref) {
     cellCtx = { ...rowCtx, column: { table: ref.table, name: ref.column } };
@@ -238,7 +205,6 @@ async function decodeField(
   try {
     return await codec.decode(wireValue, cellCtx);
   } catch (error) {
-    // Codec-authored runtime envelopes (e.g. `RUNTIME.DECODE_FAILED` thrown from inside the codec body, or `RUNTIME.ABORTED` raised via `CodecCallContext.signal` per ADR 207) carry their own per-codec context — wrapping them again would erase that context and coerce the abort intent into a generic decode failure. Pass them through unchanged; only foreign errors get the `wrapDecodeFailure` envelope.
     if (isRuntimeError(error)) {
       throw error;
     }
@@ -298,7 +264,6 @@ export async function decodeRow(
 
   const settled = await raceAgainstAbort(Promise.all(tasks), signal, 'decode');
 
-  // Include aggregates are decoded synchronously after concurrent codec dispatch settles, so any decode failures upstream propagate first.
   for (const entry of includeIndices) {
     settled[entry.index] = decodeIncludeAggregate(entry.alias, entry.value);
   }

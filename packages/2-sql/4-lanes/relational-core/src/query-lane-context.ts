@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
+import type { CodecDescriptor, CodecRef } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { ContractCodecRegistry } from './ast/codec-types';
@@ -12,6 +12,18 @@ export interface CodecDescriptorRegistry {
    * Descriptors carry distinct param shapes per codec id; the registry is heterogeneous and the consumer narrows per codec.
    */
   descriptorFor(codecId: string): CodecDescriptor<unknown> | undefined;
+  /**
+   * Derive the canonical {@link CodecRef} for a contract `(table, column)`. The builder side calls this at AST construction time to stamp `codec` onto every column-bound `ParamRef` / `ProjectionItem`; the runtime side uses the result as the cache key into the content-keyed codec resolver.
+   *
+   * Resolution rules over `storage.tables[table].columns[column]`:
+   *
+   * - `typeRef` column → emit `{codecId, typeParams}` from `storage.types[typeRef]` (multiple columns sharing the typeRef produce the same ref → same memoised codec).
+   * - inline `typeParams` column → emit `{codecId, typeParams}` from the column itself.
+   * - non-parameterized column → emit `{codecId}` with `typeParams` undefined (keys as `${codecId}:undefined` → one shared codec).
+   *
+   * Returns `undefined` when the registry was built without contract storage (package-scoped registries used purely as descriptor lookups), when the table or column is unknown, or when the column declares a `typeRef` that the storage doesn't define.
+   */
+  codecRefForColumn(table: string, column: string): CodecRef | undefined;
   /**
    * All registered descriptors. Used by `validateCodecRegistryCompleteness` and other startup-time consumers that enumerate descriptors.
    */
@@ -53,8 +65,7 @@ export type MutationDefaultsOptions = {
 export interface ExecutionContext<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly contract: TContract;
   /**
-   * Contract-bound codec registry built once at context-construction time by walking the contract's columns and resolving each through its descriptor's factory. The dispatch path (`encodeParam` / `decodeRow`) consults `forColumn(table, column)` for column-bound call sites; `forCodecId(codecId)` is the refs-less fallback, permitted only for non-parameterized codec ids (the builder-pipeline validator pass enforces refs on
-   * every parameterized `ParamRef`). Pre-populated with one canonical instance per non-parameterized descriptor so `forCodecId` covers refs-less codec ids that no contract column declares.
+   * Contract-bound codec registry built once at context-construction time by walking the contract's columns and resolving each through its descriptor's factory. Runtime dispatch (`encodeParam` / `decodeRow`) resolves codecs via `forCodecRef(ref)` — the single dispatch shape for AST-bound codec resolution.
    */
   readonly contractCodecs: ContractCodecRegistry;
   /**

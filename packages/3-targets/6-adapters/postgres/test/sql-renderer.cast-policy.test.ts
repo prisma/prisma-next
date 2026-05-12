@@ -80,7 +80,7 @@ function selectWithParam(column: string, codecId: string | undefined, value: unk
   const ref =
     codecId === undefined
       ? ParamRef.of(value, { name: column })
-      : ParamRef.of(value, { name: column, codecId });
+      : ParamRef.of(value, { name: column, codec: { codecId } });
   return SelectAst.from(TableSource.named('user'))
     .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
     .withWhere(BinaryExpr.eq(ColumnRef.of('user', column), ref));
@@ -186,7 +186,7 @@ describe('renderLoweredSql cast policy', () => {
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'id'),
-          ParamRef.of(1, { name: 'unknown', codecId: 'app/never-used@1' }),
+          ParamRef.of(1, { name: 'unknown', codec: { codecId: 'app/never-used@1' } }),
         ),
       );
 
@@ -195,13 +195,15 @@ describe('renderLoweredSql cast policy', () => {
     );
   });
 
-  it('emits plain $N when the param ref carries no codecId', () => {
+  it('throws RUNTIME.PARAM_REF_MISSING_CODEC when the param ref carries no codec', () => {
+    // AST-bound codec contract: every ParamRef reaching the renderer must carry a CodecRef. A missing codec is a builder bug rather than a fallback opportunity, so surface it loudly.
     const lookup = emptyLookup;
 
     const ast = selectWithParam('id', undefined, 1);
-    const lowered = renderLoweredSql(ast, baseContract, lookup);
 
-    expect(lowered.sql).toBe('SELECT "user"."id" AS "id" FROM "user" WHERE "user"."id" = $1');
+    expect(() => renderLoweredSql(ast, baseContract, lookup)).toThrow(
+      /PARAM_REF_MISSING_CODEC|reached lowering without/,
+    );
   });
 });
 

@@ -25,9 +25,9 @@ interface ParamSpec {
 }
 
 function paramRefFromSpec(spec: ParamSpec): ParamRef {
-  const options: { name?: string; codecId?: string } = {};
+  const options: { name?: string; codec?: { codecId: string } } = {};
   if (spec.name !== undefined) options.name = spec.name;
-  if (spec.codecId !== undefined) options.codecId = spec.codecId;
+  if (spec.codecId !== undefined) options.codec = { codecId: spec.codecId };
   return ParamRef.of(spec.value, options);
 }
 
@@ -267,7 +267,7 @@ describe('encodeParam — ctx forwarded to codec.encode', () => {
     const controller = new AbortController();
     await encodeParam(
       'x',
-      { codecId: 'test/single-cell@1' },
+      { codec: { codecId: 'test/single-cell@1' } },
       0,
       { signal: controller.signal },
       buildTestContractCodecs(registry),
@@ -290,12 +290,18 @@ describe('encodeParam — ctx forwarded to codec.encode', () => {
 
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
     await expect(
-      encodeParam(null, { codecId: 'test/never@1' }, 0, ctx, buildTestContractCodecs(registry)),
+      encodeParam(
+        null,
+        { codec: { codecId: 'test/never@1' } },
+        0,
+        ctx,
+        buildTestContractCodecs(registry),
+      ),
     ).resolves.toBeNull();
     await expect(
       encodeParam(
         undefined,
-        { codecId: 'test/never@1' },
+        { codec: { codecId: 'test/never@1' } },
         0,
         ctx,
         buildTestContractCodecs(registry),

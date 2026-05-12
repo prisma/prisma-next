@@ -1,19 +1,9 @@
 /**
- * Column type descriptors for pgvector extension.
- *
- * These descriptors provide both codecId and nativeType for use in contract authoring. They are derived from the same source of truth as codec definitions and manifests.
+ * Column type descriptor factory for pgvector extension. `vector(N)` is the canonical authoring surface; every pgvector column must declare a dimension via this factory. The dimension threads into the runtime codec through `paramsSchema.length` and into the DDL via the family-layer `expandNativeType` hook (e.g. `vector(1536)`).
  */
 
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from '../core/constants';
-
-/**
- * Static vector column descriptor without dimension. Use `vector(N)` for dimensioned vectors that produce `vector(N)` DDL.
- */
-export const vectorColumn = {
-  codecId: VECTOR_CODEC_ID,
-  nativeType: 'vector',
-} as const satisfies ColumnTypeDescriptor;
 
 /**
  * Factory for creating dimensioned vector column descriptors.

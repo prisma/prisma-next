@@ -81,7 +81,7 @@ describe('query plan aggregate', () => {
         { totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' } },
         BinaryExpr.gte(
           AggregateExpr.sum(ColumnRef.of('posts', 'views')),
-          ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' }),
+          ParamRef.of(1, { name: 'views', codec: { codecId: 'pg/int4@1' } }),
         ),
       ),
     ).toThrow('ParamRef is not supported in grouped having expressions');
@@ -95,7 +95,7 @@ describe('query plan aggregate', () => {
         { totalViews: { kind: 'aggregate', fn: 'sum', column: 'views' } },
         BinaryExpr.in(
           AggregateExpr.sum(ColumnRef.of('posts', 'views')),
-          ListExpression.of([ParamRef.of(1, { name: 'views', codecId: 'pg/int4@1' })]),
+          ListExpression.of([ParamRef.of(1, { name: 'views', codec: { codecId: 'pg/int4@1' } })]),
         ),
       ),
     ).toThrow('ParamRef is not supported in grouped having expressions');
@@ -191,10 +191,10 @@ describe('query plan aggregate', () => {
     expect(plan.params).toEqual([100]);
     const params = [...new Set(plan.ast.collectParamRefs())];
     expect(params).toHaveLength(1);
-    expect(params[0]?.codecId).toBe('pg/int4@1');
+    expect(params[0]?.codec?.codecId).toBe('pg/int4@1');
   });
 
-  it('stamps min/max ProjectionItem.codecId from the underlying column', () => {
+  it('stamps min/max ProjectionItem.codec from the underlying column', () => {
     const plan = compileAggregate(baseContract, 'posts', [], {
       minViews: { kind: 'aggregate', fn: 'min', column: 'views' },
       maxViews: { kind: 'aggregate', fn: 'max', column: 'views' },
@@ -202,11 +202,11 @@ describe('query plan aggregate', () => {
 
     expect(plan.ast.kind).toBe('select');
     const ast = plan.ast as SelectAst;
-    const byAlias = Object.fromEntries(ast.projection.map((p) => [p.alias, p.codecId]));
+    const byAlias = Object.fromEntries(ast.projection.map((p) => [p.alias, p.codec?.codecId]));
     expect(byAlias).toEqual({ minViews: 'pg/int4@1', maxViews: 'pg/int4@1' });
   });
 
-  it('leaves count/sum/avg ProjectionItem.codecId undefined (deferred until target+widening-aware mapping)', () => {
+  it('leaves count/sum/avg ProjectionItem.codec undefined (deferred until target+widening-aware mapping)', () => {
     const plan = compileAggregate(baseContract, 'posts', [], {
       total: { kind: 'aggregate', fn: 'count' },
       sumViews: { kind: 'aggregate', fn: 'sum', column: 'views' },
@@ -214,7 +214,7 @@ describe('query plan aggregate', () => {
     });
 
     const ast = plan.ast as SelectAst;
-    const byAlias = Object.fromEntries(ast.projection.map((p) => [p.alias, p.codecId]));
+    const byAlias = Object.fromEntries(ast.projection.map((p) => [p.alias, p.codec?.codecId]));
     expect(byAlias).toEqual({ total: undefined, sumViews: undefined, avgViews: undefined });
   });
 
@@ -230,7 +230,7 @@ describe('query plan aggregate', () => {
 
     const ast = plan.ast as SelectAst;
     const peak = ast.projection.find((p) => p.alias === 'peakViews');
-    expect(peak?.codecId).toBe('pg/int4@1');
+    expect(peak?.codec?.codecId).toBe('pg/int4@1');
   });
 
   describe('validateGroupedHavingExpr rejects non-predicate expression types', () => {
@@ -303,9 +303,9 @@ describe('query plan aggregate', () => {
     });
 
     it('rejects top-level ParamRef', () => {
-      expect(() => compileWithHaving(ParamRef.of(1, { name: 'x', codecId: 'pg/int4@1' }))).toThrow(
-        'ParamRef is not supported in grouped having expressions',
-      );
+      expect(() =>
+        compileWithHaving(ParamRef.of(1, { name: 'x', codec: { codecId: 'pg/int4@1' } })),
+      ).toThrow('ParamRef is not supported in grouped having expressions');
     });
 
     it('rejects ListExpression', () => {

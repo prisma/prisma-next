@@ -1,5 +1,11 @@
 import type { CodecControlHooks, ExpandNativeTypeInput } from '@prisma-next/family-sql/control';
-import { buildOperation, refsOf, toExpr } from '@prisma-next/sql-relational-core/expression';
+import {
+  buildOperation,
+  type CodecExpression,
+  type Expression,
+  type TraitExpression,
+  toExpr,
+} from '@prisma-next/sql-relational-core/expression';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
@@ -132,11 +138,13 @@ export function postgresQueryOperations<CT extends CodecTypesBase>(): QueryOpera
   return {
     ilike: {
       self: { traits: ['textual'] },
-      impl: (self, pattern) => {
-        const selfRefs = refsOf(self);
+      impl: (
+        self: TraitExpression<readonly ['textual'], false, CT>,
+        pattern: CodecExpression<'pg/text@1', false, CT>,
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
         return buildOperation({
           method: 'ilike',
-          args: [toExpr(self), toExpr(pattern, PG_TEXT_CODEC_ID, selfRefs)],
+          args: [toExpr(self), toExpr(pattern, { codecId: PG_TEXT_CODEC_ID })],
           returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
           lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} ILIKE {{arg0}}' },
         });

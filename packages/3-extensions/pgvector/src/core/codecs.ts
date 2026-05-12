@@ -49,9 +49,9 @@ export class PgVectorCodec extends CodecImpl<
   string,
   number[]
 > {
-  readonly length: number | undefined;
+  readonly length: number;
 
-  constructor(descriptor: AnyCodecDescriptor, length: number | undefined) {
+  constructor(descriptor: AnyCodecDescriptor, length: number) {
     super(descriptor);
     this.length = length;
   }
@@ -63,7 +63,7 @@ export class PgVectorCodec extends CodecImpl<
     if (!value.every((v) => typeof v === 'number')) {
       throw new Error('Vector value must contain only numbers');
     }
-    if (this.length !== undefined && value.length !== this.length) {
+    if (value.length !== this.length) {
       throw new Error(`Vector length mismatch: expected ${this.length}, got ${value.length}`);
     }
   }
@@ -115,11 +115,8 @@ export class PgVectorDescriptor extends CodecDescriptorImpl<VectorParams> {
   override renderOutputType(params: VectorParams): string {
     return `Vector<${params.length}>`;
   }
-  /**
-   * The runtime calls `factory(undefined)(ctx)` to materialize a representative codec for parameterized descriptors that ship a no-params column variant (here, `vectorColumn` vs `vector(N)`). The runtime cast widens `params` to `unknown`, so guarding with an optional read keeps the typed call site (`factory({ length })`) strict while still producing a length-agnostic codec for representative use. Encode/decode for an undimensioned column run through this representative; the wire format `[v1,v2,...]` is dimension-independent.
-   */
   override factory(params: VectorParams): (ctx: CodecInstanceContext) => PgVectorCodec {
-    return () => new PgVectorCodec(this, (params as VectorParams | undefined)?.length);
+    return () => new PgVectorCodec(this, params.length);
   }
 }
 

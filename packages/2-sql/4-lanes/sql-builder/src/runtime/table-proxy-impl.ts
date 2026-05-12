@@ -59,7 +59,7 @@ export class TableProxyImpl<
     super(ctx);
     this.#tableName = tableName;
     this.#table = table;
-    this.#scope = tableToScope(alias, table);
+    this.#scope = tableToScope(alias, table, { storage: ctx.storage, tableName });
     this.#fromSource = TableSource.named(tableName, alias !== tableName ? alias : undefined);
   }
 

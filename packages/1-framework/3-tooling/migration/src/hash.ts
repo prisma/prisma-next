@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { canonicalizeJson } from './canonicalize-json';
+import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import type { MigrationMetadata } from './metadata';
 import type { MigrationOps, OnDiskMigrationPackage } from './package';
 

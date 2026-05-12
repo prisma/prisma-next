@@ -89,7 +89,7 @@ flowchart TD
 
 ### Plan Helpers (`plan.ts`)
 - Defines `SqlQueryPlan<Row>` interface for SQL query plans produced by lanes before lowering
-- Per [ADR 205](../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Execution%20metadata%20lives%20on%20AST.md), codec IDs travel on `ProjectionItem.codecId` (output) and `ParamRef.codecId` (parameters) on the AST itself, not on plan-level descriptor lists
+- Per [ADR 212](../../../../docs/architecture%20docs/adrs/ADR%20212%20-%20AST-bound%20codec%20resolution.md), codec identity travels on `ParamRef.codec` (parameters) and `ProjectionItem.codec` (output) as a `CodecRef` on the AST itself, not on plan-level descriptor lists. See [DEVELOPING.md](DEVELOPING.md) for the `CodecRef` invariant.
 
 ### Codec authoring (class form)
 

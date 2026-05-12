@@ -400,7 +400,6 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       try {
         await driver.query(step.sql, step.params ?? []);
       } catch (error: unknown) {
-        // Catch SqlQueryError and include normalized metadata
         if (SqlQueryError.is(error)) {
           return runnerFailure(
             'EXECUTION_FAILED',
@@ -420,7 +419,6 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
             },
           );
         }
-        // Let SqlConnectionError and other errors propagate (fail-fast)
         throw error;
       }
     }

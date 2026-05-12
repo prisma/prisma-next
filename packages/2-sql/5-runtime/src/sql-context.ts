@@ -1,5 +1,13 @@
-import type { Contract, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
-import type { AnyCodecDescriptor, CodecDescriptor } from '@prisma-next/framework-components/codec';
+import type {
+  Contract,
+  ExecutionMutationDefaultValue,
+  JsonValue,
+} from '@prisma-next/contract/types';
+import type {
+  AnyCodecDescriptor,
+  CodecDescriptor,
+  CodecRef,
+} from '@prisma-next/framework-components/codec';
 import type { ComponentDescriptor } from '@prisma-next/framework-components/components';
 import { checkContractComponentRequirements } from '@prisma-next/framework-components/components';
 import {
@@ -15,6 +23,7 @@ import {
   type RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
+import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   createSqlOperationRegistry,
@@ -23,7 +32,6 @@ import {
 import type {
   Adapter,
   AnyQueryAst,
-  Codec,
   ContractCodecRegistry,
   LoweredStatement,
   SqlCodecInstanceContext,
@@ -37,6 +45,7 @@ import type {
   MutationDefaultsOptions,
   TypeHelperRegistry,
 } from '@prisma-next/sql-relational-core/query-lane-context';
+import { createAstCodecResolver } from './codecs/ast-codec-resolver';
 
 /**
  * Runtime parameterized codec descriptor.
@@ -342,145 +351,173 @@ function validateColumnTypeParams(
   }
 }
 
-function isResolvedCodec(candidate: unknown): candidate is Codec {
-  return (
-    candidate !== null &&
-    typeof candidate === 'object' &&
-    'id' in candidate &&
-    'decode' in candidate
-  );
+/**
+ * Build-time contract-integrity check: every `(table, column)` resolves to a {@link CodecRef} whose `codecId` is registered and whose `typeParams` presence matches the descriptor's `isParameterized` flag.
+ *
+ * Surfaces three classes of malformed contract that AST-bound codec resolution would otherwise mask silently:
+ *
+ * - column references a codecId no contributor registered → `RUNTIME.CODEC_DESCRIPTOR_MISSING`.
+ * - parameterized codec, no `typeParams` (legacy "tolerate refs without params" shape) → `RUNTIME.CODEC_PARAMETERIZATION_MISMATCH`.
+ * - non-parameterized codec, `typeParams` supplied → `RUNTIME.CODEC_PARAMETERIZATION_MISMATCH`.
+ *
+ * Runs unconditionally from `createExecutionContext` so contract bugs fail fast at construction time instead of silently skipping affected columns in the codec registry's pre-population walk.
+ */
+function assertColumnCodecIntegrity(
+  storage: SqlStorage,
+  codecDescriptors: CodecDescriptorRegistry,
+): void {
+  for (const [tableName, table] of Object.entries(storage.tables)) {
+    for (const columnName of Object.keys(table.columns)) {
+      const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+      if (!ref) continue;
+
+      const descriptor = codecDescriptors.descriptorFor(ref.codecId);
+      if (!descriptor) {
+        throw runtimeError(
+          'RUNTIME.CODEC_DESCRIPTOR_MISSING',
+          `Column '${tableName}.${columnName}' references codec '${ref.codecId}' but no contributor registered a codec descriptor for that codecId. Add the extension pack that owns the codec to the runtime stack.`,
+          { table: tableName, column: columnName, codecId: ref.codecId },
+        );
+      }
+
+      if (descriptor.isParameterized && ref.typeParams === undefined) {
+        // Some parameterized codecs declare every paramsSchema field as optional
+        // (e.g. `pg/timestamptz@1` precision). Defer to the descriptor's own
+        // schema rather than rejecting purely on structural absence: probe the
+        // schema with an empty params object and only fail when the schema
+        // rejects it (i.e. at least one field is required).
+        const probe = descriptor.paramsSchema['~standard'].validate({});
+        if (probe instanceof Promise) {
+          // Swallow the probe Promise's rejection so Node doesn't warn about an
+          // unhandled rejection once we throw synchronously below.
+          probe.catch(() => {});
+          throw runtimeError(
+            'RUNTIME.TYPE_PARAMS_INVALID',
+            `Column '${tableName}.${columnName}' uses parameterized codec '${ref.codecId}' whose paramsSchema returned a Promise; paramsSchema must be a synchronous Standard Schema validator. Return a value/issues result directly instead of a Promise.`,
+            { table: tableName, column: columnName, codecId: ref.codecId },
+          );
+        }
+        const rejects = 'issues' in probe && !!probe.issues;
+        if (rejects) {
+          throw runtimeError(
+            'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH',
+            `Column '${tableName}.${columnName}' uses parameterized codec '${ref.codecId}' but no typeParams are supplied. Provide typeParams on the column, or use a typeRef pointing at a storage.types entry that carries them.`,
+            {
+              table: tableName,
+              column: columnName,
+              codecId: ref.codecId,
+              expected: 'parameterized',
+              actual: 'no typeParams',
+            },
+          );
+        }
+      }
+
+      if (!descriptor.isParameterized && ref.typeParams !== undefined) {
+        throw runtimeError(
+          'RUNTIME.CODEC_PARAMETERIZATION_MISMATCH',
+          `Column '${tableName}.${columnName}' supplies typeParams to non-parameterized codec '${ref.codecId}'. Remove the typeParams or switch to a parameterized codec id.`,
+          {
+            table: tableName,
+            column: columnName,
+            codecId: ref.codecId,
+            expected: 'non-parameterized',
+            actual: 'has typeParams',
+          },
+        );
+      }
+    }
+  }
 }
 
 /**
- * Walk the contract's `storage.tables[].columns[]` and resolve each column to a `Codec` through the unified descriptor map. Per-instance behavior:
+ * Build a {@link ContractCodecRegistry} that resolves codecs exclusively through the `forCodecRef` content-keyed cache.
  *
- * - **typeRef columns**: reuse the resolved codec materialized once by `initializeTypeHelpers` for the `storage.types` entry. Multiple columns sharing one typeRef share one codec instance.
- * - **inline-typeParams columns**: call `descriptor.factory(typeParams) (ctx)` once per column (per-column anonymous instance).
- * - **non-parameterized columns**: call `descriptor.factory()(ctx)` once. The synthesized descriptor's factory is constant — every call returns the same shared codec instance — so columns sharing a non-parameterized codec id share one resolved codec without explicit caching.
+ * One pre-population pass walks `storage.types` and `storage.tables[].columns[]` to seed the resolver's per-ref instance context with the *aggregated* `usedAt` set for each canonical `(codecId, typeParams)` key. The same codec materialised through `forColumn` or `forCodecRef` is therefore one instance with one `SqlCodecInstanceContext` — stateful codecs reading `usedAt` see the full column set regardless of which surface the caller used.
  *
- * Codec-registry-unification spec § AC-4: every column resolves through one descriptor map without branching on parameterization. JSON-Schema validation, when required, lives inside the resolved codec's `decode` body (see `arktype-json`'s `ArktypeJsonCodecClass`); the framework no longer maintains a parallel validator registry.
+ * Per-key instance-name policy:
+ *
+ * - typeRef-shared columns use the `storage.types[name]` name.
+ * - inline-`typeParams` columns use `<col:Table.column>` (the first column observed at that key; additional columns sharing the key extend `usedAt`).
+ * - non-parameterized codec ids use `<codec:codecId>`, aggregating every column on that codec id into one `usedAt` set.
+ * - ad-hoc refs the contract walk did not pre-populate (e.g. AST-supplied refs from deserialised migration ops) fall back to the canonical cache key `${codecId}:${canonicalizeJson(typeParams)}` — the only structurally honest identity for an ad-hoc ref, distinct per `(codecId, typeParams)`.
+ *
+ * Contract integrity is enforced upstream by {@link assertColumnCodecIntegrity}: every column must reference a registered `codecId` whose `descriptor.isParameterized` flag matches the presence of `typeParams` (via `codecRefForColumn`). The pre-population walk and `forColumn` therefore make no defensive checks — malformed columns fail fast at `createExecutionContext` construction with `RUNTIME.CODEC_DESCRIPTOR_MISSING` or `RUNTIME.CODEC_PARAMETERIZATION_MISMATCH` rather than being silently skipped here.
+ *
+ * `forColumn(t, c)` is a thin delegate over `forCodecRef(codecRefForColumn(t, c))`; encode/decode hot paths read the resolver directly via `forCodecRef`. The only `undefined` `forColumn` returns is the legitimate "no such column in the contract" case.
  */
 function buildContractCodecRegistry(
   contract: Contract<SqlStorage>,
   codecDescriptors: CodecDescriptorRegistry,
-  types: TypeHelperRegistry,
-  parameterizedDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): ContractCodecRegistry {
-  const byColumn = new Map<string, Codec>();
-  const byCodecId = new Map<string, Codec>();
-  // Codec ids whose `byCodecId` entry is ambiguous — multiple distinct resolved instances landed under the same parameterized codec id (e.g. `Vector<1024>` and `Vector<1536>` both registering under `pg/vector@1`). The refs-less `forCodecId` fallback rejects these ids so a DSL-param without a column ref cannot silently bind to the wrong instance. The validator pass enforces refs on every parameterized `ParamRef`, so this
-  // branch is reachable only as a defensive guard for non-parameterized columns whose `byCodecId` entry is unique by construction.
-  const ambiguousCodecIds = new Set<string>();
+  const refKeyOf = (ref: CodecRef): string => `${ref.codecId}:${canonicalizeJson(ref.typeParams)}`;
 
-  // Pre-populate `byCodecId` with non-parameterized descriptor instances. Refs-less encode/decode call sites (computed projections without a column ref, transient builder ParamRefs) resolve through `forCodecId(id)` and need a representative instance for codec ids that no contract column declares. Non-parameterized descriptors' factories are constant — every call yields the same shared codec — so a single materialization
-  // is correct.
-  for (const descriptor of codecDescriptors.values()) {
-    if (descriptor.isParameterized) continue;
-    const ctx: SqlCodecInstanceContext = {
-      name: `<shared:${descriptor.codecId}>`,
-      usedAt: [],
-    };
-    const voidFactory = descriptor.factory as unknown as (
-      params: undefined,
-    ) => (ctx: SqlCodecInstanceContext) => Codec;
-    byCodecId.set(descriptor.codecId, voidFactory(undefined)(ctx));
-  }
+  const usedAtByKey = new Map<string, Array<{ readonly table: string; readonly column: string }>>();
+  const nameByKey = new Map<string, string>();
 
-  // Representative instances for parameterized descriptors whose factory tolerates `factory(undefined)` (e.g. pgvector — the factory ignores its params and returns the same shared codec). Used as the last-resort fallback in `forCodecId` for refs-less call sites whose codec id has no contract column the walk could resolve through (e.g. `cosineSimilarity(col, [literal])` builds an inline `ParamRef` without column refs).
-  // Stored separately so column-bound walk results don't trip the ambiguity check, and consulted only when `byCodecId` has no column-bound entry. Descriptors whose factory needs real params (arktype-json) raise and are skipped — the per-column dispatch path materializes those lazily when refs are populated.
-  const parameterizedRepresentatives = new Map<string, Codec>();
-  for (const descriptor of codecDescriptors.values()) {
-    if (!descriptor.isParameterized) continue;
-    const ctx: SqlCodecInstanceContext = {
-      name: `<shared:${descriptor.codecId}>`,
-      usedAt: [],
+  const typeRefSites = collectTypeRefSites(contract.storage);
+  for (const [typeName, typeInstance] of Object.entries(contract.storage.types ?? {})) {
+    const ref: CodecRef = {
+      codecId: typeInstance.codecId,
+      typeParams: typeInstance.typeParams as JsonValue,
     };
-    // Call `factory` *as a method on the descriptor* — `descriptor.factory(undefined)` — rather than detaching it into a local. Several descriptors implement `factory` as a class method whose body returns an arrow that captures `this` (`return () => new SomeCodec(this);`), and detaching loses that binding so the codec ends up with an `undefined` descriptor and `codec.id` throws.
-    const factory = descriptor.factory.bind(descriptor) as unknown as (
-      params: unknown,
-    ) => (ctx: SqlCodecInstanceContext) => Codec;
-    try {
-      parameterizedRepresentatives.set(descriptor.codecId, factory(undefined)(ctx));
-    } catch {
-      // Parameterized descriptor whose factory requires real params; refs-less fallback for this codec id is unavailable.
+    const key = refKeyOf(ref);
+    const sites = typeRefSites.get(typeName) ?? [];
+    const existing = usedAtByKey.get(key);
+    // Two `storage.types` aliases that canonicalize to the same (codecId, typeParams) share a single codec instance via the resolver. Append sites instead of replacing so a stateful codec reading the aggregated site list sees every column behind every alias rather than just the last one.
+    if (existing) {
+      existing.push(...sites);
+    } else {
+      usedAtByKey.set(key, [...sites]);
+      nameByKey.set(key, typeName);
     }
   }
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
-      const columnKey = `${tableName}.${columnName}`;
-      const descriptor = codecDescriptors.descriptorFor(column.codecId);
-
-      let resolvedCodec: Codec | undefined;
-
-      if (descriptor) {
-        const isParameterized = parameterizedDescriptors.has(column.codecId);
-
-        if (column.typeRef) {
-          // The named instance was already materialized once by `initializeTypeHelpers`; reuse it so multiple columns sharing the same typeRef share one codec instance (and any per-instance helper state on it).
-          const helper = types[column.typeRef];
-          if (isResolvedCodec(helper)) {
-            resolvedCodec = helper;
-          }
-        } else if (column.typeParams && isParameterized) {
-          const parameterizedDescriptor = parameterizedDescriptors.get(column.codecId);
-          if (parameterizedDescriptor) {
-            const validatedParams = validateTypeParams(column.typeParams, parameterizedDescriptor, {
-              tableName,
-              columnName,
-            });
-            const ctx: SqlCodecInstanceContext = {
-              name: `<col:${tableName}.${columnName}>`,
-              usedAt: [{ table: tableName, column: columnName }],
-            };
-            resolvedCodec = parameterizedDescriptor.factory(validatedParams)(ctx);
-          }
-        } else if (!isParameterized) {
-          // Non-parameterized column: materialize a fresh codec instance per `forColumn(table, column)` entry with a column-specific `SqlCodecInstanceContext`. The pre-populated `byCodecId` representative (built with the synthetic `<shared:codecId>` context and empty `usedAt`) is reserved for `forCodecId()` refs-less fallbacks; reusing it for column-bound dispatch would erase per-column diagnostics for any descriptor whose factory reads `CodecInstanceContext`.
-          const ctx: SqlCodecInstanceContext = {
-            name: `<col:${tableName}.${columnName}>`,
-            usedAt: [{ table: tableName, column: columnName }],
-          };
-          // The descriptor's `P` is `void` for non-parameterized codecs; the runtime's `void` value is `undefined`. The cast narrows the descriptor's family-agnostic `CodecInstanceContext` slot to the SQL `SqlCodecInstanceContext` we pass at this call site — function-argument contravariance makes the narrow safe.
-          // `bind` preserves the `this`-on-descriptor invariant — several descriptors implement `factory` as a class method whose body returns an arrow that captures `this`; detaching loses the binding and produces a codec whose `descriptor` is `undefined`.
-          const voidFactory = descriptor.factory.bind(descriptor) as unknown as (
-            params: undefined,
-          ) => (ctx: SqlCodecInstanceContext) => Codec;
-          resolvedCodec = voidFactory(undefined)(ctx);
-        }
-        // else: parameterized codec id with no typeRef and no typeParams — this is the legitimate "undimensioned" form for codecs that ship a no-params column variant alongside a parameterized one (e.g. pgvector's `vectorColumn` vs. `vector(N)`). Leave `resolvedCodec` undefined; encode/decode for this column flows through `forCodecId`. The fallback works for these cases because their wire format is params-independent (vector
-        // formats `[v1,v2,...]` regardless of declared length).
+      if (column.typeRef !== undefined) continue;
+      const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+      if (!ref) continue;
+      const key = refKeyOf(ref);
+      const site = { table: tableName, column: columnName };
+      const existing = usedAtByKey.get(key);
+      if (existing) {
+        existing.push(site);
+      } else {
+        usedAtByKey.set(key, [site]);
+        const name =
+          ref.typeParams !== undefined
+            ? `<col:${tableName}.${columnName}>`
+            : `<codec:${ref.codecId}>`;
+        nameByKey.set(key, name);
       }
+    }
+  }
 
-      if (resolvedCodec) {
-        byColumn.set(columnKey, resolvedCodec);
-        const existing = byCodecId.get(column.codecId);
-        if (existing === undefined) {
-          byCodecId.set(column.codecId, resolvedCodec);
-        } else if (existing !== resolvedCodec && parameterizedDescriptors.has(column.codecId)) {
-          ambiguousCodecIds.add(column.codecId);
-        }
-      }
+  const resolver = createAstCodecResolver(codecDescriptors, (ref) => {
+    const key = refKeyOf(ref);
+    // Fallback uses the canonical cache key as the instance name. Two ad-hoc refs with the same `codecId` but different `typeParams` resolve to distinct codecs (different cache keys) and must therefore expose distinct `name`s; a `codecId`-only fallback would collide and break stateful codecs that key per-instance state on `name`.
+    return {
+      name: nameByKey.get(key) ?? key,
+      usedAt: usedAtByKey.get(key) ?? [],
+    };
+  });
+
+  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
+    for (const columnName of Object.keys(table.columns)) {
+      const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
+      if (!ref) continue;
+      resolver.forCodecRef(ref);
     }
   }
 
   const registry: ContractCodecRegistry = {
     forColumn(table, column) {
-      return byColumn.get(`${table}.${column}`);
+      const ref = codecDescriptors.codecRefForColumn(table, column);
+      return ref ? resolver.forCodecRef(ref) : undefined;
     },
-    forCodecId(codecId) {
-      // Codec-id-only fallback for refs-less sites. The validator pass (`validateParamRefRefs`) enforces refs on every parameterized `ParamRef` before encode, so this path is only legitimately reachable for non-parameterized codec ids. The map is pre-populated with every non-parameterized descriptor's canonical instance and overlaid with column-resolved instances from the contract walk; parameterized codec ids without a
-      // typeRef/typeParams-bound column never reach this map.
-      //
-      // Reject ambiguous parameterized fallbacks: if the contract walk resolved more than one distinct codec instance under this id (e.g. multiple vector dimensions, multiple arktype-json schemas), the codec-id-keyed lookup cannot honor the call site — fail fast rather than bind to whichever instance happened to land first.
-      if (ambiguousCodecIds.has(codecId)) {
-        throw runtimeError(
-          'RUNTIME.TYPE_PARAMS_INVALID',
-          `Codec '${codecId}' resolves to multiple parameterized instances; column-aware dispatch is required.`,
-          { codecId },
-        );
-      }
-      return byCodecId.get(codecId) ?? parameterizedRepresentatives.get(codecId);
+    forCodecRef(ref) {
+      return resolver.forCodecRef(ref);
     },
   };
 
@@ -684,7 +721,8 @@ export function createExecutionContext<
     }
   }
 
-  const codecDescriptors = buildCodecDescriptorRegistry(allCodecDescriptors);
+  const codecDescriptors = buildCodecDescriptorRegistry(allCodecDescriptors, contract.storage);
+  assertColumnCodecIntegrity(contract.storage, codecDescriptors);
   const mutationDefaultGeneratorRegistry = collectMutationDefaultGenerators(contributors);
   assertMutationDefaultGeneratorsAvailable(contract, mutationDefaultGeneratorRegistry);
 
@@ -694,12 +732,7 @@ export function createExecutionContext<
 
   const types = initializeTypeHelpers(contract.storage, parameterizedCodecDescriptors);
 
-  const contractCodecs = buildContractCodecRegistry(
-    contract,
-    codecDescriptors,
-    types,
-    parameterizedCodecDescriptors,
-  );
+  const contractCodecs = buildContractCodecRegistry(contract, codecDescriptors);
 
   return {
     contract,

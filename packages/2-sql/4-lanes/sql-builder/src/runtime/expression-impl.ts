@@ -1,3 +1,4 @@
+import type { CodecRef } from '@prisma-next/framework-components/codec';
 import type { AnyExpression as AstExpression } from '@prisma-next/sql-relational-core/ast';
 import type { Expression } from '@prisma-next/sql-relational-core/expression';
 import type { ScopeField } from '../scope';
@@ -5,21 +6,17 @@ import type { ScopeField } from '../scope';
 /**
  * Runtime wrapper around a relational-core AST expression node. Carries ScopeField metadata (codecId, nullable) so aggregate-like combinators can propagate the input codec onto their result.
  *
- * `refs` records the column-bound binding (`{ table, column }`) when known — the field-proxy populates it for both the namespaced form (`f.user.email` → `ColumnRef`) and the top-level shortcut (`f.email` → `IdentifierRef` + refs metadata). Encode-side dispatch and the `validateParamRefRefs` pass read it via `refsOf(expression)`.
+ * `codec` records the column-bound {@link CodecRef} when the field-proxy knows the binding — both the namespaced form (`f.user.email` → `ColumnRef`) and the top-level shortcut (`f.email` → `IdentifierRef`) stamp the ref derived from contract storage. `codecOf(expression)` exposes it for operation implementations forwarding the ref to `toExpr`.
  */
 export class ExpressionImpl<T extends ScopeField = ScopeField> implements Expression<T> {
   private readonly ast: AstExpression;
   readonly returnType: T;
-  readonly refs: { readonly table: string; readonly column: string } | undefined;
+  readonly codec: CodecRef | undefined;
 
-  constructor(
-    ast: AstExpression,
-    returnType: T,
-    refs?: { readonly table: string; readonly column: string },
-  ) {
+  constructor(ast: AstExpression, returnType: T, codec?: CodecRef) {
     this.ast = ast;
     this.returnType = returnType;
-    this.refs = refs;
+    this.codec = codec;
   }
 
   buildAst(): AstExpression {

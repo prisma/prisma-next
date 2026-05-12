@@ -1,10 +1,19 @@
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { ParamSpec } from '@prisma-next/operations';
 import type { QueryOperationReturn } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
+import type { CodecRef } from './ast/codec-types';
 import type { AnyExpression as AstExpression } from './ast/types';
 import { OperationExpr, ParamRef } from './ast/types';
 
-export type ScopeField = { codecId: string; nullable: boolean };
+export type ScopeField = {
+  codecId: string;
+  nullable: boolean;
+  /**
+   * Optional {@link CodecRef} derived from contract storage at scope construction time. Builder paths that mint column-bound `ParamRef` / `ProjectionItem` nodes stamp this slot onto the AST so encode/decode dispatch resolves through `contractCodecs.forCodecRef`. Leave `undefined` when the scope was built without contract storage (rare — tests, ad-hoc scopes).
+   */
+  codec?: CodecRef;
+};
 
 /**
  * A typed SQL expression. Identity is carried by the `returnType` descriptor (inherited from `QueryOperationReturn` and narrowed to `T`) — distinct `T` makes distinct Expression types structurally. `buildAst()` materialises the underlying AST node.
@@ -58,41 +67,43 @@ export type TraitExpression<
 /**
  * Resolve a raw value or an Expression into an AST expression node.
  *
- * When `value` is an Expression (duck-typed by its `buildAst` method), the AST it wraps is returned. Otherwise the value is embedded as a ParamRef tagged with `codecId` (if given) and optionally `refs: { table, column }` (if the caller knows the column-bound site).
+ * When `value` is an Expression (duck-typed by its `buildAst` method), the AST it wraps is returned. Otherwise the value is embedded as a ParamRef tagged with the caller-supplied {@link CodecRef} (when known). The runtime resolves the ref via `contractCodecs.forCodecRef(codec)`; content-keyed memoisation collapses repeated lookups for the same logical column onto one shared codec.
  *
- * For parameterized codec ids (e.g. `pg/vector@1`), encode-side dispatch requires `refs` to select the per-instance codec — so operation implementations that compare a column to a user-supplied value should derive `refs` from the column-bound side and pass it down. Non-parameterized codec ids (e.g. `pg/int4@1`) tolerate refs-less ParamRefs; the validator pass enforces refs only for parameterized ids.
+ * Operation implementations that compare a column-bound expression to a user value derive the column's {@link CodecRef} from the column-bound side (via {@link codecOf}) and forward it here so encode-side dispatch resolves to the per-instance codec for parameterized codec ids (`vector(1024)` vs. `vector(1536)`).
  */
-export function toExpr(
-  value: unknown,
-  codecId?: string,
-  refs?: { table: string; column: string },
-): AstExpression {
+export function toExpr(value: unknown, codec?: CodecRef): AstExpression {
   if (isExpressionLike(value)) {
     return value.buildAst();
   }
-  if (codecId === undefined && refs === undefined) return ParamRef.of(value);
-  return ParamRef.of(value, {
-    ...(codecId !== undefined ? { codecId } : {}),
-    ...(refs !== undefined ? { refs } : {}),
-  });
+  if (codec === undefined) {
+    throw runtimeError(
+      'RUNTIME.PARAM_REF_CODEC_REQUIRED',
+      `Cannot construct a ParamRef for a ${value === null ? 'null' : typeof value} value without an explicit codec. ` +
+        'Provide a CodecRef at the call site or use a column-bound builder path.',
+    );
+  }
+  return ParamRef.of(value, { codec });
 }
 
 /**
- * Derive `(table, column)` refs from an expression-like value when it carries column-bound metadata. Returns `undefined` for non-column-bound expressions and for raw scalar values.
+ * Derive the {@link CodecRef} carried by an expression-like value.
  *
- * Two sources are consulted, in order: 1. An optional `refs` slot on the `Expression` wrapper (the SQL builder's `ExpressionImpl` records `(table, column)` for top-level fields whose AST is `IdentifierRef` — the AST stays bare to preserve SQL rendering, the metadata lives on the wrapper). 2. The wrapped AST when it's already a `ColumnRef` (the namespaced field-proxy form, or operation impls passing column-bound exprs
- * directly).
+ * Resolution order:
+ * 1. `wrapper.codec` — explicit column-bound {@link CodecRef} stamped at field-proxy time.
+ * 2. `wrapper.returnType.codec` — scope-level codec when the scope was built from contract storage.
+ * 3. `{ codecId: wrapper.returnType.codecId }` — minimal ref derived from the expression's declared codec id (covers synthetic expressions like `count()` whose returnType has a known codec id but no explicit column binding).
  *
- * Operation implementations call this on the column-bound side of a comparison and forward the refs to {@link toExpr} on the user-value side, so the resulting `ParamRef` carries the table+column required by encode-side `forColumn` dispatch.
+ * Returns `undefined` for raw scalar values (non-expression-like).
  */
-export function refsOf(value: unknown): { table: string; column: string } | undefined {
+export function codecOf(value: unknown): CodecRef | undefined {
   if (!isExpressionLike(value)) return undefined;
-  const wrapperRefs = (value as { refs?: { table: string; column: string } }).refs;
-  if (wrapperRefs) return { table: wrapperRefs.table, column: wrapperRefs.column };
-  const ast = value.buildAst();
-  if (ast.kind === 'column-ref') {
-    return { table: ast.table, column: ast.column };
-  }
+  const wrapper = value as {
+    codec?: CodecRef;
+    returnType?: { codec?: CodecRef; codecId?: string };
+  };
+  if (wrapper.codec) return wrapper.codec;
+  if (wrapper.returnType?.codec) return wrapper.returnType.codec;
+  if (wrapper.returnType?.codecId) return { codecId: wrapper.returnType.codecId };
   return undefined;
 }
 

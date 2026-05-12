@@ -21,15 +21,14 @@ export function col(tableName: string, column: string): ColumnRef {
 }
 
 export function param(value: unknown, name?: string, codecId = 'pg/text@1'): ParamRef {
-  return ParamRef.of(value, { ...ifDefined('name', name), codecId });
+  return ParamRef.of(value, { ...ifDefined('name', name), codec: { codecId } });
 }
 
 export function shiftParamRef(delta: number): (expr: ParamRef) => ParamRef {
   return (expr: ParamRef) =>
     ParamRef.of(typeof expr.value === 'number' ? expr.value + delta : expr.value, {
       ...ifDefined('name', expr.name),
-      ...ifDefined('codecId', expr.codecId),
-      ...ifDefined('refs', expr.refs),
+      ...ifDefined('codec', expr.codec),
     });
 }
 

@@ -1,7 +1,22 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Codec } from './codec';
 
 export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
+
+/**
+ * Serializable codec identity carried by every codec-bearing AST node.
+ *
+ * `(codecId, typeParams?)` is the single fact the runtime needs to materialize a codec via `descriptorFor(codecId).factory(typeParams)(ctx)`. The pair is content-keyed: two refs with the same `codecId` and structurally equal `typeParams` (regardless of object key ordering) resolve to the same memoized {@link Codec} instance.
+ *
+ * `typeParams` is `JsonValue`-constrained so the ref survives JSON serialization (relevant for AST-embedded migration ops). Non-parameterized codecs leave `typeParams` undefined; the descriptor's `paramsSchema` validates the value at the JSON boundary.
+ *
+ * Family-agnostic by design — both SQL and Mongo AST nodes carry `codec: CodecRef | undefined`, and the resolver is the only dispatch path that survives serialization.
+ */
+export interface CodecRef {
+  readonly codecId: string;
+  readonly typeParams?: JsonValue;
+}
 
 /**
  * Per-call context the runtime threads to every `codec.encode` / `codec.decode` invocation for a single `runtime.execute()` call.
@@ -43,7 +58,7 @@ export const emptyCodecLookup: CodecLookup = {
 /**
  * Family-agnostic per-instance context supplied by the framework when applying a higher-order codec factory. Allows stateful codecs (e.g. column-scoped encryption) to derive per-instance state from the materialization site.
  *
- * - `name` — the family-agnostic instance identity. For SQL, the runtime populates this as the `storage.types` instance name (e.g. `Embedding1536`) for typeRef-shaped columns, the synthesized anonymous instance name (`<anon:Document.embedding>`) for inline-`typeParams` columns, or a shared sentinel (`<shared:pg/text@1>`) for non-parameterized codec ids. Other families pick the analogous identity for their materialization sites.
+ * - `name` — the family-agnostic instance identity. For SQL, the runtime populates this as the `storage.types` instance name (e.g. `Embedding1536`) for typeRef-shaped columns, an inline-column sentinel (`<col:Document.embedding>`) for inline-`typeParams` columns, a shared codec-id sentinel (`<codec:pg/text@1>`) for non-parameterized codec ids, or the canonical cache key (`<codecId>:<canonicalizeJson(typeParams)>`) for ad-hoc refs the contract walk did not pre-populate. Other families pick the analogous identity for their materialization sites.
  *
  * Family-specific extensions (e.g. {@link import('@prisma-next/sql-relational-core/ast').SqlCodecInstanceContext} in the SQL layer) augment this base with domain-shaped column-set metadata. Codec authors target the base when they don't read family-specific metadata; they target the family extension when they do.
  */

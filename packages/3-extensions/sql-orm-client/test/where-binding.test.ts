@@ -44,7 +44,7 @@ describe('bindWhereExpr', () => {
     expect(binary.right.kind).toBe('param-ref');
     const ref = binary.right as ParamRef;
     expect(ref.value).toBe('alice@test.com');
-    expect(ref.codecId).toBe('pg/text@1');
+    expect(ref.codec?.codecId).toBe('pg/text@1');
   });
 
   it('binds AND expressions recursively', () => {
@@ -63,8 +63,8 @@ describe('bindWhereExpr', () => {
       'a@test.com',
       'Alice',
     ]);
-    expect((andRight0 as ParamRef).codecId).toBe('pg/text@1');
-    expect((andRight1 as ParamRef).codecId).toBe('pg/text@1');
+    expect((andRight0 as ParamRef).codec?.codecId).toBe('pg/text@1');
+    expect((andRight1 as ParamRef).codec?.codecId).toBe('pg/text@1');
   });
 
   it('binds OR expressions recursively', () => {
@@ -104,7 +104,7 @@ describe('bindWhereExpr', () => {
     const viewsRight = (innerWhere.exprs[1] as BinaryExpr).right;
     expect(viewsRight.kind).toBe('param-ref');
     expect((viewsRight as ParamRef).value).toBe(100);
-    expect((viewsRight as ParamRef).codecId).toBe('pg/int4@1');
+    expect((viewsRight as ParamRef).codec?.codecId).toBe('pg/int4@1');
   });
 
   it('binds NOT EXISTS subquery expressions', () => {
@@ -146,13 +146,13 @@ describe('bindWhereExpr', () => {
     const list = binary.right as ListExpression;
     expect(list.values).toMatchObject([{ kind: 'param-ref' }, { kind: 'param-ref' }]);
     expect(list.values).toMatchObject([
-      { value: 1, codecId: 'pg/int4@1' },
-      { value: 2, codecId: 'pg/int4@1' },
+      { value: 1, codec: { codecId: 'pg/int4@1' } },
+      { value: 2, codec: { codecId: 'pg/int4@1' } },
     ]);
   });
 
   it('preserves ParamRef on the right side without rebinding', () => {
-    const existing = ParamRef.of(42, { name: 'id', codecId: 'pg/int4@1' });
+    const existing = ParamRef.of(42, { name: 'id', codec: { codecId: 'pg/int4@1' } });
     const expr = BinaryExpr.eq(ColumnRef.of('users', 'id'), existing);
     const bound = bindWhereExpr(contract, expr);
 
@@ -230,7 +230,7 @@ describe('bindWhereExpr', () => {
   });
 
   it('passes through ParamRef values inside ListExpression without rebinding', () => {
-    const existing = ParamRef.of(99, { name: 'id', codecId: 'pg/int4@1' });
+    const existing = ParamRef.of(99, { name: 'id', codec: { codecId: 'pg/int4@1' } });
     const expr = BinaryExpr.in(
       ColumnRef.of('users', 'id'),
       ListExpression.of([existing, LiteralExpr.of(42)]),
@@ -260,7 +260,7 @@ describe('bindWhereExpr', () => {
     });
 
     it('passes through top-level ParamRef unchanged', () => {
-      const expr = ParamRef.of('hello', { name: 'x', codecId: 'pg/text@1' });
+      const expr = ParamRef.of('hello', { name: 'x', codec: { codecId: 'pg/text@1' } });
       const bound = bindWhereExpr(contract, expr);
 
       expect(bound).toBe(expr);
@@ -276,7 +276,7 @@ describe('bindWhereExpr', () => {
       const innerWhere = ((bound as SubqueryExpr).query as SelectAst).where as BinaryExpr;
       expect(innerWhere.right.kind).toBe('param-ref');
       expect((innerWhere.right as ParamRef).value).toBe(100);
-      expect((innerWhere.right as ParamRef).codecId).toBe('pg/int4@1');
+      expect((innerWhere.right as ParamRef).codec?.codecId).toBe('pg/int4@1');
     });
 
     it('binds inner expressions of OperationExpr', () => {
@@ -298,7 +298,7 @@ describe('bindWhereExpr', () => {
       const innerQuery = (op.self as SubqueryExpr).query as SelectAst;
       const innerWhere = innerQuery.where as BinaryExpr;
       expect(innerWhere.right.kind).toBe('param-ref');
-      expect((innerWhere.right as ParamRef).codecId).toBe('pg/int4@1');
+      expect((innerWhere.right as ParamRef).codec?.codecId).toBe('pg/int4@1');
     });
 
     it('binds inner expression of AggregateExpr', () => {
@@ -359,7 +359,7 @@ describe('bindWhereExpr', () => {
       const inner = (bound as NotExpr).expr as BinaryExpr;
       expect(inner.right.kind).toBe('param-ref');
       expect((inner.right as ParamRef).value).toBe('test@test.com');
-      expect((inner.right as ParamRef).codecId).toBe('pg/text@1');
+      expect((inner.right as ParamRef).codec?.codecId).toBe('pg/text@1');
     });
 
     it('binds NOT(AND(...)) recursively', () => {
@@ -443,7 +443,7 @@ describe('bindWhereExpr', () => {
 
       expect(bound.op).toBe('lt');
       expect(bound.right.kind).toBe('param-ref');
-      expect((bound.right as ParamRef).codecId).toBe('pg/int4@1');
+      expect((bound.right as ParamRef).codec?.codecId).toBe('pg/int4@1');
     });
 
     it('lte binds literal to param', () => {
@@ -473,8 +473,8 @@ describe('bindWhereExpr', () => {
       expect(bound.op).toBe('notIn');
       const list = bound.right as ListExpression;
       expect(list.values).toMatchObject([
-        { kind: 'param-ref', value: 1, codecId: 'pg/int4@1' },
-        { kind: 'param-ref', value: 2, codecId: 'pg/int4@1' },
+        { kind: 'param-ref', value: 1, codec: { codecId: 'pg/int4@1' } },
+        { kind: 'param-ref', value: 2, codec: { codecId: 'pg/int4@1' } },
       ]);
     });
   });

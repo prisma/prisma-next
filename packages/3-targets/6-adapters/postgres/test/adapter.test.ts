@@ -108,11 +108,11 @@ describe('Postgres adapter', () => {
     const insertAst = InsertAst.into(TableSource.named('user'))
       .withRows([
         {
-          id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
-          email: ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
+          id: ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
+          email: ParamRef.of('a@example.com', { name: 'email', codec: { codecId: 'pg/text@1' } }),
         },
         {
-          id: ParamRef.of(2, { name: 'id2', codecId: 'pg/int4@1' }),
+          id: ParamRef.of(2, { name: 'id2', codec: { codecId: 'pg/int4@1' } }),
           email: new DefaultValueExpr(),
         },
       ])
@@ -123,11 +123,13 @@ describe('Postgres adapter', () => {
       )
       .withReturning([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]);
     const updateAst = UpdateAst.table(TableSource.named('user'))
-      .withSet({ email: ParamRef.of('b@example.com', { name: 'email', codecId: 'pg/text@1' }) })
+      .withSet({
+        email: ParamRef.of('b@example.com', { name: 'email', codec: { codecId: 'pg/text@1' } }),
+      })
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'id'),
-          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
         ),
       )
       .withReturning([ProjectionItem.of('email', ColumnRef.of('user', 'email'))]);
@@ -135,7 +137,7 @@ describe('Postgres adapter', () => {
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'id'),
-          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
         ),
       )
       .withReturning([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]);
@@ -196,11 +198,11 @@ describe('Postgres adapter', () => {
           NullCheckExpr.isNotNull(SubqueryExpr.of(scalarSubquery)),
           BinaryExpr.eq(
             ColumnRef.of('user', 'profile'),
-            ParamRef.of({ active: true }, { name: 'profile', codecId: 'pg/jsonb@1' }),
+            ParamRef.of({ active: true }, { name: 'profile', codec: { codecId: 'pg/jsonb@1' } }),
           ),
           BinaryExpr.eq(
             ColumnRef.of('user', 'metadata'),
-            ParamRef.of({ source: 'test' }, { name: 'metadata', codecId: 'pg/json@1' }),
+            ParamRef.of({ source: 'test' }, { name: 'metadata', codec: { codecId: 'pg/json@1' } }),
           ),
           BinaryExpr.in(ColumnRef.of('user', 'id'), ListExpression.fromValues([])),
           BinaryExpr.notIn(ColumnRef.of('user', 'id'), ListExpression.fromValues([])),
@@ -362,13 +364,16 @@ describe('Postgres adapter', () => {
     const insertWithParamUpdate = InsertAst.into(TableSource.named('user'))
       .withRows([
         {
-          id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
-          email: ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
+          id: ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
+          email: ParamRef.of('a@example.com', { name: 'email', codec: { codecId: 'pg/text@1' } }),
         },
       ])
       .withOnConflict(
         InsertOnConflict.on([ColumnRef.of('user', 'email')]).doUpdateSet({
-          email: ParamRef.of('b@example.com', { name: 'replacement', codecId: 'pg/text@1' }),
+          email: ParamRef.of('b@example.com', {
+            name: 'replacement',
+            codec: { codecId: 'pg/text@1' },
+          }),
         }),
       );
 
@@ -380,7 +385,7 @@ describe('Postgres adapter', () => {
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'id'),
-          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
         ),
       );
     const updateSql = adapter.lower(updateWithColumnRef, { contract, params: [] }).sql;
@@ -399,8 +404,8 @@ describe('Postgres adapter', () => {
     const ast = InsertAst.into(TableSource.named('user'))
       .withRows([
         {
-          id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
-          email: ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
+          id: ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
+          email: ParamRef.of('a@example.com', { name: 'email', codec: { codecId: 'pg/text@1' } }),
         },
       ])
       .withOnConflict(InsertOnConflict.on([ColumnRef.of('user', 'email')]).doUpdateSet({}));
@@ -437,7 +442,7 @@ describe('Postgres adapter', () => {
         BinaryExpr.in(
           ColumnRef.of('user', 'id'),
           ListExpression.of([
-            ParamRef.of(1, { name: 'a', codecId: 'pg/int4@1' }),
+            ParamRef.of(1, { name: 'a', codec: { codecId: 'pg/int4@1' } }),
             LiteralExpr.of(2),
           ]),
         ),

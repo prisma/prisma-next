@@ -24,7 +24,7 @@ describe('filters', () => {
       { columns: Record<string, { codecId?: string }> } | undefined
     >;
     const codecId = tables[table]?.columns[column]?.codecId;
-    return codecId ? ParamRef.of(value, { codecId, refs: { table, column } }) : ParamRef.of(value);
+    return codecId ? ParamRef.of(value, { codec: { codecId } }) : ParamRef.of(value);
   }
 
   it('and(), or(), not(), and all() use rich where objects', () => {
@@ -103,6 +103,14 @@ describe('filters', () => {
         ),
       ),
     );
+  });
+
+  it('eq(null) / neq(null) lower to IS NULL / IS NOT NULL', () => {
+    const post = createModelAccessor(context, 'Post');
+    const userId = post['userId']! as { eq: (v: unknown) => unknown; neq: (v: unknown) => unknown };
+
+    expect(userId.eq(null)).toEqual(NullCheckExpr.isNull(ColumnRef.of('posts', 'user_id')));
+    expect(userId.neq(null)).toEqual(NullCheckExpr.isNotNull(ColumnRef.of('posts', 'user_id')));
   });
 
   it('wraps like in NotExpr', () => {

@@ -40,6 +40,19 @@ identity.
 
 Full semantic validation happens in target/family migration planners and runners at execution/planning time.
 
+## What `ops.json` does NOT contain
+
+`ops.json` carries the **post-lowering execution form** of every operation. The runner is a dispatcher, not a compiler — it does not invoke the lowerer, the codec system, the contract validator, or any other build-time pipeline at apply time. See [ADR 192 — ops.json is the migration contract](../../../docs/architecture%20docs/adrs/ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md) §"No compilation at apply time".
+
+Concretely, an `ops.json` file does not contain:
+
+- **TypeScript** or any other source code. `migration.ts` is authoring sugar; apply never imports it.
+- **Codec metadata** (`codec`, `codecId`, `typeParams`). Codecs are resolved during lowering; their wire-format outputs land in `params[]` (SQL) or as literals in the structured command (Mongo). See [ADR 212 — AST-bound codec resolution](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20AST-bound%20codec%20resolution.md).
+- **Pre-lowering ASTs.** Every step is in the form the driver consumes — `(sql_template, params[])` for SQL, structured `kind`-discriminated commands for Mongo.
+- **Contract references** that require resolution at apply time. The runner does not need the contract to execute steps (it reads it for marker/ledger bookkeeping, not for compilation).
+
+Tampering and corruption are detected by `migrationId` (content-addressed hash of `migration.json` + `ops.json`; see [ADR 199](../../../docs/architecture%20docs/adrs/ADR%20199%20-%20Storage-only%20migration%20identity.md)). The "no apply-time compilation" invariant is what makes that hash meaningful: it pins what executes, not just what the author intended.
+
 ## Architecture
 
 ```mermaid
@@ -50,7 +63,7 @@ graph TD
     IO --> META["metadata.ts<br/>MigrationMetadata, MigrationHints"]
     IO --> PKG["package.ts<br/>MigrationPackage, MigrationOps"]
     HASH --> IO
-    HASH --> CAN["canonicalize-json.ts"]
+    HASH --> CAN["@prisma-next/framework-components/utils<br/>canonicalizeJson"]
     HASH --> CP["@prisma-next/emitter<br/>canonicalizeContract"]
     GRAPH --> GR["graph.ts<br/>MigrationGraph, MigrationEdge"]
     GRAPH --> ABS["@prisma-next/migration-tools/constants<br/>EMPTY_CONTRACT_HASH"]

@@ -5,12 +5,14 @@ import {
   AndExpr,
   type AnyExpression,
   BinaryExpr,
+  type CodecRef,
   ColumnRef,
   ExistsExpr,
   ProjectionItem,
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { Expression, ScopeField } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
@@ -104,11 +106,13 @@ export function createModelAccessor<
       }
       const traits = context.codecDescriptors.descriptorFor(column.codecId)?.traits ?? [];
       const operations = opsByCodecId.get(column.codecId) ?? [];
+      const codec = codecRefForStorageColumn(contract.storage, tableName, columnName);
       return createScalarFieldAccessor(
         tableName,
         columnName,
         column.codecId,
         column.nullable,
+        codec,
         traits,
         operations,
         context,
@@ -132,6 +136,7 @@ function createScalarFieldAccessor(
   columnName: string,
   codecId: string,
   nullable: boolean,
+  codec: CodecRef | undefined,
   traits: readonly string[],
   operations: readonly NamedOp[],
   context: ExecutionContext,
@@ -140,11 +145,12 @@ function createScalarFieldAccessor(
   const comparisonEntries: Array<[string, unknown]> = [];
   for (const [name, meta] of Object.entries(COMPARISON_METHODS_META)) {
     if (meta.traits.some((t) => !traits.includes(t))) continue;
-    comparisonEntries.push([name, meta.create(column, codecId)]);
+    comparisonEntries.push([name, meta.create(column, codec)]);
   }
 
   const accessor = {
-    returnType: { codecId, nullable },
+    returnType: { codecId, nullable, codec },
+    codec,
     buildAst: () => column,
     ...Object.fromEntries(comparisonEntries),
   } as Expression<ScopeField> & Record<string, unknown>;
@@ -178,10 +184,11 @@ function createExtensionMethodFactory(
     }
 
     const resultAst = result.buildAst();
+    const returnCodec: CodecRef = { codecId: returnCodecId };
     const methods: Record<string, unknown> = {};
     for (const [resultMethodName, meta] of Object.entries(COMPARISON_METHODS_META)) {
       if (meta.traits.some((t) => !returnTraits.includes(t))) continue;
-      methods[resultMethodName] = meta.create(resultAst, returnCodecId);
+      methods[resultMethodName] = meta.create(resultAst, returnCodec);
     }
     return methods;
   };

@@ -54,7 +54,7 @@ describe('rich SQL AST', () => {
     const update = UpdateAst.table(table);
     const del = DeleteAst.from(table);
     const column = ColumnRef.of('user', 'id');
-    const param = ParamRef.of(0, { name: 'id', codecId: 'pg/int4@1' });
+    const param = ParamRef.of(0, { name: 'id', codec: { codecId: 'pg/int4@1' } });
     const literal = LiteralExpr.of('alice');
     const binary = BinaryExpr.eq(column, param);
 
@@ -90,7 +90,7 @@ describe('rich SQL AST', () => {
     const base = SelectAst.from(TableSource.named('user'));
     const where = BinaryExpr.eq(
       ColumnRef.of('user', 'id'),
-      ParamRef.of(0, { name: 'id', codecId: 'pg/int4@1' }),
+      ParamRef.of(0, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
     );
 
     const next = base
@@ -128,7 +128,7 @@ describe('rich SQL AST', () => {
         'email',
         lowerEmail(
           ColumnRef.of('user', 'email'),
-          ParamRef.of(0, { name: 'email', codecId: 'pg/text@1' }),
+          ParamRef.of(0, { name: 'email', codec: { codecId: 'pg/text@1' } }),
         ),
       )
       .withJoins([
@@ -142,7 +142,7 @@ describe('rich SQL AST', () => {
         AndExpr.of([
           BinaryExpr.eq(
             ColumnRef.of('user', 'id'),
-            ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+            ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
           ),
           ExistsExpr.exists(
             SelectAst.from(TableSource.named('comment'))
@@ -173,7 +173,7 @@ describe('rich SQL AST', () => {
     expect(rewritten.projection[0]?.expr).toEqual(ColumnRef.of('member', 'id'));
     expect(rewritten.projection[1]?.expr?.kind).toBe('operation');
     expect((rewritten.projection[1]?.expr as OperationExpr).args[0]).toEqual(
-      ParamRef.of(10, { name: 'email', codecId: 'pg/text@1' }),
+      ParamRef.of(10, { name: 'email', codec: { codecId: 'pg/text@1' } }),
     );
     expect(rewritten.joins?.[0]?.on).toEqual(
       EqColJoinOn.of(
@@ -188,12 +188,18 @@ describe('rich SQL AST', () => {
 
   it('folds, collects column refs, and exposes base column refs', () => {
     const email = ColumnRef.of('user', 'email');
-    const op = lowerEmail(email, ParamRef.of(3, { name: 'needle', codecId: 'pg/text@1' }));
+    const op = lowerEmail(
+      email,
+      ParamRef.of(3, { name: 'needle', codec: { codecId: 'pg/text@1' } }),
+    );
     const where = AndExpr.of([
       BinaryExpr.eq(op, LiteralExpr.of('alice@example.com')),
       BinaryExpr.in(
         ColumnRef.of('user', 'status'),
-        ListExpression.of([ParamRef.of(4, { codecId: 'pg/text@1' }), LiteralExpr.of('active')]),
+        ListExpression.of([
+          ParamRef.of(4, { codec: { codecId: 'pg/text@1' } }),
+          LiteralExpr.of('active'),
+        ]),
       ),
     ]);
 
@@ -226,21 +232,33 @@ describe('rich SQL AST', () => {
 
   it('negates where expressions through not()', () => {
     expect(
-      BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })).not(),
+      BinaryExpr.eq(
+        ColumnRef.of('user', 'id'),
+        ParamRef.of(0, { codec: { codecId: 'pg/int4@1' } }),
+      ).not(),
     ).toEqual(
       new NotExpr(
-        BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(0, { codec: { codecId: 'pg/int4@1' } }),
+        ),
       ),
     );
     expect(
       AndExpr.of([
-        BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(0, { codec: { codecId: 'pg/int4@1' } }),
+        ),
         NullCheckExpr.isNull(ColumnRef.of('user', 'deletedAt')),
       ]).not(),
     ).toEqual(
       new NotExpr(
         AndExpr.of([
-          BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(0, { codecId: 'pg/int4@1' })),
+          BinaryExpr.eq(
+            ColumnRef.of('user', 'id'),
+            ParamRef.of(0, { codec: { codecId: 'pg/int4@1' } }),
+          ),
           NullCheckExpr.isNull(ColumnRef.of('user', 'deletedAt')),
         ]),
       ),

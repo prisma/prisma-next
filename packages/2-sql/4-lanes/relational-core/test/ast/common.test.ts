@@ -26,12 +26,12 @@ describe('ast/common', () => {
 
     const withCodec = ParamRef.of('test', {
       name: 'field',
-      codecId: 'pg/text@1',
+      codec: { codecId: 'pg/text@1' },
     });
     expect(withCodec).toMatchObject({
       value: 'test',
       name: 'field',
-      codecId: 'pg/text@1',
+      codec: { codecId: 'pg/text@1' },
     });
   });
 
@@ -94,7 +94,7 @@ describe('ast/common', () => {
     );
   });
 
-  it('creates ProjectionItem with optional codecId', () => {
+  it('creates ProjectionItem with optional codec', () => {
     const expr = col('user', 'id');
 
     const withoutCodec = ProjectionItem.of('id', expr);
@@ -102,19 +102,19 @@ describe('ast/common', () => {
       kind: 'projection-item',
       alias: 'id',
       expr,
-      codecId: undefined,
+      codec: undefined,
     });
 
-    const withCodec = ProjectionItem.of('id', expr, 'pg/int4@1');
+    const withCodec = ProjectionItem.of('id', expr, { codecId: 'pg/int4@1' });
     expect(withCodec).toMatchObject({
       kind: 'projection-item',
       alias: 'id',
       expr,
-      codecId: 'pg/int4@1',
+      codec: { codecId: 'pg/int4@1' },
     });
 
-    const stamped = withoutCodec.withCodecId('pg/int4@1');
-    expect(stamped.codecId).toBe('pg/int4@1');
+    const stamped = withoutCodec.withCodec({ codecId: 'pg/int4@1' });
+    expect(stamped.codec).toEqual({ codecId: 'pg/int4@1' });
     expect(stamped.alias).toBe('id');
     expect(stamped.expr).toBe(expr);
   });

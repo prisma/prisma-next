@@ -570,7 +570,7 @@ describe('createRuntime', () => {
         .withWhere(
           BinaryExpr.eq(
             ColumnRef.of('users', 'name'),
-            ParamRef.of('Alice', { name: 'secret', codecId: 'test/async-secret@1' }),
+            ParamRef.of('Alice', { name: 'secret', codec: { codecId: 'test/async-secret@1' } }),
           ),
         );
       const plan: SqlQueryPlan = {
@@ -621,7 +621,7 @@ describe('createRuntime', () => {
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('users', 'name'),
-          ParamRef.of('Alice', { name: 'secret', codecId: 'test/failing-secret@1' }),
+          ParamRef.of('Alice', { name: 'secret', codec: { codecId: 'test/failing-secret@1' } }),
         ),
       );
     const plan: SqlQueryPlan = {

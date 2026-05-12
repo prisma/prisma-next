@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Contract } from '@prisma-next/contract/types';
+import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { describe, expect, it } from 'vitest';
-import { canonicalizeJson } from '../src/canonicalize-json';
 import { computeMigrationHash, verifyMigrationHash } from '../src/hash';
 import { createTestContract, createTestMetadata, createTestOps } from './fixtures';
 

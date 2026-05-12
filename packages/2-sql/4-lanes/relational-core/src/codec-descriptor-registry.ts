@@ -1,5 +1,7 @@
-import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
+import type { CodecDescriptor, CodecRef } from '@prisma-next/framework-components/codec';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AnyCodecDescriptor } from './ast/codec-types';
+import { codecRefForStorageColumn } from './codec-ref-for-column';
 import type { CodecDescriptorRegistry } from './query-lane-context';
 
 /**
@@ -14,6 +16,7 @@ import type { CodecDescriptorRegistry } from './query-lane-context';
  */
 export function buildCodecDescriptorRegistry(
   allDescriptors: ReadonlyArray<AnyCodecDescriptor>,
+  storage?: SqlStorage,
 ): CodecDescriptorRegistry {
   type AnyDescriptor = CodecDescriptor<unknown>;
   const byId = new Map<string, AnyDescriptor>();
@@ -41,6 +44,10 @@ export function buildCodecDescriptorRegistry(
   return {
     descriptorFor(codecId: string): AnyDescriptor | undefined {
       return byId.get(codecId);
+    },
+    codecRefForColumn(table: string, column: string): CodecRef | undefined {
+      if (!storage) return undefined;
+      return codecRefForStorageColumn(storage, table, column);
     },
     *values(): IterableIterator<AnyDescriptor> {
       yield* byId.values();

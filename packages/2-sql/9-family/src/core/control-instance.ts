@@ -31,6 +31,11 @@ import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as sqlValidateContract } from '@prisma-next/sql-contract/validate';
+import type {
+  AnyQueryAst,
+  LoweredStatement,
+  LowererContext,
+} from '@prisma-next/sql-relational-core/ast';
 import {
   ensureSchemaStatement,
   ensureTableStatement,
@@ -235,6 +240,8 @@ export interface SqlControlFamilyInstance
 
   inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst;
 
+  lowerAst(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement;
+
   toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview;
 }
 
@@ -251,7 +258,9 @@ function isSqlControlAdapter<TTargetId extends string>(
     'readMarker' in value &&
     typeof (value as { readMarker: unknown }).readMarker === 'function' &&
     'readAllMarkers' in value &&
-    typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function'
+    typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function' &&
+    'lower' in value &&
+    typeof (value as { lower: unknown }).lower === 'function'
   );
 }
 
@@ -658,6 +667,10 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
     inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst {
       return sqlSchemaIrToPslAst(schemaIR);
+    },
+
+    lowerAst(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement {
+      return getControlAdapter().lower(ast, context);
     },
 
     toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview {

@@ -1,8 +1,8 @@
 import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { canonicalizeJson } from '../src/canonicalize-json';
 import { materialiseMigrationPackage } from '../src/io';
 import { createTestMetadata, createTestOps } from './fixtures';
 

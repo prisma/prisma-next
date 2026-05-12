@@ -179,7 +179,7 @@ function createTestSetup(middleware: readonly SqlMiddleware[]) {
  */
 function createJsonProjectionPlan(alias: string): SqlExecutionPlan {
   const ast = SelectAst.from(TableSource.named('users')).withProjection([
-    ProjectionItem.of(alias, ColumnRef.of('users', alias), 'pg/jsonb@1'),
+    ProjectionItem.of(alias, ColumnRef.of('users', alias), { codecId: 'pg/jsonb@1' }),
   ]);
   return {
     sql: 'select profile from users',

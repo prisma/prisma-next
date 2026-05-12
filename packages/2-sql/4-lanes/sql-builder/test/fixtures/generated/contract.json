@@ -90,7 +90,10 @@
           "nullable": true,
           "type": {
             "codecId": "pg/vector@1",
-            "kind": "scalar"
+            "kind": "scalar",
+            "typeParams": {
+              "length": 3
+            }
           }
         },
         "id": {
@@ -310,7 +313,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:16af8b9b7863e5312d0bea826c6e7391d5645a8a2c6a365aaf25f51fdcde7391",
+    "storageHash": "sha256:a3560bb03dbb07c70c7a8d4aaf79628b2a61091159042e6d664408d220ddea1f",
     "tables": {
       "articles": {
         "columns": {
@@ -369,7 +372,10 @@
           "embedding": {
             "codecId": "pg/vector@1",
             "nativeType": "vector",
-            "nullable": true
+            "nullable": true,
+            "typeParams": {
+              "length": 3
+            }
           },
           "id": {
             "codecId": "pg/int4@1",
@@ -532,6 +538,13 @@
               "package": "@prisma-next/extension-pgvector/codec-types"
             }
           ]
+        },
+        "operationTypes": {
+          "import": {
+            "alias": "PgVectorOperationTypes",
+            "named": "OperationTypes",
+            "package": "@prisma-next/extension-pgvector/operation-types"
+          }
         },
         "queryOperationTypes": {
           "import": {

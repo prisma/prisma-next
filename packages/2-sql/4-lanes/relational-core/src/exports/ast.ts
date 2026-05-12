@@ -5,4 +5,3 @@ export * from '../ast/sql-codec-helpers';
 export * from '../ast/sql-codecs';
 export * from '../ast/types';
 export * from '../ast/util';
-export * from '../ast/validate-param-refs';

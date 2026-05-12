@@ -110,7 +110,7 @@ describe('Postgres rich AST lowering', () => {
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'id'),
-          ParamRef.of(1, { name: 'userId', codecId: 'pg/int4@1' }),
+          ParamRef.of(1, { name: 'userId', codec: { codecId: 'pg/int4@1' } }),
         ),
       )
       .withOrderBy([OrderByItem.desc(ColumnRef.of('user', 'createdAt'))])
@@ -130,7 +130,7 @@ describe('Postgres rich AST lowering', () => {
     const distance = new OperationExpr({
       method: 'cosineDistance',
       self: ColumnRef.of('user', 'vector'),
-      args: [ParamRef.of([1, 2, 3], { name: 'other', codecId: 'pg/vector@1' })],
+      args: [ParamRef.of([1, 2, 3], { name: 'other', codec: { codecId: 'pg/vector@1' } })],
       returns: { codecId: 'core/float8', nullable: false },
       lowering: {
         targetFamily: 'sql',
@@ -171,11 +171,11 @@ describe('Postgres rich AST lowering', () => {
     const insertAst = InsertAst.into(TableSource.named('user'))
       .withRows([
         {
-          id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
-          email: ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
+          id: ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
+          email: ParamRef.of('a@example.com', { name: 'email', codec: { codecId: 'pg/text@1' } }),
         },
         {
-          id: ParamRef.of(2, { name: 'id', codecId: 'pg/int4@1' }),
+          id: ParamRef.of(2, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
           email: new DefaultValueExpr(),
         },
       ])
@@ -197,11 +197,13 @@ describe('Postgres rich AST lowering', () => {
     expect(insertSql).toContain('RETURNING "user"."id", "user"."email"');
 
     const updateAst = UpdateAst.table(TableSource.named('user'))
-      .withSet({ email: ParamRef.of('b@example.com', { name: 'email', codecId: 'pg/text@1' }) })
+      .withSet({
+        email: ParamRef.of('b@example.com', { name: 'email', codec: { codecId: 'pg/text@1' } }),
+      })
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'id'),
-          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
         ),
       )
       .withReturning([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]);
@@ -214,7 +216,7 @@ describe('Postgres rich AST lowering', () => {
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'id'),
-          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }),
         ),
       )
       .withReturning([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]);
@@ -225,7 +227,7 @@ describe('Postgres rich AST lowering', () => {
   it('renders RETURNING with `AS <alias>` when the projection alias differs from the column name', () => {
     const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
     const insertAst = InsertAst.into(TableSource.named('user'))
-      .withRows([{ id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }) }])
+      .withRows([{ id: ParamRef.of(1, { name: 'id', codec: { codecId: 'pg/int4@1' } }) }])
       .withReturning([ProjectionItem.of('user_id', ColumnRef.of('user', 'id'))]);
 
     const sql = adapter.lower(insertAst, { contract }).sql;

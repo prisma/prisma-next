@@ -6,6 +6,7 @@ import {
 import { type Expression, toExpr } from '@prisma-next/sql-relational-core/expression';
 
 const TEXT = 'pg/text@1' as const;
+const TEXT_REF = { codecId: TEXT } as const;
 
 export type ProximityTerm = unknown;
 
@@ -55,12 +56,12 @@ export class ParadeDbProximityChain
         'paradeDbProximity: chain must have at least one .within(distance, term) step',
       );
     }
-    const args: AnyExpression[] = [toExpr(this.start, TEXT)];
+    const args: AnyExpression[] = [toExpr(this.start, TEXT_REF)];
     let template = '({{self}}';
     this.steps.forEach((step, i) => {
       const op = step.ordered ? '##>' : '##';
       args.push(LiteralExpr.of(step.distance));
-      args.push(toExpr(step.term, TEXT));
+      args.push(toExpr(step.term, TEXT_REF));
       template += ` ${op} {{arg${2 * i}}} ${op} {{arg${2 * i + 1}}}`;
     });
     template += ')';

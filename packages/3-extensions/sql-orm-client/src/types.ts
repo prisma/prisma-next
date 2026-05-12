@@ -10,6 +10,7 @@ import {
   type AnyExpression,
   BinaryExpr,
   type BinaryOp,
+  type CodecRef,
   type CodecTrait,
   ListExpression,
   NullCheckExpr,
@@ -19,7 +20,6 @@ import {
 import type { Expression } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { ComputeColumnJsType, RuntimeScope } from '@prisma-next/sql-relational-core/types';
-import { ifDefined } from '@prisma-next/utils/defined';
 import type { RowSelection } from './collection-internal-types';
 
 export type AggregateFn = 'count' | 'sum' | 'avg' | 'min' | 'max';
@@ -255,46 +255,19 @@ type FieldOperations<
     : unknown
   : unknown;
 
-/**
- * Resolve the unique column ref carried by `left` so its surrounding `ParamRef` can dispatch through `forColumn`. The previous implementation only matched bare `column-ref` expressions, which lost refs the moment the expression got wrapped (`upper(f.id)`, `BinaryExpr`, function-call expressions, etc.) — and column-aware dispatch (AC-5) silently degraded for any predicate that touched a computed column.
- *
- * Walking via `collectColumnRefs()` and accepting only a single unambiguous ref gives `eq(upper(f.id), value)` and friends correct dispatch without inventing refs for ambiguous shapes (e.g. `eq(concat(f.firstName, f.lastName), value)` returns `undefined` and falls through to the codec-id path, which is correct for non-parameterized comparisons).
- */
-function refsFromLeft(left: AnyExpression): { table: string; column: string } | undefined {
-  if (left.kind === 'column-ref') {
-    return { table: left.table, column: left.column };
-  }
-  const columnRefs = left.collectColumnRefs();
-  if (columnRefs.length !== 1) return undefined;
-  const single = columnRefs[0];
-  if (!single) return undefined;
-  return { table: single.table, column: single.column };
+function param(codec: CodecRef | undefined, value: unknown): ParamRef {
+  if (codec === undefined) return ParamRef.of(value);
+  return ParamRef.of(value, { codec });
 }
 
-function param(
-  codecId: string | undefined,
-  value: unknown,
-  refs: { table: string; column: string } | undefined,
-): ParamRef {
-  if (codecId === undefined && refs === undefined) return ParamRef.of(value);
-  return ParamRef.of(value, {
-    ...ifDefined('codecId', codecId),
-    ...ifDefined('refs', refs),
-  });
-}
-
-function paramList(
-  codecId: string | undefined,
-  values: readonly unknown[],
-  refs: { table: string; column: string } | undefined,
-): ListExpression {
-  return ListExpression.of(values.map((value) => param(codecId, value, refs)));
+function paramList(codec: CodecRef | undefined, values: readonly unknown[]): ListExpression {
+  return ListExpression.of(values.map((value) => param(codec, value)));
 }
 
 // never[] is intentional: factories have heterogeneous signatures (value: unknown, values: readonly unknown[], pattern: string, etc.) but are only called through the typed ComparisonMethodFns interface, never through this type directly.
 type MethodFactory = (
   left: AnyExpression,
-  codecId: string | undefined,
+  codec: CodecRef | undefined,
 ) => (...args: never[]) => unknown;
 
 type ComparisonMethodMeta = {
@@ -303,17 +276,17 @@ type ComparisonMethodMeta = {
 };
 
 function scalarComparisonMethod(op: BinaryOp) {
-  return ((left, codecId) => (value: unknown) =>
-    new BinaryExpr(op, left, param(codecId, value, refsFromLeft(left)))) satisfies MethodFactory;
+  return ((left, codec) => (value: unknown) => {
+    if (value === null && (op === 'eq' || op === 'neq')) {
+      return op === 'eq' ? NullCheckExpr.isNull(left) : NullCheckExpr.isNotNull(left);
+    }
+    return new BinaryExpr(op, left, param(codec, value));
+  }) satisfies MethodFactory;
 }
 
 function listComparisonMethod(op: BinaryOp) {
-  return ((left, codecId) => (values: readonly unknown[]) =>
-    new BinaryExpr(
-      op,
-      left,
-      paramList(codecId, values, refsFromLeft(left)),
-    )) satisfies MethodFactory;
+  return ((left, codec) => (values: readonly unknown[]) =>
+    new BinaryExpr(op, left, paramList(codec, values))) satisfies MethodFactory;
 }
 
 /**

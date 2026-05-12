@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:d71e27db7ae6204cbdaaf5a439a93d18602af3248b161eed6429f2a5c044ee55'>;
+  StorageHashBase<'sha256:a47c56555b1a7f1440fc1450b6dc155aa12ed482043fdb031ec4a3917fc8b20d'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:e216decd356eea44980cf151c6044d85fb936e1fad093fbfb93ca34b96cf5847'>;
 export type ProfileHash =
@@ -69,7 +69,7 @@ export type FieldOutputTypes = {
     readonly title: CodecTypes['pg/text@1']['output'];
     readonly userId: CodecTypes['pg/int4@1']['output'];
     readonly views: CodecTypes['pg/int4@1']['output'];
-    readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
+    readonly embedding: Vector<3> | null;
   };
   readonly Profile: {
     readonly id: CodecTypes['pg/int4@1']['output'];
@@ -209,6 +209,7 @@ type ContractBase = ContractType<
             readonly nativeType: 'vector';
             readonly codecId: 'pg/vector@1';
             readonly nullable: true;
+            readonly typeParams: { readonly length: 3 };
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
@@ -396,7 +397,11 @@ type ContractBase = ContractType<
         };
         readonly embedding: {
           readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/vector@1' };
+          readonly type: {
+            readonly kind: 'scalar';
+            readonly codecId: 'pg/vector@1';
+            readonly typeParams: { readonly length: 3 };
+          };
         };
       };
       readonly relations: {
@@ -602,6 +607,13 @@ type ContractBase = ContractType<
               readonly package: '@prisma-next/extension-pgvector/codec-types';
             },
           ];
+        };
+        readonly operationTypes: {
+          readonly import: {
+            readonly alias: 'PgVectorOperationTypes';
+            readonly named: 'OperationTypes';
+            readonly package: '@prisma-next/extension-pgvector/operation-types';
+          };
         };
         readonly queryOperationTypes: {
           readonly import: {

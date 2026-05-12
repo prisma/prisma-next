@@ -38,8 +38,7 @@ function usersColParam(
   const columnMeta = columns?.[column];
   return ParamRef.of(value, {
     name: column,
-    codecId: columnMeta?.codecId ?? 'unknown',
-    refs: { table: 'users', column },
+    codec: { codecId: columnMeta?.codecId ?? 'unknown' },
   });
 }
 
@@ -315,8 +314,7 @@ describe('query plan mutations', () => {
         ColumnRef.of('users', 'id'),
         ParamRefClass.of(value, {
           name: 'id',
-          codecId: 'pg/int4@1',
-          refs: { table: 'users', column: 'id' },
+          codec: { codecId: 'pg/int4@1' },
         }),
       );
     }

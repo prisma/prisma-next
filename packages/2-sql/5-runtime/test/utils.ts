@@ -5,12 +5,13 @@ import type {
   CodecMeta,
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
-import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import {
   instantiateExecutionStack,
   type RuntimeDriverDescriptor,
 } from '@prisma-next/framework-components/execution';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
+import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -139,9 +140,31 @@ export function buildTestContractCodecs(
   for (const codec of codecs) {
     byId.set(codec.id, codec);
   }
+  // Canonical-key cache: production `forCodecRef` memoizes per `(codecId, canonicalize(typeParams))`. Tests resolve by codecId, but key the cache on the canonical pair so callers passing distinct typeParams get distinct (still codec-id-templated) entries — and so this helper cannot silently coalesce them.
+  const byCanonicalKey = new Map<string, Codec<string>>();
   return {
     forColumn: () => undefined,
-    forCodecId: (codecId) => byId.get(codecId),
+    forCodecRef: (ref) => {
+      const canonicalKey = canonicalizeJson({
+        codecId: ref.codecId,
+        ...(ref.typeParams !== undefined ? { typeParams: ref.typeParams } : {}),
+      });
+      const cached = byCanonicalKey.get(canonicalKey);
+      if (cached) return cached;
+      const template = byId.get(ref.codecId);
+      if (!template) {
+        throw runtimeError(
+          'RUNTIME.CODEC_DESCRIPTOR_MISSING',
+          `Test ContractCodecRegistry has no codec for codecId '${ref.codecId}'.`,
+          {
+            codecId: ref.codecId,
+            ...(ref.typeParams !== undefined ? { typeParams: ref.typeParams } : {}),
+          },
+        );
+      }
+      byCanonicalKey.set(canonicalKey, template);
+      return template;
+    },
   };
 }
 
@@ -152,6 +175,24 @@ export function buildTestContractCodecs(
 export function descriptorsFromCodecs(
   codecs: ReadonlyArray<Codec<string>>,
 ): ReadonlyArray<CodecDescriptor> {
+  // Permissive paramsSchema for synthesized test descriptors: accepts any
+  // shape (incl. undefined) and passes it through. Stubs do not encode
+  // parameterization, so marking them `isParameterized: true` with this
+  // schema lets the runtime integrity check tolerate columns that legitimately
+  // carry typeParams (e.g. `sql/char@1` length=36) without re-introducing
+  // the legacy "non-parameterized + typeParams" silent skip.
+  // Permissive schema for synthesized test descriptors. `validate()` always
+  // succeeds and discards input, narrowed to `void` to match the
+  // `paramsSchema: StandardSchemaV1<void, void>` slot on the descriptor.
+  // The factory ignores typeParams, so typing the validated output as `void`
+  // is honest about what the stub does with the value.
+  const acceptAnyParamsSchema = {
+    '~standard': {
+      version: 1 as const,
+      vendor: 'sql-runtime/test-utils',
+      validate: (_value: unknown) => ({ value: undefined }),
+    },
+  };
   const descriptors: CodecDescriptor[] = [];
   for (const instance of codecs) {
     const legacy = instance as {
@@ -163,8 +204,8 @@ export function descriptorsFromCodecs(
       codecId: instance.id,
       traits: legacy.traits ?? [],
       targetTypes: legacy.targetTypes ?? [],
-      paramsSchema: voidParamsSchema,
-      isParameterized: false,
+      paramsSchema: acceptAnyParamsSchema,
+      isParameterized: true,
       factory: () => () => instance,
       ...(legacy.meta !== undefined ? { meta: legacy.meta } : {}),
     });
@@ -261,19 +302,54 @@ export type StubAdapter = Adapter<SelectAst, Contract<SqlStorage>, LoweredStatem
  * The stub adapter includes simple codecs for common test types (pg/int4@1, pg/text@1, pg/timestamptz@1) to enable type inference in tests without requiring the postgres adapter package.
  */
 export function createStubAdapter(): StubAdapter {
-  // Stub codecs for common test types — match the codec IDs used in test contracts (pg/int4@1, pg/text@1, pg/timestamptz@1) without importing from the postgres adapter package.
+  // Stub codecs for codec IDs that test contracts may reference. The set must
+  // be complete enough to satisfy `assertColumnCodecIntegrity` against any
+  // emitted test contract; the encode/decode bodies are passthrough since
+  // the stub adapter never executes against a real driver.
+  // The encode/decode bodies pass through; widen TInput to a JSON-safe type
+  // so `defineTestCodec` does not require explicit JSON round-trip helpers.
+  const passthroughCodec = (typeId: string, targetType: string): Codec<string> =>
+    defineTestCodec({
+      typeId,
+      targetTypes: [targetType],
+      encode: (value: string | number | boolean | null) => value,
+      decode: (wire: string | number | boolean | null) => wire,
+    });
   const codecs: ReadonlyArray<Codec<string>> = [
+    passthroughCodec('pg/bit@1', 'bit'),
+    passthroughCodec('pg/bool@1', 'bool'),
+    passthroughCodec('pg/bytea@1', 'bytea'),
+    passthroughCodec('pg/float4@1', 'float4'),
+    passthroughCodec('pg/float8@1', 'float8'),
+    passthroughCodec('pg/int2@1', 'int2'),
     defineTestCodec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
       encode: (value: number) => value,
       decode: (wire: number) => wire,
     }),
+    passthroughCodec('pg/int8@1', 'int8'),
+    passthroughCodec('pg/interval@1', 'interval'),
+    passthroughCodec('pg/json@1', 'json'),
+    passthroughCodec('pg/jsonb@1', 'jsonb'),
+    passthroughCodec('pg/numeric@1', 'numeric'),
     defineTestCodec({
       typeId: 'pg/text@1',
       targetTypes: ['text'],
       encode: (value: string) => value,
       decode: (wire: string) => wire,
+    }),
+    passthroughCodec('pg/time@1', 'time'),
+    defineTestCodec({
+      typeId: 'pg/timestamp@1',
+      targetTypes: ['timestamp'],
+      encode: (value: Date) => value,
+      decode: (wire: Date) => wire,
+      encodeJson: (value: Date) => value.toISOString(),
+      decodeJson: (json) => {
+        if (typeof json !== 'string') throw new Error('expected ISO date string');
+        return new Date(json);
+      },
     }),
     defineTestCodec({
       typeId: 'pg/timestamptz@1',
@@ -287,6 +363,11 @@ export function createStubAdapter(): StubAdapter {
         return new Date(json);
       },
     }),
+    passthroughCodec('pg/timetz@1', 'timetz'),
+    passthroughCodec('pg/varbit@1', 'varbit'),
+    passthroughCodec('pg/uuid@1', 'uuid'),
+    passthroughCodec('sql/char@1', 'char'),
+    passthroughCodec('sql/varchar@1', 'varchar'),
   ];
 
   return {

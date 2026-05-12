@@ -3,9 +3,9 @@ import type {
   MigrationMetadata,
   MigrationPackage,
 } from '@prisma-next/framework-components/control';
+import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { type } from 'arktype';
 import { basename, dirname, join, resolve } from 'pathe';
-import { canonicalizeJson } from './canonicalize-json';
 import {
   errorDirectoryExists,
   errorInvalidDestName,

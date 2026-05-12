@@ -32,32 +32,30 @@ function planWith(refs: readonly ParamRef[], values: readonly unknown[]): SqlExe
 }
 
 describe('createSqlParamRefMutator entries()', () => {
-  it('propagates ref.refs into ParamRefEntry.column', () => {
+  it('surfaces ParamRef.codec.codecId on each entry', () => {
     const ref = ParamRef.of('a@b.com', {
       name: 'p1',
-      codecId: 'sql/varchar@1',
-      refs: { table: 'user', column: 'email' },
+      codec: { codecId: 'sql/varchar@1' },
     });
     const mutator = createSqlParamRefMutator(planWith([ref], ['a@b.com']));
 
     const [entry] = [...mutator.entries()];
 
     expect(entry?.codecId).toBe('sql/varchar@1');
-    expect(entry?.column).toEqual({ table: 'user', name: 'email' });
   });
 
-  it('omits column for ParamRefs constructed without a refs binding', () => {
-    const ref = ParamRef.of(42, { name: 'p1', codecId: 'sql/int@1' });
+  it('yields codecId undefined for ParamRefs constructed without a codec', () => {
+    const ref = ParamRef.of(42, { name: 'p1' });
     const mutator = createSqlParamRefMutator(planWith([ref], [42]));
 
     const [entry] = [...mutator.entries()];
 
-    expect(entry?.codecId).toBe('sql/int@1');
-    expect(entry?.column).toBeUndefined();
+    expect(entry).toBeDefined();
+    expect(entry!.codecId).toBeUndefined();
   });
 
   it('returns originalParams by reference identity when no mutation happens', () => {
-    const ref = ParamRef.of(1, { name: 'p1', codecId: 'sql/int@1' });
+    const ref = ParamRef.of(1, { name: 'p1', codec: { codecId: 'sql/int@1' } });
     const plan = planWith([ref], [1]);
     const mutator = createSqlParamRefMutator(plan);
 
@@ -65,7 +63,7 @@ describe('createSqlParamRefMutator entries()', () => {
   });
 
   it('returns a frozen copy carrying the mutation after replaceValue', () => {
-    const ref = ParamRef.of(1, { name: 'p1', codecId: 'sql/int@1' });
+    const ref = ParamRef.of(1, { name: 'p1', codec: { codecId: 'sql/int@1' } });
     const plan = planWith([ref], [1]);
     const mutator = createSqlParamRefMutator(plan);
 
@@ -84,8 +82,8 @@ describe('createSqlParamRefMutator entries()', () => {
   });
 
   it('replaceValues writes every matching handle in one pass', () => {
-    const ref1 = ParamRef.of('a', { name: 'p1', codecId: 'sql/text@1' });
-    const ref2 = ParamRef.of('b', { name: 'p2', codecId: 'sql/text@1' });
+    const ref1 = ParamRef.of('a', { name: 'p1', codec: { codecId: 'sql/text@1' } });
+    const ref2 = ParamRef.of('b', { name: 'p2', codec: { codecId: 'sql/text@1' } });
     const plan = planWith([ref1, ref2], ['a', 'b']);
     const mutator = createSqlParamRefMutator(plan);
     const entries = [...mutator.entries()];
@@ -99,16 +97,13 @@ describe('createSqlParamRefMutator entries()', () => {
   });
 
   it('silently ignores handles that do not belong to the plan', () => {
-    const ref = ParamRef.of(1, { name: 'p1', codecId: 'sql/int@1' });
+    const ref = ParamRef.of(1, { name: 'p1', codec: { codecId: 'sql/int@1' } });
     const plan = planWith([ref], [1]);
     const mutator = createSqlParamRefMutator(plan);
-    // Smuggle in a foreign ParamRef — it carries the same phantom brand
-    // shape so it satisfies the type system, but the runtime identity
-    // check (`indexOf` on `refs`) rejects it.
     type AnyHandle = Parameters<typeof mutator.replaceValue>[0];
     const alien = ParamRef.of(2, {
       name: 'p2',
-      codecId: 'sql/int@1',
+      codec: { codecId: 'sql/int@1' },
     }) as unknown as AnyHandle;
 
     mutator.replaceValue(alien, 99);
@@ -118,7 +113,7 @@ describe('createSqlParamRefMutator entries()', () => {
   });
 
   it('falls back to ref.value when the params array is shorter than the ref list', () => {
-    const ref = ParamRef.of('default', { name: 'p1', codecId: 'sql/text@1' });
+    const ref = ParamRef.of('default', { name: 'p1', codec: { codecId: 'sql/text@1' } });
     const plan = planWith([ref], []);
     const mutator = createSqlParamRefMutator(plan);
 
@@ -127,7 +122,7 @@ describe('createSqlParamRefMutator entries()', () => {
   });
 
   it('returns an empty entry list when the plan has no ast', () => {
-    const ref = ParamRef.of(1, { name: 'p1', codecId: 'sql/int@1' });
+    const ref = ParamRef.of(1, { name: 'p1', codec: { codecId: 'sql/int@1' } });
     const plan = planWith([ref], [1]);
     const astless = { ...plan, ast: undefined } as unknown as SqlExecutionPlan;
     const mutator = createSqlParamRefMutator(astless);
@@ -136,7 +131,7 @@ describe('createSqlParamRefMutator entries()', () => {
   });
 
   it('sees the mutated value when entries() is re-walked after replaceValue', () => {
-    const ref = ParamRef.of(1, { name: 'p1', codecId: 'sql/int@1' });
+    const ref = ParamRef.of(1, { name: 'p1', codec: { codecId: 'sql/int@1' } });
     const plan = planWith([ref], [1]);
     const mutator = createSqlParamRefMutator(plan);
 

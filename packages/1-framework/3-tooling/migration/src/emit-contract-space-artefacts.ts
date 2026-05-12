@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
+import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { join } from 'pathe';
-import { canonicalizeJson } from './canonicalize-json';
 import type { ContractSpaceHeadRef } from './read-contract-space-head-ref';
 import { assertValidSpaceId } from './space-layout';
 

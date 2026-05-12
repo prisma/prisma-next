@@ -20,6 +20,7 @@ import {
   ProjectionItem,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 
 export function bindWhereExpr(contract: Contract<SqlStorage>, expr: AnyExpression): AnyExpression {
   return bindWhereExprNode(contract, expr);
@@ -118,14 +119,11 @@ function createParamRef(
   columnRef: ColumnRef,
   value: unknown,
 ): ParamRef {
-  const codecId = contract.storage.tables[columnRef.table]?.columns[columnRef.column]?.codecId;
-  if (!codecId) {
+  if (!contract.storage.tables[columnRef.table]?.columns[columnRef.column]) {
     throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
   }
-  return ParamRef.of(value, {
-    codecId,
-    refs: { table: columnRef.table, column: columnRef.column },
-  });
+  const codec = codecRefForStorageColumn(contract.storage, columnRef.table, columnRef.column);
+  return ParamRef.of(value, codec ? { codec } : undefined);
 }
 
 function createExpressionBinder(contract: Contract<SqlStorage>): ExpressionRewriter {
@@ -176,8 +174,7 @@ function bindSelectAst(contract: Contract<SqlStorage>, ast: SelectAst): SelectAs
         new ProjectionItem(
           projection.alias,
           bindProjectionExpr(contract, projection.expr),
-          projection.codecId,
-          projection.refs,
+          projection.codec,
         ),
     ),
     where: ast.where ? bindWhereExprNode(contract, ast.where) : undefined,

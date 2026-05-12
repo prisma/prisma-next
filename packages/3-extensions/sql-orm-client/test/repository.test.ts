@@ -39,8 +39,7 @@ describe('Collection construction', () => {
       BinaryExpr.gt(
         ColumnRef.of('posts', 'views'),
         ParamRef.of(1000, {
-          codecId: 'pg/int4@1',
-          refs: { table: 'posts', column: 'views' },
+          codec: { codecId: 'pg/int4@1' },
         }),
       ),
     );

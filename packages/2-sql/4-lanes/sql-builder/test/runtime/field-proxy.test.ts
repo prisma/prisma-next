@@ -1,5 +1,8 @@
+import { coreHash } from '@prisma-next/contract/types';
+import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { ColumnRef, IdentifierRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
+import { tableToScope } from '../../src/runtime/builder-base';
 import { ExpressionImpl } from '../../src/runtime/expression-impl';
 import { createFieldProxy } from '../../src/runtime/field-proxy';
 import { joinedScope, usersScope } from './test-helpers';
@@ -16,6 +19,7 @@ describe('createFieldProxy', () => {
     expect((idExpr as ExpressionImpl).returnType).toEqual({
       codecId: 'pg/int4@1',
       nullable: false,
+      codec: { codecId: 'pg/int4@1' },
     });
   });
 
@@ -46,14 +50,47 @@ describe('createFieldProxy', () => {
     expect((proxy as Record<string, unknown>)['nonexistent']).toBeUndefined();
   });
 
-  it('attaches refs metadata for top-level fields backed by a unique namespace', () => {
+  it('attaches codec metadata for top-level fields with a codec', () => {
     const proxy = createFieldProxy(usersScope);
     const idExpr = proxy.id as ExpressionImpl;
 
-    expect(idExpr.refs).toEqual({ table: 'users', column: 'id' });
+    expect(idExpr.codec).toEqual(usersScope.topLevel.id.codec);
   });
 
-  it('omits refs for top-level fields when multiple namespaces own the field', () => {
+  it('tableToScope resolves codec by storage table name when alias differs', () => {
+    const table: StorageTable = {
+      columns: {
+        embedding: {
+          codecId: 'pgvector/vector@1',
+          nativeType: 'vector',
+          nullable: false,
+          typeRef: 'Embedding1536',
+        },
+      },
+      primaryKey: { columns: ['embedding'] },
+      uniques: [],
+      indexes: [],
+      foreignKeys: [],
+    };
+    const storage: SqlStorage = {
+      tables: { Post: table },
+      types: {
+        Embedding1536: {
+          codecId: 'pgvector/vector@1',
+          nativeType: 'vector',
+          typeParams: { length: 1536 },
+        },
+      },
+      storageHash: coreHash('sha256:h'),
+    };
+    const scope = tableToScope('post_alias', table, { storage, tableName: 'Post' });
+    expect(scope.namespaces['post_alias']?.['embedding']?.codec).toEqual({
+      codecId: 'pgvector/vector@1',
+      typeParams: { length: 1536 },
+    });
+  });
+
+  it('codec is undefined for top-level fields without a codec', () => {
     const ambiguousScope = {
       topLevel: { name: { codecId: 'pg/text@1', nullable: false } },
       namespaces: {
@@ -64,6 +101,6 @@ describe('createFieldProxy', () => {
     const proxy = createFieldProxy(ambiguousScope);
     const nameExpr = proxy.name as ExpressionImpl;
 
-    expect(nameExpr.refs).toBeUndefined();
+    expect(nameExpr.codec).toBeUndefined();
   });
 });

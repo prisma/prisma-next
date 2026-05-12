@@ -121,14 +121,14 @@ describe('ast/insert', () => {
   it('rewrite descends into returning ProjectionItem.expr', () => {
     const insertAst = InsertAst.into(table('user'))
       .withValues({ id: param(1, 'id') })
-      .withReturning([ProjectionItem.of('id', col('user', 'id'), 'pg/int4@1')]);
+      .withReturning([ProjectionItem.of('id', col('user', 'id'), { codecId: 'pg/int4@1' })]);
 
     const rewritten = insertAst.rewrite({
       columnRef: (ref) => ColumnRef.of(ref.table, `${ref.column}_renamed`),
     });
 
     expect(rewritten.returning).toEqual([
-      ProjectionItem.of('id', ColumnRef.of('user', 'id_renamed'), 'pg/int4@1'),
+      ProjectionItem.of('id', ColumnRef.of('user', 'id_renamed'), { codecId: 'pg/int4@1' }),
     ]);
   });
 

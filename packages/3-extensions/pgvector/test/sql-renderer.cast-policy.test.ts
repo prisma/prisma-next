@@ -59,7 +59,7 @@ describe('pgvector cast policy', () => {
       .withWhere(
         BinaryExpr.eq(
           ColumnRef.of('user', 'vec'),
-          ParamRef.of([1, 2, 3], { name: 'vec', codecId: 'pg/vector@1' }),
+          ParamRef.of([1, 2, 3], { name: 'vec', codec: { codecId: 'pg/vector@1' } }),
         ),
       );
     const lowered = adapter.lower(ast, { contract: vectorContract });

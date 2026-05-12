@@ -16,6 +16,7 @@ export function sql<C extends Contract<SqlStorage>>(options: SqlOptions<C>): Db<
     queryOperationTypes: context.queryOperations.entries(),
     target: context.contract.target ?? 'unknown',
     storageHash: context.contract.storage.storageHash ?? 'unknown',
+    storage: context.contract.storage,
     applyMutationDefaults: (options) => context.applyMutationDefaults(options),
   };
 
