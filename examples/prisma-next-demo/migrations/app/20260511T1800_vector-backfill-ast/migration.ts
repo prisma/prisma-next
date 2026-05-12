@@ -28,7 +28,7 @@ export default class M extends Migration {
             .limit(1),
         run: () =>
           db.sql.post
-            .update({ embedding: [0.0, 0.0, 0.0] })
+            .update({ embedding: new Array(1536).fill(0) })
             .where((f, fns) => fns.eq(f.embedding, null)),
       }),
     ];
