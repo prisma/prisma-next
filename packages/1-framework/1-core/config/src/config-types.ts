@@ -25,12 +25,21 @@ export interface ContractConfig {
    */
   readonly source: ContractSourceProvider;
   /**
-   * Path to contract.json artifact. Defaults to 'src/prisma/contract.json'.
-   * The .d.ts types file will be colocated (e.g., contract.json -> contract.d.ts).
+   * Path to contract.json artifact. Providers that know an input path (PSL,
+   * `typescriptContractFromPath`) derive an output colocated with that input
+   * so this rarely needs to be set explicitly. The `.d.ts` types file is
+   * always emitted next to the JSON (e.g., `contract.json` → `contract.d.ts`).
    */
   readonly output?: string;
 }
 
+/**
+ * Last-resort fallback used by `normalizeContractConfig` when neither the
+ * caller nor the provider has supplied an `output`. Providers that carry
+ * an input path (PSL, `typescriptContractFromPath`) prefer a colocated
+ * default; this constant is only reached by providers like `typescriptContract`
+ * that hold an in-memory contract with no source path to anchor on.
+ */
 export const DEFAULT_CONTRACT_OUTPUT = 'src/prisma/contract.json';
 
 export function normalizeContractConfig(
