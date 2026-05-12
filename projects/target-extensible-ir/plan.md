@@ -65,7 +65,17 @@ The seven PRs below correspond to the seven milestones (M1, M2, M3, M4, M5a, M5b
 - [ ] Mongo unit + integration tests pass (`mongodb-memory-server`).
 - [ ] If the SPI shape needs to flex to accommodate Mongo, the change lands in M1's interfaces — this is the cheapest moment to find such a need.
 
-**Validation:** Mongo test suites pass. Family/target boundary is observable in code.
+**Validation gate** (must all pass for SATISFIED):
+
+- `pnpm typecheck` (workspace-wide; catches consumer breakage from any rename or SPI-base lowering).
+- `pnpm lint:deps` (no new layering violations).
+- `pnpm --filter '@prisma-next/mongo*' --filter '@prisma-next/family-mongo*' --filter '@prisma-next/mongo-target*' test` (Mongo unit tests across foundation, family, and target packages).
+- `pnpm test:integration` (the only path that exercises `mongodb-memory-server`).
+- Cross-package grep guard: after the IR class flip, grep the workspace for the deleted-or-renamed type names (`MongoIndex`, `MongoIndexOptions`, `MongoCollationOptions`, …) and confirm no consumer outside the Mongo packages still references the old shape.
+
+(Workspace-wide `pnpm test:packages` is intentionally not in the gate. The pre-existing fragility recorded under § Open items doesn't touch Mongo, but `pnpm test:packages` would run those failures and produce noise the implementer would have to manually triage every round. The Mongo-scoped `--filter` set is the surface M2 actually changes.)
+
+**Other validation:** Family/target boundary observable in code (see m1 R2 watch-points in `learnings.md` — particularly the lowering of `verifyCommonMongoSchema` + `parseMongoContractStructure` from abstract to concrete at the family layer).
 
 ### M3 — Postgres SPI shells + `validateContract` migration
 
