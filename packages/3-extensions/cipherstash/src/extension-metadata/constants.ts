@@ -99,6 +99,24 @@ export const CIPHERSTASH_CODEC_IDS = [
 export const CIPHERSTASH_CODEC_ID_SET: ReadonlySet<string> = new Set(CIPHERSTASH_CODEC_IDS);
 
 /**
+ * Closed union of every cipherstash codec id this package owns.
+ * Drives compile-time exhaustiveness for codec-id-keyed dispatch
+ * tables (e.g. `coerceToEnvelope` in `src/execution/operators.ts`)
+ * and for the free-standing helpers in `src/execution/helpers.ts`
+ * that validate a column's codec id against the cipherstash set.
+ */
+export type CipherstashCodecId = (typeof CIPHERSTASH_CODEC_IDS)[number];
+
+/**
+ * Type-guard form of {@link CIPHERSTASH_CODEC_ID_SET}. Narrows
+ * `string` to {@link CipherstashCodecId} for downstream
+ * cipherstash-only branches (e.g. helper-side codec validation).
+ */
+export function isCipherstashCodecId(codecId: string): codecId is CipherstashCodecId {
+  return CIPHERSTASH_CODEC_ID_SET.has(codecId);
+}
+
+/**
  * Cipherstash-namespaced codec traits. Used as the dispatch key for
  * the multi-codec predicate operators in `src/execution/operators.ts`
  * — operators register with `self: { traits: ['cipherstash:<x>'] }`
