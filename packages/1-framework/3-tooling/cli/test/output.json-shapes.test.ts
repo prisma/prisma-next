@@ -60,6 +60,10 @@ describe('MigrationApplyResult JSON shape (aggregate-walking)', () => {
         "timings",
       ]
     `);
+    // Pin the canonical perSpace ordering: extensions alphabetically,
+    // then the app. Reordering or accidentally sorting `perSpace` would
+    // break consumers that index by position rather than `spaceId`.
+    expect(result.perSpace.map((p) => p.spaceId)).toEqual(['pgvector', 'app']);
   });
 
   it('pins per-space entry shape so per-space markers and ordering survive future refactors', () => {
