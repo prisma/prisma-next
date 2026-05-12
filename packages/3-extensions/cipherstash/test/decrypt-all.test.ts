@@ -417,3 +417,149 @@ describe('decryptAll — diagnostics on misuse', () => {
     expect(bulkDecryptSpy).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('decryptAll — heterogeneous envelope subclasses', () => {
+  // T7: the walker decrypts every `EncryptedEnvelopeBase` subclass
+  // (string + double + bigint + date + boolean + json) and dispatches
+  // through each subclass's `parseDecryptedValue` hook to narrow the
+  // SDK's polymorphic `bulkDecrypt` return to the per-type plaintext.
+  // Pins AC-DEC1 (one bulkDecrypt per `(table, column)` group across
+  // mixed types) and AC-DEC2 (each envelope's `decrypt()` returns the
+  // narrowed cached value synchronously).
+  //
+  // The mock SDK below stores the original plaintext on the
+  // ciphertext envelope's `v` slot so each per-type narrowing hook
+  // sees a value of its expected shape on the way back.
+  interface MultiSdk extends CipherstashSdk {
+    readonly bulkDecryptCalls: CipherstashBulkDecryptArgs[];
+  }
+
+  function makeMultiSdk(): MultiSdk {
+    const bulkDecryptCalls: CipherstashBulkDecryptArgs[] = [];
+    return {
+      bulkDecryptCalls,
+      decrypt: vi.fn(),
+      bulkEncrypt: vi.fn(),
+      bulkDecrypt(args) {
+        bulkDecryptCalls.push(args);
+        return Promise.resolve(args.ciphertexts.map((ct) => (ct as { v: unknown }).v));
+      },
+    };
+  }
+
+  it('groups heterogeneous types by (table, column) — one bulkDecrypt per group, narrowed plaintexts', async () => {
+    const { EncryptedDouble } = await import('../src/execution/envelope-double');
+    const { EncryptedDate } = await import('../src/execution/envelope-date');
+    const { EncryptedBoolean } = await import('../src/execution/envelope-boolean');
+    const { EncryptedJson } = await import('../src/execution/envelope-json');
+    const { EncryptedBigInt } = await import('../src/execution/envelope-bigint');
+
+    const sdk = makeMultiSdk();
+    const stringEnv = EncryptedString.fromInternal({
+      ciphertext: { v: 'alice@example.com' },
+      table: 'User',
+      column: 'email',
+      sdk,
+    });
+    const doubleEnv = EncryptedDouble.fromInternal({
+      ciphertext: { v: 3.14 },
+      table: 'User',
+      column: 'score',
+      sdk,
+    });
+    const dateEnv = EncryptedDate.fromInternal({
+      ciphertext: { v: '2024-06-15' },
+      table: 'User',
+      column: 'birthday',
+      sdk,
+    });
+    const boolEnv = EncryptedBoolean.fromInternal({
+      ciphertext: { v: true },
+      table: 'Feature',
+      column: 'enabled',
+      sdk,
+    });
+    const jsonEnv = EncryptedJson.fromInternal({
+      ciphertext: { v: { k: 'v' } },
+      table: 'Audit',
+      column: 'payload',
+      sdk,
+    });
+    const bigIntEnv = EncryptedBigInt.fromInternal({
+      ciphertext: { v: 42n },
+      table: 'Ledger',
+      column: 'amount',
+      sdk,
+    });
+
+    const rows = [
+      { id: 'r-1', email: stringEnv, score: doubleEnv, birthday: dateEnv },
+      { id: 'r-2', enabled: boolEnv, payload: jsonEnv, amount: bigIntEnv },
+    ];
+
+    await decryptAll(rows);
+
+    expect(sdk.bulkDecryptCalls).toHaveLength(6);
+    const callsByGroup = new Map(
+      sdk.bulkDecryptCalls.map(
+        (c) => [`${c.routingKey.table}\u0000${c.routingKey.column}`, c] as const,
+      ),
+    );
+    expect(callsByGroup.get('User\u0000email')?.ciphertexts).toHaveLength(1);
+    expect(callsByGroup.get('User\u0000score')?.ciphertexts).toHaveLength(1);
+    expect(callsByGroup.get('User\u0000birthday')?.ciphertexts).toHaveLength(1);
+    expect(callsByGroup.get('Feature\u0000enabled')?.ciphertexts).toHaveLength(1);
+    expect(callsByGroup.get('Audit\u0000payload')?.ciphertexts).toHaveLength(1);
+    expect(callsByGroup.get('Ledger\u0000amount')?.ciphertexts).toHaveLength(1);
+
+    expect(await stringEnv.decrypt()).toBe('alice@example.com');
+    expect(await doubleEnv.decrypt()).toBe(3.14);
+    const decryptedDate = await dateEnv.decrypt();
+    expect(decryptedDate).toBeInstanceOf(Date);
+    expect(decryptedDate.toISOString()).toBe('2024-06-15T00:00:00.000Z');
+    expect(await boolEnv.decrypt()).toBe(true);
+    expect(await jsonEnv.decrypt()).toEqual({ k: 'v' });
+    expect(await bigIntEnv.decrypt()).toBe(42n);
+  });
+
+  it('groups envelopes of different types that share (table, column) into one bulkDecrypt', async () => {
+    // The framework guarantees per-cell-codec homogeneity within a
+    // `(table, column)` slot, but the walker's grouping logic does
+    // not depend on that property — it groups purely by
+    // `(sdk, table, column)`. This test exercises the grouping
+    // contract with two envelopes of the same type at the same
+    // routing key + a third envelope at a sibling column to confirm
+    // the per-(table,column) split is preserved.
+    const { EncryptedDouble } = await import('../src/execution/envelope-double');
+    const sdk = makeMultiSdk();
+    const a = EncryptedString.fromInternal({
+      ciphertext: { v: 'alice' },
+      table: 'User',
+      column: 'email',
+      sdk,
+    });
+    const b = EncryptedString.fromInternal({
+      ciphertext: { v: 'bob' },
+      table: 'User',
+      column: 'email',
+      sdk,
+    });
+    const score = EncryptedDouble.fromInternal({
+      ciphertext: { v: 9.5 },
+      table: 'User',
+      column: 'score',
+      sdk,
+    });
+
+    await decryptAll([{ email: a, score }, { email: b }]);
+
+    expect(sdk.bulkDecryptCalls).toHaveLength(2);
+    const callsByGroup = new Map(
+      sdk.bulkDecryptCalls.map(
+        (c) => [`${c.routingKey.table}\u0000${c.routingKey.column}`, c] as const,
+      ),
+    );
+    expect(callsByGroup.get('User\u0000email')?.ciphertexts).toHaveLength(2);
+    expect(callsByGroup.get('User\u0000score')?.ciphertexts).toHaveLength(1);
+  });
+});

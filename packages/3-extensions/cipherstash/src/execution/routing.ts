@@ -14,7 +14,7 @@
  * batching is a future optimization.
  */
 
-import type { EncryptedString } from './envelope';
+import type { EncryptedEnvelopeBase } from './envelope-base';
 import type { CipherstashRoutingKey } from './sdk';
 
 /**
@@ -23,11 +23,19 @@ import type { CipherstashRoutingKey } from './sdk';
  * routing key (derived from the handle), the plaintext to encrypt, and
  * the param-ref handle the mutator yielded so the post-encrypt
  * `replaceValues` write-back can find the slot.
+ *
+ * `plaintext` types as `unknown` because the bulk-encrypt path is
+ * polymorphic across every cipherstash codec (string, double, bigint,
+ * date, boolean, json — each with its own `T`); the SDK's
+ * `bulkEncrypt({ values: ReadonlyArray<unknown>, ... })` shape is
+ * already the polymorphic surface (D1), and homogeneity within a
+ * `(table, column)` group means narrower per-cell typing is not
+ * needed for batching correctness.
  */
 export interface BulkEncryptTarget<TRef = unknown> {
   readonly ref: TRef;
-  readonly plaintext: string;
-  readonly envelope: EncryptedString;
+  readonly plaintext: unknown;
+  readonly envelope: EncryptedEnvelopeBase<unknown>;
   readonly routingKey: CipherstashRoutingKey;
 }
 
@@ -52,7 +60,7 @@ export function routingKeyId(routingKey: CipherstashRoutingKey): string {
  * "missing ciphertext" diagnostic shape: it points at the workflow that
  * should have populated the slot.
  */
-export function getRoutingKey(envelope: EncryptedString): CipherstashRoutingKey {
+export function getRoutingKey(envelope: EncryptedEnvelopeBase<unknown>): CipherstashRoutingKey {
   const handle = envelope.expose();
   if (handle.table === undefined || handle.column === undefined) {
     throw new Error(

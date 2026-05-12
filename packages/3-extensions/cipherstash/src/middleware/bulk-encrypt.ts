@@ -4,17 +4,24 @@
  * The middleware sits in the SQL runtime's `beforeExecute` chain and:
  *
  * 1. Walks the lowered query AST (`InsertAst` / `UpdateAst`) and stamps
- *    `(table, column)` routing context onto every `EncryptedString`
- *    envelope embedded in a `ParamRef`. The handle's `(table, column)`
- *    slots are the canonical input to {@link groupByRoutingKey}; this
- *    walk is the single place the AST's structural column metadata gets
- *    attached to the envelopes the SDK will see.
+ *    `(table, column)` routing context onto every cipherstash envelope
+ *    (any `EncryptedEnvelopeBase` subclass) embedded in a `ParamRef`.
+ *    The handle's `(table, column)` slots are the canonical input to
+ *    {@link groupByRoutingKey}; this walk is the single place the AST's
+ *    structural column metadata gets attached to the envelopes the SDK
+ *    will see.
  *
  * 2. Iterates `params.entries()` to collect every cipherstash-codec'd
- *    `ParamRef` whose value is an `EncryptedString`, groups them by
+ *    `ParamRef` (matched against the closed
+ *    {@link CIPHERSTASH_CODEC_ID_SET} — see the rationale on the
+ *    constant in `extension-metadata/constants.ts`), groups them by
  *    routing key, and issues exactly one `sdk.bulkEncrypt(...)` call
- *    per group. Routing-key derivation is `(table, column)` —
- *    homogeneous batches only.
+ *    per group. Routing-key derivation is `(table, column)`; per-group
+ *    homogeneity-by-column means each batch is naturally typed (every
+ *    cell in a `(table, column)` group has the same codec id, hence
+ *    the same plaintext type), so the SDK's polymorphic `values:
+ *    ReadonlyArray<unknown>` surface (D1) does not need narrowing
+ *    inside this middleware.
  *
  * 3. Stamps each returned ciphertext onto the envelope's handle via
  *    `setHandleCiphertext` and writes the envelope back through
@@ -49,10 +56,14 @@ import type {
 import type { SqlMiddleware } from '@prisma-next/sql-runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { checkCipherstashAborted, raceCipherstashAbort } from '../execution/abort';
-import { EncryptedString, setHandleCiphertext, setHandleRoutingKey } from '../execution/envelope';
+import {
+  EncryptedEnvelopeBase,
+  setHandleCiphertext,
+  setHandleRoutingKey,
+} from '../execution/envelope-base';
 import { type BulkEncryptTarget, groupByRoutingKey } from '../execution/routing';
 import type { CipherstashSdk } from '../execution/sdk';
-import { CIPHERSTASH_STRING_CODEC_ID } from '../extension-metadata/constants';
+import { CIPHERSTASH_CODEC_ID_SET } from '../extension-metadata/constants';
 
 /**
  * Construct the bulk-encrypt middleware. The returned middleware is
@@ -116,14 +127,14 @@ function collectTargets(
 ): BulkEncryptTarget<ParamRefHandle<string | undefined>>[] {
   const targets: BulkEncryptTarget<ParamRefHandle<string | undefined>>[] = [];
   for (const entry of params.entries()) {
-    if (entry.codecId !== CIPHERSTASH_STRING_CODEC_ID) continue;
+    if (entry.codecId === undefined || !CIPHERSTASH_CODEC_ID_SET.has(entry.codecId)) continue;
     const value = entry.value;
-    if (!(value instanceof EncryptedString)) continue;
+    if (!(value instanceof EncryptedEnvelopeBase)) continue;
     const handle = value.expose();
     if (handle.plaintext === undefined) {
       throw new Error(
         'cipherstash bulk-encrypt: encountered an envelope with no plaintext on the write path. ' +
-          'Use `EncryptedString.from(plaintext)` to construct write-side envelopes.',
+          'Use the relevant `Encrypted*.from(plaintext)` factory to construct write-side envelopes.',
       );
     }
     if (handle.table === undefined || handle.column === undefined) {
@@ -186,7 +197,7 @@ function stampParamRefIfEnvelope(
 ): void {
   if (value.kind !== 'param-ref') return;
   const inner = value.value;
-  if (inner instanceof EncryptedString) {
+  if (inner instanceof EncryptedEnvelopeBase) {
     setHandleRoutingKey(inner, table, column);
   }
 }
