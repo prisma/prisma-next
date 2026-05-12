@@ -5,7 +5,7 @@ function sortKeys(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(sortKeys);
   }
-  const sorted: Record<string, unknown> = {};
+  const sorted: Record<string, unknown> = Object.create(null);
   for (const key of Object.keys(value).sort()) {
     sorted[key] = sortKeys((value as Record<string, unknown>)[key]);
   }
