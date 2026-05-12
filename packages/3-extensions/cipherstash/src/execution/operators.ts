@@ -137,6 +137,18 @@ function asEncryptedParam(selfAst: AnyExpression, columnCodecId: string, value: 
   const columnRef = extractColumnRef(selfAst);
   if (columnRef !== undefined) {
     setHandleRoutingKey(envelope, columnRef.table, columnRef.column);
+    // Cipherstash codec ids are parameterized (`cipherstash/string@1`
+    // and friends carry per-column index configuration in their
+    // descriptors), so the runtime's `validateParamRefRefs` requires
+    // every ParamRef tagged with one to carry `{ table, column }` so
+    // the codec dispatcher can resolve to the per-instance codec the
+    // contract walk materialized for the column. The column-aware
+    // operators always have the column AST in hand, so we attach it
+    // here at construction time.
+    return ParamRef.of(envelope, {
+      codecId: columnCodecId,
+      refs: { table: columnRef.table, column: columnRef.column },
+    });
   }
   return ParamRef.of(envelope, { codec: { codecId: columnCodecId } });
 }
