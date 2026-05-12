@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.15.2",
-    "@cloudflare/workers-types": "4.20260430.1",
+    "@cloudflare/workers-types": "4.20260502.1",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/sql-contract-psl": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
@@ -46,7 +46,7 @@
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "dotenv": "^17.4.2",
-    "tsx": "^4.19.2",
+    "tsx": "^4.21.0",
     "typescript": "catalog:",
     "vitest": "^4.1.5",
     "wrangler": "4.87.0"
