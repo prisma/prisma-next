@@ -265,7 +265,7 @@
       "plane": "shared"
     },
     {
-      "glob": "packages/3-extensions/postgres/src/exports/pack.ts",
+      "glob": "packages/3-extensions/postgres/src/exports/family.ts",
       "domain": "extensions",
       "layer": "adapters",
       "plane": "shared"
@@ -307,7 +307,7 @@
       "plane": "shared"
     },
     {
-      "glob": "packages/3-extensions/mongo/src/exports/pack.ts",
+      "glob": "packages/3-extensions/mongo/src/exports/family.ts",
       "domain": "extensions",
       "layer": "adapters",
       "plane": "shared"

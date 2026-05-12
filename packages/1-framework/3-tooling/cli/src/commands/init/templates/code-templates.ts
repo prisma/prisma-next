@@ -63,7 +63,7 @@ model User {
 function schemaSampleTsPostgres(): string {
   return `\`\`\`typescript
 import { defineContract } from '@prisma-next/postgres/contract-builder';
-import sqlFamily from '@prisma-next/postgres/pack';
+import sqlFamily from '@prisma-next/postgres/family';
 import postgresTarget from '@prisma-next/postgres/target';
 
 export const contract = defineContract(
@@ -86,7 +86,7 @@ export const contract = defineContract(
 function schemaSampleTsMongo(): string {
   return `\`\`\`typescript
 import { defineContract } from '@prisma-next/mongo/contract-builder';
-import mongoFamily from '@prisma-next/mongo/pack';
+import mongoFamily from '@prisma-next/mongo/family';
 import mongoTarget from '@prisma-next/mongo/target';
 
 export const contract = defineContract(
@@ -155,7 +155,7 @@ model Post {
 
 function starterSchemaTsPostgres(): string {
   return `import { defineContract } from '@prisma-next/postgres/contract-builder';
-import sqlFamily from '@prisma-next/postgres/pack';
+import sqlFamily from '@prisma-next/postgres/family';
 import postgresTarget from '@prisma-next/postgres/target';
 
 export const contract = defineContract(
@@ -196,7 +196,7 @@ export const contract = defineContract(
 
 function starterSchemaTsMongo(): string {
   return `import { defineContract } from '@prisma-next/mongo/contract-builder';
-import mongoFamily from '@prisma-next/mongo/pack';
+import mongoFamily from '@prisma-next/mongo/family';
 import mongoTarget from '@prisma-next/mongo/target';
 
 export const contract = defineContract(

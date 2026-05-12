@@ -34,7 +34,7 @@ Re-exports `createMongoRuntime` from `@prisma-next/mongo-runtime` for composing 
 
 Re-exports the TypeScript contract authoring DSL (`defineContract`, `field`, `model`, `rel`, ...) so a generated `prisma/contract.ts` can author its contract using only this facade package.
 
-### `@prisma-next/mongo/pack`
+### `@prisma-next/mongo/family`
 
 Re-exports the MongoDB family pack (the value passed as `family:` to `defineContract`).
 

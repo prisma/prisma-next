@@ -502,7 +502,7 @@ Your data contract is the heart of your application. It lives at [\`prisma/contr
 
 \`\`\`typescript
 import { defineContract } from '@prisma-next/mongo/contract-builder';
-import mongoFamily from '@prisma-next/mongo/pack';
+import mongoFamily from '@prisma-next/mongo/family';
 import mongoTarget from '@prisma-next/mongo/target';
 
 export const contract = defineContract(
@@ -627,7 +627,7 @@ If this project lives inside a pnpm workspace, a few things are worth knowing:
 
 exports[`templates > per-cell snapshots (FR5.4) > mongo + typescript > starterSchema is stable 1`] = `
 "import { defineContract } from '@prisma-next/mongo/contract-builder';
-import mongoFamily from '@prisma-next/mongo/pack';
+import mongoFamily from '@prisma-next/mongo/family';
 import mongoTarget from '@prisma-next/mongo/target';
 
 export const contract = defineContract(
@@ -1076,7 +1076,7 @@ Your data contract is the heart of your application. It lives at [\`prisma/contr
 
 \`\`\`typescript
 import { defineContract } from '@prisma-next/postgres/contract-builder';
-import sqlFamily from '@prisma-next/postgres/pack';
+import sqlFamily from '@prisma-next/postgres/family';
 import postgresTarget from '@prisma-next/postgres/target';
 
 export const contract = defineContract(
@@ -1179,7 +1179,7 @@ If this project lives inside a pnpm workspace, a few things are worth knowing:
 
 exports[`templates > per-cell snapshots (FR5.4) > postgres + typescript > starterSchema is stable 1`] = `
 "import { defineContract } from '@prisma-next/postgres/contract-builder';
-import sqlFamily from '@prisma-next/postgres/pack';
+import sqlFamily from '@prisma-next/postgres/family';
 import postgresTarget from '@prisma-next/postgres/target';
 
 export const contract = defineContract(

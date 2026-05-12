@@ -87,7 +87,7 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 
 Re-exports the TypeScript contract authoring DSL (`defineContract`, `field`, `model`, `rel`, ...) so a generated `prisma/contract.ts` can author its contract using only this facade package.
 
-### `@prisma-next/postgres/pack`
+### `@prisma-next/postgres/family`
 
 Re-exports the SQL family pack (the value passed as `family:` to `defineContract`).
 
