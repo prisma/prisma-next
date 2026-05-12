@@ -58,7 +58,13 @@ describe('detectPackageManager', () => {
   });
 
   it('defaults to npm when nothing detected', async () => {
-    expect(await detectPackageManager(tmpDir)).toBe('npm');
+    const previous = process.env['npm_config_user_agent'];
+    delete process.env['npm_config_user_agent'];
+    try {
+      expect(await detectPackageManager(tmpDir)).toBe('npm');
+    } finally {
+      if (previous !== undefined) process.env['npm_config_user_agent'] = previous;
+    }
   });
 
   it('detects lockfile in ancestor directory', async () => {
@@ -67,6 +73,32 @@ describe('detectPackageManager', () => {
     mkdirSync(child, { recursive: true });
 
     expect(await detectPackageManager(child)).toBe('pnpm');
+  });
+
+  it('falls back to npm_config_user_agent when no project is found (TML-2496)', async () => {
+    const previous = process.env['npm_config_user_agent'];
+    process.env['npm_config_user_agent'] = 'pnpm/9.7.0 npm/? node/v24.0.0 darwin arm64';
+    try {
+      expect(await detectPackageManager(tmpDir)).toBe('pnpm');
+    } finally {
+      if (previous === undefined) delete process.env['npm_config_user_agent'];
+      else process.env['npm_config_user_agent'] = previous;
+    }
+  });
+
+  it('prefers an ancestor lockfile over the user agent', async () => {
+    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
+    const child = join(tmpDir, 'packages', 'my-app');
+    mkdirSync(child, { recursive: true });
+
+    const previous = process.env['npm_config_user_agent'];
+    process.env['npm_config_user_agent'] = 'yarn/4.0.0 npm/? node/v24.0.0 darwin arm64';
+    try {
+      expect(await detectPackageManager(child)).toBe('pnpm');
+    } finally {
+      if (previous === undefined) delete process.env['npm_config_user_agent'];
+      else process.env['npm_config_user_agent'] = previous;
+    }
   });
 });
 

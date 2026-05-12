@@ -1,15 +1,39 @@
 import { existsSync } from 'node:fs';
-import { detect } from 'package-manager-detector/detect';
+import { detect, getUserAgent } from 'package-manager-detector/detect';
 import { join } from 'pathe';
 
 export type PackageManager = 'pnpm' | 'npm' | 'yarn' | 'bun' | 'deno';
 
 const KNOWN: ReadonlySet<string> = new Set<PackageManager>(['pnpm', 'npm', 'yarn', 'bun', 'deno']);
 
+/**
+ * Resolves the package manager `init` should drive for `add` / `install`
+ * commands. Tries, in order:
+ *
+ *  1. **`detect()`** — walks up from `cwd` looking for a lockfile, the
+ *     `packageManager` field, the `devEngines.packageManager` field, or
+ *     install metadata. This is the right answer whenever the user is
+ *     anywhere inside an existing project, including a deep workspace
+ *     subdirectory.
+ *
+ *  2. **`getUserAgent()`** — parses `npm_config_user_agent`, the env var
+ *     every PM sets when it spawns a script. This catches the
+ *     bare-directory case where there's no project to walk up to but the
+ *     user invoked us via `pnpm dlx prisma-next init` / `bunx
+ *     prisma-next init` / `yarn dlx …`. Same signal used by every
+ *     `create-*` tool in the ecosystem (`create-vite`, `create-next-app`,
+ *     `create-astro`, `@antfu/ni`, …).
+ *
+ *  3. **`npm`** — final fallback. Always present alongside Node.
+ */
 export async function detectPackageManager(cwd: string): Promise<PackageManager> {
-  const result = await detect({ cwd });
-  if (result && KNOWN.has(result.name)) {
-    return result.name as PackageManager;
+  const detected = await detect({ cwd });
+  if (detected && KNOWN.has(detected.name)) {
+    return detected.name as PackageManager;
+  }
+  const userAgent = getUserAgent();
+  if (userAgent !== null && KNOWN.has(userAgent)) {
+    return userAgent as PackageManager;
   }
   return 'npm';
 }
