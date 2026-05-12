@@ -1,4 +1,4 @@
-import { NamespaceBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, NamespaceBase } from '@prisma-next/framework-components/ir';
 
 /**
  * Mongo target `Namespace` concretion. In Mongo the "namespace" concept
@@ -18,7 +18,7 @@ export class MongoTargetDatabase extends NamespaceBase {
   constructor(id: string) {
     super();
     this.id = id;
-    this.freeze();
+    freezeNode(this);
   }
 
   /**

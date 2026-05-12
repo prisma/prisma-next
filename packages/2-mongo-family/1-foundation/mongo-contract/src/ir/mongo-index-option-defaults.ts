@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
 import type { MongoJsonObject } from '../contract-types';
 
 export interface MongoIndexOptionDefaultsInput {
@@ -22,6 +22,6 @@ export class MongoIndexOptionDefaults extends SchemaNodeBase {
   constructor(options: MongoIndexOptionDefaultsInput = {}) {
     super();
     if (options.storageEngine !== undefined) this.storageEngine = options.storageEngine;
-    this.freeze();
+    freezeNode(this);
   }
 }

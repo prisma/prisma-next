@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
 
 export interface MongoChangeStreamPreAndPostImagesOptionsInput {
   readonly enabled: boolean;
@@ -18,6 +18,6 @@ export class MongoChangeStreamPreAndPostImagesOptions extends SchemaNodeBase {
   constructor(options: MongoChangeStreamPreAndPostImagesOptionsInput) {
     super();
     this.enabled = options.enabled;
-    this.freeze();
+    freezeNode(this);
   }
 }

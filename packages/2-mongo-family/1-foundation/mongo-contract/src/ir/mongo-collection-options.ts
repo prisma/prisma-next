@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
 import type { MongoJsonObject } from '../contract-types';
 import {
   MongoChangeStreamPreAndPostImagesOptions,
@@ -154,6 +154,6 @@ export class MongoCollectionOptions extends SchemaNodeBase {
           ? input.changeStreamPreAndPostImages
           : new MongoChangeStreamPreAndPostImagesOptions(input.changeStreamPreAndPostImages);
     }
-    this.freeze();
+    freezeNode(this);
   }
 }

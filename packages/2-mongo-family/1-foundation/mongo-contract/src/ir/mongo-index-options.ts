@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
 import type { MongoJsonObject, MongoWildcardProjection } from '../contract-types';
 import { MongoCollationOptions, type MongoCollationOptionsInput } from './mongo-collation-options';
 
@@ -86,6 +86,6 @@ export class MongoIndexOptions extends SchemaNodeBase {
     }
     if (options.wildcardProjection !== undefined)
       this.wildcardProjection = options.wildcardProjection;
-    this.freeze();
+    freezeNode(this);
   }
 }

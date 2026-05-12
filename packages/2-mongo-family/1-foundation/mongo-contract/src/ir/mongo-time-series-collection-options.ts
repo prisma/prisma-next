@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
 
 export type MongoTimeSeriesGranularity = 'seconds' | 'minutes' | 'hours';
 
@@ -35,6 +35,6 @@ export class MongoTimeSeriesCollectionOptions extends SchemaNodeBase {
       this.bucketMaxSpanSeconds = options.bucketMaxSpanSeconds;
     if (options.bucketRoundingSeconds !== undefined)
       this.bucketRoundingSeconds = options.bucketRoundingSeconds;
-    this.freeze();
+    freezeNode(this);
   }
 }

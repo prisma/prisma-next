@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
 
 export type MongoCollationCaseFirst = 'off' | 'upper' | 'lower';
 export type MongoCollationStrength = 1 | 2 | 3 | 4 | 5;
@@ -61,6 +61,6 @@ export class MongoCollationOptions extends SchemaNodeBase {
     if (options.maxVariable !== undefined) this.maxVariable = options.maxVariable;
     if (options.backwards !== undefined) this.backwards = options.backwards;
     if (options.normalization !== undefined) this.normalization = options.normalization;
-    this.freeze();
+    freezeNode(this);
   }
 }

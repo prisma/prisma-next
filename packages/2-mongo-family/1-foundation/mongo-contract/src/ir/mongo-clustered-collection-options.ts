@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
 
 export type MongoClusteredCollectionKey = Readonly<Record<string, 1>>;
 
@@ -27,6 +27,6 @@ export class MongoClusteredCollectionOptions extends SchemaNodeBase {
     if (options.name !== undefined) this.name = options.name;
     this.key = options.key;
     this.unique = options.unique;
-    this.freeze();
+    freezeNode(this);
   }
 }

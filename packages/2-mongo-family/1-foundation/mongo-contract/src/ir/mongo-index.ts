@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
 import type { MongoIndexKey } from '../contract-types';
 
 /**
@@ -59,6 +59,6 @@ export class MongoIndex extends SchemaNodeBase {
     if (input.weights !== undefined) this.weights = input.weights;
     if (input.default_language !== undefined) this.default_language = input.default_language;
     if (input.language_override !== undefined) this.language_override = input.language_override;
-    this.freeze();
+    freezeNode(this);
   }
 }

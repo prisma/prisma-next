@@ -1,3 +1,4 @@
+import { freezeNode } from '@prisma-next/framework-components/ir';
 import { MongoSchemaNode } from './schema-node';
 import type { MongoSchemaVisitor } from './visitor';
 
@@ -18,7 +19,7 @@ export class MongoSchemaValidator extends MongoSchemaNode {
     this.jsonSchema = options.jsonSchema;
     this.validationLevel = options.validationLevel;
     this.validationAction = options.validationAction;
-    this.freeze();
+    freezeNode(this);
   }
 
   accept<R>(visitor: MongoSchemaVisitor<R>): R {

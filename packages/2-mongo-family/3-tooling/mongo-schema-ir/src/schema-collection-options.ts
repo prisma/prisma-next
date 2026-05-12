@@ -1,3 +1,4 @@
+import { freezeNode } from '@prisma-next/framework-components/ir';
 import { MongoSchemaNode } from './schema-node';
 import type { MongoSchemaVisitor } from './visitor';
 
@@ -30,7 +31,7 @@ export class MongoSchemaCollectionOptions extends MongoSchemaNode {
     this.collation = options.collation;
     this.changeStreamPreAndPostImages = options.changeStreamPreAndPostImages;
     this.clusteredIndex = options.clusteredIndex;
-    this.freeze();
+    freezeNode(this);
   }
 
   accept<R>(visitor: MongoSchemaVisitor<R>): R {

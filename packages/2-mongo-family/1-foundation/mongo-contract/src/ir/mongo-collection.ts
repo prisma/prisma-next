@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
 import {
   MongoCollectionOptions,
   type MongoCollectionOptionsInput,
@@ -66,6 +66,6 @@ export class MongoCollection extends SchemaNodeBase {
           ? input.options
           : new MongoCollectionOptions(input.options);
     }
-    this.freeze();
+    freezeNode(this);
   }
 }

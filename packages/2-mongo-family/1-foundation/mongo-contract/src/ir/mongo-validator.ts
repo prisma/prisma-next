@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
 
 export type MongoValidatorValidationLevel = 'strict' | 'moderate';
 export type MongoValidatorValidationAction = 'error' | 'warn';
@@ -37,6 +37,6 @@ export class MongoValidator extends SchemaNodeBase {
     this.jsonSchema = input.jsonSchema;
     this.validationLevel = input.validationLevel;
     this.validationAction = input.validationAction;
-    this.freeze();
+    freezeNode(this);
   }
 }

@@ -1,3 +1,4 @@
+import { freezeNode } from '@prisma-next/framework-components/ir';
 import type { MongoIndexKey } from '@prisma-next/mongo-contract';
 import { MongoSchemaNode } from './schema-node';
 import type { MongoSchemaVisitor } from './visitor';
@@ -40,7 +41,7 @@ export class MongoSchemaIndex extends MongoSchemaNode {
     this.weights = options.weights;
     this.default_language = options.default_language;
     this.language_override = options.language_override;
-    this.freeze();
+    freezeNode(this);
   }
 
   accept<R>(visitor: MongoSchemaVisitor<R>): R {

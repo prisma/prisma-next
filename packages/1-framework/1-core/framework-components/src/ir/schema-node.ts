@@ -6,17 +6,21 @@
  * abstract bases (e.g. `SqlNode`, `MongoSchemaNode`) refine the alphabet for
  * their family shape; targets ship the concrete classes.
  *
- * `SchemaNodeBase` is a convenience: it centralises the freeze-and-assign
- * pattern used by every concrete IR node in the codebase (proven on
- * `OpFactoryCall` and `MongoSchemaNode`). Subclasses call `this.freeze()`
- * in their constructors after assigning their fields. The base class itself
- * stays minimal — no kind discriminant, no methods on instances — so it can
- * sit at the framework layer without committing to any family-shaped vocabulary.
+ * `SchemaNodeBase` is a minimal abstract base that pins the `kind`
+ * requirement at the class layer so the IR class hierarchy has a single
+ * root. It carries no methods: the freeze-and-assign affordance lives in
+ * the free `freezeNode` helper below. Keeping `freezeNode` out of the class
+ * type means an emitted contract literal type (`{ readonly kind: 'mongo-
+ * collection', ... }`) is structurally assignable to its class type — a
+ * `protected freeze()` instance method would otherwise leak into the public
+ * type surface and require the literal to carry it too (see
+ * `wip/unattended-decisions.md § 8`).
  *
- * Frozen instances + plain readonly fields keep IR nodes JSON-clean by
- * construction, so `JSON.stringify(node)` produces canonical JSON without a
- * `toJSON()` method. The `ContractSerializer` SPI handles round-trip from
- * canonical JSON back to typed class instances.
+ * Subclasses construct fields then call `freezeNode(this)` to seal the
+ * instance. Frozen instances + plain readonly fields keep IR nodes
+ * JSON-clean by construction, so `JSON.stringify(node)` produces canonical
+ * JSON without a `toJSON()` method. The `ContractSerializer` SPI handles
+ * round-trip from canonical JSON back to typed class instances.
  */
 
 export interface SchemaNode {
@@ -25,8 +29,15 @@ export interface SchemaNode {
 
 export abstract class SchemaNodeBase implements SchemaNode {
   abstract readonly kind: string;
+}
 
-  protected freeze(): void {
-    Object.freeze(this);
-  }
+/**
+ * Seal an IR class instance after its constructor has assigned all
+ * fields. The free-helper form (rather than a `protected freeze()`
+ * instance method) keeps the class type structurally narrow so emitted
+ * contract literal types remain assignable to their class types.
+ */
+export function freezeNode<T extends SchemaNode>(node: T): T {
+  Object.freeze(node);
+  return node;
 }
