@@ -1,8 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
-import type {
-  MigrationPlanOperation,
-  OperationPreview,
+import {
+  createControlStack,
+  type MigrationPlanOperation,
+  type OperationPreview,
 } from '@prisma-next/framework-components/control';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';
@@ -47,7 +48,8 @@ interface MigrationShowOptions extends CommonCommandOptions {
 /**
  * Details of one space's latest (or targeted) migration package.
  */
-export interface MigrationShowSpaceResult {
+export interface MigrationShowSpacePresent {
+  readonly kind: 'present';
   readonly spaceId: string;
   readonly dirName: string;
   readonly dirPath: string;
@@ -68,6 +70,21 @@ export interface MigrationShowSpaceResult {
   readonly preview: OperationPreview;
   readonly summary: string;
 }
+
+/**
+ * Placeholder for a loaded contract space that has no on-disk migration
+ * package — the extension descriptor declared the space but no migrations
+ * directory has been materialised for it yet. Surfaces the space in the
+ * response so JSON consumers see every loaded extension instead of having
+ * silently-skipped entries.
+ */
+export interface MigrationShowSpaceMissing {
+  readonly kind: 'missing';
+  readonly spaceId: string;
+  readonly summary: string;
+}
+
+export type MigrationShowSpaceResult = MigrationShowSpacePresent | MigrationShowSpaceMissing;
 
 export interface MigrationShowResult {
   readonly ok: true;
@@ -142,10 +159,11 @@ function pkgToSpaceResult(
   spaceId: string,
   pkg: OnDiskMigrationPackage,
   client: ReturnType<typeof createControlClient>,
-): MigrationShowSpaceResult {
+): MigrationShowSpacePresent {
   const ops = pkg.ops as readonly MigrationPlanOperation[];
   const preview: OperationPreview = client.toOperationPreview(ops) ?? { statements: [] };
   return {
+    kind: 'present',
     spaceId,
     dirName: pkg.dirName,
     dirPath: relative(process.cwd(), pkg.dirPath),
@@ -227,16 +245,14 @@ async function executeMigrationShowCommand(
   }
 
   // Build the aggregate against current disk state to enumerate all spaces.
-  // biome-ignore lint/suspicious/noExplicitAny: factory accepts a stack-shaped object
-  const familyInstanceForValidate = config.family.create({} as any);
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
   const aggregateResult = await buildContractSpaceAggregate({
     targetId: config.target.targetId,
     migrationsDir,
     appContract,
-    // biome-ignore lint/suspicious/noExplicitAny: extension descriptors carry family-bound generics
-    extensionPacks: (config.extensionPacks ?? []) as ReadonlyArray<any>,
-    // biome-ignore lint/suspicious/noExplicitAny: stand-in for typed Contract
-    validateContract: (json: unknown) => familyInstanceForValidate.validateContract(json) as any,
+    extensionPacks: config.extensionPacks ?? [],
+    validateContract: (json: unknown) => familyInstance.validateContract(json),
   });
   if (!aggregateResult.ok) {
     return notOk(aggregateResult.failure);
@@ -312,13 +328,23 @@ async function executeMigrationShowCommand(
     );
   }
 
-  // Extension spaces: always show the latest migration from each space.
+  // Extension spaces: always emit one entry per loaded extension so the
+  // response enumerates every space the aggregate knows about. Spaces
+  // with no on-disk migration package yet (e.g. an extension was declared
+  // but never `migrate`d) become `kind: 'missing'` placeholders instead
+  // of being silently skipped.
   for (const ext of aggregate.extensions) {
     const extSpaceDir = spaceMigrationDirectory(migrationsDir, ext.spaceId);
     const extPkgResult = await resolveLatestFromDir(extSpaceDir);
     if (!extPkgResult.ok) return extPkgResult;
     if (extPkgResult.value !== null) {
       spaces.push(pkgToSpaceResult(ext.spaceId, extPkgResult.value, client));
+    } else {
+      spaces.push({
+        kind: 'missing',
+        spaceId: ext.spaceId,
+        summary: 'No on-disk migration package for this space',
+      });
     }
   }
 
