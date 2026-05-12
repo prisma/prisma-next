@@ -11,6 +11,7 @@ import {
 } from '@prisma-next/framework-components/execution';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
+import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -139,18 +140,30 @@ export function buildTestContractCodecs(
   for (const codec of codecs) {
     byId.set(codec.id, codec);
   }
+  // Canonical-key cache: production `forCodecRef` memoizes per `(codecId, canonicalize(typeParams))`. Tests resolve by codecId, but key the cache on the canonical pair so callers passing distinct typeParams get distinct (still codec-id-templated) entries — and so this helper cannot silently coalesce them.
+  const byCanonicalKey = new Map<string, Codec<string>>();
   return {
     forColumn: () => undefined,
     forCodecRef: (ref) => {
-      const codec = byId.get(ref.codecId);
-      if (!codec) {
+      const canonicalKey = canonicalizeJson({
+        codecId: ref.codecId,
+        ...(ref.typeParams !== undefined ? { typeParams: ref.typeParams } : {}),
+      });
+      const cached = byCanonicalKey.get(canonicalKey);
+      if (cached) return cached;
+      const template = byId.get(ref.codecId);
+      if (!template) {
         throw runtimeError(
           'RUNTIME.CODEC_DESCRIPTOR_MISSING',
           `Test ContractCodecRegistry has no codec for codecId '${ref.codecId}'.`,
-          { codecId: ref.codecId },
+          {
+            codecId: ref.codecId,
+            ...(ref.typeParams !== undefined ? { typeParams: ref.typeParams } : {}),
+          },
         );
       }
-      return codec;
+      byCanonicalKey.set(canonicalKey, template);
+      return template;
     },
   };
 }
