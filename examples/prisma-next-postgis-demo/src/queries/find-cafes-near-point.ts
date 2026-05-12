@@ -13,10 +13,14 @@ import { db } from '../prisma/db';
  * not arbitrary expression projection — that's the seam where the SQL
  * builder is the right tool.
  *
+ * The `id ASC` tie-breaker after the distance ordering keeps the
+ * truncated `LIMIT` slice deterministic when two cafes happen to sit
+ * at exactly the same spherical distance from the query point.
+ *
  * SQL shape:
  *   SELECT id, name, ST_DistanceSphere(location, $point) AS meters
  *   FROM cafe
- *   ORDER BY ST_DistanceSphere(location, $point) ASC
+ *   ORDER BY ST_DistanceSphere(location, $point) ASC, id ASC
  *   LIMIT $limit
  */
 export function findCafesNearPoint(point: Geometry, limit: number) {
@@ -24,6 +28,7 @@ export function findCafesNearPoint(point: Geometry, limit: number) {
     .select('id', 'name')
     .select('meters', (f, fns) => fns.distanceSphere(f.location, point))
     .orderBy((f, fns) => fns.distanceSphere(f.location, point), { direction: 'asc' })
+    .orderBy((f) => f.id, { direction: 'asc' })
     .limit(limit)
     .build();
   return db.runtime().execute(plan);
