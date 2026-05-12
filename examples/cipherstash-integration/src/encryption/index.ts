@@ -27,8 +27,19 @@ import { Encryption } from '@cipherstash/stack';
 import type { EncryptionClient } from '@cipherstash/stack/client';
 import { encryptedColumn, encryptedTable } from '@cipherstash/stack/schema';
 
+// Per-column search-config matches `prisma/schema.prisma`. The PSL
+// constructors default every flag to `true` (per spec FR6), so the
+// stack-side schema below mirrors the maximal index surface for each
+// codec id. Mismatches here surface at runtime as ZeroKMS rejecting
+// the search term against a column whose stack-side index set
+// disagrees with the EQL bundle's installed configuration.
 export const users = encryptedTable('users', {
-  email: encryptedColumn('email').equality().freeTextSearch(),
+  email: encryptedColumn('email').equality().freeTextSearch().orderAndRange(),
+  salary: encryptedColumn('salary').dataType('number').equality().orderAndRange(),
+  accountId: encryptedColumn('accountId').dataType('bigint').equality().orderAndRange(),
+  birthday: encryptedColumn('birthday').dataType('date').equality().orderAndRange(),
+  emailVerified: encryptedColumn('emailVerified').dataType('boolean').equality(),
+  preferences: encryptedColumn('preferences').dataType('json').searchableJson(),
 });
 
 // Explicit annotation to keep the inferred type portable — without it,

@@ -15,6 +15,16 @@
  */
 
 import type { Encrypted } from '@cipherstash/stack';
+
+// `JsPlaintext` is the input type the stack SDK's `bulkEncrypt`
+// accepts: `string | number | boolean | Record<string, unknown> | JsPlaintext[]`.
+// `@cipherstash/stack` does not re-export it, and `@cipherstash/protect-ffi`
+// is an indirect dependency we don't list directly in package.json,
+// so we redeclare the structural shape locally rather than reach
+// across packages. The redeclaration is recursive on the array
+// branch — kept in sync with the stack SDK's typesync.
+type JsPlaintext = string | number | boolean | { [key: string]: unknown } | JsPlaintext[];
+
 import type {
   CipherstashRoutingKey,
   CipherstashSdk,
@@ -22,7 +32,17 @@ import type {
 import { encryptionClient, users } from './encryption';
 
 const tableRegistry = {
-  users: { table: users, columns: { email: users.email } },
+  users: {
+    table: users,
+    columns: {
+      email: users.email,
+      salary: users.salary,
+      accountId: users.accountId,
+      birthday: users.birthday,
+      emailVerified: users.emailVerified,
+      preferences: users.preferences,
+    },
+  },
 } as const;
 
 function lookup(routingKey: CipherstashRoutingKey) {
@@ -68,6 +88,34 @@ function ensureEncryptedEnvelope(
   return value;
 }
 
+/**
+ * Coerce a framework-side plaintext (`unknown` — produced by a
+ * cipherstash codec's `encode` call site, which strips back to the
+ * envelope's bare JS plaintext before handing the value to this SDK
+ * adapter) into the {@link JsPlaintext} shape `@cipherstash/stack`
+ * accepts.
+ *
+ * The framework allows codec authors to round-trip arbitrary JS
+ * values (`bigint`, `Date`, `boolean`, `Record<string, unknown>`, …)
+ * but the stack SDK's wire contract is the narrower
+ * `string | number | boolean | Record<string, unknown> | JsPlaintext[]`.
+ * This adapter narrows on the boundary:
+ *
+ *   - `bigint` → decimal string (CipherStash's bigint codec
+ *     round-trips through the string representation).
+ *   - `Date`   → ISO 8601 string (the date codec round-trips through
+ *     ISO; both ZeroKMS and the EQL bundle accept the textual form).
+ *   - everything else is asserted to satisfy `JsPlaintext`; if the
+ *     framework hands us something else (e.g. `null` or a function)
+ *     `bulkEncrypt` will fail downstream with a clearer error than a
+ *     bare cast would produce.
+ */
+function toJsPlaintext(value: unknown): JsPlaintext {
+  if (typeof value === 'bigint') return value.toString();
+  if (value instanceof Date) return value.toISOString();
+  return value as JsPlaintext;
+}
+
 function ensureString(value: unknown, kind: 'decrypt' | 'bulkDecrypt'): string {
   if (typeof value !== 'string') {
     throw new Error(
@@ -83,7 +131,7 @@ export function createCipherstashSdk(): CipherstashSdk {
     async bulkEncrypt({ values, routingKey }) {
       const { table, column } = lookup(routingKey);
       const result = await encryptionClient.bulkEncrypt(
-        values.map((plaintext) => ({ plaintext })),
+        values.map((plaintext) => ({ plaintext: toJsPlaintext(plaintext) })),
         { column, table },
       );
       if (result.failure) {
