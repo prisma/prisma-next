@@ -63,6 +63,19 @@ export const cipherstashPackMeta = {
         cipherstashBooleanCodecMetadata,
         cipherstashJsonCodecMetadata,
       ],
+      // Drives the contract emitter to add
+      //   `import type { CodecTypes as CipherstashTypes } from '@prisma-next/extension-cipherstash/codec-types'`
+      // and to intersect `CipherstashTypes` into the generated
+      // `CodecTypes` type alias. Without this slot the codec-id-keyed
+      // type lookups (`CodecTypes['cipherstash/string@1']['traits']`)
+      // collapse to `unknown` on the consumer side, and the
+      // trait-dispatched operators (`cipherstashGt`, …) never surface
+      // on real model accessors. Mirrors pgvector's `import:` slot.
+      import: {
+        package: '@prisma-next/extension-cipherstash/codec-types',
+        named: 'CodecTypes',
+        alias: 'CipherstashTypes',
+      },
       // `renderOutputType` returns the bare envelope type name (e.g.
       // `EncryptedString`, `EncryptedDouble`) for parameterized
       // cipherstash columns; the contract emitter needs to import each
