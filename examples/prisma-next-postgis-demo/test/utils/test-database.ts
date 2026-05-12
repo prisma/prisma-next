@@ -19,6 +19,34 @@ export const TEST_DATABASE_URL =
   process.env['DATABASE_URL'] ?? 'postgres://postgres:postgres@localhost:5435/postgis_demo';
 
 /**
+ * Whitelist guard for `resetTestDatabase`. We drop and recreate the
+ * `public` schema, so a misconfigured `DATABASE_URL` pointing at
+ * something non-test would be catastrophic. Accept the demo's default
+ * database name or anything ending in `_test`.
+ */
+function assertTestDatabaseUrl(url: string): void {
+  let databaseName: string;
+  try {
+    const parsed = new URL(url);
+    databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+  } catch {
+    throw new Error(
+      'resetTestDatabase: TEST_DATABASE_URL is not a valid URL. Refusing to run destructive setup against an unknown target.',
+    );
+  }
+  if (!databaseName) {
+    throw new Error(
+      'resetTestDatabase: TEST_DATABASE_URL has no database name. Refusing to run destructive setup against an unknown target.',
+    );
+  }
+  if (databaseName !== 'postgis_demo' && !databaseName.endsWith('_test')) {
+    throw new Error(
+      `resetTestDatabase: refusing to drop schemas on database '${databaseName}'. Set TEST_DATABASE_URL to a database named 'postgis_demo' or one whose name ends with '_test'.`,
+    );
+  }
+}
+
+/**
  * Probe the test database. Returns true only if the connection succeeds
  * AND the postgis extension is available. We use this to gate the
  * integration suite so missing-Docker is a skip, not a failure.
@@ -76,6 +104,7 @@ const MIGRATIONS_DIR = join(PROJECT_ROOT, 'migrations');
  * migration under `migrations/postgis/`).
  */
 export async function resetTestDatabase(contract: unknown): Promise<void> {
+  assertTestDatabaseUrl(TEST_DATABASE_URL);
   const client = new pg.Client({ connectionString: TEST_DATABASE_URL });
   try {
     await client.connect();
