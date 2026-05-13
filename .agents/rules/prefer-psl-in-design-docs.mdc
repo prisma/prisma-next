@@ -14,6 +14,26 @@ PSL is the **default authoring surface**. Most Prisma Next users come from Prism
 - **TS examples that just restate the PSL example in TS** are noise. Skip them; the equivalence is implied.
 - **Surface-neutral prose** (capability descriptions, behaviour claims) should avoid TS-only or PSL-only phrasing where the underlying capability exists in both.
 
+## Code fencing for PSL
+
+PSL code blocks **must use the `prisma` language tag**, never `psl`:
+
+````markdown
+<!-- correct -->
+```prisma
+namespace public {
+  model Profile { id String @id }
+}
+```
+
+<!-- wrong -->
+```psl
+…
+```
+````
+
+`prisma` is the language identifier registered with the highlighters that render the docs (GitHub, VSCode, the docs site). `psl` is not — it renders as plain text everywhere, defeating the purpose of syntax-tagged fences. The mistake is easy to make because the surface is colloquially called "PSL" in prose; the fence still has to say `prisma`.
+
 ## Why
 
 Two reasons, one about communication and one about design.

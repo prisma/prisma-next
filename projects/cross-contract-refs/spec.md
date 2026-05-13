@@ -8,7 +8,7 @@ App contracts must be able to declare FK references that target tables owned by 
 
 App contract today — a local FK references a model that lives in the same contract:
 
-```psl
+```prisma
 namespace public {
   model Profile {
     id       String @id @default(uuid())
@@ -20,7 +20,7 @@ namespace public {
 
 After this project, the same `@relation` mechanism works against a model that lives in *another contract space* — distinguished by a colon-prefixed type identifier:
 
-```psl
+```prisma
 namespace public {
   model Profile {
     id       String @id @default(uuid())
@@ -148,7 +148,7 @@ If the named space isn't in the aggregate, lowering fails fast with a diagnostic
 
 The framework reserves the option to add a PSL `use` declaration if name collisions or readability ever push for aliasing:
 
-```psl
+```prisma
 // Future, not v0.1:
 use supabase from "@prisma-next/extension-supabase" as auth_ext;
 
@@ -205,7 +205,7 @@ This is symmetric with TML-2459's table-creation DDL rule for `__unspecified__` 
 
 The PSL syntax for a cross-contract reference to an `__unspecified__` target elides the namespace dot:
 
-```psl
+```prisma
 user extsqlite:User @relation(fields: [userId], references: [id])
 ```
 

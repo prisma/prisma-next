@@ -77,7 +77,7 @@ Targets concretize family abstract classes for IR nodes and add IR node kinds wi
 
 The IR refactor unlocks new authoring surfaces for namespaces and cross-namespace foreign keys. **PSL gains a single new top-level form — the `namespace` block — and reuses the existing `@relation` mechanism for cross-namespace FKs via dot-qualified type references in the type position.** No new attribute is required.
 
-```psl
+```prisma
 // schema.psl
 
 namespace auth {
