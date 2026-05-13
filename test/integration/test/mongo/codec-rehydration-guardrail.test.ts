@@ -24,7 +24,7 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 /**
- * TC-18 — codec-rehydration guardrail (NFR5 / AC11).
+ * Codec-rehydration guardrail.
  *
  * Plans an aggregate (app + cipherstash extension) whose contracts
  * reference codec IDs (`mongo/objectId@1`, `mongo/string@1`,
@@ -130,101 +130,97 @@ function planAndRehydrate(contract: MongoContract): readonly MongoMigrationPlanO
   ) as readonly MongoMigrationPlanOperation[];
 }
 
-describe(
-  'codec-rehydration guardrail (TC-18)',
-  { timeout: timeouts.spinUpMongoMemoryServer },
-  () => {
-    let replSet: MongoMemoryReplSet;
-    let client: MongoClient;
-    let db: Db;
-    const dbName = 'mongo_codec_rehydration_guardrail_test';
+describe('codec-rehydration guardrail', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
+  let replSet: MongoMemoryReplSet;
+  let client: MongoClient;
+  let db: Db;
+  const dbName = 'mongo_codec_rehydration_guardrail_test';
 
-    beforeAll(async () => {
-      replSet = await MongoMemoryReplSet.create({
-        instanceOpts: [
-          { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
-        ],
-        replSet: { count: 1, storageEngine: 'wiredTiger' },
-      });
-      client = new MongoClient(replSet.getUri());
-      await client.connect();
-      db = client.db(dbName);
-    }, timeouts.spinUpMongoMemoryServer);
-
-    afterAll(async () => {
-      try {
-        await client?.close();
-        await replSet?.stop();
-      } catch {
-        // ignore cleanup errors
-      }
-    }, timeouts.spinUpMongoMemoryServer);
-
-    beforeEach(async () => {
-      await db.dropDatabase();
+  beforeAll(async () => {
+    replSet = await MongoMemoryReplSet.create({
+      instanceOpts: [
+        { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+      ],
+      replSet: { count: 1, storageEngine: 'wiredTiger' },
     });
+    client = new MongoClient(replSet.getUri());
+    await client.connect();
+    db = client.db(dbName);
+  }, timeouts.spinUpMongoMemoryServer);
 
-    it('runs rehydrated multi-space aggregate without consulting codec runtime instances', async () => {
-      // Family stack carries NO codec runtime instances — empty
-      // `controlStack` means no `extensionPacks`, no codec
-      // descriptors, nothing for the runner to consult. If the runner
-      // ever needed to resolve a codec instance at apply time, this
-      // call would surface a missing-codec failure (or throw).
-      const family = createMongoFamilyInstance(
-        {} as unknown as Parameters<typeof createMongoFamilyInstance>[0],
-      );
-      if (!hasMigrations(mongoTargetDescriptor)) throw new Error('expected migrations capability');
-      const runner = mongoTargetDescriptor.migrations.createRunner(family);
-      if (!hasMultiSpaceRunner(runner)) throw new Error('expected multi-space-capable runner');
+  afterAll(async () => {
+    try {
+      await client?.close();
+      await replSet?.stop();
+    } catch {
+      // ignore cleanup errors
+    }
+  }, timeouts.spinUpMongoMemoryServer);
 
-      const app = appContract();
-      const ext = extContract();
-      const appOps = planAndRehydrate(app);
-      const extOps = planAndRehydrate(ext);
+  beforeEach(async () => {
+    await db.dropDatabase();
+  });
 
-      const driver = await mongoControlDriver.create(replSet.getUri(dbName));
-      try {
-        const perSpaceOptions: readonly PerSpaceOptions[] = [
-          {
-            space: EXT_SPACE,
-            plan: {
-              targetId: 'mongo',
-              spaceId: EXT_SPACE,
-              destination: { storageHash: ext.storage.storageHash },
-              operations: extOps,
-            },
-            driver,
-            destinationContract: ext,
-            policy: ALL_POLICY,
-            frameworkComponents: [],
+  it('runs rehydrated multi-space aggregate without consulting codec runtime instances', async () => {
+    // Family stack carries NO codec runtime instances — empty
+    // `controlStack` means no `extensionPacks`, no codec
+    // descriptors, nothing for the runner to consult. If the runner
+    // ever needed to resolve a codec instance at apply time, this
+    // call would surface a missing-codec failure (or throw).
+    const family = createMongoFamilyInstance(
+      {} as unknown as Parameters<typeof createMongoFamilyInstance>[0],
+    );
+    if (!hasMigrations(mongoTargetDescriptor)) throw new Error('expected migrations capability');
+    const runner = mongoTargetDescriptor.migrations.createRunner(family);
+    if (!hasMultiSpaceRunner(runner)) throw new Error('expected multi-space-capable runner');
+
+    const app = appContract();
+    const ext = extContract();
+    const appOps = planAndRehydrate(app);
+    const extOps = planAndRehydrate(ext);
+
+    const driver = await mongoControlDriver.create(replSet.getUri(dbName));
+    try {
+      const perSpaceOptions: readonly PerSpaceOptions[] = [
+        {
+          space: EXT_SPACE,
+          plan: {
+            targetId: 'mongo',
+            spaceId: EXT_SPACE,
+            destination: { storageHash: ext.storage.storageHash },
+            operations: extOps,
           },
-          {
-            space: APP_SPACE_ID,
-            plan: {
-              targetId: 'mongo',
-              spaceId: APP_SPACE_ID,
-              destination: { storageHash: app.storage.storageHash },
-              operations: appOps,
-            },
-            driver,
-            destinationContract: app,
-            policy: ALL_POLICY,
-            frameworkComponents: [],
+          driver,
+          destinationContract: ext,
+          policy: ALL_POLICY,
+          frameworkComponents: [],
+        },
+        {
+          space: APP_SPACE_ID,
+          plan: {
+            targetId: 'mongo',
+            spaceId: APP_SPACE_ID,
+            destination: { storageHash: app.storage.storageHash },
+            operations: appOps,
           },
-        ];
+          driver,
+          destinationContract: app,
+          policy: ALL_POLICY,
+          frameworkComponents: [],
+        },
+      ];
 
-        const result = await runner.executeAcrossSpaces({ driver, perSpaceOptions });
+      const result = await runner.executeAcrossSpaces({ driver, perSpaceOptions });
 
-        expect(result.ok).toBe(true);
-        if (!result.ok) throw new Error('unreachable');
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('unreachable');
 
-        const markers = await readAllMarkers(db);
-        expect(markers.size).toBe(2);
-        expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(app.storage.storageHash);
-        expect(markers.get(EXT_SPACE)?.storageHash).toBe(ext.storage.storageHash);
-      } finally {
-        await driver.close();
-      }
-    });
-  },
-);
+      const markers = await readAllMarkers(db);
+      expect(markers.size).toBe(2);
+      expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(app.storage.storageHash);
+      expect(markers.get(EXT_SPACE)?.storageHash).toBe(ext.storage.storageHash);
+    } finally {
+      await driver.close();
+    }
+  });
+});

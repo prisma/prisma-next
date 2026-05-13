@@ -32,24 +32,24 @@ import {
 import mongoTestContractSpaceExtensionDescriptor from '../contract-space-fixture-mongo/control';
 
 /**
- * P5 T5.2 / T5.3 — aggregate-level end-to-end test for the Mongo
- * contract-space mechanism.
+ * Aggregate-level end-to-end test for the Mongo contract-space
+ * mechanism.
  *
  * Builds an aggregate of an app contract plus one extension contract
- * sourced from `contract-space-fixture-mongo` (T5.1), drives it
- * through the per-space runner, and asserts:
+ * sourced from `contract-space-fixture-mongo`, drives it through the
+ * per-space runner, and asserts:
  *
- * - T5.2 (TC-14): `executeAcrossSpaces` applies app and extension
- *   plans in caller order against a live `MongoMemoryReplSet`; both
- *   markers advance to their pinned hashes; per-space strict schema
- *   verify (the default, run inside `executeAcrossSpaces` after each
- *   apply) passes.
- * - T5.3 (TC-15): after the happy path, dropping the fixture's
+ * - Happy path: `executeAcrossSpaces` applies app and extension plans
+ *   in caller order against a live `MongoMemoryReplSet`; both markers
+ *   advance to their pinned hashes; per-space strict schema verify
+ *   (the default, run inside `executeAcrossSpaces` after each apply)
+ *   passes.
+ * - Failure isolation: after the happy path, dropping the fixture's
  *   unique index on the live `test_audit_event` collection makes the
  *   extension-space slice fail per-space schema verify with a
  *   remediation hint scoped to the extension's collection. The
- *   app-space slice still passes — failure isolation across
- *   contract-space boundaries (AC4 property).
+ *   app-space slice still passes — failure stays inside the
+ *   contract-space boundary that produced it.
  */
 
 const ALL_POLICY = {
@@ -128,7 +128,7 @@ function makeRunner() {
 }
 
 describe(
-  'Mongo contract-space aggregate e2e (P5 T5.2 / T5.3)',
+  'Mongo contract-space aggregate e2e',
   { timeout: timeouts.spinUpMongoMemoryServer },
   () => {
     let replSet: MongoMemoryReplSet;
@@ -161,7 +161,7 @@ describe(
       await db.dropDatabase();
     });
 
-    it('applies app + extension across spaces, advances both markers, and strict per-space verify passes (T5.2 / TC-14)', async () => {
+    it('applies app + extension across spaces, advances both markers, and strict per-space verify passes', async () => {
       const appContract = buildAppContract();
       const appOps = planFor(appContract, null);
       const extOps = planFor(extContract, null);
@@ -225,7 +225,7 @@ describe(
       }
     });
 
-    it('per-space verify isolates extension drift: dropping the fixture index fails ext-space verify but app-space verify still passes (T5.3 / TC-15)', async () => {
+    it('per-space verify isolates extension drift: dropping the fixture index fails ext-space verify but app-space verify still passes', async () => {
       const appContract = buildAppContract();
       const appOps = planFor(appContract, null);
       const extOps = planFor(extContract, null);
@@ -281,7 +281,7 @@ describe(
         // Per-space verifier output: verify the ext slice against the
         // mutated live DB and assert every reported issue is scoped to
         // the extension's collection. Failure isolation across
-        // contract-space boundaries (AC4) propagates through to the
+        // contract-space boundaries propagates through to the
         // human-readable verifier output — every issue's `table` names
         // the ext-owned collection, never the app-owned `users`.
         //

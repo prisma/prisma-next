@@ -11,15 +11,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runContractSpaceSeedPhase } from '../../src/utils/contract-space-seed-phase';
 
 /**
- * Phase 4 smoke tests (T4.1 / T4.2 / T4.3): the framework's
- * extension-space seed phase and the aggregate-loader pinned-contract
- * read helpers are family-neutral; this file pins the property that
- * they accept a Mongo-shaped contract cleanly.
+ * The framework's extension-space seed phase and the aggregate-loader
+ * pinned-contract read helpers are family-neutral; this file pins the
+ * property that they accept a Mongo-shaped contract cleanly.
  *
  * The seed phase canonicalises any `unknown` contract value to JSON
  * via `emitContractSpaceArtefacts`, and the `.d.ts` it emits is a
  * framework-wide placeholder stub (a typed `.d.ts` renderer for
- * extension contracts is separately tracked, not a Mongo gap). The
+ * extension contracts is a separately-tracked concern). The
  * Mongo-shape input here is structural; no Mongo-family runtime
  * imports are required.
  *
@@ -29,12 +28,13 @@ import { runContractSpaceSeedPhase } from '../../src/utils/contract-space-seed-p
  * shape regression in `MongoContract.storage` or in canonicalisation
  * is caught here.
  *
- * - T4.1 (TC-12): a Mongo aggregate with one extension descriptor
- *   produces the three on-disk artefacts.
- * - T4.2: `readContractSpaceContract`, `readContractSpaceHeadRef`,
+ * Coverage:
+ * - A Mongo aggregate with one extension descriptor produces the three
+ *   on-disk artefacts (`contract.json`, `contract.d.ts`, `refs/head.json`).
+ * - `readContractSpaceContract`, `readContractSpaceHeadRef`,
  *   `listContractSpaceDirectories` round-trip the written values.
- * - T4.3 (TC-13 / AC6): re-running the seed phase with no contract
- *   change produces byte-identical artefacts.
+ * - Re-running the seed phase with no contract change produces
+ *   byte-identical artefacts.
  */
 
 const EXT_SPACE = 'cipherstash';
@@ -74,11 +74,11 @@ function buildMongoExtensionContract(): MongoShapedExtensionContract {
           indexes: [{ keys: [{ field: 'tenantId', direction: 1 }], unique: true }],
         },
       },
-      storageHash: coreHash('sha256:tc12-ext-contract'),
+      storageHash: coreHash('sha256:mongo-ext-contract'),
     },
     capabilities: {},
     extensionPacks: {},
-    profileHash: profileHash('sha256:tc12-ext-profile'),
+    profileHash: profileHash('sha256:mongo-ext-profile'),
     meta: {},
   };
 }
@@ -94,7 +94,7 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
     await rm(migrationsDir, { recursive: true, force: true });
   });
 
-  it('writes contract.json, contract.d.ts and refs/head.json for a Mongo extension; loader helpers round-trip (T4.1, T4.2)', async () => {
+  it('writes contract.json, contract.d.ts and refs/head.json for a Mongo extension; loader helpers round-trip', async () => {
     const contract = buildMongoExtensionContract();
     const headHash = contract.storage.storageHash;
     const invariants = ['inv:b', 'inv:a'] as const;
@@ -134,7 +134,7 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
 
     // contract.d.ts: framework-wide placeholder stub. Asserts the
     // property a future typed-`.d.ts` renderer would change
-    // deliberately (separately tracked outside TML-2408).
+    // deliberately.
     const dtsRaw = await readFile(join(migrationsDir, EXT_SPACE, 'contract.d.ts'), 'utf-8');
     expect(dtsRaw).toContain('export {};');
     expect(dtsRaw).toContain(EXT_SPACE);
@@ -147,7 +147,7 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
     expect(headRef?.invariants).toEqual(['inv:a', 'inv:b']);
   });
 
-  it('re-emits byte-identical artefacts on a no-op re-seed (T4.3 / AC6)', async () => {
+  it('re-emits byte-identical artefacts on a no-op re-seed', async () => {
     const contract = buildMongoExtensionContract();
     const headHash = contract.storage.storageHash;
     const invariants = ['inv:a', 'inv:b'] as const;

@@ -38,10 +38,10 @@ const MONGO_DUPLICATE_KEY_CODE = 11000;
  * `_id` and any extension fields are tolerated. `invariants?` is optional —
  * absent reads as `[]` (schemaless default); present-but-malformed throws.
  *
- * `space` is required on the canonical post-port shape — every marker doc
- * is keyed by its space. Pre-port docs (`{_id: 'marker', ...}` with no
+ * `space` is required on the canonical shape — every marker doc is keyed
+ * by its space. Pre-canonical docs (`{_id: 'marker', ...}` with no
  * `space`) are upgraded by the legacy-shape detector before reaching this
- * parser; see {@link readMarker}'s caller-side upgrade pass (T1.2).
+ * parser; see {@link readMarker}'s caller-side upgrade pass.
  */
 const MongoMarkerDocSchema = type({
   space: 'string',

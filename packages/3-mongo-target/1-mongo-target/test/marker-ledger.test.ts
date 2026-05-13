@@ -123,7 +123,7 @@ describe('readMarker', () => {
 });
 
 describe('initMarker', () => {
-  it('writes a doc keyed by space (TC-3): _id and space both equal the supplied space id', async () => {
+  it('writes a doc keyed by space: _id and space both equal the supplied space id', async () => {
     await initMarker(db, APP, { storageHash: 'sha256:abc', profileHash: 'sha256:def' });
 
     const raw = await db
@@ -323,7 +323,7 @@ describe('updateMarker', () => {
   });
 });
 
-describe('readMarker — legacy upgrade (TC-4, TC-5)', () => {
+describe('readMarker — legacy upgrade', () => {
   // Pre-port code wrote a single marker doc keyed by `_id: 'marker'`
   // with no `space` field. Post-port code keys docs by space id and
   // requires `space` as part of the canonical shape. The first read

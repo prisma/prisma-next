@@ -89,9 +89,9 @@ function buildAppContract(): MongoContract {
 }
 
 /**
- * Trimmed app contract claiming only `users` (no `posts`). Used by
- * TC-8 to manufacture a per-space verify violation: the runner applies
- * a plan generated against this trimmed contract, but the
+ * Trimmed app contract claiming only `users` (no `posts`). Used to
+ * manufacture a per-space verify violation: the runner applies a plan
+ * generated against this trimmed contract, but the
  * `destinationContract` it verifies against is the full app contract
  * (which also claims `posts`). The post-apply live schema is missing
  * `posts`, so per-space verify fails.
@@ -197,8 +197,8 @@ describe(
       await db.dropDatabase();
     });
 
-    it('runs both spaces in caller order under strict per-space verify (TC-7)', async () => {
-      // With per-space verify projection wired in T3.4, strict-mode
+    it('runs both spaces in caller order under strict per-space verify', async () => {
+      // With per-space verify projection in place, strict-mode
       // verify (the default) succeeds across the aggregate even though
       // the live database holds collections owned by sibling spaces:
       // each space's verify only sees the slice its contract claims.
@@ -302,8 +302,8 @@ describe(
       }
     });
 
-    it('mid-run failure surfaces failingSpace and leaves earlier markers advanced (TC-8); resume re-applies the failed space and skips already-at-head spaces (TC-9)', async () => {
-      // The TC-8 contract under test: per-space verify projects the live
+    it('mid-run failure surfaces failingSpace and leaves earlier markers advanced; resume re-applies the failed space and skips already-at-head spaces', async () => {
+      // The contract under test: per-space verify projects the live
       // schema to the slice the destination contract claims, then verifies.
       // We manufacture a per-space contract violation by applying a plan
       // generated from a *trimmed* app contract (claims only `users`) but
@@ -363,7 +363,7 @@ describe(
         const appMarkerAfterFail = await readMarker(db, APP_SPACE_ID);
         expect(appMarkerAfterFail).toBeNull();
 
-        // TC-9: re-run with the corrected app plan (covers both
+        // Re-run with the corrected app plan (covers both
         // collections). ext is already at head — the runner's no-op
         // path skips it. App applies its full plan: `users` is
         // postcheck-idempotent-skipped, `posts` is created. Per-space
