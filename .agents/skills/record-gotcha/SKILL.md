@@ -57,11 +57,19 @@ Do not proceed. Do not write the file entry without the ticket. The two halves a
 
 ## The three products and their Linear projects
 
-| Product | Gotchas project (Triage tickets) | Main backlog (normal bugs) |
-|---------|----------------------------------|----------------------------|
-| **Prisma Next** ORM (`@prisma-next/*`, schema, generated client, migration tooling) | [`pn-gotchas`](https://linear.app/prisma-company/project/pn-gotchas-a6f6f5157a5c/overview) | `TODO: confirm main PN project key` |
-| **Prisma Compute** (`@prisma/compute-cli`, deploy, runtime, env management) | [`compute-gotchas`](https://linear.app/prisma-company/project/compute-gotchas-dd3ac34b5ad4/overview) | `TODO: confirm main Compute project key` |
-| **Prisma Postgres** (PPg, `@prisma/dev`, dialect behaviour) | [`ppg-gotchas`](https://linear.app/prisma-company/project/ppg-gotchas-afe77336f696/overview) | `TODO: confirm main PPg project key` |
+Each product has a single Linear project for *all* tickets — both gotchas and normal bugs. Gotchas and normal bugs are distinguished by **status / labels**, not by which project they're filed in.
+
+| Product | Linear project |
+|---------|----------------|
+| **Prisma Next** ORM (`@prisma-next/*`, schema, generated client, migration tooling) | [`pn-gotchas`](https://linear.app/prisma-company/project/pn-gotchas-a6f6f5157a5c/overview) |
+| **Prisma Compute** (`@prisma/compute-cli`, deploy, runtime, env management) | [`compute-gotchas`](https://linear.app/prisma-company/project/compute-gotchas-dd3ac34b5ad4/overview) |
+| **Prisma Postgres** (PPg, `@prisma/dev`, dialect behaviour) | [`ppg-gotchas`](https://linear.app/prisma-company/project/ppg-gotchas-afe77336f696/overview) |
+
+**Filing convention.**
+- **Gotcha:** status `Triage`, no priority, no labels — the project itself is the dogfood filter.
+- **Normal bug:** filed in the same project, but follow the product team's regular conventions (status, priority, labels). Used when the operator's team owns the issue and wants it in the regular triage flow rather than the dogfood lens.
+
+The project names retain the `-gotchas` suffix for historical reasons; treat them as the canonical Linear project for each product regardless.
 
 If a gotcha straddles two products, pick the surface where you were when it bit, file there once, and mention the second product in the body.
 
@@ -87,8 +95,8 @@ If you can't tell which kind of repo you're in, treat it as "other" — silent c
 
 Surface the gotcha to the operator in one short message — symptom, hypothesis on cause, the workaround you used or are about to use — then offer:
 
-1. **Capture as gotcha** — run the full gotcha workflow below (file entry + Triage ticket in the matching `*-gotchas` project). The default when the operator wants the team to see this through a dogfood lens.
-2. **File a normal bug** — the agent files a regular ticket in the *product's main backlog* (not the gotchas project) on the operator's behalf, reusing the symptom / cause / workaround / repro it just gathered. Used when the operator's team owns the issue and wants it in the regular triage flow.
+1. **Capture as gotcha** — run the full gotcha workflow below (file entry + ticket filed in `Triage` status, no priority, no labels). The default when the operator wants the team to see this through a dogfood lens.
+2. **File a normal bug** — the agent files a regular ticket in the same product Linear project on the operator's behalf, but following the team's normal-bug conventions rather than the gotcha filing convention. Used when the operator's team owns the issue and wants it in the regular triage flow.
 3. **Note-and-move-on** — do nothing further. Used when the operator already knows about the issue or it's not worth recording. The agent acknowledges and drops it.
 
 The operator picks. Default to capture-as-gotcha if the operator doesn't choose.
@@ -99,7 +107,7 @@ The operator picks. Default to capture-as-gotcha if the operator doesn't choose.
 
 Skip this skill for:
 
-- **Bugs in code the operator's own team maintains.** This is the consuming-vs-maintaining boundary. File a normal bug in the product's main backlog instead.
+- **Bugs in code the operator's own team maintains.** This is the consuming-vs-maintaining boundary. File a normal bug in the product's Linear project (using the team's normal-bug filing convention, not the gotcha-Triage one) instead.
 - **Subjective preferences** ("I'd prefer the CLI used `--service` instead of positional"). File feature requests in Linear directly, not as gotchas.
 - **Bugs in third-party tools** (Bun, Next.js, `pg`, Slack, etc.) — those go in the relevant tool's tracker. Exception: if the third-party bug only surfaces *because of* how a Prisma product is structured, record it on the Prisma side and link the third-party tracker.
 - **Misunderstandings on your end that the docs already cover.** Re-read the docs first. Honest self-test: if the answer is in the docs and you missed it, that's not a gotcha.
@@ -178,11 +186,11 @@ If you cited a `working tree` path in the Linear ticket because you hadn't commi
 
 When the operator picks "file a normal bug" instead of capturing as a gotcha:
 
-1. **Search the product's main backlog for duplicates.** Use the same symptom keywords. If a match exists, link the operator to it and ask whether to add a comment with the new repro evidence or drop it.
-2. **File the ticket on the operator's behalf** in the product's main backlog (project key per § The three products table — fill in the TODOs).
+1. **Search the product's Linear project for duplicates.** Use the same symptom keywords. If a match exists, link the operator to it and ask whether to add a comment with the new repro evidence or drop it.
+2. **File the ticket on the operator's behalf** in the matching product project (per § The three products table).
    - **Title:** symptom-led, same shape as a gotcha entry heading.
    - **Description:** symptom / cause / workaround / repro from the conversation, formatted like the Linear-ticket template below but minus the `Source:` line (there's no local gotcha file).
-   - **Status / priority / labels:** leave to the team's normal triage.
+   - **Status / priority / labels:** follow the team's normal-bug conventions, not the `Triage` / no-labels gotcha convention. Ask the operator if you don't know the team's defaults.
 3. **Confirm with the operator** by pasting the ticket URL into the conversation. No local file entry, no commit — the ticket is the record.
 
 If the operator wants to file the ticket themselves rather than have the agent do it, draft the body and hand off — they paste.
@@ -336,7 +344,7 @@ If the entry was wrong (rather than fixed), mark it `**Superseded — see <new-e
 
 ## Anti-patterns
 
-- **Filing a gotcha about code your team maintains.** That's a bug in your own backlog — file it there, not in `*-gotchas`. The gotchas projects exist to surface the *consumer perspective*; flooding them with maintenance-side bugs dilutes the signal.
+- **Filing a gotcha about code your team maintains.** That's a bug. File it in the same product Linear project, but with the team's normal-bug conventions (not `Triage` / no-labels). The gotcha filing convention exists to surface the *consumer perspective*; tagging maintenance-side bugs as gotchas dilutes the signal.
 - **Skipping the Linear ticket** because "I'll file it later." You won't. File now or not at all; "not at all" only if you decided it's not gotcha-worthy.
 - **Filing without searching for duplicates first.** The gotchas projects fill up fast; duplicate tickets dilute the signal.
 - **Recording your own misunderstanding as a product gotcha.** If the docs already cover it, skip. (Honest self-test: would you file a public ticket about this? If no, don't write a gotcha either.)
