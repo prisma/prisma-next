@@ -330,8 +330,8 @@ describe(
         expect(result.ok).toBe(true);
 
         const markerDoc = await db
-          .collection<{ invariants?: readonly string[] }>('_prisma_migrations')
-          .findOne({ _id: 'app' as unknown as never });
+          .collection<{ _id: string; invariants?: readonly string[] }>('_prisma_migrations')
+          .findOne({ _id: 'app' });
         expect(markerDoc?.invariants).toEqual(['email-verified', 'phone-backfill']);
       });
     });
