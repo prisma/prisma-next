@@ -100,7 +100,7 @@ This is a recurring, easy-to-miss class of leak (the implementer tends to seed c
 1. **Extract the round's plan IDs first.** From `projects/{project}/plan.md` and `spec.md`, pull every ID-shaped token: task IDs (`T1.1`, `T3.5`), test-case IDs (`TC-1`..`TC-N`), AC/FR/NFR IDs, checkpoint IDs (`CKPT-2`), milestone/round IDs (`P3 R2`, `M3`). One regex over the plan + spec is enough:
 
    ```bash
-   rg -oI '\b(T[0-9]+\.[0-9]+|TC-?[0-9]+|AC[0-9]+|FR[0-9]+|NFR[0-9]+|CKPT-[0-9]+|AM[0-9]+|P[0-9]+ R[0-9]+|M[0-9]+ review)\b' \
+   rg -oI '\b(T[0-9]+\.[0-9]+|TC-?[0-9]+|AC-?[0-9]+|FR[0-9]+|NFR[0-9]+|CKPT-[0-9]+|AM[0-9]+|D[0-9]+|M[0-9]+\.[0-9]+|P[0-9]+ R[0-9]+|M[0-9]+ review)\b' \
      projects/{project}/plan.md projects/{project}/spec.md \
      | sort -u
    ```
@@ -110,7 +110,7 @@ This is a recurring, easy-to-miss class of leak (the implementer tends to seed c
    ```bash
    git diff <base>..HEAD -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.py' '*.rs' '*.go' \
      | grep -E '^\+' \
-     | grep -oE '\b(T[0-9]+\.[0-9]+|TC-?[0-9]+|AC[0-9]+|FR[0-9]+|NFR[0-9]+|CKPT-[0-9]+|AM[0-9]+|P[0-9]+ R[0-9]+|M[0-9]+ review)\b' \
+     | grep -oE '\b(T[0-9]+\.[0-9]+|TC-?[0-9]+|AC-?[0-9]+|FR[0-9]+|NFR[0-9]+|CKPT-[0-9]+|AM[0-9]+|D[0-9]+|M[0-9]+\.[0-9]+|P[0-9]+ R[0-9]+|M[0-9]+ review)\b' \
      | sort -u
    ```
 
