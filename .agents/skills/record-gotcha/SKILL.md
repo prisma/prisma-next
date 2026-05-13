@@ -167,7 +167,7 @@ Capture the Linear ticket id (e.g. `TML-1234`) and URL — you'll need both for 
 
 One commit per gotcha (or per closely-related group). Conventional shape:
 
-```
+```text
 docs(gotcha): record <one-line title>
 
 <2–4 line summary: what was surprising, workaround in one sentence,
