@@ -84,7 +84,10 @@ async function executeFindOneAndUpdate(
  * mechanism this enables.
  */
 export async function readMarker(db: Db, space: string): Promise<ContractMarkerRecord | null> {
-  const cmd = new RawAggregateCommand(COLLECTION, [{ $match: { _id: space } }, { $limit: 1 }]);
+  const cmd = new RawAggregateCommand(COLLECTION, [
+    { $match: { _id: space, space } },
+    { $limit: 1 },
+  ]);
   const docs = await executeAggregate(db, cmd);
   const doc = docs[0];
   if (!doc) return null;
@@ -104,7 +107,13 @@ export async function readMarker(db: Db, space: string): Promise<ContractMarkerR
  */
 export async function readAllMarkers(db: Db): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
   const cmd = new RawAggregateCommand(COLLECTION, [
-    { $match: { _id: { $type: 'string' }, space: { $type: 'string' } } },
+    {
+      $match: {
+        _id: { $type: 'string' },
+        space: { $type: 'string' },
+        $expr: { $eq: ['$_id', '$space'] },
+      },
+    },
   ]);
   const docs = await executeAggregate(db, cmd);
   const out = new Map<string, ContractMarkerRecord>();
@@ -188,7 +197,7 @@ export async function updateMarker(
         ];
   const cmd = new RawFindOneAndUpdateCommand(
     COLLECTION,
-    { _id: space, storageHash: expectedFrom },
+    { _id: space, space, storageHash: expectedFrom },
     update,
     false,
   );

@@ -379,6 +379,48 @@ describe('writeLedgerEntry', () => {
   });
 });
 
+describe('mismatched _id and space (defence-in-depth)', () => {
+  // initMarker writes _id === space, so a row where the two diverge can
+  // only appear via direct corruption or a non-Prisma writer. The reads
+  // and CAS update should ignore such rows so a malformed doc can't
+  // masquerade as a marker for either of the two implied spaces.
+  const insertMismatched = async () =>
+    db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
+      _id: APP,
+      space: EXT,
+      storageHash: 'sha256:rogue',
+      profileHash: 'sha256:rogue',
+      updatedAt: new Date(),
+    });
+
+  it('readMarker ignores a row whose _id does not equal space', async () => {
+    await insertMismatched();
+
+    expect(await readMarker(db, APP)).toBeNull();
+    expect(await readMarker(db, EXT)).toBeNull();
+  });
+
+  it('readAllMarkers excludes rows whose _id does not equal space', async () => {
+    await insertMismatched();
+    await initMarker(db, EXT, { storageHash: 'sha256:ext1', profileHash: 'sha256:p1' });
+
+    const markers = await readAllMarkers(db);
+    expect(markers.size).toBe(1);
+    expect(markers.get(EXT)?.storageHash).toBe('sha256:ext1');
+  });
+
+  it('updateMarker CAS does not match a row whose _id does not equal space', async () => {
+    await insertMismatched();
+
+    const updated = await updateMarker(db, APP, 'sha256:rogue', {
+      storageHash: 'sha256:v2',
+      profileHash: 'sha256:p2',
+    });
+
+    expect(updated).toBe(false);
+  });
+});
+
 describe('readAllMarkers', () => {
   it('returns an empty map when no marker docs exist', async () => {
     const markers = await readAllMarkers(db);
