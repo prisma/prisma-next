@@ -263,12 +263,12 @@ function createRefListCommand(): Command {
 }
 
 export {
-  executeRefSetCommand,
-  executeRefGetCommand,
-  executeRefDeleteCommand,
-  executeRefListCommand,
   cliErrorInvalidRefName,
   cliErrorInvalidRefValue,
+  executeRefDeleteCommand,
+  executeRefGetCommand,
+  executeRefListCommand,
+  executeRefSetCommand,
 };
 
 export function createMigrationRefCommand(): Command {

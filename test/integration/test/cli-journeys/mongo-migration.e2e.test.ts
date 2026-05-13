@@ -320,98 +320,95 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
   });
 });
 
-describe(
-  'Journey: Mongo migration authoring (live database)',
-  { timeout: timeouts.spinUpMongoMemoryServer },
-  () => {
-    let replSet: MongoMemoryReplSet;
-    let client: MongoClient;
-    const dbName = 'mongo_journey_test';
-    const created = new Set<string>();
+describe('Journey: Mongo migration authoring (live database)', {
+  timeout: timeouts.spinUpMongoMemoryServer,
+}, () => {
+  let replSet: MongoMemoryReplSet;
+  let client: MongoClient;
+  const dbName = 'mongo_journey_test';
+  const created = new Set<string>();
 
-    beforeAll(async () => {
-      replSet = await MongoMemoryReplSet.create({
-        instanceOpts: [
-          { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
-        ],
-        replSet: { count: 1, storageEngine: 'wiredTiger' },
-      });
-      client = new MongoClient(replSet.getUri());
-      await client.connect();
-    }, timeouts.spinUpMongoMemoryServer);
-
-    beforeEach(async () => {
-      await client.db(dbName).dropDatabase();
+  beforeAll(async () => {
+    replSet = await MongoMemoryReplSet.create({
+      instanceOpts: [
+        { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+      ],
+      replSet: { count: 1, storageEngine: 'wiredTiger' },
     });
+    client = new MongoClient(replSet.getUri());
+    await client.connect();
+  }, timeouts.spinUpMongoMemoryServer);
 
-    afterEach(async () => {
-      for (const dir of created) {
-        await rm(dir, { recursive: true, force: true }).catch(() => {});
-      }
-      created.clear();
-    });
+  beforeEach(async () => {
+    await client.db(dbName).dropDatabase();
+  });
 
-    afterAll(async () => {
-      await client?.close().catch(() => {});
-      await replSet?.stop().catch(() => {});
-    }, timeouts.spinUpMongoMemoryServer);
+  afterEach(async () => {
+    for (const dir of created) {
+      await rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+    created.clear();
+  });
 
-    it('plans + applies initial DDL, then hand-authored dataTransform migration runs against live MongoDB', async () => {
-      const connectionString = buildMongoUri(replSet.getUri(), dbName);
-      const ctx = setupMongoJourney(connectionString);
-      created.add(ctx.testDir);
+  afterAll(async () => {
+    await client?.close().catch(() => {});
+    await replSet?.stop().catch(() => {});
+  }, timeouts.spinUpMongoMemoryServer);
 
-      const emit0 = await emitContract(ctx);
-      expect(emit0.exitCode, `contract emit: ${emit0.stderr}`).toBe(0);
+  it('plans + applies initial DDL, then hand-authored dataTransform migration runs against live MongoDB', async () => {
+    const connectionString = buildMongoUri(replSet.getUri(), dbName);
+    const ctx = setupMongoJourney(connectionString);
+    created.add(ctx.testDir);
 
-      const plan0 = await migrationPlan(ctx, ['--name', 'initial']);
-      expect(plan0.exitCode, `migration plan initial: ${plan0.stdout}\n${plan0.stderr}`).toBe(0);
+    const emit0 = await emitContract(ctx);
+    expect(emit0.exitCode, `contract emit: ${emit0.stderr}`).toBe(0);
 
-      const emitInit = await migrationEmit(ctx, [
-        '--dir',
-        `migrations/app/${basename(getLatestMigrationDir(ctx))}`,
+    const plan0 = await migrationPlan(ctx, ['--name', 'initial']);
+    expect(plan0.exitCode, `migration plan initial: ${plan0.stdout}\n${plan0.stderr}`).toBe(0);
+
+    const emitInit = await migrationEmit(ctx, [
+      '--dir',
+      `migrations/app/${basename(getLatestMigrationDir(ctx))}`,
+    ]);
+    expect(
+      emitInit.exitCode,
+      `migration emit initial: ${emitInit.stdout}\n${emitInit.stderr}`,
+    ).toBe(0);
+
+    const apply0 = await migrationApply(ctx);
+    expect(apply0.exitCode, `migration apply initial: ${apply0.stdout}\n${apply0.stderr}`).toBe(0);
+
+    const collections = await client.db(dbName).listCollections({ name: 'users' }).toArray();
+    expect(collections.map((c) => c.name)).toContain('users');
+
+    await client
+      .db(dbName)
+      .collection('users')
+      .insertMany([
+        { email: 'alice@example.com', name: 'Alice' },
+        { email: 'bob@example.com', name: 'BOB' },
+        { email: 'carol@example.com', name: 'Carol' },
       ]);
-      expect(
-        emitInit.exitCode,
-        `migration emit initial: ${emitInit.stdout}\n${emitInit.stderr}`,
-      ).toBe(0);
 
-      const apply0 = await migrationApply(ctx);
-      expect(apply0.exitCode, `migration apply initial: ${apply0.stdout}\n${apply0.stderr}`).toBe(
-        0,
-      );
+    swapToAdditive(ctx);
+    const emit1 = await emitContract(ctx);
+    expect(emit1.exitCode, `contract emit additive: ${emit1.stderr}`).toBe(0);
 
-      const collections = await client.db(dbName).listCollections({ name: 'users' }).toArray();
-      expect(collections.map((c) => c.name)).toContain('users');
+    const newResult = await migrationNew(ctx, ['--name', 'normalize-names']);
+    expect(newResult.exitCode, `migration new: ${newResult.stdout}\n${newResult.stderr}`).toBe(0);
 
-      await client
-        .db(dbName)
-        .collection('users')
-        .insertMany([
-          { email: 'alice@example.com', name: 'Alice' },
-          { email: 'bob@example.com', name: 'BOB' },
-          { email: 'carol@example.com', name: 'Carol' },
-        ]);
+    const migrationDir = findMigrationDirBySlug(ctx, 'normalize_names');
+    const migrationTsPath = join(migrationDir, 'migration.ts');
+    const draftManifest = JSON.parse(
+      readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
+    ) as { from: string; to: string };
 
-      swapToAdditive(ctx);
-      const emit1 = await emitContract(ctx);
-      expect(emit1.exitCode, `contract emit additive: ${emit1.stderr}`).toBe(0);
-
-      const newResult = await migrationNew(ctx, ['--name', 'normalize-names']);
-      expect(newResult.exitCode, `migration new: ${newResult.stdout}\n${newResult.stderr}`).toBe(0);
-
-      const migrationDir = findMigrationDirBySlug(ctx, 'normalize_names');
-      const migrationTsPath = join(migrationDir, 'migration.ts');
-      const draftManifest = JSON.parse(
-        readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
-      ) as { from: string; to: string };
-
-      // Hand-author the migration: a createIndex op (matches what the planner
-      // would emit) plus a dataTransform that lowercases the `name` field.
-      // The check finds documents whose `name` contains an uppercase letter;
-      // after the transform all names are lower-case so the check is
-      // satisfied, enabling idempotency-skip on re-apply (tested below).
-      const handAuthored = `import { MigrationCLI } from '@prisma-next/cli/migration-cli';
+    // Hand-author the migration: a createIndex op (matches what the planner
+    // would emit) plus a dataTransform that lowercases the `name` field.
+    // The check finds documents whose `name` contains an uppercase letter;
+    // after the transform all names are lower-case so the check is
+    // satisfied, enabling idempotency-skip on re-apply (tested below).
+    const handAuthored = `import { MigrationCLI } from '@prisma-next/cli/migration-cli';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex, dataTransform } from '@prisma-next/target-mongo/migration';
 import { RawUpdateManyCommand, RawAggregateCommand } from '@prisma-next/mongo-query-ast/execution';
@@ -462,64 +459,58 @@ class M extends Migration {
 export default M;
 MigrationCLI.run(import.meta.url, M);
 `;
-      writeFileSync(migrationTsPath, handAuthored);
+    writeFileSync(migrationTsPath, handAuthored);
 
-      const emitResult = await migrationEmit(ctx, ['--dir', migrationDir]);
-      expect(
-        emitResult.exitCode,
-        `migration emit: ${emitResult.stdout}\n${emitResult.stderr}`,
-      ).toBe(0);
+    const emitResult = await migrationEmit(ctx, ['--dir', migrationDir]);
+    expect(emitResult.exitCode, `migration emit: ${emitResult.stdout}\n${emitResult.stderr}`).toBe(
+      0,
+    );
 
-      const ops = JSON.parse(
-        readFileSync(join(migrationDir, 'ops.json'), 'utf-8'),
-      ) as ReadonlyArray<{
-        id: string;
-        operationClass: string;
-      }>;
-      expect(ops.map((o) => o.id)).toEqual(
-        expect.arrayContaining(['data_transform.lowercase-user-name']),
-      );
-      expect(ops.some((o) => o.id.startsWith('index.users.'))).toBe(true);
+    const ops = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8')) as ReadonlyArray<{
+      id: string;
+      operationClass: string;
+    }>;
+    expect(ops.map((o) => o.id)).toEqual(
+      expect.arrayContaining(['data_transform.lowercase-user-name']),
+    );
+    expect(ops.some((o) => o.id.startsWith('index.users.'))).toBe(true);
 
-      const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
-        migrationHash: string;
-      };
-      expect(manifest.migrationHash).toMatch(/^sha256:/);
+    const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
+      migrationHash: string;
+    };
+    expect(manifest.migrationHash).toMatch(/^sha256:/);
 
-      const apply1 = await migrationApply(ctx);
-      expect(apply1.exitCode, `migration apply additive: ${apply1.stdout}\n${apply1.stderr}`).toBe(
-        0,
-      );
+    const apply1 = await migrationApply(ctx);
+    expect(apply1.exitCode, `migration apply additive: ${apply1.stdout}\n${apply1.stderr}`).toBe(0);
 
-      const users = await client
-        .db(dbName)
-        .collection('users')
-        .find({}, { projection: { _id: 0, email: 1, name: 1 } })
-        .sort({ email: 1 })
-        .toArray();
-      expect(users).toEqual([
-        { email: 'alice@example.com', name: 'alice' },
-        { email: 'bob@example.com', name: 'bob' },
-        { email: 'carol@example.com', name: 'carol' },
-      ]);
+    const users = await client
+      .db(dbName)
+      .collection('users')
+      .find({}, { projection: { _id: 0, email: 1, name: 1 } })
+      .sort({ email: 1 })
+      .toArray();
+    expect(users).toEqual([
+      { email: 'alice@example.com', name: 'alice' },
+      { email: 'bob@example.com', name: 'bob' },
+      { email: 'carol@example.com', name: 'carol' },
+    ]);
 
-      const indexes = await client.db(dbName).collection('users').indexes();
-      expect(indexes.some((idx) => JSON.stringify(idx.key) === JSON.stringify({ name: 1 }))).toBe(
-        true,
-      );
+    const indexes = await client.db(dbName).collection('users').indexes();
+    expect(indexes.some((idx) => JSON.stringify(idx.key) === JSON.stringify({ name: 1 }))).toBe(
+      true,
+    );
 
-      // Re-apply: the runner postcheck sees all names are already lower-case,
-      // so the data transform is skipped. Data must be byte-identical.
-      const apply2 = await migrationApply(ctx);
-      expect(apply2.exitCode, `re-apply: ${apply2.stdout}\n${apply2.stderr}`).toBe(0);
+    // Re-apply: the runner postcheck sees all names are already lower-case,
+    // so the data transform is skipped. Data must be byte-identical.
+    const apply2 = await migrationApply(ctx);
+    expect(apply2.exitCode, `re-apply: ${apply2.stdout}\n${apply2.stderr}`).toBe(0);
 
-      const usersAfterReApply = await client
-        .db(dbName)
-        .collection('users')
-        .find({}, { projection: { _id: 0, email: 1, name: 1 } })
-        .sort({ email: 1 })
-        .toArray();
-      expect(usersAfterReApply).toEqual(users);
-    });
-  },
-);
+    const usersAfterReApply = await client
+      .db(dbName)
+      .collection('users')
+      .find({}, { projection: { _id: 0, email: 1, name: 1 } })
+      .sort({ email: 1 })
+      .toArray();
+    expect(usersAfterReApply).toEqual(users);
+  });
+});

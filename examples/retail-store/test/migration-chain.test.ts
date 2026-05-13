@@ -43,160 +43,158 @@ function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
   );
 }
 
-describe(
-  'full retail-store migration chain (m1 → m2 → m3)',
-  { timeout: timeouts.spinUpMongoMemoryServer },
-  () => {
-    let replSet: MongoMemoryReplSet;
-    let client: MongoClient;
-    let db: Db;
-    const dbName = 'migration_chain_test';
+describe('full retail-store migration chain (m1 → m2 → m3)', {
+  timeout: timeouts.spinUpMongoMemoryServer,
+}, () => {
+  let replSet: MongoMemoryReplSet;
+  let client: MongoClient;
+  let db: Db;
+  const dbName = 'migration_chain_test';
 
-    beforeAll(async () => {
-      replSet = await MongoMemoryReplSet.create({
-        instanceOpts: [
-          { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
-        ],
-        replSet: { count: 1, storageEngine: 'wiredTiger' },
+  beforeAll(async () => {
+    replSet = await MongoMemoryReplSet.create({
+      instanceOpts: [
+        { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+      ],
+      replSet: { count: 1, storageEngine: 'wiredTiger' },
+    });
+    client = new MongoClient(replSet.getUri());
+    await client.connect();
+    db = client.db(dbName);
+  }, timeouts.spinUpMongoMemoryServer);
+
+  beforeEach(async () => {
+    await db.dropDatabase();
+  });
+
+  afterAll(async () => {
+    try {
+      await client?.close();
+      await replSet?.stop();
+    } catch {
+      // ignore cleanup errors
+    }
+  }, timeouts.spinUpMongoMemoryServer);
+
+  it('applies all three migrations, post-apply schema satisfies the contract, and pre-existing products are backfilled', async () => {
+    const m1 = loadMigration(MIG1_DIR);
+    const m2 = loadMigration(MIG2_DIR);
+    const m3 = loadMigration(MIG3_DIR);
+
+    const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
+    try {
+      const runner = new MongoMigrationRunner(
+        createMongoRunnerDeps(
+          controlDriver,
+          MongoDriverImpl.fromDb(extractDb(controlDriver)),
+          makeFamily(),
+        ),
+      );
+
+      // Migration 1 — bootstrap. No origin (greenfield); strict verify on.
+      const r1 = await runner.execute({
+        plan: {
+          targetId: 'mongo',
+          destination: { storageHash: m1.endContract.storage.storageHash },
+          operations: m1.ops,
+        },
+        destinationContract: m1.endContract,
+        policy: ALL_POLICY,
+        frameworkComponents: [],
+        strictVerification: true,
       });
-      client = new MongoClient(replSet.getUri());
-      await client.connect();
-      db = client.db(dbName);
-    }, timeouts.spinUpMongoMemoryServer);
+      expect(r1.ok, `m1 failed: ${JSON.stringify(r1)}`).toBe(true);
 
-    beforeEach(async () => {
-      await db.dropDatabase();
-    });
+      // Migration 2 — add a non-validator index.
+      const r2 = await runner.execute({
+        plan: {
+          targetId: 'mongo',
+          origin: { storageHash: m1.endContract.storage.storageHash },
+          destination: { storageHash: m2.endContract.storage.storageHash },
+          operations: m2.ops,
+        },
+        destinationContract: m2.endContract,
+        policy: ALL_POLICY,
+        frameworkComponents: [],
+        strictVerification: true,
+      });
+      expect(r2.ok, `m2 failed: ${JSON.stringify(r2)}`).toBe(true);
 
-    afterAll(async () => {
-      try {
-        await client?.close();
-        await replSet?.stop();
-      } catch {
-        // ignore cleanup errors
+      // Seed two pre-existing products that pre-date the `status` field.
+      // These conform to the state-2 strict validator (which doesn't yet
+      // include `status`); migration 3 adds `status` to the validator and
+      // backfills the value.
+      await db.collection('products').insertMany([
+        {
+          name: 'Pre-existing widget A',
+          brand: 'Acme',
+          code: 'A001',
+          description: 'A widget that pre-dates the status field',
+          primaryCategory: 'Apparel',
+          subCategory: 'Topwear',
+          articleType: 'T-Shirts',
+          price: { amount: 10.99, currency: 'USD' },
+          image: { url: 'http://example.com/a.png' },
+        },
+        {
+          name: 'Pre-existing widget B',
+          brand: 'Acme',
+          code: 'B001',
+          description: 'Another pre-existing widget',
+          primaryCategory: 'Apparel',
+          subCategory: 'Bottomwear',
+          articleType: 'Trousers',
+          price: { amount: 20.99, currency: 'USD' },
+          image: { url: 'http://example.com/b.png' },
+        },
+      ]);
+
+      // Migration 3 — refresh validator + dataTransform backfill.
+      const r3 = await runner.execute({
+        plan: {
+          targetId: 'mongo',
+          origin: { storageHash: m2.endContract.storage.storageHash },
+          destination: { storageHash: m3.endContract.storage.storageHash },
+          operations: m3.ops,
+        },
+        destinationContract: m3.endContract,
+        policy: ALL_POLICY,
+        frameworkComponents: [],
+        strictVerification: true,
+      });
+      expect(r3.ok, `m3 failed: ${JSON.stringify(r3)}`).toBe(true);
+
+      // Independent verify call: introspect the live DB and diff against
+      // the state-3 contract. Belt-and-braces — the runner already verified
+      // post-apply (gating its marker advance on it), but this re-run
+      // makes the assertion explicit at the test layer and would catch
+      // any future drift between runner-internal verify and stand-alone
+      // `verifyMongoSchema`.
+      const liveSchema = await introspectSchema(extractDb(controlDriver));
+      const verifyResult = verifyMongoSchema({
+        contract: m3.endContract,
+        schema: liveSchema,
+        strict: true,
+        frameworkComponents: [],
+      });
+      expect(verifyResult.ok, `post-chain verify failed: ${JSON.stringify(verifyResult)}`).toBe(
+        true,
+      );
+
+      // Marker should have advanced to the state-3 hash via migration 3.
+      const marker = await db
+        .collection<{ _id: string; storageHash: string }>('_prisma_migrations')
+        .findOne({ _id: 'app' });
+      expect(marker?.storageHash).toBe(m3.endContract.storage.storageHash);
+
+      // Backfill: pre-existing products now carry `status: 'active'`.
+      const products = await db.collection('products').find({}).toArray();
+      expect(products).toHaveLength(2);
+      for (const p of products) {
+        expect(p['status']).toBe('active');
       }
-    }, timeouts.spinUpMongoMemoryServer);
-
-    it('applies all three migrations, post-apply schema satisfies the contract, and pre-existing products are backfilled', async () => {
-      const m1 = loadMigration(MIG1_DIR);
-      const m2 = loadMigration(MIG2_DIR);
-      const m3 = loadMigration(MIG3_DIR);
-
-      const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
-      try {
-        const runner = new MongoMigrationRunner(
-          createMongoRunnerDeps(
-            controlDriver,
-            MongoDriverImpl.fromDb(extractDb(controlDriver)),
-            makeFamily(),
-          ),
-        );
-
-        // Migration 1 — bootstrap. No origin (greenfield); strict verify on.
-        const r1 = await runner.execute({
-          plan: {
-            targetId: 'mongo',
-            destination: { storageHash: m1.endContract.storage.storageHash },
-            operations: m1.ops,
-          },
-          destinationContract: m1.endContract,
-          policy: ALL_POLICY,
-          frameworkComponents: [],
-          strictVerification: true,
-        });
-        expect(r1.ok, `m1 failed: ${JSON.stringify(r1)}`).toBe(true);
-
-        // Migration 2 — add a non-validator index.
-        const r2 = await runner.execute({
-          plan: {
-            targetId: 'mongo',
-            origin: { storageHash: m1.endContract.storage.storageHash },
-            destination: { storageHash: m2.endContract.storage.storageHash },
-            operations: m2.ops,
-          },
-          destinationContract: m2.endContract,
-          policy: ALL_POLICY,
-          frameworkComponents: [],
-          strictVerification: true,
-        });
-        expect(r2.ok, `m2 failed: ${JSON.stringify(r2)}`).toBe(true);
-
-        // Seed two pre-existing products that pre-date the `status` field.
-        // These conform to the state-2 strict validator (which doesn't yet
-        // include `status`); migration 3 adds `status` to the validator and
-        // backfills the value.
-        await db.collection('products').insertMany([
-          {
-            name: 'Pre-existing widget A',
-            brand: 'Acme',
-            code: 'A001',
-            description: 'A widget that pre-dates the status field',
-            primaryCategory: 'Apparel',
-            subCategory: 'Topwear',
-            articleType: 'T-Shirts',
-            price: { amount: 10.99, currency: 'USD' },
-            image: { url: 'http://example.com/a.png' },
-          },
-          {
-            name: 'Pre-existing widget B',
-            brand: 'Acme',
-            code: 'B001',
-            description: 'Another pre-existing widget',
-            primaryCategory: 'Apparel',
-            subCategory: 'Bottomwear',
-            articleType: 'Trousers',
-            price: { amount: 20.99, currency: 'USD' },
-            image: { url: 'http://example.com/b.png' },
-          },
-        ]);
-
-        // Migration 3 — refresh validator + dataTransform backfill.
-        const r3 = await runner.execute({
-          plan: {
-            targetId: 'mongo',
-            origin: { storageHash: m2.endContract.storage.storageHash },
-            destination: { storageHash: m3.endContract.storage.storageHash },
-            operations: m3.ops,
-          },
-          destinationContract: m3.endContract,
-          policy: ALL_POLICY,
-          frameworkComponents: [],
-          strictVerification: true,
-        });
-        expect(r3.ok, `m3 failed: ${JSON.stringify(r3)}`).toBe(true);
-
-        // Independent verify call: introspect the live DB and diff against
-        // the state-3 contract. Belt-and-braces — the runner already verified
-        // post-apply (gating its marker advance on it), but this re-run
-        // makes the assertion explicit at the test layer and would catch
-        // any future drift between runner-internal verify and stand-alone
-        // `verifyMongoSchema`.
-        const liveSchema = await introspectSchema(extractDb(controlDriver));
-        const verifyResult = verifyMongoSchema({
-          contract: m3.endContract,
-          schema: liveSchema,
-          strict: true,
-          frameworkComponents: [],
-        });
-        expect(verifyResult.ok, `post-chain verify failed: ${JSON.stringify(verifyResult)}`).toBe(
-          true,
-        );
-
-        // Marker should have advanced to the state-3 hash via migration 3.
-        const marker = await db
-          .collection<{ _id: string; storageHash: string }>('_prisma_migrations')
-          .findOne({ _id: 'app' });
-        expect(marker?.storageHash).toBe(m3.endContract.storage.storageHash);
-
-        // Backfill: pre-existing products now carry `status: 'active'`.
-        const products = await db.collection('products').find({}).toArray();
-        expect(products).toHaveLength(2);
-        for (const p of products) {
-          expect(p['status']).toBe('active');
-        }
-      } finally {
-        await controlDriver.close();
-      }
-    });
-  },
-);
+    } finally {
+      await controlDriver.close();
+    }
+  });
+});

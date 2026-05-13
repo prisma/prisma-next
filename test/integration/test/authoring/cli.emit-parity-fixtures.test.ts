@@ -78,122 +78,116 @@ describe('emit parity fixtures', () => {
   });
 
   for (const fixtureCase of parityCases) {
-    it(
-      `matches ts and psl emission for ${fixtureCase.caseName}`,
-      { timeout: timeouts.typeScriptCompilation },
-      async () => {
-        const testSetup = setupIntegrationTestDirectoryForAuthoringParityCase(fixtureCase);
+    it(`matches ts and psl emission for ${fixtureCase.caseName}`, {
+      timeout: timeouts.typeScriptCompilation,
+    }, async () => {
+      const testSetup = setupIntegrationTestDirectoryForAuthoringParityCase(fixtureCase);
 
-        try {
-          const tsConfig = await loadConfig(testSetup.tsConfigPath);
-          const pslConfig = await loadConfig(testSetup.pslConfigPath);
+      try {
+        const tsConfig = await loadConfig(testSetup.tsConfigPath);
+        const pslConfig = await loadConfig(testSetup.pslConfigPath);
 
-          if (!tsConfig.contract || !pslConfig.contract || !tsConfig.driver || !pslConfig.driver) {
-            throw new Error('Fixture parity tests require contract + driver in both configs');
-          }
-
-          const originalCwd = process.cwd();
-          let tsProviderResultFirst: Awaited<ReturnType<typeof tsConfig.contract.source.load>>;
-          let tsProviderResultSecond: Awaited<ReturnType<typeof tsConfig.contract.source.load>>;
-          let pslProviderResultFirst: Awaited<ReturnType<typeof pslConfig.contract.source.load>>;
-          let pslProviderResultSecond: Awaited<ReturnType<typeof pslConfig.contract.source.load>>;
-          try {
-            process.chdir(testSetup.testDir);
-            const tsContext = sourceContextFromConfig(tsConfig);
-            const pslContext = sourceContextFromConfig(pslConfig);
-            tsProviderResultFirst = await tsConfig.contract.source.load(tsContext);
-            tsProviderResultSecond = await tsConfig.contract.source.load(tsContext);
-            pslProviderResultFirst = await pslConfig.contract.source.load(pslContext);
-            pslProviderResultSecond = await pslConfig.contract.source.load(pslContext);
-          } finally {
-            process.chdir(originalCwd);
-          }
-
-          expect(tsProviderResultSecond).toEqual(tsProviderResultFirst);
-          expect(pslProviderResultSecond).toEqual(pslProviderResultFirst);
-
-          if (!tsProviderResultFirst.ok) {
-            throw new Error(`TS provider failed: ${tsProviderResultFirst.failure.summary}`);
-          }
-          if (!pslProviderResultFirst.ok) {
-            throw new Error(`PSL provider failed: ${pslProviderResultFirst.failure.summary}`);
-          }
-
-          const stack = createControlStack({
-            family: tsConfig.family,
-            target: tsConfig.target,
-            adapter: tsConfig.adapter,
-            driver: tsConfig.driver,
-            extensionPacks: tsConfig.extensionPacks ?? [],
-          });
-          const familyInstance = tsConfig.family.create(stack);
-
-          const frameworkComponents = [
-            tsConfig.target,
-            tsConfig.adapter,
-            ...(tsConfig.extensionPacks ?? []),
-          ];
-          const enrichedTs = enrichContract(tsProviderResultFirst.value, frameworkComponents);
-          const enrichedPsl = enrichContract(pslProviderResultFirst.value, frameworkComponents);
-
-          const normalizedTs = familyInstance.validateContract(enrichedTs);
-          const normalizedPsl = familyInstance.validateContract(enrichedPsl);
-          expect(normalizedTs).toEqual(normalizedPsl);
-
-          const tsEmitFirst = await emit(normalizedTs, stack, sqlEmission);
-          const tsEmitSecond = await emit(normalizedTs, stack, sqlEmission);
-          const pslEmitFirst = await emit(normalizedPsl, stack, sqlEmission);
-          const pslEmitSecond = await emit(normalizedPsl, stack, sqlEmission);
-
-          expect(tsEmitFirst).toMatchObject({
-            contractJson: tsEmitSecond.contractJson,
-            storageHash: tsEmitSecond.storageHash,
-            profileHash: tsEmitSecond.profileHash,
-          });
-          expect(pslEmitFirst).toMatchObject({
-            contractJson: pslEmitSecond.contractJson,
-            storageHash: pslEmitSecond.storageHash,
-            profileHash: pslEmitSecond.profileHash,
-          });
-
-          const tsContractJson = parseContractJson(tsEmitFirst.contractJson);
-          const pslContractJson = parseContractJson(pslEmitFirst.contractJson);
-
-          expect(tsContractJson).toEqual(pslContractJson);
-          assertContractJsonOmitsSourceProvenance(tsContractJson);
-
-          expect(tsEmitFirst.storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-          expect(tsEmitFirst.profileHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-          expect(pslEmitFirst.storageHash).toBe(tsEmitFirst.storageHash);
-          expect(pslEmitFirst.profileHash).toBe(tsEmitFirst.profileHash);
-
-          const tsExecution = tsContractJson['execution'] as Record<string, unknown> | undefined;
-          const pslExecution = pslContractJson['execution'] as Record<string, unknown> | undefined;
-          const tsExecutionHash = tsExecution?.['executionHash'];
-          const pslExecutionHash = pslExecution?.['executionHash'];
-          expect(pslExecutionHash).toBe(tsExecutionHash);
-          if (tsExecutionHash !== undefined) {
-            expect(typeof tsExecutionHash).toBe('string');
-            expect(tsExecutionHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-          }
-
-          if (writeExpected) {
-            writeFileSync(
-              fixtureCase.expectedContractPath,
-              `${tsEmitFirst.contractJson}\n`,
-              'utf-8',
-            );
-          }
-
-          const expectedContractJson = parseContractJson(
-            readFileSync(fixtureCase.expectedContractPath, 'utf-8'),
-          );
-          expect(tsContractJson).toEqual(expectedContractJson);
-        } finally {
-          testSetup.cleanup();
+        if (!tsConfig.contract || !pslConfig.contract || !tsConfig.driver || !pslConfig.driver) {
+          throw new Error('Fixture parity tests require contract + driver in both configs');
         }
-      },
-    );
+
+        const originalCwd = process.cwd();
+        let tsProviderResultFirst: Awaited<ReturnType<typeof tsConfig.contract.source.load>>;
+        let tsProviderResultSecond: Awaited<ReturnType<typeof tsConfig.contract.source.load>>;
+        let pslProviderResultFirst: Awaited<ReturnType<typeof pslConfig.contract.source.load>>;
+        let pslProviderResultSecond: Awaited<ReturnType<typeof pslConfig.contract.source.load>>;
+        try {
+          process.chdir(testSetup.testDir);
+          const tsContext = sourceContextFromConfig(tsConfig);
+          const pslContext = sourceContextFromConfig(pslConfig);
+          tsProviderResultFirst = await tsConfig.contract.source.load(tsContext);
+          tsProviderResultSecond = await tsConfig.contract.source.load(tsContext);
+          pslProviderResultFirst = await pslConfig.contract.source.load(pslContext);
+          pslProviderResultSecond = await pslConfig.contract.source.load(pslContext);
+        } finally {
+          process.chdir(originalCwd);
+        }
+
+        expect(tsProviderResultSecond).toEqual(tsProviderResultFirst);
+        expect(pslProviderResultSecond).toEqual(pslProviderResultFirst);
+
+        if (!tsProviderResultFirst.ok) {
+          throw new Error(`TS provider failed: ${tsProviderResultFirst.failure.summary}`);
+        }
+        if (!pslProviderResultFirst.ok) {
+          throw new Error(`PSL provider failed: ${pslProviderResultFirst.failure.summary}`);
+        }
+
+        const stack = createControlStack({
+          family: tsConfig.family,
+          target: tsConfig.target,
+          adapter: tsConfig.adapter,
+          driver: tsConfig.driver,
+          extensionPacks: tsConfig.extensionPacks ?? [],
+        });
+        const familyInstance = tsConfig.family.create(stack);
+
+        const frameworkComponents = [
+          tsConfig.target,
+          tsConfig.adapter,
+          ...(tsConfig.extensionPacks ?? []),
+        ];
+        const enrichedTs = enrichContract(tsProviderResultFirst.value, frameworkComponents);
+        const enrichedPsl = enrichContract(pslProviderResultFirst.value, frameworkComponents);
+
+        const normalizedTs = familyInstance.validateContract(enrichedTs);
+        const normalizedPsl = familyInstance.validateContract(enrichedPsl);
+        expect(normalizedTs).toEqual(normalizedPsl);
+
+        const tsEmitFirst = await emit(normalizedTs, stack, sqlEmission);
+        const tsEmitSecond = await emit(normalizedTs, stack, sqlEmission);
+        const pslEmitFirst = await emit(normalizedPsl, stack, sqlEmission);
+        const pslEmitSecond = await emit(normalizedPsl, stack, sqlEmission);
+
+        expect(tsEmitFirst).toMatchObject({
+          contractJson: tsEmitSecond.contractJson,
+          storageHash: tsEmitSecond.storageHash,
+          profileHash: tsEmitSecond.profileHash,
+        });
+        expect(pslEmitFirst).toMatchObject({
+          contractJson: pslEmitSecond.contractJson,
+          storageHash: pslEmitSecond.storageHash,
+          profileHash: pslEmitSecond.profileHash,
+        });
+
+        const tsContractJson = parseContractJson(tsEmitFirst.contractJson);
+        const pslContractJson = parseContractJson(pslEmitFirst.contractJson);
+
+        expect(tsContractJson).toEqual(pslContractJson);
+        assertContractJsonOmitsSourceProvenance(tsContractJson);
+
+        expect(tsEmitFirst.storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+        expect(tsEmitFirst.profileHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+        expect(pslEmitFirst.storageHash).toBe(tsEmitFirst.storageHash);
+        expect(pslEmitFirst.profileHash).toBe(tsEmitFirst.profileHash);
+
+        const tsExecution = tsContractJson['execution'] as Record<string, unknown> | undefined;
+        const pslExecution = pslContractJson['execution'] as Record<string, unknown> | undefined;
+        const tsExecutionHash = tsExecution?.['executionHash'];
+        const pslExecutionHash = pslExecution?.['executionHash'];
+        expect(pslExecutionHash).toBe(tsExecutionHash);
+        if (tsExecutionHash !== undefined) {
+          expect(typeof tsExecutionHash).toBe('string');
+          expect(tsExecutionHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+        }
+
+        if (writeExpected) {
+          writeFileSync(fixtureCase.expectedContractPath, `${tsEmitFirst.contractJson}\n`, 'utf-8');
+        }
+
+        const expectedContractJson = parseContractJson(
+          readFileSync(fixtureCase.expectedContractPath, 'utf-8'),
+        );
+        expect(tsContractJson).toEqual(expectedContractJson);
+      } finally {
+        testSetup.cleanup();
+      }
+    });
   }
 });
 
@@ -216,80 +210,78 @@ describe('emit parity fixture diagnostics', () => {
   });
 
   for (const diagnosticsCase of diagnosticsCases) {
-    it(
-      `reports actionable psl diagnostics for ${diagnosticsCase.caseName}`,
-      { timeout: timeouts.typeScriptCompilation },
-      async () => {
-        const testSetup = setupIntegrationTestDirectoryForAuthoringParityCase(coreSurfaceCase);
-        const command = createContractEmitCommand();
-        const expectedFixture = parseExpectedDiagnosticsFixture(
-          readFileSync(diagnosticsCase.expectedDiagnosticsPath, 'utf-8'),
+    it(`reports actionable psl diagnostics for ${diagnosticsCase.caseName}`, {
+      timeout: timeouts.typeScriptCompilation,
+    }, async () => {
+      const testSetup = setupIntegrationTestDirectoryForAuthoringParityCase(coreSurfaceCase);
+      const command = createContractEmitCommand();
+      const expectedFixture = parseExpectedDiagnosticsFixture(
+        readFileSync(diagnosticsCase.expectedDiagnosticsPath, 'utf-8'),
+      );
+
+      try {
+        writeFileSync(
+          join(testSetup.testDir, 'schema.prisma'),
+          readFileSync(diagnosticsCase.schemaPath, 'utf-8'),
+          'utf-8',
         );
 
+        const pslConfig = await loadConfig(testSetup.pslConfigPath);
+        if (!pslConfig.contract) {
+          throw new Error('PSL config contract is required for diagnostics fixture test');
+        }
+
+        const originalCwd = process.cwd();
+        let sourceResult: Awaited<ReturnType<typeof pslConfig.contract.source.load>>;
         try {
-          writeFileSync(
-            join(testSetup.testDir, 'schema.prisma'),
-            readFileSync(diagnosticsCase.schemaPath, 'utf-8'),
-            'utf-8',
-          );
+          process.chdir(testSetup.testDir);
+          sourceResult = await pslConfig.contract.source.load(sourceContextFromConfig(pslConfig));
+        } finally {
+          process.chdir(originalCwd);
+        }
+        expect(sourceResult.ok).toBe(false);
+        if (sourceResult.ok) {
+          throw new Error(`Expected PSL source provider to fail for ${diagnosticsCase.caseName}`);
+        }
 
-          const pslConfig = await loadConfig(testSetup.pslConfigPath);
-          if (!pslConfig.contract) {
-            throw new Error('PSL config contract is required for diagnostics fixture test');
-          }
-
-          const originalCwd = process.cwd();
-          let sourceResult: Awaited<ReturnType<typeof pslConfig.contract.source.load>>;
-          try {
-            process.chdir(testSetup.testDir);
-            sourceResult = await pslConfig.contract.source.load(sourceContextFromConfig(pslConfig));
-          } finally {
-            process.chdir(originalCwd);
-          }
-          expect(sourceResult.ok).toBe(false);
-          if (sourceResult.ok) {
-            throw new Error(`Expected PSL source provider to fail for ${diagnosticsCase.caseName}`);
-          }
-
-          expect(sourceResult.failure.summary).toBe(expectedFixture.failureSummary);
-          expect(sourceResult.failure.diagnostics).toHaveLength(expectedFixture.diagnostics.length);
-          expect(sourceResult.failure.diagnostics).toEqual(
-            expect.arrayContaining(
-              expectedFixture.diagnostics.map((diagnostic) =>
-                expect.objectContaining({
-                  code: diagnostic.code,
-                  sourceId: diagnostic.sourceId,
-                  span: expect.objectContaining({
-                    start: expect.objectContaining({
-                      line: diagnostic.startLine,
-                      column: expect.any(Number),
-                    }),
+        expect(sourceResult.failure.summary).toBe(expectedFixture.failureSummary);
+        expect(sourceResult.failure.diagnostics).toHaveLength(expectedFixture.diagnostics.length);
+        expect(sourceResult.failure.diagnostics).toEqual(
+          expect.arrayContaining(
+            expectedFixture.diagnostics.map((diagnostic) =>
+              expect.objectContaining({
+                code: diagnostic.code,
+                sourceId: diagnostic.sourceId,
+                span: expect.objectContaining({
+                  start: expect.objectContaining({
+                    line: diagnostic.startLine,
+                    column: expect.any(Number),
                   }),
                 }),
-              ),
+              }),
             ),
-          );
+          ),
+        );
 
-          const commandCwd = process.cwd();
-          try {
-            process.chdir(testSetup.testDir);
-            await expect(
-              executeCommand(command, ['--config', 'prisma-next.config.parity-psl.ts']),
-            ).rejects.toThrow();
-          } finally {
-            process.chdir(commandCwd);
-          }
-
-          const errorOutput = consoleErrors.join('\n');
-          expect(errorOutput).toContain(expectedFixture.failureSummary);
-          for (const diagnostic of expectedFixture.diagnostics) {
-            expect(errorOutput).toContain(diagnostic.code);
-          }
-          expect(errorOutput).toMatch(/schema\.prisma:\d+:\d+/);
+        const commandCwd = process.cwd();
+        try {
+          process.chdir(testSetup.testDir);
+          await expect(
+            executeCommand(command, ['--config', 'prisma-next.config.parity-psl.ts']),
+          ).rejects.toThrow();
         } finally {
-          testSetup.cleanup();
+          process.chdir(commandCwd);
         }
-      },
-    );
+
+        const errorOutput = consoleErrors.join('\n');
+        expect(errorOutput).toContain(expectedFixture.failureSummary);
+        for (const diagnostic of expectedFixture.diagnostics) {
+          expect(errorOutput).toContain(diagnostic.code);
+        }
+        expect(errorOutput).toMatch(/schema\.prisma:\d+:\d+/);
+      } finally {
+        testSetup.cleanup();
+      }
+    });
   }
 });

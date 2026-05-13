@@ -80,12 +80,17 @@ type EmbedRelationRowType<
 export type InferFullRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
   ModelName extends string & keyof TContract['models'],
-> = EmbedRelationKeys<TContract, ModelName> extends never
-  ? ResolvedOutputRow<TContract, ModelName>
-  : ResolvedOutputRow<TContract, ModelName> & {
-      -readonly [K in EmbedRelationKeys<TContract, ModelName> &
-        keyof ModelRelations<TContract, ModelName>]: EmbedRelationRowType<TContract, ModelName, K>;
-    };
+> =
+  EmbedRelationKeys<TContract, ModelName> extends never
+    ? ResolvedOutputRow<TContract, ModelName>
+    : ResolvedOutputRow<TContract, ModelName> & {
+        -readonly [K in EmbedRelationKeys<TContract, ModelName> &
+          keyof ModelRelations<TContract, ModelName>]: EmbedRelationRowType<
+          TContract,
+          ModelName,
+          K
+        >;
+      };
 
 type VariantRow<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,

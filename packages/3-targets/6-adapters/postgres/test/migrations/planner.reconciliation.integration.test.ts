@@ -179,49 +179,47 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     expect(typeRow.rows[0]?.matches).toBe(true);
   });
 
-  it(
-    'applies SET DEFAULT on a column with no prior default',
-    { timeout: testTimeout },
-    async () => {
-      const baselineContract = makeContract(
-        {
-          config: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            label: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          }),
-        },
-        'set-default-baseline',
-      );
-      await applyBaseline(driver!, baselineContract);
+  it('applies SET DEFAULT on a column with no prior default', {
+    timeout: testTimeout,
+  }, async () => {
+    const baselineContract = makeContract(
+      {
+        config: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          label: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        }),
+      },
+      'set-default-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
 
-      const updatedContract = makeContract(
-        {
-          config: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            label: {
-              nativeType: 'text',
-              codecId: 'pg/text@1',
-              nullable: false,
-              default: { kind: 'literal', value: 'untitled' },
-            },
-          }),
-        },
-        'set-default-updated',
-      );
+    const updatedContract = makeContract(
+      {
+        config: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          label: {
+            nativeType: 'text',
+            codecId: 'pg/text@1',
+            nullable: false,
+            default: { kind: 'literal', value: 'untitled' },
+          },
+        }),
+      },
+      'set-default-updated',
+    );
 
-      await planAndExecute(driver!, updatedContract);
+    await planAndExecute(driver!, updatedContract);
 
-      const defaultRow = await driver!.query<{ column_default: string | null }>(
-        `SELECT column_default
+    const defaultRow = await driver!.query<{ column_default: string | null }>(
+      `SELECT column_default
            FROM information_schema.columns
            WHERE table_schema = 'public'
              AND table_name = 'config'
              AND column_name = 'label'`,
-      );
-      expect(defaultRow.rows[0]?.column_default).not.toBeNull();
-      expect(defaultRow.rows[0]?.column_default).toContain('untitled');
-    },
-  );
+    );
+    expect(defaultRow.rows[0]?.column_default).not.toBeNull();
+    expect(defaultRow.rows[0]?.column_default).toContain('untitled');
+  });
 
   it('drops an extra table', { timeout: testTimeout }, async () => {
     const baselineContract = makeContract(
@@ -540,55 +538,53 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
 
   // TML-2089: the existence-only postcheck (IS NOT NULL) passes before the operation runs
   // because the column already has a (wrong) default. The idempotency probe skips SET DEFAULT.
-  it.fails(
-    'applies ALTER DEFAULT to change an existing column default',
-    { timeout: testTimeout },
-    async () => {
-      const baselineContract = makeContract(
-        {
-          config: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            status: {
-              nativeType: 'text',
-              codecId: 'pg/text@1',
-              nullable: false,
-              default: { kind: 'literal', value: 'draft' },
-            },
-          }),
-        },
-        'alter-default-baseline',
-      );
-      await applyBaseline(driver!, baselineContract);
+  it.fails('applies ALTER DEFAULT to change an existing column default', {
+    timeout: testTimeout,
+  }, async () => {
+    const baselineContract = makeContract(
+      {
+        config: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          status: {
+            nativeType: 'text',
+            codecId: 'pg/text@1',
+            nullable: false,
+            default: { kind: 'literal', value: 'draft' },
+          },
+        }),
+      },
+      'alter-default-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
 
-      const updatedContract = makeContract(
-        {
-          config: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            status: {
-              nativeType: 'text',
-              codecId: 'pg/text@1',
-              nullable: false,
-              default: { kind: 'literal', value: 'active' },
-            },
-          }),
-        },
-        'alter-default-updated',
-      );
+    const updatedContract = makeContract(
+      {
+        config: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          status: {
+            nativeType: 'text',
+            codecId: 'pg/text@1',
+            nullable: false,
+            default: { kind: 'literal', value: 'active' },
+          },
+        }),
+      },
+      'alter-default-updated',
+    );
 
-      await planAndExecute(driver!, updatedContract);
+    await planAndExecute(driver!, updatedContract);
 
-      const defaultRow = await driver!.query<{ column_default: string | null }>(
-        `SELECT column_default
+    const defaultRow = await driver!.query<{ column_default: string | null }>(
+      `SELECT column_default
            FROM information_schema.columns
            WHERE table_schema = 'public'
              AND table_name = 'config'
              AND column_name = 'status'`,
-      );
-      expect(defaultRow.rows[0]?.column_default).not.toBeNull();
-      expect(defaultRow.rows[0]?.column_default).toContain('active');
-      expect(defaultRow.rows[0]?.column_default).not.toContain('draft');
-    },
-  );
+    );
+    expect(defaultRow.rows[0]?.column_default).not.toBeNull();
+    expect(defaultRow.rows[0]?.column_default).toContain('active');
+    expect(defaultRow.rows[0]?.column_default).not.toContain('draft');
+  });
 
   // ==========================================================================
   // Compound scenarios — multiple reconciliation operations in a single plan
@@ -801,55 +797,53 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     expect(indexExists.rows[0]?.exists).toBe(false);
   });
 
-  it(
-    'widens and tightens nullability on different columns of the same table',
-    { timeout: testTimeout },
-    async () => {
-      const baselineContract = makeContract(
-        {
-          item: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            col_a: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            col_b: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-          }),
-        },
-        'compound-mixed-null-baseline',
-      );
-      await applyBaseline(driver!, baselineContract);
+  it('widens and tightens nullability on different columns of the same table', {
+    timeout: testTimeout,
+  }, async () => {
+    const baselineContract = makeContract(
+      {
+        item: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          col_a: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          col_b: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+        }),
+      },
+      'compound-mixed-null-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
 
-      // Flip both: col_a becomes nullable (widening), col_b becomes NOT NULL (destructive)
-      const updatedContract = makeContract(
-        {
-          item: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            col_a: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-            col_b: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          }),
-        },
-        'compound-mixed-null-updated',
-      );
+    // Flip both: col_a becomes nullable (widening), col_b becomes NOT NULL (destructive)
+    const updatedContract = makeContract(
+      {
+        item: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          col_a: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+          col_b: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        }),
+      },
+      'compound-mixed-null-updated',
+    );
 
-      await planAndExecute(driver!, updatedContract);
+    await planAndExecute(driver!, updatedContract);
 
-      const colA = await driver!.query<{ is_nullable: string }>(
-        `SELECT is_nullable
+    const colA = await driver!.query<{ is_nullable: string }>(
+      `SELECT is_nullable
          FROM information_schema.columns
          WHERE table_schema = 'public'
            AND table_name = 'item'
            AND column_name = 'col_a'`,
-      );
-      expect(colA.rows[0]?.is_nullable).toBe('YES');
+    );
+    expect(colA.rows[0]?.is_nullable).toBe('YES');
 
-      const colB = await driver!.query<{ is_nullable: string }>(
-        `SELECT is_nullable
+    const colB = await driver!.query<{ is_nullable: string }>(
+      `SELECT is_nullable
          FROM information_schema.columns
          WHERE table_schema = 'public'
            AND table_name = 'item'
            AND column_name = 'col_b'`,
-      );
-      expect(colB.rows[0]?.is_nullable).toBe('NO');
-    },
-  );
+    );
+    expect(colB.rows[0]?.is_nullable).toBe('NO');
+  });
 
   it('changes column type when column has an index', { timeout: testTimeout }, async () => {
     const baselineContract = makeContract(
@@ -912,54 +906,52 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
 
   // TML-2089: same as "applies ALTER DEFAULT" — the existence-only postcheck (IS NOT NULL)
   // passes before the operation runs because the column already has a (wrong) default.
-  it.fails(
-    'changes a literal default to a function default',
-    { timeout: testTimeout },
-    async () => {
-      const baselineContract = makeContract(
-        {
-          item: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            uid: {
-              nativeType: 'uuid',
-              codecId: 'pg/uuid@1',
-              nullable: false,
-              default: { kind: 'literal', value: '00000000-0000-0000-0000-000000000000' },
-            },
-          }),
-        },
-        'fn-default-baseline',
-      );
-      await applyBaseline(driver!, baselineContract);
+  it.fails('changes a literal default to a function default', {
+    timeout: testTimeout,
+  }, async () => {
+    const baselineContract = makeContract(
+      {
+        item: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          uid: {
+            nativeType: 'uuid',
+            codecId: 'pg/uuid@1',
+            nullable: false,
+            default: { kind: 'literal', value: '00000000-0000-0000-0000-000000000000' },
+          },
+        }),
+      },
+      'fn-default-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
 
-      const updatedContract = makeContract(
-        {
-          item: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            uid: {
-              nativeType: 'uuid',
-              codecId: 'pg/uuid@1',
-              nullable: false,
-              default: { kind: 'function', expression: 'gen_random_uuid()' },
-            },
-          }),
-        },
-        'fn-default-updated',
-      );
+    const updatedContract = makeContract(
+      {
+        item: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          uid: {
+            nativeType: 'uuid',
+            codecId: 'pg/uuid@1',
+            nullable: false,
+            default: { kind: 'function', expression: 'gen_random_uuid()' },
+          },
+        }),
+      },
+      'fn-default-updated',
+    );
 
-      await planAndExecute(driver!, updatedContract);
+    await planAndExecute(driver!, updatedContract);
 
-      const defaultRow = await driver!.query<{ column_default: string | null }>(
-        `SELECT column_default
+    const defaultRow = await driver!.query<{ column_default: string | null }>(
+      `SELECT column_default
          FROM information_schema.columns
          WHERE table_schema = 'public'
            AND table_name = 'item'
            AND column_name = 'uid'`,
-      );
-      expect(defaultRow.rows[0]?.column_default).not.toBeNull();
-      expect(defaultRow.rows[0]?.column_default).toContain('gen_random_uuid');
-    },
-  );
+    );
+    expect(defaultRow.rows[0]?.column_default).not.toBeNull();
+    expect(defaultRow.rows[0]?.column_default).toContain('gen_random_uuid');
+  });
 
   it('changes column type from text to enum', { timeout: testTimeout }, async () => {
     const baselineContract = makeContract(
@@ -1026,45 +1018,44 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     expect(typeRow.rows[0]?.formatted_type).toBe('status_type');
   });
 
-  it(
-    'applies ALTER COLUMN TYPE between parameterized type variants',
-    { timeout: testTimeout },
-    async () => {
-      const baselineContract = makeContract(
-        {
-          item: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            name: {
-              nativeType: 'character varying',
-              codecId: 'pg/varchar@1',
-              nullable: true,
-              typeParams: { length: 64 },
-            },
-          }),
-        },
-        'varchar-typmod-baseline',
-      );
-      await applyBaseline(driver!, baselineContract);
+  it('applies ALTER COLUMN TYPE between parameterized type variants', {
+    timeout: testTimeout,
+  }, async () => {
+    const baselineContract = makeContract(
+      {
+        item: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          name: {
+            nativeType: 'character varying',
+            codecId: 'pg/varchar@1',
+            nullable: true,
+            typeParams: { length: 64 },
+          },
+        }),
+      },
+      'varchar-typmod-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
 
-      const updatedContract = makeContract(
-        {
-          item: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            name: {
-              nativeType: 'character varying',
-              codecId: 'pg/varchar@1',
-              nullable: true,
-              typeParams: { length: 255 },
-            },
-          }),
-        },
-        'varchar-typmod-updated',
-      );
+    const updatedContract = makeContract(
+      {
+        item: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          name: {
+            nativeType: 'character varying',
+            codecId: 'pg/varchar@1',
+            nullable: true,
+            typeParams: { length: 255 },
+          },
+        }),
+      },
+      'varchar-typmod-updated',
+    );
 
-      await planAndExecute(driver!, updatedContract);
+    await planAndExecute(driver!, updatedContract);
 
-      const typeRow = await driver!.query<{ formatted_type: string }>(
-        `SELECT format_type(a.atttypid, a.atttypmod) AS formatted_type
+    const typeRow = await driver!.query<{ formatted_type: string }>(
+      `SELECT format_type(a.atttypid, a.atttypmod) AS formatted_type
            FROM pg_attribute a
            JOIN pg_class c ON c.oid = a.attrelid
            JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -1072,55 +1063,52 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
              AND c.relname = 'item'
              AND a.attname = 'name'
              AND NOT a.attisdropped`,
-      );
-      expect(typeRow.rows[0]?.formatted_type).toBe('character varying(255)');
-    },
-  );
+    );
+    expect(typeRow.rows[0]?.formatted_type).toBe('character varying(255)');
+  });
 
-  it(
-    'widens nullability and drops default from a NOT NULL DEFAULT column',
-    { timeout: testTimeout },
-    async () => {
-      const baselineContract = makeContract(
-        {
-          config: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            status: {
-              nativeType: 'text',
-              codecId: 'pg/text@1',
-              nullable: false,
-              default: { kind: 'literal', value: 'active' },
-            },
-          }),
-        },
-        'compound-widen-drop-default-baseline',
-      );
-      await applyBaseline(driver!, baselineContract);
+  it('widens nullability and drops default from a NOT NULL DEFAULT column', {
+    timeout: testTimeout,
+  }, async () => {
+    const baselineContract = makeContract(
+      {
+        config: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          status: {
+            nativeType: 'text',
+            codecId: 'pg/text@1',
+            nullable: false,
+            default: { kind: 'literal', value: 'active' },
+          },
+        }),
+      },
+      'compound-widen-drop-default-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
 
-      // Make nullable, remove default
-      const updatedContract = makeContract(
-        {
-          config: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            status: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-          }),
-        },
-        'compound-widen-drop-default-updated',
-      );
+    // Make nullable, remove default
+    const updatedContract = makeContract(
+      {
+        config: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          status: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+        }),
+      },
+      'compound-widen-drop-default-updated',
+    );
 
-      await planAndExecute(driver!, updatedContract);
+    await planAndExecute(driver!, updatedContract);
 
-      const colInfo = await driver!.query<{ is_nullable: string; column_default: string | null }>(
-        `SELECT is_nullable, column_default
+    const colInfo = await driver!.query<{ is_nullable: string; column_default: string | null }>(
+      `SELECT is_nullable, column_default
          FROM information_schema.columns
          WHERE table_schema = 'public'
            AND table_name = 'config'
            AND column_name = 'status'`,
-      );
-      expect(colInfo.rows[0]?.is_nullable).toBe('YES');
-      expect(colInfo.rows[0]?.column_default).toBeNull();
-    },
-  );
+    );
+    expect(colInfo.rows[0]?.is_nullable).toBe('YES');
+    expect(colInfo.rows[0]?.column_default).toBeNull();
+  });
 
   // ==========================================================================
   // P1-2: Temporal type ALTER COLUMN TYPE reconciliation
@@ -1188,113 +1176,109 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
   // P1-3: SET DEFAULT on timestamptz column — postcheck type cast normalization
   // ==========================================================================
 
-  it(
-    'applies SET DEFAULT with string literal on a timestamptz column',
-    { timeout: testTimeout },
-    async () => {
-      const baselineContract = makeContract(
-        {
-          event: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            created_at: { nativeType: 'timestamptz', codecId: 'pg/timestamptz@1', nullable: false },
-          }),
-        },
-        'timestamptz-default-baseline',
-      );
-      await applyBaseline(driver!, baselineContract);
+  it('applies SET DEFAULT with string literal on a timestamptz column', {
+    timeout: testTimeout,
+  }, async () => {
+    const baselineContract = makeContract(
+      {
+        event: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          created_at: { nativeType: 'timestamptz', codecId: 'pg/timestamptz@1', nullable: false },
+        }),
+      },
+      'timestamptz-default-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
 
-      const updatedContract = makeContract(
-        {
-          event: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            created_at: {
-              nativeType: 'timestamptz',
-              codecId: 'pg/timestamptz@1',
-              nullable: false,
-              default: { kind: 'literal', value: '2023-01-01T00:00:00.000Z' },
-            },
-          }),
-        },
-        'timestamptz-default-updated',
-      );
+    const updatedContract = makeContract(
+      {
+        event: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          created_at: {
+            nativeType: 'timestamptz',
+            codecId: 'pg/timestamptz@1',
+            nullable: false,
+            default: { kind: 'literal', value: '2023-01-01T00:00:00.000Z' },
+          },
+        }),
+      },
+      'timestamptz-default-updated',
+    );
 
-      await planAndExecute(driver!, updatedContract);
+    await planAndExecute(driver!, updatedContract);
 
-      const defaultRow = await driver!.query<{ column_default: string | null }>(
-        `SELECT column_default
+    const defaultRow = await driver!.query<{ column_default: string | null }>(
+      `SELECT column_default
          FROM information_schema.columns
          WHERE table_schema = 'public'
            AND table_name = 'event'
            AND column_name = 'created_at'`,
-      );
-      expect(defaultRow.rows[0]?.column_default).not.toBeNull();
-      expect(defaultRow.rows[0]?.column_default).toContain('2023-01-01');
-    },
-  );
+    );
+    expect(defaultRow.rows[0]?.column_default).not.toBeNull();
+    expect(defaultRow.rows[0]?.column_default).toContain('2023-01-01');
+  });
 
   // ==========================================================================
   // P1-4: ALTER COLUMN TYPE to mixed-case enum
   // ==========================================================================
 
-  it(
-    'applies ALTER COLUMN TYPE from text to mixed-case enum',
-    { timeout: testTimeout },
-    async () => {
-      const baselineContract = makeContract(
-        {
-          item: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          }),
-        },
-        'text-to-mixed-enum-baseline',
-      );
-      await applyBaseline(driver!, baselineContract);
+  it('applies ALTER COLUMN TYPE from text to mixed-case enum', {
+    timeout: testTimeout,
+  }, async () => {
+    const baselineContract = makeContract(
+      {
+        item: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        }),
+      },
+      'text-to-mixed-enum-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
 
-      const updatedContract: Contract<SqlStorage> = {
-        target: 'postgres',
-        targetFamily: 'sql',
-        profileHash: profileHash('sha256:test'),
-        storage: {
-          storageHash: coreHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
-          tables: {
-            item: {
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                status: {
-                  nativeType: 'StatusType',
-                  codecId: 'pg/enum@1',
-                  nullable: false,
-                  typeRef: 'StatusType',
-                },
+    const updatedContract: Contract<SqlStorage> = {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: profileHash('sha256:test'),
+      storage: {
+        storageHash: coreHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
+        tables: {
+          item: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              status: {
+                nativeType: 'StatusType',
+                codecId: 'pg/enum@1',
+                nullable: false,
+                typeRef: 'StatusType',
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
-          },
-          types: {
-            StatusType: {
-              codecId: 'pg/enum@1',
-              nativeType: 'StatusType',
-              typeParams: { values: ['active', 'inactive'] },
-            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
-        roots: {},
-        models: {},
-        capabilities: {},
-        extensionPacks: {},
-        meta: {},
-      };
+        types: {
+          StatusType: {
+            codecId: 'pg/enum@1',
+            nativeType: 'StatusType',
+            typeParams: { values: ['active', 'inactive'] },
+          },
+        },
+      },
+      roots: {},
+      models: {},
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+    };
 
-      // planAndExecute succeeds iff the postcheck passes — the postcheck
-      // compares buildExpectedFormatType output (which conditionally quotes
-      // mixed-case UDT names) against PG's format_type().
-      await expect(planAndExecute(driver!, updatedContract)).resolves.not.toThrow();
-    },
-  );
+    // planAndExecute succeeds iff the postcheck passes — the postcheck
+    // compares buildExpectedFormatType output (which conditionally quotes
+    // mixed-case UDT names) against PG's format_type().
+    await expect(planAndExecute(driver!, updatedContract)).resolves.not.toThrow();
+  });
 
   // ==========================================================================
   // P2-1: Constraint check must be scoped to specific table
@@ -1308,111 +1292,109 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
   // verifier is fixed, this test should pass and the .fails can be removed.
   // ==========================================================================
 
-  it.fails(
-    'drops the correct FK when two tables share a constraint name',
-    { timeout: testTimeout },
-    async () => {
-      const baselineContract = makeContract(
-        {
-          parent: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          }),
-          child1: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [{ columns: ['parent_id'], name: 'child1_parent_id_idx' }],
-            foreignKeys: [
-              {
-                columns: ['parent_id'],
-                references: { table: 'parent', columns: ['id'] },
-                name: 'fk_parent',
-                constraint: true,
-                index: true,
-              },
-            ],
-          },
-          child2: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [{ columns: ['parent_id'], name: 'child2_parent_id_idx' }],
-            foreignKeys: [
-              {
-                columns: ['parent_id'],
-                references: { table: 'parent', columns: ['id'] },
-                name: 'fk_parent',
-                constraint: true,
-                index: true,
-              },
-            ],
-          },
-        },
-        'shared-fk-name-baseline',
-      );
-      await applyBaseline(driver!, baselineContract);
-
-      // Remove FK from child1 only, keep on child2
-      const updatedContract = makeContract(
-        {
-          parent: makeTable({
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          }),
-          child1: makeTable({
+  it.fails('drops the correct FK when two tables share a constraint name', {
+    timeout: testTimeout,
+  }, async () => {
+    const baselineContract = makeContract(
+      {
+        parent: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        }),
+        child1: {
+          columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          }),
-          child2: {
-            columns: {
-              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-              parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [{ columns: ['parent_id'], name: 'child2_parent_id_idx' }],
-            foreignKeys: [
-              {
-                columns: ['parent_id'],
-                references: { table: 'parent', columns: ['id'] },
-                name: 'fk_parent',
-                constraint: true,
-                index: true,
-              },
-            ],
           },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [{ columns: ['parent_id'], name: 'child1_parent_id_idx' }],
+          foreignKeys: [
+            {
+              columns: ['parent_id'],
+              references: { table: 'parent', columns: ['id'] },
+              name: 'fk_parent',
+              constraint: true,
+              index: true,
+            },
+          ],
         },
-        'shared-fk-name-updated',
-      );
+        child2: {
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [{ columns: ['parent_id'], name: 'child2_parent_id_idx' }],
+          foreignKeys: [
+            {
+              columns: ['parent_id'],
+              references: { table: 'parent', columns: ['id'] },
+              name: 'fk_parent',
+              constraint: true,
+              index: true,
+            },
+          ],
+        },
+      },
+      'shared-fk-name-baseline',
+    );
+    await applyBaseline(driver!, baselineContract);
 
-      await planAndExecute(driver!, updatedContract);
+    // Remove FK from child1 only, keep on child2
+    const updatedContract = makeContract(
+      {
+        parent: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        }),
+        child1: makeTable({
+          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        }),
+        child2: {
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [{ columns: ['parent_id'], name: 'child2_parent_id_idx' }],
+          foreignKeys: [
+            {
+              columns: ['parent_id'],
+              references: { table: 'parent', columns: ['id'] },
+              name: 'fk_parent',
+              constraint: true,
+              index: true,
+            },
+          ],
+        },
+      },
+      'shared-fk-name-updated',
+    );
 
-      const child1Fk = await driver!.query<{ exists: boolean }>(
-        `SELECT EXISTS (
+    await planAndExecute(driver!, updatedContract);
+
+    const child1Fk = await driver!.query<{ exists: boolean }>(
+      `SELECT EXISTS (
           SELECT 1 FROM pg_constraint c
           JOIN pg_class t ON t.oid = c.conrelid
           WHERE c.conname = 'fk_parent'
             AND t.relname = 'child1'
             AND c.connamespace = 'public'::regnamespace
         ) AS exists`,
-      );
-      expect(child1Fk.rows[0]?.exists).toBe(false);
+    );
+    expect(child1Fk.rows[0]?.exists).toBe(false);
 
-      const child2Fk = await driver!.query<{ exists: boolean }>(
-        `SELECT EXISTS (
+    const child2Fk = await driver!.query<{ exists: boolean }>(
+      `SELECT EXISTS (
           SELECT 1 FROM pg_constraint c
           JOIN pg_class t ON t.oid = c.conrelid
           WHERE c.conname = 'fk_parent'
             AND t.relname = 'child2'
             AND c.connamespace = 'public'::regnamespace
         ) AS exists`,
-      );
-      expect(child2Fk.rows[0]?.exists).toBe(true);
-    },
-  );
+    );
+    expect(child2Fk.rows[0]?.exists).toBe(true);
+  });
 });

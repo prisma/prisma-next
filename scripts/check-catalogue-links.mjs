@@ -67,9 +67,10 @@ function* extractLinks(content) {
     }
     if (inFence) continue;
     INLINE_LINK_RE.lastIndex = 0;
-    let match;
-    while ((match = INLINE_LINK_RE.exec(line)) !== null) {
+    let match = INLINE_LINK_RE.exec(line);
+    while (match !== null) {
       yield { image: match[1] === '!', rawTarget: match[3], line: i + 1 };
+      match = INLINE_LINK_RE.exec(line);
     }
   }
 }
@@ -86,7 +87,7 @@ function isInternalLink(target) {
  *  cannot be normalized). Strips the fragment, decodes %xx escapes, and
  *  resolves relative to `fromFile`'s directory. */
 function resolveTarget(rawTarget, fromFile) {
-  let target = rawTarget.split('#')[0];
+  const target = rawTarget.split('#')[0];
   if (!target) return null;
   let decoded;
   try {

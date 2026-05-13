@@ -142,65 +142,61 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
       expect(columnResult.rows[0]?.udt_name).toBe('role');
     });
 
-    it(
-      'skips enum creation when type already exists with matching values',
-      { timeout: testTimeout },
-      async () => {
-        // Pre-create the enum type
-        await driver!.query(`CREATE TYPE "public"."role" AS ENUM ('USER', 'ADMIN')`);
+    it('skips enum creation when type already exists with matching values', {
+      timeout: testTimeout,
+    }, async () => {
+      // Pre-create the enum type
+      await driver!.query(`CREATE TYPE "public"."role" AS ENUM ('USER', 'ADMIN')`);
 
-        const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-        const schema = await familyInstance.introspect({
-          driver: driver!,
-          contract: contractWithEnum,
-        });
+      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+      const schema = await familyInstance.introspect({
+        driver: driver!,
+        contract: contractWithEnum,
+      });
 
-        const planResult = planner.plan({
-          contract: contractWithEnum,
-          schema,
-          policy: INIT_ADDITIVE_POLICY,
-          fromContract: null,
-          frameworkComponents,
-          spaceId: APP_SPACE_ID,
-        });
+      const planResult = planner.plan({
+        contract: contractWithEnum,
+        schema,
+        policy: INIT_ADDITIVE_POLICY,
+        fromContract: null,
+        frameworkComponents,
+        spaceId: APP_SPACE_ID,
+      });
 
-        expectNarrowedType(planResult.kind === 'success');
+      expectNarrowedType(planResult.kind === 'success');
 
-        // Should not include type.Role operation since it already exists
-        const operationIds = planResult.plan.operations.map((op) => op.id);
-        expect(operationIds).not.toContain('type.Role');
-        expect(operationIds).toContain('table.user');
-      },
-    );
+      // Should not include type.Role operation since it already exists
+      const operationIds = planResult.plan.operations.map((op) => op.id);
+      expect(operationIds).not.toContain('type.Role');
+      expect(operationIds).toContain('table.user');
+    });
 
-    it(
-      'plans add value operations when enum exists with subset of values',
-      { timeout: testTimeout },
-      async () => {
-        // Pre-create enum with only USER value
-        await driver!.query(`CREATE TYPE "public"."role" AS ENUM ('USER')`);
+    it('plans add value operations when enum exists with subset of values', {
+      timeout: testTimeout,
+    }, async () => {
+      // Pre-create enum with only USER value
+      await driver!.query(`CREATE TYPE "public"."role" AS ENUM ('USER')`);
 
-        const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-        const schema = await familyInstance.introspect({
-          driver: driver!,
-          contract: contractWithEnum,
-        });
+      const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+      const schema = await familyInstance.introspect({
+        driver: driver!,
+        contract: contractWithEnum,
+      });
 
-        const planResult = planner.plan({
-          contract: contractWithEnum,
-          schema,
-          policy: { allowedOperationClasses: ['additive', 'widening'] },
-          fromContract: null,
-          frameworkComponents,
-          spaceId: APP_SPACE_ID,
-        });
+      const planResult = planner.plan({
+        contract: contractWithEnum,
+        schema,
+        policy: { allowedOperationClasses: ['additive', 'widening'] },
+        fromContract: null,
+        frameworkComponents,
+        spaceId: APP_SPACE_ID,
+      });
 
-        expectNarrowedType(planResult.kind === 'success');
+      expectNarrowedType(planResult.kind === 'success');
 
-        // Should include operation to add ADMIN value
-        const operationIds = planResult.plan.operations.map((op) => op.id);
-        expect(operationIds).toContain('type.Role.value.ADMIN');
-      },
-    );
+      // Should include operation to add ADMIN value
+      const operationIds = planResult.plan.operations.map((op) => op.id);
+      expect(operationIds).toContain('type.Role.value.ADMIN');
+    });
   });
 });

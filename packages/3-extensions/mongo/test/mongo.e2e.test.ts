@@ -20,107 +20,105 @@ import mongo from '../src/runtime/mongo';
 // We use `{ uri, dbName }` rather than `{ url }` because `MongoMemoryReplSet`
 // returns URIs with a `?replicaSet=...` query string, which makes path-based
 // dbName injection ambiguous.
-describe(
-  'mongo() facade — e2e (replica set)',
-  { timeout: timeouts.spinUpMongoMemoryServer },
-  () => {
-    let replSet: MongoMemoryReplSet;
+describe('mongo() facade — e2e (replica set)', {
+  timeout: timeouts.spinUpMongoMemoryServer,
+}, () => {
+  let replSet: MongoMemoryReplSet;
 
-    beforeAll(async () => {
-      replSet = await MongoMemoryReplSet.create({
-        replSet: { count: 1, storageEngine: 'wiredTiger' },
-      });
-    }, timeouts.spinUpMongoMemoryServer);
+  beforeAll(async () => {
+    replSet = await MongoMemoryReplSet.create({
+      replSet: { count: 1, storageEngine: 'wiredTiger' },
+    });
+  }, timeouts.spinUpMongoMemoryServer);
 
-    afterAll(async () => {
-      await replSet?.stop();
-    }, timeouts.spinUpMongoMemoryServer);
+  afterAll(async () => {
+    await replSet?.stop();
+  }, timeouts.spinUpMongoMemoryServer);
 
-    it('orm and query are available before any connection is made', () => {
+  it('orm and query are available before any connection is made', () => {
+    const db = mongo<Contract>({
+      contractJson,
+      uri: replSet.getUri(),
+      dbName: 'facade_eager',
+    });
+    expect(db.orm).toBeDefined();
+    expect(db.orm.users).toBeDefined();
+    expect(db.orm.tasks).toBeDefined();
+    expect(db.query).toBeDefined();
+  });
+
+  it(
+    'createAll + where().first() round-trips through the lazy facade',
+    async () => {
       const db = mongo<Contract>({
         contractJson,
         uri: replSet.getUri(),
-        dbName: 'facade_eager',
+        dbName: 'facade_first',
       });
-      expect(db.orm).toBeDefined();
-      expect(db.orm.users).toBeDefined();
-      expect(db.orm.tasks).toBeDefined();
-      expect(db.query).toBeDefined();
-    });
 
-    it(
-      'createAll + where().first() round-trips through the lazy facade',
-      async () => {
-        const db = mongo<Contract>({
-          contractJson,
-          uri: replSet.getUri(),
-          dbName: 'facade_first',
-        });
+      try {
+        const created = await db.orm.users.createAll([
+          {
+            name: 'Alice',
+            email: 'alice@example.com',
+            loginCount: 1,
+            tags: ['admin'],
+            homeAddress: null,
+          },
+          {
+            name: 'Bob',
+            email: 'bob@example.com',
+            loginCount: 0,
+            tags: [],
+            homeAddress: null,
+          },
+        ]);
 
-        try {
-          const created = await db.orm.users.createAll([
-            {
-              name: 'Alice',
-              email: 'alice@example.com',
-              loginCount: 1,
-              tags: ['admin'],
-              homeAddress: null,
-            },
-            {
-              name: 'Bob',
-              email: 'bob@example.com',
-              loginCount: 0,
-              tags: [],
-              homeAddress: null,
-            },
-          ]);
+        expect(created).toHaveLength(2);
+        expect(created[0]?._id).toBeTruthy();
 
-          expect(created).toHaveLength(2);
-          expect(created[0]?._id).toBeTruthy();
+        const alice = await db.orm.users.where({ email: 'alice@example.com' }).first();
+        expect(alice?.name).toBe('Alice');
+        expect(alice?.email).toBe('alice@example.com');
+      } finally {
+        await db.close();
+      }
+    },
+    timeouts.spinUpMongoMemoryServer,
+  );
 
-          const alice = await db.orm.users.where({ email: 'alice@example.com' }).first();
-          expect(alice?.name).toBe('Alice');
-          expect(alice?.email).toBe('alice@example.com');
-        } finally {
-          await db.close();
-        }
-      },
-      timeouts.spinUpMongoMemoryServer,
-    );
+  it(
+    'connect() is callable explicitly and drives the same lazy runtime',
+    async () => {
+      const db = mongo<Contract>({ contractJson });
+      try {
+        await db.connect({ uri: replSet.getUri(), dbName: 'facade_explicit' });
+        const users = await db.orm.users.all();
+        expect([...users]).toHaveLength(0);
+      } finally {
+        await db.close();
+      }
+    },
+    timeouts.spinUpMongoMemoryServer,
+  );
 
-    it(
-      'connect() is callable explicitly and drives the same lazy runtime',
-      async () => {
-        const db = mongo<Contract>({ contractJson });
-        try {
-          await db.connect({ uri: replSet.getUri(), dbName: 'facade_explicit' });
-          const users = await db.orm.users.all();
-          expect([...users]).toHaveLength(0);
-        } finally {
-          await db.close();
-        }
-      },
-      timeouts.spinUpMongoMemoryServer,
-    );
-
-    it(
-      'connect() rejects when called twice',
-      async () => {
-        const db = mongo<Contract>({
-          contractJson,
-          uri: replSet.getUri(),
-          dbName: 'facade_twice',
-        });
-        try {
-          await db.connect();
-          await expect(
-            db.connect({ uri: replSet.getUri(), dbName: 'facade_twice' }),
-          ).rejects.toThrow('Mongo client already connected');
-        } finally {
-          await db.close();
-        }
-      },
-      timeouts.spinUpMongoMemoryServer,
-    );
-  },
-);
+  it(
+    'connect() rejects when called twice',
+    async () => {
+      const db = mongo<Contract>({
+        contractJson,
+        uri: replSet.getUri(),
+        dbName: 'facade_twice',
+      });
+      try {
+        await db.connect();
+        await expect(db.connect({ uri: replSet.getUri(), dbName: 'facade_twice' })).rejects.toThrow(
+          'Mongo client already connected',
+        );
+      } finally {
+        await db.close();
+      }
+    },
+    timeouts.spinUpMongoMemoryServer,
+  );
+});

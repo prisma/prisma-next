@@ -271,139 +271,137 @@ async function setupTestProject(args: {
   };
 }
 
-describe.sequential(
-  'pgvector Scenario A end-to-end (PGlite, T4.3)',
-  { timeout: timeouts.spinUpPpgDev },
-  () => {
-    let database: Awaited<ReturnType<typeof createDevDatabase>>;
-    let driver: Awaited<ReturnType<typeof postgresDriverDescriptor.create>> | undefined;
-    let project: TestProject | undefined;
+describe.sequential('pgvector Scenario A end-to-end (PGlite, T4.3)', {
+  timeout: timeouts.spinUpPpgDev,
+}, () => {
+  let database: Awaited<ReturnType<typeof createDevDatabase>>;
+  let driver: Awaited<ReturnType<typeof postgresDriverDescriptor.create>> | undefined;
+  let project: TestProject | undefined;
 
-    beforeAll(async () => {
-      database = await createDevDatabase();
-    }, timeouts.spinUpPpgDev);
+  beforeAll(async () => {
+    database = await createDevDatabase();
+  }, timeouts.spinUpPpgDev);
 
-    afterAll(async () => {
-      if (database) await database.close();
-    }, timeouts.spinUpPpgDev);
+  afterAll(async () => {
+    if (database) await database.close();
+  }, timeouts.spinUpPpgDev);
 
-    beforeEach(async () => {
-      driver = await postgresDriverDescriptor.create(database.connectionString);
-      await driver.query('drop schema if exists public cascade');
-      await driver.query('drop schema if exists prisma_contract cascade');
-      await driver.query('create schema public');
-    }, timeouts.spinUpPpgDev);
+  beforeEach(async () => {
+    driver = await postgresDriverDescriptor.create(database.connectionString);
+    await driver.query('drop schema if exists public cascade');
+    await driver.query('drop schema if exists prisma_contract cascade');
+    await driver.query('create schema public');
+  }, timeouts.spinUpPpgDev);
 
-    afterEach(async () => {
-      if (driver) {
-        await driver.close();
-        driver = undefined;
-      }
-      if (project) {
-        await rm(project.projectRoot, { recursive: true, force: true });
-        project = undefined;
-      }
+  afterEach(async () => {
+    if (driver) {
+      await driver.close();
+      driver = undefined;
+    }
+    if (project) {
+      await rm(project.projectRoot, { recursive: true, force: true });
+      project = undefined;
+    }
+  });
+
+  it('pinned ops.json carries the CREATE EXTENSION SQL byte-for-byte (TC-15)', async () => {
+    project = await setupTestProject({ migration: pgvectorBaselineMigration });
+    const opsPath = join(project.pgvectorBaselineDir, 'ops.json');
+    const opsRaw = await readFile(opsPath, 'utf-8');
+    const ops = JSON.parse(opsRaw) as ReadonlyArray<{
+      readonly invariantId?: string;
+      readonly execute?: ReadonlyArray<{ readonly sql: string }>;
+    }>;
+    const installOp = ops.find((op) => op.invariantId === PGVECTOR_INSTALL_INVARIANT_ID);
+    expect(installOp).toBeDefined();
+    expect(installOp?.execute?.[0]?.sql).toBe('CREATE EXTENSION IF NOT EXISTS vector');
+  });
+
+  it('mode=plan against the real install op produces a multi-space plan', async () => {
+    project = await setupTestProject({ migration: pgvectorBaselineMigration });
+
+    const result = await executeDbInit({
+      driver: driver!,
+      familyInstance,
+      contract: buildAppContract({ withLength: true }),
+      mode: 'plan',
+      migrations: postgresTargetDescriptor.migrations,
+      frameworkComponents: [...frameworkComponents],
+      migrationsDir: project.migrationsDir,
+      targetId: 'postgres',
+      extensionPacks: [pgvectorExtensionDescriptor],
     });
 
-    it('pinned ops.json carries the CREATE EXTENSION SQL byte-for-byte (TC-15)', async () => {
-      project = await setupTestProject({ migration: pgvectorBaselineMigration });
-      const opsPath = join(project.pgvectorBaselineDir, 'ops.json');
-      const opsRaw = await readFile(opsPath, 'utf-8');
-      const ops = JSON.parse(opsRaw) as ReadonlyArray<{
-        readonly invariantId?: string;
-        readonly execute?: ReadonlyArray<{ readonly sql: string }>;
-      }>;
-      const installOp = ops.find((op) => op.invariantId === PGVECTOR_INSTALL_INVARIANT_ID);
-      expect(installOp).toBeDefined();
-      expect(installOp?.execute?.[0]?.sql).toBe('CREATE EXTENSION IF NOT EXISTS vector');
+    if (!result.ok) {
+      throw new Error(
+        `Expected plan ok but got failure: ${JSON.stringify(result.failure, null, 2)}`,
+      );
+    }
+    const operations = result.value.plan.operations;
+    expect(operations.length).toBeGreaterThan(0);
+
+    const opIdsInOrder = operations.map((op: { readonly id: string }) => op.id);
+    const installIdx = opIdsInOrder.findIndex(
+      (id: string) => id === 'pgvector.install-vector-extension',
+    );
+    const appDocIdx = opIdsInOrder.findIndex((id: string) => id.includes(APP_TABLE));
+
+    expect(installIdx).toBeGreaterThanOrEqual(0);
+    expect(appDocIdx).toBeGreaterThan(installIdx);
+  });
+
+  it('synthetic vector stub: applies pgvector + app-space atomically; markers + round-trip OK', async () => {
+    project = await setupTestProject({ migration: buildSyntheticBaselineMigration() });
+
+    const result = await executeDbInit({
+      driver: driver!,
+      familyInstance,
+      contract: buildAppContract({ withLength: false }),
+      mode: 'apply',
+      migrations: postgresTargetDescriptor.migrations,
+      frameworkComponents: [...frameworkComponents],
+      migrationsDir: project.migrationsDir,
+      targetId: 'postgres',
+      extensionPacks: [pgvectorExtensionDescriptor],
     });
 
-    it('mode=plan against the real install op produces a multi-space plan', async () => {
-      project = await setupTestProject({ migration: pgvectorBaselineMigration });
-
-      const result = await executeDbInit({
-        driver: driver!,
-        familyInstance,
-        contract: buildAppContract({ withLength: true }),
-        mode: 'plan',
-        migrations: postgresTargetDescriptor.migrations,
-        frameworkComponents: [...frameworkComponents],
-        migrationsDir: project.migrationsDir,
-        targetId: 'postgres',
-        extensionPacks: [pgvectorExtensionDescriptor],
-      });
-
-      if (!result.ok) {
-        throw new Error(
-          `Expected plan ok but got failure: ${JSON.stringify(result.failure, null, 2)}`,
-        );
-      }
-      const operations = result.value.plan.operations;
-      expect(operations.length).toBeGreaterThan(0);
-
-      const opIdsInOrder = operations.map((op: { readonly id: string }) => op.id);
-      const installIdx = opIdsInOrder.findIndex(
-        (id: string) => id === 'pgvector.install-vector-extension',
+    if (!result.ok) {
+      throw new Error(
+        `Expected db apply success but got failure: ${JSON.stringify(result.failure, null, 2)}`,
       );
-      const appDocIdx = opIdsInOrder.findIndex((id: string) => id.includes(APP_TABLE));
+    }
 
-      expect(installIdx).toBeGreaterThanOrEqual(0);
-      expect(appDocIdx).toBeGreaterThan(installIdx);
-    });
+    const markers = await driver!.query<{
+      space: string;
+      core_hash: string;
+      invariants: readonly string[];
+    }>('select space, core_hash, invariants from prisma_contract.marker order by space');
+    const markerBySpace = new Map(markers.rows.map((row) => [row.space, row]));
 
-    it('synthetic vector stub: applies pgvector + app-space atomically; markers + round-trip OK', async () => {
-      project = await setupTestProject({ migration: buildSyntheticBaselineMigration() });
+    expect(markerBySpace.has('app')).toBe(true);
+    expect(markerBySpace.has(PGVECTOR_SPACE_ID)).toBe(true);
 
-      const result = await executeDbInit({
-        driver: driver!,
-        familyInstance,
-        contract: buildAppContract({ withLength: false }),
-        mode: 'apply',
-        migrations: postgresTargetDescriptor.migrations,
-        frameworkComponents: [...frameworkComponents],
-        migrationsDir: project.migrationsDir,
-        targetId: 'postgres',
-        extensionPacks: [pgvectorExtensionDescriptor],
-      });
+    expect(markerBySpace.get(PGVECTOR_SPACE_ID)?.core_hash).toBe(PGVECTOR_STORAGE_HASH);
+    expect([...(markerBySpace.get(PGVECTOR_SPACE_ID)?.invariants ?? [])].sort()).toEqual(
+      [...pgvectorHeadRef.invariants].sort(),
+    );
 
-      if (!result.ok) {
-        throw new Error(
-          `Expected db apply success but got failure: ${JSON.stringify(result.failure, null, 2)}`,
-        );
-      }
+    expect(markerBySpace.get('app')?.core_hash).toBe(APP_CONTRACT_HASH);
 
-      const markers = await driver!.query<{
-        space: string;
-        core_hash: string;
-        invariants: readonly string[];
-      }>('select space, core_hash, invariants from prisma_contract.marker order by space');
-      const markerBySpace = new Map(markers.rows.map((row) => [row.space, row]));
+    const docTable = await driver!.query<{ exists: boolean }>(
+      `select to_regclass('public."${APP_TABLE}"') is not null as exists`,
+    );
+    expect(docTable.rows[0]?.exists).toBe(true);
 
-      expect(markerBySpace.has('app')).toBe(true);
-      expect(markerBySpace.has(PGVECTOR_SPACE_ID)).toBe(true);
-
-      expect(markerBySpace.get(PGVECTOR_SPACE_ID)?.core_hash).toBe(PGVECTOR_STORAGE_HASH);
-      expect([...(markerBySpace.get(PGVECTOR_SPACE_ID)?.invariants ?? [])].sort()).toEqual(
-        [...pgvectorHeadRef.invariants].sort(),
-      );
-
-      expect(markerBySpace.get('app')?.core_hash).toBe(APP_CONTRACT_HASH);
-
-      const docTable = await driver!.query<{ exists: boolean }>(
-        `select to_regclass('public."${APP_TABLE}"') is not null as exists`,
-      );
-      expect(docTable.rows[0]?.exists).toBe(true);
-
-      await driver!.query(
-        `insert into public."${APP_TABLE}" ("id", "${APP_FIELD}") values ($1, $2)`,
-        ['doc-1', '[1,2,3]'],
-      );
-      const row = await driver!.query<{ id: string; embedding: string }>(
-        `select "id", "${APP_FIELD}" as embedding from public."${APP_TABLE}"`,
-      );
-      expect(row.rows.length).toBe(1);
-      expect(row.rows[0]?.id).toBe('doc-1');
-      expect(row.rows[0]?.embedding).toBe('[1,2,3]');
-    });
-  },
-);
+    await driver!.query(
+      `insert into public."${APP_TABLE}" ("id", "${APP_FIELD}") values ($1, $2)`,
+      ['doc-1', '[1,2,3]'],
+    );
+    const row = await driver!.query<{ id: string; embedding: string }>(
+      `select "id", "${APP_FIELD}" as embedding from public."${APP_TABLE}"`,
+    );
+    expect(row.rows.length).toBe(1);
+    expect(row.rows[0]?.id).toBe('doc-1');
+    expect(row.rows[0]?.embedding).toBe('[1,2,3]');
+  });
+});

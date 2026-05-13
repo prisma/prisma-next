@@ -263,5 +263,5 @@ export function defineContract(
   return buildContractFromDsl(builtDefinition);
 }
 
-export { field, model, rel };
 export type { ComposedAuthoringHelpers, ContractInput, ContractModelBuilder, ScalarFieldBuilder };
+export { field, model, rel };

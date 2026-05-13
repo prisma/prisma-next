@@ -17,15 +17,13 @@ import { beforeAll } from 'vitest';
 
 // Re-export common imports for test files
 export { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
-export type { CodecTypes } from '@prisma-next/target-postgres/codec-types';
-export { postgresAdapter, postgresDriver, sql, postgres };
-export { validateContract };
-export type { Contract, SqlStorage };
 export { default as sqlFamily } from '@prisma-next/family-sql/pack';
 export { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+export type { CodecTypes } from '@prisma-next/target-postgres/codec-types';
 export { default as postgresPack } from '@prisma-next/target-postgres/pack';
-export { timeouts, withClient };
 export { pgvector } from './family.schema-verify.extensions';
+export type { Contract, SqlStorage };
+export { postgres, postgresAdapter, postgresDriver, sql, timeouts, validateContract, withClient };
 
 /**
  * Sets up a shared dev database for schema verification tests.

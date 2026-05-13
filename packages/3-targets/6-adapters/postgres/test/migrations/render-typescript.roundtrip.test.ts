@@ -109,97 +109,91 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it(
-    'renders TS that re-parses to operations matching renderOps(calls) exactly',
-    { timeout: timeouts.typeScriptCompilation },
-    async () => {
-      const calls = [
-        new CreateExtensionCall('citext'),
-        new CreateSchemaCall('app'),
-        new CreateTableCall(
-          'public',
-          'user',
-          [
-            { name: 'id', typeSql: 'text', defaultSql: '', nullable: false },
-            { name: 'email', typeSql: 'text', defaultSql: '', nullable: false },
-          ],
-          { columns: ['id'] },
-        ),
-        new AddColumnCall('public', 'user', {
-          name: 'nickname',
-          typeSql: 'text',
-          defaultSql: '',
-          nullable: true,
-        }),
-        new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
-        new DropTableCall('public', 'stale'),
-      ];
-      const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
+  it('renders TS that re-parses to operations matching renderOps(calls) exactly', {
+    timeout: timeouts.typeScriptCompilation,
+  }, async () => {
+    const calls = [
+      new CreateExtensionCall('citext'),
+      new CreateSchemaCall('app'),
+      new CreateTableCall(
+        'public',
+        'user',
+        [
+          { name: 'id', typeSql: 'text', defaultSql: '', nullable: false },
+          { name: 'email', typeSql: 'text', defaultSql: '', nullable: false },
+        ],
+        { columns: ['id'] },
+      ),
+      new AddColumnCall('public', 'user', {
+        name: 'nickname',
+        typeSql: 'text',
+        defaultSql: '',
+        nullable: true,
+      }),
+      new CreateIndexCall('public', 'user', 'user_email_idx', ['email']),
+      new DropTableCall('public', 'stale'),
+    ];
+    const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
 
-      const tsSource = rewriteImports(migration.renderTypeScript());
-      await writeFile(join(tmpDir, 'migration.ts'), tsSource);
+    const tsSource = rewriteImports(migration.renderTypeScript());
+    await writeFile(join(tmpDir, 'migration.ts'), tsSource);
 
-      const { stdout, stderr } = await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
-        cwd: tmpDir,
-      });
-      expect(stderr).toBe('');
-      expect(stdout).toContain('Wrote ops.json + migration.json to ');
+    const { stdout, stderr } = await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
+      cwd: tmpDir,
+    });
+    expect(stderr).toBe('');
+    expect(stdout).toContain('Wrote ops.json + migration.json to ');
 
-      const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
-      const ops = JSON.parse(opsJson);
+    const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
+    const ops = JSON.parse(opsJson);
 
-      const expected = JSON.parse(JSON.stringify(renderOps(calls)));
-      expect(ops).toEqual(expected);
-    },
-  );
+    const expected = JSON.parse(JSON.stringify(renderOps(calls)));
+    expect(ops).toEqual(expected);
+  });
 
-  it(
-    'renders an empty calls list whose executed scaffold emits []',
-    { timeout: timeouts.typeScriptCompilation },
-    async () => {
-      const migration = new TypeScriptRenderablePostgresMigration([], META, APP_SPACE_ID);
+  it('renders an empty calls list whose executed scaffold emits []', {
+    timeout: timeouts.typeScriptCompilation,
+  }, async () => {
+    const migration = new TypeScriptRenderablePostgresMigration([], META, APP_SPACE_ID);
 
-      const tsSource = rewriteImports(migration.renderTypeScript());
-      await writeFile(join(tmpDir, 'migration.ts'), tsSource);
+    const tsSource = rewriteImports(migration.renderTypeScript());
+    await writeFile(join(tmpDir, 'migration.ts'), tsSource);
 
-      const { stderr } = await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
-        cwd: tmpDir,
-      });
-      expect(stderr).toBe('');
+    const { stderr } = await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
+      cwd: tmpDir,
+    });
+    expect(stderr).toBe('');
 
-      const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
-      expect(ops).toEqual([]);
-    },
-  );
+    const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
+    expect(ops).toEqual([]);
+  });
 
-  it(
-    'preserves RawSqlCall ops byte-for-byte through the render → execute round-trip',
-    { timeout: timeouts.typeScriptCompilation },
-    async () => {
-      const op = {
-        id: 'raw.custom.1',
-        label: 'raw custom 1',
-        operationClass: 'additive' as const,
-        target: { id: 'postgres' as const },
-        precheck: [],
-        execute: [{ description: 'do thing', sql: 'SELECT 1' }],
-        postcheck: [],
-        meta: { note: 'preserved' },
-      };
-      const calls = [new RawSqlCall(op)];
-      const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
+  it('preserves RawSqlCall ops byte-for-byte through the render → execute round-trip', {
+    timeout: timeouts.typeScriptCompilation,
+  }, async () => {
+    const op = {
+      id: 'raw.custom.1',
+      label: 'raw custom 1',
+      operationClass: 'additive' as const,
+      target: { id: 'postgres' as const },
+      precheck: [],
+      execute: [{ description: 'do thing', sql: 'SELECT 1' }],
+      postcheck: [],
+      meta: { note: 'preserved' },
+    };
+    const calls = [new RawSqlCall(op)];
+    const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
 
-      const tsSource = rewriteImports(migration.renderTypeScript());
-      await writeFile(join(tmpDir, 'migration.ts'), tsSource);
+    const tsSource = rewriteImports(migration.renderTypeScript());
+    await writeFile(join(tmpDir, 'migration.ts'), tsSource);
 
-      await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
-        cwd: tmpDir,
-      });
+    await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
+      cwd: tmpDir,
+    });
 
-      const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
+    const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
 
-      expect(ops).toHaveLength(1);
-      expect(ops[0]).toEqual(JSON.parse(JSON.stringify(op)));
-    },
-  );
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toEqual(JSON.parse(JSON.stringify(op)));
+  });
 });
