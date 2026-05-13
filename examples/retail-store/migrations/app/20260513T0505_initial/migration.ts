@@ -208,7 +208,7 @@ class M extends Migration {
                 properties: { url: { bsonType: 'string' } },
                 required: ['url'],
               },
-              masterCategory: { bsonType: 'string' },
+              primaryCategory: { bsonType: 'string' },
               name: { bsonType: 'string' },
               price: {
                 bsonType: 'object',
@@ -224,7 +224,7 @@ class M extends Migration {
               'code',
               'description',
               'image',
-              'masterCategory',
+              'primaryCategory',
               'name',
               'price',
               'subCategory',

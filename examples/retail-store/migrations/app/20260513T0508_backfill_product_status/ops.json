@@ -46,7 +46,7 @@
                     "url"
                   ]
                 },
-                "masterCategory": {
+                "primaryCategory": {
                   "bsonType": "string"
                 },
                 "name": {
@@ -81,7 +81,7 @@
                 "code",
                 "description",
                 "image",
-                "masterCategory",
+                "primaryCategory",
                 "name",
                 "price",
                 "status",

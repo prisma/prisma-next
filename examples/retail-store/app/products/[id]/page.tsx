@@ -33,7 +33,7 @@ export default async function ProductDetail({ params }: { params: Promise<{ id: 
         <CardContent className="flex flex-col gap-4">
           <p className="text-muted">{product.description}</p>
           <div className="flex gap-2">
-            <Badge variant="muted">{product.masterCategory}</Badge>
+            <Badge variant="muted">{product.primaryCategory}</Badge>
             <Badge variant="outline">{product.subCategory}</Badge>
             <Badge variant="outline">{product.articleType}</Badge>
           </div>

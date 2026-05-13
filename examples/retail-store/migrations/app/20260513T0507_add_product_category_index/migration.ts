@@ -16,7 +16,7 @@ class M extends Migration {
       createIndex(
         'products',
         [
-          { direction: 1, field: 'masterCategory' },
+          { direction: 1, field: 'primaryCategory' },
           { direction: 1, field: 'articleType' },
         ],
         {},

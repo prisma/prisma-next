@@ -382,7 +382,7 @@
               "name": "Image"
             }
           },
-          "masterCategory": {
+          "primaryCategory": {
             "nullable": false,
             "type": {
               "codecId": "mongo/string@1",
@@ -1269,7 +1269,7 @@
                     "url"
                   ]
                 },
-                "masterCategory": {
+                "primaryCategory": {
                   "bsonType": "string"
                 },
                 "name": {
@@ -1301,7 +1301,7 @@
                 "code",
                 "description",
                 "image",
-                "masterCategory",
+                "primaryCategory",
                 "name",
                 "price",
                 "subCategory"

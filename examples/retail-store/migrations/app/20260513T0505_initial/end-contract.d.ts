@@ -142,7 +142,7 @@ export type FieldOutputTypes = {
     readonly brand: CodecTypes['mongo/string@1']['output'];
     readonly code: CodecTypes['mongo/string@1']['output'];
     readonly description: CodecTypes['mongo/string@1']['output'];
-    readonly masterCategory: CodecTypes['mongo/string@1']['output'];
+    readonly primaryCategory: CodecTypes['mongo/string@1']['output'];
     readonly subCategory: CodecTypes['mongo/string@1']['output'];
     readonly articleType: CodecTypes['mongo/string@1']['output'];
     readonly price: PriceOutput;
@@ -210,7 +210,7 @@ export type FieldInputTypes = {
     readonly brand: CodecTypes['mongo/string@1']['input'];
     readonly code: CodecTypes['mongo/string@1']['input'];
     readonly description: CodecTypes['mongo/string@1']['input'];
-    readonly masterCategory: CodecTypes['mongo/string@1']['input'];
+    readonly primaryCategory: CodecTypes['mongo/string@1']['input'];
     readonly subCategory: CodecTypes['mongo/string@1']['input'];
     readonly articleType: CodecTypes['mongo/string@1']['input'];
     readonly price: PriceInput;
@@ -261,7 +261,7 @@ type ContractBase = ContractType<
               readonly brand: { readonly bsonType: 'string' };
               readonly code: { readonly bsonType: 'string' };
               readonly description: { readonly bsonType: 'string' };
-              readonly masterCategory: { readonly bsonType: 'string' };
+              readonly primaryCategory: { readonly bsonType: 'string' };
               readonly subCategory: { readonly bsonType: 'string' };
               readonly articleType: { readonly bsonType: 'string' };
               readonly price: {
@@ -285,7 +285,7 @@ type ContractBase = ContractType<
               'code',
               'description',
               'image',
-              'masterCategory',
+              'primaryCategory',
               'name',
               'price',
               'subCategory',
@@ -819,7 +819,7 @@ type ContractBase = ContractType<
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
         };
-        readonly masterCategory: {
+        readonly primaryCategory: {
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
         };

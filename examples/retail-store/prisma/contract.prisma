@@ -52,7 +52,7 @@ model Product {
   brand          String
   code           String
   description    String
-  masterCategory String
+  primaryCategory String
   subCategory    String
   articleType    String
   price          Price
@@ -62,7 +62,7 @@ model Product {
   @@map("products")
   @@textIndex([name, description], weights: "{\"name\": 10, \"description\": 1}")
   @@index([brand, subCategory])
-  @@index([masterCategory, articleType])
+  @@index([primaryCategory, articleType])
   @@index([code], type: "hashed")
 }
 

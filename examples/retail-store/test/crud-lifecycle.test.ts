@@ -18,7 +18,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
       brand: 'TestBrand',
       code: 'TB-001',
       description: 'A test shirt',
-      masterCategory: 'Apparel',
+      primaryCategory: 'Apparel',
       subCategory: 'Topwear',
       articleType: 'Shirts',
       price: { amount: 49.99, currency: 'USD' },

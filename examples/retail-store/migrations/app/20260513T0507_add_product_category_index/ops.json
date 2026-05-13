@@ -1,7 +1,7 @@
 [
   {
-    "id": "index.products.create(masterCategory:1,articleType:1)",
-    "label": "Create index on products (masterCategory:1, articleType:1)",
+    "id": "index.products.create(primaryCategory:1,articleType:1)",
+    "label": "Create index on products (primaryCategory:1, articleType:1)",
     "operationClass": "additive",
     "precheck": [
       {
@@ -15,7 +15,7 @@
           "field": "key",
           "op": "$eq",
           "value": {
-            "masterCategory": 1,
+            "primaryCategory": 1,
             "articleType": 1
           }
         },
@@ -31,14 +31,14 @@
           "keys": [
             {
               "direction": 1,
-              "field": "masterCategory"
+              "field": "primaryCategory"
             },
             {
               "direction": 1,
               "field": "articleType"
             }
           ],
-          "name": "masterCategory_1_articleType_1"
+          "name": "primaryCategory_1_articleType_1"
         }
       }
     ],
@@ -54,7 +54,7 @@
           "field": "key",
           "op": "$eq",
           "value": {
-            "masterCategory": 1,
+            "primaryCategory": 1,
             "articleType": 1
           }
         },
