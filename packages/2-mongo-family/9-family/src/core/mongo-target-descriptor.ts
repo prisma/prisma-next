@@ -99,9 +99,8 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
           // the projection an aggregate of two spaces could not pass strict
           // verify (every other-space collection would look like an extra).
           //
-          // See `projects/contract-spaces-mongo-port/spec.md` § Approach and
-          // `docs/architecture docs/subsystems/10. MongoDB Family.md` § Contract
-          // spaces.
+          // See `docs/architecture docs/subsystems/10. MongoDB Family.md` §
+          // Contract spaces and ADR 212 — Contract spaces.
           async executeAcrossSpaces({ driver, perSpaceOptions }): Promise<MultiSpaceRunnerResult> {
             const members = perSpaceOptions.map(toSpaceMember);
             const perSpaceResults: Array<{

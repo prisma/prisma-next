@@ -211,7 +211,7 @@ The framework runs the same machinery once per space:
 - **Runner.** Applies each space's migrations against the live database, updating the corresponding marker row.
 - **Verifier.** Aggregates all loaded spaces' contracts into an in-memory expected schema, then compares against the live database.
 
-The producer-side helpers (`planAllSpaces`, `concatenateSpaceApplyInputs`, `verifyContractSpaces`, `emitContractSpaceArtefacts`, `gatherDiskContractSpaceState`, `detectSpaceContractDrift`) live in `@prisma-next/migration-tools/exports/spaces` — target-agnostic primitives. The SQL family wires them into `db init` / `db update` / `db verify` at consumption sites; a Mongo or other family would compose them the same way (the contract-space concept is not SQL-specific even though today only the SQL family ships the wiring).
+The producer-side helpers (`planAllSpaces`, `concatenateSpaceApplyInputs`, `verifyContractSpaces`, `emitContractSpaceArtefacts`, `gatherDiskContractSpaceState`, `detectSpaceContractDrift`) live in `@prisma-next/migration-tools/spaces` — target-agnostic primitives. The SQL family wires them into `db init` / `db update` / `db verify` at consumption sites; a Mongo or other family would compose them the same way (the contract-space concept is not SQL-specific even though today only the SQL family ships the wiring).
 
 ### Apply-time atomicity and ordering
 
