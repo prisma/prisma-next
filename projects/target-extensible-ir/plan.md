@@ -2,7 +2,7 @@
 
 ## Summary
 
-The project ships in seven PRs sequenced foundation → consumers → exemplars → docs. The opening foundation PR introduces the framework SPI interfaces (`ContractSerializer<TContract>`, `SchemaVerifier<TContract, TSchema>`), the framework `SchemaNodeBase` abstract class, the `Storage` interface with `namespaces` shape, and the per-SPI family abstract bases. No new `Target<TContract, TSchema>` aggregator is introduced; the existing target descriptor pattern (`SqlControlTargetDescriptor`, etc.) grows two new named properties next to `migrations`. Mongo lands as the first consumer of the foundation (rather than as a parallel stream) so SPI shape disagreements surface against a second family before SQL targets commit to the SPI shape. Postgres + SQLite land together (M3) because they share family-level abstract bases — flipping one without the other would leave the family bases in a dual-shape state. The two structural exemplars (enums, then namespace) build on the now-stable foundation; the namespace exemplar splits in two — M5a introduces the namespace concept, multi-tenancy, and the authoring-DSL surface; M5b adds cross-namespace FKs as the load-bearing user-facing capability. Documentation lands at close-out.
+The project ships in eight milestones sequenced foundation → consumers → mechanism → exemplars → docs. The opening foundation milestone introduces the framework SPI interfaces (`ContractSerializer<TContract>`, `SchemaVerifier<TContract, TSchema>`), the framework `SchemaNodeBase` abstract class, the `Storage` interface with `namespaces` shape, and the per-SPI family abstract bases. No new `Target<TContract, TSchema>` aggregator is introduced; the existing target descriptor pattern (`SqlControlTargetDescriptor`, etc.) grows two new named properties next to `migrations`. Mongo lands as the first consumer of the foundation (rather than as a parallel stream) so SPI shape disagreements surface against a second family before SQL targets commit to the SPI shape. M2.5 severs the inverted Mongo family→target dependency edge so SPI bases land at the family layer (matching SQL) before M3. Postgres + SQLite land together (M3) because they share family-level abstract bases — flipping one without the other would leave the family bases in a dual-shape state. **M3.5 lands the target-extensible authoring mechanism — a new `entities` namespace on `AuthoringContributions` plus the family-agnostic lift of `composed-authoring-helpers.ts` — so the two structural exemplars can contribute their entity kinds via the proven pack-bag-driven extension surface (rather than via hand-edited family-layer construction sites).** The two structural exemplars (enums, then namespace) build on the mechanism; the namespace exemplar splits in two — M5a introduces the namespace concept, multi-tenancy, and the authoring-DSL surface; M5b adds cross-namespace FKs as the load-bearing user-facing capability. Documentation lands at close-out.
 
 The user-facing capabilities this project delivers are: multi-schema Postgres contracts with namespace declarations in PSL (top-level `namespace { … }` blocks; namespaces do not recursively nest) and the TS builder; cross-namespace FK references within a contract space via dot-qualified type references in `@relation` (the FL-02 fix that unblocks Supabase's `auth.users` story); connection-bound multi-tenancy via `__unspecified__` + `search_path`. The IR refactor that underwrites these capabilities is invisible to users but is what makes the follow-up Supabase project (RLS policies, `supabase()` runtime facade, `auth.users` queryable surface) a series of focused feature PRs rather than another foundational reshape.
 
@@ -22,11 +22,11 @@ Independent / non-blocking:
 - **[TML-2458 — Remove vestigial `MigrationMetadata` fields](https://linear.app/prisma-company/issue/TML-2458).** Tiny, scoped to one type. No file conflict. Cheap to land before this project so we don't migrate fields that are about to be deleted, but it can land at any time.
 - **[TML-2464 — Strip single/multi-space branching](https://linear.app/prisma-company/issue/TML-2464).** Blocked by TML-2463 + TML-2408 + this project. Should land **after** this project so the branch-removal touches IR-walking sites once (post-IR-flip) rather than twice.
 
-Resulting global sequence: TML-2458 (any time) → TML-2457 → TML-2463 ∥ TML-2408 → **this project (M1 → M2 → M3 → M4 → M5a → M5b → M6)** → TML-2464.
+Resulting global sequence: TML-2458 (any time) → TML-2457 → TML-2463 ∥ TML-2408 → **this project (M1 → M2 → M2.5 → M3 → M3.5 → M4 → M5a → M5b → M6)** → TML-2464.
 
 ## Milestones
 
-The seven PRs below correspond to the seven milestones (M1, M2, M3, M4, M5a, M5b, M6). Each milestone is a single PR. **M3 is not splittable into Postgres-then-SQLite:** the two SQL targets share family-level abstract bases (`SqlTable`, `SqlColumn`, `SqlForeignKey`, …), and lifting one to the class-hierarchy shape without the other would leave the family bases in a dual-shape state — incompatible with NFR1 ("no dual-shape transition window"). The Postgres + SQLite lifts therefore land in one PR; SQLite's share of the work is mechanical within that scope.
+The eight milestones below correspond to the eight PRs (M1, M2, M2.5, M3, M3.5, M4, M5a, M5b, M6). Each milestone is a single PR. **M3 is not splittable into Postgres-then-SQLite:** the two SQL targets share family-level abstract bases (`SqlTable`, `SqlColumn`, `SqlForeignKey`, …), and lifting one to the class-hierarchy shape without the other would leave the family bases in a dual-shape state — incompatible with NFR1 ("no dual-shape transition window"). The Postgres + SQLite lifts therefore land in one PR; SQLite's share of the work is mechanical within that scope.
 
 ### M1 — Foundation (framework interfaces + family abstract bases)
 
@@ -122,14 +122,48 @@ The seven PRs below correspond to the seven milestones (M1, M2, M3, M4, M5a, M5b
 
 **Validation:** existing Postgres + SQLite test suites green; round-trip property tests confirm fidelity (AC8).
 
+### M3.5 — Target-extensible authoring (entity contributions)
+
+**Goal:** make the contract builders target-extensible so the structural exemplars (M4 enum, M5a/b namespace) and any future target-specific entity (RLS policies, roles, views — out of scope for this project but the mechanism's first real consumers) can be contributed by target packs via the existing pack-bag-driven extension surface, rather than via hand-edited family-layer construction sites. Closes the gap diagnosed at M2 R2 close-out: the IR is target-extensible (M2 R2) but the builders that construct it are not.
+
+**Background.** The existing `composed-authoring-helpers.ts` scaffolding (`packages/2-sql/2-authoring/contract-ts/src/composed-authoring-helpers.ts`) already carries pack-bag-driven type narrowing for **fields**, **type constructors**, codec types, query operation types, and SQL index types via the `MergeExtensionXxx<Packs>` + `UnionToIntersection` template, surfacing them as a typed `helpers` parameter to `defineContract`'s factory. This milestone extends that template to a new **`entities`** namespace on `AuthoringContributions` for top-level contract-authoring-domain kinds (the kinds packs contribute — models, namespaces, enums, future RLS policies, roles, views) — distinct from the application-domain instances users author against them (their `User`, `Invoice`, `Product`). No novel type-system machinery; the contribution shape mirrors the existing codec-descriptor pattern (`codecDescriptors[].factory` on pack refs) — a descriptor with a schema (PSL/TS lowest common denominator) plus an output mechanism that is either a declarative template (preferred where expressible) or a factory function (when computation can't be templated, as for IR-class instances that carry methods, freeze semantics, and per-class identity).
+
+**Sequencing.** Runs AFTER M3 (Postgres SPI shells; the SQL-side SPIs need to be in tree before the mechanism wires construction through them) and BEFORE M4 (the enum exemplar is the first consumer of the new `entities` namespace).
+
+**Tasks:**
+
+- [ ] **Add `entities` namespace to `AuthoringContributions`** in `packages/1-framework/1-core/framework-components/src/shared/framework-authoring.ts`. The descriptor shape: `{ kind: 'entity', schema, output: { template } | { factory } }` where `template` follows the existing `AuthoringTemplateValue` shape (preferred where expressible) and `factory: (input) => SchemaNode` constructs an IR-class instance from validated input (used for any contribution whose output is a class instance, which is most or all contributions in this namespace today). Mirror the existing `field` / `type` namespace shape for collision detection (`isAuthoringEntityDescriptor`, recursive `mergeAuthoringNamespaces` walker).
+- [ ] **Lift `composed-authoring-helpers.ts` to a family-agnostic location.** The current file lives at `packages/2-sql/2-authoring/contract-ts/src/composed-authoring-helpers.ts` with SQL-flavoured type parameters (`TargetPackRef<'sql', string>`, etc.). Move the family-agnostic merge / instantiation scaffolding to a shared location (likely `@prisma-next/contract-authoring`) so Mongo can mirror; SQL-specific helper composition stays where it is, importing the lifted scaffolding. Verify both contract-builders (`packages/2-sql/2-authoring/contract-ts` and `packages/2-mongo-family/2-authoring/contract-ts`) consume the lifted module without circular deps.
+- [ ] **Extend `ComposedAuthoringHelpers<Family, Target, ExtensionPacks>` to merge entity contributions across packs.** Apply the same `MergeExtensionEntityNamespaces<ExtensionPacks>` + `UnionToIntersection` template used today for `field` / `type`. Surfaces contributed entities at `helpers.entities.<entityName>(...)` (top-level placement; collisions detected at compose time per the existing `assertNoCrossRegistryCollisions` discipline).
+- [ ] **Wire the SQL contract-builder.** `defineContract`'s factory already receives `helpers: ComposedAuthoringHelpers<Family, Target, ExtensionPacks>`; the new `helpers.entities` surface becomes available without changing the call signature. Update `contract-lowering.ts` / `build-contract.ts` to consume entity-contribution outputs alongside the existing model / type / field paths.
+- [ ] **Wire the Mongo contract-builder.** Same pattern; `packages/2-mongo-family/2-authoring/contract-ts/src/contract-builder.ts` adopts the lifted scaffolding and exposes `helpers.entities` to its factory shape. Mongo's family-pack contributes the existing built-in entity kinds (collection, etc.) via the new mechanism, removing the hand-imported IR-class construction sites identified at M2 R2 close-out as the load-bearing gap.
+- [ ] **Pack-side wiring exemplar.** Demonstrate one in-tree pack contributing an entity through the new mechanism end-to-end (likely a Postgres-pack contribution serving as the rehearsal for M4 enum). Acceptance: user code authoring against a pack that ships entity contributions sees the entity helper at `helpers.entities.<name>` with full type narrowing, and the contributed call site lowers to the correct IR-class instance via the pack-supplied factory.
+- [ ] **Spec amendment + ADR draft.** This milestone's spec amendment (under `## Authoring surface` in spec.md) documents the unified contribution shape and the `entities` namespace. The ADR draft (`projects/target-extensible-ir/specs/target-extensible-authoring.md`) captures the rejected alternatives (declarative-only-for-entities; builder-emits-JSON; mixin / class-extension; sub-builder dispatch; per-target builder packages). Both land as part of M3.5 work.
+
+**Out of scope for this milestone.**
+
+- **Sub-builder / mid-chain extension** (e.g. extending `ScalarFieldBuilder` so packs can contribute `.encrypted()` at chain positions). Different type-system shape; would be the *attribute* contribution surface in the entity / attribute / relationship vocabulary; deferred until a use case demands it.
+- **Backport of the descriptor + factory shape to `field` and `type` namespaces.** Mechanical follow-up tracked separately as [TML-2513](https://linear.app/prisma-company/issue/TML-2513).
+- **Postgres-domain entities** (RLS policies, roles, views). Real-world consumers of this mechanism, but explicitly out of scope per spec; ship in a follow-on project on the proven mechanism.
+
+**Validation gate** (must all pass for SATISFIED):
+
+- `pnpm typecheck` (workspace-wide; the lift of `composed-authoring-helpers.ts` is a heavy-generics relocation and must not regress type narrowing for any in-tree consumer).
+- `pnpm lint:deps` (no new layering violations; the lifted scaffolding lives at family-agnostic layer without circular deps).
+- Filtered tests on the SQL + Mongo contract-builder packages: `pnpm --filter '@prisma-next/sql-contract-ts' --filter '@prisma-next/mongo-contract-ts' --filter '@prisma-next/contract-authoring' test`.
+- The pack-side wiring exemplar's tests pass: type-level narrowing works (the entity helper appears at `helpers.entities.<name>` with the contributed signature), runtime construction works (the call lowers to an IR-class instance via the supplied factory), round-trip works (the constructed instance serializes back to canonical JSON via the existing `ContractSerializer` SPI).
+
+**Acceptance:** spec.md § "Authoring surface" describes the unified contribution shape and the `entities` namespace; the lifted scaffolding lives at family-agnostic layer; both family contract-builders consume it; one in-tree pack contributes an entity via the new mechanism with full type narrowing and runtime correctness.
+
 ### M4 — Enum exemplar (low-risk refactor)
 
-**Goal:** prove the new IR pattern works end-to-end on a real existing concept by lifting enums from codec-hook glue into first-class IR nodes.
+**Goal:** prove the new IR pattern works end-to-end on a real existing concept by lifting enums from codec-hook glue into first-class IR nodes. **First real consumer of the M3.5 mechanism**: the Postgres pack contributes the enum entity via `helpers.entities.enum(...)` rather than via a hand-edited family-layer factory site.
 
 **Tasks:**
 
 - [ ] Declare `abstract class SqlEnumType extends SqlNode` (family layer).
 - [ ] Declare `class PostgresEnumType extends SqlEnumType` (target layer); Postgres-specific `CREATE TYPE` rendering, native-type-name resolution.
+- [ ] Contribute the enum entity through the M3.5 `entities` namespace on the Postgres target pack (descriptor + factory). The factory constructs `PostgresEnumType` instances; the descriptor's PSL schema lowers existing enum syntax through the new path. Validation: removing the contribution causes the existing enum tests to fail with the expected "no entity helper named `enum`" type error.
 - [ ] Verifier walks `SqlEnumType` instances natively via the per-SPI verifier. Codec hooks for the enum case (`codecHooks.verifyType`, `expandNativeType` enum branches in `verify-sql-schema.ts`) are removed.
 - [ ] Existing migration ops (`CreateEnumTypeCall`, `AddEnumValuesCall`, `DropEnumTypeCall`) consume the IR nodes directly without an intermediate translation layer.
 - [ ] Authoring DSL preserved; internal lowering routes through the new IR.
@@ -139,7 +173,7 @@ The seven PRs below correspond to the seven milestones (M1, M2, M3, M4, M5a, M5b
 
 ### M5a — Namespace exemplar (new concept) + authoring DSL
 
-**Goal:** introduce the higher-risk new framework-level concept on a foundation that is now well-exercised, and ship the authoring-DSL surface that makes namespaces usable in PSL and the TS builder.
+**Goal:** introduce the higher-risk new framework-level concept on a foundation that is now well-exercised, and ship the authoring-DSL surface that makes namespaces usable in PSL and the TS builder. **Second consumer of the M3.5 mechanism**: each target pack with native namespacing (`postgres`, `mongo`) contributes its Namespace concretion as an entity via `helpers.entities.namespace(...)` (TS) and the dedicated `namespace { … }` PSL block lowering through the same descriptor path. The greenfield concept exercises the mechanism's "introduce a new framework-level kind" path (where M4 exercises the "lift existing target-specific glue" path).
 
 **Tasks:**
 
@@ -181,7 +215,7 @@ The seven PRs below correspond to the seven milestones (M1, M2, M3, M4, M5a, M5b
 - [ ] Add the AST/IR class-hierarchy section to `docs/reference/typescript-patterns.md` as a sibling to "Interface-Based Design with Factory Functions" (FR22).
 - [ ] Update `docs/Architecture Overview.md` § "Guiding Principles" to surface "framework provides affordances; targets implement specifics" and "familiar with one target, fluent in another" (FR23).
 - [ ] Update affected subsystem docs (`Data Contract`, `Contract Emitter & Types`, `Adapters & Targets`) to reflect the class-hierarchy IR shape (FR24).
-- [ ] Refine the ADR drafts started in M1 under `projects/target-extensible-ir/specs/`. AC10 names the two that must exist by close-out — the 3-layer polymorphic IR convention and the architectural principles underwriting it (FR25) — plus any further ADRs M1 surfaced as load-bearing. M6 brings them all to "ready to promote" state; the close-out step moves them to `docs/architecture docs/adrs/`.
+- [ ] Refine the ADR drafts under `projects/target-extensible-ir/specs/`. AC10 names the two that must exist by close-out — the 3-layer polymorphic IR convention and the architectural principles underwriting it (FR25) — plus any further ADRs surfaced as load-bearing during execution (M1 drafts the first two; M3.5 drafts a third for target-extensible authoring / `entities` contributions; later milestones may surface more). M6 brings them all to "ready to promote" state; the close-out step moves them to `docs/architecture docs/adrs/`.
 
 **Validation:** docs reviewable as diffs; ADR drafts ready for promotion at close-out.
 
@@ -196,7 +230,7 @@ The seven PRs below correspond to the seven milestones (M1, M2, M3, M4, M5a, M5b
 ## Close-out (required)
 
 - [ ] Verify all acceptance criteria in [`projects/target-extensible-ir/spec.md`](spec.md).
-- [ ] Promote ADR drafts (3-layer IR convention; architectural principles) from `projects/target-extensible-ir/specs/` to `docs/architecture docs/adrs/`.
+- [ ] Promote ADR drafts (3-layer IR convention; architectural principles; target-extensible authoring / `entities` contributions; any other drafts surfaced during execution) from `projects/target-extensible-ir/specs/` to `docs/architecture docs/adrs/`.
 - [ ] Confirm `AGENTS.md` / `CLAUDE.md` Golden Rule is updated and `docs/reference/typescript-patterns.md` carries the new AST/IR section.
 - [ ] Confirm `docs/Architecture Overview.md` § "Guiding Principles" surfaces "framework provides affordances; targets implement specifics" and "familiar with one target, fluent in another".
 - [ ] Confirm subsystem docs in `docs/architecture docs/subsystems/` (Data Contract, Contract Emitter & Types, Adapters & Targets) reflect the class-hierarchy IR shape.
