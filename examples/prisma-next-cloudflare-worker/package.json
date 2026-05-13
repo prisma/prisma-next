@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.15.2",
-    "@cloudflare/workers-types": "4.20260430.1",
+    "@cloudflare/workers-types": "4.20260503.1",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/sql-contract-psl": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",

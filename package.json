@@ -44,7 +44,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.3.11",
+    "@biomejs/biome": "2.4.14",
     "@prisma-next/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "^4.0.17",
