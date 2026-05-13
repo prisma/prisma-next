@@ -564,12 +564,6 @@
                 "description": {
                   "bsonType": "string"
                 },
-                "embedding": {
-                  "bsonType": "array",
-                  "items": {
-                    "bsonType": "double"
-                  }
-                },
                 "image": {
                   "bsonType": "object",
                   "properties": {
@@ -602,9 +596,6 @@
                     "currency"
                   ]
                 },
-                "status": {
-                  "bsonType": "string"
-                },
                 "subCategory": {
                   "bsonType": "string"
                 }
@@ -619,7 +610,6 @@
                 "masterCategory",
                 "name",
                 "price",
-                "status",
                 "subCategory"
               ]
             }

@@ -1,0 +1,65 @@
+[
+  {
+    "id": "index.products.create(masterCategory:1,articleType:1)",
+    "label": "Create index on products (masterCategory:1, articleType:1)",
+    "operationClass": "additive",
+    "precheck": [
+      {
+        "description": "index does not already exist on products",
+        "source": {
+          "kind": "listIndexes",
+          "collection": "products"
+        },
+        "filter": {
+          "kind": "field",
+          "field": "key",
+          "op": "$eq",
+          "value": {
+            "masterCategory": 1,
+            "articleType": 1
+          }
+        },
+        "expect": "notExists"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index on products",
+        "command": {
+          "kind": "createIndex",
+          "collection": "products",
+          "keys": [
+            {
+              "direction": 1,
+              "field": "masterCategory"
+            },
+            {
+              "direction": 1,
+              "field": "articleType"
+            }
+          ],
+          "name": "masterCategory_1_articleType_1"
+        }
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "index exists on products",
+        "source": {
+          "kind": "listIndexes",
+          "collection": "products"
+        },
+        "filter": {
+          "kind": "field",
+          "field": "key",
+          "op": "$eq",
+          "value": {
+            "masterCategory": 1,
+            "articleType": 1
+          }
+        },
+        "expect": "exists"
+      }
+    ]
+  }
+]

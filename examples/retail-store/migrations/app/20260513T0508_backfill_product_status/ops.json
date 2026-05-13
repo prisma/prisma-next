@@ -1,5 +1,102 @@
 [
   {
+    "id": "collection.products.setValidation",
+    "label": "Set validation on products",
+    "operationClass": "destructive",
+    "precheck": [],
+    "execute": [
+      {
+        "description": "set validation on products",
+        "command": {
+          "kind": "collMod",
+          "collection": "products",
+          "validator": {
+            "$jsonSchema": {
+              "bsonType": "object",
+              "properties": {
+                "_id": {
+                  "bsonType": "objectId"
+                },
+                "articleType": {
+                  "bsonType": "string"
+                },
+                "brand": {
+                  "bsonType": "string"
+                },
+                "code": {
+                  "bsonType": "string"
+                },
+                "description": {
+                  "bsonType": "string"
+                },
+                "embedding": {
+                  "bsonType": "array",
+                  "items": {
+                    "bsonType": "double"
+                  }
+                },
+                "image": {
+                  "bsonType": "object",
+                  "properties": {
+                    "url": {
+                      "bsonType": "string"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ]
+                },
+                "masterCategory": {
+                  "bsonType": "string"
+                },
+                "name": {
+                  "bsonType": "string"
+                },
+                "price": {
+                  "bsonType": "object",
+                  "properties": {
+                    "amount": {
+                      "bsonType": "double"
+                    },
+                    "currency": {
+                      "bsonType": "string"
+                    }
+                  },
+                  "required": [
+                    "amount",
+                    "currency"
+                  ]
+                },
+                "status": {
+                  "bsonType": "string"
+                },
+                "subCategory": {
+                  "bsonType": "string"
+                }
+              },
+              "required": [
+                "_id",
+                "articleType",
+                "brand",
+                "code",
+                "description",
+                "image",
+                "masterCategory",
+                "name",
+                "price",
+                "status",
+                "subCategory"
+              ]
+            }
+          },
+          "validationLevel": "strict",
+          "validationAction": "error"
+        }
+      }
+    ],
+    "postcheck": []
+  },
+  {
     "id": "data_transform.backfill-product-status",
     "label": "Data transform: backfill-product-status",
     "operationClass": "data",

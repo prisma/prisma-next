@@ -13,13 +13,12 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:4407077380e2331b356697c35153192b3bdafadb432f0d64b081d24e8af3e55a'>;
+  StorageHashBase<'sha256:f76977c7745bd6fbf38728c544b372927969f19955489d7ff5c9c1eddcdc0b36'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
 
 export type CodecTypes = MongoCodecTypes;
-export type OperationTypes = Record<string, never>;
 
 export type PriceOutput = {
   readonly amount: CodecTypes['mongo/double@1']['output'];
@@ -148,8 +147,6 @@ export type FieldOutputTypes = {
     readonly articleType: CodecTypes['mongo/string@1']['output'];
     readonly price: PriceOutput;
     readonly image: ImageOutput;
-    readonly embedding: ReadonlyArray<CodecTypes['mongo/double@1']['output']> | null;
-    readonly status: CodecTypes['mongo/string@1']['output'];
   };
   readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['output'] };
   readonly User: {
@@ -218,8 +215,6 @@ export type FieldInputTypes = {
     readonly articleType: CodecTypes['mongo/string@1']['input'];
     readonly price: PriceInput;
     readonly image: ImageInput;
-    readonly embedding: ReadonlyArray<CodecTypes['mongo/double@1']['input']> | null;
-    readonly status: CodecTypes['mongo/string@1']['input'];
   };
   readonly SearchEvent: { readonly query: CodecTypes['mongo/string@1']['input'] };
   readonly User: {
@@ -235,7 +230,7 @@ export type FieldInputTypes = {
     readonly exitMethod: CodecTypes['mongo/string@1']['input'] | null;
   };
 };
-export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes, FieldInputTypes>;
+export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;
 
 type ContractBase = ContractType<
   {
@@ -282,11 +277,6 @@ type ContractBase = ContractType<
                 readonly properties: { readonly url: { readonly bsonType: 'string' } };
                 readonly required: readonly ['url'];
               };
-              readonly embedding: {
-                readonly bsonType: 'array';
-                readonly items: { readonly bsonType: 'double' };
-              };
-              readonly status: { readonly bsonType: 'string' };
             };
             readonly required: readonly [
               '_id',
@@ -298,7 +288,6 @@ type ContractBase = ContractType<
               'masterCategory',
               'name',
               'price',
-              'status',
               'subCategory',
             ];
           };
@@ -849,15 +838,6 @@ type ContractBase = ContractType<
         readonly image: {
           readonly nullable: false;
           readonly type: { readonly kind: 'valueObject'; readonly name: 'Image' };
-        };
-        readonly embedding: {
-          readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/double@1' };
-          readonly many: true;
-        };
-        readonly status: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
         };
       };
       readonly relations: Record<string, never>;
