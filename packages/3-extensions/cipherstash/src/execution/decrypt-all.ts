@@ -122,7 +122,16 @@ export async function decryptAll(rows: unknown, opts?: DecryptAllOptions): Promi
     for (let i = 0; i < group.length; i++) {
       const target = group[i];
       const plaintext = plaintexts[i];
-      if (!target || plaintext === undefined) continue;
+      if (!target) continue;
+      if (plaintext === undefined) {
+        throw new Error(
+          `cipherstash decryptAll: SDK returned undefined plaintext at index ${i} ` +
+            `for routing key (${target.routingKey.table}, ${target.routingKey.column}). ` +
+            'A missing plaintext indicates the SDK could not decrypt this envelope; ' +
+            'silently skipping it would leave the caller with an envelope that still ' +
+            'reports as not-yet-decrypted, so we surface the failure here instead.',
+        );
+      }
       // The SDK's `bulkDecrypt` returns `ReadonlyArray<unknown>`;
       // narrowing to each envelope's `T` is the per-subclass
       // responsibility. `applyDecryptedSdkResult` is a static member

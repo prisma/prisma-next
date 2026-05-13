@@ -150,6 +150,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.10.4
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       tsx:
         specifier: ^4.19.2
         version: 4.21.0

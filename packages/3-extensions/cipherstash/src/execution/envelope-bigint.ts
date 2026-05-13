@@ -49,10 +49,10 @@ export class EncryptedBigInt extends EncryptedEnvelopeBase<bigint> {
       return sdkResult;
     }
     if (typeof sdkResult === 'number') {
-      if (!Number.isFinite(sdkResult) || !Number.isInteger(sdkResult)) {
+      if (!Number.isSafeInteger(sdkResult)) {
         throw new Error(
-          `EncryptedBigInt.parseDecryptedValue: SDK returned a non-integer number (${sdkResult}); ` +
-            'expected an integer or bigint plaintext.',
+          'EncryptedBigInt.parseDecryptedValue: SDK returned a number that is not a safe integer; ' +
+            'expected an integer plaintext within Number.MAX_SAFE_INTEGER or a bigint.',
         );
       }
       return BigInt(sdkResult);
@@ -62,7 +62,7 @@ export class EncryptedBigInt extends EncryptedEnvelopeBase<bigint> {
         return BigInt(sdkResult);
       } catch {
         throw new Error(
-          `EncryptedBigInt.parseDecryptedValue: cannot construct a bigint from SDK plaintext "${sdkResult}".`,
+          'EncryptedBigInt.parseDecryptedValue: SDK returned a string plaintext that is not a valid bigint literal.',
         );
       }
     }

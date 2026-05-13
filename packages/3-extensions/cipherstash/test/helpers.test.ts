@@ -171,16 +171,14 @@ describe('cipherstashAsc / cipherstashDesc — AST shape', () => {
     const col = columnAccessor(TABLE, 'email', CIPHERSTASH_STRING_CODEC_ID);
     const item = cipherstashAsc(col);
     expect(item).toBeInstanceOf(OrderByItem);
-    expect(item.dir).toBe('asc');
-    expect(item.expr).toBe(col.buildAst());
+    expect(item).toMatchObject({ dir: 'asc', expr: col.buildAst() });
   });
 
   it('cipherstashDesc returns an OrderByItem with dir desc wrapping the column buildAst', () => {
     const col = columnAccessor(TABLE, 'score', CIPHERSTASH_DOUBLE_CODEC_ID);
     const item = cipherstashDesc(col);
     expect(item).toBeInstanceOf(OrderByItem);
-    expect(item.dir).toBe('desc');
-    expect(item.expr).toBe(col.buildAst());
+    expect(item).toMatchObject({ dir: 'desc', expr: col.buildAst() });
   });
 });
 
