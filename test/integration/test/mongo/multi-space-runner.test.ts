@@ -73,10 +73,24 @@ function buildAppContract(): MongoContract {
     storage: {
       collections: {
         users: {
-          indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'email', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
         posts: {
-          indexes: [{ keys: [{ field: 'slug', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'slug', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
       },
       storageHash: coreHash('sha256:app-contract-multi-space'),
@@ -114,7 +128,14 @@ function buildAppContractMissingPosts(): MongoContract {
     storage: {
       collections: {
         users: {
-          indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'email', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
       },
       storageHash: coreHash('sha256:app-contract-trimmed'),
@@ -135,7 +156,14 @@ function buildExtContract(): MongoContract {
     storage: {
       collections: {
         cipherstash_state: {
-          indexes: [{ keys: [{ field: 'tenantId', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'tenantId', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
       },
       storageHash: coreHash('sha256:ext-contract-multi-space'),

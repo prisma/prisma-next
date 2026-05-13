@@ -74,7 +74,14 @@ function appContract(): MongoContract {
     storage: {
       collections: {
         users: {
-          indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'email', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
       },
       storageHash: coreHash('sha256:tc18-app-contract'),
@@ -95,7 +102,14 @@ function extContract(): MongoContract {
     storage: {
       collections: {
         cipherstash_state: {
-          indexes: [{ keys: [{ field: 'tenantId', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'tenantId', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
       },
       storageHash: coreHash('sha256:tc18-ext-contract'),

@@ -9,13 +9,16 @@ const TARGET_FAMILY = 'mongo' as const;
 const storageBody = {
   collections: {
     [MONGO_TEST_COLLECTION]: {
+      kind: 'mongo-collection' as const,
       indexes: [
         {
+          kind: 'mongo-index' as const,
           keys: [{ field: 'tenantId', direction: 1 as const }],
           unique: true,
         },
       ],
       validator: {
+        kind: 'mongo-validator' as const,
         jsonSchema: {
           bsonType: 'object',
           required: ['tenantId', 'event'],
