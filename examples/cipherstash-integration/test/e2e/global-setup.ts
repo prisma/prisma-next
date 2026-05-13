@@ -98,8 +98,7 @@ export default async function setup(): Promise<() => Promise<void>> {
   // is for the `pnpm start` demo loop).
   process.env['DATABASE_URL'] = HARNESS_DATABASE_URL;
 
-  const cliBin = resolve(exampleDir, 'node_modules', '.bin', 'prisma-next');
-  const apply = spawnSync(cliBin, ['migration', 'apply'], {
+  const apply = spawnSync('pnpm', ['exec', 'prisma-next', 'migration', 'apply'], {
     cwd: exampleDir,
     stdio: 'pipe',
     env: process.env,

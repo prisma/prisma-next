@@ -521,7 +521,7 @@ describe('decryptAll — heterogeneous envelope subclasses', () => {
     expect(await bigIntEnv.decrypt()).toBe(42n);
   });
 
-  it('groups envelopes of different types that share (table, column) into one bulkDecrypt', async () => {
+  it('groups envelopes that share (table, column) into one bulkDecrypt, preserving sibling column splits', async () => {
     // The framework guarantees per-cell-codec homogeneity within a
     // `(table, column)` slot, but the walker's grouping logic does
     // not depend on that property — it groups purely by
