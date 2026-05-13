@@ -27,7 +27,8 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/ts-render": "workspace:*",
-    "@prisma-next/utils": "workspace:*"
+    "@prisma-next/utils": "workspace:*",
+    "@standard-schema/spec": "1.1.0"
   },
   "devDependencies": {
     "@prisma-next/driver-sqlite": "workspace:*",
