@@ -14,12 +14,11 @@
  * The correct fix introduces that primitive at the framework level
  * (`interface Storage { readonly namespaces: Record<string, Namespace> }`
  * and friends), with each family's storage type required to conform.
- * That work is scoped in TML-2459 (target-extensible-ir) M1; TML-2459's
- * M2 R2 plan explicitly schedules removal of this duck-typed walk when
- * the IR class flip rebases onto this PR. Landing an interim typed shape
- * here would create a third on-disk shape that TML-2459 would have to
- * migrate away from again — violating its NFR1 ("no dual-shape
- * transition window").
+ * That work is scoped in TML-2459 (target-extensible-ir), which will
+ * remove this duck-typed walk when the IR class flip rebases onto this
+ * PR. Landing an interim typed shape here would create a third on-disk
+ * shape that TML-2459 would have to migrate away from again, opening a
+ * dual-shape transition window that TML-2459 explicitly rules out.
  *
  * Behavioural notes for the lifetime of this helper:
  *
