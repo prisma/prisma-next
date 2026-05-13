@@ -50,6 +50,22 @@ The user runs the orchestrator at Opus 4.7 Medium by default for quick execution
 
 Decision recorded at `wip/unattended-decisions.md § 10`.
 
+## Pattern: filename-filtered gates miss target-flavoured tests under non-target-flavoured paths
+
+**Shape.** A validation gate that filters integration / e2e tests by filename pattern (e.g. `cd test/integration && pnpm test mongo`) silently skips test files that exercise the target's surface but don't carry the target name in their path. Surfaced in M2 R2 → M2 R2-closure transition: two real `pnpm test:integration` failures (`test/cli.emit-command.additional.test.ts` Mongo case; `test/authoring/side-by-side-contracts.test.ts` Mongo side-by-side case) had been red since the M2 R2 class flip landed, but neither path matched the filename filter `mongo`. Verified pre-existing — `git checkout <SATISFIED-SHA> -- <files>` produced an empty diff against the rebase-closure HEAD, confirming the test files were byte-identical at the SATISFIED moment.
+
+**Why it matters.** A filename-filtered gate produces a false-clean signal — the gate runs, returns green, the milestone is declared SATISFIED, and the failures only surface when a downstream round runs the workspace-wide gate. The audit trail then has to reconstruct whether those failures are regressions introduced by the downstream work (innocent-until-proven-guilty) or escapees from an earlier milestone (the actual case here). Either interpretation requires manual investigation; both are noise the round shouldn't be paying for.
+
+**Action.** When a milestone's plan declares a filename-filtered test gate, do one of:
+
+1. **Replace with a name-pattern filter.** `pnpm vitest run --testNamePattern '<TargetName>'` matches by `describe`/`it` text, which target-aware test authors actually populate. Filename filters are a proxy for "tests about the target" that breaks the moment a test file mixes targets or names them in `describe` blocks rather than file paths.
+
+2. **Add a workspace-wide companion gate.** Keep the filename filter for the fast-feedback path, but add `pnpm test:integration` (or the project's workspace-wide equivalent) to the gate as a SATISFIED-blocking check. The wider gate catches the escapees the filter misses; the cost is a slower gate run, which is acceptable at the SATISFIED bar.
+
+3. **At minimum, audit the filter coverage at intent-validation time.** When the orchestrator validates a SATISFIED verdict from a filename-filtered gate, run `rg -l '<TargetName>' test/` (or the equivalent in the project's harness) and cross-check that every match is either inside the filter's catchment or has its own gate path.
+
+The orchestrator's intent-validation pass for SATISFIED on filename-filtered gates explicitly includes this check from M3 onward; updating the plan's gate definitions for M3 and later milestones to use option (1) or (2) by default is a project-internal fix the M3 entry orchestrator note records.
+
 ## Pattern: cross-target consistency check is part of intent-validation
 
 **Shape.** When a foundation milestone introduces SPI bases / family abstract bases / shared interfaces, the orchestrator's intent-validation pass MUST include a per-target reachability check: for each (target, family-base) pair the foundation introduces, can the target's package actually `extends <FamilyBase>` without producing a circular workspace dependency?
