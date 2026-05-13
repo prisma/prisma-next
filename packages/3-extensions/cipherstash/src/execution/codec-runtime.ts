@@ -31,12 +31,12 @@ import {
   CIPHERSTASH_STRING_CODEC_ID,
 } from '../extension-metadata/constants';
 import { CipherstashCellCodec, makeCipherstashCellCodec } from './cell-codec-factory';
-import { EncryptedString } from './envelope';
 import { EncryptedBigInt } from './envelope-bigint';
 import { EncryptedBoolean } from './envelope-boolean';
 import { EncryptedDate } from './envelope-date';
 import { EncryptedDouble } from './envelope-double';
 import { EncryptedJson } from './envelope-json';
+import { EncryptedString } from './envelope-string';
 import type { CipherstashSdk } from './sdk';
 
 export { CIPHERSTASH_STRING_CODEC_ID };

@@ -36,7 +36,7 @@ import { createSqlParamRefMutator } from '@prisma-next/sql-relational-core/middl
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type { SqlMiddlewareContext } from '@prisma-next/sql-runtime';
 import { describe, expect, it, vi } from 'vitest';
-import { EncryptedString, setHandleRoutingKey } from '../src/execution/envelope';
+import { EncryptedString, setHandleRoutingKey } from '../src/execution/envelope-string';
 import type {
   CipherstashBulkDecryptArgs,
   CipherstashBulkEncryptArgs,

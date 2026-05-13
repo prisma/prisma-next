@@ -96,13 +96,13 @@ import {
   type CipherstashCodecId,
   isCipherstashCodecId,
 } from '../extension-metadata/constants';
-import { EncryptedString, setHandleRoutingKey } from './envelope';
 import type { EncryptedEnvelopeBase } from './envelope-base';
 import { EncryptedBigInt } from './envelope-bigint';
 import { EncryptedBoolean } from './envelope-boolean';
 import { EncryptedDate } from './envelope-date';
 import { EncryptedDouble } from './envelope-double';
 import { EncryptedJson } from './envelope-json';
+import { EncryptedString, setHandleRoutingKey } from './envelope-string';
 
 /**
  * Codec ID of the framework's Postgres boolean codec. Referenced as a

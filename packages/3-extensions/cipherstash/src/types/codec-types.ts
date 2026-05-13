@@ -43,7 +43,6 @@
  * `src/execution/operators.ts`).
  */
 
-import type { EncryptedString } from '../execution/envelope';
 // Type-only imports — the codec-types subpath compiles to an empty
 // JS module under tsdown (every import below is elided), so importing
 // the envelope classes by type carries no runtime cost in the
@@ -53,6 +52,7 @@ import type { EncryptedBoolean } from '../execution/envelope-boolean';
 import type { EncryptedDate } from '../execution/envelope-date';
 import type { EncryptedDouble } from '../execution/envelope-double';
 import type { EncryptedJson } from '../execution/envelope-json';
+import type { EncryptedString } from '../execution/envelope-string';
 
 export type CodecTypes = {
   readonly 'cipherstash/string@1': {
@@ -84,7 +84,10 @@ export type CodecTypes = {
     readonly traits: 'cipherstash:equality';
   };
   readonly 'cipherstash/json@1': {
-    readonly input: unknown | EncryptedJson;
+    // `unknown` already subsumes `EncryptedJson`, but the alias is kept in
+    // scope (via the import above) so the codec entry still flags JSON as
+    // an envelope-bearing codec at the type-import layer.
+    readonly input: unknown;
     readonly output: EncryptedJson;
     readonly traits: 'cipherstash:searchable-json';
   };

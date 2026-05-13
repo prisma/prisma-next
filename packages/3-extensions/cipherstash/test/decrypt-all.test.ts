@@ -22,16 +22,16 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { decryptAll } from '../src/execution/decrypt-all';
-import {
-  EncryptedString,
-  type EncryptedStringFromInternalArgs,
-  isHandleDecrypted,
-} from '../src/execution/envelope';
 import { EncryptedBigInt } from '../src/execution/envelope-bigint';
 import { EncryptedBoolean } from '../src/execution/envelope-boolean';
 import { EncryptedDate } from '../src/execution/envelope-date';
 import { EncryptedDouble } from '../src/execution/envelope-double';
 import { EncryptedJson } from '../src/execution/envelope-json';
+import {
+  EncryptedString,
+  type EncryptedStringFromInternalArgs,
+  isHandleDecrypted,
+} from '../src/execution/envelope-string';
 import type {
   CipherstashBulkDecryptArgs,
   CipherstashBulkEncryptArgs,

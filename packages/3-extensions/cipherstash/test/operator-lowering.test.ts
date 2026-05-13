@@ -75,11 +75,11 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
-import { EncryptedString } from '../src/execution/envelope';
 import { EncryptedBigInt } from '../src/execution/envelope-bigint';
 import { EncryptedBoolean } from '../src/execution/envelope-boolean';
 import { EncryptedDate } from '../src/execution/envelope-date';
 import { EncryptedDouble } from '../src/execution/envelope-double';
+import { EncryptedString } from '../src/execution/envelope-string';
 import { cipherstashQueryOperations } from '../src/execution/operators';
 import type { CipherstashSdk } from '../src/execution/sdk';
 import { createCipherstashRuntimeDescriptor } from '../src/exports/runtime';

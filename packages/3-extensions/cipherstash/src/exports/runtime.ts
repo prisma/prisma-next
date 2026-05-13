@@ -47,11 +47,6 @@ export {
 export type { DecryptAllOptions } from '../execution/decrypt-all';
 export { decryptAll } from '../execution/decrypt-all';
 export type {
-  EncryptedStringFromInternalArgs,
-  EncryptedStringHandle,
-} from '../execution/envelope';
-export { EncryptedString } from '../execution/envelope';
-export type {
   EncryptedBigIntFromInternalArgs,
   EncryptedBigIntHandle,
 } from '../execution/envelope-bigint';
@@ -76,6 +71,11 @@ export type {
   EncryptedJsonHandle,
 } from '../execution/envelope-json';
 export { EncryptedJson } from '../execution/envelope-json';
+export type {
+  EncryptedStringFromInternalArgs,
+  EncryptedStringHandle,
+} from '../execution/envelope-string';
+export { EncryptedString } from '../execution/envelope-string';
 export {
   cipherstashAsc,
   cipherstashDesc,

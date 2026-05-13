@@ -19,12 +19,12 @@ import {
   createCipherstashJsonCodec,
   createCipherstashStringCodec,
 } from '../src/execution/codec-runtime';
-import { EncryptedString, setHandleCiphertext } from '../src/execution/envelope';
 import { EncryptedBigInt } from '../src/execution/envelope-bigint';
 import { EncryptedBoolean } from '../src/execution/envelope-boolean';
 import { EncryptedDate } from '../src/execution/envelope-date';
 import { EncryptedDouble } from '../src/execution/envelope-double';
 import { EncryptedJson } from '../src/execution/envelope-json';
+import { EncryptedString, setHandleCiphertext } from '../src/execution/envelope-string';
 import {
   createParameterizedCodecDescriptors,
   encryptedBigIntParamsSchema,

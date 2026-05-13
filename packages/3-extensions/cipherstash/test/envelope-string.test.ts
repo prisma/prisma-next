@@ -10,7 +10,7 @@
 
 import { inspect } from 'node:util';
 import { describe, expect, it, vi } from 'vitest';
-import { EncryptedString, setHandleRoutingKey } from '../src/execution/envelope';
+import { EncryptedString, setHandleRoutingKey } from '../src/execution/envelope-string';
 import type { CipherstashSdk } from '../src/execution/sdk';
 
 describe('EncryptedString.from(plaintext)', () => {

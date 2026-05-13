@@ -19,14 +19,14 @@ packages/3-extensions/cipherstash/
     │   └── contract.d.ts             contract-space declaration
     ├── execution/
     │   ├── envelope-base.ts          EncryptedEnvelopeBase<T> shared substrate
-    │   ├── envelope.ts               EncryptedString (extends base)
+    │   ├── envelope-string.ts        EncryptedString (extends base)
     │   ├── envelope-double.ts        EncryptedDouble
     │   ├── envelope-bigint.ts        EncryptedBigInt + parseDecryptedValue override
     │   ├── envelope-date.ts          EncryptedDate + parseDecryptedValue override
     │   ├── envelope-boolean.ts       EncryptedBoolean
     │   ├── envelope-json.ts          EncryptedJson
     │   ├── cell-codec-factory.ts     makeCipherstashCellCodec({...}) factory
-    │   ├── codec-runtime.ts          createCipherstashStringCodec(sdk) (legacy entry)
+    │   ├── codec-runtime.ts          createCipherstashStringCodec(sdk) string-only constructor
     │   ├── parameterized.ts          RuntimeParameterizedCodecDescriptor for all six
     │   ├── operators.ts              13 predicate operators + asEncryptedParam dispatch
     │   ├── helpers.ts                4 free-standing helpers (Asc / Desc / JsonbPath…)
@@ -43,7 +43,7 @@ packages/3-extensions/cipherstash/
     │   └── bulk-encrypt.ts           bulkEncryptMiddleware(sdk) + stampRoutingKeysFromAst
     ├── migration/
     │   ├── codec-hooks-factory.ts    makeCipherstashCodecHooks({...}) factory (per codec)
-    │   ├── cipherstash-codec.ts      cipherstashStringCodecHooks (legacy entry)
+    │   ├── cipherstash-codec.ts      cipherstashStringCodecHooks string-only hook bundle
     │   ├── call-classes.ts           CipherstashAddSearchConfigCall / RemoveSearchConfigCall
     │   ├── eql-bundle.ts             EQL install SQL (vendored byte-for-byte)
     │   └── eql-install.generated.ts  generated EQL install op definitions

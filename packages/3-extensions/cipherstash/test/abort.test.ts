@@ -40,7 +40,7 @@ import {
   EncryptedString,
   type EncryptedStringFromInternalArgs,
   setHandleRoutingKey,
-} from '../src/execution/envelope';
+} from '../src/execution/envelope-string';
 import type { CipherstashSdk } from '../src/execution/sdk';
 import { CIPHERSTASH_STRING_CODEC_ID } from '../src/extension-metadata/constants';
 import { bulkEncryptMiddleware } from '../src/middleware/bulk-encrypt';
