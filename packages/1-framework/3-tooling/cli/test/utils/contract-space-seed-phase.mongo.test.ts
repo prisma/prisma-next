@@ -115,10 +115,12 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
 
     expect(out.seeded).toHaveLength(1);
     const record = out.seeded[0]!;
-    expect(record.spaceId).toBe(EXT_SPACE);
-    expect(record.action).toBe('updated');
-    expect(record.priorHash).toBeNull();
-    expect(record.newHash).toBe(headHash);
+    expect(record).toMatchObject({
+      spaceId: EXT_SPACE,
+      action: 'updated',
+      priorHash: null,
+      newHash: headHash,
+    });
 
     const dirs = await listContractSpaceDirectories(migrationsDir);
     expect(dirs).toContain(EXT_SPACE);
@@ -143,8 +145,10 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
     // framework — the input order was reversed).
     const headRef = await readContractSpaceHeadRef(migrationsDir, EXT_SPACE);
     expect(headRef).not.toBeNull();
-    expect(headRef!.hash).toBe(headHash);
-    expect(headRef!.invariants).toEqual(['inv:a', 'inv:b']);
+    expect(headRef).toMatchObject({
+      hash: headHash,
+      invariants: ['inv:a', 'inv:b'],
+    });
   });
 
   it('re-emits byte-identical artefacts on a no-op re-seed', async () => {
