@@ -323,159 +323,6 @@ describe('updateMarker', () => {
   });
 });
 
-describe('readMarker — legacy upgrade', () => {
-  // Pre-port code wrote a single marker doc keyed by `_id: 'marker'`
-  // with no `space` field. Post-port code keys docs by space id and
-  // requires `space` as part of the canonical shape. The first read
-  // for the app space upgrades the legacy doc transparently. These
-  // tests exercise the convergence properties of that upgrade.
-
-  type RawMarker = { _id: string; [key: string]: unknown };
-  const markerCol = () => db.collection<RawMarker>('_prisma_migrations');
-
-  async function seedLegacyMarker(extra: Record<string, unknown> = {}): Promise<void> {
-    await markerCol().insertOne({
-      _id: 'marker',
-      storageHash: 'sha256:legacy-storage',
-      profileHash: 'sha256:legacy-profile',
-      updatedAt: new Date('2024-01-15T00:00:00Z'),
-      meta: { authoredBy: 'pre-port-code' },
-      ...extra,
-    });
-  }
-
-  it('fresh DB returns null and writes nothing (state A is stable)', async () => {
-    const marker = await readMarker(db, APP);
-    expect(marker).toBeNull();
-
-    const docs = await markerCol().find({}).toArray();
-    expect(docs).toHaveLength(0);
-  });
-
-  it('legacy-only DB upgrades on first read and converges (state B → E)', async () => {
-    await seedLegacyMarker({ canonicalVersion: 7, appTag: 'pre-port' });
-
-    const marker = await readMarker(db, APP);
-
-    expect(marker).not.toBeNull();
-    expect(marker?.storageHash).toBe('sha256:legacy-storage');
-    expect(marker?.profileHash).toBe('sha256:legacy-profile');
-    expect(marker?.canonicalVersion).toBe(7);
-    expect(marker?.appTag).toBe('pre-port');
-    expect(marker?.meta).toEqual({ authoredBy: 'pre-port-code' });
-
-    // Convergence: canonical doc present, legacy doc gone.
-    const canonical = await markerCol().findOne({ _id: APP });
-    const legacy = await markerCol().findOne({ _id: 'marker' });
-    expect(canonical?.['space']).toBe(APP);
-    expect(canonical?.['storageHash']).toBe('sha256:legacy-storage');
-    expect(legacy).toBeNull();
-  });
-
-  it('preserves invariants through the legacy upgrade', async () => {
-    await seedLegacyMarker({ invariants: ['alpha', 'beta'] });
-
-    const marker = await readMarker(db, APP);
-    expect(marker?.invariants).toEqual(['alpha', 'beta']);
-  });
-
-  it('upgrade is idempotent: re-reading after upgrade returns the same record', async () => {
-    await seedLegacyMarker();
-
-    const first = await readMarker(db, APP);
-    const second = await readMarker(db, APP);
-
-    expect(second).toEqual(first);
-    const docs = await markerCol().find({}).sort({ _id: 1 }).toArray();
-    expect(docs).toHaveLength(1);
-    expect(docs[0]?.['_id']).toBe(APP);
-  });
-
-  it('already-upgraded DB returns canonical and never touches `_id: marker` (state C is stable)', async () => {
-    await initMarker(db, APP, { storageHash: 'sha256:v1', profileHash: 'sha256:p1' });
-
-    const marker = await readMarker(db, APP);
-    expect(marker?.storageHash).toBe('sha256:v1');
-
-    const docs = await markerCol().find({}).toArray();
-    expect(docs).toHaveLength(1);
-    expect(docs[0]?.['_id']).toBe(APP);
-  });
-
-  it('mid-upgrade DB (both shapes) returns canonical and sweeps legacy (state D → E)', async () => {
-    // Simulates a partial-write recovery: a previous run inserted
-    // canonical but was killed before deleting legacy.
-    await initMarker(db, APP, { storageHash: 'sha256:canonical', profileHash: 'sha256:p1' });
-    await seedLegacyMarker({ storageHash: 'sha256:stale-legacy' });
-
-    const marker = await readMarker(db, APP);
-    expect(marker?.storageHash).toBe('sha256:canonical');
-
-    const legacy = await markerCol().findOne({ _id: 'marker' });
-    expect(legacy).toBeNull();
-  });
-
-  it('concurrent first-readers on legacy DB all converge to the same canonical doc', async () => {
-    await seedLegacyMarker();
-
-    const results = await Promise.all(Array.from({ length: 8 }, () => readMarker(db, APP)));
-
-    for (const m of results) {
-      expect(m?.storageHash).toBe('sha256:legacy-storage');
-      expect(m?.profileHash).toBe('sha256:legacy-profile');
-    }
-    const docs = await markerCol().find({}).toArray();
-    expect(docs).toHaveLength(1);
-    expect(docs[0]?.['_id']).toBe(APP);
-  });
-
-  it('non-app reads ignore legacy docs (return null without touching them)', async () => {
-    await seedLegacyMarker();
-
-    const ext = await readMarker(db, EXT);
-    expect(ext).toBeNull();
-
-    // Legacy doc still around — it'll be swept on the next app-space read.
-    const legacy = await markerCol().findOne({ _id: 'marker' });
-    expect(legacy).not.toBeNull();
-  });
-
-  it('a doc at `_id: marker` carrying its own `space` field is treated as canonical, not legacy', async () => {
-    // A hypothetical future extension whose space id happens to be
-    // `'marker'` writes `{_id: 'marker', space: 'marker', ...}`. Reading
-    // the app space must not interpret it as legacy and must not
-    // delete it.
-    await markerCol().insertOne({
-      _id: 'marker',
-      space: 'marker',
-      storageHash: 'sha256:ext-storage',
-      profileHash: 'sha256:ext-profile',
-      updatedAt: new Date(),
-    });
-
-    const appMarker = await readMarker(db, APP);
-    expect(appMarker).toBeNull();
-
-    const stillThere = await markerCol().findOne({ _id: 'marker' });
-    expect(stillThere?.['space']).toBe('marker');
-
-    // The owning space can read it back through the normal path.
-    const extMarker = await readMarker(db, 'marker');
-    expect(extMarker?.storageHash).toBe('sha256:ext-storage');
-  });
-
-  it('aborts the upgrade with a corruption error when legacy invariants are malformed', async () => {
-    await seedLegacyMarker({ invariants: 'not-an-array' });
-
-    await expect(readMarker(db, APP)).rejects.toThrow(/Invalid marker doc.*invariants/);
-    // Legacy doc remains for the operator to inspect; canonical never written.
-    const canonical = await markerCol().findOne({ _id: APP });
-    const legacy = await markerCol().findOne({ _id: 'marker' });
-    expect(canonical).toBeNull();
-    expect(legacy).not.toBeNull();
-  });
-});
-
 describe('writeLedgerEntry', () => {
   it('writes a ledger entry that exists in collection, tagged with space', async () => {
     await writeLedgerEntry(db, APP, {
@@ -557,11 +404,11 @@ describe('readAllMarkers', () => {
     expect(markers.has(APP)).toBe(true);
   });
 
-  it('skips legacy pre-port docs that lack a space field (left for the next app-space read to upgrade)', async () => {
+  it('filters out malformed docs that lack the required space field', async () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
-      _id: 'marker',
-      storageHash: 'sha256:legacy',
-      profileHash: 'sha256:legacy',
+      _id: 'malformed',
+      storageHash: 'sha256:abc',
+      profileHash: 'sha256:def',
       updatedAt: new Date(),
     });
     await initMarker(db, EXT, { storageHash: 'sha256:ext1', profileHash: 'sha256:p2' });
@@ -569,23 +416,6 @@ describe('readAllMarkers', () => {
     const markers = await readAllMarkers(db);
     expect(markers.size).toBe(1);
     expect(markers.has(EXT)).toBe(true);
-    expect(markers.has('marker')).toBe(false);
-  });
-
-  it('a non-app `readMarker(space)` for a space id colliding with the legacy `_id: "marker"` returns null rather than parsing the legacy doc as that space', async () => {
-    // A hypothetical extension whose space id happens to be `'marker'`
-    // must not have its (still-unwritten) marker fabricated from a
-    // pre-port legacy doc. The next app-space read will upgrade or
-    // sweep the legacy doc; until then the colliding non-app read
-    // observes null and the caller treats the space as not-yet-applied.
-    await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
-      _id: 'marker',
-      storageHash: 'sha256:legacy',
-      profileHash: 'sha256:legacy',
-      updatedAt: new Date(),
-    });
-
-    const marker = await readMarker(db, 'marker');
-    expect(marker).toBeNull();
+    expect(markers.has('malformed')).toBe(false);
   });
 });
