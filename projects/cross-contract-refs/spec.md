@@ -6,17 +6,33 @@ App contracts must be able to declare FK references that target tables owned by 
 
 ## At a glance
 
-App contract today:
+App contract today — a local FK references a model that lives in the same contract:
 
-```ts
-// app/contract.ts — within a single contract space, post-TML-2459
-const Profile = model('Profile', { namespace: 'public', fields: {…} })
-  .relations({
-    author: rel.belongsTo(Author, { from: 'authorId', to: 'id' }),  // Author lives in this contract
-  });
+```psl
+namespace public {
+  model Profile {
+    id       String @id @default(uuid())
+    authorId String
+    author   Author @relation(fields: [authorId], references: [id])  // Author lives in this contract
+  }
+}
 ```
 
-After this project, the same call shape works against a model handle imported from an extension:
+After this project, the same `@relation` mechanism works against a model that lives in *another contract space* — distinguished by a colon-prefixed type identifier:
+
+```psl
+namespace public {
+  model Profile {
+    id       String @id @default(uuid())
+    userId   String
+    user     supabase:auth.User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  }
+}
+```
+
+The colon-prefix `supabase:` is the only new PSL grammar token; `@relation`'s shape is unchanged from the within-contract cross-namespace case introduced in TML-2459 (FR16b). The framework resolves `supabase` against the `extensionPacks` list configured in `prisma-next.config.ts`.
+
+The TS surface uses the same call shape as a local FK; the framework distinguishes cross-contract from local by the brand on the imported model handle (`AuthUser` is imported from `@prisma-next/extension-supabase/contract`):
 
 ```ts
 // app/contract.ts — referencing another contract space
@@ -55,20 +71,6 @@ export const contract = defineContract(
   },
 );
 ```
-
-PSL variant:
-
-```psl
-namespace public {
-  model Profile {
-    id       String @id @default(uuid())
-    userId   String
-    user     supabase:auth.User @relation(fields: [userId], references: [id])
-  }
-}
-```
-
-The colon-prefix `supabase:` is the only new PSL grammar token; `@relation`'s shape is unchanged from the within-contract cross-namespace case introduced in TML-2459 (FR16b).
 
 Lowered DDL emitted by the planner (target home namespace is named `auth`):
 

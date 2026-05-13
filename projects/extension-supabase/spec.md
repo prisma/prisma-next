@@ -6,51 +6,39 @@ This project ships `@prisma-next/extension-supabase` — the user-facing npm pac
 
 ## At a glance
 
-End-to-end usage. The user installs one npm package and gets the full surface:
+End-to-end usage. The user installs one npm package and gets the full surface — contract authoring in PSL (or in TS — the two forms are equivalent), runtime factory in TS:
 
-```ts
-// app/contract.ts
-import {
-  defineContract,
-  rel,
-} from '@prisma-next/sql-contract-ts/contract-builder';
-import { AuthUser, roles as supabaseRoles } from '@prisma-next/extension-supabase/contract';
-import supabasePack from '@prisma-next/extension-supabase/pack';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import postgresPack from '@prisma-next/target-postgres/pack';
+```psl
+// app/prisma/schema.prisma
+namespace public {
+  model Profile {
+    id       String @id @default(uuid())
+    userId   String @unique(map: "profile_userId_unique")
+    username String
 
-export const contract = defineContract(
-  {
-    family: sqlFamily,
-    target: postgresPack,
-    namespaces: ['public'],
-    extensionPacks: [supabasePack],
-  },
-  ({ field, model }) => {
-    const Profile = model('Profile', {
-      namespace: 'public',
-      rls: 'auto',
-      fields: { id: field.id.uuidv4(), userId: field.uuid(), username: field.text() },
-    })
-      .relations({ user: rel.belongsTo(AuthUser, { from: 'userId', to: 'id' }) })
-      .attributes(({ fields, constraints }) => ({
-        uniques: [constraints.unique(fields.userId, { name: 'profile_userId_unique' })],
-      }))
-      .sql(({ cols, constraints }) => ({
-        table: 'profile',
-        foreignKeys: [constraints.foreignKey(cols.userId, AuthUser.refs.id, { name: 'profile_userId_fkey', onDelete: 'cascade' })],
-      }))
-      .rls([
-        { name: 'profiles_select_anon_and_authed', operation: 'select', roles: [supabaseRoles.anon, supabaseRoles.authenticated], using: 'true' },
-        { name: 'profiles_update_own', operation: 'update', roles: [supabaseRoles.authenticated],
-          using:     'user_id = (auth.uid())::uuid',
-          withCheck: 'user_id = (auth.uid())::uuid',
-        },
-      ]);
-    return { models: { Profile } };
-  },
-);
+    user     supabase:auth.User @relation(fields: [userId], references: [id], onDelete: Cascade, map: "profile_userId_fkey")
+
+    @@map("profile")
+  }
+
+  policy profiles_select_anon_and_authed {
+    target    = Profile
+    operation = select
+    roles     = [anon, authenticated]
+    using     = "true"
+  }
+
+  policy profiles_update_own {
+    target    = Profile
+    operation = update
+    roles     = [authenticated]
+    using     = "user_id = (auth.uid())::uuid"
+    withCheck = "user_id = (auth.uid())::uuid"
+  }
+}
 ```
+
+`family`, `target`, `extensionPacks: [supabasePack]`, and contract provider selection (`prismaContract(...)` vs `typescriptContract(...)`) live in `prisma-next.config.ts`. The TS contract surface is structurally parallel: `defineContract({ namespaces: ['public'], extensionPacks: [supabasePack], … }, ({ model }) => { … })` with `.rls([{ name, operation, roles, using, withCheck }, …])` as a fourth staged method on the model builder. The example app under M3 ships both forms side by side.
 
 ```ts
 // app/db.ts
