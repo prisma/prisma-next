@@ -547,6 +547,11 @@ button:hover {
   gap: 6px;
 }
 
+.leaflet-container {
+  background: var(--color-background-neutral-weak);
+  font-family: inherit;
+}
+
 .map-wrap > .leaflet-container {
   flex: 1;
   border-radius: var(--radius-square-high);
@@ -596,11 +601,6 @@ button:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-.leaflet-container {
-  background: var(--color-background-neutral-weak);
-  font-family: inherit;
 }
 
 /* Click hint overlay */

@@ -161,66 +161,64 @@ describe.sequential('Schema verification after runner - integration', () => {
   });
 
   describe('when contract has mixed-case enum types', () => {
-    it(
-      'runner post-apply verification passes for mixed-case enum column',
-      { timeout: testTimeout },
-      async () => {
-        // Contract with mixed-case enum type name (e.g., "BillingState")
-        // PostgreSQL's format_type() quotes these: "BillingState" vs BillingState
-        const enumContract: Contract<SqlStorage> = {
-          target: 'postgres',
-          targetFamily: 'sql',
-          profileHash: profileHash('sha256:test'),
-          storage: {
-            storageHash: coreHash('sha256:contract-enum-mixed-case'),
-            tables: {
-              Organization: {
-                columns: {
-                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                  billingState: {
-                    nativeType: 'BillingState',
-                    codecId: 'pg/enum@1',
-                    nullable: false,
-                    typeRef: 'BillingState',
-                  },
+    it('runner post-apply verification passes for mixed-case enum column', {
+      timeout: testTimeout,
+    }, async () => {
+      // Contract with mixed-case enum type name (e.g., "BillingState")
+      // PostgreSQL's format_type() quotes these: "BillingState" vs BillingState
+      const enumContract: Contract<SqlStorage> = {
+        target: 'postgres',
+        targetFamily: 'sql',
+        profileHash: profileHash('sha256:test'),
+        storage: {
+          storageHash: coreHash('sha256:contract-enum-mixed-case'),
+          tables: {
+            Organization: {
+              columns: {
+                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                billingState: {
+                  nativeType: 'BillingState',
+                  codecId: 'pg/enum@1',
+                  nullable: false,
+                  typeRef: 'BillingState',
                 },
-                primaryKey: { columns: ['id'] },
-                uniques: [],
-                indexes: [],
-                foreignKeys: [],
               },
-            },
-            types: {
-              BillingState: {
-                codecId: 'pg/enum@1',
-                nativeType: 'BillingState',
-                typeParams: { values: ['ok', 'atRisk', 'blocked'] },
-              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
           },
-          roots: {},
-          models: {},
-          capabilities: {},
-          extensionPacks: {},
-          meta: {},
-        };
+          types: {
+            BillingState: {
+              codecId: 'pg/enum@1',
+              nativeType: 'BillingState',
+              typeParams: { values: ['ok', 'atRisk', 'blocked'] },
+            },
+          },
+        },
+        roots: {},
+        models: {},
+        capabilities: {},
+        extensionPacks: {},
+        meta: {},
+      };
 
-        // This should NOT throw - the runner's post-apply verification must handle
-        // the quoted enum type name returned by format_type()
-        await runSuccessfulMigrationForContract(driver!, enumContract);
+      // This should NOT throw - the runner's post-apply verification must handle
+      // the quoted enum type name returned by format_type()
+      await runSuccessfulMigrationForContract(driver!, enumContract);
 
-        // Also verify via familyInstance.schemaVerify for completeness
-        const result = await familyInstance.schemaVerify({
-          driver: driver!,
-          contract: enumContract,
-          strict: false,
-          frameworkComponents,
-        });
+      // Also verify via familyInstance.schemaVerify for completeness
+      const result = await familyInstance.schemaVerify({
+        driver: driver!,
+        contract: enumContract,
+        strict: false,
+        frameworkComponents,
+      });
 
-        expect(result.ok).toBe(true);
-        expect(result.schema.issues).toHaveLength(0);
-      },
-    );
+      expect(result.ok).toBe(true);
+      expect(result.schema.issues).toHaveLength(0);
+    });
   });
 
   describe('when schema is mutated after migration', () => {

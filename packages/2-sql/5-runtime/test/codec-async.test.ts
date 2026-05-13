@@ -584,45 +584,41 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
 describe('seeded-secret-codec — realistic crypto path against the runtime', () => {
   const seed = 'codec-async-test-seed';
 
-  it(
-    'encodeParams encrypts plaintext via async codec.encode (no Promise leaks)',
-    { timeout: timeouts.databaseOperation },
-    async () => {
-      const registry = [createAsyncSecretCodec({ typeId: 'pg/secret@1', seed })];
+  it('encodeParams encrypts plaintext via async codec.encode (no Promise leaks)', {
+    timeout: timeouts.databaseOperation,
+  }, async () => {
+    const registry = [createAsyncSecretCodec({ typeId: 'pg/secret@1', seed })];
 
-      const plan = buildAstPlan({
-        params: [{ value: 'Alice', codecId: 'pg/secret@1', name: 'secret' }],
-      });
+    const plan = buildAstPlan({
+      params: [{ value: 'Alice', codecId: 'pg/secret@1', name: 'secret' }],
+    });
 
-      const result = await encodeParams(plan, {}, buildTestContractCodecs(registry));
-      const wire = result[0];
-      expect(typeof wire).toBe('string');
-      expect(wire).not.toBe('Alice');
-      await expect(decryptSecret(wire as string, seed)).resolves.toBe('Alice');
-    },
-  );
+    const result = await encodeParams(plan, {}, buildTestContractCodecs(registry));
+    const wire = result[0];
+    expect(typeof wire).toBe('string');
+    expect(wire).not.toBe('Alice');
+    await expect(decryptSecret(wire as string, seed)).resolves.toBe('Alice');
+  });
 
-  it(
-    'decodeRow decrypts ciphertext via async codec.decode and yields plain values',
-    { timeout: timeouts.databaseOperation },
-    async () => {
-      const registry = [createAsyncSecretCodec({ typeId: 'pg/secret@1', seed })];
+  it('decodeRow decrypts ciphertext via async codec.decode and yields plain values', {
+    timeout: timeouts.databaseOperation,
+  }, async () => {
+    const registry = [createAsyncSecretCodec({ typeId: 'pg/secret@1', seed })];
 
-      const wire = await encryptSecret('top-secret', seed);
-      const plan = buildAstPlan({
-        projections: [
-          {
-            alias: 'secret',
-            codecId: 'pg/secret@1',
-            column: { table: 'user', column: 'secret' },
-          },
-        ],
-      });
+    const wire = await encryptSecret('top-secret', seed);
+    const plan = buildAstPlan({
+      projections: [
+        {
+          alias: 'secret',
+          codecId: 'pg/secret@1',
+          column: { table: 'user', column: 'secret' },
+        },
+      ],
+    });
 
-      const result = await decodeRow({ secret: wire }, plan, {}, buildTestContractCodecs(registry));
-      expect(result['secret']).toBe('top-secret');
-    },
-  );
+    const result = await decodeRow({ secret: wire }, plan, {}, buildTestContractCodecs(registry));
+    expect(result['secret']).toBe('top-secret');
+  });
 
   it('decode failures from async crypto are wrapped in RUNTIME.DECODE_FAILED with cause', async () => {
     const registry = [createAsyncSecretCodec({ typeId: 'pg/secret@1', seed })];

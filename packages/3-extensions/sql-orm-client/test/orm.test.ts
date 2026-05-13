@@ -200,26 +200,24 @@ describe('orm()', () => {
     type _UnknownCollection = DbClient['unknown'];
   });
 
-  it(
-    'uses registered collection classes in include refinements',
-    { timeout: timeouts.typeScriptCompilation },
-    () => {
-      const runtime = createMockRuntime();
-      const db = orm({
-        runtime,
-        context,
-        collections: { Post: PostCollection },
-      });
+  it('uses registered collection classes in include refinements', {
+    timeout: timeouts.typeScriptCompilation,
+  }, () => {
+    const runtime = createMockRuntime();
+    const db = orm({
+      runtime,
+      context,
+      collections: { Post: PostCollection },
+    });
 
-      const withPosts = db.User.include('posts', (posts) => {
-        expectPostCollection(posts);
-        return posts.popular();
-      });
+    const withPosts = db.User.include('posts', (posts) => {
+      expectPostCollection(posts);
+      return posts.popular();
+    });
 
-      const include = withPosts.state.includes[0]!;
-      expect(include.nested.filters).toHaveLength(1);
-    },
-  );
+    const include = withPosts.state.includes[0]!;
+    expect(include.nested.filters).toHaveLength(1);
+  });
 
   it('propagates registered collection classes through nested include refinements', () => {
     const runtime = createMockRuntime();

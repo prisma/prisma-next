@@ -112,143 +112,135 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
     }
   });
 
-  it(
-    'renders TS that re-parses to operations matching renderOps(calls) exactly',
-    { timeout: timeouts.coldTransformImport },
-    async () => {
-      const calls = [
-        new CreateTableCall('user', {
+  it('renders TS that re-parses to operations matching renderOps(calls) exactly', {
+    timeout: timeouts.coldTransformImport,
+  }, async () => {
+    const calls = [
+      new CreateTableCall('user', {
+        columns: [
+          {
+            name: 'id',
+            typeSql: 'INTEGER',
+            defaultSql: '',
+            nullable: false,
+            inlineAutoincrementPrimaryKey: true,
+          },
+          { name: 'email', typeSql: 'TEXT', defaultSql: '', nullable: false },
+        ],
+        primaryKey: { columns: ['id'] },
+        uniques: [{ columns: ['email'], name: 'uq_user_email' }],
+        foreignKeys: [],
+      }),
+      new AddColumnCall('user', {
+        name: 'nickname',
+        typeSql: 'TEXT',
+        defaultSql: '',
+        nullable: true,
+      }),
+      new CreateIndexCall('user', 'user_email_idx', ['email']),
+      new DropTableCall('stale'),
+    ];
+    const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
+
+    const tsSource = rewriteImports(migration.renderTypeScript());
+    await writeFile(join(tmpDir, 'migration.ts'), tsSource);
+
+    const { stdout, stderr } = await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
+      cwd: tmpDir,
+    });
+    expect(stderr).toBe('');
+    expect(stdout).toContain('Wrote ops.json + migration.json to ');
+
+    const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
+    const ops = JSON.parse(opsJson);
+
+    const expected = JSON.parse(JSON.stringify(renderOps(calls)));
+    expect(ops).toEqual(expected);
+  });
+
+  it('renders an empty calls list whose executed scaffold emits []', {
+    timeout: timeouts.coldTransformImport,
+  }, async () => {
+    const migration = new TypeScriptRenderableSqliteMigration([], META, APP_SPACE_ID);
+
+    const tsSource = rewriteImports(migration.renderTypeScript());
+    await writeFile(join(tmpDir, 'migration.ts'), tsSource);
+
+    const { stderr } = await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
+      cwd: tmpDir,
+    });
+    expect(stderr).toBe('');
+
+    const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
+    expect(ops).toEqual([]);
+  });
+
+  it('preserves RawSqlCall ops byte-for-byte through the render → execute round-trip', {
+    timeout: timeouts.coldTransformImport,
+  }, async () => {
+    const op = {
+      id: 'raw.custom.1',
+      label: 'raw custom 1',
+      operationClass: 'additive' as const,
+      target: { id: 'sqlite' as const },
+      precheck: [],
+      execute: [{ description: 'do thing', sql: 'SELECT 1' }],
+      postcheck: [],
+      meta: { note: 'preserved' },
+    };
+    const calls = [new RawSqlCall(op)];
+    const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
+
+    const tsSource = rewriteImports(migration.renderTypeScript());
+    await writeFile(join(tmpDir, 'migration.ts'), tsSource);
+
+    await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
+      cwd: tmpDir,
+    });
+
+    const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
+
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toEqual(JSON.parse(JSON.stringify(op)));
+  });
+
+  it('preserves RecreateTableCall through the render → execute round-trip', {
+    timeout: timeouts.coldTransformImport,
+  }, async () => {
+    const calls = [
+      new RecreateTableCall({
+        tableName: 'user',
+        contractTable: {
           columns: [
-            {
-              name: 'id',
-              typeSql: 'INTEGER',
-              defaultSql: '',
-              nullable: false,
-              inlineAutoincrementPrimaryKey: true,
-            },
-            { name: 'email', typeSql: 'TEXT', defaultSql: '', nullable: false },
+            { name: 'id', typeSql: 'INTEGER', defaultSql: '', nullable: false },
+            { name: 'email', typeSql: 'TEXT', defaultSql: '', nullable: true },
           ],
           primaryKey: { columns: ['id'] },
-          uniques: [{ columns: ['email'], name: 'uq_user_email' }],
+          uniques: [],
           foreignKeys: [],
-        }),
-        new AddColumnCall('user', {
-          name: 'nickname',
-          typeSql: 'TEXT',
-          defaultSql: '',
-          nullable: true,
-        }),
-        new CreateIndexCall('user', 'user_email_idx', ['email']),
-        new DropTableCall('stale'),
-      ];
-      const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
-
-      const tsSource = rewriteImports(migration.renderTypeScript());
-      await writeFile(join(tmpDir, 'migration.ts'), tsSource);
-
-      const { stdout, stderr } = await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
-        cwd: tmpDir,
-      });
-      expect(stderr).toBe('');
-      expect(stdout).toContain('Wrote ops.json + migration.json to ');
-
-      const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
-      const ops = JSON.parse(opsJson);
-
-      const expected = JSON.parse(JSON.stringify(renderOps(calls)));
-      expect(ops).toEqual(expected);
-    },
-  );
-
-  it(
-    'renders an empty calls list whose executed scaffold emits []',
-    { timeout: timeouts.coldTransformImport },
-    async () => {
-      const migration = new TypeScriptRenderableSqliteMigration([], META, APP_SPACE_ID);
-
-      const tsSource = rewriteImports(migration.renderTypeScript());
-      await writeFile(join(tmpDir, 'migration.ts'), tsSource);
-
-      const { stderr } = await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
-        cwd: tmpDir,
-      });
-      expect(stderr).toBe('');
-
-      const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
-      expect(ops).toEqual([]);
-    },
-  );
-
-  it(
-    'preserves RawSqlCall ops byte-for-byte through the render → execute round-trip',
-    { timeout: timeouts.coldTransformImport },
-    async () => {
-      const op = {
-        id: 'raw.custom.1',
-        label: 'raw custom 1',
-        operationClass: 'additive' as const,
-        target: { id: 'sqlite' as const },
-        precheck: [],
-        execute: [{ description: 'do thing', sql: 'SELECT 1' }],
-        postcheck: [],
-        meta: { note: 'preserved' },
-      };
-      const calls = [new RawSqlCall(op)];
-      const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
-
-      const tsSource = rewriteImports(migration.renderTypeScript());
-      await writeFile(join(tmpDir, 'migration.ts'), tsSource);
-
-      await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
-        cwd: tmpDir,
-      });
-
-      const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
-
-      expect(ops).toHaveLength(1);
-      expect(ops[0]).toEqual(JSON.parse(JSON.stringify(op)));
-    },
-  );
-
-  it(
-    'preserves RecreateTableCall through the render → execute round-trip',
-    { timeout: timeouts.coldTransformImport },
-    async () => {
-      const calls = [
-        new RecreateTableCall({
-          tableName: 'user',
-          contractTable: {
-            columns: [
-              { name: 'id', typeSql: 'INTEGER', defaultSql: '', nullable: false },
-              { name: 'email', typeSql: 'TEXT', defaultSql: '', nullable: true },
-            ],
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            foreignKeys: [],
+        },
+        schemaColumnNames: ['id', 'email'],
+        indexes: [{ name: 'idx_user_email', columns: ['email'] }],
+        summary: 'Recreates table user',
+        postchecks: [
+          {
+            description: 'verify "email" nullability on "user"',
+            sql: "SELECT COUNT(*) > 0 FROM pragma_table_info('user') WHERE name = 'email' AND \"notnull\" = 0",
           },
-          schemaColumnNames: ['id', 'email'],
-          indexes: [{ name: 'idx_user_email', columns: ['email'] }],
-          summary: 'Recreates table user',
-          postchecks: [
-            {
-              description: 'verify "email" nullability on "user"',
-              sql: "SELECT COUNT(*) > 0 FROM pragma_table_info('user') WHERE name = 'email' AND \"notnull\" = 0",
-            },
-          ],
-          operationClass: 'widening',
-        }),
-      ];
-      const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
+        ],
+        operationClass: 'widening',
+      }),
+    ];
+    const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
 
-      const tsSource = rewriteImports(migration.renderTypeScript());
-      await writeFile(join(tmpDir, 'migration.ts'), tsSource);
+    const tsSource = rewriteImports(migration.renderTypeScript());
+    await writeFile(join(tmpDir, 'migration.ts'), tsSource);
 
-      await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], { cwd: tmpDir });
+    await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], { cwd: tmpDir });
 
-      const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
+    const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
 
-      const expected = JSON.parse(JSON.stringify(renderOps(calls)));
-      expect(ops).toEqual(expected);
-    },
-  );
+    const expected = JSON.parse(JSON.stringify(renderOps(calls)));
+    expect(ops).toEqual(expected);
+  });
 });

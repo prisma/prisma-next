@@ -44,6 +44,7 @@ export interface OrderClause {
 export type PostgresLoweredStatement = LoweredStatement;
 
 export type {
+  AnyQueryAst,
   BinaryExpr,
   ColumnRef,
   DefaultValueExpr,
@@ -54,7 +55,6 @@ export type {
   LiteralExpr,
   OperationExpr,
   ParamRef,
-  AnyQueryAst,
   SelectAst,
   StorageColumn,
   StorageTable,

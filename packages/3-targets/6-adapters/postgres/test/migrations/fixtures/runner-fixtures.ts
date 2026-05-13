@@ -153,4 +153,4 @@ export function formatRunnerFailure(failure: SqlMigrationRunnerFailure): string 
   return parts.join('\n');
 }
 
-export { postgresTargetDescriptor, createMigrationPlan, postgresDriverDescriptor };
+export { createMigrationPlan, postgresDriverDescriptor, postgresTargetDescriptor };

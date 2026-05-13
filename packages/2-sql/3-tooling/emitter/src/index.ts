@@ -25,7 +25,7 @@ export const sqlEmission = {
 
   validateTypes(contract: Contract, _ctx: ValidationContext): void {
     const storage = contract.storage as unknown as SqlStorage | undefined;
-    if (!storage || !storage.tables) {
+    if (!storage?.tables) {
       return;
     }
 
@@ -41,7 +41,7 @@ export const sqlEmission = {
         }
 
         const match = codecId.match(typeIdRegex);
-        if (!match || !match[1]) {
+        if (!match?.[1]) {
           throw new Error(
             `Column "${colName}" in table "${tableName}" has invalid codec ID format "${codecId}". Expected format: ns/name@version`,
           );
@@ -56,7 +56,7 @@ export const sqlEmission = {
     }
 
     const storage = contract.storage as unknown as SqlStorage | undefined;
-    if (!storage || !storage.tables) {
+    if (!storage?.tables) {
       throw new Error('SQL contract must have storage.tables');
     }
 

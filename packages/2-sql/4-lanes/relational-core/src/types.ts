@@ -37,21 +37,22 @@ type ExtractColumnToField<
   TContract extends Contract<SqlStorage>,
   TableName extends string,
   ColumnName extends string,
-> = ExtractTableToModel<TContract, TableName> extends infer ModelName extends string
-  ? TContract['models'] extends infer Models extends Record<string, unknown>
-    ? ModelName & keyof Models extends infer MKey extends string
-      ? Models[MKey] extends {
-          readonly storage: { readonly fields: infer Fields extends Record<string, unknown> };
-        }
-        ? {
-            [F in keyof Fields & string]: Fields[F] extends { readonly column: ColumnName }
-              ? F
-              : never;
-          }[keyof Fields & string]
+> =
+  ExtractTableToModel<TContract, TableName> extends infer ModelName extends string
+    ? TContract['models'] extends infer Models extends Record<string, unknown>
+      ? ModelName & keyof Models extends infer MKey extends string
+        ? Models[MKey] extends {
+            readonly storage: { readonly fields: infer Fields extends Record<string, unknown> };
+          }
+          ? {
+              [F in keyof Fields & string]: Fields[F] extends { readonly column: ColumnName }
+                ? F
+                : never;
+            }[keyof Fields & string]
+          : never
         : never
       : never
-    : never
-  : never;
+    : never;
 
 type FallbackCodecLookup<
   ColumnMeta extends StorageColumn,
@@ -120,14 +121,12 @@ export type CodecTypes = Record<string, { readonly output: unknown }>;
  * // Ops = { cosineDistance: { ... }, l2Distance: { ... } }
  * ```
  */
-export type OperationsForTypeId<
-  TypeId extends string,
-  Operations extends OperationTypes,
-> = Operations extends Record<string, never>
-  ? Record<string, never>
-  : TypeId extends keyof Operations
-    ? Operations[TypeId]
-    : Record<string, never>;
+export type OperationsForTypeId<TypeId extends string, Operations extends OperationTypes> =
+  Operations extends Record<string, never>
+    ? Record<string, never>
+    : TypeId extends keyof Operations
+      ? Operations[TypeId]
+      : Record<string, never>;
 
 export type ComputeColumnJsType<
   TContract extends Contract<SqlStorage>,
@@ -135,23 +134,24 @@ export type ComputeColumnJsType<
   ColumnName extends string,
   ColumnMeta extends StorageColumn,
   CodecTypes extends Record<string, { readonly output: unknown }>,
-> = ExtractTableToModel<TContract, TableName> extends infer ModelName
-  ? [ModelName] extends [never]
-    ? FallbackCodecLookup<ColumnMeta, CodecTypes>
-    : ModelName extends string
-      ? ExtractColumnToField<TContract, TableName, ColumnName> extends infer FieldName
-        ? [FieldName] extends [never]
-          ? FallbackCodecLookup<ColumnMeta, CodecTypes>
-          : FieldName extends string
-            ? ModelName extends keyof ExtractFieldOutputTypes<TContract>
-              ? FieldName extends keyof ExtractFieldOutputTypes<TContract>[ModelName]
-                ? ExtractFieldOutputTypes<TContract>[ModelName][FieldName]
+> =
+  ExtractTableToModel<TContract, TableName> extends infer ModelName
+    ? [ModelName] extends [never]
+      ? FallbackCodecLookup<ColumnMeta, CodecTypes>
+      : ModelName extends string
+        ? ExtractColumnToField<TContract, TableName, ColumnName> extends infer FieldName
+          ? [FieldName] extends [never]
+            ? FallbackCodecLookup<ColumnMeta, CodecTypes>
+            : FieldName extends string
+              ? ModelName extends keyof ExtractFieldOutputTypes<TContract>
+                ? FieldName extends keyof ExtractFieldOutputTypes<TContract>[ModelName]
+                  ? ExtractFieldOutputTypes<TContract>[ModelName][FieldName]
+                  : never
                 : never
               : never
-            : never
+          : never
         : never
-      : never
-  : never;
+    : never;
 
 /**
  * Utility type to check if a contract has the required capabilities for includeMany.

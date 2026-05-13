@@ -547,55 +547,53 @@ describe('createRuntime', () => {
     expect(debug).not.toHaveBeenCalled();
   });
 
-  it(
-    'awaits async parameter encoding before driver execution',
-    { timeout: timeouts.databaseOperation },
-    async () => {
-      const asyncSecretCodec = createAsyncSecretCodec({
-        typeId: 'test/async-secret@1',
-        seed: runtimeSecretSeed,
-      });
-      const { stackInstance, context, driver } = createTestSetup({
-        extraCodecs: [asyncSecretCodec],
-      });
-      const runtime = createRuntime({
-        stackInstance,
-        context,
-        driver,
-        verify: { mode: 'onFirstUse', requireMarker: false },
-      });
+  it('awaits async parameter encoding before driver execution', {
+    timeout: timeouts.databaseOperation,
+  }, async () => {
+    const asyncSecretCodec = createAsyncSecretCodec({
+      typeId: 'test/async-secret@1',
+      seed: runtimeSecretSeed,
+    });
+    const { stackInstance, context, driver } = createTestSetup({
+      extraCodecs: [asyncSecretCodec],
+    });
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
 
-      const ast = SelectAst.from(TableSource.named('users'))
-        .withProjection([ProjectionItem.of('id', ColumnRef.of('users', 'id'))])
-        .withWhere(
-          BinaryExpr.eq(
-            ColumnRef.of('users', 'name'),
-            ParamRef.of('Alice', { name: 'secret', codec: { codecId: 'test/async-secret@1' } }),
-          ),
-        );
-      const plan: SqlQueryPlan = {
-        ast,
-        params: ['Alice'],
-        meta: {
-          target: testContract.target,
-          targetFamily: testContract.targetFamily,
-          storageHash: testContract.storage.storageHash,
-          lane: 'dsl',
-        },
-      };
+    const ast = SelectAst.from(TableSource.named('users'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('users', 'id'))])
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('Alice', { name: 'secret', codec: { codecId: 'test/async-secret@1' } }),
+        ),
+      );
+    const plan: SqlQueryPlan = {
+      ast,
+      params: ['Alice'],
+      meta: {
+        target: testContract.target,
+        targetFamily: testContract.targetFamily,
+        storageHash: testContract.storage.storageHash,
+        lane: 'dsl',
+      },
+    };
 
-      await runtime.execute(plan).toArray();
+    await runtime.execute(plan).toArray();
 
-      expect(driver.__spies.rootExecute).toHaveBeenCalledOnce();
-      const sentRequest = driver.__spies.rootExecute.mock.calls[0]?.[0] as
-        | { params?: readonly unknown[] }
-        | undefined;
-      const sentSecret = sentRequest?.params?.[0];
-      expect(typeof sentSecret).toBe('string');
-      expect(sentSecret).not.toBe('Alice');
-      await expect(decryptSecret(sentSecret as string, runtimeSecretSeed)).resolves.toBe('Alice');
-    },
-  );
+    expect(driver.__spies.rootExecute).toHaveBeenCalledOnce();
+    const sentRequest = driver.__spies.rootExecute.mock.calls[0]?.[0] as
+      | { params?: readonly unknown[] }
+      | undefined;
+    const sentSecret = sentRequest?.params?.[0];
+    expect(typeof sentSecret).toBe('string');
+    expect(sentSecret).not.toBe('Alice');
+    await expect(decryptSecret(sentSecret as string, runtimeSecretSeed)).resolves.toBe('Alice');
+  });
 
   it('wraps async parameter encoding failures before the driver runs', async () => {
     const failingCodec = defineTestCodec({
