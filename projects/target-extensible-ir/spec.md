@@ -113,6 +113,53 @@ The TS builder surface is kept structurally parallel: `defineContract`'s config 
 
 Cross-*contract-space* references (between contracts, not between namespaces in one contract) are out of scope for this project and deferred to follow-up work.
 
+### Pack-contributed entity construction
+
+A target-extensible IR is only as extensible as the builders that construct it. Once the IR admits target-specific kinds (`PostgresEnumType`, `PostgresSchema`, future `PostgresRlsPolicy`, future `PostgresView`), the contract authoring surface needs a corresponding extension point so target packs can ship those kinds without hand-edited family-layer construction sites. This project ships that extension point as a new **`entities`** namespace on `AuthoringContributions`, mirroring the existing pack-bag-driven `field` and `type` namespaces ([`packages/1-framework/1-core/framework-components/src/shared/framework-authoring.ts`](../../packages/1-framework/1-core/framework-components/src/shared/framework-authoring.ts)) and the `composed-authoring-helpers.ts` type narrowing scaffolding ([`packages/2-sql/2-authoring/contract-ts/src/composed-authoring-helpers.ts`](../../packages/2-sql/2-authoring/contract-ts/src/composed-authoring-helpers.ts), lifted to a family-agnostic location as part of this work).
+
+**Vocabulary.** The word "entity" carries three distinct meanings in the codebase that share the term without conflict:
+
+- **Visualisation discriminant** — `SchemaNodeKind = 'entity'` in [`control-schema-view.ts`](../../packages/1-framework/1-core/framework-components/src/control/control-schema-view.ts), used by CLI rendering to tag a schema-node as a top-level entity for layout.
+- **Contribution-kind namespace** (introduced here) — the `entities` namespace on `AuthoringContributions`, naming *kinds* of contract-authoring-domain entities packs can contribute (models, namespaces, enums, future RLS policies, roles, views).
+- **Application-domain instance** — the user's authored `User`, `Invoice`, `Product` — *instances of* the kinds packs contribute. These are the entities the user's application is *about*.
+
+The contribution-kind namespace is meta-level: packs ship `entities.namespace`, `entities.enum`, `entities.policy` (kinds); users author `User`, `Invoice`, `Profile` (instances).
+
+**Contribution shape.** Every entity contribution is a descriptor with two parts: a **schema** (the PSL/TS lowest-common-denominator description of the contribution's input shape) and an **output mechanism** that is either a declarative template (preferred where expressible — mirrors today's `AuthoringTemplateValue`-shaped outputs on `field` / `type` contributions) or a **factory function** (for outputs that can't be templated — IR-class instances that carry methods, freeze semantics, and per-class identity). The factory mirrors the existing codec-descriptor pattern (`codecDescriptors[].factory` on pack refs); pack refs already carry runtime factories alongside JSON-shaped descriptors. The factory takes validated input (matching the descriptor's schema) and returns an IR-class instance ready to embed in the contract IR.
+
+> _Illustrative — exact API surface up to the implementer:_
+>
+> ```ts
+> // pack contribution surface
+> const postgresPack: TargetPackRef<'sql', 'postgres'> = {
+>   …,
+>   authoring: {
+>     entities: {
+>       enum: {
+>         kind: 'entity',
+>         schema: type({ name: 'string', values: 'string[]' }),
+>         output: { factory: (input, ctx) => new PostgresEnumType(input) },
+>       },
+>     },
+>   },
+> };
+>
+> // user authoring surface (TS DSL)
+> const Status = helpers.entities.enum({ name: 'Status', values: ['active', 'archived'] });
+> // → constructs a PostgresEnumType instance via the factory; type narrowing surfaces
+> //   `helpers.entities.enum` because the postgresPack ref appears in the contract's pack list
+>
+> // user authoring surface (PSL)
+> //   the same descriptor's `schema` lowers PSL `enum Status { active archived }` declarations
+> //   through the same factory path; no parallel PSL-only contribution
+> ```
+
+**Single contribution surface for both authoring runtimes.** The `schema` lowers PSL syntax (`enum Status { … }`, `namespace public { … }`); the same `output` (template or factory) constructs the IR-class instance regardless of which runtime initiated the call. This avoids the historical drift where TS DSL extensions could express things PSL extensions could not, by forcing every contribution through the lowest-common-denominator schema shape.
+
+**Pack-bag-driven type narrowing.** The contract user passes a list of packs to `defineContract`; the resulting `helpers.entities` is a typed merge of all entity contributions from all packs in the list, narrowed via the same `MergeExtensionXxx<Packs>` + `UnionToIntersection` template that today merges `field`, `type`, codec, and SQL index contributions. Type narrowing is symmetric with declarative-template contributions; only the dispatch at *use* time differs (factory invocation vs template evaluation).
+
+**Where this lands.** The mechanism is shipped in M3.5 (after Postgres SPI shells, before the enum exemplar). The two structural exemplars (M4 enum, M5a/b namespace) are the first real consumers — enum proves the "lift target-specific glue into a pack contribution" path; namespace proves the "introduce a new framework-level kind via a pack contribution" path. Postgres-domain entities (RLS policies, roles, views) are real-world consumers of the same mechanism but are explicitly out of scope per Non-goals; they ship in a follow-on project on the proven mechanism. **Sub-builder / mid-chain extension** (e.g. extending `ScalarFieldBuilder` so packs can contribute `.encrypted()` at chain positions — the *attribute* contribution surface in the entity / attribute / relationship vocabulary) is also out of scope; admitted to the roadmap when a use case demands it. The descriptor + factory shape backport to the existing `field` and `type` namespaces is a mechanical follow-up tracked separately as [TML-2513](https://linear.app/prisma-company/issue/TML-2513).
+
 ## Problem
 
 Five concrete pain points motivate this project:
@@ -443,6 +490,13 @@ The two tables are deliberately parallel: a developer who reads the SQL Postgres
 - **FR7.** Round-trip is performed via a framework-level SPI: `interface ContractSerializer<TContract> { deserializeContract(json: unknown): TContract; serializeContract(contract: TContract): JsonObject }`. The interface covers both directions; the symmetric framing locks in the JSON ⇄ classes seam at the SPI boundary and is the single named API surface the round-trip invariant, test infrastructure, and future canonicalization key off. Per-SPI family abstract bases (`SqlContractSerializerBase`, `MongoContractSerializerBase`) carry family-shared arktype validation and expose protected hooks for target-specific class construction. Concrete target SPI implementers (`PostgresContractSerializer`, `MongoTargetContractSerializer`) extend the family base; the existing target descriptor composes them as `descriptor.contractSerializer`.
 - **FR8.** The standalone `validateContract` function is removed. Hydration call sites become `descriptor.contractSerializer.deserializeContract(json)` (and serialization, where needed, becomes `descriptor.contractSerializer.serializeContract(contract)`). Every existing `validateContract` call site is migrated. Framework-internal callers depend on the framework SPI interfaces (`ContractSerializer<TContract>`), never on a concrete target class or descriptor instance type. Tests that don't exercise serialization satisfy the SPI with a `createIdentityContractSerializer<TContract>()` helper the framework ships. The user-facing facade (`postgres<Contract>(...)`) wraps this primitive and hides the SPI from end-users.
 
+### Authoring extensibility
+
+- **FR8a.** `AuthoringContributions` gains an **`entities`** namespace. Contributions in the namespace are descriptors of shape `{ kind: 'entity', schema, output: { template } | { factory } }`, mirroring the existing `field` / `type` namespace shape. The `schema` is the PSL/TS lowest-common-denominator description of the contribution's input; the `output` is either a declarative template (preferred where expressible — same `AuthoringTemplateValue` shape used by `field` / `type` outputs today) or a factory function `(input, ctx) => SchemaNode` that constructs an IR-class instance from validated input. Both authoring runtimes (PSL and TS DSL) reach the same factory through the same descriptor — there is no parallel PSL-only contribution surface.
+- **FR8b.** Pack-bag-driven type narrowing is symmetric with the existing `field` / `type` mechanism. The `ComposedAuthoringHelpers<Family, Target, ExtensionPacks>` template gains an `entities` member that merges entity contributions across all packs in the contract's pack list via the existing `MergeExtensionXxx<Packs>` + `UnionToIntersection` template. The user authoring surface is `helpers.entities.<entityName>(input)` with full type narrowing on `input` per the contributing pack's descriptor schema.
+- **FR8c.** The `composed-authoring-helpers.ts` scaffolding is lifted from its current SQL-only location ([`packages/2-sql/2-authoring/contract-ts/src/composed-authoring-helpers.ts`](../../packages/2-sql/2-authoring/contract-ts/src/composed-authoring-helpers.ts)) to a family-agnostic location so both SQL and Mongo contract-builders consume the same scaffolding. SQL-specific helper composition stays where it is and imports the lifted module; the Mongo contract-builder mirrors the SQL pattern via the lifted module.
+- **FR8d.** Both family contract-builders (SQL: `packages/2-sql/2-authoring/contract-ts`; Mongo: `packages/2-mongo-family/2-authoring/contract-ts`) consume the new mechanism. Hand-edited family-layer construction sites that today directly instantiate target IR classes (the load-bearing gap diagnosed at M2 R2 close-out for Mongo, and the structurally identical gap on the SQL side) are replaced by entity contributions on the contributing pack.
+
 ### Enums (refactor exemplar)
 
 - **FR9.** Enum types are first-class IR nodes (`abstract class SqlEnumType extends SqlNode` at the family layer; `class PostgresEnumType extends SqlEnumType` at the target layer; analogous for any other SQL target that supports enums).
@@ -539,6 +593,7 @@ Independent / non-blocking: [TML-2458](https://linear.app/prisma-company/issue/T
 - [ ] **AC10.** ADR drafts capturing (a) the 3-layer polymorphic IR convention and (b) the architectural principles underwriting it exist under `projects/target-extensible-ir/specs/` (to be promoted to `docs/architecture docs/adrs/` at project close-out).
 - [ ] **AC11.** `pnpm lint:deps` passes; no new layering violations are introduced. Layering rules are tightened where the new structure permits.
 - [ ] **AC12.** Every `validateContract` call site is migrated to `descriptor.contractSerializer.deserializeContract(json)` (or, for tests, the same call against `createIdentityContractSerializer<TContract>()`). The standalone `validateContract` function is removed from the codebase; the user-facing facade (`postgres<Contract>(...)`) wraps the SPI call so end-users do not see it directly. Framework-internal call sites depend on the framework SPI interface (`ContractSerializer<TContract>`), never on a concrete target descriptor type — verified by inspection of the migrated call sites and the absence of `validateContract` from the public exports.
+- [ ] **AC12a.** The `AuthoringContributions.entities` namespace exists; both family contract-builders (SQL + Mongo) consume the lifted family-agnostic `composed-authoring-helpers.ts` scaffolding; pack-bag-driven type narrowing surfaces contributed entity helpers at `helpers.entities.<entityName>` with the descriptor's input schema. The two structural exemplars contribute via the new namespace: M4's enum entity is contributed by the Postgres pack as `helpers.entities.enum(...)`; M5a's namespace entity is contributed by each native-namespacing target pack (Postgres, Mongo) as `helpers.entities.namespace(...)`. Removing either contribution from its pack causes the corresponding exemplar's tests to fail with the expected "no entity helper named …" type error — verifying the contribution path is load-bearing, not duplicated by a hand-edited family-layer fallback.
 - [ ] **AC13.** Mongo family→target dependency direction matches SQL (target depends on family; never the reverse). `@prisma-next/family-mongo` does not depend on `@prisma-next/target-mongo`, `@prisma-next/adapter-mongo`, or `@prisma-next/driver-mongo` (verify with `cat packages/2-mongo-family/9-family/package.json | rg "target-mongo|adapter-mongo|driver-mongo"` returning zero hits in `dependencies`). The Mongo control descriptor (`mongoTargetDescriptor`) lives in `@prisma-next/target-mongo` (mirroring SQLite's `packages/3-targets/3-targets/sqlite/src/core/control-target.ts`); the family's public API (`@prisma-next/family-mongo/control`) re-exports it for backwards-compat with consumers but does not own the implementation. The three Mongo family SPI bases (`MongoContractSerializerBase`, `MongoSchemaVerifierBase`, abstract `MongoStorageBase`) live at the family layer (`@prisma-next/family-mongo`), matching where SQL's SPI bases land — not at the foundation layer (`@prisma-next/mongo-contract`) where M2 R1 originally placed them as a workaround for the inverted dep edge. Detailed task spec at `projects/target-extensible-ir/specs/relocate-mongo-target-descriptor.spec.md`.
 
 # Other Considerations
