@@ -33,6 +33,31 @@ import {
 } from '@prisma-next/mongo-contract';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 
+// `canonicalStringify` rejects non-plain objects so a `Map` or class
+// instance cannot silently collapse to `{}`. The storage-shape values
+// produced by `toStorageIndex` post-M2-R2 are `MongoIndex` class
+// instances (see ADR for the storage-map class flip / FR18), which
+// trips that guard. This local helper produces the same key-sorted,
+// JSON-like representation `canonicalStringify` produces for plain
+// objects, but accepts class instances by reading their enumerable
+// properties via `Object.entries`. The output is only used as an
+// in-memory dedup signature for collection indexes; it never leaves
+// the builder.
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(',')}]`;
+  }
+
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
+      .join(',')}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
 type VariantSpec = {
   readonly value: string;
 };
@@ -1337,7 +1362,7 @@ function buildCollections(
     for (let i = 0; i < storageIndexes.length; i++) {
       const storageIndex = storageIndexes[i];
       if (storageIndex === undefined) continue;
-      const indexSignature = canonicalStringify(storageIndex);
+      const indexSignature = stableStringify(storageIndex);
       const collectionIndexKey = `${modelBuilder.__collection}:${indexSignature}`;
       const firstOwner = declaredIndexOwners.get(collectionIndexKey);
       if (firstOwner) {
