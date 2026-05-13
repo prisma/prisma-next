@@ -1,6 +1,6 @@
 ---
 name: create-pr
-description: Creates a GitHub PR with a conventional-commit title and a narrative description for prisma-next. Use when the user wants to create a pull request, open a PR, or submit changes for review.
+description: Creates a GitHub PR with a Linear-ticket-prefixed title and a decision-led, narrative description for prisma-next. Use when the user wants to create a pull request, open a PR, or submit changes for review.
 ---
 
 # Create PR Skill
@@ -12,15 +12,7 @@ description: Creates a GitHub PR with a conventional-commit title and a narrativ
 1. Run `git log main..HEAD --oneline` to see all commits on the current branch (fallback: `git log origin/main..HEAD --oneline`).
 2. Run `git diff main...HEAD --stat` to see which files changed (fallback: `git diff origin/main...HEAD --stat`).
 3. Run `git diff main...HEAD` to read the full diff (fallback: `git diff origin/main...HEAD`).
-4. Identify the **conventional commit type** from the changes:
-   - `feat` — new feature or capability
-   - `fix` — bug fix
-   - `refactor` — restructuring without behavior change
-   - `chore` — tooling, deps, config
-   - `docs` — documentation only
-   - `test` — test additions or changes
-5. Identify the **scope** — the primary architectural layer or package affected (e.g., `sql-runtime`, `postgres-adapter`, `contract`, `framework`, `cli`, `sql-lane`).
-6. Check for local-only changes that won’t be in the PR unless committed:
+4. Check for local-only changes that won't be in the PR unless committed:
    - `git status -sb`
    - If there are uncommitted changes, explicitly call out that `gh pr create` can proceed but those changes will not be in the PR.
 
@@ -34,80 +26,101 @@ Extract from the URL:
 
 ### Step 3: Compose the PR Title
 
-Use conventional commits format:
+Format:
 
 ```
-type(scope): concise lowercase description
+$TICKET_ID: <concise title in sentence case>
 ```
 
 Rules:
-- Keep under 60 characters total.
-- Lowercase after the colon.
+- Always start with the Linear ticket ID followed by `: ` (colon + space).
+- Sentence case after the colon (capital first letter; rest lowercase except proper nouns, package names, types, etc.).
 - No period at the end.
-- Must clearly convey what changed.
+- Aim for under 70 characters total. Optimise for **information density**, not raw character count — a slightly longer title that names the concrete deliverable is better than a short abstract one.
+- The title must convey **what concrete thing changed**, not just an abstract scope. A teammate scanning a list of PR titles should be able to tell what this PR delivers without opening it.
+  - Bad: `TML-2375: expand encrypted type and operator surface` (abstract)
+  - Good: `TML-2375: 5 new cipherstash codecs + EQL operator surface` (concrete)
+- If the change spans multiple packages or layers, name the headline package or capability, not all of them. Secondary scopes belong in the body.
 
 Examples:
-- `feat(sql-runtime): add text codec support`
-- `fix(postgres-adapter): handle null in jsonb columns`
-- `refactor(contract): split emission into two phases`
+- `TML-1859: add text codec support to sql-runtime`
+- `TML-2104: handle null in jsonb columns (postgres adapter)`
+- `TML-2375: 5 new cipherstash codecs + EQL operator surface`
+- `TML-2456: split contract emission into two phases`
 
 ### Step 4: Compose the PR Description
 
-Use the walkthrough output as the PR description.
+The PR description must follow a **decision-led, narrative** structure. A teammate without prior context on the work should be able to read it top-to-bottom and understand what we decided, why, and how it fits together — without being overwhelmed by file lists or alternatives we ultimately rejected.
 
-1. Run the `.agents/skills/drive-pr-walkthrough/SKILL.md` workflow for the current branch vs base (default: `origin/main...HEAD`) and write `walkthrough.md` to disk.
-2. Apply adjustments directly to that same `walkthrough.md` file on disk, then use the adjusted file contents as the PR description in Step 5:
-   - **Omit** the entire `## Sources` section (it’s great for local review, but it’s noise in a GitHub PR body).
-   - **Prepend** the Linear close line at the very top:
+#### Required structure (in this order)
 
-     ```md
-     closes [$TICKET_ID](https://linear.app/prisma-company/issue/$TICKET_ID/$SLUG)
-     ```
+1. **Linear close line** (one line, very top):
 
-   - **Adjust links for GitHub**:
-     - Keep the link text including the line ranges (e.g. `file.ts (L12–L34)`).
-     - But change the link target to a GitHub-friendly relative path (e.g. `(path/to/file.ts)`), **removing** any local-editor suffixes like `:12-34`.
+   ```md
+   closes [$TICKET_ID](https://linear.app/prisma-company/issue/$TICKET_ID/$SLUG)
+   ```
 
-   - Do **not** create a second adjusted file unless the user explicitly asks for one.
-   - In Step 5, the heredoc body should come from this adjusted `walkthrough.md` content.
+2. **`## At a glance`** — a copy-pasteable code sample from real code in the branch (not invented, not pseudocode) that demonstrates the change in user-observable terms. Below the code, one short sentence that grounds the "before" state if relevant.
 
-3. Keep the rest of the walkthrough structure as-is (it’s the intended narrative PR shape), with one exception:
-   - `## Before / After (intention in code)` is **optional**.
-   - Only include it when you can show a *real, minimal* “before” vs “after” snippet taken from actual code in `origin/<base>` and `HEAD` (e.g. a function signature, a call-site, or a plan shape), not comment-only placeholders.
-   - If you can’t produce a meaningful snippet, **omit the section entirely** and begin at `## Intent`.
+   - The snippet must be small enough to absorb in 10 seconds but rich enough to convey what's new. Prefer a real call-site, contract emission, query, or output shape.
+   - If the change is genuinely impossible to demonstrate in code (rare — even a refactor usually changes a signature), substitute a minimal representative diff or output sample. Do **not** open with abstract prose.
 
-   Recommended section order (when “Before / After” is omitted):
-   - `## Intent`
-   - `## Change map`
-   - `## The story`
-   - `## Behavior changes & evidence`
-   - `## Compatibility / migration / risk`
-   - `## Follow-ups / open questions`
-   - `## Non-goals / intentionally out of scope`
+3. **`## Decision`** — lead with what we decided. State the deliverable in one paragraph or a short numbered list. If the PR carries more than one substantive piece (e.g. a feature + an enabling framework change), enumerate them so the reader can't miss any. Link to ADRs inline at the points they matter.
 
-Notes:
-- The walkthrough must stay **intent/behavior-first**, not a file list.
-- Avoid “reviewer coaching” phrases; write like a normal narrative.
+4. **`## How it fits together`** — the narrative, built bit by bit. 3–6 numbered steps that walk the reader from substrate to delivery. Each step should have a clear job (e.g. "lift the substrate", "add the codecs", "widen the operator surface", "prove against live infra"). Inline ADR links where relevant.
+
+5. **`## Behavior changes & evidence`** — one bullet per observable change. Each bullet:
+   - Leads with the change in plain, user-observable language.
+   - Anchors to **1–3 implementation files** (not all of them) using GitHub-friendly relative links.
+   - Cites **1–2 evidence files** (tests / fixtures / e2e).
+   - Avoid dumping every file in the package. The change map should be distributed across these bullets, not pasted as a separate section.
+
+6. **`## Compatibility / migration / risk`** — SPI / API / behavioral compatibility notes; pre-existing flake disclosures; any expectation updates that landed alongside the change.
+
+7. **`## Follow-ups`** — Linear tickets or doc notes for deferred work.
+
+8. **`## Alternatives considered`** — final section. Each bullet names an alternative we genuinely weighed and why we didn't take it. Pull alternatives forward from any ADRs or design discussions so the reader doesn't have to click through. Frame as alternatives (decisions we made), not as "non-goals" (scope statements).
+
+#### Forbidden / discouraged patterns
+
+- **Don't open with abstract prose.** No "Intent" paragraph at the very top. The reader should hit a concrete code sample first.
+- **Don't paste a "Change map" section near the top** that lists every file. File links belong distributed across the narrative steps and behavior bullets where they have context.
+- **Don't dump file paths in behavior bullets.** Each bullet gets at most ~3 implementation anchors and ~2 evidence anchors. If a section needs more, it's two changes — split the bullet.
+- **Don't bury major decisions inside other sections.** If the PR carries a substantive framework change alongside a feature, the framework change must be enumerated in `## Decision` so a reader can't skim past it.
+- **Don't conflate "non-goals" with "alternatives considered".** Non-goals are scope statements ("we didn't ship X"); alternatives are decisions ("we considered X and chose Y because Z"). The PR ends with the latter.
+- **Don't include reviewer-coaching phrases** ("anchor", "read this first", "tl;dr"). Write like a normal narrative.
+- **Don't paste auto-generated review-tool comments** in the body you author. They're appended automatically by bots after creation.
+
+#### Drafting workflow
+
+1. Run the `.agents/skills/drive-pr-walkthrough/SKILL.md` workflow for the current branch vs base (default: `origin/main...HEAD`) and write `walkthrough.md` to disk. The walkthrough provides raw material — narrative steps, behavior changes, evidence links — but its default section order is **not** the PR shape. You will restructure it.
+2. Write the PR body to disk as a working file (e.g. `wip/pr-<num>-body.md`) following the **Required structure** above. Reuse the walkthrough's narrative, behavior bullets, and evidence links where they fit; restructure to lead with the code sample and the decision, and to end with alternatives.
+3. **Adjust links for GitHub**:
+   - Keep helpful link text (file paths, optionally line ranges).
+   - Use GitHub-friendly relative paths (e.g. `path/to/file.ts`); strip local-editor suffixes like `:12-34`.
+4. Apply the **forbidden / discouraged patterns** check to the draft before showing it to the user.
 
 ### Step 5: Confirm and Create
 
 1. Present the full title and description to the user for review.
 2. After approval, ensure the branch is pushed to remote (`git push -u origin HEAD` if needed).
-3. Create the PR:
+3. Create the PR using the body file:
 
 ```bash
-gh pr create --title "the title" --body "$(cat <<'EOF'
-the body
-EOF
-)"
+gh pr create --title "$TICKET_ID: <title>" --body-file wip/pr-<num>-body.md
 ```
+
+(Use `--body-file` rather than a heredoc to avoid quoting/escaping pitfalls with backticks and code samples.)
 
 4. Return the PR URL.
 
 ## Don't Do
 
 1. Don't paste diff stats or long file lists — focus on intention and semantics.
-2. Don't write “reviewer coaching” phrases (“anchor”, “read this first”, etc.). Prefer a normal narrative.
-3. Don't use uppercase after the colon in the title.
-4. Don't create the PR without showing the user the title and description first.
-5. Don't guess the Linear ticket number — always ask.
+2. Don't write reviewer-coaching phrases ("anchor", "read this first", etc.). Prefer a normal narrative.
+3. Don't open the description with prose — it must open with a real code sample under `## At a glance`.
+4. Don't bury substantive secondary changes (e.g. framework reorders alongside a feature) — enumerate them in `## Decision`.
+5. Don't end the description with "non-goals" — end with `## Alternatives considered`, framed as decisions you weighed.
+6. Don't create the PR without showing the user the title and description first.
+7. Don't guess the Linear ticket number — always ask.
+8. Don't use the conventional-commit `type(scope):` title format — that's the old format. The current format is `$TICKET_ID: <title>`.
