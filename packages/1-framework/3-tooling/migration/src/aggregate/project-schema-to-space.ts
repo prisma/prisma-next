@@ -1,8 +1,17 @@
+import { extractStorageElementNames } from './extract-storage-element-names';
 import type { ContractSpaceMember } from './types';
 
 /**
- * Project the introspected live schema to the slice claimed by a single
- * contract-space member.
+ * Project the **introspected live schema** to the slice claimed by a
+ * single contract-space member.
+ *
+ * "Schema" here means the live introspected database state — the
+ * planner / verifier sees this object as a `MongoSchemaIR` (Mongo) or
+ * `SqlSchemaIR` (SQL). It is **not** a database schema in the SQL
+ * `CREATE SCHEMA` sense, nor a contract-space namespace. The
+ * function's job is to filter that introspected state down to the
+ * elements claimed by one space, so a per-space verify pass doesn't
+ * see another space's storage as "extras".
  *
  * Returns the same `schema` value with every top-level storage element
  * (table or collection) claimed by **other** members of the aggregate
@@ -17,9 +26,9 @@ import type { ContractSpaceMember } from './types';
  *   by other members as "extras" and emit destructive ops to drop them.
  * - The aggregate verifier's **schemaCheck**: projects per member so the
  *   single-contract verify only sees the slice claimed by the member it
- *   is checking. Closes the F23 architectural concern (multi-member
- *   deployments where each member's elements look like extras to every
- *   other member's verify pass).
+ *   is checking. Closes the architectural concern that a multi-member
+ *   deployment makes each member's elements look like extras to every
+ *   other member's verify pass.
  *
  * **Duck-typing semantics**: the helper operates on `unknown` for the
  * schema and falls through structurally if the shape doesn't match.
@@ -41,6 +50,10 @@ import type { ContractSpaceMember } from './types';
  * duck-type. A future family with a different storage shape gets the
  * schema returned unchanged rather than blowing up the aggregate
  * planner.
+ *
+ * Record-shape detection guards against arrays (`!Array.isArray`) so
+ * an unrecognised array-shaped value falls through unchanged rather
+ * than being pruned by numeric keys.
  */
 export function projectSchemaToSpace(
   schema: unknown,
@@ -54,7 +67,11 @@ export function projectSchemaToSpace(
 
   const schemaObj = schema as { readonly tables?: unknown; readonly collections?: unknown };
 
-  if (typeof schemaObj.tables === 'object' && schemaObj.tables !== null) {
+  if (
+    typeof schemaObj.tables === 'object' &&
+    schemaObj.tables !== null &&
+    !Array.isArray(schemaObj.tables)
+  ) {
     return pruneRecord(schemaObj, 'tables', ownedByOthers);
   }
 
@@ -62,7 +79,11 @@ export function projectSchemaToSpace(
     return pruneCollectionsArray(schemaObj, ownedByOthers);
   }
 
-  if (typeof schemaObj.collections === 'object' && schemaObj.collections !== null) {
+  if (
+    typeof schemaObj.collections === 'object' &&
+    schemaObj.collections !== null &&
+    !Array.isArray(schemaObj.collections)
+  ) {
     return pruneRecord(schemaObj, 'collections', ownedByOthers);
   }
 
@@ -70,9 +91,9 @@ export function projectSchemaToSpace(
 }
 
 /**
- * Collect element names claimed by other-members. Reads each
- * other-member's `contract.storage` and extracts table/collection names
- * from whichever record-shaped field is present.
+ * Collect the set of storage element names claimed by other members.
+ * Reuses the loader's `extractStorageElementNames` helper so the
+ * tables/collections walk lives in exactly one place.
  */
 function collectOwnedNames(
   member: ContractSpaceMember,
@@ -81,19 +102,8 @@ function collectOwnedNames(
   const owned = new Set<string>();
   for (const other of otherMembers) {
     if (other.spaceId === member.spaceId) continue;
-    const storage = (other.contract as { readonly storage?: unknown }).storage;
-    if (typeof storage !== 'object' || storage === null) continue;
-    const storageObj = storage as { readonly tables?: unknown; readonly collections?: unknown };
-
-    if (typeof storageObj.tables === 'object' && storageObj.tables !== null) {
-      for (const name of Object.keys(storageObj.tables as Record<string, unknown>)) {
-        owned.add(name);
-      }
-    }
-    if (typeof storageObj.collections === 'object' && storageObj.collections !== null) {
-      for (const name of Object.keys(storageObj.collections as Record<string, unknown>)) {
-        owned.add(name);
-      }
+    for (const name of extractStorageElementNames(other.contract)) {
+      owned.add(name);
     }
   }
   return owned;
