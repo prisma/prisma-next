@@ -6,8 +6,11 @@
 #
 # Container name is `cipherstash-e2e-postgres` to avoid colliding
 # with the workspace-root `docker-compose.yaml` (which uses port
-# 5433 for the framework e2e suite); this harness uses port 5432
-# to match the example app's `.env` `DATABASE_URL=...@localhost:5432/...`.
+# 5433 for the framework e2e suite); this harness binds to host
+# port 54329 (forwarded to the container's 5432) to avoid clashing
+# with a developer's locally installed Postgres on 5432. The
+# harness's global setup overrides DATABASE_URL to point at this
+# port at runtime.
 
 services:
   postgres:

@@ -50,7 +50,7 @@ function seedRow(s: (typeof SEED)[number]) {
 describe('EncryptedString orderAndRange e2e (live PG + EQL + ZeroKMS)', () => {
   beforeAll(async () => {
     await ensureConnected();
-    truncateUsers();
+    await truncateUsers();
     await Promise.all(SEED.map((s) => db.orm.User.create(seedRow(s))));
   });
 

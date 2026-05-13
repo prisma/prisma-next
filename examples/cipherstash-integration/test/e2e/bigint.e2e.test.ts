@@ -56,7 +56,7 @@ function seedRow(s: (typeof SEED)[number]) {
 describe('EncryptedBigInt e2e (live PG + EQL + ZeroKMS)', () => {
   beforeAll(async () => {
     await ensureConnected();
-    truncateUsers();
+    await truncateUsers();
     await Promise.all(SEED.map((s) => db.orm.User.create(seedRow(s))));
   });
 
@@ -110,7 +110,7 @@ describe('EncryptedBigInt e2e (live PG + EQL + ZeroKMS)', () => {
     ]);
   });
 
-  it('rejects bigint plaintexts above Number.MAX_SAFE_INTEGER at the SDK boundary', () => {
+  it('accepts bigint plaintexts above Number.MAX_SAFE_INTEGER at construction', () => {
     expect(() => EncryptedBigInt.from(BigInt(Number.MAX_SAFE_INTEGER) + 1n)).not.toThrow();
     // The construction is fine — the failure surfaces at the SDK
     // boundary (`toJsPlaintext`) the moment a bulk-encrypt fires for

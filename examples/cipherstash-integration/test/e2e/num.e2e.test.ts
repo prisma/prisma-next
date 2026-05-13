@@ -55,7 +55,7 @@ function seedRow(s: (typeof SEED)[number]) {
 describe('EncryptedDouble e2e (live PG + EQL + ZeroKMS)', () => {
   beforeAll(async () => {
     await ensureConnected();
-    truncateUsers();
+    await truncateUsers();
     await Promise.all(SEED.map((s) => db.orm.User.create(seedRow(s))));
   });
 
@@ -67,7 +67,7 @@ describe('EncryptedDouble e2e (live PG + EQL + ZeroKMS)', () => {
     for (const s of SEED) {
       const r = byId.get(s.id);
       expect(r, `seed row ${s.id} present`).toBeDefined();
-      expect(r ? await r.salary.decrypt() : undefined).toBe(s.salary);
+      expect(await r!.salary.decrypt()).toBe(s.salary);
     }
   });
 
@@ -96,7 +96,7 @@ describe('EncryptedDouble e2e (live PG + EQL + ZeroKMS)', () => {
     expect(rows.map((r) => r.id).sort()).toEqual(['e2e-num-1', 'e2e-num-2']);
   });
 
-  it('cipherstashAsc orders by numeric value (D8 bare-column verdict)', async () => {
+  it('cipherstashAsc orders by numeric value via bare-column ORDER BY', async () => {
     const rows = await db.orm.User.orderBy((u) => cipherstashAsc(u.salary)).all();
     expect(rows.map((r) => r.id)).toEqual(['e2e-num-0', 'e2e-num-1', 'e2e-num-2', 'e2e-num-3']);
   });

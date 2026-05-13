@@ -81,7 +81,7 @@ function seedRow(s: (typeof SEED)[number]) {
 describe('EncryptedJson e2e (live PG + EQL + ZeroKMS)', () => {
   beforeAll(async () => {
     await ensureConnected();
-    truncateUsers();
+    await truncateUsers();
     await Promise.all(SEED.map((s) => db.orm.User.create(seedRow(s))));
   });
 
@@ -93,7 +93,7 @@ describe('EncryptedJson e2e (live PG + EQL + ZeroKMS)', () => {
     for (const s of SEED) {
       const r = byId.get(s.id);
       expect(r, `seed row ${s.id} present`).toBeDefined();
-      expect(r ? await r.preferences.decrypt() : undefined).toEqual(s.preferences);
+      expect(await r!.preferences.decrypt()).toEqual(s.preferences);
     }
   });
 

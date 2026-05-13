@@ -140,7 +140,7 @@ describe('Mixed-codec e2e (live PG + EQL + ZeroKMS)', () => {
 
   beforeAll(async () => {
     runtime = (await db.connect({ url })) as { close(): Promise<void> };
-    truncateUsers();
+    await truncateUsers();
     await Promise.all(SEED.map((s) => db.orm.User.create(seedRow(s))));
     counting.counts.reset();
   });

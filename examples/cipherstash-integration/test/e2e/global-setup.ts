@@ -26,13 +26,42 @@
  * tears it down explicitly).
  */
 
-import { spawnSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
+import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { config as loadDotenv } from 'dotenv';
+import { dirname, resolve } from 'pathe';
 
 const HARNESS_DATABASE_URL = 'postgres://cipherstash:cipherstash@localhost:54329/cipherstash_e2e';
 const POSTGRES_CONTAINER = 'cipherstash-e2e-postgres';
+
+const PG_ISREADY_TIMEOUT_MS = 10_000;
+const MIGRATION_APPLY_TIMEOUT_MS = 120_000;
+const TRUNCATE_TIMEOUT_MS = 10_000;
+
+function describeSpawnFailure(
+  label: string,
+  result: SpawnSyncReturns<Buffer>,
+  hint?: string,
+): string {
+  const lines = [`cipherstash e2e harness: ${label} failed.`];
+  if (result.error) {
+    lines.push(`  spawn error: ${result.error.message}`);
+  }
+  if (result.signal) {
+    lines.push(`  killed by signal: ${result.signal}`);
+  }
+  if (typeof result.status === 'number') {
+    lines.push(`  exit status: ${result.status}`);
+  } else if (!result.error && !result.signal) {
+    lines.push('  exit status: <unknown>');
+  }
+  const stderr = result.stderr?.toString().trim();
+  const stdout = result.stdout?.toString().trim();
+  if (stderr) lines.push(`--- stderr ---\n${stderr}`);
+  if (stdout) lines.push(`--- stdout ---\n${stdout}`);
+  if (hint) lines.push(hint);
+  return lines.join('\n');
+}
 
 export default async function setup(): Promise<() => Promise<void>> {
   const exampleDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -50,14 +79,17 @@ export default async function setup(): Promise<() => Promise<void>> {
   const pgIsReady = spawnSync(
     'docker',
     ['exec', POSTGRES_CONTAINER, 'pg_isready', '-U', 'cipherstash', '-d', 'cipherstash_e2e'],
-    { stdio: 'pipe' },
+    { stdio: 'pipe', timeout: PG_ISREADY_TIMEOUT_MS },
   );
-  if (pgIsReady.status !== 0) {
+  if (pgIsReady.error || pgIsReady.signal || pgIsReady.status !== 0) {
     throw new Error(
-      `cipherstash e2e harness: container \`${POSTGRES_CONTAINER}\` is not running ` +
-        'or not accepting connections. Bring it up with:\n' +
-        '  docker compose -f test/e2e/docker-compose.yml up -d\n' +
-        '(from `examples/cipherstash-integration`).',
+      describeSpawnFailure(
+        `container \`${POSTGRES_CONTAINER}\` is not running or not accepting connections`,
+        pgIsReady,
+        'Bring it up with:\n' +
+          '  docker compose -f test/e2e/docker-compose.yml up -d\n' +
+          '(from `examples/cipherstash-integration`).',
+      ),
     );
   }
 
@@ -71,13 +103,10 @@ export default async function setup(): Promise<() => Promise<void>> {
     cwd: exampleDir,
     stdio: 'pipe',
     env: process.env,
+    timeout: MIGRATION_APPLY_TIMEOUT_MS,
   });
-  if (apply.status !== 0) {
-    throw new Error(
-      `cipherstash e2e harness: \`prisma-next migration apply\` failed (exit ${apply.status}):\n` +
-        `--- stderr ---\n${apply.stderr?.toString() ?? ''}\n` +
-        `--- stdout ---\n${apply.stdout?.toString() ?? ''}`,
-    );
+  if (apply.error || apply.signal || apply.status !== 0) {
+    throw new Error(describeSpawnFailure('`prisma-next migration apply`', apply));
   }
 
   // Clean slate for the suite. The `users` table is the only data-bearing
@@ -96,13 +125,10 @@ export default async function setup(): Promise<() => Promise<void>> {
       '-c',
       'TRUNCATE TABLE users',
     ],
-    { stdio: 'pipe' },
+    { stdio: 'pipe', timeout: TRUNCATE_TIMEOUT_MS },
   );
-  if (truncate.status !== 0) {
-    throw new Error(
-      `cipherstash e2e harness: TRUNCATE failed (exit ${truncate.status}):\n` +
-        `${truncate.stderr?.toString() ?? ''}\n${truncate.stdout?.toString() ?? ''}`,
-    );
+  if (truncate.error || truncate.signal || truncate.status !== 0) {
+    throw new Error(describeSpawnFailure('TRUNCATE TABLE users', truncate));
   }
 
   return async () => {};
