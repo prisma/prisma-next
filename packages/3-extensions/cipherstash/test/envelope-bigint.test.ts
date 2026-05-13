@@ -96,7 +96,23 @@ describe('EncryptedBigInt.fromInternal(...) — read-side round-trip', () => {
       column: 'amount',
       sdk,
     });
-    await expect(envelope.decrypt()).rejects.toThrow(/non-integer number/);
+    await expect(envelope.decrypt()).rejects.toThrow(/not a safe integer/);
+  });
+
+  it('rejects numbers above Number.MAX_SAFE_INTEGER', async () => {
+    const ciphertext = { c: 'cipher', i: { t: 'ledger', c: 'amount' } };
+    const sdk: CipherstashSdk = {
+      decrypt: vi.fn().mockResolvedValue(Number.MAX_SAFE_INTEGER + 1),
+      bulkEncrypt: vi.fn(),
+      bulkDecrypt: vi.fn(),
+    };
+    const envelope = EncryptedBigInt.fromInternal({
+      ciphertext,
+      table: 'ledger',
+      column: 'amount',
+      sdk,
+    });
+    await expect(envelope.decrypt()).rejects.toThrow(/not a safe integer/);
   });
 
   it('rejects non-numeric string plaintexts', async () => {
@@ -112,7 +128,7 @@ describe('EncryptedBigInt.fromInternal(...) — read-side round-trip', () => {
       column: 'amount',
       sdk,
     });
-    await expect(envelope.decrypt()).rejects.toThrow(/cannot construct a bigint/);
+    await expect(envelope.decrypt()).rejects.toThrow(/not a valid bigint literal/);
   });
 
   it('rejects unsupported plaintext types', async () => {

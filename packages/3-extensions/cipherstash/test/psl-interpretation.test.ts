@@ -407,6 +407,15 @@ describe('PSL interpretation: cipherstash.EncryptedBigInt constructor', () => {
 }
 `);
     expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining('freeTextSearch'),
+        }),
+      ]),
+    );
   });
 });
 
@@ -478,6 +487,15 @@ describe('PSL interpretation: cipherstash.EncryptedBoolean constructor', () => {
 }
 `);
     expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining('orderAndRange'),
+        }),
+      ]),
+    );
   });
 });
 
@@ -518,5 +536,14 @@ describe('PSL interpretation: cipherstash.EncryptedJson constructor', () => {
 }
 `);
     expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining('equality'),
+        }),
+      ]),
+    );
   });
 });

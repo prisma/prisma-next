@@ -43,7 +43,7 @@ describe('runBeforeExecuteChain', () => {
       mutator: ParamRefMutator | undefined;
     }> = [];
     const ctx = makeCtx();
-    const mutator = {} as ParamRefMutator;
+    const mutator = {} as unknown as ParamRefMutator;
 
     const mw: RuntimeMiddleware<MockExec> = {
       name: 'observer',
@@ -154,7 +154,7 @@ describe('runBeforeExecuteChain', () => {
 
   it('threads the same params mutator into each middleware (mutations compose)', async () => {
     const observed: ParamRefMutator[] = [];
-    const mutator = {} as ParamRefMutator;
+    const mutator = {} as unknown as ParamRefMutator;
 
     function mw(label: string): RuntimeMiddleware<MockExec> {
       return {

@@ -61,9 +61,7 @@ export class EncryptedDate extends EncryptedEnvelopeBase<Date> {
       const parsed = new Date(sdkResult);
       if (Number.isNaN(parsed.getTime())) {
         throw new Error(
-          `EncryptedDate.parseDecryptedValue: cannot construct a Date from SDK plaintext "${String(
-            sdkResult,
-          )}".`,
+          `EncryptedDate.parseDecryptedValue: SDK returned a ${typeof sdkResult} plaintext that does not parse to a valid Date.`,
         );
       }
       return parsed;
@@ -79,6 +77,11 @@ export class EncryptedDate extends EncryptedEnvelopeBase<Date> {
    * before the codec encodes the envelope to wire format.
    */
   static from(plaintext: Date): EncryptedDate {
+    if (!(plaintext instanceof Date) || !Number.isFinite(plaintext.getTime())) {
+      throw new Error(
+        'EncryptedDate.from: plaintext must be a valid Date instance (got an invalid Date or non-Date value).',
+      );
+    }
     return new EncryptedDate({
       plaintext,
       ciphertext: undefined,

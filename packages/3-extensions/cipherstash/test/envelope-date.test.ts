@@ -119,7 +119,15 @@ describe('EncryptedDate.fromInternal(...) — read-side round-trip + parseDecryp
       column: 'occurred_on',
       sdk,
     });
-    await expect(envelope.decrypt()).rejects.toThrow(/cannot construct a Date/);
+    await expect(envelope.decrypt()).rejects.toThrow(/does not parse to a valid Date/);
+  });
+});
+
+describe('EncryptedDate.from(plaintext) — input validation', () => {
+  it('throws when plaintext is an Invalid Date (NaN time)', () => {
+    expect(() => EncryptedDate.from(new Date('not-a-date'))).toThrow(
+      /must be a valid Date instance/,
+    );
   });
 });
 
@@ -167,9 +175,11 @@ describe('EncryptedDate — fromInternal preserves SDK references', () => {
       sdk,
     });
     const handle = envelope.expose();
-    expect(handle.table).toBe('event');
-    expect(handle.column).toBe('occurred_on');
+    expect(handle).toMatchObject({
+      table: 'event',
+      column: 'occurred_on',
+      plaintext: undefined,
+    });
     expect(handle.sdk).toBe(sdk);
-    expect(handle.plaintext).toBeUndefined();
   });
 });
