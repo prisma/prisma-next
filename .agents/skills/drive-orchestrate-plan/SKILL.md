@@ -7,7 +7,7 @@ description: >
   the reviewer reports SATISFIED on each milestone. Runs after `drive-create-plan` and
   before the team's PR-opening skill.
 metadata:
-  version: "2026.5.12"
+  version: "2026.5.13"
 ---
 
 # Drive: Orchestrate Plan
@@ -140,6 +140,62 @@ The mechanic depends on your agent harness. Examples:
 - Other harnesses (codex, etc.) may not expose subagent resumption directly; in that case, run the loop with a single long-lived implementer chat and a single long-lived reviewer chat that the orchestrator drives turn-by-turn.
 
 What matters is the principle: the same chat / transcript / subagent context is fed each new round of work, not a fresh blank-slate one. Without this, every round starts fresh and the subagent loses everything it learned in prior rounds.
+
+## Multitasking the loop (Cursor IDE)
+
+Some harnesses let the orchestrator **launch a subagent into the background and keep working while it runs**. Cursor's IDE is the primary case: when the user is in **Multitask Mode**, the `Task` tool accepts `run_in_background: true`, returns immediately, and the orchestrator is **automatically notified** when the subagent completes — no polling required.
+
+This skill's iteration loop is a strong fit. The implementer and reviewer subagent calls are usually the longest-wall-time turns in any round (multi-minute test runs, multi-file diffs to read), and the orchestrator has real prep work it can do while they run.
+
+### When to background
+
+| Subagent call             | Background? | Why                                                                                                           |
+|---------------------------|-------------|---------------------------------------------------------------------------------------------------------------|
+| Implementer round         | Yes         | Long-running; orchestrator has prep work for the upcoming review and the next round.                          |
+| Reviewer round            | Yes         | Same shape; orchestrator has prep work for the verdict-triage and the next implementer prompt.                |
+| First round of a project  | Yes         | Multitasking applies from round 1; the orchestrator can scaffold artefacts while the spawn is in flight.      |
+
+**Never run two persistent subagents in parallel against the same role.** There is exactly one implementer and one reviewer per project; they are stateful and resume across rounds. Two concurrent invocations of the same persistent subagent race on its transcript and break continuity. The loop is **sequential per role** — implementer round → wait for completion → reviewer round → wait for completion — even when each individual call is backgrounded.
+
+Different roles **can** legitimately overlap when the orchestrator is doing a one-shot side task (e.g. a fresh-eyes reviewer pass requested by the user) that doesn't touch the persistent subagents — that's a deliberate one-off and is fine.
+
+### What the orchestrator does while a subagent runs
+
+The wait window is real, productive time. Use it:
+
+1. **Pre-stage the next delegation prompt.** While the implementer is running R<N>, the orchestrator can already draft the R<N> reviewer prompt (round identifier, expected diff range, the validation gates, any standing decisions to restate). When the implementer returns, the prompt is ready to send.
+2. **Prepare R<N+1> implementer scoping.** Read the next milestone's tasks; pre-identify the surfaces R<N+1> will touch; sniff the spec for ambiguities you'd want to surface to the user before the next round.
+3. **Run quick on-disk checks the orchestrator owns.** Independent of any subagent: scan `wip/heartbeats/<role>.txt` for staleness; re-read `plan.md § Open items`; verify deferral records are still consistent.
+4. **Drain the user's other questions.** In Multitask Mode the user may be sending unrelated requests on a separate thread; respond to those rather than blocking on the loop.
+5. **Read heartbeats, don't poll.** Per § Heartbeats, the orchestrator consults `wip/heartbeats/*.txt` only when uncertainty surfaces (a long-running gate that visibly exceeds its stated `expected_duration`, or a stale `ts` past the ~10-min threshold). The completion notification is the canonical "round done" signal; heartbeats are the canonical "round stuck?" signal.
+
+### What the orchestrator does **not** do while a subagent runs
+
+- **Do not poll the backgrounded subagent.** The harness notifies on completion. Polling burns context and adds no information that isn't on the heartbeat file already.
+- **Do not write code or run validation gates yourself in parallel.** The implementer's transcript is the canonical record of what landed; a parallel orchestrator commit corrupts the artefact contract.
+- **Do not delegate a parallel subagent that touches the same surface.** A "fresh-eyes side review" while the persistent reviewer is mid-round is not a fresh-eyes pass — it's a race on the surface the persistent reviewer is reasoning about. Wait for the persistent reviewer's verdict first.
+
+### Adapting the delegation calls for backgrounding
+
+In Cursor's `Task` tool:
+
+```text
+Task({
+  subagent_type: "generalPurpose",  // or whichever the harness offers
+  description: "implementer m3 R2",
+  prompt: <delegate-implement.md filled out>,
+  resume: <implementer subagent ID, or omitted on round 1>,
+  run_in_background: true,           // <-- multitask: yes
+})
+```
+
+When `run_in_background: true`, the call returns immediately with an output-file path. The orchestrator continues working on the prep tasks above. When the subagent completes, Cursor surfaces the result to the orchestrator's turn — that is the trigger to read the report and proceed to the next loop step.
+
+Outside Multitask Mode (or on harnesses that don't expose backgrounding), the call is synchronous: the orchestrator blocks until the subagent returns. The loop algorithm is unchanged either way — backgrounding is a wall-clock optimisation, not a control-flow change.
+
+### Heartbeats are still load-bearing under multitasking
+
+Backgrounding a subagent **does not remove the need for heartbeats** — it makes them more important. The orchestrator's only signal that a backgrounded subagent is making progress (vs hung) is the heartbeat file; the completion notification fires only on success/failure return. Subagents continue to ping per § Heartbeats; orchestrator continues to read them when uncertainty surfaces.
 
 ### Why this matters
 
@@ -355,10 +411,10 @@ Surface the inferred gate to the user for confirmation, then write it back into 
 For each milestone in `plan.md` (or the single milestone named in `iterate <milestone-id>`):
 
 1. **Pre-flight.** Confirm `code-review.md` exists; if not, scaffold it from `./templates/code-review.template.md` so the AC scoreboard exists from round 1. Read `code-review.md § Subagent IDs` to recover the persistent implementer/reviewer IDs from prior rounds; if absent (project's first round, or a fresh chat session inheriting the project), note that this round will spawn fresh and record the IDs. Confirm the milestone declares a validation gate; if not, infer it per § Validation gates and confirm with the user before delegating.
-2. **Delegate implementation** using `./templates/delegate-implement.md`, pre-filled with the milestone scope, prior-round context (if R2+), and validation gates from the plan. **Resume the persistent implementer subagent** using your harness's resume mechanism, except on the first round of the project where you spawn fresh and record the new ID in `code-review.md` (see § Subagent continuity).
+2. **Delegate implementation** using `./templates/delegate-implement.md`, pre-filled with the milestone scope, prior-round context (if R2+), and validation gates from the plan. **Resume the persistent implementer subagent** using your harness's resume mechanism, except on the first round of the project where you spawn fresh and record the new ID in `code-review.md` (see § Subagent continuity). **In Multitask Mode**, set `run_in_background: true` and use the wait window for prep work per § Multitasking the loop.
 3. **Receive implementer report.** Expect: diff highlights, validation results, flagged items, deferral requests, anything surprising.
 4. **If implementer returns deferral requests**: surface to the user as a structured decision (see § Escalation surface). Do not re-delegate until the user has decided.
-5. **Delegate review** using `./templates/delegate-review.md`, passing pointers to recent commits and the implementer's report. **Resume the persistent reviewer subagent** using your harness's resume mechanism, except on the first round of the project where you spawn fresh and record the new ID (see § Subagent continuity).
+5. **Delegate review** using `./templates/delegate-review.md`, passing pointers to recent commits and the implementer's report. **Resume the persistent reviewer subagent** using your harness's resume mechanism, except on the first round of the project where you spawn fresh and record the new ID (see § Subagent continuity). **In Multitask Mode**, set `run_in_background: true` and use the wait window for prep work per § Multitasking the loop.
 6. **Receive reviewer verdict.** One of `SATISFIED`, `ANOTHER ROUND NEEDED`, `ESCALATING TO USER`.
 7. **Validate the review against intent.** Required step. The reviewer reasons forward from artifacts; you reason forward from intent (see § The three personas → Orchestrator → Epistemic frame). Read the verdict, the AC scoreboard delta, the new findings (and their severities), and the round entry the reviewer appended under `## Round notes` in `code-review.md`. Apply your project-level context to four questions:
 
@@ -550,6 +606,7 @@ These are the cross-cutting invariants the orchestrator is responsible for enfor
 - **Validate every reviewer verdict against intent before triaging.** The reviewer's verdict is authoritative on artifact-match; intent fidelity is yours alone (see § Loop algorithm step 7). Skipping this step lets reviewer drift imprint into subsequent rounds, which is expensive to roll back. When intent-validation surfaces drift, prefer re-prompting the reviewer over silently absorbing the gap; verdict overrides are rare and must be visibly recorded in `code-review.md`.
 - **User decisions translate to plan/spec edits before re-delegating.** Any decision that affects future rounds belongs on disk, not in the orchestrator's working memory.
 - **Track deferred items in `plan.md § Open items`**, not in conversation. The plan is the durable surface.
+- **Background subagent calls in Multitask Mode; never poll.** When the harness supports it (Cursor IDE in Multitask Mode is the canonical case), launch implementer and reviewer rounds with `run_in_background: true` and use the wait window for prep work per § Multitasking the loop. Rely on the completion notification for "done" and on `wip/heartbeats/<role>.txt` for "stuck?". Do not poll the backgrounded subagent. Do not run two persistent subagents of the same role in parallel — the loop is sequential per role even when each call is backgrounded.
 - **When operating unattended, log every otherwise-escalated decision.** The user has handed off interactivity in exchange for a written audit trail (see § Unattended mode). Each in-place decision goes in the unattended-decisions log using the template at `./templates/unattended-decisions.template.md`. Entries must be self-contained: a reader who has not seen the round-by-round detail and cannot consult the (likely-deleted) review artifacts must still be able to understand the decision, evaluate its reasoning, and verify it on disk.
 
 ## Hand-off points
