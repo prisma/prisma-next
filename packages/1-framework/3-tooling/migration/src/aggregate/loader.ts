@@ -8,6 +8,7 @@ import { readContractSpaceContract } from '../read-contract-space-contract';
 import { readContractSpaceHeadRef } from '../read-contract-space-head-ref';
 import { APP_SPACE_ID, spaceMigrationDirectory } from '../space-layout';
 import { listContractSpaceDirectories } from '../verify-contract-spaces';
+import { extractStorageElementNames } from './extract-storage-element-names';
 import type { ContractSpaceAggregate, ContractSpaceMember, HydratedMigrationGraph } from './types';
 
 /**
@@ -361,32 +362,4 @@ export async function loadContractSpaceAggregate(
       extensions: extensionMembers,
     },
   });
-}
-
-/**
- * Extract the set of top-level storage element names a contract claims.
- *
- * Duck-typed across the storage shapes used in this codebase today:
- *
- * - SQL families: `storage.tables: Record<string, ...>` → table names.
- * - Mongo: `storage.collections: Record<string, ...>` → collection names.
- *
- * Both shapes are unioned: a contract that exposed both (a hypothetical
- * cross-family shape) would contribute both sets. Returns `[]` for any
- * other shape, so a future family with a different storage layout gets
- * disjointness effectively disabled (not enforced) rather than a hard
- * failure — the same fall-through guarantee as `projectSchemaToSpace`.
- */
-function extractStorageElementNames(contract: Contract): readonly string[] {
-  const storage = (contract as { readonly storage?: unknown }).storage;
-  if (typeof storage !== 'object' || storage === null) return [];
-  const storageObj = storage as { readonly tables?: unknown; readonly collections?: unknown };
-  const names: string[] = [];
-  if (typeof storageObj.tables === 'object' && storageObj.tables !== null) {
-    names.push(...Object.keys(storageObj.tables as Record<string, unknown>));
-  }
-  if (typeof storageObj.collections === 'object' && storageObj.collections !== null) {
-    names.push(...Object.keys(storageObj.collections as Record<string, unknown>));
-  }
-  return names;
 }
