@@ -136,7 +136,7 @@ Before declaring a task / round done, run this scan against your own `+` diff. *
 ```bash
 git diff --cached -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.py' '*.rs' '*.go' \
   | grep -E '^\+' \
-  | grep -oE '\b(T[0-9]+\.[0-9]+|TC-?[0-9]+|AC[0-9]+|FR[0-9]+|NFR[0-9]+|CKPT-[0-9]+|AM[0-9]+|P[0-9]+ R[0-9]+|M[0-9]+ review)\b' \
+  | grep -oE '\b(T[0-9]+\.[0-9]+|TC-?[0-9]+|AC-?[0-9]+|FR[0-9]+|NFR[0-9]+|CKPT-[0-9]+|AM[0-9]+|D[0-9]+|M[0-9]+\.[0-9]+|P[0-9]+ R[0-9]+|M[0-9]+ review)\b' \
   | sort -u
 ```
 
