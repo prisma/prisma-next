@@ -63,7 +63,7 @@ Note that ADR 029's shadow-DB preflight is user-DDL-scoped and does not cover `e
 ### Other targets
 - **MySQL**: same table in prisma_contract database or current schema
 - **SQLite**: `prisma_contract_marker` table with the same columns (including the `space` PK); the runner merges the `invariants` set inside `BEGIN EXCLUSIVE` (no native text-array merge in SQL). Same three-state idempotent migration as Postgres.
-- **Mongo**: `prisma_contract.marker` collection — per-space contract spaces are out of scope for the Mongo family today (see [ADR 212](./ADR%20212%20-%20Contract%20spaces.md)). The Mongo bridge surfaces the legacy single-row marker as the `'app'` space's row when read through cross-family interfaces. `invariants` is read as `doc.invariants ?? []` so older docs without the field transparently report the empty set (natural schemaless behaviour, not a compat shim).
+- **Mongo**: `_prisma_migrations` collection with one marker document per loaded contract space, keyed `{_id: <spaceId>, space: <spaceId>, ...}` (see [ADR 212](./ADR%20212%20-%20Contract%20spaces.md) and [Subsystem 10 — Contract spaces](../subsystems/10.%20MongoDB%20Family.md#contract-spaces)). Ledger entries gain a `space` field too. `invariants` is read as `doc.invariants ?? []` so docs without the field transparently report the empty set (natural schemaless behaviour, not a compat shim).
 - Adapters must provide DDL for creating and reading the marker consistently
 
 ## Ownership and lifecycle
