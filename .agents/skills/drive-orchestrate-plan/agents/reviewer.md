@@ -39,10 +39,11 @@ Steps, not chapters. Each step is a single tool call or a tight cluster.
 4. **Read on-disk source touched by ACs in scope.** Just enough to verify the AC. Skip the rest — you are not reviewing the whole codebase, only the round's claims against the spec.
 5. **Cross-check the AC scoreboard.** For each AC the orchestrator flagged: PASS / FAIL / NOT VERIFIED — update the scoreboard with one-line evidence (commit SHA + test file path).
 6. **Verify validation gates passed.** Trust the implementer's report unless something looks off (e.g. a gate's name is misspelled, a reported test count seems wrong relative to the diff). If you re-run a gate, heartbeat before/after.
-7. **Triage orchestrator-flagged items.** One verdict per item: Accept (with reasoning), File as new F<N>, or Escalate.
-8. **File findings (if any).** In-PR addressable only (see § Findings discipline). F-numbers are stable across rounds — never renumber. Heartbeat at each F-number filed.
-9. **Write verdict.** Append a single round entry under `## Round notes` in `code-review.md`. Format below. Heartbeat the artifact write.
-10. **Issue verdict to the orchestrator.** Return shape below.
+7. **Scan for transient project IDs leaking into code.** Mandatory, every round, every code change. See § Transient ID scan below. File any hit as a `must-fix` finding.
+8. **Triage orchestrator-flagged items.** One verdict per item: Accept (with reasoning), File as new F<N>, or Escalate.
+9. **File findings (if any).** In-PR addressable only (see § Findings discipline). F-numbers are stable across rounds — never renumber. Heartbeat at each F-number filed.
+10. **Write verdict.** Append a single round entry under `## Round notes` in `code-review.md`. Format below. Heartbeat the artifact write.
+11. **Issue verdict to the orchestrator.** Return shape below.
 
 ## Round-entry format in `code-review.md`
 
@@ -82,6 +83,41 @@ Maintain a table near the top of `code-review.md`:
 
 Update on every round. Status values: `PASS` / `FAIL` / `NOT VERIFIED — <reason>` / `ACCEPTED DEFERRAL — <link>` / `OUT OF SCOPE`. The summary at the top of `code-review.md` always carries current totals (`N PASS / M FAIL / K NOT VERIFIED`).
 
+## Transient ID scan
+
+Source code, comments, test names, and identifier strings must never reference transient project planning artefacts (task IDs, test-case IDs, AC/FR/NFR IDs, phase/round/checkpoint IDs, `projects/<x>/...` paths, etc.). The full ban list and rationale lives in [`.agents/rules/no-transient-project-ids-in-code.mdc`](../../../rules/no-transient-project-ids-in-code.mdc) — read it before your first round on any project.
+
+This is a recurring, easy-to-miss class of leak (the implementer tends to seed comments with the IDs they're tracking against). Catching it at review time is cheap; scrubbing post-merge is much more expensive. **Run the scan on every round, every code change.**
+
+### How to scan
+
+1. **Extract the round's plan IDs first.** From `projects/{project}/plan.md` and `spec.md`, pull every ID-shaped token: task IDs (`T1.1`, `T3.5`), test-case IDs (`TC-1`..`TC-N`), AC/FR/NFR IDs, checkpoint IDs (`CKPT-2`), milestone/round IDs (`P3 R2`, `M3`). One regex over the plan + spec is enough:
+
+   ```bash
+   rg -oI '\b(T[0-9]+\.[0-9]+|TC-?[0-9]+|AC[0-9]+|FR[0-9]+|NFR[0-9]+|CKPT-[0-9]+|AM[0-9]+|P[0-9]+ R[0-9]+|M[0-9]+ review)\b' \
+     projects/{project}/plan.md projects/{project}/spec.md \
+     | sort -u
+   ```
+
+2. **Scan the round's `+` diff for those tokens** (and the structural patterns that catch IDs you missed in step 1). The diff filter keeps the scan focused on what this round introduced — pre-existing leaks are the responsibility of the round that added them, not this round:
+
+   ```bash
+   git diff <base>..HEAD -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.py' '*.rs' '*.go' \
+     | grep -E '^\+' \
+     | grep -oE '\b(T[0-9]+\.[0-9]+|TC-?[0-9]+|AC[0-9]+|FR[0-9]+|NFR[0-9]+|CKPT-[0-9]+|AM[0-9]+|P[0-9]+ R[0-9]+|M[0-9]+ review)\b' \
+     | sort -u
+   ```
+
+   Also grep for `projects/<this-project>/` paths in source files (these should never appear in code outside of `projects/` itself).
+
+3. **For every hit**, identify the file + line and file as a `must-fix` finding. Recommended-action snippet: rewrite the comment / test name to describe the property in its own words, drop the ID. The rule file has worked examples (test names, JSDoc, hash fixtures, prose attributions).
+
+4. **Emit zero hits in your scan output before issuing a verdict.** If the scan produces hits and you do not file findings for every one, that's a reviewer protocol breach — the next-round implementer should have a concrete worklist, not a vague "watch out for IDs in comments".
+
+### Why this is a `must-fix`, not `should-fix`
+
+Transient IDs in code rot silently. A comment citing `T3.4` will reference a task that no longer exists (because plans get renumbered, regenerated, or deleted at close-out). The decay is invisible at review time but expensive to retrofit later — by then the comment is the only documentation of intent and the artefact it pointed at is gone. Catching it at write time is the only cost-effective time to fix it.
+
 ## The acceptance bar for `SATISFIED`
 
 A milestone reaches `SATISFIED` when **all** of:
@@ -90,6 +126,7 @@ A milestone reaches `SATISFIED` when **all** of:
 - No `FAIL` or unaccepted-deferral on any AC.
 - All milestone validation gates pass (verified by running them, or by trusting the implementer's report if you have no reason to distrust it).
 - All orchestrator-flagged items triaged.
+- The transient-ID scan (see § Transient ID scan) emits zero hits against the round's `+` diff.
 - The findings log is empty of opens. **All severities** (`must-fix`, `should-fix`, `low / process`) block milestone close — severity is for within-round prioritization, not for letting items carry forward.
 
 If any item fails this checklist, the verdict is `ANOTHER ROUND NEEDED` (with concrete next-actions enumerated as F-numbers and severities) or `ESCALATING TO USER` (with concrete decision points).
@@ -219,3 +256,4 @@ No "round notes" prose, no "what changed since last review" recap, no SDR delta,
 - **Producing SDR or walkthrough drafts.** Out of scope for the iteration loop. The walkthrough is generated at PR-open time by the team's PR-opening skill.
 - **Long round-entry blocks.** Three lines plus heading is the target for clean rounds. If your round entry is more than ~12 lines, you are narrating.
 - **Renumbering F-numbers.** F-numbers are durable across rounds. A finding from R1 keeps its F-number through R2, R3, …, even if its status changes from `open` to `resolved`.
+- **Skipping the transient-ID scan.** Reviewers that don't run the scan let plan IDs (`T3.5`, `TC-12`, `AC4`, `CKPT-2`) leak into code comments and test names. The scan is mandatory every round, every code change. See § Transient ID scan.

@@ -117,7 +117,30 @@ If you encounter what looks like a side-quest opportunity that wasn't explicitly
 - Never amend a commit unless the orchestrator explicitly authorizes amend (e.g. for a hook-modified file). New problems → new commits.
 - Never push without explicit authorization from the orchestrator.
 - Never commit anything under the repo's gitignored scratch directory or files matching `*.local.*` patterns.
-- Reference the milestone and task IDs in the commit body when applicable.
+- Reference the milestone and task IDs in the commit body when applicable. **Commit messages and PR descriptions are out of band of the source-tree ban below** — task IDs are useful there.
+
+## No transient project IDs in code
+
+Source code, comments, test names, and identifier strings must **never** reference transient project planning artefacts. The full ban list and rationale lives in [`.agents/rules/no-transient-project-ids-in-code.mdc`](../../../rules/no-transient-project-ids-in-code.mdc) — read it before your first round on any project.
+
+The high-frequency leaks the implementer keeps making:
+
+- Test names like `it('runs both spaces (TC-7)', …)` → drop the `(TC-7)`. Name the property the test pins.
+- JSDoc blocks like `// T3.4 — wire per-space verify` → describe what the code does, not which task delivered it.
+- Hash fixtures named after IDs (`'sha256:tc12-fixture'`) → name them after their role (`'sha256:mongo-ext-fixture'`).
+- `projects/<this-project>/...` paths in source files (including `@link`s) → never appear in code outside `projects/` itself.
+- Prose attributions like "out of scope per spec § 4", "deferred to T5.6", "per CKPT-2 decision" → the *constraint* belongs in the comment, not the artefact that introduced it.
+
+Before declaring a task / round done, run this scan against your own `+` diff. **Any hits → rewrite before declaring done.** Stable references (Linear ticket IDs like `TML-2408`, ADR numbers, `PR #494`) are fine; only *transient* IDs are banned.
+
+```bash
+git diff --cached -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.py' '*.rs' '*.go' \
+  | grep -E '^\+' \
+  | grep -oE '\b(T[0-9]+\.[0-9]+|TC-?[0-9]+|AC[0-9]+|FR[0-9]+|NFR[0-9]+|CKPT-[0-9]+|AM[0-9]+|P[0-9]+ R[0-9]+|M[0-9]+ review)\b' \
+  | sort -u
+```
+
+Output should be empty. The reviewer runs this exact scan every round and files any hit as a `must-fix` finding (which blocks `SATISFIED`).
 
 ## Test execution discipline
 
