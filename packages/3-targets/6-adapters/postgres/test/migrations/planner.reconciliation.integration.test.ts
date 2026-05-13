@@ -138,7 +138,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       await driver.close();
       driver = undefined;
     }
-  });
+  }, testTimeout);
 
   it('applies ALTER COLUMN TYPE from text to integer', { timeout: testTimeout }, async () => {
     const baselineContract = makeContract(
