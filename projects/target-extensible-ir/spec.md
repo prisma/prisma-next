@@ -90,7 +90,7 @@ namespace auth {
 namespace public {
   model Profile {
     id     String @id @default(uuid())
-    userId String
+    userId String    @unique
     user   auth.User @relation(fields: [userId], references: [id])
   }
 }

@@ -24,11 +24,13 @@ After this project, the same `@relation` mechanism works against a model that li
 namespace public {
   model Profile {
     id       String @id @default(uuid())
-    userId   String
+    userId   String @unique
     user     supabase:auth.User @relation(fields: [userId], references: [id], onDelete: Cascade)
   }
 }
 ```
+
+`userId` is `@unique` to make the relationship a true 1:1 — at most one `Profile` row per `auth.User`. Without it, the FK would permit n:1 and any RLS policy keying off "this row's `userId` is the calling user" would be re-attachable to another user, defeating the policy.
 
 The colon-prefix `supabase:` is the only new PSL grammar token; `@relation`'s shape is unchanged from the within-contract cross-namespace case introduced in TML-2459 (FR16b). The framework resolves `supabase` against the `extensionPacks` list configured in `prisma-next.config.ts`.
 
@@ -57,7 +59,10 @@ export const contract = defineContract(
           // Same call shape as a local rel.belongsTo. The framework distinguishes
           // cross-contract from local by the brand on the AuthUser handle.
           user: rel.belongsTo(AuthUser, { from: 'userId', to: 'id' }),
-        }).sql(({ cols, constraints }) => ({
+        }).attributes(({ fields, constraints }) => ({
+          // userId is unique → the relation is 1:1 in shape, not 1:n.
+          uniques: [constraints.unique(fields.userId, { name: 'profile_userId_unique' })],
+        })).sql(({ cols, constraints }) => ({
           table: 'profile',
           foreignKeys: [
             constraints.foreignKey(cols.userId, AuthUser.refs.id, {
