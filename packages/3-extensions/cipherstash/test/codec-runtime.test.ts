@@ -110,10 +110,17 @@ describe('codec.decode(wire, ctx)', () => {
     expect(handle.sdk).toBe(sdk);
   });
 
-  it('throws a clear error when ctx.column is absent', async () => {
+  it('throws a RUNTIME.DECODE_FAILED envelope when the column routing context is absent', async () => {
     const codec = createCipherstashStringCodec(emptySdk());
     const wire = `("${JSON.stringify({}).replaceAll('"', '""')}")`;
-    await expect(codec.decode(wire, ctxWithoutColumn)).rejects.toThrow(/ctx\.column/);
+    await expect(codec.decode(wire, ctxWithoutColumn)).rejects.toMatchObject({
+      code: 'RUNTIME.DECODE_FAILED',
+      category: 'RUNTIME',
+      details: {
+        codecId: 'cipherstash/string@1',
+        reason: 'cipherstash-decode-column-context-missing',
+      },
+    });
   });
 });
 

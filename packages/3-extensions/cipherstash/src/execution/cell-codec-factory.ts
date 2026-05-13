@@ -32,6 +32,7 @@ import {
   CodecImpl,
   type CodecTrait,
 } from '@prisma-next/framework-components/codec';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { Codec, SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
 import { CIPHERSTASH_CODEC_TRAITS, EQL_V2_ENCRYPTED_TYPE } from '../extension-metadata/constants';
 import type { EncryptedEnvelopeBase } from './envelope-base';
@@ -125,9 +126,17 @@ export class CipherstashCellCodec<E extends EncryptedEnvelopeBase<unknown>> exte
   async encode(value: E, _ctx: SqlCodecCallContext): Promise<unknown> {
     const handle = value.expose();
     if (handle.ciphertext === undefined) {
-      throw new Error(
-        'cipherstash codec: envelope has no ciphertext at encode time. ' +
-          'Register the bulk-encrypt middleware in the runtime so envelopes are encrypted before encoding.',
+      throw runtimeError(
+        'RUNTIME.ENCODE_FAILED',
+        `cipherstash ${this.descriptor.codecId}: encrypted column value has not been encrypted yet. ` +
+          'Add the cipherstash bulk-encrypt middleware to your runtime so plaintext values are encrypted before encode runs. ' +
+          'Example: `runtime({ ..., middleware: [bulkEncryptMiddleware({ sdk })] })`. ' +
+          'See the cipherstash extension README for the full runtime wiring.',
+        {
+          codecId: this.descriptor.codecId,
+          reason: 'cipherstash-ciphertext-missing',
+          envelopeRouting: { table: handle.table, column: handle.column },
+        },
       );
     }
     return encodeEqlV2EncryptedWire(handle.ciphertext);
@@ -135,16 +144,30 @@ export class CipherstashCellCodec<E extends EncryptedEnvelopeBase<unknown>> exte
 
   async decode(wire: unknown, ctx: SqlCodecCallContext): Promise<E> {
     if (this.sdk === undefined) {
-      throw new Error(
-        'cipherstash codec: decode called on the metadata-only codec instance. ' +
-          'Construct a runtime descriptor via `createCipherstashRuntimeDescriptor({ sdk })` and use that instead.',
+      throw runtimeError(
+        'RUNTIME.DECODE_FAILED',
+        `cipherstash ${this.descriptor.codecId}: decode invoked on a metadata-only codec instance that has no SDK attached. ` +
+          'Build a runtime codec via the parameterized descriptors returned by `createParameterizedCodecDescriptors(sdk)`, ' +
+          `or construct the codec directly through the matching \`create*Codec(sdk)\` factory (e.g. \`create${this.#typeName}Codec\`) ` +
+          'exported from `@prisma-next/extension-cipherstash/runtime`.',
+        {
+          codecId: this.descriptor.codecId,
+          reason: 'cipherstash-sdk-required',
+        },
       );
     }
     const column = ctx.column;
     if (!column) {
-      throw new Error(
-        'cipherstash codec: decode requires ctx.column to construct a routing-aware envelope. ' +
-          'The SQL runtime populates ctx.column for projected columns; aggregate/computed cells are not supported by this codec.',
+      throw runtimeError(
+        'RUNTIME.DECODE_FAILED',
+        `cipherstash ${this.descriptor.codecId}: decode requires the column routing context that the SQL runtime populates ` +
+          'for projected columns. The cell being decoded came from an aggregate, computed expression, or other unrouted source. ' +
+          'cipherstash codecs need a stable `(table, column)` routing key for envelope construction and bulk-decrypt grouping; ' +
+          'project the underlying encrypted column directly instead of through an aggregate.',
+        {
+          codecId: this.descriptor.codecId,
+          reason: 'cipherstash-decode-column-context-missing',
+        },
       );
     }
     return this.#fromInternal({
@@ -168,13 +191,30 @@ export class CipherstashCellCodec<E extends EncryptedEnvelopeBase<unknown>> exte
 }
 
 /**
- * Construct a fallback descriptor for a cipherstash cell codec. Used
- * by `create*Codec(sdk)` callers that need a bare `Codec` instance and
- * by `Codec` declarations in tests; production runtime descriptors
- * resolve the per-instance codec through the parameterized descriptor's
- * `factory(params)(ctx)` path.
+ * Construct an auxiliary descriptor for a cipherstash cell codec.
+ *
+ * The framework's `CodecImpl` base class requires a `descriptor` field
+ * on every codec instance; readers like `codec.id` proxy through
+ * `descriptor.codecId`. The production lookup path, however, resolves
+ * cipherstash codecs through the **parameterized** descriptors built
+ * in `parameterized.ts` — its `factory(params)(ctx)` returns the codec
+ * instance directly, never going via `codec.descriptor.factory`.
+ *
+ * This descriptor therefore needs only to carry **truthful metadata**
+ * (`codecId`, `traits`, `targetTypes`, `meta`, `renderOutputType`) so
+ * that any caller reading those fields off the codec sees the right
+ * values. Its `factory` field is intentionally a throwing stub: if
+ * anything ever does invoke it, that is a programming error (the call
+ * site should be going through the parameterized descriptor) and a
+ * loud failure is preferred to a silent fallback.
+ *
+ * The auxiliary cannot be replaced by passing the parameterized
+ * descriptor through to the codec constructor because the
+ * parameterized descriptor's `factory` resolves to the codec instance
+ * itself — constructing the descriptor before the codec, and the
+ * codec before the descriptor, are mutually circular.
  */
-function makeFallbackDescriptor<E extends EncryptedEnvelopeBase<unknown>>(
+function makeAuxiliaryDescriptor<E extends EncryptedEnvelopeBase<unknown>>(
   options: CipherstashCellCodecOptions<E>,
 ): AnyCodecDescriptor {
   return {
@@ -194,7 +234,13 @@ function makeFallbackDescriptor<E extends EncryptedEnvelopeBase<unknown>>(
     isParameterized: false,
     renderOutputType: () => options.typeName,
     factory: () => () => {
-      throw new Error('cipherstash codec: fallback descriptor factory is not callable');
+      throw new Error(
+        'cipherstash codec: auxiliary descriptor factory was invoked. ' +
+          'This is a programming error — cipherstash codecs are resolved through the ' +
+          'parameterized descriptors built in `parameterized.ts`, not through ' +
+          '`codec.descriptor.factory`. Use `createParameterizedCodecDescriptors(sdk)` ' +
+          'to get the production runtime descriptors.',
+      );
     },
   };
 }
@@ -208,5 +254,5 @@ export function makeCipherstashCellCodec<E extends EncryptedEnvelopeBase<unknown
   sdk: CipherstashSdk,
   options: CipherstashCellCodecOptions<E>,
 ): CipherstashCellCodec<E> & Codec<string, readonly CodecTrait[], unknown, E> {
-  return new CipherstashCellCodec(makeFallbackDescriptor(options), sdk, options);
+  return new CipherstashCellCodec(makeAuxiliaryDescriptor(options), sdk, options);
 }
