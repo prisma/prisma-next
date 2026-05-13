@@ -7,7 +7,7 @@ class M extends Migration {
   override describe() {
     return {
       from: null,
-      to: 'sha256:4407077380e2331b356697c35153192b3bdafadb432f0d64b081d24e8af3e55a',
+      to: 'sha256:f76977c7745bd6fbf38728c544b372927969f19955489d7ff5c9c1eddcdc0b36',
     };
   }
 
@@ -203,7 +203,6 @@ class M extends Migration {
               brand: { bsonType: 'string' },
               code: { bsonType: 'string' },
               description: { bsonType: 'string' },
-              embedding: { bsonType: 'array', items: { bsonType: 'double' } },
               image: {
                 bsonType: 'object',
                 properties: { url: { bsonType: 'string' } },
@@ -216,7 +215,6 @@ class M extends Migration {
                 properties: { amount: { bsonType: 'double' }, currency: { bsonType: 'string' } },
                 required: ['amount', 'currency'],
               },
-              status: { bsonType: 'string' },
               subCategory: { bsonType: 'string' },
             },
             required: [
@@ -229,7 +227,6 @@ class M extends Migration {
               'masterCategory',
               'name',
               'price',
-              'status',
               'subCategory',
             ],
           },

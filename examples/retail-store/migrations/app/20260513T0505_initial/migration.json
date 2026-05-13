@@ -1,6 +1,6 @@
 {
   "from": null,
-  "to": "sha256:4407077380e2331b356697c35153192b3bdafadb432f0d64b081d24e8af3e55a",
+  "to": "sha256:f76977c7745bd6fbf38728c544b372927969f19955489d7ff5c9c1eddcdc0b36",
   "fromContract": null,
   "toContract": {
     "schemaVersion": "1",
@@ -375,14 +375,6 @@
               "kind": "scalar"
             }
           },
-          "embedding": {
-            "many": true,
-            "nullable": true,
-            "type": {
-              "codecId": "mongo/double@1",
-              "kind": "scalar"
-            }
-          },
           "image": {
             "nullable": false,
             "type": {
@@ -409,13 +401,6 @@
             "type": {
               "kind": "valueObject",
               "name": "Price"
-            }
-          },
-          "status": {
-            "nullable": false,
-            "type": {
-              "codecId": "mongo/string@1",
-              "kind": "scalar"
             }
           },
           "subCategory": {
@@ -1273,12 +1258,6 @@
                 "description": {
                   "bsonType": "string"
                 },
-                "embedding": {
-                  "bsonType": "array",
-                  "items": {
-                    "bsonType": "double"
-                  }
-                },
                 "image": {
                   "bsonType": "object",
                   "properties": {
@@ -1311,9 +1290,6 @@
                     "currency"
                   ]
                 },
-                "status": {
-                  "bsonType": "string"
-                },
                 "subCategory": {
                   "bsonType": "string"
                 }
@@ -1328,7 +1304,6 @@
                 "masterCategory",
                 "name",
                 "price",
-                "status",
                 "subCategory"
               ]
             },
@@ -1403,7 +1378,7 @@
           }
         }
       },
-      "storageHash": "sha256:4407077380e2331b356697c35153192b3bdafadb432f0d64b081d24e8af3e55a"
+      "storageHash": "sha256:f76977c7745bd6fbf38728c544b372927969f19955489d7ff5c9c1eddcdc0b36"
     },
     "capabilities": {},
     "extensionPacks": {},
@@ -1420,7 +1395,7 @@
     "plannerVersion": "2.0.0"
   },
   "labels": [],
-  "createdAt": "2026-05-12T20:19:19.937Z",
+  "createdAt": "2026-05-13T05:05:47.654Z",
   "providedInvariants": [],
-  "migrationHash": "sha256:9e22f08c1c5ac2b9fd9cc2273f53808c1b77e7c086e28ddc952b4a5e7edd3320"
+  "migrationHash": "sha256:739a7a4a4efd0005c1dee4a8b4fc2dd723d1d89fb7c874cf8b366253b5042d6a"
 }

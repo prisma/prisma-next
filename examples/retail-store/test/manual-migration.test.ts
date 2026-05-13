@@ -10,7 +10,7 @@ import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { resolve } from 'pathe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import BackfillProductStatus from '../migrations/app/20260512T2020_backfill_product_status/migration';
+import BackfillProductStatus from '../migrations/app/20260513T0508_backfill_product_status/migration';
 
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] as const,
@@ -25,7 +25,7 @@ function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
 
 const migrationDir = resolve(
   import.meta.dirname,
-  '../migrations/app/20260512T2020_backfill_product_status',
+  '../migrations/app/20260513T0508_backfill_product_status',
 );
 
 describe(
@@ -65,8 +65,9 @@ describe(
     it('migration class can be imported and operations accessed directly', () => {
       const instance = new BackfillProductStatus();
       const ops = instance.operations;
-      expect(ops).toHaveLength(1);
-      expect(ops[0]!.id).toBe('data_transform.backfill-product-status');
+      expect(ops).toHaveLength(2);
+      expect(ops[0]!.id).toBe('collection.products.setValidation');
+      expect(ops[1]!.id).toBe('data_transform.backfill-product-status');
     });
 
     it('migration.json has expected structure', () => {
@@ -80,16 +81,46 @@ describe(
     });
 
     it('ops.json deserializes and applies against real MongoDB, backfilling missing status', async () => {
+      // Pre-create `products` so `setValidation` (op 1) has a collection to
+      // collMod. In a full chain run, migration 1's `createCollection`
+      // would do this; the isolated test stands it up directly.
+      await db.createCollection('products');
+
       // Seed two pre-existing products that pre-date the `status` field;
       // the data transform should observe both and update them.
+      // Records must satisfy the state-3 validator that migration 3's
+      // setValidation op installs (since the runner applies setValidation
+      // before the dataTransform, and updateMany re-validates each touched
+      // document). Decimal price.amount values match the contract's
+      // `bsonType: "double"` requirement.
       await db.collection('products').insertMany([
-        { name: 'Pre-existing widget A', brand: 'Acme', price: { amount: 10, currency: 'USD' } },
-        { name: 'Pre-existing widget B', brand: 'Acme', price: { amount: 20, currency: 'USD' } },
+        {
+          name: 'Pre-existing widget A',
+          brand: 'Acme',
+          code: 'A001',
+          description: 'a widget',
+          masterCategory: 'Apparel',
+          subCategory: 'Topwear',
+          articleType: 'T-Shirts',
+          price: { amount: 10.99, currency: 'USD' },
+          image: { url: 'http://example.com/a.png' },
+        },
+        {
+          name: 'Pre-existing widget B',
+          brand: 'Acme',
+          code: 'B001',
+          description: 'another widget',
+          masterCategory: 'Apparel',
+          subCategory: 'Bottomwear',
+          articleType: 'Trousers',
+          price: { amount: 20.99, currency: 'USD' },
+          image: { url: 'http://example.com/b.png' },
+        },
       ]);
 
       const opsJson = readFileSync(resolve(migrationDir, 'ops.json'), 'utf-8');
       const ops = deserializeMongoOps(JSON.parse(opsJson));
-      expect(ops).toHaveLength(1);
+      expect(ops).toHaveLength(2);
 
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
@@ -125,7 +156,7 @@ describe(
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;
-        expect(result.value.operationsExecuted).toBe(1);
+        expect(result.value.operationsExecuted).toBe(2);
 
         const products = await db.collection('products').find({}).toArray();
         expect(products).toHaveLength(2);

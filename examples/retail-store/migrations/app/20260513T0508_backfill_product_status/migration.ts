@@ -9,12 +9,35 @@ import {
   type MongoQueryPlan,
   RawUpdateManyCommand,
 } from '@prisma-next/mongo-query-ast/execution';
-import { dataTransform } from '@prisma-next/target-mongo/migration';
+import { dataTransform, setValidation } from '@prisma-next/target-mongo/migration';
 import endContractJson from './end-contract.json' with { type: 'json' };
 
-// The end-contract's storage hash is the destination this migration writes
-// to; we tag every plan's meta with it so the runner can chain marker writes.
 const STORAGE_HASH = endContractJson.storage.storageHash;
+
+// `migration new` records the contract delta as `from` → `to` but produces an
+// empty `operations` array; the author is responsible for declaring the work
+// that bridges the two contract states. This migration's contract delta adds
+// `embedding` and `status` fields to `products` (with `status` becoming
+// required via its `@default("active")`), so two ops are needed:
+//
+// 1. `setValidation` — refresh the live `$jsonSchema` so it includes the new
+//    fields. Without this, `db verify` would fail with `VALIDATOR_MISMATCH`
+//    after this migration applies because the live validator (still the
+//    state-1 shape from migration 1's `createCollection`) wouldn't match the
+//    contract-derived expected validator for state 3.
+//
+// 2. `dataTransform` — backfill `status: "active"` on pre-existing products
+//    so they satisfy the new `required: [..., "status", ...]` rule.
+//
+// The validator is sourced from `end-contract.json` so the op stays in sync
+// with the contract if the chain is ever re-emitted. The JSON types these
+// fields as `string`, so narrow them to the literal unions setValidation
+// expects.
+const PRODUCTS_VALIDATOR = endContractJson.storage.collections.products.validator as {
+  jsonSchema: Record<string, unknown>;
+  validationLevel: 'strict' | 'moderate';
+  validationAction: 'error' | 'warn';
+};
 
 function existingProductsWithoutStatus(): MongoQueryPlan {
   return {
@@ -32,9 +55,9 @@ function backfillRun(): MongoQueryPlan {
     collection: 'products',
     // Raw command form: the typed query-builder (`mongoQuery(...).updateMany(...)`)
     // produces the same logical plan but its JSON form is not yet handled by
-    // the runner's ops deserializer, so hand-authored data transforms use the
-    // raw command shape — matching the framework's data-transform test
-    // fixtures.
+    // the runner's ops deserializer (TML-2506), so hand-authored data
+    // transforms use the raw command shape — matching the framework's
+    // data-transform test fixtures.
     command: new RawUpdateManyCommand(
       'products',
       { status: { $exists: false } },
@@ -55,6 +78,10 @@ class BackfillProductStatus extends Migration {
 
   override get operations() {
     return [
+      setValidation('products', PRODUCTS_VALIDATOR.jsonSchema, {
+        validationLevel: PRODUCTS_VALIDATOR.validationLevel,
+        validationAction: PRODUCTS_VALIDATOR.validationAction,
+      }),
       dataTransform('backfill-product-status', {
         check: { source: existingProductsWithoutStatus },
         run: backfillRun,
