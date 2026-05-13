@@ -6,83 +6,58 @@
 
 A Prisma Next app using Supabase is one where the app contract references Supabase-managed tables (notably `auth.users`), and the framework knows enough about those tables to typecheck FK references, verify they exist with the right shape, and emit RLS policies — but **does not migrate them**.
 
-```ts
-// app/contract.ts (the user's code)
-import { defineContract, rel } from '@prisma-next/sql-contract-ts/contract-builder';
-import { AuthUser, roles as supabaseRoles } from '@prisma-next/extension-supabase/contract';
-import supabasePack from '@prisma-next/extension-supabase/pack';
-import sqlFamily from '@prisma-next/family-sql/pack';
-import postgresPack from '@prisma-next/target-postgres/pack';
+```psl
+// app/prisma/schema.prisma (the user's code)
+namespace public {
+  model Profile {
+    id       String @id @default(uuid())
+    userId   String @unique(map: "profile_userId_unique")
+    username String
 
-export const contract = defineContract(
-  {
-    family: sqlFamily,
-    target: postgresPack,
-    namespaces: ['public'],
-    extensionPacks: [supabasePack],
-  },
-  ({ field, model }) => {
-    const Profile = model('Profile', {
-      namespace: 'public',
-      fields: {
-        id: field.id.uuidv4(),
-        userId: field.uuid(),
-        username: field.text(),
-      },
-    });
+    // Cross-contract FK — the `supabase:` prefix resolves against
+    // extensionPacks in prisma-next.config.ts.
+    user     supabase:auth.User @relation(fields: [userId], references: [id], onDelete: Cascade, map: "profile_userId_fkey")
 
-    return {
-      models: {
-        Profile: Profile.relations({
-          // Cross-contract FK — model handle's brand tells the framework this
-          // reference targets another contract space (no new TS syntax).
-          user: rel.belongsTo(AuthUser, { from: 'userId', to: 'id' }),
-        })
-          .attributes(({ fields, constraints }) => ({
-            uniques: [ constraints.unique(fields.userId, { name: 'profile_userId_unique' }) ],
-          }))
-          .sql(({ cols, constraints }) => ({
-            table: 'profile',
-            foreignKeys: [
-              constraints.foreignKey(cols.userId, AuthUser.refs.id, {
-                name: 'profile_userId_fkey',
-                onDelete: 'cascade',
-              }),
-            ],
-          }))
-          // Postgres-only stage, target-gated by pack-aware typing.
-          // Each policy carries its own name + operation + roles + predicate(s).
-          // Multiple permissive policies per (target, op) are allowed (Postgres ORs them).
-          .rls([
-            {
-              name: 'profiles_select_own',
-              operation: 'select',
-              roles: [supabaseRoles.authenticated],
-              using: 'user_id = (auth.uid())::uuid',
-            },
-            {
-              name: 'profiles_update_own',
-              operation: 'update',
-              roles: [supabaseRoles.authenticated],
-              using:     'user_id = (auth.uid())::uuid',
-              withCheck: 'user_id = (auth.uid())::uuid',
-            },
-          ]),
-      },
-    };
-  },
-);
+    @@map("profile")
+  }
+
+  // RLS policies live in the same namespace as their target model.
+  // Multiple permissive policies per (target, op) are allowed
+  // (Postgres ORs them).
+
+  policy profiles_select_own {
+    target    = Profile
+    operation = select
+    roles     = [authenticated]
+    using     = "user_id = (auth.uid())::uuid"
+  }
+
+  policy profiles_update_own {
+    target    = Profile
+    operation = update
+    roles     = [authenticated]
+    using     = "user_id = (auth.uid())::uuid"
+    withCheck = "user_id = (auth.uid())::uuid"
+  }
+}
 ```
 
 ```ts
 // prisma-next.config.ts
 import { defineConfig } from '@prisma-next/config';
-import { typescriptContract } from '@prisma-next/contract-ts';
+import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import supabasePack from '@prisma-next/extension-supabase/pack';
+import sqlFamily from '@prisma-next/family-sql/control';
+import postgresPack from '@prisma-next/target-postgres/control';
 
 export default defineConfig({
-  contract: typescriptContract('./app/contract.ts'),
+  family: sqlFamily,
+  target: postgresPack,
   extensionPacks: [supabasePack],
+  contract: prismaContract('./app/prisma/schema.prisma', {
+    output: 'app/migrations/app/contract.json',
+    target: postgresPack,
+  }),
 });
 ```
 
@@ -103,6 +78,8 @@ export const db = supabase<Contract, TypeMaps>({
 //   db.asAnon().sql.from(Profile).select({ ... }).build()
 //   db.asServiceRole().sql.from(Profile).update({ ... }).build()
 ```
+
+The TS contract surface is structurally parallel and is described in each constituent project's spec; both PSL and TS lower to the same canonical `contract.json`. Once that JSON exists, the runtime story is identical regardless of which authoring surface produced it.
 
 One facade, one factory call. There is no top-level `db.sql` — `db` requires a role first (`asUser` / `asAnon` / `asServiceRole`) before queries can be built. In a Supabase app there's no meaningful "no role" execution context; making it impossible by construction is intentional.
 

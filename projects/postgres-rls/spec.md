@@ -6,7 +6,34 @@ Row-Level Security is the central reason teams pick Supabase, but it's also a ge
 
 ## At a glance
 
-TypeScript authoring — RLS as a fourth staged method on the model builder, alongside the existing `.attributes(...)` and `.sql(...)`:
+PSL authoring — top-level `policy <name> { … }` blocks live in the same namespace as the model they target:
+
+```psl
+namespace public {
+  model Profile {
+    id       String @id @default(uuid())
+    userId   String @unique
+    username String @unique
+  }
+
+  policy profiles_select_anon_and_authed {
+    target    = Profile
+    operation = select
+    roles     = [anon, authenticated]
+    using     = "true"
+  }
+
+  policy profiles_update_own {
+    target    = Profile
+    operation = update
+    roles     = [authenticated]
+    using     = "user_id = (auth.uid())::uuid"
+    withCheck = "user_id = (auth.uid())::uuid"
+  }
+}
+```
+
+TypeScript authoring — `.rls(...)` is a fourth staged method on the model builder, alongside the existing `.attributes(...)` and `.sql(...)`. The TS surface adds one capability the PSL surface does not have: function-form `using` / `withCheck` predicates that interpolate other model handles via a `ref()` helper, so policy bodies that reference another table track table/namespace renames automatically.
 
 ```ts
 const Profile = model('Profile', {
@@ -44,33 +71,6 @@ const Profile = model('Profile', {
         `author_id IN (SELECT id FROM ${ref(Profile)} WHERE user_id = (auth.uid())::uuid)`,
     },
   ]);
-```
-
-PSL authoring — top-level `policy <name> { … }` blocks living in the same namespace as the model they target:
-
-```psl
-namespace public {
-  model Profile {
-    id       String @id @default(uuid())
-    userId   String @unique
-    username String @unique
-  }
-
-  policy profiles_select_anon_and_authed {
-    target    = Profile
-    operation = select
-    roles     = [anon, authenticated]
-    using     = "true"
-  }
-
-  policy profiles_update_own {
-    target    = Profile
-    operation = update
-    roles     = [authenticated]
-    using     = "user_id = (auth.uid())::uuid"
-    withCheck = "user_id = (auth.uid())::uuid"
-  }
-}
 ```
 
 Lowered DDL emitted by the planner:
