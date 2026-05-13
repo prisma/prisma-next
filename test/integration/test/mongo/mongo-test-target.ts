@@ -64,7 +64,7 @@ export function createMongoTestTarget(
       };
     },
 
-    async applyContract({ driver, contract, policy, isInitial }) {
+    async applyContract({ driver, contract, fromContract, policy, isInitial }) {
       const planner = new MongoMigrationPlanner();
       const effectivePolicy = isInitial ? ALL_POLICY : (policy ?? ALL_POLICY);
 
@@ -73,7 +73,7 @@ export function createMongoTestTarget(
         contract,
         schema: live,
         policy: effectivePolicy,
-        fromContract: null,
+        fromContract,
         frameworkComponents: [],
       });
       if (planResult.kind !== 'success') {
@@ -89,6 +89,9 @@ export function createMongoTestTarget(
       const runResult = await runner.execute({
         plan: {
           targetId: 'mongo',
+          ...(fromContract !== null
+            ? { origin: { storageHash: fromContract.storage.storageHash } }
+            : {}),
           destination: { storageHash: contract.storage.storageHash },
           operations: serialized,
         },
