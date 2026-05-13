@@ -6,7 +6,7 @@
 
 A Prisma Next app using Supabase is one where the app contract references Supabase-managed tables (notably `auth.users`), and the framework knows enough about those tables to typecheck FK references, verify they exist with the right shape, and emit RLS policies — but **does not migrate them**.
 
-```psl
+```prisma
 // app/prisma/schema.prisma (the user's code)
 namespace public {
   model Profile {

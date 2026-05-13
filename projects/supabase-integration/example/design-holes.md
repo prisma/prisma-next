@@ -87,7 +87,7 @@ The earlier version of this section recommended a dict keyed by operation (`{ se
 
 **PSL surface** — settled in a parallel discussion. Top-level named-block declarations:
 
-```psl
+```prisma
 namespace public {
   policy profile_select {
     target = Profile
@@ -237,7 +237,7 @@ The subquery case takes the function form. The `ref()` helper is the only thing 
 
 Plain strings only. Authors type qualified names matching their migrations:
 
-```psl
+```prisma
 namespace public {
   policy posts_update_own {
     target = Post

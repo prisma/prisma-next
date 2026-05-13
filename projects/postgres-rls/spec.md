@@ -8,7 +8,7 @@ Row-Level Security is the central reason teams pick Supabase, but it's also a ge
 
 PSL authoring — top-level `policy <name> { … }` blocks live in the same namespace as the model they target:
 
-```psl
+```prisma
 namespace public {
   model Profile {
     id       String @id @default(uuid())

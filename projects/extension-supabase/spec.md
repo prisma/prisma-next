@@ -8,7 +8,7 @@ This project ships `@prisma-next/extension-supabase` — the user-facing npm pac
 
 End-to-end usage. The user installs one npm package and gets the full surface — contract authoring in PSL (or in TS — the two forms are equivalent), runtime factory in TS:
 
-```psl
+```prisma
 // app/prisma/schema.prisma
 namespace public {
   model Profile {
