@@ -9,9 +9,18 @@ description: Creates a GitHub PR with a Linear-ticket-prefixed title and a decis
 
 ### Step 1: Gather Context
 
-1. Run `git log main..HEAD --oneline` to see all commits on the current branch (fallback: `git log origin/main..HEAD --oneline`).
-2. Run `git diff main...HEAD --stat` to see which files changed (fallback: `git diff origin/main...HEAD --stat`).
-3. Run `git diff main...HEAD` to read the full diff (fallback: `git diff origin/main...HEAD`).
+Detect the PR's base branch instead of hardcoding `main`. Set `BASE_BRANCH` once and reuse it in every diff/log command:
+
+```bash
+BASE_BRANCH=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null | sed 's@^origin/@@')
+BASE_BRANCH=${BASE_BRANCH:-main}
+```
+
+`git rev-parse --abbrev-ref origin/HEAD` returns the remote's default branch (e.g. `origin/main`); the `sed` strips the `origin/` prefix. The fallback to `main` covers repos where `origin/HEAD` is unset. If you know the PR was branched off a non-default branch, override `BASE_BRANCH` explicitly before running the commands below.
+
+1. Run `git log "$BASE_BRANCH..HEAD" --oneline` to see all commits on the current branch (fallback: `git log "origin/$BASE_BRANCH..HEAD" --oneline`).
+2. Run `git diff "$BASE_BRANCH...HEAD" --stat` to see which files changed (fallback: `git diff "origin/$BASE_BRANCH...HEAD" --stat`).
+3. Run `git diff "$BASE_BRANCH...HEAD"` to read the full diff (fallback: `git diff "origin/$BASE_BRANCH...HEAD"`).
 4. Check for local-only changes that won't be in the PR unless committed:
    - `git status -sb`
    - If there are uncommitted changes, explicitly call out that `gh pr create` can proceed but those changes will not be in the PR.
@@ -28,12 +37,12 @@ Extract from the URL:
 
 Format:
 
-```
+```text
 $TICKET_ID: <concise title in sentence case>
 ```
 
 Rules:
-- Always start with the Linear ticket ID followed by `: ` (colon + space).
+- Always start with the Linear ticket ID followed by `:` then a single space.
 - Sentence case after the colon (capital first letter; rest lowercase except proper nouns, package names, types, etc.).
 - No period at the end.
 - Aim for under 70 characters total. Optimise for **information density**, not raw character count — a slightly longer title that names the concrete deliverable is better than a short abstract one.
@@ -83,7 +92,7 @@ The PR description must follow a **decision-led, narrative** structure. A teamma
 
 #### Forbidden / discouraged patterns
 
-- **Don't open with abstract prose.** No "Intent" paragraph at the very top. The reader should hit a concrete code sample first.
+- **Don't open with abstract prose.** The body opens with the Linear close line, immediately followed by `## At a glance` and its concrete code sample. No "Intent" paragraph in between.
 - **Don't paste a "Change map" section near the top** that lists every file. File links belong distributed across the narrative steps and behavior bullets where they have context.
 - **Don't dump file paths in behavior bullets.** Each bullet gets at most ~3 implementation anchors and ~2 evidence anchors. If a section needs more, it's two changes — split the bullet.
 - **Don't bury major decisions inside other sections.** If the PR carries a substantive framework change alongside a feature, the framework change must be enumerated in `## Decision` so a reader can't skim past it.
@@ -118,7 +127,7 @@ gh pr create --title "$TICKET_ID: <title>" --body-file wip/pr-<num>-body.md
 
 1. Don't paste diff stats or long file lists — focus on intention and semantics.
 2. Don't write reviewer-coaching phrases ("anchor", "read this first", etc.). Prefer a normal narrative.
-3. Don't open the description with prose — it must open with a real code sample under `## At a glance`.
+3. Don't open the description with prose — after the Linear close line, the body must move straight into `## At a glance` and its real code sample.
 4. Don't bury substantive secondary changes (e.g. framework reorders alongside a feature) — enumerate them in `## Decision`.
 5. Don't end the description with "non-goals" — end with `## Alternatives considered`, framed as decisions you weighed.
 6. Don't create the PR without showing the user the title and description first.

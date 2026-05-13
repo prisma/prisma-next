@@ -10,7 +10,7 @@ Extensions whose codec output cannot back a framework built-in operator's wire s
 
 ```mermaid
 flowchart LR
-  Built[built-in `eq` operator] -.gated on.-> Trait[equality trait]
+  Built[built-in eq operator] -.gated on.-> Trait[equality trait]
   Codec[cipherstash codec] -.declares.-> NoTraits["traits: []"]
   NoTraits -.blocks.-> Built
   Codec -.registers.-> Ns[cipherstashEq via OperationRegistry]
