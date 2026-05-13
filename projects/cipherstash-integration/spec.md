@@ -79,7 +79,7 @@ Three decisions are recorded at the umbrella level because they affect multiple 
 
 Project 1 needs the AST node to support raw-SQL composition inside the `SqlQueryPlan` machinery. The right shape — agreed in design discussion — is a first-class AST node (`RawSqlExpr`) joining the `AnyQueryAst` union, with a Postgres lowerer arm that parameterizes embedded `ParamRef`s through the standard codec pipeline.
 
-The AST node is owned by Project 1 (the [`raw-sql-ast-node.spec.md`](project-1/specs/raw-sql-ast-node.spec.md) task spec) so Project 1 is unblocked without waiting on `sql-raw-factory`. `sql-raw-factory` consumes that AST node and adds the user-facing typed-template-literal surface on top. The cleavage is precise:
+The AST node is owned by Project 1 (the [`raw-sql-ast-node.spec.md`](project-1/specs/raw-sql-ast-node.spec.md) task spec) so Project 1 is unblocked without waiting on `sql-raw-factory`. `sql-raw-factory` consumes that AST node and adds the user-facing typed-template-literal surface on top. The split is precise:
 
 - **Project 1's task spec ships:** the AST node, the Postgres lowerer arm, and a small `planFromAst` envelope helper. Construction is package-internal — `RawSqlExpr.of(fragments, args)` directly.
 - **`sql-raw-factory` ships:** the `raw\`...\`` template-literal factory; the `RawArg` type union (Expression | ParamRef | RawSqlIdentifier); the `identifier(...)` escape hatch and its lowerer arm; type-level rejection of bare values; the `param()` ergonomic re-export of `ParamRef.of`.
@@ -94,7 +94,7 @@ This decision affects both Project 1 and Project 2: Project 1 wires the hook arm
 
 ## Project 1's MVP scope is bounded by "ship only what's tested end-to-end"
 
-The umbrella adopts a strict end-to-end-test gate as the cleavage between Project 1 and Project 2: every public surface that Project 1 ships must have a passing integration test against live Postgres + EQL. Anything that doesn't (other column types, other operators) defers to Project 2. This avoids the failure mode where Project 1 ships PSL constructors for `EncryptedNumber` / `EncryptedDate` / etc. that compile fine but break at runtime because the corresponding codec / search-operator paths weren't in scope.
+The umbrella adopts a strict end-to-end-test gate as the boundary between Project 1 and Project 2: every public surface that Project 1 ships must have a passing integration test against live Postgres + EQL. Anything that doesn't (other column types, other operators) defers to Project 2. This avoids the failure mode where Project 1 ships PSL constructors for `EncryptedNumber` / `EncryptedDate` / etc. that compile fine but break at runtime because the corresponding codec / search-operator paths weren't in scope.
 
 # Out of scope (for the umbrella)
 

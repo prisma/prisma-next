@@ -1,14 +1,14 @@
 # Live PG + EQL + ZeroKMS e2e harness
 
-This directory hosts the live-Postgres + EQL bundle + ZeroKMS end-to-end harness for the cipherstash-integration example app. Seven `*.e2e.test.ts` files cover one acceptance criterion each:
+This directory hosts the live-Postgres + EQL bundle + ZeroKMS end-to-end harness for the cipherstash-integration example app. Seven `*.e2e.test.ts` files cover one codec or scenario each:
 
-- `ac-e2e-num.e2e.test.ts` — `EncryptedDouble` round-trip; `Gt`/`Gte`/`Lt`/`Lte`/`Between`/`Asc`/`Desc`.
-- `ac-e2e-bigint.e2e.test.ts` — `EncryptedBigInt` round-trip; equality + range + sort.
-- `ac-e2e-date.e2e.test.ts` — `EncryptedDate` round-trip; date range + sort.
-- `ac-e2e-bool.e2e.test.ts` — `EncryptedBoolean` round-trip; `Eq` / `Ne` / `InArray`.
-- `ac-e2e-json.e2e.test.ts` — `EncryptedJson` round-trip + `cipherstashJsonbPathQueryFirst` / `cipherstashJsonbGet` SELECT-expression helpers. The `cipherstashJsonbPathExists` predicate clause is skipped per the known limitation tracked at [TML-2504](https://linear.app/prisma-company/issue/TML-2504).
-- `ac-e2e-str-range.e2e.test.ts` — `EncryptedString({ orderAndRange: true })` supports `Gt` + `Asc` + `Ilike` coexistence.
-- `ac-e2e-mixed.e2e.test.ts` — mixed-codec query issues the minimum SDK round-trips (one per `(table, column)`).
+- `num.e2e.test.ts` — `EncryptedDouble` round-trip; `Gt`/`Gte`/`Lt`/`Lte`/`Between`/`Asc`/`Desc`.
+- `bigint.e2e.test.ts` — `EncryptedBigInt` round-trip; equality + range + sort.
+- `date.e2e.test.ts` — `EncryptedDate` round-trip; date range + sort.
+- `bool.e2e.test.ts` — `EncryptedBoolean` round-trip; `Eq` / `Ne` / `InArray`.
+- `json.e2e.test.ts` — `EncryptedJson` round-trip + `cipherstashJsonbPathQueryFirst` / `cipherstashJsonbGet` SELECT-expression helpers. The `cipherstashJsonbPathExists` predicate clause is skipped per the known limitation tracked at [TML-2504](https://linear.app/prisma-company/issue/TML-2504).
+- `str-range.e2e.test.ts` — `EncryptedString({ orderAndRange: true })` supports `Gt` + `Asc` + `Ilike` coexistence.
+- `mixed.e2e.test.ts` — mixed-codec query issues the minimum SDK round-trips (one per `(table, column)`).
 
 ## Local setup
 

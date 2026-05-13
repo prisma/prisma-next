@@ -359,12 +359,14 @@ describe('bulkEncryptMiddleware', () => {
     });
   });
 
-  describe('matches every cipherstash codec id (T7)', () => {
+  describe('matches every cipherstash codec id', () => {
     // The middleware filters `params.entries()` against the closed set
     // `CIPHERSTASH_CODEC_ID_SET` rather than the single string codec
     // id; this exercises that every codec in the package's surface
     // (string + double + bigint + date + boolean + json) routes
-    // through the bulk-encrypt path. AC-MW1 / AC-MW2.
+    // through the bulk-encrypt path, and that every plaintext slot
+    // in a mixed-codec INSERT participates in exactly one
+    // `bulkEncrypt` call per `(table, column)` group.
 
     function buildHeterogeneousInsertPlan(
       table: string,
@@ -436,8 +438,8 @@ describe('bulkEncryptMiddleware', () => {
       expect(byColumn.has('enabled')).toBe(true);
       expect(byColumn.has('payload')).toBe(true);
 
-      // Per-envelope plaintext is forwarded as `unknown` (D1) — the
-      // SDK sees the original JS plaintext untouched.
+      // Per-envelope plaintext is forwarded to the SDK as `unknown`
+      // — the SDK sees the original JS plaintext untouched.
       expect(byColumn.get('score')?.values).toEqual([3.14]);
       expect(byColumn.get('amount')?.values).toEqual([42n]);
       expect(byColumn.get('enabled')?.values).toEqual([true]);

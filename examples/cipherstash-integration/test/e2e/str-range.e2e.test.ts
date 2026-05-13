@@ -1,7 +1,7 @@
 /**
- * AC-E2E-STR-RANGE — End-to-end round-trip for `EncryptedString`
- * authored with `orderAndRange: true` against live Postgres + EQL
- * bundle + ZeroKMS.
+ * End-to-end round-trip for `EncryptedString` authored with
+ * `orderAndRange: true` against live Postgres + EQL bundle +
+ * ZeroKMS.
  *
  * The example schema authors `email` with the default no-args
  * constructor (`cipherstash.EncryptedString()`), which opts every
@@ -47,7 +47,7 @@ function seedRow(s: (typeof SEED)[number]) {
   };
 }
 
-describe('AC-E2E-STR-RANGE (live PG + EQL + ZeroKMS)', () => {
+describe('EncryptedString orderAndRange e2e (live PG + EQL + ZeroKMS)', () => {
   beforeAll(async () => {
     await ensureConnected();
     truncateUsers();

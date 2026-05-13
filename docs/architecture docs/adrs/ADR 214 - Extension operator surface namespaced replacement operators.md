@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. The namespaced-replacement-operator pattern landed with `@prisma-next/extension-cipherstash` in Project 1 (the original `cipherstashEq` / `cipherstashIlike` surface) and was extended with the predicate/helper split in Project 2 ([TML-2375](https://linear.app/prisma-company/issue/TML-2375)). This ADR records both decisions in one place; the cipherstash extension is the canonical worked example.
+Accepted. The namespaced-replacement-operator pattern landed with the initial `@prisma-next/extension-cipherstash` release alongside the original `cipherstashEq` / `cipherstashIlike` surface, and was extended with the predicate/helper split when the encrypted-codec catalogue grew to cover numbers, dates, booleans, and JSON ([TML-2375](https://linear.app/prisma-company/issue/TML-2375)). This ADR records both decisions in one place; the cipherstash extension is the canonical worked example.
 
 ## At a glance
 
@@ -17,7 +17,7 @@ flowchart LR
   Ns -.lowers to.-> EqlEq[eql_v2.eq]
 ```
 
-The operator surface itself decomposes along the framework's predicate/non-predicate cleavage. Predicate operators (return boolean) register as column methods through the `OperationRegistry` and flow through trait-dispatched `QueryOperationTypes`. Non-predicate operators (return non-boolean shapes like `OrderByItem` for sort or codec-typed `Expression` for SELECT-expression accessors) ship as **free-standing helper functions** exported from the extension's runtime entry, not as column methods. The two surfaces are typed and dispatched differently because their dispatch contracts differ.
+The operator surface itself decomposes along the framework's predicate/non-predicate split. Predicate operators (return boolean) register as column methods through the `OperationRegistry` and flow through trait-dispatched `QueryOperationTypes`. Non-predicate operators (return non-boolean shapes like `OrderByItem` for sort or codec-typed `Expression` for SELECT-expression accessors) ship as **free-standing helper functions** exported from the extension's runtime entry, not as column methods. The two surfaces are typed and dispatched differently because their dispatch contracts differ.
 
 ```mermaid
 flowchart LR
@@ -41,11 +41,11 @@ Extensions that ship encrypted, geographic, vector, or otherwise specially-encod
 
 If the cipherstash codec declared the `equality` trait, the framework's built-in `m.email.eq(...)` would synthesise on cipherstash columns and lower to SQL `=` — a wrong-SQL footgun. Conversely, *suppressing* the built-in `eq` without offering a replacement leaves the user without an equality check. The codec is therefore forced to take both steps: declare zero traits to block the built-in *and* offer a namespaced replacement that lowers to the correct EQL function.
 
-The same pattern surfaced when Project 2 added non-boolean operators (sort over encrypted columns; JSON SELECT-expression accessors over encrypted JSON). These don't fit the column-method dispatch contract the predicate operators use — `ORDER BY` takes `OrderByItem` values, not columns; JSON accessors return `Expression` values that are themselves usable as input to follow-on operators. Trying to register them through the operator registry collapses to an empty surface (the registry's non-predicate path keys chainable methods off the *return* codec's traits, and cipherstash codecs declare none) and forcing a column-method shape would require widening the registry's return-type contract or introducing non-uniform per-operator return-type machinery — both larger framework changes.
+The same pattern surfaced when the extension grew non-boolean operators (sort over encrypted columns; JSON SELECT-expression accessors over encrypted JSON). These don't fit the column-method dispatch contract the predicate operators use — `ORDER BY` takes `OrderByItem` values, not columns; JSON accessors return `Expression` values that are themselves usable as input to follow-on operators. Trying to register them through the operator registry collapses to an empty surface (the registry's non-predicate path keys chainable methods off the *return* codec's traits, and cipherstash codecs declare none) and forcing a column-method shape would require widening the registry's return-type contract or introducing non-uniform per-operator return-type machinery — both larger framework changes.
 
 ## Decision
 
-### Part A — Namespaced replacement operators (Project 1)
+### Part A — Namespaced replacement operators
 
 When an extension's codec output cannot back a framework built-in operator's wire semantics:
 
@@ -57,9 +57,9 @@ The naming convention is `<extensionPrefix><BuiltInName>` (e.g. `cipherstashEq`,
 
 The trait-removal half is regression-pinned per package (cipherstash has `test/equality-trait-removal.test.ts` asserting that every cipherstash codec advertises only `cipherstash:`-namespaced traits, never the framework `equality` trait). The flat-keyed-registry half is structurally enforced by the framework — there is no API to bind a name twice.
 
-### Part B — Predicate / non-predicate split (Project 2)
+### Part B — Predicate / non-predicate split
 
-Extension operators decompose along the framework's natural cleavage between *predicate operators* (return a codec carrying the `boolean` trait) and *non-predicate operators* (everything else: sort comparators, SELECT-expression accessors, computed projections).
+Extension operators decompose along the framework's natural split between *predicate operators* (return a codec carrying the `boolean` trait) and *non-predicate operators* (everything else: sort comparators, SELECT-expression accessors, computed projections).
 
 | Shape | Surface | Dispatch contract | Example |
 |---|---|---|---|

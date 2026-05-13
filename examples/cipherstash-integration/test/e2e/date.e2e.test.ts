@@ -1,6 +1,6 @@
 /**
- * AC-E2E-DATE — End-to-end round-trip for `EncryptedDate` against
- * live Postgres + EQL bundle + ZeroKMS.
+ * End-to-end round-trip for `EncryptedDate` against live
+ * Postgres + EQL bundle + ZeroKMS.
  *
  * Pins:
  *   - INSERT + decrypt round-trip recovers the source `Date`.
@@ -45,7 +45,7 @@ function seedRow(s: (typeof SEED)[number]) {
   };
 }
 
-describe('AC-E2E-DATE (live PG + EQL + ZeroKMS)', () => {
+describe('EncryptedDate e2e (live PG + EQL + ZeroKMS)', () => {
   beforeAll(async () => {
     await ensureConnected();
     truncateUsers();

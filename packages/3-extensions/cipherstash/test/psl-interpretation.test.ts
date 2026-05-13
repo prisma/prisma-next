@@ -123,7 +123,7 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
     );
   });
 
-  it('lets orderAndRange be explicitly disabled (D6)', () => {
+  it('lets orderAndRange be explicitly disabled', () => {
     const result = interpret(`model User {
   id Int @id
   notes cipherstash.EncryptedString({ orderAndRange: false })

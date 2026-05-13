@@ -55,9 +55,9 @@ void _ciphertextsAreUnknown;
 // --- Negative: a string-only `bulkEncrypt` rejects `ReadonlyArray<unknown>`
 
 // A hypothetical narrower contract: `values` typed as `ReadonlyArray<string>`.
-// Callers who pass a polymorphic batch (the actual contract D1 locks in)
-// no longer compile — proving the polymorphic shape is what makes the
-// framework boundary work.
+// Callers who pass a polymorphic batch (the actual contract the SDK
+// boundary commits to) no longer compile — proving the polymorphic
+// shape is what makes the framework boundary work.
 declare const narrowedBulkEncrypt: (args: {
   readonly routingKey: { readonly table: string; readonly column: string };
   readonly values: ReadonlyArray<string>;

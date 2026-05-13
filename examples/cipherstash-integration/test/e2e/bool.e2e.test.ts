@@ -1,19 +1,17 @@
 /**
- * AC-E2E-BOOL — End-to-end round-trip for `EncryptedBoolean`
- * against live Postgres + EQL bundle + ZeroKMS.
+ * End-to-end round-trip for `EncryptedBoolean` against live
+ * Postgres + EQL bundle + ZeroKMS.
  *
  * Booleans surface only the equality-trait operators (no
- * order-and-range) so this AC pins:
+ * order-and-range) so this file pins:
  *   - INSERT + decrypt round-trip recovers `true` / `false`.
- *   - `cipherstashEq(true)` / `cipherstashEq(false)` filter to the
- *     matching set. Note: `cipherstashEq` is the legacy single-codec
- *     operator pinned to `cipherstash/string@1`. For non-string
- *     equality, the trait-namespaced `cipherstashInArray([value])`
- *     is the canonical form (see `src/index.ts`'s boolean demo).
- *     The spec wording mentions `cipherstashEq`/`Ne` on booleans;
- *     we exercise both surfaces below — `cipherstashInArray` for the
- *     trait-dispatched path (the working live form) and
- *     `cipherstashNe` for the inequality direction.
+ *   - Equality filters to the matching set. Note: `cipherstashEq` is
+ *     the legacy single-codec operator pinned to `cipherstash/string@1`.
+ *     For non-string equality, the trait-namespaced
+ *     `cipherstashInArray([value])` is the canonical form (see
+ *     `src/index.ts`'s boolean demo). We exercise
+ *     `cipherstashInArray` (the trait-dispatched live form) and
+ *     `cipherstashNe` (the inequality direction).
  */
 
 import {
@@ -47,7 +45,7 @@ function seedRow(s: (typeof SEED)[number]) {
   };
 }
 
-describe('AC-E2E-BOOL (live PG + EQL + ZeroKMS)', () => {
+describe('EncryptedBoolean e2e (live PG + EQL + ZeroKMS)', () => {
   beforeAll(async () => {
     await ensureConnected();
     truncateUsers();

@@ -28,9 +28,9 @@ import type { CipherstashRoutingKey } from './sdk';
  * polymorphic across every cipherstash codec (string, double, bigint,
  * date, boolean, json — each with its own `T`); the SDK's
  * `bulkEncrypt({ values: ReadonlyArray<unknown>, ... })` shape is
- * already the polymorphic surface (D1), and homogeneity within a
- * `(table, column)` group means narrower per-cell typing is not
- * needed for batching correctness.
+ * already polymorphic, and homogeneity within a `(table, column)`
+ * group means narrower per-cell typing is not needed for batching
+ * correctness.
  */
 export interface BulkEncryptTarget<TRef = unknown> {
   readonly ref: TRef;

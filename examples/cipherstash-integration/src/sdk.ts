@@ -132,7 +132,9 @@ function toJsPlaintext(value: unknown): JsPlaintext {
  * The framework's `CipherstashSdk.decrypt` is typed `Promise<string>`
  * but every concrete `Encrypted*` envelope is wired to a polymorphic
  * `bulkDecrypt` whose entries can be `number`, `boolean`, `Date`-as-
- * ISO-string, `bigint`-as-number, or a JSON object (per spec D1).
+ * ISO-string, `bigint`-as-number, or a JSON object — the SDK
+ * boundary is `ReadonlyArray<unknown>` and each codec is responsible
+ * for parsing its own plaintext shape.
  * The envelope's `parseDecryptedValue` hook narrows back to the
  * concrete plaintext type; this adapter has nothing to validate
  * beyond "not undefined / not error". Returning the raw value lets

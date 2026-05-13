@@ -130,7 +130,7 @@ The order is mechanical; the substrate factories are the leverage that makes add
 
 ## The operator surface — predicate vs helper
 
-The 17 cipherstash operators decompose along the framework's predicate / non-predicate cleavage per [ADR 214 — Extension operator surface](../../../docs/architecture%20docs/adrs/ADR%20214%20-%20Extension%20operator%20surface%20namespaced%20replacement%20operators.md).
+The 17 cipherstash operators decompose along the framework's predicate / non-predicate split per [ADR 214 — Extension operator surface](../../../docs/architecture%20docs/adrs/ADR%20214%20-%20Extension%20operator%20surface%20namespaced%20replacement%20operators.md).
 
 ### Predicate operators — column-method surface
 

@@ -110,6 +110,7 @@ Thresholds are defined in `.cursor/rules-footprint.config.json`.
 ## Research & docs writing
 - `.cursor/rules/research-comparisons-need-axes.mdc` — Comparisons must state the shared axis (knob/invariant/trade-off)
 - `.cursor/rules/walkthrough-additive-changes.mdc` — Walkthrough wording: phrase additive changes as additions (avoid “no X → Y”)
+- `.cursor/rules/avoid-cleavage-in-prose.mdc` — Don't use the word "cleavage" as a metaphor in docs/specs/PRs; prefer split/boundary/distinction
 - `.cursor/rules/review-scope-overrides.mdc` — When writing review artifacts, honor user-specified base branches
 - `.cursor/rules/cursor-markdown-file-links.mdc` — Path-only repo-relative links in review markdown (Cursor does not resolve `:line` in link targets)
 Notes

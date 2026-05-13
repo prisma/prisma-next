@@ -1,13 +1,13 @@
 /**
- * AC-E2E-BIGINT — End-to-end round-trip for `EncryptedBigInt`
- * against live Postgres + EQL bundle + ZeroKMS.
+ * End-to-end round-trip for `EncryptedBigInt` against live
+ * Postgres + EQL bundle + ZeroKMS.
  *
- * Pins the cipherstash bigint codec behaviour the spec calls out
- * for `AC-E2E-NUM` and adds bigint-specific assertions.
+ * Pins the cipherstash bigint codec's encrypt + decrypt + range +
+ * sort behaviour with bigint-specific assertions on top of the
+ * general numeric coverage in `num.e2e.test.ts`.
  *
  * # Known limitation: Number.MAX_SAFE_INTEGER cap
  *
- * The spec calls for "values that exceed `Number.MAX_SAFE_INTEGER`".
  * The underlying `@cipherstash/stack` SDK accepts only the
  * `string | number | boolean | object | array` `JsPlaintext` shape for
  * `bulkEncrypt`, and ZeroKMS's `big_int` cast rejects string
@@ -53,7 +53,7 @@ function seedRow(s: (typeof SEED)[number]) {
   };
 }
 
-describe('AC-E2E-BIGINT (live PG + EQL + ZeroKMS)', () => {
+describe('EncryptedBigInt e2e (live PG + EQL + ZeroKMS)', () => {
   beforeAll(async () => {
     await ensureConnected();
     truncateUsers();

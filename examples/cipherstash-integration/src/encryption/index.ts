@@ -28,7 +28,7 @@ import type { EncryptionClient } from '@cipherstash/stack/client';
 import { encryptedColumn, encryptedTable } from '@cipherstash/stack/schema';
 
 // Per-column search-config matches `prisma/schema.prisma`. The PSL
-// constructors default every flag to `true` (per spec FR6), so the
+// constructors default every search-index flag to `true`, so the
 // stack-side schema below mirrors the maximal index surface for each
 // codec id. Mismatches here surface at runtime as ZeroKMS rejecting
 // the search term against a column whose stack-side index set

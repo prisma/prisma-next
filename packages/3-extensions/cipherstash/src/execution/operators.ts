@@ -266,9 +266,9 @@ function extractColumnRef(selfAst: AnyExpression): ColumnRef | undefined {
 
 /**
  * Build a single-codec cipherstash operator descriptor — the
- * legacy shape used by `cipherstashEq` / `cipherstashIlike` from
- * Project 1. Newer multi-codec operators use {@link envelopeOperator}
- * with trait-based dispatch instead.
+ * original shape used by `cipherstashEq` / `cipherstashIlike`,
+ * pinned to `cipherstash/string@1`. Multi-codec operators use
+ * {@link envelopeOperator} with trait-based dispatch instead.
  *
  * @param publicMethod - The user-facing method name on the column
  *   accessor (e.g. `cipherstashEq`). Must not collide with any

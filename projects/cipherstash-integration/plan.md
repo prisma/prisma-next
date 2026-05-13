@@ -29,7 +29,7 @@ The dependency edges:
 | Edge | Direction | Hard / Soft |
 |---|---|---|
 | Project 1 → Project 2 | Project 2 *expands* Project 1's surface (more types, more operators) | **Hard** — Project 2 instantiates Project 1's codec/PSL/TS/operator pattern per type. |
-| Project 1 → `sql-raw-factory` | Project 1 ships the `RawSqlExpr` AST node `sql-raw-factory` consumes | **Soft on ordering, hard on substance** — `sql-raw-factory` could ship before Project 1 if it owns the AST node, but the agreed cleavage has Project 1 ship it |
+| Project 1 → `sql-raw-factory` | Project 1 ships the `RawSqlExpr` AST node `sql-raw-factory` consumes | **Soft on ordering, hard on substance** — `sql-raw-factory` could ship before Project 1 if it owns the AST node, but the agreed split has Project 1 ship it |
 | TML-2397 (contract spaces) → all components | Codec lifecycle hook, per-space verifier, EQL bundle install in cipherstash space's baseline migration | **Hard, satisfied** — all components rebase onto `tml-2397-cipherstash-contract-space` |
 | Framework PRs (#400, #402, #404, #409) → Project 1 | Codec call context, unified `CodecDescriptor<P>`, invariant-aware ref routing, middleware `intercept` + `contentHash` | **Hard, satisfied** — already on the contract-spaces base |
 

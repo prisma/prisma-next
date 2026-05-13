@@ -56,7 +56,7 @@ describe('cipherstash column-types', () => {
       });
     });
 
-    it('lets orderAndRange be explicitly disabled (D6)', () => {
+    it('lets orderAndRange be explicitly disabled', () => {
       expect(encryptedString({ orderAndRange: false })).toMatchObject({
         typeParams: { equality: true, freeTextSearch: true, orderAndRange: false },
       });

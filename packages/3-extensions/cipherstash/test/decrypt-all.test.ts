@@ -389,8 +389,8 @@ describe('decryptAll — diagnostics on misuse', () => {
     // the cached plaintext to force the walker to consider it as a
     // bulk-decrypt target. The cleanest way to exercise the negative
     // path without reaching into private APIs is to pass an envelope
-    // whose handle is in the ill-formed shape; the spec's open-question
-    // 5 (resolved) confirms this is a misuse case, not a supported flow.
+    // whose handle is in the ill-formed shape; this is an explicit
+    // misuse case, not a supported flow.
     const envelope = EncryptedString.fromInternal({
       ciphertext: { c: 'ct:alice' },
       // Cast through unknown to exercise the diagnostic path; the
@@ -424,13 +424,13 @@ describe('decryptAll — diagnostics on misuse', () => {
 });
 
 describe('decryptAll — heterogeneous envelope subclasses', () => {
-  // T7: the walker decrypts every `EncryptedEnvelopeBase` subclass
+  // The walker decrypts every `EncryptedEnvelopeBase` subclass
   // (string + double + bigint + date + boolean + json) and dispatches
   // through each subclass's `parseDecryptedValue` hook to narrow the
   // SDK's polymorphic `bulkDecrypt` return to the per-type plaintext.
-  // Pins AC-DEC1 (one bulkDecrypt per `(table, column)` group across
-  // mixed types) and AC-DEC2 (each envelope's `decrypt()` returns the
-  // narrowed cached value synchronously).
+  // Pins both invariants together: one `bulkDecrypt` per
+  // `(table, column)` group across mixed types, and each envelope's
+  // `decrypt()` returns the narrowed cached value synchronously.
   //
   // The mock SDK below stores the original plaintext on the
   // ciphertext envelope's `v` slot so each per-type narrowing hook

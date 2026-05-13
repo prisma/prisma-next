@@ -20,8 +20,8 @@
  *    homogeneity-by-column means each batch is naturally typed (every
  *    cell in a `(table, column)` group has the same codec id, hence
  *    the same plaintext type), so the SDK's polymorphic `values:
- *    ReadonlyArray<unknown>` surface (D1) does not need narrowing
- *    inside this middleware.
+ *    ReadonlyArray<unknown>` surface does not need narrowing inside
+ *    this middleware.
  *
  * 3. Stamps each returned ciphertext onto the envelope's handle via
  *    `setHandleCiphertext` and writes the envelope back through

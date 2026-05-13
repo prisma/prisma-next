@@ -47,8 +47,10 @@
  * the result is itself a JSON-encrypted value usable as the column
  * argument to a follow-on JSON helper or predicate. The path is a
  * user-authored static literal (a JSONpath expression or a JSON key
- * string) and is bound as a `pg/text@1` `ParamRef`; user-controlled
- * runtime path values are out of scope per spec.
+ * string) and is bound as a `pg/text@1` `ParamRef`. Dynamic
+ * user-controlled runtime path values are not supported here — paths
+ * must be statically authored to keep the JSONpath surface free of
+ * injection-shaped input.
  *
  * # No registry participation
  *

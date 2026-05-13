@@ -8,7 +8,7 @@ Add `RawSqlExpr` to the SQL `AnyQueryAst` union as a first-class AST node carryi
 
 Adding `RawSqlExpr` as a real AST node fixes the structural problem and lets cipherstash's migration factories produce `DataTransformOperation`s carrying `invariantId`s — *without* coupling cipherstash to the (separate, parallel) effort to ship a public `raw\`...\`` template-literal factory at [`sql-raw-factory`](../../sql-raw-factory/spec.md).
 
-The cleavage is deliberate: this task spec ships the **AST node + lowerer arm + minimum package-internal construction surface**. The public user-facing `raw\`...\`` factory, the `RawArg` type union (Expression | ParamRef | Identifier), bare-value type rejection, and the `identifier(...)` escape hatch all live in `projects/sql-raw-factory/`. Cipherstash needs none of those — it constructs `RawSqlExpr` directly from validated `ParamRef`s built inside the migration-factories module.
+The split is deliberate: this task spec ships the **AST node + lowerer arm + minimum package-internal construction surface**. The public user-facing `raw\`...\`` factory, the `RawArg` type union (Expression | ParamRef | Identifier), bare-value type rejection, and the `identifier(...)` escape hatch all live in `projects/sql-raw-factory/`. Cipherstash needs none of those — it constructs `RawSqlExpr` directly from validated `ParamRef`s built inside the migration-factories module.
 
 If `sql-raw-factory` ships before this spec, the work merges into that project. If this spec ships first, `sql-raw-factory` consumes the AST node and adds the user-facing factory on top.
 

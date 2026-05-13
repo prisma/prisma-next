@@ -1,6 +1,6 @@
 /**
- * AC-E2E-JSON — End-to-end round-trip for `EncryptedJson` against
- * live Postgres + EQL bundle + ZeroKMS.
+ * End-to-end round-trip for `EncryptedJson` against live
+ * Postgres + EQL bundle + ZeroKMS.
  *
  * Pins:
  *   - INSERT + decrypt round-trip recovers the source JSON object.
@@ -78,7 +78,7 @@ function seedRow(s: (typeof SEED)[number]) {
   };
 }
 
-describe('AC-E2E-JSON (live PG + EQL + ZeroKMS)', () => {
+describe('EncryptedJson e2e (live PG + EQL + ZeroKMS)', () => {
   beforeAll(async () => {
     await ensureConnected();
     truncateUsers();

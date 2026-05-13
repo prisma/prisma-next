@@ -2,8 +2,8 @@
  * Cipherstash cancellation umbrella.
  *
  * Pins the contract for the cipherstash-internal `RUNTIME.ABORTED`
- * envelope wrapping at every async observation point that the umbrella
- * spec calls out:
+ * envelope wrapping at every async observation point the extension
+ * exposes:
  *
  *   - `bulk-encrypt`  — bulk-encrypt middleware`s `sdk.bulkEncrypt` call.
  *   - `decrypt`       — single-cell `EncryptedString#decrypt()` SDK call.

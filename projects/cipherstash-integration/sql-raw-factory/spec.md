@@ -8,7 +8,7 @@ Implement the user-facing `raw\`...\`` SQL factory the framework's type declarat
 
 This project ships the public factory. It does **not** ship the underlying `RawSqlExpr` AST node — that lands separately in the [raw-sql-ast-node task spec](../project-1/specs/raw-sql-ast-node.spec.md) under [Project 1](../project-1/spec.md) of the umbrella, driven by cipherstash's migration-factories needs and timed independently. This project is the *consumer* of that AST node, adding the user-facing typed-template-literal surface and the SQL-injection-defense affordances.
 
-The cleavage:
+The split:
 
 - **Upstream (cipherstash-integration / `raw-sql-ast-node.spec.md`):** `RawSqlExpr` AST node, lowerer arm, `planFromAst` envelope helper. Package-internal construction surface — callers use `RawSqlExpr.of(fragments, args)` directly.
 - **This project (`sql-raw-factory`):** Public `raw\`...\`` template-literal factory, `RawArg` type union (Expression | ParamRef | RawSqlIdentifier), `identifier(...)` SQL-identifier escape hatch, type-level rejection of bare values with helpful error messages, `param(value, opts)` ergonomic re-export.

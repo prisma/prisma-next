@@ -1,18 +1,19 @@
 /**
- * AC-E2E-MIXED — End-to-end mixed-codec query against live
- * Postgres + EQL bundle + ZeroKMS.
+ * End-to-end mixed-codec query against live Postgres + EQL bundle
+ * + ZeroKMS.
  *
  * Pins the cross-codec invariants:
  *   - A single query that touches multiple cipherstash columns of
  *     different types in WHERE + ORDER BY succeeds end-to-end.
  *   - Bulk-encrypt batches every search-term envelope into the
  *     minimum number of SDK round-trips — one `bulkEncrypt` per
- *     `(table, column)` group (see {@link AC-MW1} / {@link AC-MW2}).
+ *     `(table, column)` group (covered by the bulk-encrypt
+ *     middleware unit tests in
+ *     `packages/3-extensions/cipherstash/test/bulk-encrypt-middleware.test.ts`).
  *
  * The SDK round-trip count is observed by instrumenting the example
- * app's `createCipherstashSdk()` for the duration of the test. The
- * spec language ("the minimum number of SDK round-trips") here is
- * concretely:
+ * app's `createCipherstashSdk()` for the duration of the test.
+ * Concretely:
  *
  *   - WHERE clause touches `email` (string) + `salary` (double) +
  *     `birthday` (date) + `emailVerified` (boolean) — four cipher
@@ -122,7 +123,7 @@ function createCountingSdk() {
   };
 }
 
-describe('AC-E2E-MIXED (live PG + EQL + ZeroKMS)', () => {
+describe('Mixed-codec e2e (live PG + EQL + ZeroKMS)', () => {
   // Use a private `db` instance with a counting SDK so the round-trip
   // assertions are insulated from any other test file that may have
   // mutated the harness's shared client.

@@ -35,9 +35,9 @@ type JsonReturn = Expression<{ codecId: 'cipherstash/json@1'; nullable: false }>
 
 // Bidirectional assignability check. `JsonReturn` is the
 // `Expression<{codecId: 'cipherstash/json@1', nullable: false}>` type
-// the spec promises; the helpers must produce something assignable
-// to that slot, and a `JsonReturn` value must be assignable back to
-// the helper-return type. Direct `toEqualTypeOf<JsonReturn>` fails
+// the JSON helpers commit to producing; the helpers must produce
+// something assignable to that slot, and a `JsonReturn` value must
+// be assignable back to the helper-return type. Direct `toEqualTypeOf<JsonReturn>` fails
 // strict equality because `Expression<R>` is an intersection of
 // `QueryOperationReturn` and the narrowed `{returnType: R}` shape;
 // the intersection's `returnType` field carries both the broad

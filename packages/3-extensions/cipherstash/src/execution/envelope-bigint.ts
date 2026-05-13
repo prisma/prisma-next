@@ -1,8 +1,8 @@
 /**
  * `EncryptedBigInt` envelope — the user-facing input/output type for
  * `cipherstash/bigint@1` columns. Concrete subclass of
- * {@link EncryptedEnvelopeBase} parameterised on `bigint` (per spec
- * D2; EQL `cast_as = 'big_int'`).
+ * {@link EncryptedEnvelopeBase} parameterised on `bigint`; lowers to
+ * EQL `cast_as = 'big_int'`.
  *
  * The SDK's polymorphic decrypt path returns the bigint plaintext in
  * whatever shape the wire-format choice surfaces — today, the

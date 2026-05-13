@@ -1,15 +1,18 @@
 /**
- * AC-E2E-NUM — End-to-end round-trip for `EncryptedDouble` against
- * live Postgres + EQL bundle + ZeroKMS.
+ * End-to-end round-trip for `EncryptedDouble` against live
+ * Postgres + EQL bundle + ZeroKMS.
  *
- * Pins the per-codec behaviour the spec calls out:
+ * Pins:
  *   - INSERT + decrypt round-trip recovers the source numbers.
  *   - `cipherstashGt`, `cipherstashGte`, `cipherstashLt`,
  *     `cipherstashLte`, `cipherstashBetween` each filter rows
  *     correctly against the IEEE-754-encrypted column.
  *   - `cipherstashAsc` / `cipherstashDesc` produce numerically-
- *     sorted results — the bare-column ORDER BY bet (spec D8)
- *     resolves here against the live EQL operator family.
+ *     sorted results via bare-column `ORDER BY` against the live
+ *     EQL operator family. The cipherstash codec relies on the
+ *     EQL bundle's overloads of `<` / `>` for `eql_v2_encrypted`,
+ *     so an `ORDER BY <col>` clause sorts by the encrypted ORE
+ *     value without requiring a wrapping helper.
  *
  * Seed: four rows with file-scoped ID prefix `e2e-num-`. The
  * `beforeAll` truncates `users` first so the file's assertions
@@ -49,7 +52,7 @@ function seedRow(s: (typeof SEED)[number]) {
   };
 }
 
-describe('AC-E2E-NUM (live PG + EQL + ZeroKMS)', () => {
+describe('EncryptedDouble e2e (live PG + EQL + ZeroKMS)', () => {
   beforeAll(async () => {
     await ensureConnected();
     truncateUsers();

@@ -10,7 +10,7 @@
 // the gating semantics.
 //
 // Operator visibility per column follows from the codec's trait
-// set (per spec D7):
+// set:
 //
 //   - `email` (string) — `cipherstashEq`, `cipherstashIlike`,
 //     `cipherstashNotIlike` (free-text-search), plus
