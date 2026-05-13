@@ -114,8 +114,7 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
     });
 
     expect(out.seeded).toHaveLength(1);
-    const [record] = out.seeded;
-    if (!record) throw new Error('unreachable');
+    const record = out.seeded[0]!;
     expect(record.spaceId).toBe(EXT_SPACE);
     expect(record.action).toBe('updated');
     expect(record.priorHash).toBeNull();
@@ -143,8 +142,9 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
     // refs/head.json: hash + invariants (alphabetically sorted by the
     // framework — the input order was reversed).
     const headRef = await readContractSpaceHeadRef(migrationsDir, EXT_SPACE);
-    expect(headRef?.hash).toBe(headHash);
-    expect(headRef?.invariants).toEqual(['inv:a', 'inv:b']);
+    expect(headRef).not.toBeNull();
+    expect(headRef!.hash).toBe(headHash);
+    expect(headRef!.invariants).toEqual(['inv:a', 'inv:b']);
   });
 
   it('re-emits byte-identical artefacts on a no-op re-seed', async () => {
@@ -173,7 +173,7 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
     const firstHead = await readFile(join(migrationsDir, EXT_SPACE, 'refs', 'head.json'));
 
     const second = await runContractSpaceSeedPhase(seedInput);
-    expect(second.seeded[0]?.action).toBe('unchanged');
+    expect(second.seeded[0]!.action).toBe('unchanged');
 
     expect(await readFile(join(migrationsDir, EXT_SPACE, 'contract.json'))).toEqual(firstContract);
     expect(await readFile(join(migrationsDir, EXT_SPACE, 'contract.d.ts'))).toEqual(firstDts);
