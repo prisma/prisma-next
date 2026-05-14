@@ -1,6 +1,5 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { createContract } from '@prisma-next/contract/testing';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
@@ -109,8 +108,6 @@ async function setupDivergentFixture(): Promise<InvariantFixture & { refHash: st
     {
       from: FROM_HASH,
       to: TO_HASH,
-      fromContract: null,
-      toContract: createContract(),
       hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
       labels: [],
       providedInvariants: [],
@@ -126,8 +123,6 @@ async function setupDivergentFixture(): Promise<InvariantFixture & { refHash: st
     {
       from: FROM_HASH,
       to: REF_HASH,
-      fromContract: null,
-      toContract: createContract(),
       hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
       labels: [],
       providedInvariants: [],
@@ -171,8 +166,6 @@ async function setupFixture(opts: {
     {
       from: FROM_HASH,
       to: TO_HASH,
-      fromContract: null,
-      toContract: createContract(),
       hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
       labels: [],
       providedInvariants: edgeInvariants,

@@ -39,9 +39,8 @@ export interface ContractSpaceHeadRef {
 
 /**
  * Canonical structural shape of a migration package — the unit a planner
- * produces and a runner consumes: a directory name, the ADR 197 metadata
- * envelope (which carries the `toContract` snapshot), and the operation
- * list.
+ * produces and a runner consumes: a directory name, the metadata
+ * envelope, and the operation list.
  *
  * In-memory by default. Readers in `@prisma-next/migration-tools`
  * (`readMigrationPackage` / `readMigrationsDir`) return the augmented

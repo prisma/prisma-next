@@ -73,9 +73,7 @@ describe('executeDbInit', () => {
     expect(planFn).toHaveBeenCalledWith(
       expect.objectContaining({
         // `db init` reconciles against the live introspected schema and has
-        // no prior contract; the required `fromContract: null` is the
         // structural representation of "no origin contract" (AC-5).
-        fromContract: null,
       }),
     );
   });

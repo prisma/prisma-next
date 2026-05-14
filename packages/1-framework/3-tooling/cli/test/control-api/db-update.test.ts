@@ -447,9 +447,7 @@ describe('executeDbUpdate', () => {
       expect.objectContaining({
         policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
         // `db update` reconciles against the live introspected schema and has
-        // no prior contract; the required `fromContract: null` is the
         // structural representation of "no origin contract" (AC-5).
-        fromContract: null,
       }),
     );
   });

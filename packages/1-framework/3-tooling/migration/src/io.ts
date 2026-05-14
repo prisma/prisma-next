@@ -3,7 +3,6 @@ import type {
   MigrationMetadata,
   MigrationPackage,
 } from '@prisma-next/framework-components/control';
-import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { type } from 'arktype';
 import { basename, dirname, join, resolve } from 'pathe';
 import {
@@ -40,8 +39,6 @@ const MigrationMetadataSchema = type({
   from: 'string > 0 | null',
   to: 'string',
   migrationHash: 'string',
-  fromContract: 'object | null',
-  toContract: 'object',
   hints: MigrationHintsSchema,
   labels: 'string[]',
   providedInvariants: 'string[]',
@@ -74,35 +71,31 @@ export async function writeMigrationPackage(
  * Materialise an in-memory {@link MigrationPackage} to a per-space
  * directory on disk.
  *
- * Writes three files under `<targetDir>/<pkg.dirName>/`:
+ * Writes two files under `<targetDir>/<pkg.dirName>/`:
  *
  * - `migration.json` — the manifest (pretty-printed, matches
  *   {@link writeMigrationPackage}'s output for byte-for-byte parity with
  *   app-space migrations).
  * - `ops.json` — the operation list (pretty-printed).
- * - `contract.json` — the canonical-JSON serialisation of
- *   `metadata.toContract`. This is the per-package post-state contract
- *   snapshot; the canonicalisation pass guarantees byte-determinism so
- *   re-emitting the same package across machines / runs produces an
- *   identical file.
  *
  * Distinct verb from the lower-level {@link writeMigrationPackage}
  * (which takes constituent `(metadata, ops)`): callers reading
- * `materialise…` know they are persisting a struct-typed package
- * including its contract-snapshot side car.
+ * `materialise…` know they are persisting a struct-typed package.
  *
  * Overwrite-idempotent: the per-package directory is cleared before
  * each emit, so re-running against the same `targetDir` produces
  * byte-identical contents and never leaves stale files behind. The
- * spec's "re-emitting the same package across runs / machines produces
- * byte-identical files" guarantee (§ 3) covers both same-dir and
- * fresh-dir re-emits. The lower-level {@link writeMigrationPackage}
- * stays strict because the CLI authoring path (`migration plan` /
- * `migration new`) deliberately refuses to clobber an existing
- * authored migration; this helper is the re-emit path that is
- * supposed to converge on a single canonical on-disk shape.
+ * lower-level {@link writeMigrationPackage} stays strict because the
+ * CLI authoring path (`migration plan` / `migration new`) deliberately
+ * refuses to clobber an existing authored migration; this helper is
+ * the re-emit path that is supposed to converge on a single canonical
+ * on-disk shape.
  *
- * @see specs/framework-mechanism.spec.md § 3 — Emission helper (T1.7).
+ * The per-space head contract lives at
+ * `<projectMigrationsDir>/<spaceId>/contract.json` (written by
+ * {@link import('./emit-contract-space-artefacts').emitContractSpaceArtefacts}),
+ * not inside the per-package directory. The runner reads only
+ * `migration.json` + `ops.json` from each package.
  */
 export async function materialiseMigrationPackage(
   targetDir: string,
@@ -111,9 +104,6 @@ export async function materialiseMigrationPackage(
   const dir = join(targetDir, pkg.dirName);
   await rm(dir, { recursive: true, force: true });
   await writeMigrationPackage(dir, pkg.metadata, pkg.ops);
-  await writeFile(join(dir, 'contract.json'), `${canonicalizeJson(pkg.metadata.toContract)}\n`, {
-    flag: 'wx',
-  });
 }
 
 /**

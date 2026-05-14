@@ -215,19 +215,6 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
-  it('errors when "toContract" is missing', async () => {
-    const dir = join(tmpDir, '20260225T1430_no_contract');
-    const { toContract: _, ...metadataWithout } = createTestMetadata();
-    await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadataWithout));
-    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
-
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
-      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
-      return true;
-    });
-  });
-
   it('errors when "createdAt" is missing', async () => {
     const dir = join(tmpDir, '20260225T1430_no_created');
     const { createdAt: _, ...metadataWithout } = createTestMetadata();

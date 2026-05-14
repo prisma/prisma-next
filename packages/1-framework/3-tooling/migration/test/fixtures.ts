@@ -21,12 +21,9 @@ export function createTestMetadata(
   overrides: Partial<MigrationMetadata> = {},
   ops: MigrationOps = [],
 ): MigrationMetadata {
-  const toContract = overrides.toContract ?? createTestContract();
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: null,
     to: 'sha256:abc123',
-    fromContract: null,
-    toContract,
     hints: {
       used: [],
       applied: ['additive_only'],
