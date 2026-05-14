@@ -1,6 +1,5 @@
 import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { materialiseMigrationPackage } from '../src/io';
@@ -17,7 +16,7 @@ describe('materialiseMigrationPackage', () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it('writes manifest, ops, and contract.json under <targetDir>/<pkg.dirName>/', async () => {
+  it('writes manifest and ops under <targetDir>/<pkg.dirName>/', async () => {
     const ops = createTestOps();
     const metadata = createTestMetadata({}, ops);
     const pkg = { dirName: '20260507T1100_install', metadata, ops };
@@ -26,10 +25,10 @@ describe('materialiseMigrationPackage', () => {
 
     const dir = join(tmpDir, pkg.dirName);
     const entries = (await readdir(dir)).sort();
-    expect(entries).toEqual(['contract.json', 'migration.json', 'ops.json']);
+    expect(entries).toEqual(['migration.json', 'ops.json']);
   });
 
-  it('serialises contract.json as the canonical JSON form of metadata.toContract', async () => {
+  it('does not write a per-package contract.json', async () => {
     const ops = createTestOps();
     const metadata = createTestMetadata({}, ops);
     const pkg = { dirName: 'baseline', metadata, ops };
@@ -37,8 +36,8 @@ describe('materialiseMigrationPackage', () => {
     await materialiseMigrationPackage(tmpDir, pkg);
 
     const dir = join(tmpDir, pkg.dirName);
-    const contractRaw = await readFile(join(dir, 'contract.json'), 'utf-8');
-    expect(contractRaw).toBe(`${canonicalizeJson(metadata.toContract)}\n`);
+    const entries = await readdir(dir);
+    expect(entries).not.toContain('contract.json');
   });
 
   it('produces byte-identical output across two writes of the same package to different dirs', async () => {
@@ -58,10 +57,6 @@ describe('materialiseMigrationPackage', () => {
     const aOps = await readFile(join(dirA, pkg.dirName, 'ops.json'), 'utf-8');
     const bOps = await readFile(join(dirB, pkg.dirName, 'ops.json'), 'utf-8');
     expect(aOps).toBe(bOps);
-
-    const aContract = await readFile(join(dirA, pkg.dirName, 'contract.json'), 'utf-8');
-    const bContract = await readFile(join(dirB, pkg.dirName, 'contract.json'), 'utf-8');
-    expect(aContract).toBe(bContract);
   });
 
   it('overwrites the per-package directory idempotently and removes stale files', async () => {
@@ -74,22 +69,15 @@ describe('materialiseMigrationPackage', () => {
 
     const firstManifest = await readFile(join(dir, 'migration.json'), 'utf-8');
     const firstOps = await readFile(join(dir, 'ops.json'), 'utf-8');
-    const firstContract = await readFile(join(dir, 'contract.json'), 'utf-8');
 
     await writeFile(join(dir, 'stale.json'), '{"stale":true}\n');
-    expect((await readdir(dir)).sort()).toEqual([
-      'contract.json',
-      'migration.json',
-      'ops.json',
-      'stale.json',
-    ]);
+    expect((await readdir(dir)).sort()).toEqual(['migration.json', 'ops.json', 'stale.json']);
 
     await materialiseMigrationPackage(tmpDir, pkg);
 
     expect(await readFile(join(dir, 'migration.json'), 'utf-8')).toBe(firstManifest);
     expect(await readFile(join(dir, 'ops.json'), 'utf-8')).toBe(firstOps);
-    expect(await readFile(join(dir, 'contract.json'), 'utf-8')).toBe(firstContract);
-    expect((await readdir(dir)).sort()).toEqual(['contract.json', 'migration.json', 'ops.json']);
+    expect((await readdir(dir)).sort()).toEqual(['migration.json', 'ops.json']);
   });
 
   it('creates the target directory if it does not yet exist', async () => {

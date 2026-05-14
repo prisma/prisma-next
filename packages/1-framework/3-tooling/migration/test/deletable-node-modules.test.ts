@@ -231,8 +231,6 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
     await writeTestPackage(join(migrationsDir, TEST_SPACE_ID, '20260225_baseline'), {
       from: null,
       to: HEAD_HASH,
-      fromContract: null,
-      toContract: spaceContract,
     });
 
     await rm(join(projectRoot, 'node_modules'), { recursive: true, force: true });

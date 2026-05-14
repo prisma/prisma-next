@@ -1,6 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import {
   emitContractSpaceArtefacts,
@@ -25,8 +24,6 @@ function makeMetadata(args: {
     from: args.from,
     to: args.to,
     migrationHash: `mh:${args.to}`,
-    fromContract: args.from === null ? null : ({ storage: { v: 'prior' } } as unknown as Contract),
-    toContract: { storage: { v: args.to } } as unknown as Contract,
     hints: { used: [], applied: [], plannerVersion: '2.0.0' },
     labels: [],
     providedInvariants: [],

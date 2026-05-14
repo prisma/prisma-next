@@ -115,7 +115,6 @@ async function executeMigrationNewCommand(
     );
   }
 
-  let fromContract: Contract | null = null;
   let fromHash: string | null = null;
   let fromContractSourceDir: string | null = null;
 
@@ -136,7 +135,6 @@ async function executeMigrationNewCommand(
           );
         }
         fromHash = match.metadata.to;
-        fromContract = match.metadata.toContract;
         fromContractSourceDir = match.dirPath;
       } else {
         const latestMigration = findLatestMigration(graph);
@@ -146,7 +144,6 @@ async function executeMigrationNewCommand(
             (p) => p.metadata.migrationHash === latestMigration.migrationHash,
           );
           if (leafPkg) {
-            fromContract = leafPkg.metadata.toContract;
             fromContractSourceDir = leafPkg.dirPath;
           }
         }
@@ -180,8 +177,6 @@ async function executeMigrationNewCommand(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: fromHash,
     to: toStorageHash,
-    fromContract,
-    toContract: toContractJson,
     hints: {
       used: [],
       applied: [],

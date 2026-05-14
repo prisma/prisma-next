@@ -1,6 +1,5 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { createContract } from '@prisma-next/contract/testing';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
@@ -116,8 +115,6 @@ async function setupTamperFixture(): Promise<TamperFixture> {
     {
       from: FROM_HASH,
       to: TO_HASH,
-      fromContract: null,
-      toContract: createContract(),
       hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
       labels: [],
       providedInvariants: [],

@@ -39,7 +39,7 @@ describe('materialiseExtensionMigrationPackageIfMissing', () => {
     expect(second.written).toBe(false);
   });
 
-  it('leaves on-disk content byte-identical when the dir already exists (AC-7 / AM12)', async () => {
+  it('leaves on-disk content byte-identical when the dir already exists', async () => {
     const ops = createTestOps();
     const metadata = createTestMetadata({}, ops);
     const pkg = { dirName: 'baseline', metadata, ops };
@@ -47,7 +47,7 @@ describe('materialiseExtensionMigrationPackageIfMissing', () => {
     await materialiseExtensionMigrationPackageIfMissing(tmpDir, pkg);
 
     const before = await Promise.all(
-      ['migration.json', 'ops.json', 'contract.json'].map((name) =>
+      ['migration.json', 'ops.json'].map((name) =>
         readFile(join(tmpDir, pkg.dirName, name), 'utf-8'),
       ),
     );
@@ -55,7 +55,7 @@ describe('materialiseExtensionMigrationPackageIfMissing', () => {
     await materialiseExtensionMigrationPackageIfMissing(tmpDir, pkg);
 
     const after = await Promise.all(
-      ['migration.json', 'ops.json', 'contract.json'].map((name) =>
+      ['migration.json', 'ops.json'].map((name) =>
         readFile(join(tmpDir, pkg.dirName, name), 'utf-8'),
       ),
     );

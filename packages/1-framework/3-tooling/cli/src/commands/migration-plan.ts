@@ -58,6 +58,18 @@ interface MigrationPlanOptions extends CommonCommandOptions {
   readonly from?: string;
 }
 
+/**
+ * Load a predecessor migration's destination contract from its sibling
+ * `end-contract.json` on disk. The manifest no longer inlines the
+ * contract; the planner reads it from the canonical on-disk artefact
+ * authored by a previous `migration plan` run.
+ */
+async function readPredecessorEndContract(migrationDir: string): Promise<Contract> {
+  const path = join(migrationDir, 'end-contract.json');
+  const raw = await readFile(path, 'utf-8');
+  return JSON.parse(raw) as Contract;
+}
+
 export interface MigrationPlanResult {
   readonly ok: boolean;
   readonly noOp: boolean;
@@ -202,8 +214,8 @@ async function executeMigrationPlanCommand(
         );
       }
       fromHash = resolved.value.metadata.to;
-      fromContract = resolved.value.metadata.toContract;
       fromContractSourceDir = resolved.value.dirPath;
+      fromContract = await readPredecessorEndContract(fromContractSourceDir);
     } else {
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
@@ -212,8 +224,8 @@ async function executeMigrationPlanCommand(
           (p) => p.metadata.migrationHash === latestMigration.migrationHash,
         );
         if (leafPkg) {
-          fromContract = leafPkg.metadata.toContract;
           fromContractSourceDir = leafPkg.dirPath;
+          fromContract = await readPredecessorEndContract(fromContractSourceDir);
         }
       }
     }
@@ -327,8 +339,6 @@ async function executeMigrationPlanCommand(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash' | 'providedInvariants'> = {
     from: fromHash,
     to: toStorageHash,
-    fromContract,
-    toContract: toContractJson,
     hints: {
       used: [],
       applied: [],

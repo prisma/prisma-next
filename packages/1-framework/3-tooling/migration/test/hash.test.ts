@@ -1,9 +1,8 @@
 import { createHash } from 'node:crypto';
-import type { Contract } from '@prisma-next/contract/types';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { describe, expect, it } from 'vitest';
 import { computeMigrationHash, verifyMigrationHash } from '../src/hash';
-import { createTestContract, createTestMetadata, createTestOps } from './fixtures';
+import { createTestMetadata, createTestOps } from './fixtures';
 
 describe('computeMigrationHash', () => {
   it('produces deterministic output', () => {
@@ -16,12 +15,6 @@ describe('computeMigrationHash', () => {
 
   it('returns sha256: prefixed string', () => {
     const id = computeMigrationHash(createTestMetadata(), createTestOps());
-    expect(id).toMatch(/^sha256:[a-f0-9]{64}$/);
-  });
-
-  it('handles fromContract: null (empty project)', () => {
-    const metadata = createTestMetadata({ fromContract: null });
-    const id = computeMigrationHash(metadata, createTestOps());
     expect(id).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
@@ -44,37 +37,6 @@ describe('computeMigrationHash', () => {
     const id1 = computeMigrationHash(metadata, createTestOps());
     const id2 = computeMigrationHash(metadata, []);
     expect(id1).not.toBe(id2);
-  });
-
-  it('is unchanged when toContract is mutated (non-storage fields)', () => {
-    const ops = createTestOps();
-    const m1 = createTestMetadata({
-      toContract: createTestContract({ target: 'postgres' }),
-    });
-    const m2 = createTestMetadata({
-      toContract: createTestContract({ target: 'mysql' }),
-    });
-    expect(computeMigrationHash(m1, ops)).toBe(computeMigrationHash(m2, ops));
-  });
-
-  it('is unchanged when fromContract is mutated', () => {
-    const ops = createTestOps();
-    const m1 = createTestMetadata({
-      fromContract: createTestContract({ target: 'postgres' }),
-    });
-    const m2 = createTestMetadata({
-      fromContract: createTestContract({ target: 'mysql' }),
-    });
-    expect(computeMigrationHash(m1, ops)).toBe(computeMigrationHash(m2, ops));
-  });
-
-  it('is unchanged when toContract.meta (a non-storage field) changes', () => {
-    const ops = createTestOps();
-    const baseContract = createTestContract();
-    const mutatedContract = { ...baseContract, meta: { foo: 'bar' } } as Contract;
-    const m1 = createTestMetadata({ toContract: baseContract });
-    const m2 = createTestMetadata({ toContract: mutatedContract });
-    expect(computeMigrationHash(m1, ops)).toBe(computeMigrationHash(m2, ops));
   });
 
   it('is unchanged when metadata.hints.plannerVersion is mutated', () => {
@@ -116,8 +78,7 @@ describe('computeMigrationHash', () => {
 
     const {
       migrationHash: _migrationHash,
-      fromContract: _fromContract,
-      toContract: _toContract,
+      signature: _signature,
       hints: _hints,
       ...strippedMeta
     } = metadata;
@@ -165,8 +126,6 @@ describe('verifyMigrationHash', () => {
     const baseMetadata = {
       from: null,
       to: 'sha256:abc123',
-      fromContract: null,
-      toContract: createTestContract(),
       hints: { used: [], applied: [], plannerVersion: '0.0.1' },
       labels: [],
       providedInvariants: [],

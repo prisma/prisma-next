@@ -357,8 +357,6 @@ describe('MigrationCLI.run', () => {
       from: 'sha256:from',
       to: 'sha256:to',
       migrationHash: null,
-      fromContract: { storage: { storageHash: 'sha256:from' }, marker: 'preserved-from' },
-      toContract: { storage: { storageHash: 'sha256:to' }, marker: 'preserved-to' },
       hints: { used: [], applied: [], plannerVersion: '2.0.0' },
       labels: ['scaffolded'],
       createdAt: '2026-01-15T10:00:00.000Z',
@@ -375,8 +373,6 @@ describe('MigrationCLI.run', () => {
 
     expect(exitCode).toBe(0);
     const manifest = JSON.parse(readFileSync(join(workDir, 'migration.json'), 'utf-8'));
-    expect(manifest.fromContract).toEqual(existing.fromContract);
-    expect(manifest.toContract).toEqual(existing.toContract);
     expect(manifest.labels).toEqual(existing.labels);
     expect(manifest.createdAt).toBe(existing.createdAt);
     // Even though the on-disk fixture started with `migrationHash: null`,

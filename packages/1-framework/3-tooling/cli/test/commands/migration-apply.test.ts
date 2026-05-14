@@ -1,8 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createContract, createSqlContract } from '@prisma-next/contract/testing';
-import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
@@ -38,8 +36,6 @@ async function writeAttestedMigration(
   opts: {
     from: string | null;
     to: string;
-    fromContract: Contract | null;
-    toContract: Contract;
     ops: MigrationPlanOperation[];
     timestamp: Date;
     slug: string;
@@ -50,8 +46,6 @@ async function writeAttestedMigration(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: opts.from,
     to: opts.to,
-    fromContract: opts.fromContract,
-    toContract: opts.toContract,
     hints: {
       used: [],
       applied: ['additive_only'],
@@ -79,21 +73,9 @@ describe('migration apply — pending migration resolution', {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-        },
-      },
-    });
-
     await writeAttestedMigration(migrationsDir, {
       from: null,
       to: 'sha256:hash-a',
-      fromContract: null,
-      toContract: contractA,
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'initial',
@@ -118,33 +100,9 @@ describe('migration apply — pending migration resolution', {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-        },
-      },
-    });
-    const contractB = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-          post: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-        },
-      },
-    });
-
     await writeAttestedMigration(migrationsDir, {
       from: null,
       to: 'sha256:hash-a',
-      fromContract: null,
-      toContract: contractA,
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'add_user',
@@ -153,8 +111,6 @@ describe('migration apply — pending migration resolution', {
     await writeAttestedMigration(migrationsDir, {
       from: 'sha256:hash-a',
       to: 'sha256:hash-b',
-      fromContract: contractA,
-      toContract: contractB,
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'add_post',
@@ -181,33 +137,9 @@ describe('migration apply — pending migration resolution', {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-        },
-      },
-    });
-    const contractB = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-          post: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-        },
-      },
-    });
-
     await writeAttestedMigration(migrationsDir, {
       from: null,
       to: 'sha256:hash-a',
-      fromContract: null,
-      toContract: contractA,
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'add_user',
@@ -216,8 +148,6 @@ describe('migration apply — pending migration resolution', {
     await writeAttestedMigration(migrationsDir, {
       from: 'sha256:hash-a',
       to: 'sha256:hash-b',
-      fromContract: contractA,
-      toContract: contractB,
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'add_post',
@@ -240,8 +170,6 @@ describe('migration apply — pending migration resolution', {
     await writeAttestedMigration(migrationsDir, {
       from: null,
       to: 'sha256:hash-a',
-      fromContract: null,
-      toContract: createContract(),
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'initial',
@@ -264,8 +192,6 @@ describe('migration apply — pending migration resolution', {
     await writeAttestedMigration(migrationsDir, {
       from: null,
       to: 'sha256:hash-a',
-      fromContract: null,
-      toContract: createContract(),
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'initial',
@@ -292,8 +218,6 @@ describe('migration apply — pending migration resolution', {
     await writeAttestedMigration(migrationsDir, {
       from: null,
       to: 'sha256:hash-a',
-      fromContract: null,
-      toContract: createContract(),
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'initial',
@@ -306,8 +230,6 @@ describe('migration apply — pending migration resolution', {
     const baseMetadata = {
       from: 'sha256:hash-a',
       to: EMPTY_CONTRACT_HASH,
-      fromContract: createContract(),
-      toContract: createContract(),
       hints: { used: [], applied: [], plannerVersion: '1.0.0' },
       labels: [],
       providedInvariants: [],
@@ -328,33 +250,9 @@ describe('migration apply — pending migration resolution', {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-        },
-      },
-    });
-    const contractB = createSqlContract({
-      storage: {
-        tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-          post: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-          },
-        },
-      },
-    });
-
     await writeAttestedMigration(migrationsDir, {
       from: null,
       to: 'sha256:hash-a',
-      fromContract: null,
-      toContract: contractA,
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'initial',
@@ -363,8 +261,6 @@ describe('migration apply — pending migration resolution', {
     await writeAttestedMigration(migrationsDir, {
       from: 'sha256:hash-a',
       to: 'sha256:hash-b',
-      fromContract: contractA,
-      toContract: contractB,
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'add_post',
@@ -385,14 +281,9 @@ describe('migration apply — pending migration resolution', {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const contractA = createContract();
-    const contractB = createContract();
-
     const m1 = await writeAttestedMigration(migrationsDir, {
       from: null,
       to: 'sha256:hash-a',
-      fromContract: null,
-      toContract: contractA,
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'first',
@@ -401,8 +292,6 @@ describe('migration apply — pending migration resolution', {
     const m2 = await writeAttestedMigration(migrationsDir, {
       from: 'sha256:hash-a',
       to: 'sha256:hash-b',
-      fromContract: contractA,
-      toContract: contractB,
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'second',
