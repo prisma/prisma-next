@@ -1,6 +1,7 @@
 # ADR 199 — Storage-only migration identity
 
 **Revised:** 2026-04-30 — `kind` removed; `from` is now nullable (TML-2270).
+**Revised:** 2026-05-14 — vestigial `authorship` and `signature` fields removed from `MigrationMetadata` (TML-2458); `strippedMeta` description and example updated to match.
 
 **Amends:** [ADR 169 §3 — Content-addressed migration identity](ADR%20169%20-%20On-disk%20migration%20persistence.md)
 
@@ -20,7 +21,6 @@ This is wrong. The migration doesn't care about operation names. It cares about 
 export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOps): string {
   const {
     migrationId: _migrationId,
-    signature: _signature,
     fromContract: _fromContract,
     toContract: _toContract,
     hints: _hints,
@@ -37,7 +37,7 @@ export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOp
 }
 ```
 
-`strippedMeta` contains `from`, `to`, `labels`, `providedInvariants`, `authorship?`, `createdAt`. The `from` field is `string | null`: when it is a string, it is the prior-state storage hash — the same storage-projection commitment that ADR 004 defines; `null` denotes a baseline with no prior state. The `to` field is the destination storage hash. They pin the migration to its bookends: which physical schema it expects (if any), and which physical schema it produces. `providedInvariants` participates in identity because it captures which routing-visible data transforms the migration declares; changing the set changes which refs the migration satisfies, so it is *not* metadata-about. Together with `ops`, the strippedMeta fields fully describe what the migration does to the database. Everything else (the discarded `fromContract`, `toContract`, `hints`, plus the trivially-derived `migrationHash` / `signature` themselves) is metadata *about* the migration, not part of its physical identity.
+`strippedMeta` contains `from`, `to`, `labels`, `providedInvariants`, `createdAt`. The `from` field is `string | null`: when it is a string, it is the prior-state storage hash — the same storage-projection commitment that ADR 004 defines; `null` denotes a baseline with no prior state. The `to` field is the destination storage hash. They pin the migration to its bookends: which physical schema it expects (if any), and which physical schema it produces. `providedInvariants` participates in identity because it captures which routing-visible data transforms the migration declares; changing the set changes which refs the migration satisfies, so it is *not* metadata-about. Together with `ops`, the strippedMeta fields fully describe what the migration does to the database. Everything else (the discarded `fromContract`, `toContract`, `hints`, plus the trivially-derived `migrationHash` itself) is metadata *about* the migration, not part of its physical identity.
 
 ### What stays on disk
 

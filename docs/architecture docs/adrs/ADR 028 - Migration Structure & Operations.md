@@ -56,9 +56,7 @@ Together, they form composable primitives: ADR 028 provides the mechanisms, ADR 
   - pre and post check sets
   - labels optional metadata like branch or tag
   - verified proofs such as shadow apply result, planner version, adapter profile
-  - authorship info for accountability
   - createdAt timestamp for deterministic ordering (recorded in edge manifest)
-  - signature optional provenance signature for hosted preflight/promotion
   - archived boolean flag marking edges superseded by baseline (kept for audit, ignored for pathfinding)
 
 These fields in each migration's `migration.json` enable graph reconstruction without a separate index. See ADR 039 for details on index-optional operation.
@@ -113,8 +111,7 @@ migrations/
   ],
   "integrity": {
     "createdWith": "prisma-next@0.8.0",
-    "generatedAt": "2025-03-01T08:10:10Z",
-    "signature": null
+    "generatedAt": "2025-03-01T08:10:10Z"
   }
 }
 ```
@@ -138,23 +135,21 @@ migrations/
   },
   "pre": [{ "description": "ensure table \"user\" does not exist", "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM information_schema.tables\n  WHERE table_schema = 'public' AND table_name = 'user'\n)" }],
   "post": [{ "description": "verify table \"user\" exists", "sql": "SELECT EXISTS (\n  SELECT 1 FROM information_schema.tables\n  WHERE table_schema = 'public' AND table_name = 'user'\n)" }],
-  "labels": ["main"],
-  "authorship": { "author": "example", "email": "dev@example.com" }
+  "labels": ["main"]
 }
 ```
 
 edgeId = sha256(canonicalize([
-  sha256(canonicalize(migration.json without edgeId/signature)),
+  sha256(canonicalize(migration.json without edgeId)),
   sha256(canonicalize(ops.json)),
   sha256(canonicalize(fromContract)),
   sha256(canonicalize(toContract))
 ]))
 
-### Edge attestation (hash and optional signature)
+### Edge attestation (hash)
 
 - The edgeId is the canonical, content-addressed digest of the edge header, ops, and referenced contracts. Editing ops or header fields changes the digest.
-- A `signature` field may be included in `migration.json` as `{ keyId, value }`, where `value = sign(edgeId, keyId)`. Signatures are optional locally and required by hosted preflight/promotion policies.
-- Tools provide commands to compute, sign, and verify edges. Verification recomputes `edgeId`, validates the signature when present, and checks `{from,to}` hashes against referenced contracts.
+- Tools provide commands to compute and verify edges. Verification recomputes `edgeId` and checks `{from,to}` hashes against referenced contracts.
 
 ## Operations on migration files
 
@@ -211,7 +206,7 @@ This section aligns lifecycle terminology and commands with the Migration System
 ### States
 
 - Draft: `edgeId` missing/stale
-- Attested: `edgeId` computed, optional `signature` present
+- Attested: `edgeId` computed
 - Preflighted: proofs recorded after shadow/hosted run
 - Applied: DB marker updated; ledger entry written
 
@@ -219,25 +214,21 @@ This section aligns lifecycle terminology and commands with the Migration System
 
 - Plan: `prisma-next migration plan [--from <hash> --to <hash>]` — produce attested edge from contracts
 - New: `prisma-next migration new [--from <hash> --to <hash>]` — scaffold empty edge (Draft)
-- Verify: `prisma-next migration verify <dir> [--sign --key <keyId>]` — compute `edgeId`, validate signature (if present), optionally sign (Attested)
-- Sign: `prisma-next migration sign <dir> --key <keyId>` — attach provenance signature only
+- Verify: `prisma-next migration verify <dir>` — recompute `edgeId` and check it against the manifest (Attested)
 - Preflight (shadow): `prisma-next preflight --mode=shadow --verify-edge` — verify then sandbox
-- Preflight (PPg): `prisma-next preflight bundle && prisma-next preflight submit` — hosted preflight with attested+signed edge
-
-Hosted preflight MUST reject unsigned edges; local policy MAY allow unsigned but SHOULD require `--verify-edge`.
+- Preflight (PPg): `prisma-next preflight bundle && prisma-next preflight submit` — hosted preflight with attested edge
 
 ### Helpful commands (synopsis)
 
 - `prisma-next migration plan [--from <hash> --to <hash>]` — diff contracts and write an attested edge
 - `prisma-next migration new [--from <hash> --to <hash>]` — scaffold empty edge (Draft)
-- `prisma-next migration verify <dir> [--sign --key <keyId>]` — compute `edgeId`, validate signature (if present), optionally sign
-- `prisma-next migration sign <dir> --key <keyId>` — attach provenance signature without changing content
+- `prisma-next migration verify <dir>` — recompute `edgeId` and check it against the manifest
 - `prisma-next preflight --mode=shadow --verify-edge` — verify then sandbox apply
-- `prisma-next preflight bundle` / `submit` — hosted preflight with bundle signing
+- `prisma-next preflight bundle` / `submit` — hosted preflight
 
 ### Policy knobs (CI/org)
 
-- Require `--verify-edge` in all preflight runs; optionally require a valid signature
+- Require `--verify-edge` in all preflight runs
 - Require PPg hosted preflight before promotion to staging/production
 - Reject parallel edges (same `from`/`to`, different `edgeId`) unless a policy label is present
 - Enforce advisory locks and idempotency class constraints per adapter
@@ -251,7 +242,6 @@ Hosted preflight MUST reject unsigned edges; local policy MAY allow unsigned but
 ## Integrity and validation
 - Canonicalization rules per ADR 010 applied before hashing
 - Edge ids are deterministic and content-addressed
-- Optional graph.index.json has a top-level integrity.signature field reserved for repository signing if desired
 - CI enforces:
   - no duplicate edgeIds
   - no cycles
@@ -325,7 +315,6 @@ See ADR 102 for policy decisions on:
 ## Security and privacy
 - Migration files contain no secrets and no parameter values
 - Notes may include human context but should not include PII by default
-- Signatures and authorship are optional but recommended in regulated environments
 
 ## Alternatives considered
 - **Pure file-order migrations with applied history in DB**: Simpler but loses determinism, is fragile under branching, and complicates squashing
