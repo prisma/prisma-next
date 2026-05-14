@@ -7,7 +7,17 @@ The project ships in eight milestones sequenced foundation → consumers → mec
 The user-facing capabilities this project delivers are: multi-schema Postgres contracts with namespace declarations in PSL (top-level `namespace { … }` blocks; namespaces do not recursively nest) and the TS builder; cross-namespace FK references within a contract space via dot-qualified type references in `@relation` (the FL-02 fix that unblocks Supabase's `auth.users` story); connection-bound multi-tenancy via `__unspecified__` + `search_path`. The IR refactor that underwrites these capabilities is invisible to users but is what makes the follow-up Supabase project (RLS policies, `supabase()` runtime facade, `auth.users` queryable surface) a series of focused feature PRs rather than another foundational reshape.
 
 **Spec:** [`projects/target-extensible-ir/spec.md`](spec.md)
-**Linear:** [TML-2459 — Target-Extensible IR](https://linear.app/prisma-company/issue/TML-2459)
+**Linear (project):** [Target-Extensible IR + Namespaces](https://linear.app/prisma-company/issue/TML-2459) (originating ticket TML-2459, completed; per-milestone tickets TML-2468 through TML-2474)
+**Linear (PR umbrellas):** [TML-2520 — PR2 follow-up (M5a + M5b + namespace ADRs)](https://linear.app/prisma-company/issue/TML-2520)
+
+## Delivery sequencing — split into two PRs
+
+The project ships across **two PRs** to keep each PR's review burden manageable and to isolate risk between the proven mechanism (M1-M4) and the heavier greenfield namespace work (M5a + M5b). The project itself stays intact at `projects/target-extensible-ir/` across both PRs; only the delivery is split.
+
+- **PR1 — `target-extensible-ir` branch (current).** Ships M1 + M2 + M2.5 + M3 + M3.5 + M4 + M6. Closes the polymorphic IR + extensible authoring (entities) mechanism + first real consumer (Postgres enum exemplar) + the documentation sweep covering the IR convention + entities mechanism. Decision recorded at the M5a-pause point: M5a's pre-flight reconnaissance found the namespace work was substantial enough that bundling it into one PR with M1-M4 would double the diff and put the proven mechanism at risk if M5a hit a deeper architectural issue. The PR1 narrative stands on its own: *"Contract IR + Schema IR are now extensible per-target via 3-layer polymorphic class hierarchies; contract authoring is extensible per-target via the entities mechanism; one full exemplar (enum) demonstrates the round-trip."*
+- **PR2 — namespace follow-up branch (umbrella ticket TML-2520).** Branches off the merged PR1 base. Ships M5a + M5b + namespace-specific ADRs. Consumes the proven M1-M4 mechanism without depending on further changes to it. Reconnaissance at `wip/m5a-reconnaissance.md` is portable to the PR2 branch (PSL consumer cascade audit, storage-keying inventory, M2 Mongo namespace template reference).
+
+The project's close-out (delete `projects/target-extensible-ir/`, promote remaining ADRs to `docs/`, strip references) happens **after PR2 merges**, not after PR1. PR1 lands the M6 docs that cover the M1-M4 surface (IR convention + entities mechanism); PR2's docs sweep adds the namespace ADRs alongside its implementation. See § Close-out for the full sequence.
 
 ## Cross-project dependencies
 
@@ -219,6 +229,8 @@ The SQL pattern (verified on disk in pre-M2.5-R1 reconnaissance, recorded in `wi
 
 ### M5a — Namespace exemplar (new concept) + authoring DSL
 
+**Status: deferred to PR2 ([TML-2520](https://linear.app/prisma-company/issue/TML-2520) / TML-2472 M5a).** See § Delivery sequencing at the top of this plan for rationale. Scope, tasks, and validation gates below remain canonical for the PR2 implementer; reconnaissance preserved at `wip/m5a-reconnaissance.md` is portable to the PR2 branch.
+
 **Goal:** introduce the higher-risk new framework-level concept on a foundation that is now well-exercised, and ship the authoring-DSL surface that makes namespaces usable in PSL and the TS builder. **Second consumer of the M3.5 mechanism**: each target pack with native namespacing (`postgres`, `mongo`) contributes its Namespace concretion as an entity via `helpers.entities.namespace(...)` (TS) and the dedicated `namespace { … }` PSL block lowering through the same descriptor path. The greenfield concept exercises the mechanism's "introduce a new framework-level kind" path (where M4 exercises the "lift existing target-specific glue" path).
 
 **Tasks:**
@@ -238,6 +250,8 @@ The SQL pattern (verified on disk in pre-M2.5-R1 reconnaissance, recorded in `wi
 
 ### M5b — Cross-namespace FK references
 
+**Status: deferred to PR2 ([TML-2520](https://linear.app/prisma-company/issue/TML-2520) / TML-2473).** See § Delivery sequencing for rationale.
+
 **Goal:** complete the namespace story by adding cross-namespace FK references within a single contract space — the FL-02 fix that unblocks Supabase's `auth.users` story.
 
 **Tasks:**
@@ -251,19 +265,26 @@ The SQL pattern (verified on disk in pre-M2.5-R1 reconnaissance, recorded in `wi
 
 **Validation:** AC4 (cross-namespace FK) passes. FL-02 acceptance demonstrated via PGlite integration test. The Supabase `auth.users` reference shape is now expressible in Prisma Next contracts.
 
-### M6 — Documentation + ADR drafts
+### M6 — Documentation + ADR drafts (PR1 scope)
 
-**Goal:** lift the convention out of the project workspace into durable repo docs so it outlives the project.
+**Goal:** lift the IR convention + entities mechanism out of the project workspace into durable repo docs so they outlive PR1's branch and are reviewable as part of PR1 (rather than waiting for the project's eventual close-out after PR2).
 
-**Tasks:**
+**Scope split between PR1 + PR2.** M6 in PR1 covers everything that's anchored on the M1-M4 + M3.5 surface: the IR convention (3-layer polymorphic class hierarchy), the entities mechanism, the architectural principles ("framework provides affordances; targets implement specifics"), the storage shape decisions (Decision 18 polymorphic `storage.types`), and the TS-surface evolution to the canonical `helpers.entities.<name>(...)` shape (Decision 19). **Namespace-specific ADRs and any namespace-driven subsystem-doc updates land in PR2's docs sweep**, not here.
 
-- [ ] Update `AGENTS.md` / `CLAUDE.md` Golden Rule on "Interface-Based Design" to split along the service-vs-AST/IR axis described in the spec § "Codifying the convention" (FR21).
-- [ ] Add the AST/IR class-hierarchy section to `docs/reference/typescript-patterns.md` as a sibling to "Interface-Based Design with Factory Functions" (FR22).
-- [ ] Update `docs/Architecture Overview.md` § "Guiding Principles" to surface "framework provides affordances; targets implement specifics" and "familiar with one target, fluent in another" (FR23).
-- [ ] Update affected subsystem docs (`Data Contract`, `Contract Emitter & Types`, `Adapters & Targets`) to reflect the class-hierarchy IR shape (FR24).
-- [ ] Refine the ADR drafts under `projects/target-extensible-ir/specs/`. AC10 names the two that must exist by close-out — the 3-layer polymorphic IR convention and the architectural principles underwriting it (FR25) — plus any further ADRs surfaced as load-bearing during execution (M1 drafts the first two; M3.5 drafts a third for target-extensible authoring / `entities` contributions; later milestones may surface more). M6 brings them all to "ready to promote" state; the close-out step moves them to `docs/architecture docs/adrs/`.
+**Tasks (PR1):**
 
-**Validation:** docs reviewable as diffs; ADR drafts ready for promotion at close-out.
+- [ ] Update `AGENTS.md` / `CLAUDE.md` Golden Rule on "Interface-Based Design" to split along the service-vs-AST/IR axis described in the spec § "Codifying the convention" (FR21). Service interfaces (factory-pattern) vs AST/IR class hierarchies (3-layer polymorphic) are now distinct conventions; the rule needs both.
+- [ ] Add the AST/IR class-hierarchy section to `docs/reference/typescript-patterns.md` as a sibling to "Interface-Based Design with Factory Functions" (FR22). Include the `freezeNode(this)` convention (Decision 8), the `kind` discriminator strategy (Decisions 15/16: optional framework-level + per-leaf enumerable when polymorphic dispatch earns it), and the SPI dispatch shape (`hydrateEnumType`-style hooks; per-target subclass override).
+- [ ] Update `docs/Architecture Overview.md` § "Guiding Principles" to surface "framework provides affordances; targets implement specifics" and "familiar with one target, fluent in another" (FR23). The polymorphic IR + entities mechanism are the two structural reifications of these principles; cite both.
+- [ ] Update affected subsystem docs to reflect the class-hierarchy IR shape (FR24): **Data Contract** (polymorphic `storage.types`; per-target IR subclasses; serializer SPI `hydrateEnumType` hook), **Contract Emitter & Types** (per-target `serializeContract` owns the on-disk JSON envelope; runtime-only fields stay enumerable on instances + are elided by the serializer), **Adapters & Targets** (the SPI dispatch surface; `helpers.entities.<name>(...)` contribution path; codec-hook removal pattern). Namespace-related subsystem updates wait for PR2.
+- [ ] Promote ADR drafts under `projects/target-extensible-ir/specs/` to "ready to merge" state, but **do not move them to `docs/architecture docs/adrs/`** — that's the project close-out step after PR2. ADRs anchored on PR1's surface that need to exist by PR1's M6 close-out (per AC10 + FR25):
+  - 3-layer polymorphic IR convention (M1 draft);
+  - Architectural principles underwriting it (M1 draft);
+  - Target-extensible authoring / `entities` contributions (M3.5 draft);
+  - Storage shape for first-class IR vs codec-typed entries — Decision 18 Option B (M4-derived; new ADR if not yet drafted).
+- [ ] Audit the spec.md for forward-references to namespaces / M5a / M5b that PR1 readers shouldn't take as "this PR ships that"; either soften the wording or add a "shipped in PR2" callout. The spec stays canonical for both PRs (per § Delivery sequencing); the audit is just to keep PR1 reviewers from looking for the namespace work in this PR's diff.
+
+**Validation:** docs reviewable as diffs; ADR drafts ready for promotion at the eventual project close-out (post-PR2).
 
 ## Open items
 
@@ -277,13 +298,15 @@ The SQL pattern (verified on disk in pre-M2.5-R1 reconnaissance, recorded in `wi
 - **Codec-aware default-decoding regression (introduced in M3, surfaced by M3 R3b).** The pre-M3 SQL `validateContract(value, codecLookup)` ran `decodeContractDefaults` after structural validation so `column.default.value` of literal columns was passed through `codec.decodeJson` before the contract reached consumers. The M3 SPI shape (`deserializeContract(json: unknown): TContract`) doesn't accept a `codecLookup`, so `SqlContractSerializerBase` skips the decoding step. Every consumer that previously got decoded literal defaults now gets the raw JSON. Surface: limited but real — jsonb literal defaults + any column with non-trivial JSON-encoded default values. The dead-code `validate.test.ts` codec-decoding tests at `packages/2-sql/1-core/contract/test/validate.test.ts` (lines ~696–737) still pass because they test the legacy standalone wrapper directly, but no production runtime exercises that path anymore. M3 R3b's call-site sweep surfaced this; integration tests didn't catch it. **Three follow-up options:** (a) thread `CodecLookup` through the SPI signature; (b) introduce a separate post-deserialization `decodeContractDefaults(contract, codecLookup)` hook the family-level `ControlFamilyInstance.validateContract` composes after the SPI deserializer; (c) accept the regression and drop the dead `validate.ts` + tests. Recommendation: (b) — keeps SPI shape clean, restores production behavior, naturally addressable in M3.5 (when the entity-contribution mechanism makes contract construction more pluggable) or as a focused follow-up. Filed as a tracked open item rather than blocking M3 close-out because no integration test catches it and no consumer has reported it; the dead-code tests provide a regression net for whoever fixes it.
 - **Pre-existing test fragility surfaced during M1 R1 review.** Running `pnpm test:packages` against the M1 HEAD surfaced ~9 files / ~12 tests / ~8 unhandled errors across `@prisma-next/adapter-postgres` (Postgres connection flakiness in integration tests) and `@prisma-next/cli` (mock-setup issues). None touch M1-modified files; failures vary across runs (different packages failing in different runs), confirming flakiness rather than regression. Out of M1's `typecheck + lint:deps` validation gate. The Postgres adapter integration-test flakiness will likely resurface and may block M3 R1 if it persists; revisit at M3 entry. **Trajectory note (M2 R2 closure round, 2026-05-13):** the PGlite shutdown-race flake set affected 22 integration files in the M2 R2 closure round's full-suite run vs 7 files in the prior M2 R2 run, all 22 producing the canonical `Error: Connection terminated unexpectedly` in `pg/lib/client.js:180:73` and all isolation re-runs returning green. The flake is contention-dependent and the breadth widened across the worktree's other concurrent activity. M3 entry orchestrator should consider fast-tracking mitigation (Linear ticket; PGlite vs real-Postgres choice; per-test isolation pattern) rather than waiting for the flake to actually block a SATISFIED gate. No Linear tickets filed yet (per orchestrator/user decision E2 in m1 R1 triage).
 
-## Close-out (required)
+## Close-out (required) — happens after PR2 merges
 
-- [ ] Verify all acceptance criteria in [`projects/target-extensible-ir/spec.md`](spec.md).
-- [ ] Promote ADR drafts (3-layer IR convention; architectural principles; target-extensible authoring / `entities` contributions; any other drafts surfaced during execution) from `projects/target-extensible-ir/specs/` to `docs/architecture docs/adrs/`.
-- [ ] Confirm `AGENTS.md` / `CLAUDE.md` Golden Rule is updated and `docs/reference/typescript-patterns.md` carries the new AST/IR section.
+> The project's close-out is **not** PR1's responsibility. PR1 ships M1-M4 + M3.5 + M2.5 + M6 (PR1-scoped docs) and leaves the project artifacts at `projects/target-extensible-ir/` intact for PR2 to consume. Close-out below is the post-PR2 step.
+
+- [ ] Verify all acceptance criteria in [`projects/target-extensible-ir/spec.md`](spec.md). PR1 closes ACs 1, 2, 7, 8, 9, 10, 11, 12 (mechanism + first exemplar + IR convention docs). PR2 closes ACs 4, 4a, 5, 6 (namespace + cross-namespace FK + multi-tenancy).
+- [ ] Promote ADR drafts (3-layer IR convention; architectural principles; target-extensible authoring / `entities` contributions; storage shape Decision 18; namespace + cross-namespace FK from PR2; any other drafts surfaced during execution) from `projects/target-extensible-ir/specs/` to `docs/architecture docs/adrs/`.
+- [ ] Confirm `AGENTS.md` / `CLAUDE.md` Golden Rule is updated and `docs/reference/typescript-patterns.md` carries the new AST/IR section. (PR1 lands the M1-M4 surface; PR2's docs sweep adds namespace-specific updates if any.)
 - [ ] Confirm `docs/Architecture Overview.md` § "Guiding Principles" surfaces "framework provides affordances; targets implement specifics" and "familiar with one target, fluent in another".
-- [ ] Confirm subsystem docs in `docs/architecture docs/subsystems/` (Data Contract, Contract Emitter & Types, Adapters & Targets) reflect the class-hierarchy IR shape.
+- [ ] Confirm subsystem docs in `docs/architecture docs/subsystems/` (Data Contract, Contract Emitter & Types, Adapters & Targets) reflect the class-hierarchy IR shape AND the namespace shape.
 - [ ] Migrate any other long-lived docs into `docs/`.
 - [ ] Strip repo-wide references to `projects/target-extensible-ir/**` (replace with canonical `docs/` links or remove).
 - [ ] Delete `projects/target-extensible-ir/`.
