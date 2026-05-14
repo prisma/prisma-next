@@ -378,11 +378,16 @@ function generateStorageTypesType(types: SqlStorage['types']): string {
   const typeEntries: string[] = [];
   for (const [typeName, typeInstance] of Object.entries(types)) {
     if (typeInstance instanceof SqlEnumType) {
-      const nameLit = serializeValue(typeInstance.name);
+      const binding = typeInstance.codecBinding;
+      const codecId = serializeValue(binding.codecId);
       const nativeType = serializeValue(typeInstance.nativeType);
-      const valuesLit = `readonly [${typeInstance.values.map((v) => serializeValue(v)).join(', ')}]`;
+      const typeParamsStr = serializeTypeParamsLiteral(
+        // `codecBinding.typeParams` is a readonly structural object; the serializer
+        // expects a mutable `Record` shape for key iteration only.
+        binding.typeParams as unknown as Record<string, unknown>,
+      );
       typeEntries.push(
-        `readonly ${typeName}: { readonly kind: 'sql-enum-type'; readonly name: ${nameLit}; readonly nativeType: ${nativeType}; readonly values: ${valuesLit} }`,
+        `readonly ${typeName}: { readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
       );
       continue;
     }

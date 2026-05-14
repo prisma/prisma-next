@@ -298,10 +298,9 @@ type ContractBase = ContractType<
     };
     readonly types: {
       readonly user_type: {
-        readonly kind: 'sql-enum-type';
-        readonly name: 'user_type';
+        readonly codecId: 'pg/enum@1';
         readonly nativeType: 'user_type';
-        readonly values: readonly ['admin', 'user'];
+        readonly typeParams: { readonly values: readonly ['admin', 'user'] };
       };
     };
     readonly storageHash: StorageHash;
