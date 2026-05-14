@@ -6,7 +6,6 @@ import type {
   MigrationPlan,
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
-import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import { errorInvalidOperationEntry, errorStaleContractBookends } from './errors';
 import { computeMigrationHash } from './hash';
@@ -162,7 +161,6 @@ function buildAttestedMetadata(
     // contract bookend would only be available after `migration plan`.
     toContract: existing?.toContract ?? ({ storage: { storageHash: meta.to } } as Contract),
     hints: normalizeHints(existing?.hints),
-    ...ifDefined('authorship', existing?.authorship),
   };
 
   const migrationHash = computeMigrationHash(baseMetadata, ops);

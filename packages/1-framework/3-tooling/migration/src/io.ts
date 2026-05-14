@@ -45,14 +45,6 @@ const MigrationMetadataSchema = type({
   hints: MigrationHintsSchema,
   labels: 'string[]',
   providedInvariants: 'string[]',
-  'authorship?': type({
-    'author?': 'string',
-    'email?': 'string',
-  }),
-  'signature?': type({
-    keyId: 'string',
-    value: 'string',
-  }).or('null'),
   createdAt: 'string',
 });
 

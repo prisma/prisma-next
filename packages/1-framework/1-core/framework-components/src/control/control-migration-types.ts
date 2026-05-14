@@ -65,8 +65,6 @@ export interface MigrationMetadata {
    * means the migration has no routing-visible data transforms.
    */
   readonly providedInvariants: readonly string[];
-  readonly authorship?: { readonly author?: string; readonly email?: string };
-  readonly signature?: { readonly keyId: string; readonly value: string } | null;
   readonly createdAt: string;
 }
 

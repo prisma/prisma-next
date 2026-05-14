@@ -249,16 +249,6 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
-  it('accepts metadata with optional authorship field', async () => {
-    const dir = join(tmpDir, '20260225T1430_with_author');
-    await writeTestPackage(dir, {
-      authorship: { author: 'test', email: 'test@example.com' },
-    });
-
-    const pkg = await readMigrationPackage(dir);
-    expect(pkg.metadata.authorship).toEqual({ author: 'test', email: 'test@example.com' });
-  });
-
   it('rejects migration.json with migrationHash: null', async () => {
     const dir = join(tmpDir, '20260225T1430_null_hash');
     const metadata = { ...createTestMetadata(), migrationHash: null };
