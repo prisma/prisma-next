@@ -5,6 +5,7 @@ import {
 import {
   type ContractMarkerRecordLike,
   type ContractSpaceAggregate,
+  type ContractSpaceMember,
   graphWalkStrategy,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
@@ -493,24 +494,27 @@ export function validateFocusedSpaceOption(args: {
 }
 
 /**
- * Build the aggregate enumeration of contract spaces for the status
- * output. Loads the aggregate from disk (lossy on failure — extension
- * spaces are simply omitted, the existing single-space app behaviour
- * keeps working), reads per-space marker rows when online, and uses
- * {@link graphWalkStrategy} to compute each space's pending count.
+ * Load the contract-space aggregate for the `migration status` command.
  *
- * Sub-spec § `migration status` semantics — the aggregate-walking
- * version reports per-space marker + pending state alongside the
- * cross-space totals.
+ * Returns:
+ * - `{ ok: true, aggregate }` on success.
+ * - `{ ok: false, failure }` when the loader rejects the on-disk state
+ *   (layout, disjointness, integrity, validation, target mismatch).
+ *
+ * Callers that need the aggregate to focus on a non-app space (`--space
+ * <id>`) must surface a loader failure as a hard error — the focused
+ * member can't be resolved without it. Callers that only need the
+ * aggregate for the per-space enumeration (default app-space flow)
+ * silently degrade to "extensions not enumerated" — the single-space app
+ * pipeline still has everything it needs.
  */
-export async function loadAggregateStatusSpaces(args: {
+async function loadStatusAggregate(args: {
   readonly targetId: string;
   readonly migrationsDir: string;
   readonly appContractRaw: unknown;
   readonly extensionPacks: BuildAggregateInputs<string, string>['extensionPacks'];
   readonly validateContract: BuildAggregateInputs<string, string>['validateContract'];
-  readonly markersBySpace: ReadonlyMap<string, ContractMarkerRecordLike> | null;
-}): Promise<readonly MigrationStatusSpaceEntry[]> {
+}): Promise<Result<ContractSpaceAggregate, CliStructuredError>> {
   const loadInputs: BuildAggregateInputs<string, string> = {
     targetId: args.targetId,
     migrationsDir: args.migrationsDir,
@@ -518,21 +522,31 @@ export async function loadAggregateStatusSpaces(args: {
     extensionPacks: args.extensionPacks,
     validateContract: args.validateContract,
   };
+  return buildContractSpaceAggregate(loadInputs);
+}
 
-  const loaded = await buildContractSpaceAggregate(loadInputs);
-  if (!loaded.ok) {
-    // Loader failure (drift, layout violation, etc.) — surfacing it
-    // as a status diagnostic would duplicate `migration plan`'s job.
-    // The single-space app pipeline still runs; extensions are simply
-    // not enumerated.
-    return [];
-  }
-  const aggregate = loaded.value;
-
+/**
+ * Pure projection: render a loaded {@link ContractSpaceAggregate}
+ * (plus optional live markers) into the per-space status rows the
+ * `MigrationStatusResult.spaces` field carries.
+ *
+ * Walks each member through {@link graphWalkStrategy} to compute its
+ * pending-migration count. `markersBySpace === null` produces
+ * marker-unknown rows (offline or the family doesn't support
+ * `readAllMarkers`); `null`-valued entries in the map mean "online,
+ * confirmed no marker for this space" and surface a `no-marker`
+ * status when the space has migrations on disk.
+ *
+ * @internal Exported for testing only.
+ */
+export function deriveStatusSpaceRows(
+  aggregate: ContractSpaceAggregate,
+  markersBySpace: ReadonlyMap<string, ContractMarkerRecordLike> | null,
+): readonly MigrationStatusSpaceEntry[] {
   const orderedMembers = [...aggregate.extensions, aggregate.app];
   const rows: MigrationStatusSpaceEntry[] = [];
   for (const member of orderedMembers) {
-    const liveMarker = args.markersBySpace?.get(member.spaceId) ?? null;
+    const liveMarker = markersBySpace?.get(member.spaceId) ?? null;
     const isApp = member.spaceId === aggregate.app.spaceId;
 
     if (member.migrations.graph.nodes.size === 0) {
@@ -540,7 +554,7 @@ export async function loadAggregateStatusSpaces(args: {
         spaceId: member.spaceId,
         kind: isApp ? 'app' : 'extension',
         headHash: member.headRef.hash,
-        ...(args.markersBySpace !== null
+        ...(markersBySpace !== null
           ? {
               markerHash: liveMarker?.storageHash ?? null,
               status: member.headRef.hash === EMPTY_CONTRACT_HASH ? 'up-to-date' : 'never-planned',
@@ -551,7 +565,7 @@ export async function loadAggregateStatusSpaces(args: {
       continue;
     }
 
-    if (args.markersBySpace === null) {
+    if (markersBySpace === null) {
       rows.push({
         spaceId: member.spaceId,
         kind: isApp ? 'app' : 'extension',
@@ -594,6 +608,42 @@ export async function loadAggregateStatusSpaces(args: {
 }
 
 /**
+ * Build the aggregate enumeration of contract spaces for the status
+ * output. Loads the aggregate from disk (lossy on failure — extension
+ * spaces are simply omitted, the existing single-space app behaviour
+ * keeps working), reads per-space marker rows when online, and uses
+ * {@link graphWalkStrategy} to compute each space's pending count.
+ *
+ * Sub-spec § `migration status` semantics — the aggregate-walking
+ * version reports per-space marker + pending state alongside the
+ * cross-space totals.
+ */
+export async function loadAggregateStatusSpaces(args: {
+  readonly targetId: string;
+  readonly migrationsDir: string;
+  readonly appContractRaw: unknown;
+  readonly extensionPacks: BuildAggregateInputs<string, string>['extensionPacks'];
+  readonly validateContract: BuildAggregateInputs<string, string>['validateContract'];
+  readonly markersBySpace: ReadonlyMap<string, ContractMarkerRecordLike> | null;
+}): Promise<readonly MigrationStatusSpaceEntry[]> {
+  const loaded = await loadStatusAggregate({
+    targetId: args.targetId,
+    migrationsDir: args.migrationsDir,
+    appContractRaw: args.appContractRaw,
+    extensionPacks: args.extensionPacks,
+    validateContract: args.validateContract,
+  });
+  if (!loaded.ok) {
+    // Loader failure (drift, layout violation, etc.) — surfacing it
+    // as a status diagnostic would duplicate `migration plan`'s job.
+    // The single-space app pipeline still runs; extensions are simply
+    // not enumerated.
+    return [];
+  }
+  return deriveStatusSpaceRows(loaded.value, args.markersBySpace);
+}
+
+/**
  * Read the raw contract.json bytes from disk for the aggregate
  * loader. Returns `null` if the file is missing or unparseable —
  * the existing `readContractEnvelope` path will report the same
@@ -609,6 +659,200 @@ async function loadContractRawSafely(config: {
   } catch {
     return null;
   }
+}
+
+/**
+ * Build a {@link MigrationStatusResult} focused on a single extension
+ * contract space.
+ *
+ * The aggregate-level fields (`spaces`, `totalPendingAcrossSpaces`)
+ * still describe every loaded space — only the renderer-facing
+ * `graph`, `bundles`, `edgeStatuses`, `migrations`, `summary`,
+ * `markerHash`, `targetHash`, and `contractHash` are scoped to the
+ * focused space. Extension spaces have no CLI-managed `--ref` and no
+ * invariants (per ADR 212, an extension's head is pinned by its
+ * descriptor), so the ref/invariant routing the app-space pipeline
+ * runs collapses to a tight diagnostic set:
+ *
+ * - `MIGRATION.MARKER_NOT_IN_HISTORY` — marker is online but doesn't
+ *   land on any node in this space's graph (DB updated outside
+ *   `migration apply`).
+ * - `MIGRATION.NO_MARKER` — online, but no marker row exists for
+ *   this space (greenfield, or pre-init).
+ * - `MIGRATION.DATABASE_BEHIND` / `MIGRATION.UP_TO_DATE` — the same
+ *   "what does `apply` do?" signal as for the app, scoped to the
+ *   focused space.
+ *
+ * `allMarkers === null` while online means the family doesn't expose
+ * `readAllMarkers` or the marker probe failed; we render the chain
+ * without edge statuses and surface no marker-state diagnostic.
+ */
+export async function executeFocusedExtensionStatus(args: {
+  readonly member: ContractSpaceMember;
+  readonly allMarkers: ReadonlyMap<string, ContractMarkerRecordLike> | null;
+  readonly mode: 'online' | 'offline';
+  readonly aggregateSpaces: readonly MigrationStatusSpaceEntry[];
+  readonly totalPendingAcrossSpaces: number | undefined;
+}): Promise<Result<MigrationStatusResult, CliStructuredError>> {
+  const { member, mode, aggregateSpaces, totalPendingAcrossSpaces } = args;
+
+  const targetHash = member.headRef.hash;
+  // Loader invariant: an integrity-checked extension member has
+  // `contract.storage.storageHash === headRef.hash`. Use the headRef
+  // hash everywhere so the two fields are observably the same byte
+  // sequence to JSON consumers.
+  const contractHash = targetHash;
+  const graph = member.migrations.graph;
+  const bundles = [...member.migrations.packagesByMigrationHash.values()];
+
+  // Marker discovery. `allMarkers === null` means "marker state is
+  // unknown" (offline, or online but readAllMarkers unavailable);
+  // a `null` entry from the map means "online, confirmed no marker
+  // row for this space".
+  let markerHash: string | undefined;
+  let markerKnown: boolean;
+  if (args.allMarkers === null) {
+    markerHash = undefined;
+    markerKnown = false;
+  } else {
+    const liveMarker = args.allMarkers.get(member.spaceId) ?? null;
+    markerHash = liveMarker?.storageHash;
+    markerKnown = true;
+  }
+
+  const diagnostics: StatusDiagnostic[] = [];
+
+  // Empty graph — extension ships no migrations yet (greenfield).
+  // Loader invariant guarantees `headRef.hash === EMPTY_CONTRACT_HASH`
+  // in this branch, so there's no pending work to report.
+  if (graph.nodes.size === 0) {
+    return ok({
+      ok: true,
+      mode,
+      migrations: [],
+      targetHash: EMPTY_CONTRACT_HASH,
+      contractHash,
+      summary: `No migrations found for contract space "${member.spaceId}"`,
+      diagnostics,
+      requiredInvariants: [],
+      ...ifDefined('markerHash', markerHash),
+      spaces: aggregateSpaces,
+      ...ifDefined('totalPendingAcrossSpaces', totalPendingAcrossSpaces),
+    });
+  }
+
+  // Marker is online and known, but doesn't land on any node in this
+  // space's graph. Bail out early — the same shape the app-space
+  // pipeline emits for its equivalent state.
+  if (
+    mode === 'online' &&
+    markerKnown &&
+    markerHash !== undefined &&
+    !graph.nodes.has(markerHash) &&
+    markerHash !== contractHash
+  ) {
+    diagnostics.push({
+      code: 'MIGRATION.MARKER_NOT_IN_HISTORY',
+      severity: 'warn',
+      message: `Database was updated outside the migration system for contract space "${member.spaceId}" (marker does not match any migration)`,
+      hints: [
+        "Run 'prisma-next db update' to push the current contract to the database",
+        "Run 'prisma-next db verify' to inspect the database state",
+      ],
+    });
+    return ok({
+      ok: true,
+      mode,
+      migrations: [],
+      targetHash: EMPTY_CONTRACT_HASH,
+      contractHash,
+      summary: `${bundles.length} migration(s) on disk`,
+      diagnostics,
+      markerHash,
+      requiredInvariants: [],
+      spaces: aggregateSpaces,
+      ...ifDefined('totalPendingAcrossSpaces', totalPendingAcrossSpaces),
+    });
+  }
+
+  // Online + readAllMarkers unsupported: marker is unknown for the
+  // focused space. Render the chain offline-style (no edge statuses
+  // and no marker-state diagnostics) so the output doesn't pretend
+  // to know what's applied.
+  const statusMode: 'online' | 'offline' = mode === 'online' && markerKnown ? 'online' : 'offline';
+
+  if (statusMode === 'online' && markerHash === undefined) {
+    diagnostics.push({
+      code: 'MIGRATION.NO_MARKER',
+      severity: 'warn',
+      message: `No marker found for contract space "${member.spaceId}" — extension space has not been initialized`,
+      hints: ["Run 'prisma-next migration apply' to apply pending migrations across all spaces"],
+    });
+  }
+
+  const chain = resolveDisplayChain(graph, targetHash, markerHash);
+  if (!chain) {
+    return notOk(
+      errorRuntime(`Cannot reconstruct migration history for contract space "${member.spaceId}"`, {
+        why: `No path from ${EMPTY_CONTRACT_HASH} to target ${targetHash}`,
+        fix: 'The migration history may have gaps. Check the migrations directory for missing or corrupted packages.',
+      }),
+    );
+  }
+
+  const edgeStatuses = deriveEdgeStatuses(graph, targetHash, contractHash, markerHash, statusMode);
+  const entries = buildMigrationEntries(chain, bundles, statusMode, markerHash, edgeStatuses);
+
+  const pendingCount = edgeStatuses.filter((e) => e.status === 'pending').length;
+  const appliedCount = edgeStatuses.filter((e) => e.status === 'applied').length;
+
+  let summary: string;
+  if (statusMode === 'online') {
+    if (pendingCount === 0 && markerHash !== undefined) {
+      summary = `Database is up to date for contract space "${member.spaceId}" (${appliedCount} migration${
+        appliedCount !== 1 ? 's' : ''
+      } applied)`;
+    } else if (markerHash === undefined) {
+      summary = `${pendingCount} pending migration(s) — contract space "${member.spaceId}" has no marker`;
+    } else {
+      summary = `${pendingCount} pending migration(s) for contract space "${member.spaceId}" — run 'prisma-next migration apply' to apply`;
+    }
+
+    if (pendingCount > 0) {
+      diagnostics.push({
+        code: 'MIGRATION.DATABASE_BEHIND',
+        severity: 'info',
+        message: `${pendingCount} migration(s) pending for contract space "${member.spaceId}"`,
+        hints: ["Run 'prisma-next migration apply' to apply pending migrations"],
+      });
+    } else if (markerHash !== undefined) {
+      diagnostics.push({
+        code: 'MIGRATION.UP_TO_DATE',
+        severity: 'info',
+        message: `Contract space "${member.spaceId}" is up to date`,
+        hints: [],
+      });
+    }
+  } else {
+    summary = `${entries.length} migration(s) on disk for contract space "${member.spaceId}"`;
+  }
+
+  return ok({
+    ok: true,
+    mode,
+    migrations: entries,
+    targetHash,
+    contractHash,
+    summary,
+    diagnostics,
+    ...ifDefined('markerHash', markerHash),
+    requiredInvariants: [],
+    graph,
+    bundles,
+    edgeStatuses,
+    spaces: aggregateSpaces,
+    ...ifDefined('totalPendingAcrossSpaces', totalPendingAcrossSpaces),
+  });
 }
 
 async function executeMigrationStatusCommand(
@@ -668,6 +912,9 @@ async function executeMigrationStatusCommand(
     if (activeRefName) {
       details.push({ label: 'ref', value: activeRefName });
     }
+    if (options.space !== undefined && options.space !== 'app') {
+      details.push({ label: 'space', value: options.space });
+    }
     if (activeRefEntry && activeRefEntry.invariants.length > 0) {
       details.push({
         label: 'required',
@@ -694,6 +941,146 @@ async function executeMigrationStatusCommand(
       severity: 'warn',
       message: `Could not read contract: ${error instanceof Error ? error.message : 'unknown error'}`,
       hints: ["Run 'prisma-next contract emit' to generate a valid contract"],
+    });
+  }
+
+  // Load the contract-space aggregate once so both the `--space`
+  // selector and the per-space enumeration in `MigrationStatusResult`
+  // can read from the same value. Failure modes:
+  //
+  // - Contract bytes unreadable: aggregate stays `null`. The app-space
+  //   pipeline still runs (it has its own `CONTRACT.UNREADABLE`
+  //   diagnostic from `readContractEnvelope` above); `--space <non-app>`
+  //   has no aggregate to validate against and short-circuits with a
+  //   structured runtime error.
+  // - Loader rejects on-disk state (layout / disjointness / integrity /
+  //   validation / target mismatch): aggregate stays `null` and the
+  //   loader's `CliStructuredError` is captured. Same routing — silent
+  //   degradation for the app-space pipeline, hard error for
+  //   `--space <non-app>`.
+  let aggregate: ContractSpaceAggregate | null = null;
+  let aggregateLoadError: CliStructuredError | null = null;
+  const contractRawForAggregate = await loadContractRawSafely(config);
+  if (contractRawForAggregate !== null) {
+    // Build a real control stack so `validateContract` runs against a
+    // fully composed family instance — descriptors that read stack
+    // members during construction (e.g. codec lookups) get a consistent
+    // view.
+    const stack = createControlStack(config);
+    const familyInstance = config.family.create(stack);
+    try {
+      const loaded = await loadStatusAggregate({
+        targetId: config.target.targetId,
+        migrationsDir,
+        appContractRaw: contractRawForAggregate,
+        extensionPacks: config.extensionPacks ?? [],
+        validateContract: (json: unknown) => familyInstance.validateContract(json),
+      });
+      if (loaded.ok) {
+        aggregate = loaded.value;
+      } else {
+        aggregateLoadError = loaded.failure;
+      }
+    } catch (error) {
+      aggregateLoadError = errorUnexpected(error instanceof Error ? error.message : String(error), {
+        why: 'Failed to load contract-space aggregate for migration status.',
+      });
+    }
+  }
+
+  // Validate `--space <id>` against the loaded aggregate. Unknown ids
+  // and `--ref` + non-app combinations return structured errors here
+  // before any DB connection is opened — fast feedback for typos.
+  let focusedSpaceId = 'app';
+  if (options.space !== undefined && options.space !== 'app') {
+    if (aggregate === null) {
+      return notOk(
+        aggregateLoadError ??
+          errorRuntime(
+            `Cannot focus on contract space "${options.space}" — contract-space aggregate is not loaded`,
+            {
+              why: '`--space <id>` requires the contract-space aggregate to load successfully. The most common cause is a missing or unreadable `contract.json`.',
+              fix: "Run 'prisma-next contract emit' to generate a valid contract, or drop `--space` to status against the app space.",
+            },
+          ),
+      );
+    }
+    const validated = validateFocusedSpaceOption({
+      spaceOption: options.space,
+      refName: activeRefName,
+      aggregate,
+    });
+    if (!validated.ok) {
+      return notOk(validated.failure);
+    }
+    focusedSpaceId = validated.value.focusedSpaceId;
+  }
+
+  // === Focused extension-space dispatch ===
+  //
+  // The extension path is a self-contained sibling of the app pipeline:
+  // it does its own DB read (only `readAllMarkers` is needed — the
+  // per-marker reader is app-marker-specific) and builds its result
+  // directly from the aggregate member. Keeping the routing here
+  // localises the impact on the app-space code below — that flow
+  // remains unchanged structurally, it just now consumes a pre-loaded
+  // aggregate instead of loading one inline at the bottom.
+  if (focusedSpaceId !== 'app') {
+    // Unreachable: focusedSpaceId !== 'app' is only set when the
+    // validator succeeded against a non-null aggregate above.
+    if (aggregate === null) {
+      return notOk(
+        errorUnexpected('Internal error: focused contract space without loaded aggregate', {
+          why: 'Reached the focused-extension dispatch with `aggregate === null`. This should be unreachable — the `--space` validator only resolves a non-app id when the aggregate is loaded.',
+        }),
+      );
+    }
+    const member = aggregate.extensions.find((e) => e.spaceId === focusedSpaceId);
+    if (!member) {
+      return notOk(
+        errorUnexpected(
+          `Internal error: focused contract space "${focusedSpaceId}" not found in aggregate`,
+          {
+            why: 'The `--space` validator approved this id against the same aggregate. This branch should be unreachable.',
+          },
+        ),
+      );
+    }
+
+    let extMode: 'online' | 'offline' = 'offline';
+    let extAllMarkers: ReadonlyMap<string, ContractMarkerRecordLike> | null = null;
+    if (dbConnection && hasDriver) {
+      const client = createControlClient({
+        family: config.family,
+        target: config.target,
+        adapter: config.adapter,
+        driver: config.driver,
+        extensionPacks: config.extensionPacks ?? [],
+      });
+      try {
+        await client.connect(dbConnection);
+        extMode = 'online';
+        if (typeof client.readAllMarkers === 'function') {
+          extAllMarkers = await client.readAllMarkers();
+        }
+      } catch {
+        if (!flags.json && !flags.quiet) {
+          ui.warn('Could not connect to database — showing offline status');
+        }
+      } finally {
+        await client.close();
+      }
+    }
+
+    const extRows = deriveStatusSpaceRows(aggregate, extAllMarkers);
+    const extTotal = computeTotalPendingAcrossSpaces(extRows);
+
+    return executeFocusedExtensionStatus({
+      member,
+      allMarkers: extAllMarkers,
+      mode: extMode,
+      aggregateSpaces: extRows,
+      totalPendingAcrossSpaces: extTotal,
     });
   }
 
@@ -806,35 +1193,14 @@ async function executeMigrationStatusCommand(
     }
   }
 
-  // Build the aggregate enumeration of contract spaces. Lossy on
-  // failure (extensions are simply omitted) so the existing
-  // single-space app pipeline below still runs even if extensions
-  // can't be loaded — a strict failure here would degrade the
-  // load-bearing app-space output for unrelated reasons.
-  const contractRawForAggregate = await loadContractRawSafely(config);
-  let aggregateSpaces: readonly MigrationStatusSpaceEntry[] = [];
-  if (contractRawForAggregate !== null) {
-    // The aggregate loader needs a typed-Contract producer. Build a
-    // real control stack so `validateContract` runs against a fully
-    // composed family instance — descriptors that read stack members
-    // during construction (e.g. codec lookups) get a consistent view.
-    const stack = createControlStack(config);
-    const familyInstance = config.family.create(stack);
-    try {
-      aggregateSpaces = await loadAggregateStatusSpaces({
-        targetId: config.target.targetId,
-        migrationsDir,
-        appContractRaw: contractRawForAggregate,
-        extensionPacks: config.extensionPacks ?? [],
-        validateContract: (json: unknown) => familyInstance.validateContract(json),
-        markersBySpace: allMarkers,
-      });
-    } catch {
-      // Loader failure short-circuits silently — the existing
-      // single-space app pipeline below still runs.
-      aggregateSpaces = [];
-    }
-  }
+  // Per-space enumeration. The aggregate was loaded earlier (before
+  // `--space` validation) — derive the rows now that markers are
+  // available too. Aggregate load failures already short-circuited the
+  // extension-focused path above; here we silently degrade so the
+  // app-space output keeps working when extension layout is broken.
+  const aggregateSpaces: readonly MigrationStatusSpaceEntry[] = aggregate
+    ? deriveStatusSpaceRows(aggregate, allMarkers)
+    : [];
   const totalPendingAcrossSpaces = computeTotalPendingAcrossSpaces(aggregateSpaces);
 
   // Pre-check unknown invariants. Online: union the graph's declared
