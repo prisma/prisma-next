@@ -15,6 +15,8 @@ import { createSqliteMigrationPlanner } from './migrations/planner';
 import { renderDefaultLiteral } from './migrations/planner-ddl-builders';
 import type { SqlitePlanTargetDetails } from './migrations/planner-target-details';
 import { createSqliteMigrationRunner } from './migrations/runner';
+import { SqliteContractSerializer } from './sqlite-contract-serializer';
+import { SqliteSchemaVerifier } from './sqlite-schema-verifier';
 
 function sqliteRenderDefault(def: ColumnDefault, _column: StorageColumn): string {
   if (def.kind === 'function') {
@@ -29,6 +31,8 @@ function sqliteRenderDefault(def: ColumnDefault, _column: StorageColumn): string
 const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', SqlitePlanTargetDetails> =
   {
     ...sqliteTargetDescriptorMeta,
+    contractSerializer: new SqliteContractSerializer(),
+    schemaVerifier: new SqliteSchemaVerifier(),
     migrations: {
       createPlanner(_family: SqlControlFamilyInstance): MigrationPlanner<'sql', 'sqlite'> {
         return createSqliteMigrationPlanner();
