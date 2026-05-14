@@ -17,17 +17,17 @@ On-disk migration persistence, hash verification, and history reconstruction for
 
 `computeMigrationHash` in `hash.ts` uses explicit framing:
 
-1. Strip identity-affecting fields (`migrationHash`, `fromContract`,
-   `toContract`, `hints`) from the metadata envelope, then canonicalize the
-   stripped envelope and the ops array.
+1. Strip non-identity fields (`migrationHash`, `signature`, `hints`) from
+   the metadata envelope, then canonicalize the stripped envelope and the
+   ops array.
 2. SHA-256 each canonical part independently.
 3. SHA-256 the canonical JSON tuple `[hash(metadata), hash(ops)]`.
 
 This avoids delimiter-ambiguity and pins `migrationHash` to a 2-tuple over
 the on-disk storage shape. Per [ADR 199 — Storage-only migration identity],
-contracts are anchored separately via storage-hash bookends inside the
-metadata envelope, and planner hints are advisory and must not affect
-identity.
+contracts are anchored by the storage-hash bookends (`from`, `to`) inside
+the metadata envelope — the full contract IRs themselves are not part of
+the manifest. Planner hints are advisory and must not affect identity.
 
 [ADR 199 — Storage-only migration identity]: ../../../docs/architecture%20docs/adrs/ADR%20199%20-%20Storage-only%20migration%20identity.md
 

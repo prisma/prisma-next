@@ -157,7 +157,6 @@ async function writeExtensionContractSpaceArtefacts(args: {
   readonly fromHash: string | null;
   readonly toHash: string;
   readonly ops: readonly MigrationPlanOperation[];
-  readonly toContract: Contract<SqlStorage>;
 }): Promise<ContractSpaceArtefactSetup> {
   const migrationsDir = join(args.tmpRoot, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
@@ -172,8 +171,6 @@ async function writeExtensionContractSpaceArtefacts(args: {
   const baseMeta = {
     from: args.fromHash,
     to: args.toHash,
-    fromContract: null,
-    toContract: args.toContract,
     hints: { used: [], applied: [], plannerVersion: '2.0.0' },
     labels: [],
     providedInvariants: [],
@@ -252,7 +249,6 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
       fromHash: null,
       toHash: extContractV1.storage.storageHash,
       ops: buildBaselineOps(),
-      toContract: extContractV1,
     });
   }
 
@@ -346,8 +342,6 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
         const baseMeta = {
           from: extContractV1.storage.storageHash,
           to: extContractV2.storage.storageHash,
-          fromContract: null,
-          toContract: extContractV2,
           hints: { used: [], applied: [], plannerVersion: '2.0.0' },
           labels: [],
           providedInvariants: [],
@@ -444,8 +438,6 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
         const baseMeta = {
           from: extContractV1.storage.storageHash,
           to: extContractV2.storage.storageHash,
-          fromContract: null,
-          toContract: extContractV2,
           hints: { used: [], applied: [], plannerVersion: '2.0.0' },
           labels: [],
           providedInvariants: [],

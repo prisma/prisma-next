@@ -7,14 +7,12 @@ import {
   MONGO_TEST_BASELINE_MIGRATION_NAME,
   MONGO_TEST_COLLECTION,
 } from './constants';
-import { MONGO_TEST_HEAD_HASH, mongoTestContractSpaceContract } from './contract';
+import { MONGO_TEST_HEAD_HASH } from './contract';
 
 const baselineMetadata = {
   migrationHash: 'synthetic-mongo-test-contract-space-baseline-hash-v1',
   from: null,
   to: MONGO_TEST_HEAD_HASH,
-  fromContract: null,
-  toContract: mongoTestContractSpaceContract,
   hints: { used: [], applied: [], plannerVersion: '2.0.0' },
   labels: [],
   providedInvariants: [MONGO_TEST_BASELINE_INVARIANT_ID],

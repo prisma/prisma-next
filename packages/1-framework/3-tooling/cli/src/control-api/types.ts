@@ -2,7 +2,7 @@ import type {
   ContractSourceDiagnostics,
   ContractSourceProvider,
 } from '@prisma-next/config/config-types';
-import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -590,7 +590,6 @@ export interface MigrationApplyStep {
   readonly dirName: string;
   readonly from: string | null;
   readonly to: string;
-  readonly toContract: Contract;
   readonly operations: readonly MigrationPlanOperation[];
   /**
    * Sorted, deduplicated invariant ids from `migration.json.providedInvariants`.

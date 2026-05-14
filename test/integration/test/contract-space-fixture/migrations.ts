@@ -7,14 +7,12 @@ import {
   TEST_BASELINE_MIGRATION_NAME,
   TEST_BOX_TABLE,
 } from './constants';
-import { TEST_HEAD_HASH, testContractSpaceContract } from './contract';
+import { TEST_HEAD_HASH } from './contract';
 
 const baselineMetadata = {
   migrationHash: 'synthetic-test-contract-space-baseline-hash-v1',
   from: null,
   to: TEST_HEAD_HASH,
-  fromContract: null,
-  toContract: testContractSpaceContract,
   hints: { used: [], applied: [], plannerVersion: '2.0.0' },
   labels: [],
   providedInvariants: [TEST_BASELINE_INVARIANT_ID],
