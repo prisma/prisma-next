@@ -413,5 +413,49 @@ describe('migration plan command', () => {
         },
       ]);
     });
+
+    it('surfaces a structured file-not-found error when the predecessor end-contract.json is missing', async () => {
+      // Locks the spec acceptance criterion for TML-2512: `migration plan`
+      // must surface a clear structured CLI error (not a raw ENOENT crash)
+      // when it cannot read the previous migration's destination contract
+      // snapshot.
+      const { consoleErrors, consoleOutput } = setupCommandMocks({ isTTY: false });
+      setupBaseConfig();
+      const OLD_HASH = 'sha256:old-hash';
+      const NEW_HASH = 'sha256:new-hash';
+
+      mocks.readFile.mockImplementation(async (path: string) => {
+        if (typeof path === 'string' && path.endsWith('end-contract.json')) {
+          const err = new Error(`ENOENT: no such file or directory, open '${path}'`) as Error & {
+            code: string;
+          };
+          err.code = 'ENOENT';
+          throw err;
+        }
+        return makeContractJson(NEW_HASH);
+      });
+      mocks.loadMigrationPackages.mockResolvedValue({
+        bundles: [
+          {
+            metadata: { migrationHash: 'sha256:prev-id', to: OLD_HASH },
+            dirPath: '/tmp/test/migrations/20260301T0900_prev',
+            dirName: '20260301T0900_prev',
+          },
+        ],
+        graph: new Map(),
+      });
+      mocks.findLatestMigration.mockReturnValue({
+        to: OLD_HASH,
+        migrationHash: 'sha256:prev-id',
+      });
+
+      const command = createMigrationPlanCommand();
+      await expect(executeCommand(command, ['--json'])).rejects.toThrow('process.exit called');
+
+      const message = [...consoleOutput, ...consoleErrors].join('\n');
+      expect(message).toContain('end-contract.json');
+      expect(message).toContain('20260301T0900_prev');
+      expect(message).toContain('Re-emit the predecessor migration');
+    });
   });
 });

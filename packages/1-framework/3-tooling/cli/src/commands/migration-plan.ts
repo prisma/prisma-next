@@ -63,10 +63,26 @@ interface MigrationPlanOptions extends CommonCommandOptions {
  * `end-contract.json` on disk. The manifest no longer inlines the
  * contract; the planner reads it from the canonical on-disk artefact
  * authored by a previous `migration plan` run.
+ *
+ * Throws `CliStructuredError` with `errorFileNotFound` when the
+ * sibling file is missing — the user has likely deleted or never
+ * authored the snapshot, and the message names the file and points
+ * them at re-emitting from the source.
  */
 async function readPredecessorEndContract(migrationDir: string): Promise<Contract> {
   const path = join(migrationDir, 'end-contract.json');
-  const raw = await readFile(path, 'utf-8');
+  let raw: string;
+  try {
+    raw = await readFile(path, 'utf-8');
+  } catch (error) {
+    if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+      throw errorFileNotFound(path, {
+        why: `Predecessor migration is missing its destination contract snapshot at ${path}`,
+        fix: 'Re-emit the predecessor migration (`prisma-next migration plan` from its source) so its sibling `end-contract.json` is restored, then re-run this command.',
+      });
+    }
+    throw error;
+  }
   return JSON.parse(raw) as Contract;
 }
 
@@ -232,6 +248,12 @@ async function executeMigrationPlanCommand(
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
+    }
+    // `readPredecessorEndContract` raises a `CliStructuredError` directly
+    // for the missing-snapshot case so the operator gets a precise
+    // why/fix; pass it through unchanged rather than re-wrapping.
+    if (CliStructuredError.is(error)) {
+      return notOk(error);
     }
     // Wrap unexpected (non-MigrationToolsError) failures from the migration
     // load phase in a structured CLI envelope. Letting them throw would
