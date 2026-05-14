@@ -2,10 +2,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'pathe';
 import { describe, expect, it } from 'vitest';
 import {
-  agentSkillMd,
-  variables as agentSkillVars,
-} from '../../../src/commands/init/templates/agent-skill';
-import {
   configFile,
   dbFile,
   starterSchema,
@@ -368,106 +364,6 @@ describe('templates', () => {
     });
   });
 
-  describe('agentSkillMd', () => {
-    it('contains file locations for postgres', () => {
-      const md = agentSkillMd('postgres', 'psl', 'prisma/contract.prisma', 'pnpm prisma-next');
-
-      expect(md).toContain('prisma/contract.prisma');
-      expect(md).toContain('prisma/db.ts');
-      expect(md).toContain('prisma-next.config.ts');
-    });
-
-    it('uses ORM query pattern for postgres', () => {
-      const md = agentSkillMd('postgres', 'psl', 'prisma/contract.prisma', 'pnpm prisma-next');
-
-      expect(md).toContain('PostgreSQL');
-      expect(md).toContain('@prisma-next/postgres');
-      expect(md).toContain('db.orm.User');
-      expect(md).toContain('.first()');
-      expect(md).toContain('Use `db.orm` for queries');
-    });
-
-    it('contains commands including migration operations', () => {
-      const md = agentSkillMd('postgres', 'psl', 'prisma/contract.prisma', 'pnpm prisma-next');
-
-      expect(md).toContain('contract emit');
-      expect(md).toContain('db init');
-      expect(md).toContain('db update');
-      expect(md).toContain('migration plan');
-      expect(md).toContain('migration apply');
-      expect(md).toContain('migration status');
-    });
-
-    it('contains rules and workflow guidance', () => {
-      const md = agentSkillMd('postgres', 'psl', 'prisma/contract.prisma', 'pnpm prisma-next');
-
-      expect(md).toContain('Never hand-edit');
-      expect(md).toContain('Use `db.orm` for queries');
-      expect(md).toContain('Workflow for common tasks');
-    });
-
-    it('uses lazy ORM pattern with lowercased plural roots for mongo', () => {
-      const md = agentSkillMd('mongo', 'psl', 'prisma/contract.prisma', 'pnpm prisma-next');
-
-      expect(md).toContain('MongoDB');
-      expect(md).toContain('@prisma-next/mongo');
-      expect(md).toContain('db.orm.users');
-      expect(md).toContain('db.orm.posts');
-      expect(md).toContain('.first()');
-      expect(md).not.toContain('db.sql');
-      expect(md).not.toContain('db.orm.User');
-    });
-
-    it('documents replica-set requirement and lazy connection for mongo', () => {
-      const md = agentSkillMd('mongo', 'psl', 'prisma/contract.prisma', 'pnpm prisma-next');
-
-      expect(md).toContain('replica set');
-      expect(md).toContain('connects lazily');
-    });
-
-    it('documents the escape hatches and steers users away from db.runtime() for mongo', () => {
-      const md = agentSkillMd('mongo', 'psl', 'prisma/contract.prisma', 'pnpm prisma-next');
-
-      expect(md).toContain('db.query');
-      expect(md).toContain('mongoClient');
-      expect(md).toContain('Escape hatches');
-      expect(md).not.toMatch(/drop down[^\n]*via `db\.runtime\(\)`/);
-      expect(md).not.toMatch(/`db\.runtime\(\)`[^\n]*only when the ORM/);
-    });
-
-    // FR5.2: agent skill references the right contract path and authoring label.
-    describe('authoring (FR5.2)', () => {
-      it('postgres + typescript: references prisma/contract.ts and labels TypeScript', () => {
-        const md = agentSkillMd('postgres', 'typescript', 'prisma/contract.ts', 'pnpm prisma-next');
-
-        expect(md).toContain('prisma/contract.ts');
-        expect(md).toContain('TypeScript authoring');
-        expect(md).not.toContain('prisma/contract.prisma');
-      });
-
-      it('postgres + psl: references prisma/contract.prisma and labels PSL', () => {
-        const md = agentSkillMd('postgres', 'psl', 'prisma/contract.prisma', 'pnpm prisma-next');
-
-        expect(md).toContain('prisma/contract.prisma');
-        expect(md).toContain('PSL authoring');
-      });
-
-      it('mongo + typescript: references prisma/contract.ts and labels TypeScript', () => {
-        const md = agentSkillMd('mongo', 'typescript', 'prisma/contract.ts', 'pnpm prisma-next');
-
-        expect(md).toContain('prisma/contract.ts');
-        expect(md).toContain('TypeScript authoring');
-      });
-
-      it('mongo + psl: references prisma/contract.prisma and labels PSL', () => {
-        const md = agentSkillMd('mongo', 'psl', 'prisma/contract.prisma', 'pnpm prisma-next');
-
-        expect(md).toContain('prisma/contract.prisma');
-        expect(md).toContain('PSL authoring');
-      });
-    });
-  });
-
   describe('tsconfig', () => {
     describe('defaultTsConfig', () => {
       it('includes all required compiler options', () => {
@@ -610,10 +506,6 @@ describe('templates', () => {
             quickReferenceMd(target, authoring, schemaPath, 'pnpm prisma-next'),
           ).toMatchSnapshot();
         });
-
-        it('agentSkillMd is stable', () => {
-          expect(agentSkillMd(target, authoring, schemaPath, 'pnpm prisma-next')).toMatchSnapshot();
-        });
       });
     }
   });
@@ -627,16 +519,6 @@ describe('templates', () => {
     it('quick-reference-mongo.md placeholders match declared variables', () => {
       const mdVars = extractPlaceholders('quick-reference-mongo.md');
       expect(mdVars).toEqual(new Set(quickRefVars));
-    });
-
-    it('agent-skill-postgres.md placeholders match declared variables', () => {
-      const mdVars = extractPlaceholders('agent-skill-postgres.md');
-      expect(mdVars).toEqual(new Set(agentSkillVars));
-    });
-
-    it('agent-skill-mongo.md placeholders match declared variables', () => {
-      const mdVars = extractPlaceholders('agent-skill-mongo.md');
-      expect(mdVars).toEqual(new Set(agentSkillVars));
     });
   });
 });

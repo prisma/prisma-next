@@ -8,6 +8,13 @@ import { formatErrorJson, formatErrorOutput } from '../../utils/formatters/error
 import type { GlobalFlags } from '../../utils/global-flags';
 import { TerminalUI } from '../../utils/terminal-ui';
 import {
+  LEGACY_SKILL_FILE,
+  markerFilePath,
+  runProjectLevelSkillInstall,
+  runUserLevelSkillInstall,
+  writeMarker,
+} from './agent-skill-install';
+import {
   detectPackageManager,
   formatAddArgs,
   formatAddDevArgs,
@@ -29,6 +36,7 @@ import {
   INIT_EXIT_INTERNAL_ERROR,
   INIT_EXIT_OK,
   INIT_EXIT_PRECONDITION,
+  INIT_EXIT_SKILL_INSTALL_FAILED,
   INIT_EXIT_USER_ABORTED,
 } from './exit-codes';
 import { mergeGitattributes, requiredGitattributesLines } from './hygiene-gitattributes';
@@ -48,7 +56,6 @@ import {
 } from './output';
 import { type ProbeOutcome, type ProbeOverrides, probeServerVersion } from './probe-db';
 import { findStaleArtefacts, removeDependency } from './reinit-cleanup';
-import { agentSkillMd } from './templates/agent-skill';
 import { configFile, dbFile, starterSchema, targetPackageName } from './templates/code-templates';
 import { envExampleContent, envFileContent, MIN_SERVER_VERSION } from './templates/env';
 import { quickReferenceMd } from './templates/quick-reference';
@@ -72,6 +79,15 @@ interface InstallReport {
   readonly deps: readonly string[];
   readonly devDeps: readonly string[];
   readonly warnings: readonly string[];
+  /**
+   * The package manager that actually ran. Equal to the detected `pm`
+   * on the common path; differs when the FR7.2 pnpm → npm fallback
+   * fired, in which case it's `'npm'`. Threaded into the agent-skill
+   * install so the runner stays consistent with the install we just
+   * ran — re-trying through `pnpm dlx` when `pnpm install` just failed
+   * for workspace/catalog reasons would fail again for the same reason.
+   */
+  readonly effectivePm: PackageManager;
 }
 
 /**
@@ -156,10 +172,6 @@ export async function runInit(
       path: 'prisma-next.md',
       content: quickReferenceMd(inputs.target, inputs.authoring, inputs.schemaPath, pkgRun),
     },
-    {
-      path: '.agents/skills/prisma-next/SKILL.md',
-      content: agentSkillMd(inputs.target, inputs.authoring, inputs.schemaPath, pkgRun),
-    },
     { path: '.env.example', content: envExampleContent(inputs.target) },
   ];
 
@@ -171,6 +183,15 @@ export async function runInit(
   // phase: each path is checked for existence in the precondition,
   // and missing-on-disk-at-write-time is tolerated.
   const filesToDelete: string[] = inputs.reinit ? [...findStaleArtefacts(baseDir, schemaDir)] : [];
+
+  // Legacy hand-rolled skill file from before `init` delegated to
+  // `npx skills add @prisma-next/agent-skill`. Always queued for
+  // deletion (not gated on `--reinit`) so a project initialised by
+  // an older `init` doesn't keep a stale stub once the user upgrades
+  // and reruns `init`.
+  if (existsSync(join(baseDir, LEGACY_SKILL_FILE))) {
+    filesToDelete.push(LEGACY_SKILL_FILE);
+  }
 
   // FR3.2: a real `.env` is only written when the user opted in. Never
   // overwrite an existing `.env` — secrets live there and clobbering
@@ -416,6 +437,92 @@ export async function runInit(
     }
   }
 
+  // Agent-skill install. Project-level is unconditional (modulo
+  // `--no-skill`); user-level is opt-in via `--install-user-skill` or
+  // the FR5 first-run prompt. A project-level failure is fatal
+  // (`INIT_EXIT_SKILL_INSTALL_FAILED`); a user-level failure is a
+  // warning so the user's main scaffold is not blocked (FR10).
+  //
+  // Runs after install + emit because (1) `node_modules` is in place,
+  // so any consumers downstream are coherent, and (2) the user has
+  // seen the scaffolding succeed before this network-bound step
+  // potentially fails. We skip the install when the user passed
+  // `--no-install` for the same reason — no `node_modules` means the
+  // workspace isn't ready to consume the skill yet anyway.
+  if (!inputs.installProjectSkill) {
+    warnings.push(
+      'Skipped @prisma-next/agent-skill install (--no-skill). To install later, run `npx skills add @prisma-next/agent-skill` in this project.',
+    );
+  } else if (install.skipped) {
+    warnings.push(
+      'Skipped @prisma-next/agent-skill install because --no-install was passed. Once you run install manually, register the skill with `npx skills add @prisma-next/agent-skill`.',
+    );
+  } else {
+    let installUserSkill = inputs.installUserSkill;
+    if (inputs.userSkillPromptPending && !flags.json && !flags.quiet) {
+      const answer = await clack.confirm({
+        message:
+          'Install @prisma-next/agent-skill at the user level too? (Your agent will pick it up across every project on this host.)',
+        initialValue: true,
+        output: process.stderr,
+      });
+      const answeredYes = !clack.isCancel(answer) && answer === true;
+      writeMarker({
+        userSkillPromptShown: true,
+        shownAt: new Date().toISOString(),
+        answeredYes,
+      });
+      installUserSkill = answeredYes;
+    } else if (inputs.installUserSkill) {
+      // Explicit `--install-user-skill` writes the marker too so a
+      // later interactive run does not re-prompt.
+      writeMarker({
+        userSkillPromptShown: true,
+        shownAt: new Date().toISOString(),
+        answeredYes: true,
+      });
+    }
+
+    const spinner = ui.spinner();
+    spinner.start('Registering @prisma-next/agent-skill with the agent runtime...');
+    try {
+      const project = await runProjectLevelSkillInstall({
+        baseDir,
+        pm: install.effectivePm,
+        filesWritten,
+      });
+      spinner.stop(
+        `Registered @prisma-next/agent-skill (project level) — ran \`${project.command}\``,
+      );
+    } catch (error) {
+      spinner.stop('Agent-skill install failed');
+      if (CliStructuredError.is(error)) {
+        return emitError(ui, flags, error);
+      }
+      throw error;
+    }
+
+    if (installUserSkill) {
+      const userSpinner = ui.spinner();
+      userSpinner.start('Installing @prisma-next/agent-skill at the user level...');
+      const userResult = await runUserLevelSkillInstall({ baseDir, pm: install.effectivePm });
+      if (userResult.ok) {
+        userSpinner.stop(
+          `Installed @prisma-next/agent-skill at the user level — ran \`${userResult.command}\``,
+        );
+      } else {
+        userSpinner.stop('User-level install failed (non-fatal — continuing)');
+        warnings.push(userResult.warning);
+      }
+    }
+
+    if (inputs.userSkillPromptPending) {
+      warnings.push(
+        `Wrote ${markerFilePath()} so the user-level prompt won't appear again. Delete it to re-trigger.`,
+      );
+    }
+  }
+
   const output: InitOutput = {
     ok: true,
     target: inputs.target === 'mongo' ? 'mongodb' : 'postgres',
@@ -525,6 +632,8 @@ export function exitCodeForError(error: { readonly code: string }): number {
       return INIT_EXIT_EMIT_FAILED;
     case '5009': // invalid output document — internal bug in prisma-next
       return INIT_EXIT_INTERNAL_ERROR;
+    case '5013': // agent-skill install failed
+      return INIT_EXIT_SKILL_INSTALL_FAILED;
     default:
       // Any unexpected code is treated as an internal bug rather than
       // mis-routed to PRECONDITION. Adding a new code requires an
@@ -646,7 +755,7 @@ async function runInstall(ctx: {
         'Manual steps',
       );
     }
-    return { skipped: true, deps: [], devDeps: [], warnings: catalogWarnings };
+    return { skipped: true, deps: [], devDeps: [], warnings: catalogWarnings, effectivePm: pm };
   }
 
   const exec = promisify(execFile);
@@ -661,7 +770,7 @@ async function runInstall(ctx: {
   try {
     await runPair(pm);
     spinner.stop(`Installed ${allPackages}`);
-    return { skipped: false, deps, devDeps, warnings: catalogWarnings };
+    return { skipped: false, deps, devDeps, warnings: catalogWarnings, effectivePm: pm };
   } catch (err) {
     const stderrText = redactSecrets(readChildStderr(err));
 
@@ -693,6 +802,7 @@ async function runInstall(ctx: {
           // catalog-honour warning to avoid a contradictory message
           // pair.
           warnings: [fallbackWarning],
+          effectivePm: 'npm',
         };
       } catch (npmErr) {
         spinner.stop('Installation failed');

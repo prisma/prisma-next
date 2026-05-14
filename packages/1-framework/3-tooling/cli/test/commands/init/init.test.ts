@@ -141,7 +141,7 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
     rmSync(tmpDir, { recursive: true, force: true });
   }, timeouts.databaseOperation);
 
-  it('scaffolds five files for postgres target', async () => {
+  it('scaffolds the per-target files (no agent-skill template — install handled by @prisma-next/agent-skill)', async () => {
     const exit = await runInitTest(tmpDir, {
       options: { install: false },
       flags: interactiveFlags(),
@@ -151,7 +151,11 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
     expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(true);
     expect(existsSync(join(tmpDir, 'prisma/db.ts'))).toBe(true);
     expect(existsSync(join(tmpDir, 'prisma-next.md'))).toBe(true);
-    expect(existsSync(join(tmpDir, '.agents/skills/prisma-next/SKILL.md'))).toBe(true);
+    // The hand-rolled `.agents/skills/prisma-next/SKILL.md` template is no
+    // longer emitted by init — the published `@prisma-next/agent-skill`
+    // package replaces it, and the `skills` CLI places its content under
+    // a discovery path that's the agent runtime's concern, not init's.
+    expect(existsSync(join(tmpDir, '.agents/skills/prisma-next/SKILL.md'))).toBe(false);
   });
 
   it('generates config with single facade import and contract as string path', async () => {
@@ -1472,15 +1476,15 @@ describe('runInit (--json output, FR1.5 / FR10.2)', { timeout: timeouts.database
     // The `nextSteps` array is part of the documented `--json` contract
     // (FR1.5 / FR10.2). Agents and CI are expected to surface these
     // strings to the user verbatim, so we lock the canonical anchor
-    // tokens (DATABASE_URL, the contract-emit command, the agent skill
-    // file) rather than just asserting "non-empty". A rewording is fine;
+    // tokens (DATABASE_URL, the contract-emit command, the agent skill)
+    // rather than just asserting "non-empty". A rewording is fine;
     // dropping any of these anchors needs to be a conscious change.
     const nextSteps = parsed['nextSteps'] as string[];
     expect(Array.isArray(nextSteps)).toBe(true);
     const nextStepsText = nextSteps.join('\n');
     expect(nextStepsText).toContain('DATABASE_URL');
     expect(nextStepsText).toMatch(/(prisma-next|npx prisma-next) contract emit/);
-    expect(nextStepsText).toContain('.agents/skills/prisma-next/SKILL.md');
+    expect(nextStepsText).toContain('@prisma-next/agent-skill');
   });
 
   it('writes a structured error to stdout in JSON mode when preconditions fail', async () => {
