@@ -336,23 +336,20 @@ for the durable model.
 
 - **Model validations.** Prisma Next doesn't do `email: string @validates(format: 'email')`
   for you. Validate in application code with arktype or zod. If you
-  need declarative validations in the contract, file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  need declarative validations in the contract, file a feature request via the `prisma-next-feedback` skill.
 - **Lifecycle callbacks** (`beforeSave`, `afterCreate`, etc.). Prisma
   Next doesn't run hooks on model writes. Use middleware
   (`prisma-next-runtime`) or app code. If you need first-class lifecycle
-  callbacks, file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  callbacks, file a feature request via the `prisma-next-feedback` skill.
 - **Soft delete / `paranoid: true`.** Prisma Next doesn't ship a
   built-in soft-delete column. Add a `deletedAt DateTime?` column and
   filter `.where(m => m.deletedAt.isNull())` in your queries (or in a
   middleware). If you need built-in soft delete, file a feature
-  request: <https://github.com/prisma/prisma-next/issues/new>.
+  request via the `prisma-next-feedback` skill.
 - **Scopes / default filters.** Prisma Next doesn't have ActiveRecord-
   style scopes. Compose query builders yourself (e.g. a `published()`
   helper that returns `db.orm.Post.where(p => p.status.eq('published'))`).
-  If you need scopes built-in, file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  If you need scopes built-in, file a feature request via the `prisma-next-feedback` skill.
 
 ## Reference Files
 

@@ -1,6 +1,6 @@
 ---
 name: prisma-next-runtime
-description: Wire the Prisma Next runtime — db.ts setup, middleware composition (telemetry, lints, budgets), connection configuration, per-environment config, Vite/Next no-emit plugin, switching targets. Use for db.ts, postgres(), mongo(), middleware, telemetry, query log, lints, budgets, DATABASE_URL, .env, connection pool, dev vs prod config, vite plugin, next plugin, no-emit, read replicas, multi-database.
+description: Wire the Prisma Next runtime — db.ts setup, middleware composition (telemetry, lints, budgets), connection configuration, per-environment config, switching targets. Use for db.ts, postgres(), mongo(), middleware, telemetry, query log, lints, budgets, DATABASE_URL, .env, connection pool, dev vs prod config, read replicas, multi-database.
 ---
 
 # Prisma Next — Runtime (`db.ts` Wiring)
@@ -17,16 +17,18 @@ environment configuration.
 - User wants to add middleware (telemetry, lints, budgets, custom).
 - User wants per-environment config (dev vs prod, multi-region).
 - User wants to switch targets (Postgres ↔ Mongo).
-- User wants to use the no-emit Vite/Next plugin.
 - User mentions: *db.ts, postgres(), mongo(), middleware, telemetry,
   query log, lints, budgets, DATABASE_URL, .env, connection pool, dev
-  vs prod, vite plugin, next plugin, read replicas, multi-database*.
+  vs prod, read replicas, multi-database*.
 
 ## When Not to Use
 
 - User wants to write queries → `prisma-next-queries`.
 - User wants to edit the contract → `prisma-next-contract`.
+- User wants to wire Prisma Next into a build tool (Vite plugin,
+  Next.js, …) → `prisma-next-build`.
 - User wants to debug a connection / runtime error → `prisma-next-debug`.
+- User wants to file a bug or feature request → `prisma-next-feedback`.
 
 ## Key Concepts (before any workflow)
 
@@ -42,9 +44,11 @@ environment configuration.
   config (target, contract path, extensions, capabilities); `.env` is
   for per-environment values (`DATABASE_URL`, secrets). Don't put
   secrets in the config.
-- **Vite / Next plugin**: an alternative dev flow where contract
-  artifacts are computed at build time (no on-disk `contract.json` /
-  `contract.d.ts`). For production builds, still emit explicitly.
+- **Build-system / dev-server integration** is a different skill:
+  contract auto-emit during `vite dev` (and the future Next.js
+  equivalent) is owned by `prisma-next-build`. The runtime entry
+  point reads `contract.json` / `contract.d.ts` regardless of how
+  they got there, so the two skills compose cleanly.
 
 ## Workflow — Basic `db.ts`
 
@@ -229,43 +233,25 @@ If a project needs to switch its underlying target:
 `db.ts` ends up importing from `@prisma-next/mongo/runtime` instead of
 `@prisma-next/postgres/runtime`. The `db` API surface stays the same.
 
-## Vite plugin (no-emit dev flow)
+## Build-system / dev-server integration
 
-For TS-authored contracts, you can skip the on-disk `contract.json` /
-`contract.d.ts` files and let Vite emit them at build time:
+If you want contract artefacts to re-emit automatically while the
+dev server is running (instead of running `prisma-next contract
+emit` by hand each time the contract source changes), reach for
+the build-tool plugin from `prisma-next-build`:
 
-```typescript
-// vite.config.ts
-import { defineConfig } from 'vite';
-import { prismaNext } from '@prisma-next/vite';
+- **Vite**: install `@prisma-next/vite-plugin-contract-emit` and
+  register `prismaVitePlugin('prisma-next.config.ts')` in
+  `vite.config.ts`.
+- **Next.js, Webpack, esbuild, Rollup, Turbopack**: no first-party
+  plugin yet — the workaround is a `prebuild` script that runs
+  `prisma-next contract emit`. See `prisma-next-build` for the
+  walkthrough.
 
-export default defineConfig({
-  plugins: [prismaNext({ configPath: './prisma-next.config.ts' })],
-});
-```
-
-Then in `db.ts`, import virtual modules:
-
-```typescript
-import postgres from '@prisma-next/postgres/runtime';
-import type { Contract, TypeMaps } from 'virtual:prisma-next/contract.d';
-import contractJson from 'virtual:prisma-next/contract.json';
-
-export const db = postgres<Contract, TypeMaps>({ contractJson, url: process.env['DATABASE_URL']! });
-```
-
-For production builds where you can't rely on the plugin, run
-`prisma-next contract emit` to materialize the artifacts.
-
-## Next.js equivalent
-
-Same pattern, different config file:
-
-```typescript
-// next.config.ts
-import { withPrismaNext } from '@prisma-next/next';
-export default withPrismaNext({ configPath: './prisma-next.config.ts' })({ /* nextConfig */ });
-```
+The runtime side (this skill) is the same regardless: `db.ts`
+reads `contract.json` + `contract.d.ts` from disk. The
+build-system plugin's job is to keep those files current during
+development.
 
 ## Common Pitfalls
 
@@ -287,27 +273,27 @@ export default withPrismaNext({ configPath: './prisma-next.config.ts' })({ /* ne
   ship a built-in primary/replica router or shard-aware client.
   Workaround: configure separate `db.ts` instances per data store
   and call the right one in your application code. If you need
-  first-class multi-database routing, file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  first-class multi-database routing, file a feature request via
+  the `prisma-next-feedback` skill.
 - **Connection pooling tuning as a first-class config field.** The
   underlying driver (`pg`, `mongodb`) accepts pool options, and you
   can pass them through, but PN doesn't surface them in
   `prisma-next.config.ts`. Workaround: pass driver options through
   the `postgres({ driverOptions: { ... } })` parameter. If you need
-  first-class pool config, file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  first-class pool config, file a feature request via the
+  `prisma-next-feedback` skill.
 - **Query logger middleware as a built-in.** Prisma Next doesn't ship
   a "log every query" middleware. Workaround: write a small custom
   middleware that wraps each operation and logs; or use the telemetry
   middleware and inspect spans. If you need a built-in query log,
-  file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  file a feature request via the `prisma-next-feedback` skill.
 
 ## Reference Files
 
 - `references/middleware-api.md` — the middleware contract; how to author a custom one.
 - `references/connection-config.md` — every connection-config option PN forwards to the driver.
-- `references/vite-plugin.md` / `references/next-plugin.md` — plugin options.
+- For build-system / dev-server integration (Vite plugin, future
+  Next.js plugin): see the `prisma-next-build` skill.
 
 ## Checklist
 
@@ -317,4 +303,5 @@ export default withPrismaNext({ configPath: './prisma-next.config.ts' })({ /* ne
 - [ ] Middleware ordered intentionally (telemetry outermost typically).
 - [ ] Per-env divergence (if any) gated by `NODE_ENV` or similar.
 - [ ] Did NOT hardcode credentials in any committed file.
-- [ ] Did NOT confabulate read-replica / multi-DB / connection-pool config — pointed at the capability-gap section + feature-request URL.
+- [ ] Did NOT confabulate read-replica / multi-DB / connection-pool config — pointed at the capability-gap section and routed to `prisma-next-feedback` for the user to file a request.
+- [ ] For build-system / dev-server prompts (Vite plugin, Next.js plugin, …) routed to `prisma-next-build`.

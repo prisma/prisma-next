@@ -392,24 +392,22 @@ underlying driver does (Postgres: yes; Mongo: yes via cursors).
 - **`EXPLAIN` / query plan inspection.** Prisma Next doesn't expose an
   `.explain()` method. Workaround: `db.sql.raw\`EXPLAIN ANALYZE
   ${someQuery}\``. If you need first-class plan inspection, file a
-  feature request: <https://github.com/prisma/prisma-next/issues/new>.
+  feature request: file a feature request via the `prisma-next-feedback` skill.
 - **Prepared statements as a user-facing surface.** PN's adapters
   prepare under the hood for parameterized queries, but you can't
   pre-prepare a statement and re-execute by name. Workaround: use
   TypedSQL (which compiles to a typed callable) or the raw lane. If
-  you need first-class prepared statements, file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  you need first-class prepared statements, file a feature request via the `prisma-next-feedback` skill.
 - **`db.batch()` / multi-statement batching.** Prisma Next runs each
   call sequentially. Workaround: wrap in a transaction (`db.transaction`),
   or use raw SQL with a `;`-separated statement set. If you need
   Prisma-7-style `db.$transaction([call1, call2])` batching, file a
-  feature request: <https://github.com/prisma/prisma-next/issues/new>.
+  feature request: file a feature request via the `prisma-next-feedback` skill.
 - **Automatic N+1 detection.** Prisma Next does not warn when an
   `.include()` is missing. Workaround: be deliberate about includes
   in code review; the capability-gated `includeMany` is the manual
   approach for explicit many-load chains. If you need automatic N+1
-  warnings, file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  warnings, file a feature request via the `prisma-next-feedback` skill.
 
 ## Reference Files
 

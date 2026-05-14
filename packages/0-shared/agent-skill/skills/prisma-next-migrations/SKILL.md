@@ -274,19 +274,16 @@ When `db update` or `migration apply` proposes a destructive op
   migrations from your app's startup code (the "Drizzle pattern" for
   serverless / edge). Workaround: run `prisma-next migration apply`
   from your deploy pipeline before the app starts. If you need
-  runtime-apply built-in, file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  runtime-apply built-in, file a feature request via the `prisma-next-feedback` skill.
 - **Seeds-as-first-class.** Prisma Next doesn't ship a `prisma db seed`
   equivalent. Workaround: write a TypeScript script that imports `db`
   and runs your setup queries; invoke it from `package.json`'s scripts
   (e.g. `"seed": "tsx scripts/seed.ts"`). If you need first-class
-  seeding, file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  seeding, file a feature request via the `prisma-next-feedback` skill.
 - **Migration squashing.** Prisma Next doesn't squash older migrations
   into a baseline. They accumulate; for very large histories, manual
   baseline-and-truncate is the path. If you need built-in squashing,
-  file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  file a feature request via the `prisma-next-feedback` skill.
 
 ## Reference Files
 

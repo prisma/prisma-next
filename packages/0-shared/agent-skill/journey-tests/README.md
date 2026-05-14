@@ -41,5 +41,9 @@ research project and is deferred from this milestone.
 | [`02f-merge-preview.md`](02f-merge-preview.md) | migration-review | AC5f |
 | [`02g-diamond-convergence.md`](02g-diamond-convergence.md) | migration-review, migrations | AC5g |
 | [`02h-query-interface.md`](02h-query-interface.md) | queries | AC5h |
-| [`03-capability-gaps.md`](03-capability-gaps.md) | contract, migrations, queries, debug | AC6 |
+| [`03-capability-gaps.md`](03-capability-gaps.md) | contract, migrations, queries, build, debug, feedback | AC6 |
 | [`04-aggregate-contract.md`](04-aggregate-contract.md) | contract, runtime | AC9 |
+| [`05-build-vite.md`](05-build-vite.md) | build | AC8b |
+| [`05b-build-nextjs-gap.md`](05b-build-nextjs-gap.md) | build, feedback | AC8b (Next.js path) |
+| [`06-feedback-bug.md`](06-feedback-bug.md) | feedback | AC8c (bug path) |
+| [`06b-feedback-feature.md`](06b-feedback-feature.md) | contract, feedback | AC8c (feature path) |

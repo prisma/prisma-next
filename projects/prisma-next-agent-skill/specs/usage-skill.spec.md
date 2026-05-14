@@ -1,6 +1,6 @@
 # Summary
 
-Define a published agent-skill package `@prisma-next/agent-skill` (one npm package, multiple skill subdirectories), version-locked to Prisma Next, whose body teaches an LLM agent how to operate Prisma Next end-to-end: adopt it into a new or existing project, edit the contract, plan and review migrations, write queries across the available query interfaces, wire up `db.ts`, and debug structured errors. Define the in-repo authoring layout (`packages/0-shared/agent-skill/`), the `SKILL.md` skeleton every skill follows, the eight-skill cluster that fits the workflows under the 500-line-per-`SKILL.md` budget, the description-tuning convention that includes foreign-ORM trigger vocabulary, the *"What Prisma Next doesn't do yet"* honesty pattern that names unbuilt features instead of confabulating APIs, and the *content-rotation policy* that keeps the skill body fresh as the framework evolves.
+Define a published agent-skill package `@prisma-next/agent-skill` (one npm package, multiple skill subdirectories), version-locked to Prisma Next, whose body teaches an LLM agent how to operate Prisma Next end-to-end: adopt it into a new or existing project, edit the contract, plan and review migrations, write queries across the available query interfaces, wire up `db.ts`, integrate Prisma Next into the project's build system (Vite today, Next.js later), debug structured errors, and file bug reports or feature requests against Prisma Next itself. Define the in-repo authoring layout (`packages/0-shared/agent-skill/`), the `SKILL.md` skeleton every skill follows, the ten-skill cluster that fits the workflows under the 500-line-per-`SKILL.md` budget, the description-tuning convention that includes foreign-ORM trigger vocabulary, the *"What Prisma Next doesn't do yet"* honesty pattern that names unbuilt features instead of confabulating APIs (and routes the user to the feedback skill so missing features become a backlog signal rather than a dead end), and the *content-rotation policy* that keeps the skill body fresh as the framework evolves.
 
 This skill is the *Layer 1 + Layer 2* artifact for the project: it closes the agent-side onboarding gap to zero (an agent dropped into a fresh Prisma Next project produces a working first query without external docs) and eliminates the daily-friction tax on common operations (schema edits, migration authoring, query writing, runtime configuration). It is the surface every partner-hosted agent (Supabase, v0, Lovable) consumes when its user is on Prisma Next.
 
@@ -12,9 +12,9 @@ This spec depends on [`upgrade-skill.spec.md`](upgrade-skill.spec.md)'s recipe-c
 
 Today, the *agent's* experience of Prisma Next is essentially nonexistent. Open an IDE agent against a Prisma Next project, ask it to "add a User model and let me list users", and watch it default to Prisma 7's `prisma/schema.prisma` + `prisma generate` patterns — even though the project's `prisma-next.config.ts` says otherwise. The agent has no signal that Prisma Next exists, no understanding of `contract.json`, no awareness of the `db.sql` vs `db.orm` split, no idea what a capability is. The Prisma Next docs are accessible to it, but the agent has no reason to read them: it has a confident answer already.
 
-This spec ships the artifact that fixes that: a small, structured, agent-readable surface installed once at project scaffold time. The artifact is **one npm package** containing **eight skill subdirectories**, each with its own `SKILL.md` and per-skill `references/`. The matcher fires on the relevant `description` field; the agent loads only that skill's body; deeper material loads on demand. The same install command (`npx skills add @prisma-next/agent-skill`) registers all eight skills with the agent runtime; `prisma-next init` invokes it on the user's behalf (handled in [`init-integration.spec.md`](init-integration.spec.md)).
+This spec ships the artifact that fixes that: a small, structured, agent-readable surface installed once at project scaffold time. The artifact is **one npm package** containing **ten skill subdirectories**, each with its own `SKILL.md` and per-skill `references/`. The matcher fires on the relevant `description` field; the agent loads only that skill's body; deeper material loads on demand. The same install command (`npx skills add @prisma-next/agent-skill`) registers all ten skills with the agent runtime; `prisma-next init` invokes it on the user's behalf (handled in [`init-integration.spec.md`](init-integration.spec.md)).
 
-The eight skills:
+The ten skills:
 
 | # | Skill | Scope |
 |---|---|---|
@@ -25,7 +25,9 @@ The eight skills:
 | 5 | `prisma-next-migration-review` | Deployment, concurrency, "what runs on merge?", CI integration. |
 | 6 | `prisma-next-queries` | Query builders, ORM client, query-interface decision. |
 | 7 | `prisma-next-runtime` | `db.ts` wiring, middleware, environment config. |
-| 8 | `prisma-next-debug` | Signal-routing + per-error-domain references. |
+| 8 | `prisma-next-build` | Build-system / dev-server integration via Prisma Next build-tool plugins (Vite today; Next.js later). |
+| 9 | `prisma-next-debug` | Signal-routing + per-error-domain references. |
+| 10 | `prisma-next-feedback` | File a bug report or a feature request against Prisma Next. |
 
 A user-facing flow, end-to-end:
 
@@ -101,9 +103,14 @@ packages/0-shared/agent-skill/
     ├── prisma-next-runtime/
     │   ├── SKILL.md
     │   └── references/
-    └── prisma-next-debug/
-        ├── SKILL.md
-        └── references/
+    ├── prisma-next-build/
+    │   ├── SKILL.md
+    │   └── references/
+    ├── prisma-next-debug/
+    │   ├── SKILL.md
+    │   └── references/
+    └── prisma-next-feedback/
+        └── SKILL.md
 ```
 
 Tier choice (`0-shared/`) aligns with the upgrade-skill packages from [`upgrade-skill.spec.md`](upgrade-skill.spec.md). The skill names are all brand-prefixed (`prisma-next-*`) so the matcher doesn't collide with other ORMs' skills installed in the same agent runtime.
@@ -186,7 +193,9 @@ Prisma Next is in early access. Several common ORM features are not yet built. T
 
 Every skill carries a top-level **What Prisma Next doesn't do yet** section listing the gaps relevant to that skill's domain. Format per entry:
 
-> - **\<Feature\>**: Prisma Next doesn't do \<X\> for you. \<User-side workaround in one or two sentences\>. If you need this built-in, file a feature request: \<URL\>.
+> - **\<Feature\>**: Prisma Next doesn't do \<X\> for you. \<User-side workaround in one or two sentences\>. If you need this built-in, file a feature request via the `prisma-next-feedback` skill.
+
+The route to `prisma-next-feedback` (FR19b) replaces what would otherwise be a bare URL in every gap entry. The feedback skill is the canonical, agent-readable surface for filing the request — it walks the agent through producing a minimal-repro / desired-API-shaped body the framework team can act on, instead of a one-line link the user may or may not click.
 
 When the list bulks up the SKILL.md body past the budget (FR4), spill it into `references/not-yet-supported.md` and link from the section header.
 
@@ -253,7 +262,7 @@ The acceptance criteria in [Acceptance Criteria](#acceptance-criteria) name the 
 
 - **FR2. Version-locking.** Every PN release publishes the agent-skill package at the same version. The publish workflow refuses to ship without it (NFR8 from [`upgrade-skill.spec.md`](upgrade-skill.spec.md) extends to cover this package). Consumers at PN `0.7.x` get the `0.7.x`-tagged agent-skill set; the framework cannot ship without the skill, and the skill cannot ship without the framework.
 
-- **FR3. Eight-skill cluster.** The package contains exactly the eight skill subdirectories listed in [Cluster shape](#cluster-shape--eight-skills), each with its own `SKILL.md`. Additional skills require this spec to be amended. The skill names are fixed as specified.
+- **FR3. Ten-skill cluster.** The package contains exactly the ten skill subdirectories listed in [The ten skills](#at-a-glance), each with its own `SKILL.md`. Additional skills require this spec to be amended. The skill names are fixed as specified.
 
 - **FR4. Per-`SKILL.md` size budget.** Every `SKILL.md` body fits within ~350 lines (target; ~500 lines hard ceiling per the agentskills.io spec recommendation). Content that exceeds the budget moves to per-skill `references/*.md` files referenced from the SKILL.md body. The `prisma-next` router skill is exempt from the lower bound — it is intentionally tiny (~50 lines).
 
@@ -275,7 +284,7 @@ The acceptance criteria in [Acceptance Criteria](#acceptance-criteria) name the 
   - Foreign-ORM vocabulary the user might type instead (e.g. *validations* for the contract skill, *prisma migrate dev* for the migrations skill, *prisma studio* for the debug skill). The "Use for ..." list per skill is enumerated in the implementation; the spec pins the rule, not the exact text.
   - Length: 25–35 words.
 
-- **FR9. Capability-gap section.** Every skill has a *What Prisma Next doesn't do yet* section listing unbuilt features in that skill's domain. Format per [Capability-gap honesty](#capability-gap-honesty--what-prisma-next-doesnt-do-yet); minimum entries per skill enumerated in [Cluster scope](#cluster-scope--per-skill-inventory) below. Adding or removing entries as the framework evolves is governed by the content-rotation policy ([Content-rotation policy](#content-rotation-policy--co-location--pr-template-item-defer-the-rest)).
+- **FR9. Capability-gap section.** Every skill has a *What Prisma Next doesn't do yet* section listing unbuilt features in that skill's domain. Format per [Capability-gap honesty](#capability-gap-honesty--what-prisma-next-doesnt-do-yet); minimum entries per skill enumerated in [Cluster scope](#cluster-scope--per-skill-inventory) below. Each entry closes with a route to the `prisma-next-feedback` skill (FR19b) instead of a bare feature-request URL — the feedback skill is the canonical, agent-readable surface for filing the request and the capability-gap entry's last line is *"file this via the `prisma-next-feedback` skill"* or equivalent. Adding or removing entries as the framework evolves is governed by the content-rotation policy ([Content-rotation policy](#content-rotation-policy--co-location--pr-template-item-defer-the-rest)).
 
 - **FR10. Bad/good code pairs.** Every workflow step that has a wrong-vs-right contrast uses a `// Bad:` / `// Good:` code-block pair rather than prose explanation. The judgement call about which steps need a pair is the skill author's; the rule is that whenever a contrast is shown, it is shown as code, not as English.
 
@@ -285,7 +294,7 @@ The acceptance criteria in [Acceptance Criteria](#acceptance-criteria) name the 
 
 Each skill's content is bounded by the inventory below. *Bullets are workflows* unless explicitly labelled as decision tables or reference material.
 
-- **FR12. `prisma-next` — Router.** ~50 lines, no `references/`. Body lists the seven workflow skills with one-line trigger conditions each, ends with *"if you can't tell which to use, ask the user what they want to do."*
+- **FR12. `prisma-next` — Router.** ~50 lines, no `references/`. Body lists the nine workflow skills with one-line trigger conditions each, ends with *"if you can't tell which to use, ask the user what they want to do."*
 
 - **FR13. `prisma-next-quickstart` — Adoption.** Two branching paths:
   - **Path 1 — Greenfield.** `prisma-next init` → pick target → first model → first `contract emit` → `db init` → first query.
@@ -373,10 +382,28 @@ Each skill's content is bounded by the inventory below. *Bullets are workflows* 
   - Configure connection: `db.connection` in config vs `DATABASE_URL` env var vs `--db` flag.
   - Per-environment config (dev vs prod).
   - Switch targets (Postgres ↔ Mongo).
-  - Use the Vite plugin for no-emit dev flow.
-  - Use the Next plugin equivalent.
+
+  Build-system / dev-server integration (Vite, future Next.js) is **out of scope** here and belongs to `prisma-next-build` (FR18b). The runtime skill's *When Not to Use* section routes those prompts.
 
   *What PN doesn't do yet:* multi-database routing / read replicas (configure separate `db.ts` instances per service), connection pooling tuning as first-class (pass driver options through).
+
+- **FR18b. `prisma-next-build` — Build-system / dev-server integration.** Workflows:
+  - Decision table: do I need a build-system plugin at all? (Yes if I want no-emit dev: contract artifacts regenerate automatically on `schema.psl` / `contract.ts` edits during `vite dev`. No if I'm fine running `prisma-next contract emit` by hand or wiring a `prebuild` script.)
+  - Install [`@prisma-next/vite-plugin-contract-emit`](../../../packages/1-framework/3-tooling/vite-plugin-contract-emit/README.md) (Vite 7 or 8).
+  - Wire `prismaVitePlugin('prisma-next.config.ts')` into `vite.config.ts`.
+  - Configure the plugin: `debounceMs`, `logLevel` (`silent` / `info` / `debug`).
+  - Verify the dev loop: start the dev server, edit `schema.psl`, see the contract artefacts re-emit (success log line) without a manual command.
+  - Recover when the plugin warns about config-only watching (the loader could not resolve `contract.source.inputs`).
+  - Read an error overlay produced by an emit failure (PSL syntax, missing namespace, conflicting extensions); chain to `prisma-next-debug` for resolution.
+  - Verify the published-pair invariant (`contract.d.ts` renamed before `contract.json`) is happening — the user does not need to do anything beyond letting the plugin run.
+  - Tear down: explicit `disposeEmitQueue(outputJsonPath)` is the plugin's responsibility and is not user-surface; mention it for users embedding their own Vite plugin.
+  - Diagnose dev-server / HMR interactions with React Router v7 Framework Mode (the [`examples/react-router-demo`](../../../examples/react-router-demo/) case): the contract auto-emit and the framework's own SSR re-load run side-by-side.
+
+  *What PN doesn't do yet (build-system gaps the skill must name):*
+  - **Next.js plugin.** No first-party Next.js plugin exists yet. Workaround: run `prisma-next contract emit` from a `prebuild` script in `package.json` and from a manual command during development. If you need an integrated Next.js plugin, file a feature request via `prisma-next-feedback`.
+  - **Vite < 7.** The plugin requires Vite 7 or 8 (the peer-dependency range). Vite 6 is not supported and is not on the support matrix.
+  - **Other bundlers (Webpack, esbuild, Rollup, Turbopack).** Not first-party. Run `prisma-next contract emit` from the bundler's pre-build hook. If you need a first-party plugin, file a feature request.
+  - **Build-time-only emission outside dev.** The plugin runs in `vite dev` and re-emits on file changes; it does not run during `vite build`. For CI / production builds, use the explicit `prisma-next contract emit` step.
 
 - **FR19. `prisma-next-debug` — When things break.** Workflows (signal-routing table — symptom → reference file):
   - "My query won't typecheck" — contract stale, capability missing, query-interface mismatch.
@@ -395,6 +422,23 @@ Each skill's content is bounded by the inventory below. *Bullets are workflows* 
   - `references/contract-errors.md` — contract emit / wiring validation failures.
 
   *What PN doesn't do yet:* Studio / GUI database browser (use `prisma-next db schema` for CLI tree output), query logger middleware as first-class (add via custom middleware for now).
+
+- **FR19b. `prisma-next-feedback` — Bug reports and feature requests.** Short skill (~80–120 lines, no `references/`). The single most-fired path from every other skill's *What Prisma Next doesn't do yet* entries: when the agent confirms a capability gap, it routes the user here instead of dropping a feature-request URL in passing. Workflows:
+  - Decide bug report vs feature request: it's a bug if the documented surface behaved unexpectedly (CLI exited with the wrong code, a documented query interface produced a wrong result, an error envelope's `fix` field was misleading, a published TypeScript signature didn't match runtime behaviour); it's a feature request otherwise.
+  - Collect a minimal, public-safe reproduction: a redacted `schema.psl` / contract excerpt, the failing command + its full output (with `-v` if a structured error is involved), the Prisma Next version (`pnpm ls @prisma-next/postgres` or equivalent) and the runtime (Node version, OS), the package manager (pnpm / npm / yarn / bun). Do not include `DATABASE_URL` secrets or proprietary schema fragments.
+  - Render the report on the existing GitHub Issues forms at <https://github.com/prisma/prisma-next/issues/new/choose>. If issue templates are not present (early-access — see *What PN doesn't do yet* below), the skill instructs the agent to open a free-form issue with a structured body the agent fills in: *Summary*, *Steps to reproduce*, *Expected behaviour*, *Actual behaviour*, *Environment*, *Workaround (if any)*.
+  - For feature requests: name the unbuilt feature, name the user's workaround (the agent already has this from the capability-gap entry that triggered the route), describe the desired API or behaviour in one paragraph, and link the source skill's capability-gap entry that triggered the request. The link makes the surface area concrete.
+  - For bug reports: the skill walks the agent through producing a minimal repro that the framework team can re-run locally. Where possible, the repro is a small change against [`examples/prisma-next-demo`](../../../examples/prisma-next-demo/) so the team can reproduce against the canonical substrate.
+  - Confirm with the user before submitting: the skill must surface the rendered title and body to the user for review, never auto-submit silently. Submission via `gh` CLI is the recommended path when available; otherwise the skill opens the *new issue* URL in the browser with the body prefilled.
+  - Optional: encourage the user to install the `prisma-next-upgrade` skill if the bug is fixed by a newer Prisma Next release; chain to a quick *upgrade then verify* loop.
+
+  No `references/` directory by default; the skill is small enough that everything lives in the body.
+
+  *What PN doesn't do yet:*
+  - **First-class issue templates.** The repository may not yet expose GitHub Issue Forms (`.github/ISSUE_TEMPLATE/*.yml`). Until it does, the skill prescribes the structured-body shape itself. If you want first-class issue templates in the repository, file a feature request — via this skill, of course.
+  - **In-product feedback channel.** Prisma Next does not phone home and does not have an in-product "send feedback" command. The repository's GitHub Issues page is the canonical surface. If you want a CLI-side `prisma-next feedback` command, file a feature request.
+
+  The feedback skill is the **terminal of the capability-gap routing pattern**: any skill body that lists *What Prisma Next doesn't do yet* must close each entry with *"file this via the `prisma-next-feedback` skill"* (the exact prose may vary; the route must be present). The feedback skill is also reachable directly via prompts like *"this is a bug"*, *"this should be a feature"*, *"how do I report this?"*, and *"file an issue against Prisma Next"*.
 
 ### Project-context reasoning
 
@@ -444,9 +488,9 @@ Each skill's content is bounded by the inventory below. *Bullets are workflows* 
 
 # Acceptance Criteria
 
-- **AC1. Published package shape.** A stable release publishes `@prisma-next/agent-skill` to npm at the same version as the rest of the PN packages. `npm view @prisma-next/agent-skill dist-tags.latest` returns the same value as `npm view @prisma-next/postgres dist-tags.latest`. The package contains exactly the eight skill subdirectories named in FR12 – FR19. Covers FR1, FR2, FR3, NFR1, NFR2.
+- **AC1. Published package shape.** A stable release publishes `@prisma-next/agent-skill` to npm at the same version as the rest of the PN packages. `npm view @prisma-next/agent-skill dist-tags.latest` returns the same value as `npm view @prisma-next/postgres dist-tags.latest`. The package contains exactly the ten skill subdirectories named in FR12 – FR19b. Covers FR1, FR2, FR3, NFR1, NFR2.
 
-- **AC2. Per-skill structure conforms to the skeleton.** Each of the eight `SKILL.md` files has the sections from FR6 in order: frontmatter, title, preamble (with the FR7 headline as its first sentence), *When to Use*, *When Not to Use*, *Key Concepts*, *Workflow*, optional topic sections, *Common Pitfalls*, *What Prisma Next doesn't do yet*, *Reference Files*, *Checklist*. Verified by a structural check (a small script that asserts the section headings are present in order); part of `pnpm test --filter @prisma-next/agent-skill` if such a test is added, otherwise verified manually by the reviewer. Covers FR6, FR7, FR9.
+- **AC2. Per-skill structure conforms to the skeleton.** Each of the ten `SKILL.md` files has the sections from FR6 in order: frontmatter, title, preamble (with the FR7 headline as its first sentence), *When to Use*, *When Not to Use*, *Key Concepts*, *Workflow*, optional topic sections, *Common Pitfalls*, *What Prisma Next doesn't do yet*, *Reference Files*, *Checklist*. Verified by a structural check (a small script that asserts the section headings are present in order); part of `pnpm test --filter @prisma-next/agent-skill` if such a test is added, otherwise verified manually by the reviewer. Covers FR6, FR7, FR9.
 
 - **AC3. Size budget.** Each `SKILL.md` body fits within the FR4 budget: ≤500 lines hard, ≤350 lines target, plus the router-skill exemption. Covers FR4, NFR3.
 
@@ -471,14 +515,15 @@ Each skill's content is bounded by the inventory below. *Bullets are workflows* 
 
   Each journey is one Markdown checklist at `journey-tests/02-*.md`. Covers FR13 – FR19, the project spec's FR7.
 
-- **AC6. Capability-gap honesty.** For each of the following user prompts, the agent (with the skill installed) responds with the *What Prisma Next doesn't do yet* entry from the matching skill, names the workaround, and produces a feature-request link — *not* a fabricated API call:
+- **AC6. Capability-gap honesty.** For each of the following user prompts, the agent (with the skill installed) responds with the *What Prisma Next doesn't do yet* entry from the matching skill, names the workaround, and routes to `prisma-next-feedback` to file the request — *not* a fabricated API call:
   - **AC6a.** *"Add a validation: email must contain `@`."* Skill: `prisma-next-contract`.
   - **AC6b.** *"Run a `beforeSave` hook on User to lowercase the email."* Skill: `prisma-next-contract`.
   - **AC6c.** *"Open Prisma Studio."* Skill: `prisma-next-debug`.
   - **AC6d.** *"`EXPLAIN` this query."* Skill: `prisma-next-queries`.
   - **AC6e.** *"Apply pending migrations from app startup code."* Skill: `prisma-next-migrations`.
+  - **AC6f.** *"Wire this up with Next.js."* Skill: `prisma-next-build` (gap: no first-party Next.js plugin yet).
 
-  Verified by running the journey test `journey-tests/03-capability-gaps.md`. Covers FR9, NFR7.
+  Verified by running the journey test `journey-tests/03-capability-gaps.md`. Covers FR9, FR19b, NFR7.
 
 - **AC7. Foreign-ORM trigger keywords fire the right skill.** Prompts that use vocabulary from competing ORMs match the correct PN skill:
   - **AC7a.** *"`prisma migrate dev` equivalent"* → `prisma-next-migrations`.
@@ -489,7 +534,24 @@ Each skill's content is bounded by the inventory below. *Bullets are workflows* 
 
   Each prompt verifies the matcher fires on the correct skill. Covers FR8.
 
-- **AC8. Router skill catches vague prompts.** Prompts like *"help me with Prisma Next"*, *"I'm new to PN, where do I start?"*, *"explain Prisma Next"* match the `prisma-next` router skill. The router's body asks the user a disambiguating question (e.g. *"What do you want to do — add a model, run a migration, write a query, or debug an error?"*) and routes accordingly. Covers FR12.
+- **AC8. Router skill catches vague prompts.** Prompts like *"help me with Prisma Next"*, *"I'm new to PN, where do I start?"*, *"explain Prisma Next"* match the `prisma-next` router skill. The router's body asks the user a disambiguating question (e.g. *"What do you want to do — add a model, run a migration, write a query, or debug an error?"*) and routes accordingly, including to `prisma-next-build` and `prisma-next-feedback` for the matching prompt shapes. Covers FR12.
+
+- **AC8b. `prisma-next-build` covers the Vite plugin end-to-end.** An agent with the skill installed, given a fresh Vite + React project that has run `prisma-next init` (project-level skill installed), receives the prompt *"set up automatic contract emission during `vite dev`"* and:
+  - Installs `@prisma-next/vite-plugin-contract-emit` as a devDependency.
+  - Edits `vite.config.ts` to register `prismaVitePlugin('prisma-next.config.ts')`.
+  - Starts `vite dev`, edits the contract source, and demonstrates that the contract artefacts regenerate without a manual `prisma-next contract emit` step.
+
+  For the Next.js prompt — *"do the same in Next.js"* — the agent surfaces the *What PN doesn't do yet* entry (no first-party Next.js plugin yet), recommends the `prebuild` script workaround, and routes the user to `prisma-next-feedback` if they want the gap closed. Verified by running the journey test `journey-tests/05-build-vite.md` and `journey-tests/05b-build-nextjs-gap.md`. Covers FR18b.
+
+- **AC8c. `prisma-next-feedback` produces a structured, public-safe issue body.** An agent with the skill installed, prompted with *"I want to report that `prisma-next migration plan` exits 0 even when the planner found no diff — that's surprising"*, walks the user through:
+  - Classifying it as a bug report (not a feature request).
+  - Producing a minimal reproduction against [`examples/prisma-next-demo`](../../../examples/prisma-next-demo/) (or the user's own project, with secrets redacted).
+  - Capturing the Prisma Next version + Node version + package manager + OS.
+  - Rendering the issue title and body in the structured shape from FR19b (*Summary / Steps to reproduce / Expected / Actual / Environment / Workaround*).
+  - Surfacing the rendered body for user confirmation before submission.
+  - Submitting via `gh issue create` if `gh` is installed, otherwise opening the prefilled new-issue URL.
+
+  For the feature-request prompt — *"this is missing, can you file a feature request?"* originating from any `prisma-next-*` skill's capability-gap entry — the rendered body references back to the capability-gap entry that triggered the route, naming the source skill. Verified by running the journey test `journey-tests/06-feedback-bug.md` and `journey-tests/06b-feedback-feature.md`. Covers FR19b.
 
 - **AC9. Monorepo / aggregate-contract reasoning.** An agent with the skill installed, given a checkout of [`examples/multi-extension-monorepo/`](../../../examples/multi-extension-monorepo/), receives the prompt *"add a `Post` model to the blog package"* and:
   - Reads the blog package's `prisma-next.config.ts` (not the root one).
@@ -510,7 +572,7 @@ Each skill's content is bounded by the inventory below. *Bullets are workflows* 
 
 - **AC14. Glossary alignment.** A sample of skill prose (one passage per skill, taken at random by the reviewer) uses the user-facing terms from `docs/glossary.md`. Code samples may retain internal names (`extensionPacks:`, `lane`) where the glossary tracker shows the rename is pending. Covers FR11.
 
-- **AC15. Capability-gap entries are present.** Every skill body whose FR specifies capability-gap entries (FR14, FR15, FR17, FR18, FR19) has a *What Prisma Next doesn't do yet* section listing at least the entries from that FR. Each entry follows the FR9 format: feature name, one-line workaround, feature-request URL. Covers FR9.
+- **AC15. Capability-gap entries are present and route to `prisma-next-feedback`.** Every skill body whose FR specifies capability-gap entries (FR14, FR15, FR17, FR18, FR18b, FR19) has a *What Prisma Next doesn't do yet* section listing at least the entries from that FR. Each entry follows the FR9 format: feature name, one-line workaround, route to the `prisma-next-feedback` skill (replacing what would otherwise be a bare URL). Covers FR9, FR19b.
 
 # Other Considerations
 
@@ -551,6 +613,8 @@ Each skill's content is bounded by the inventory below. *Bullets are workflows* 
 - [`packages/1-framework/3-tooling/cli/src/commands/init/templates/agent-skill-postgres.md`](../../../packages/1-framework/3-tooling/cli/src/commands/init/templates/agent-skill-postgres.md), `agent-skill-mongo.md` — the hand-rolled templates this spec's artifact replaces (removed by [`init-integration.spec.md`](init-integration.spec.md)).
 - [`examples/multi-extension-monorepo/`](../../../examples/multi-extension-monorepo/) — the aggregate-contract substrate AC9 anchors against.
 - [`packages/1-framework/3-tooling/cli/README.md`](../../../packages/1-framework/3-tooling/cli/README.md) — the CLI command surface the skills describe.
+- [`packages/1-framework/3-tooling/vite-plugin-contract-emit/README.md`](../../../packages/1-framework/3-tooling/vite-plugin-contract-emit/README.md) — the canonical surface the `prisma-next-build` skill teaches.
+- [`https://github.com/prisma/prisma-next/issues/new/choose`](https://github.com/prisma/prisma-next/issues/new/choose) — the canonical submission surface the `prisma-next-feedback` skill points at.
 - [`docs/architecture docs/adrs/ADR 212 - Contract spaces.md`](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md) — the durable doc the contract skill links to for aggregate-contract reasoning.
 - [`get-convex/agent-skills`](https://github.com/get-convex/agent-skills) — the upstream Markdown skeleton this spec adopts.
 - [`projects/prisma-next-agent-skill/references/`](../references/) — competitive-survey notes (Drizzle, Sequelize, TypeORM, Kysely, Active Record, Convex, Supabase, Vercel) consulted during shaping.
@@ -575,9 +639,9 @@ The substantive design questions were resolved during shaping (see [Decisions re
 
 ## Decisions resolved during refinement
 
-- **One package, eight skills.** Verified the multi-skill-per-package pattern against Convex (6 skills), Vercel (6 skills), and Supabase (5 skills). The package-shape constraint does not bound skill count; the SKILL.md size budget does.
+- **One package, ten skills.** Verified the multi-skill-per-package pattern against Convex (6 skills), Vercel (6 skills), and Supabase (5 skills). The package-shape constraint does not bound skill count; the SKILL.md size budget does.
 - **Convex SKILL.md skeleton, adopted wholesale.** Validated against six published Convex skills (53–377 lines each). Rejected alternatives: Supabase's lighter shape (no Checklist / Common Pitfalls — leaves too much to the agent's judgement), Vercel's more verbose shape (too long per skill for our budget).
-- **Eight-skill cluster, not six and not ten.** Six conflates `migrations` with `migration-review` (different user states, different prompts), and combines `runtime` into `contract` (cross-cuts the contract skill's authoring focus). Ten introduces an unjustified bootstrap skill (`init` is the entry point) and an unjustified separate skill for capability-gated features (those live naturally inside `queries`). Eight is the smallest cluster that fits each workflow group's content under the 500-line budget.
+- **Ten-skill cluster.** Started at eight (router + adoption / contract / migrations / migration-review / queries / runtime / debug). Build-system / dev-server integration was originally folded into `runtime`, but the surface is distinct enough (Vite plugin install, dev-server lifecycle, error overlay, the no-emit dev loop) and is the focal point for new partner integrations (Next.js plugin next), so it gets its own `prisma-next-build` skill. Bug reports and feature requests were originally a one-line URL appended to every capability-gap entry, but every other skill in the cluster needs to terminate its "what PN doesn't do yet" routing somewhere, and a dedicated `prisma-next-feedback` skill (a) walks the agent through producing a structured, public-safe issue body the framework team can act on and (b) makes "this is a bug" / "this should be a feature" prompts directly matchable. Both new skills are small (~80–150 lines target). Rejected alternatives: keeping build-system content inside `runtime` (fragments the runtime workflow and obscures the partner-integration story), keeping feedback as a bare URL per capability-gap entry (the URL is unconfirmable from the skill, and the framework team gets unstructured reports the gap-entry doesn't shape).
 - **Brand-prefixed skill names.** `prisma-next-<X>` for every skill so the matcher does not collide with other ORMs' skills installed in the same agent runtime. Rejected alternative: bare names like `migrations`, `queries` — too generic; risk of false matches against unrelated installed skills.
 - **Canonical mental-model preamble.** *Edit your data contract. Prisma handles the rest.* — the single sentence the agent chains back to. Rejected alternatives: a longer preamble (clutters every skill), no shared preamble (loses the unifying frame the agent benefits from carrying across skill activations).
 - **"What Prisma Next doesn't do yet" pattern.** Honest about gaps; lists the workaround and the feature-request URL. Rejected alternative: silent omission of unbuilt features — the dominant failure mode without explicit acknowledgement is the agent confabulating API surfaces that look right but don't exist.

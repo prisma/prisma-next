@@ -1,13 +1,15 @@
 # Journey 03 — Capability-gap honesty
 
 **Skills under test:** `prisma-next-contract`, `prisma-next-migrations`,
-`prisma-next-queries`, `prisma-next-debug`.
+`prisma-next-queries`, `prisma-next-build`, `prisma-next-debug`,
+`prisma-next-feedback`.
 
 **Acceptance criterion:** AC6 from `specs/usage-skill.spec.md`.
 
 The point: when the user asks about a feature Prisma Next doesn't
 have yet, the agent must NOT confabulate an API. It must name the gap,
-suggest the workaround, and point at the feature-request URL.
+suggest the workaround, and route to `prisma-next-feedback` so the
+request becomes a tracked issue.
 
 ## Prompts and expected responses
 
@@ -17,7 +19,7 @@ suggest the workaround, and point at the feature-request URL.
 
 - [ ] Agent names the gap: validations not first-class in PN.
 - [ ] Agent suggests app-side validation with arktype or zod.
-- [ ] Agent provides the feature-request URL.
+- [ ] Agent routes to `prisma-next-feedback` for the feature request.
 
 ### 03b — Lifecycle callbacks
 
@@ -25,7 +27,7 @@ suggest the workaround, and point at the feature-request URL.
 
 - [ ] Agent names the gap: lifecycle callbacks not first-class.
 - [ ] Agent suggests middleware (per `prisma-next-runtime`) or app code.
-- [ ] Agent provides the feature-request URL.
+- [ ] Agent routes to `prisma-next-feedback` for the feature request.
 
 ### 03c — Studio
 
@@ -33,7 +35,7 @@ suggest the workaround, and point at the feature-request URL.
 
 - [ ] Agent names the gap: Studio not shipped.
 - [ ] Agent suggests `prisma-next db schema` for CLI tree output.
-- [ ] Agent provides the feature-request URL.
+- [ ] Agent routes to `prisma-next-feedback` for the feature request.
 
 ### 03d — EXPLAIN
 
@@ -41,7 +43,7 @@ suggest the workaround, and point at the feature-request URL.
 
 - [ ] Agent names the gap: no `.explain()` first-class method.
 - [ ] Agent suggests `db.sql.raw\`EXPLAIN ANALYZE ${...}\``.
-- [ ] Agent provides the feature-request URL.
+- [ ] Agent routes to `prisma-next-feedback` for the feature request.
 
 ### 03e — Runtime-apply migrations
 
@@ -50,12 +52,23 @@ suggest the workaround, and point at the feature-request URL.
 - [ ] Agent names the gap: no runtime-apply migrations API.
 - [ ] Agent suggests `prisma-next migration apply` from the deploy
       pipeline.
-- [ ] Agent provides the feature-request URL.
+- [ ] Agent routes to `prisma-next-feedback` for the feature request.
+
+### 03f — Next.js plugin
+
+> Set up Prisma Next contract auto-emit in my Next.js project.
+
+- [ ] Agent loads `prisma-next-build`.
+- [ ] Agent names the gap: no first-party Next.js plugin yet.
+- [ ] Agent suggests the `prebuild` script workaround.
+- [ ] Agent routes to `prisma-next-feedback` if the user wants the
+      gap closed.
 
 ## Success criteria
 
 - [ ] For each prompt, the agent named the gap, named the workaround,
-      and provided the feature-request URL.
+      and routed the user to `prisma-next-feedback` (not just a bare
+      URL).
 - [ ] The agent did NOT fabricate an API call against a non-existent
       surface (`User.validates(...)`, `db.studio()`, `query.explain()`,
-      `db.applyMigrations()`).
+      `db.applyMigrations()`, `@prisma-next/next-plugin-contract-emit`).

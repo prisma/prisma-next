@@ -28,7 +28,9 @@ start?"*), this skill fires and routes them to the right specific skill.
   - Reviewing what's about to run on merge, handling concurrent migrations → `prisma-next-migration-review`.
   - Writing a query → `prisma-next-queries`.
   - Wiring `db.ts`, middleware, environment config → `prisma-next-runtime`.
+  - Build-system / dev-server plugin (Vite, Next.js, …) → `prisma-next-build`.
   - A specific error code or symptom → `prisma-next-debug`.
+  - Reporting a bug or filing a feature request against Prisma Next → `prisma-next-feedback`.
 
 ## Routing rules
 
@@ -40,7 +42,9 @@ Otherwise, ask **one** disambiguating question. Pick from:
 - *"Do you want to set up a new Prisma Next project, or wire it into an existing database?"* → `prisma-next-quickstart`.
 - *"Do you want to edit your data contract (add a model / field / relation), or work with the database (migrations, queries)?"* → `prisma-next-contract` vs the others.
 - *"Is this about authoring a migration, or about reviewing what's going to run on deploy?"* → `prisma-next-migrations` vs `prisma-next-migration-review`.
+- *"Is this about wiring Prisma Next into your build tool (Vite / Next.js / …), or about wiring `db.ts` and middleware at runtime?"* → `prisma-next-build` vs `prisma-next-runtime`.
 - *"What error or symptom are you seeing?"* → `prisma-next-debug`.
+- *"Do you want to report this as a bug to the Prisma Next team, or is this a feature request?"* → `prisma-next-feedback`.
 
 If you still can't tell which skill applies, ask the user what they want
 to do. Do not guess.
@@ -62,11 +66,12 @@ Three steps the user does:
 2. **The system plans the migrations for you.** (`prisma-next-migrations`)
 3. **If you need data migrations, you edit `migration.ts` and execute it.** (`prisma-next-migrations`)
 
-Everything else — queries, runtime wiring, debugging — sits on top of
-those three.
+Everything else — queries, runtime wiring, build integration,
+debugging, feedback — sits on top of those three.
 
 ## Checklist
 
 - [ ] If the prompt matches a specific workflow skill, route there without asking.
 - [ ] If the prompt is vague, ask one disambiguating question.
 - [ ] Do not attempt to answer the user's question from this skill — load the right specific skill first.
+- [ ] If the user describes a missing feature or a misbehaviour they want fixed, route to `prisma-next-feedback`.

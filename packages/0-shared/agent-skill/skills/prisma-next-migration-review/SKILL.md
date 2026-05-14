@@ -319,12 +319,10 @@ transform error, destructive op without explicit confirmation).
   requires (or vice versa), the recommended path is to author the
   per-env divergence as two separate migrations and gate one in your
   deploy script. If you need first-class per-env migration routing,
-  file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  file a feature request via the `prisma-next-feedback` skill.
 - **A built-in "branch diff" view of migrations.** Workaround named
   above (run `migration status` on both branches, `diff`). If you need
-  built-in branch comparison, file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  built-in branch comparison, file a feature request via the `prisma-next-feedback` skill.
 
 ## Reference Files
 
