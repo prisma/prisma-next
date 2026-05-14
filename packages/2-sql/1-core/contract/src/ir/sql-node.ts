@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { IRNodeBase } from '@prisma-next/framework-components/ir';
 
 /**
  * SQL family IR node base. Carries the family-level `kind` discriminator
@@ -32,7 +32,7 @@ import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
  * JSON envelopes; the family-level `'sql'` is uniform across all SQL
  * IR and carries no dispatch-relevant information.
  */
-export abstract class SqlNode extends SchemaNodeBase {
+export abstract class SqlNode extends IRNodeBase {
   readonly kind?: string;
 
   constructor() {

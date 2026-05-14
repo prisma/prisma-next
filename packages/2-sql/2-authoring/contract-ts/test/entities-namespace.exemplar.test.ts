@@ -3,7 +3,7 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
-import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
 
@@ -33,7 +33,7 @@ interface DemoEntityInput {
   readonly columns: readonly string[];
 }
 
-class DemoEntity extends SchemaNodeBase {
+class DemoEntity extends IRNodeBase {
   readonly kind = 'demo-entity' as const;
   readonly name: string;
   readonly columns: readonly string[];

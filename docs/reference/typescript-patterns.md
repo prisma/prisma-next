@@ -101,7 +101,7 @@ The heuristic: ask whether the type *is* a polymorphic data tree (AST/IR) or whe
 
 ### `kind` discriminator strategy
 
-The framework's `SchemaNodeBase` declares `kind` as `abstract readonly kind?: string` — **optional at the framework level**. Family bases and concrete classes commit per-leaf as needed:
+The framework's `IRNodeBase` declares `kind` as `abstract readonly kind?: string` — **optional at the framework level**. Family bases and concrete classes commit per-leaf as needed:
 
 - **Polymorphic dispatch today** (verifiers / walkers dispatch on `kind`): each leaf class declares an enumerable literal `kind = '<family>-<leaf>' as const`. The leaf literal dominates union narrowing; framework consumers and target consumers both narrow through it. Reference: `PostgresEnumType.kind = 'sql-enum-type' as const`.
 - **No polymorphic dispatch today** (consumers walk by structural position, not by `kind`): the family base installs a single non-enumerable own `kind` property in its constructor via `Object.defineProperty(this, 'kind', { enumerable: false, … })`. This keeps `JSON.stringify(node)` envelope-compatible with the pre-class shape (no `kind` field on disk), keeps `toEqual({…})` assertions against pre-lift flat shapes passing, and still allows direct access and runtime narrowing. Reference: `SqlNode.kind = 'sql'` non-enumerable on the family base.
@@ -118,7 +118,7 @@ JSON envelopes hydrate into class instances through the target's `ContractSerial
 
 ### Pack-contributed entity authoring
 
-Target packs contribute new entity kinds (Postgres enums, Postgres schemas, future RLS policies) via the `entities` namespace on `AuthoringContributions`. Each entity descriptor carries a factory `(input, ctx) => SchemaNode` that constructs the IR-class instance; pack-bag-driven type narrowing surfaces the contributed kind at `helpers.entities.<entityName>(input)` in the TS DSL with full type narrowing on `input`. PSL syntax for the same kind lowers through the same descriptor. The mechanism is the authoring counterpart of the IR's target-extensibility — once the IR admits target-specific kinds, the authoring surface admits them too without hand-edited family-layer construction sites.
+Target packs contribute new entity kinds (Postgres enums, Postgres schemas, future RLS policies) via the `entities` namespace on `AuthoringContributions`. Each entity descriptor carries a factory `(input, ctx) => IRNode` that constructs the IR-class instance; pack-bag-driven type narrowing surfaces the contributed kind at `helpers.entities.<entityName>(input)` in the TS DSL with full type narrowing on `input`. PSL syntax for the same kind lowers through the same descriptor. The mechanism is the authoring counterpart of the IR's target-extensibility — once the IR admits target-specific kinds, the authoring surface admits them too without hand-edited family-layer construction sites.
 
 ### Exception: Classes with Private Properties in Exported Types
 

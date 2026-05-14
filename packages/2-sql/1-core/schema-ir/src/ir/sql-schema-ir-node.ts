@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { IRNodeBase } from '@prisma-next/framework-components/ir';
 
 /**
  * SQL Schema IR node base. Carries the family-level
@@ -19,7 +19,7 @@ import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
  * against pre-lift flat shapes passing, and keeps `node.kind` readable
  * for future polymorphic dispatch.
  */
-export abstract class SqlSchemaIRNode extends SchemaNodeBase {
+export abstract class SqlSchemaIRNode extends IRNodeBase {
   readonly kind?: string;
 
   constructor() {

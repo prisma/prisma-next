@@ -1,4 +1,4 @@
-import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
 import type { MongoJsonObject, MongoWildcardProjection } from '../contract-types';
 import { MongoCollationOptions, type MongoCollationOptionsInput } from './mongo-collation-options';
 
@@ -32,13 +32,13 @@ export interface MongoIndexOptionsInput {
  * Mongo Contract IR node for the per-index option vocabulary (the second
  * argument to `db.collection.createIndex(keys, options)` minus the keys
  * themselves). Lifted from a `type =` data shape to an AST class
- * extending `SchemaNodeBase` per FR18.
+ * extending `IRNodeBase` per FR18.
  *
  * Nested `collation` is itself an IR class (`MongoCollationOptions`); the
  * constructor accepts either a class instance or a data literal and
  * normalises to the class form so downstream walks see a uniform IR tree.
  */
-export class MongoIndexOptions extends SchemaNodeBase {
+export class MongoIndexOptions extends IRNodeBase {
   readonly kind = 'mongo-index-options' as const;
   declare readonly unique?: boolean;
   declare readonly name?: string;

@@ -32,7 +32,7 @@ Stating "Thin core, fat targets" without stating its underlying principles produ
 
 The follow-up Supabase project (RLS policies, `supabase()` runtime facade, `auth.users` queryable surface) is a stress test of both principles:
 
-- **Supabase needs target-specific IR kinds** (`RlsPolicy`) the framework has never heard of. The "framework provides affordances; targets implement specifics" principle is what allows Postgres to extend `SchemaNodeBase` directly with a new kind without touching the framework. Without that principle, Supabase has to either widen the framework's IR shape (every consumer in every other target now sees an irrelevant kind) or smuggle RLS through `annotations` blobs (lossy, opaque, no static types).
+- **Supabase needs target-specific IR kinds** (`RlsPolicy`) the framework has never heard of. The "framework provides affordances; targets implement specifics" principle is what allows Postgres to extend `IRNodeBase` directly with a new kind without touching the framework. Without that principle, Supabase has to either widen the framework's IR shape (every consumer in every other target now sees an irrelevant kind) or smuggle RLS through `annotations` blobs (lossy, opaque, no static types).
 
 - **Supabase reads "the same" as Postgres.** A developer who learns Prisma Next on vanilla Postgres should be able to open a Supabase contract and read it. They will see `auth.users` (a namespace coordinate they recognise from M5a/b), and an `RlsPolicy` kind they don't recognise — but the *shape* of the IR around it is the same. They learn one new kind, not a new architecture. The "familiar with one target, fluent in another" principle is what makes that gradient possible.
 
@@ -52,22 +52,22 @@ State both principles explicitly in the architecture docs.
 
 **What "affordance" means here.** An affordance is a piece of framework surface that:
 
-- Names a concept and commits to its minimal shape (`interface SchemaNode { readonly kind: string }`).
-- Provides ergonomic scaffolding when scaffolding is cheap and pays for itself (`abstract class SchemaNodeBase` centralising `freeze()`).
+- Names a concept and commits to its minimal shape (`interface IRNode { readonly kind: string }`).
+- Provides ergonomic scaffolding when scaffolding is cheap and pays for itself (`abstract class IRNodeBase` centralising `freeze()`).
 - Declares an SPI that consumers depend on (`interface ContractSerializer<TContract>`), so consumers reach the target through the abstraction rather than the concrete class.
 - Leaves *specifics* — rendering, dialect quirks, native types, target-only kinds — to the target.
 
 **What this rules out.** The framework does not:
 
 - Branch on target identity (`if (target === 'postgres')` is an architectural smell — see [`.cursor/rules/no-target-branches.mdc`](../../../.cursor/rules/no-target-branches.mdc)).
-- Carry target-shape fields on framework types (`SchemaNode` does not declare `nativeType` because not every kind has one).
+- Carry target-shape fields on framework types (`IRNode` does not declare `nativeType` because not every kind has one).
 - Implement behaviour the target should implement (the framework does not know how to render a Postgres `CREATE INDEX` statement; Postgres does).
 
 **Reference instances of this principle:**
 
 - [ADR 185 — SPI types live at the lowest consuming layer](../../../docs/architecture%20docs/adrs/ADR%20185%20-%20SPI%20types%20live%20at%20the%20lowest%20consuming%20layer.md). The dependency-inversion pattern that operationalises this principle — the framework declares the SPI; the target implements it.
 - [ADR 195 — Planner IR with two renderers](../../../docs/architecture%20docs/adrs/ADR%20195%20-%20Planner%20IR%20with%20two%20renderers.md). The framework interface for `OpFactoryCall` is three readonly fields; the target abstract base + ~20 concrete classes carry every specific.
-- [3-layer polymorphic IR convention](3-layer-polymorphic-ir-convention.md) (this project's companion ADR). The framework alphabet is `SchemaNode`, `Namespace`, `Storage`, plus the SPI shapes; the family provides the dialect bases (`SqlTable`, `SqlContractSerializerBase`); the target provides the words (`PostgresTable`, `PostgresContractSerializer`).
+- [3-layer polymorphic IR convention](3-layer-polymorphic-ir-convention.md) (this project's companion ADR). The framework alphabet is `IRNode`, `Namespace`, `Storage`, plus the SPI shapes; the family provides the dialect bases (`SqlTable`, `SqlContractSerializerBase`); the target provides the words (`PostgresTable`, `PostgresContractSerializer`).
 
 ### Principle 2: Familiar with one target, fluent in another
 
@@ -94,14 +94,14 @@ State both principles explicitly in the architecture docs.
 
 ### What this enables
 
-- **Ecosystem extensibility.** A third-party target author (or a sibling project like Supabase) extends an existing family by extending the family abstract bases, plus optional target-only kinds extending `SchemaNodeBase` directly. The framework never has to know the new target exists; the consumers that depend on framework SPIs continue to work without modification. This is what makes the follow-up Supabase project a series of focused feature PRs rather than another foundational reshape (FR23 framing).
+- **Ecosystem extensibility.** A third-party target author (or a sibling project like Supabase) extends an existing family by extending the family abstract bases, plus optional target-only kinds extending `IRNodeBase` directly. The framework never has to know the new target exists; the consumers that depend on framework SPIs continue to work without modification. This is what makes the follow-up Supabase project a series of focused feature PRs rather than another foundational reshape (FR23 framing).
 - **Cross-target onboarding cost stays sub-linear.** Adding a target N+1 to a developer's known set is cheap because the framework already taught them N's shape. The cost is the target's specifics, not its architecture.
 - **Targets innovate on content, not form.** A target that wants to add a target-specific kind (Postgres functions, RLS policies, MongoDB change streams) can; the framework's affordance covers it without modification. A target that wants to invent a new IR shape (a different storage walk, a different verifier dispatch) cannot, because the affordances are the form and the form is fixed.
 - **Reviewers have a sharpened question.** When a PR proposes adding behaviour to the framework, the review question is "is this an affordance or a specific?" If it is an affordance (an SPI shape, an abstract base, a shape constraint), it belongs in the framework. If it is a specific (a rendering decision, a dialect quirk, a target-only kind), it belongs in the target. The principle gives reviewers a clean axis to decide.
 
 ### What this costs
 
-- **A fuzzy edge: when does an affordance become specific enough to belong in the family?** The principles point in different directions at the boundary. Example: a "column has a native-type concept" — is that a framework affordance (`SchemaNode` carries it) or a SQL-family affordance (`SqlColumn` carries it) or a target specific (`PostgresColumn.nativeType`)? The current decision is "target specific" because Mongo's collection field shape has no `nativeType`. But that decision is judgement, not a derivation from the principle. The project's working rule (subject to refinement): the framework only ships the affordance if *every* family needs it; the family only ships the abstract base if every target in the family needs it; otherwise the target ships it. The rule is conservative — adding an affordance later is cheaper than removing one — but it is not mechanical. Reviewers exercise judgement at the boundary.
+- **A fuzzy edge: when does an affordance become specific enough to belong in the family?** The principles point in different directions at the boundary. Example: a "column has a native-type concept" — is that a framework affordance (`IRNode` carries it) or a SQL-family affordance (`SqlColumn` carries it) or a target specific (`PostgresColumn.nativeType`)? The current decision is "target specific" because Mongo's collection field shape has no `nativeType`. But that decision is judgement, not a derivation from the principle. The project's working rule (subject to refinement): the framework only ships the affordance if *every* family needs it; the family only ships the abstract base if every target in the family needs it; otherwise the target ships it. The rule is conservative — adding an affordance later is cheaper than removing one — but it is not mechanical. Reviewers exercise judgement at the boundary.
 - **Discipline cost on framework changes.** Anyone proposing a framework change must answer "does this preserve the principle?" before landing. That is a real cognitive load on framework PRs, and one some changes will fail the first time they are reviewed.
 - **Mental model investment.** The principle is more abstract than "Thin core, fat targets" alone. Adopting it requires reading this ADR (or one of its reference instances) and internalising the affordance/specifics distinction. The pay-off is that contributors can *generate* design decisions consistent with the principle, rather than copying patterns from existing code without understanding why the patterns work.
 

@@ -1,4 +1,4 @@
-import { type Namespace, SchemaNodeBase, type Storage } from '@prisma-next/framework-components/ir';
+import { IRNodeBase, type Namespace, type Storage } from '@prisma-next/framework-components/ir';
 
 /**
  * Mongo family storage IR abstract base. Refines the framework `Storage`
@@ -13,17 +13,17 @@ import { type Namespace, SchemaNodeBase, type Storage } from '@prisma-next/frame
  * connection-bound binding. The default storage carries
  * `namespaces: { [UNSPECIFIED_NAMESPACE_ID]: MongoTargetUnspecifiedDatabase.instance }`.
  *
- * Extends `SchemaNodeBase` so concrete target-storage subclasses can use
+ * Extends `IRNodeBase` so concrete target-storage subclasses can use
  * the framework `freezeNode` helper consistently with the rest of the
- * SchemaNodeBase-derived IR.
+ * IRNodeBase-derived IR.
  *
  * Named `MongoStorageBase` (rather than `MongoStorage`) to avoid a
  * package-internal naming collision with the existing `type MongoStorage`
  * data shape in `contract-types`, and to follow the codebase's `*Base`
- * convention for abstract IR-side bases (`SchemaNodeBase`, `NamespaceBase`,
+ * convention for abstract IR-side bases (`IRNodeBase`, `NamespaceBase`,
  * `MongoContractSerializerBase`, `MongoSchemaVerifierBase`).
  */
-export abstract class MongoStorageBase extends SchemaNodeBase implements Storage {
+export abstract class MongoStorageBase extends IRNodeBase implements Storage {
   readonly kind?: string;
   abstract readonly namespaces: Readonly<Record<string, Namespace>>;
 }

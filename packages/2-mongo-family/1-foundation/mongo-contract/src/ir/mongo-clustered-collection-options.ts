@@ -1,4 +1,4 @@
-import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
 
 export type MongoClusteredCollectionKey = Readonly<Record<string, 1>>;
 
@@ -11,12 +11,12 @@ export interface MongoClusteredCollectionOptionsInput {
 /**
  * Clustered-collection options (the `clusteredIndex` collection-creation
  * field). Lifted from a `type =` data shape to an AST class extending
- * `SchemaNodeBase` per FR18.
+ * `IRNodeBase` per FR18.
  *
  * MongoDB requires `key` and `unique` for any clustered collection; the
  * constructor enforces presence by type signature.
  */
-export class MongoClusteredCollectionOptions extends SchemaNodeBase {
+export class MongoClusteredCollectionOptions extends IRNodeBase {
   readonly kind = 'mongo-clustered-collection-options' as const;
   declare readonly name?: string;
   readonly key: MongoClusteredCollectionKey;

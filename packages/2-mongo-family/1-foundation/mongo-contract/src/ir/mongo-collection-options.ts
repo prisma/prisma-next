@@ -1,4 +1,4 @@
-import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
 import type { MongoJsonObject } from '../contract-types';
 import {
   MongoChangeStreamPreAndPostImagesOptions,
@@ -91,7 +91,7 @@ export interface MongoCollectionOptionsAuthoringInput {
  * Mongo Contract IR node for collection-level creation options (the
  * second argument to `db.createCollection(name, options)`). Lifted from
  * the pre-M2R2 `MongoStorageCollectionOptions` storage interface to a
- * class extending `SchemaNodeBase` per FR18.
+ * class extending `IRNodeBase` per FR18.
  *
  * Single concrete family-layer class (no target subclass). The
  * constructor accepts the storage JSON envelope shape ({@link
@@ -105,7 +105,7 @@ export interface MongoCollectionOptionsAuthoringInput {
  * downstream walks see a uniform AST regardless of whether the input
  * was a JSON literal or an already-constructed class.
  */
-export class MongoCollectionOptions extends SchemaNodeBase {
+export class MongoCollectionOptions extends IRNodeBase {
   readonly kind = 'mongo-collection-options' as const;
   declare readonly capped?: MongoStorageCappedShape;
   declare readonly storageEngine?: MongoJsonObject;

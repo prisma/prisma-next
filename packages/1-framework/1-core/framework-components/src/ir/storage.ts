@@ -1,3 +1,4 @@
+import type { IRNode } from './ir-node';
 import type { Namespace } from './namespace';
 
 /**
@@ -12,7 +13,13 @@ import type { Namespace } from './namespace';
  * therefore walk the namespace map without knowing the family alphabet, and
  * the `(namespace.id, name)` keying that the verifier and planner depend on
  * is honest at every layer.
+ *
+ * Extends `IRNode` so the framework's IR-walking surfaces (verifiers,
+ * serializers) can dispatch on `Storage`-typed slots through the same
+ * IR-node alphabet as every other node — the structural dual already
+ * holds in code (every concrete storage class extends an IR-node base);
+ * the interface promotion makes the typing honest.
  */
-export interface Storage {
+export interface Storage extends IRNode {
   readonly namespaces: Readonly<Record<string, Namespace>>;
 }

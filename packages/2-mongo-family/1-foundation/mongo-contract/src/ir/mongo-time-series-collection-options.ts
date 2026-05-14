@@ -1,4 +1,4 @@
-import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
 
 export type MongoTimeSeriesGranularity = 'seconds' | 'minutes' | 'hours';
 
@@ -12,13 +12,13 @@ export interface MongoTimeSeriesCollectionOptionsInput {
 
 /**
  * Time-series collection options. Lifted from a `type =` data shape to
- * an AST class extending `SchemaNodeBase` per FR18.
+ * an AST class extending `IRNodeBase` per FR18.
  *
  * MongoDB requires `timeField` for any time-series collection; the
  * constructor enforces presence by type signature (`timeField: string`
  * is required on the input).
  */
-export class MongoTimeSeriesCollectionOptions extends SchemaNodeBase {
+export class MongoTimeSeriesCollectionOptions extends IRNodeBase {
   readonly kind = 'mongo-time-series-collection-options' as const;
   readonly timeField: string;
   declare readonly metaField?: string;

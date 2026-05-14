@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { IRNodeBase } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { MongoChangeStreamPreAndPostImagesOptions } from '../../src/ir/mongo-change-stream-pre-and-post-images-options';
 import { MongoClusteredCollectionOptions } from '../../src/ir/mongo-clustered-collection-options';
@@ -17,9 +17,9 @@ describe('MongoIndexOptionDefaults', () => {
     expect(opts.storageEngine).toEqual({ wiredTiger: { foo: 'bar' } });
   });
 
-  it('extends SchemaNodeBase and freezes', () => {
+  it('extends IRNodeBase and freezes', () => {
     const opts = new MongoIndexOptionDefaults();
-    expect(opts).toBeInstanceOf(SchemaNodeBase);
+    expect(opts).toBeInstanceOf(IRNodeBase);
     expect(Object.isFrozen(opts)).toBe(true);
   });
 
@@ -52,9 +52,9 @@ describe('MongoTimeSeriesCollectionOptions', () => {
     expect(opts.bucketRoundingSeconds).toBe(60);
   });
 
-  it('extends SchemaNodeBase and freezes', () => {
+  it('extends IRNodeBase and freezes', () => {
     const opts = new MongoTimeSeriesCollectionOptions({ timeField: 'ts' });
-    expect(opts).toBeInstanceOf(SchemaNodeBase);
+    expect(opts).toBeInstanceOf(IRNodeBase);
     expect(Object.isFrozen(opts)).toBe(true);
   });
 
@@ -89,9 +89,9 @@ describe('MongoClusteredCollectionOptions', () => {
     expect(opts.name).toBe('primary');
   });
 
-  it('extends SchemaNodeBase and freezes', () => {
+  it('extends IRNodeBase and freezes', () => {
     const opts = new MongoClusteredCollectionOptions({ key: { _id: 1 }, unique: true });
-    expect(opts).toBeInstanceOf(SchemaNodeBase);
+    expect(opts).toBeInstanceOf(IRNodeBase);
     expect(Object.isFrozen(opts)).toBe(true);
   });
 
@@ -112,9 +112,9 @@ describe('MongoChangeStreamPreAndPostImagesOptions', () => {
     expect(opts.enabled).toBe(true);
   });
 
-  it('extends SchemaNodeBase and freezes', () => {
+  it('extends IRNodeBase and freezes', () => {
     const opts = new MongoChangeStreamPreAndPostImagesOptions({ enabled: false });
-    expect(opts).toBeInstanceOf(SchemaNodeBase);
+    expect(opts).toBeInstanceOf(IRNodeBase);
     expect(Object.isFrozen(opts)).toBe(true);
   });
 

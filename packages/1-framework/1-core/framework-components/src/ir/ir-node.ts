@@ -13,33 +13,37 @@
  * because Mongo IR has polymorphic walkers; SQL declares a single
  * family-level `kind = 'sql'` on `SqlNode` because SQL IR has no
  * polymorphic dispatch today. No framework consumer dispatches on
- * `SchemaNode.kind` at the BASE type — every dispatch site narrows
+ * `IRNode.kind` at the BASE type — every dispatch site narrows
  * through a union of leaves where each leaf carries a literal kind, so
  * requiring `kind` at the base would be unearned. Future leaves that
  * earn polymorphic dispatch override with a required literal at that
  * leaf (e.g. `override readonly kind = 'sql-enum-type' as const`).
  *
- * `SchemaNodeBase` carries no methods: the freeze-and-assign affordance
+ * `IRNodeBase` carries no methods: the freeze-and-assign affordance
  * lives in the free `freezeNode` helper below. Keeping `freezeNode` out
  * of the class type means an emitted contract literal type
  * (`{ readonly kind: 'mongo-collection', ... }` or an unkeyed literal
  * like `{ nativeType, codecId, nullable }`) is structurally assignable
  * to its class type — a `protected freeze()` instance method would
  * otherwise leak into the public type surface and require the literal
- * to carry it too (see `wip/unattended-decisions.md § 8`).
+ * to carry it too.
  *
  * Subclasses construct fields then call `freezeNode(this)` to seal the
  * instance. Frozen instances + plain readonly fields keep IR nodes
  * JSON-clean by construction, so `JSON.stringify(node)` produces canonical
  * JSON without a `toJSON()` method. The `ContractSerializer` SPI handles
  * round-trip from canonical JSON back to typed class instances.
+ *
+ * The name (`IRNode` / `IRNodeBase`) reflects the dual-hierarchy reality:
+ * this base is the common root for both Contract IR and Schema IR class
+ * hierarchies, not a Schema-IR-specific alphabet.
  */
 
-export interface SchemaNode {
+export interface IRNode {
   readonly kind?: string;
 }
 
-export abstract class SchemaNodeBase implements SchemaNode {
+export abstract class IRNodeBase implements IRNode {
   abstract readonly kind?: string;
 }
 
@@ -48,8 +52,11 @@ export abstract class SchemaNodeBase implements SchemaNode {
  * fields. The free-helper form (rather than a `protected freeze()`
  * instance method) keeps the class type structurally narrow so emitted
  * contract literal types remain assignable to their class types.
+ *
+ * The helper name stays `freezeNode` — it operates on IR nodes
+ * regardless of root naming.
  */
-export function freezeNode<T extends SchemaNode>(node: T): T {
+export function freezeNode<T extends IRNode>(node: T): T {
   Object.freeze(node);
   return node;
 }

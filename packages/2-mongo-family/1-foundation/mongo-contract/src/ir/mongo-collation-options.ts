@@ -1,4 +1,4 @@
-import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
 
 export type MongoCollationCaseFirst = 'off' | 'upper' | 'lower';
 export type MongoCollationStrength = 1 | 2 | 3 | 4 | 5;
@@ -28,7 +28,7 @@ export interface MongoCollationOptionsInput {
  * Mongo Contract IR leaf for collection / index collation options.
  *
  * Lifted from a `type =` data shape to an AST class extending
- * `SchemaNodeBase` per FR18 ("Mongo's Contract IR is fully unified under
+ * `IRNodeBase` per FR18 ("Mongo's Contract IR is fully unified under
  * the AST-class pattern, layered family / target"). Single concrete class
  * (no target subclass): collation options carry no target-specific
  * variation at this layer — both Atlas and self-hosted Mongo consume the
@@ -38,7 +38,7 @@ export interface MongoCollationOptionsInput {
  * them from the canonical JSON output (matches the pre-lift data shape's
  * round-trip behaviour, modulo the new `kind` discriminator).
  */
-export class MongoCollationOptions extends SchemaNodeBase {
+export class MongoCollationOptions extends IRNodeBase {
   readonly kind = 'mongo-collation-options' as const;
   readonly locale: string;
   declare readonly caseLevel?: boolean;

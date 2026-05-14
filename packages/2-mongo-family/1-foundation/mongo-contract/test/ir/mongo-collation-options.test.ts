@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { IRNodeBase } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { MongoCollationOptions } from '../../src/ir/mongo-collation-options';
 
@@ -38,9 +38,9 @@ describe('MongoCollationOptions', () => {
     expect(opts.kind).toBe('mongo-collation-options');
   });
 
-  it('is an instance of SchemaNodeBase (extends the framework IR base)', () => {
+  it('is an instance of IRNodeBase (extends the framework IR base)', () => {
     const opts = new MongoCollationOptions({ locale: 'en' });
-    expect(opts).toBeInstanceOf(SchemaNodeBase);
+    expect(opts).toBeInstanceOf(IRNodeBase);
     expect(opts).toBeInstanceOf(MongoCollationOptions);
   });
 

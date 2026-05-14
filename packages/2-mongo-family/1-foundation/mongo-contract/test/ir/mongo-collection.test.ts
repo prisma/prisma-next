@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { IRNodeBase } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { MongoCollection } from '../../src/ir/mongo-collection';
 import { MongoCollectionOptions } from '../../src/ir/mongo-collection-options';
@@ -52,9 +52,9 @@ describe('MongoCollection', () => {
     expect(collection.options?.changeStreamPreAndPostImages?.enabled).toBe(true);
   });
 
-  it('extends SchemaNodeBase and freezes', () => {
+  it('extends IRNodeBase and freezes', () => {
     const collection = new MongoCollection();
-    expect(collection).toBeInstanceOf(SchemaNodeBase);
+    expect(collection).toBeInstanceOf(IRNodeBase);
     expect(collection).toBeInstanceOf(MongoCollection);
     expect(Object.isFrozen(collection)).toBe(true);
   });

@@ -1,4 +1,4 @@
-import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
 
 export type MongoValidatorValidationLevel = 'strict' | 'moderate';
 export type MongoValidatorValidationAction = 'error' | 'warn';
@@ -13,7 +13,7 @@ export interface MongoValidatorInput {
  * Mongo Contract IR node for collection-level document validators (the
  * `validator` field on Mongo's `createCollection`). Lifted from the
  * pre-M2R2 `MongoStorageValidator` storage interface to a class extending
- * `SchemaNodeBase` per FR18.
+ * `IRNodeBase` per FR18.
  *
  * Concrete at the family layer (no target subclass). The spec's
  * abstract-family + target-concrete pattern (`MongoTargetValidator
@@ -26,7 +26,7 @@ export interface MongoValidatorInput {
  * — a future `MongoTargetValidator extends MongoValidator` is an
  * additive change, not a breaking one.
  */
-export class MongoValidator extends SchemaNodeBase {
+export class MongoValidator extends IRNodeBase {
   readonly kind = 'mongo-validator' as const;
   readonly jsonSchema: Record<string, unknown>;
   readonly validationLevel: MongoValidatorValidationLevel;

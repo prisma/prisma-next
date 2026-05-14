@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { IRNodeBase } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { MongoCollationOptions } from '../../src/ir/mongo-collation-options';
 import { MongoIndexOptions } from '../../src/ir/mongo-index-options';
@@ -37,9 +37,9 @@ describe('MongoIndexOptions', () => {
     expect(opts.collation).toBe(collation);
   });
 
-  it('extends SchemaNodeBase and freezes', () => {
+  it('extends IRNodeBase and freezes', () => {
     const opts = new MongoIndexOptions({ unique: true });
-    expect(opts).toBeInstanceOf(SchemaNodeBase);
+    expect(opts).toBeInstanceOf(IRNodeBase);
     expect(opts).toBeInstanceOf(MongoIndexOptions);
     expect(Object.isFrozen(opts)).toBe(true);
   });

@@ -1,4 +1,4 @@
-import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
 import {
   MongoCollectionOptions,
   type MongoCollectionOptionsInput,
@@ -25,7 +25,7 @@ export interface MongoCollectionInput {
  * Mongo Contract IR node for a single collection entry in
  * `contract.storage.collections`. Lifted from the pre-M2R2
  * `MongoStorageCollection` storage interface to a class extending
- * `SchemaNodeBase` per FR18.
+ * `IRNodeBase` per FR18.
  *
  * Concrete at the family layer (no target subclass). The spec's
  * `MongoTargetCollection extends MongoCollection` pattern remains
@@ -41,7 +41,7 @@ export interface MongoCollectionInput {
  * one (e.g. `import { MongoCollection as MongoContractCollection }
  * from '@prisma-next/mongo-contract'`).
  */
-export class MongoCollection extends SchemaNodeBase {
+export class MongoCollection extends IRNodeBase {
   readonly kind = 'mongo-collection' as const;
   declare readonly indexes?: ReadonlyArray<MongoIndex>;
   declare readonly validator?: MongoValidator;

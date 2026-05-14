@@ -1,4 +1,4 @@
-import { freezeNode, SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { freezeNode, IRNodeBase } from '@prisma-next/framework-components/ir';
 import type { MongoIndexKey } from '../contract-types';
 
 /**
@@ -24,7 +24,7 @@ export interface MongoIndexInput {
  * Mongo Contract IR node for a single collection index entry (one
  * element of `MongoCollection.indexes`). Lifted from the
  * pre-M2R2 `MongoStorageIndex` storage interface to a class extending
- * `SchemaNodeBase` per FR18.
+ * `IRNodeBase` per FR18.
  *
  * Single concrete family-layer class (no target subclass). The spec's
  * `MongoTargetIndex extends MongoIndex` pattern remains additive — a
@@ -33,7 +33,7 @@ export interface MongoIndexInput {
  * family-layer class is enough and avoids a target-import layering
  * violation from the contract-ts builder.
  */
-export class MongoIndex extends SchemaNodeBase {
+export class MongoIndex extends IRNodeBase {
   readonly kind = 'mongo-index' as const;
   readonly keys: ReadonlyArray<MongoIndexKey>;
   declare readonly unique?: boolean;

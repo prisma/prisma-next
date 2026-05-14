@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { IRNodeBase } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { MongoChangeStreamPreAndPostImagesOptions } from '../../src/ir/mongo-change-stream-pre-and-post-images-options';
 import { MongoCollationOptions } from '../../src/ir/mongo-collation-options';
@@ -72,9 +72,9 @@ describe('MongoCollectionOptions', () => {
     expect(opts.expireAfterSeconds).toBe(86400);
   });
 
-  it('extends SchemaNodeBase and freezes', () => {
+  it('extends IRNodeBase and freezes', () => {
     const opts = new MongoCollectionOptions({ capped: { size: 4096 } });
-    expect(opts).toBeInstanceOf(SchemaNodeBase);
+    expect(opts).toBeInstanceOf(IRNodeBase);
     expect(opts).toBeInstanceOf(MongoCollectionOptions);
     expect(Object.isFrozen(opts)).toBe(true);
   });

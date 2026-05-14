@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { IRNodeBase } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { MongoIndex } from '../../src/ir/mongo-index';
 
@@ -34,9 +34,9 @@ describe('MongoIndex', () => {
     expect(idx.language_override).toBe('lang');
   });
 
-  it('extends SchemaNodeBase and freezes', () => {
+  it('extends IRNodeBase and freezes', () => {
     const idx = new MongoIndex({ keys: [{ field: 'email', direction: 1 }] });
-    expect(idx).toBeInstanceOf(SchemaNodeBase);
+    expect(idx).toBeInstanceOf(IRNodeBase);
     expect(idx).toBeInstanceOf(MongoIndex);
     expect(Object.isFrozen(idx)).toBe(true);
   });

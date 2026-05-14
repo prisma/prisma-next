@@ -1,4 +1,4 @@
-import { type SchemaNode, SchemaNodeBase } from './schema-node';
+import { type IRNode, IRNodeBase } from './ir-node';
 
 /**
  * Reserved sentinel namespace id meaning
@@ -31,10 +31,10 @@ export const UNSPECIFIED_NAMESPACE_ID = '__unspecified__' as const;
  * See `UNSPECIFIED_NAMESPACE_ID` above for the sentinel id and the
  * singleton-subclass pattern that materialises it.
  */
-export interface Namespace extends SchemaNode {
+export interface Namespace extends IRNode {
   readonly id: string;
 }
 
-export abstract class NamespaceBase extends SchemaNodeBase implements Namespace {
+export abstract class NamespaceBase extends IRNodeBase implements Namespace {
   abstract readonly id: string;
 }

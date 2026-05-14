@@ -10,7 +10,7 @@
 
 Both Contract IR and Schema IR are organised as polymorphic class hierarchies in three layers:
 
-1. **Framework** (`packages/1-framework/...`): defines the IR alphabet (`SchemaNode`, `Namespace`, `Storage`) and the SPI interfaces consumers depend on (`ContractSerializer<TContract>`, `SchemaVerifier<TContract, TSchema>`). Carries the `SchemaNodeBase` and `NamespaceBase` abstract classes that centralise the freeze-and-assign pattern every concrete IR node uses.
+1. **Framework** (`packages/1-framework/...`): defines the IR alphabet (`IRNode`, `Namespace`, `Storage`) and the SPI interfaces consumers depend on (`ContractSerializer<TContract>`, `SchemaVerifier<TContract, TSchema>`). Carries the `IRNodeBase` and `NamespaceBase` abstract classes that centralise the freeze-and-assign pattern every concrete IR node uses.
 2. **Family** (`packages/2-sql/...`, `packages/2-mongo-family/...`): ships abstract base classes for the family-shape vocabulary (`SqlTable`, `SqlColumn`, `SqlForeignKey`, …; `MongoSchemaNode` and the Mongo collection bases). Per SPI, ships an abstract base (`SqlContractSerializerBase`, `MongoSchemaVerifierBase`, …) carrying family-shared walk logic and exposing protected hooks for target extensions.
 3. **Target** (`packages/3-targets/...`, `packages/3-mongo-target/...`): ships concrete classes specialising the family abstract bases (`PostgresTable extends SqlTable` carrying `nativeType` and default-rendering; `SqliteIndex extends SqlIndex` carrying SQLite's `WHERE` shape) **plus target-only kinds with no family parent** (`PostgresFunction`, future `PostgresRlsPolicy`, `MongoChangeStream`). Owns the verifier, planner, introspector — they walk the target's concrete classes natively.
 
@@ -37,9 +37,9 @@ This ADR generalises those patterns to all IR in the codebase and codifies the f
 
 ### Framework layer
 
-- `interface SchemaNode { readonly kind: string }` — the bare alphabet. Every concrete IR node, whatever its family or target, satisfies this.
-- `abstract class SchemaNodeBase implements SchemaNode` — centralises `protected freeze()`. Subclasses call `this.freeze()` in their constructors after assigning their fields.
-- `interface Namespace extends SchemaNode { readonly id: string }` — first-class building block. Sentinel id `'__unspecified__'` reserved for connection-bound binding (resolved by per-target singleton subclasses, not by call-site branches).
+- `interface IRNode { readonly kind?: string }` — the bare alphabet. Every concrete IR node, whatever its family or target, satisfies this.
+- `abstract class IRNodeBase implements IRNode` — centralises `protected freeze()`. Subclasses call `this.freeze()` in their constructors after assigning their fields.
+- `interface Namespace extends IRNode { readonly id: string }` — first-class building block. Sentinel id `'__unspecified__'` reserved for connection-bound binding (resolved by per-target singleton subclasses, not by call-site branches).
 - `abstract class NamespaceBase implements Namespace` — convenience base for target Namespace concretions.
 - `interface Storage { readonly namespaces: Record<string, Namespace> }` — every IR carries namespaces. Type-level enforcement of "every storage object belongs to a namespace" (FR15).
 - `interface ContractSerializer<TContract> { deserializeContract(json): TContract; serializeContract(contract): JsonObject }` — the JSON ⇄ class boundary. Both directions live on the same SPI because the framework needs both faces today (round-trip property tests, drift detection, future canonicalization).
@@ -47,13 +47,13 @@ This ADR generalises those patterns to all IR in the codebase and codifies the f
 
 ### Family layer
 
-- IR alphabet: `abstract class SqlNode extends SchemaNodeBase`, `abstract class MongoSchemaNode extends SchemaNodeBase`. Concrete IR-node bases (`SqlTable`, `SqlColumn`, `SqlForeignKey`, `SqlIndex`, `SqlPrimaryKey`, `SqlUnique`, `SqlStorage`) commit to the family-shape contract but defer field richness to the target layer.
+- IR alphabet: `abstract class SqlNode extends IRNodeBase`, `abstract class MongoSchemaNode extends IRNodeBase`. Concrete IR-node bases (`SqlTable`, `SqlColumn`, `SqlForeignKey`, `SqlIndex`, `SqlPrimaryKey`, `SqlUnique`, `SqlStorage`) commit to the family-shape contract but defer field richness to the target layer.
 - SPI bases: per-SPI single-inheritance abstract classes (`SqlContractSerializerBase`, `SqlSchemaVerifierBase`, `MongoContractSerializerBase`, `MongoSchemaVerifierBase`). Default `serializeContract` is identity over JSON-clean class instances; `deserializeContract` calls a protected `parseFamilyContractStructure` hook + a protected `constructTargetContract` hook. `verifySchema` runs `verifyCommonFamilySchema` + `verifyTargetExtensions` and combines the issues.
 
 ### Target layer
 
 - IR-node concretions extend the family abstract bases (`PostgresTable extends SqlTable`, `MongoTargetCollection extends MongoCollection`).
-- Target-only kinds extend `SchemaNodeBase` directly when no family parent fits (`PostgresRlsPolicy`, `PostgresFunction`).
+- Target-only kinds extend `IRNodeBase` directly when no family parent fits (`PostgresRlsPolicy`, `PostgresFunction`).
 - SPI implementers extend the family SPI base (`PostgresContractSerializer extends SqlContractSerializerBase<PostgresContract>`, `MongoTargetSchemaVerifier extends MongoSchemaVerifierBase`).
 - The existing target descriptor (`postgresControlTargetDescriptor`, Mongo target descriptor) composes the implementer instances as named properties next to the existing `migrations` property.
 
@@ -79,21 +79,21 @@ Visitors are reserved for narrow structural ops (`MongoSchemaVisitor`, `OpFactor
 
 ### What this enables
 
-- **Target extensibility without framework or family edits.** Postgres adds an `RlsPolicy` IR node by extending `SchemaNodeBase` directly, registers it in `PostgresStorage`, and the verifier walks it natively. The framework never needs to know an RLS policy exists; the family never needs to know.
+- **Target extensibility without framework or family edits.** Postgres adds an `RlsPolicy` IR node by extending `IRNodeBase` directly, registers it in `PostgresStorage`, and the verifier walks it natively. The framework never needs to know an RLS policy exists; the family never needs to know.
 - **Type-safe target-specific fields.** `PostgresColumn.nativeType` is a real field on a real class, not a `meta.nativeType` blob fished out at runtime. Consumers that have a `PostgresColumn` in hand reach `nativeType` directly.
 - **One-line specialisation for descendant targets.** Cockroach extends Postgres by `class CockroachContractSerializer extends PostgresContractSerializer { protected constructTargetContract(...) { ... } }` and injecting the override into the Cockroach descriptor — no need to absorb the rest of the Postgres-target surface.
 - **Cross-target consistency.** A reader who follows the SQL-Postgres column reads the Mongo collection the same way: framework alphabet → family abstract → target concretion. The convention IS the cross-target consistency promise the architectural principles encode (FR23).
 
 ### What this costs
 
-- **Constructor-time freeze.** Every concrete IR-node class calls `this.freeze()` in its constructor. The boilerplate is one line, codified by `SchemaNodeBase`.
-- **Three-layer cognitive cost.** A reader who wants to know what a `PostgresColumn` looks like reads three files: `SchemaNodeBase`, `SqlColumn`, `PostgresColumn`. The cost buys the layered extension story; the cost is paid once per kind, not per consumer.
+- **Constructor-time freeze.** Every concrete IR-node class calls `this.freeze()` in its constructor. The boilerplate is one line, codified by `IRNodeBase`.
+- **Three-layer cognitive cost.** A reader who wants to know what a `PostgresColumn` looks like reads three files: `IRNodeBase`, `SqlColumn`, `PostgresColumn`. The cost buys the layered extension story; the cost is paid once per kind, not per consumer.
 - **JSON-canonical discipline.** Class fields must remain plain readonly properties (no `Map`, no `Set`, no `Date`, no methods on properties). The `ContractSerializer` round-trip property test attests this on every CI run; violations are caught at PR review or by the round-trip test, not at runtime.
 
 ### What this rules out
 
 - **No flat-data IR.** `type SqlStorage = …` (flat) does not coexist with `class SqlStorage` (polymorphic) in the consumer surface. M3 deletes the flat-data SQL Contract IR; M2 deletes the flat-data Mongo Contract IR. Anything that reaches for the old flat shape after that fails to compile.
-- **No `accept` method on every node.** The visitor pattern is reserved for narrow structural ops where a single visitor can exhaustively cover the dispatch (`MongoSchemaVisitor`, `OpFactoryCall.accept`). General consumers dispatch on `kind` directly. `SchemaNode` does **not** declare `accept`; family bases do not bake it in.
+- **No `accept` method on every node.** The visitor pattern is reserved for narrow structural ops where a single visitor can exhaustively cover the dispatch (`MongoSchemaVisitor`, `OpFactoryCall.accept`). General consumers dispatch on `kind` directly. `IRNode` does **not** declare `accept`; family bases do not bake it in.
 - **No new aggregator interface.** `Target<TContract, TSchema>` is not a thing. The descriptor IS the aggregator; the framework consumes SPI references via `descriptor.contractSerializer`, `descriptor.schemaVerifier`, etc.
 
 ## Alternatives considered

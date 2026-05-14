@@ -1,4 +1,4 @@
-import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
+import { IRNodeBase } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { MongoValidator } from '../../src/ir/mongo-validator';
 
@@ -28,13 +28,13 @@ describe('MongoValidator', () => {
     expect(v.validationAction).toBe('warn');
   });
 
-  it('extends SchemaNodeBase and freezes', () => {
+  it('extends IRNodeBase and freezes', () => {
     const v = new MongoValidator({
       jsonSchema: {},
       validationLevel: 'strict',
       validationAction: 'error',
     });
-    expect(v).toBeInstanceOf(SchemaNodeBase);
+    expect(v).toBeInstanceOf(IRNodeBase);
     expect(v).toBeInstanceOf(MongoValidator);
     expect(Object.isFrozen(v)).toBe(true);
     expect(() => {
