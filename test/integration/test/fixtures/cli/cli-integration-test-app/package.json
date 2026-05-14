@@ -23,5 +23,6 @@
     "@types/node": "catalog:",
     "dotenv": "^17.4.2",
     "pg": "catalog:"
-  }
+  },
+  "version": "0.7.0"
 }

@@ -55,5 +55,6 @@
     "vite": "catalog:",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "catalog:"
-  }
+  },
+  "version": "0.7.0"
 }

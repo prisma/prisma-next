@@ -42,5 +42,6 @@
     "@types/node": "catalog:",
     "tsx": "^4.19.2",
     "typescript": "catalog:"
-  }
+  },
+  "version": "0.7.0"
 }
