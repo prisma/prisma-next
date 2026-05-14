@@ -591,11 +591,17 @@ export function instantiateAuthoringEntity(
   args: readonly unknown[],
   ctx: AuthoringEntityContext,
 ): unknown {
-  validateAuthoringHelperArguments(helperPath, descriptor.args, args);
+  // Factory-output entities carry their input contract on the factory
+  // signature itself — TypeScript narrows callers via
+  // `EntityHelperFunction`'s extracted `input` parameter, and the factory
+  // is free to do its own runtime validation (e.g. arktype Type). The
+  // descriptor-level `args` validator is reserved for template-output
+  // entities (which mirror field/type's declarative argument shape).
   if ('factory' in descriptor.output) {
     const input = args[0];
     return descriptor.output.factory(input, ctx);
   }
+  validateAuthoringHelperArguments(helperPath, descriptor.args, args);
   return resolveAuthoringTemplateValue(descriptor.output.template, args);
 }
 
