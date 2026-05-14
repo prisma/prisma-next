@@ -24,7 +24,6 @@ export {
   StorageTypeInstance,
   type StorageTypeInstanceInput,
 } from './ir/storage-type-instance';
-export { asCodecTypedStorageTypes } from './ir/storage-types-view';
 export {
   UniqueConstraint,
   type UniqueConstraintInput,
