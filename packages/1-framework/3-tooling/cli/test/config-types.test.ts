@@ -61,7 +61,7 @@ describe('defineConfig', () => {
           },
           timings: { total: 0 },
         }),
-        schemaVerifyAgainstSchema: () => ({
+        verifySchema: () => ({
           ok: true,
           summary: 'test',
           contract: { storageHash: 'test' },

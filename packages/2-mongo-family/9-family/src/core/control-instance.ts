@@ -200,7 +200,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     });
   }
 
-  schemaVerifyAgainstSchema(options: {
+  verifySchema(options: {
     readonly contract: unknown;
     readonly schema: MongoSchemaIR;
     readonly strict: boolean;

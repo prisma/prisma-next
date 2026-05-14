@@ -219,7 +219,7 @@ export interface SqlControlFamilyInstance
    * pre-projection, single-contract verifiers see other-space tables
    * as `extras`.
    */
-  schemaVerifyAgainstSchema(options: {
+  verifySchema(options: {
     readonly contract: unknown;
     readonly schema: SqlSchemaIR;
     readonly strict: boolean;
@@ -529,7 +529,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
       });
     },
-    schemaVerifyAgainstSchema(options: {
+    verifySchema(options: {
       readonly contract: unknown;
       readonly schema: SqlSchemaIR;
       readonly strict: boolean;

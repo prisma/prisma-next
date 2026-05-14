@@ -45,7 +45,7 @@ export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
    *
    * Synchronous — no I/O. Idempotent.
    */
-  schemaVerifyAgainstSchema(options: {
+  verifySchema(options: {
     readonly contract: unknown;
     readonly schema: TSchemaIR;
     readonly strict: boolean;
