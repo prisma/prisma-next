@@ -165,6 +165,35 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
+  it('rejects manifest carrying a legacy inlined `toContract` field', async () => {
+    const dir = join(tmpDir, '20260225T1430_carries_to_contract');
+    const metadata = {
+      ...createTestMetadata({}, []),
+      toContract: { storage: { storageHash: 'x' } },
+    };
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify([]));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
+  it('rejects manifest carrying a legacy inlined `fromContract` field', async () => {
+    const dir = join(tmpDir, '20260225T1430_carries_from_contract');
+    const metadata = { ...createTestMetadata({}, []), fromContract: null };
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify([]));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
   it('accepts `from: null` (baseline manifest)', async () => {
     const dir = join(tmpDir, '20260225T1430_baseline');
     await writeTestPackage(dir, { from: null });
