@@ -4,6 +4,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import {
   type ContractMarkerRecordLike,
+  type ContractSpaceAggregate,
   graphWalkStrategy,
 } from '@prisma-next/migration-tools/aggregate';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
@@ -29,7 +30,7 @@ import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
 import {
-  type CliStructuredError,
+  CliStructuredError,
   errorRuntime,
   errorUnexpected,
   mapMigrationToolsError,
@@ -74,6 +75,7 @@ interface MigrationStatusOptions extends CommonCommandOptions {
   readonly graph?: boolean;
   readonly limit?: string;
   readonly all?: boolean;
+  readonly space?: string;
 }
 
 export interface MigrationStatusEntry {
@@ -435,6 +437,59 @@ function determineLimit(opts: MigrationStatusOptions) {
     return DEFAULT_LIMIT;
   }
   return parsed;
+}
+
+/**
+ * Validate the `--space <id>` selector against a loaded contract-space
+ * aggregate. Centralises the two error paths the `migration status`
+ * command opens up for multi-space focus:
+ *
+ * - Unknown space id (`PN-CLI-5020`) — fix hints list every loaded
+ *   space id in canonical schedule order (extensions alphabetical,
+ *   then app) so an agent can recover without round-tripping.
+ * - `--ref <name>` combined with a non-app `--space <id>`
+ *   (`PN-CLI-5021`) — refs are an app-space concern; extensions
+ *   advance to their own `headRef` and have no CLI-managed ref
+ *   surface. `--ref` + `--space app` is accepted (degenerate
+ *   equivalence to plain `--ref`).
+ *
+ * `spaceOption === undefined` (default app-space) and explicit
+ * `--space app` both resolve to `focusedSpaceId: 'app'` so the caller
+ * has a single branch to read.
+ */
+export function validateFocusedSpaceOption(args: {
+  readonly spaceOption: string | undefined;
+  readonly refName: string | undefined;
+  readonly aggregate: ContractSpaceAggregate;
+}): Result<{ readonly focusedSpaceId: string }, CliStructuredError> {
+  const requested = args.spaceOption;
+  if (requested === undefined || requested === 'app') {
+    return ok({ focusedSpaceId: 'app' });
+  }
+  const member = args.aggregate.extensions.find((e) => e.spaceId === requested);
+  if (!member) {
+    const knownIds = [...args.aggregate.extensions.map((e) => e.spaceId)].sort();
+    knownIds.push('app');
+    return notOk(
+      new CliStructuredError('5020', `Unknown contract space "${requested}"`, {
+        domain: 'CLI',
+        why: `\`--space ${requested}\` does not match any loaded contract space.`,
+        fix: `Loaded spaces: ${knownIds.join(', ')}. Pass one of these IDs as the value of \`--space\`.`,
+        meta: { requested, known: knownIds },
+      }),
+    );
+  }
+  if (args.refName !== undefined) {
+    return notOk(
+      new CliStructuredError('5021', `\`--ref\` is not compatible with \`--space ${requested}\``, {
+        domain: 'CLI',
+        why: 'Named refs are an app-space concern. Extension contract spaces always advance to their pinned `headRef` and have no CLI-managed ref surface.',
+        fix: 'Drop `--ref` to status against the extension space, or drop `--space` to status the app against the named ref.',
+        meta: { requested, refName: args.refName },
+      }),
+    );
+  }
+  return ok({ focusedSpaceId: requested });
 }
 
 /**
@@ -1072,6 +1127,10 @@ export function createMigrationStatusCommand(): Command {
     .option('--graph', 'Show the full migration graph with all branches')
     .option('--limit <n>', 'Maximum number of migrations to display (default: 10)')
     .option('--all', 'Show full history (disables truncation)')
+    .option(
+      '--space <id>',
+      'Focus on a single contract space (default: app). Pass an extension id to status its history; pass `app` for the default behaviour.',
+    )
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlags(options);
 
