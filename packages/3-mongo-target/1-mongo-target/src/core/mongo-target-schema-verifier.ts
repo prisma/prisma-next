@@ -3,9 +3,9 @@ import {
   contractToMongoSchemaIR,
   diffMongoSchemas,
 } from '@prisma-next/family-mongo/control';
+import { MongoSchemaVerifierBase } from '@prisma-next/family-mongo/ir';
 import type { SchemaIssue, SchemaVerifyOptions } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import { MongoSchemaVerifierBase } from '@prisma-next/mongo-contract/ir';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import type { MongoTargetContract } from './mongo-target-contract';
 

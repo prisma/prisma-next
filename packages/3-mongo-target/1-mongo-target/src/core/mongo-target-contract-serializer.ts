@@ -1,5 +1,5 @@
+import { MongoContractSerializerBase } from '@prisma-next/family-mongo/ir';
 import type { MongoContract } from '@prisma-next/mongo-contract';
-import { MongoContractSerializerBase } from '@prisma-next/mongo-contract/ir';
 import type { MongoTargetContract } from './mongo-target-contract';
 import { MongoTargetStorage } from './mongo-target-storage';
 

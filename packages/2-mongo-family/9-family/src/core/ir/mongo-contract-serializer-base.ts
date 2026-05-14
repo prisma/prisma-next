@@ -1,11 +1,14 @@
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
+import {
+  MongoCollection,
+  type MongoCollectionInput,
+  type MongoContract,
+  MongoContractSchema,
+  validateMongoStorage,
+} from '@prisma-next/mongo-contract';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { type as arktypeType } from 'arktype';
-import { MongoContractSchema } from '../contract-schema';
-import type { MongoContract } from '../contract-types';
-import { validateMongoStorage } from '../validate-storage';
-import { MongoCollection, type MongoCollectionInput } from './mongo-collection';
 
 /**
  * Mongo family `ContractSerializer` abstract base. Owns the family-shared

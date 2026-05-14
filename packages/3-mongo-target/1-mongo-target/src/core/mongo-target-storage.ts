@@ -1,7 +1,7 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
+import { MongoStorageBase } from '@prisma-next/family-mongo/ir';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { MongoCollection } from '@prisma-next/mongo-contract';
-import { MongoStorageBase } from '@prisma-next/mongo-contract/ir';
 import { MongoTargetUnspecifiedDatabase } from './mongo-target-database';
 
 export interface MongoTargetStorageCtor {

@@ -1,6 +1,6 @@
 import { coreHash } from '@prisma-next/contract/types';
+import { MongoStorageBase } from '@prisma-next/family-mongo/ir';
 import { MongoCollection, MongoIndex } from '@prisma-next/mongo-contract';
-import { MongoStorageBase } from '@prisma-next/mongo-contract/ir';
 import { describe, expect, it } from 'vitest';
 import {
   MongoTargetDatabase,
