@@ -1,4 +1,4 @@
-import type { ControlAdapterDescriptor } from '@prisma-next/framework-components/control';
+import type { MongoControlAdapterDescriptor } from '@prisma-next/family-mongo/control-adapter';
 
 export { MongoCommandExecutor, MongoInspectionExecutor } from '../core/command-executor';
 export { introspectSchema } from '../core/introspect-schema';
@@ -9,6 +9,7 @@ export {
   updateMarker,
   writeLedgerEntry,
 } from '../core/marker-ledger';
+export { MongoControlAdapterImpl } from '../core/mongo-control-adapter';
 export {
   createMongoControlDriver,
   type MongoControlDriverInstance,
@@ -16,8 +17,9 @@ export {
 export { createMongoRunnerDeps, extractDb } from '../core/runner-deps';
 
 import { mongoCodecDescriptors } from '../core/codecs';
+import { MongoControlAdapterImpl } from '../core/mongo-control-adapter';
 
-const mongoAdapterDescriptor: ControlAdapterDescriptor<'mongo', 'mongo'> = {
+const mongoAdapterDescriptor: MongoControlAdapterDescriptor<'mongo'> = {
   kind: 'adapter',
   id: 'mongo',
   familyId: 'mongo',
@@ -49,7 +51,7 @@ const mongoAdapterDescriptor: ControlAdapterDescriptor<'mongo', 'mongo'> = {
     },
   },
   create(_stack) {
-    return { familyId: 'mongo' as const, targetId: 'mongo' as const };
+    return new MongoControlAdapterImpl();
   },
 };
 

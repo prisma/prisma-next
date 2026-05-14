@@ -1,8 +1,8 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
+  ControlAdapterDescriptor,
   ControlAdapterInstance,
   ControlDriverInstance,
-  ControlStack,
 } from '@prisma-next/framework-components/control';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 
@@ -89,9 +89,9 @@ export interface MongoControlAdapter<TTarget extends string = string>
 }
 
 /**
- * Mongo control adapter descriptor interface.
- * Provides a factory method to create control adapter instances.
+ * Mongo control adapter descriptor. Mirrors `SqlControlAdapterDescriptor`:
+ * extends the framework's `ControlAdapterDescriptor` and narrows the
+ * `create()` return to a `MongoControlAdapter<TTarget>`.
  */
-export interface MongoControlAdapterDescriptor<TTarget extends string = string> {
-  create(stack: ControlStack<'mongo', TTarget>): MongoControlAdapter<TTarget>;
-}
+export interface MongoControlAdapterDescriptor<TTarget extends string = string>
+  extends ControlAdapterDescriptor<'mongo', TTarget, MongoControlAdapter<TTarget>> {}
