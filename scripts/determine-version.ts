@@ -101,7 +101,11 @@ let result: VersionResult;
 
 switch (eventName) {
   case 'workflow_dispatch':
-    result = { version: baseVersion, tag: inputDistTag ?? 'latest' };
+    // `??` is wrong here: an empty INPUT_DIST_TAG would slip through as
+    // the dist-tag and cause `pnpm publish --tag ""` to fail downstream.
+    // The workflow declares `dist-tag` with a `latest` default, so this
+    // fallback is a defensive belt-and-braces.
+    result = { version: baseVersion, tag: inputDistTag || 'latest' };
     break;
 
   case 'push':
