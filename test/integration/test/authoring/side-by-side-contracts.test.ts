@@ -4,6 +4,7 @@ import mongoAdapter from '@prisma-next/adapter-mongo/control';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { ContractSourceContext } from '@prisma-next/cli/config-types';
 import { enrichContract } from '@prisma-next/cli/control-api';
+import type { CanonicalSerializeContract } from '@prisma-next/contract/hashing';
 import type { Contract } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/emitter';
 import { mongoFamilyDescriptor } from '@prisma-next/family-mongo/control';
@@ -16,7 +17,7 @@ import { mongoContract } from '@prisma-next/mongo-contract-psl/provider';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as validateSqlContract } from '@prisma-next/sql-contract/validate';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
-import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
+import { type MongoTargetContract, mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 import postgres from '@prisma-next/target-postgres/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { dirname, join } from 'pathe';
@@ -245,10 +246,8 @@ describe('side-by-side contract examples', () => {
       };
       expect(stripValidatorFields(normalizedTs)).toEqual(stripValidatorFields(normalizedPsl));
 
-      const mongoSerializeContract =
-        mongoTargetDescriptor.contractSerializer.serializeContract.bind(
-          mongoTargetDescriptor.contractSerializer,
-        );
+      const mongoSerializeContract: CanonicalSerializeContract = (contract) =>
+        mongoTargetDescriptor.contractSerializer.serializeContract(contract as MongoTargetContract);
       const emittedTs = await emit(normalizedTs, mongoStack, mongoFamilyDescriptor.emission, {
         serializeContract: mongoSerializeContract,
       });
