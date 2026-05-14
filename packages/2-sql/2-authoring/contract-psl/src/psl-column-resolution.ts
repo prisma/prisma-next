@@ -2,6 +2,7 @@ import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types'
 import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
+  AuthoringEntityDescriptor,
   AuthoringFieldPresetDescriptor,
   AuthoringTypeConstructorDescriptor,
 } from '@prisma-next/framework-components/authoring';
@@ -9,6 +10,7 @@ import {
   hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
+  isAuthoringEntityDescriptor,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
   validateAuthoringHelperArguments,
@@ -69,6 +71,33 @@ export function getAuthoringTypeConstructor(
   }
 
   return isAuthoringTypeConstructorDescriptor(current) ? current : undefined;
+}
+
+/**
+ * Walks `authoringContributions.entities` segment-by-segment and returns
+ * the entity descriptor at the resolved path, or `undefined` if no
+ * descriptor is registered.
+ *
+ * Used by the PSL interpreter to dispatch declarative entity-shaped
+ * declarations (`enum`, future `namespace { … }`, …) through the
+ * M3.5 entities mechanism — the descriptor's `factory` (or
+ * `template`) materialises the IR-class instance without the
+ * interpreter knowing target-specific construction.
+ */
+export function getAuthoringEntity(
+  contributions: AuthoringContributions | undefined,
+  path: readonly string[],
+): AuthoringEntityDescriptor | undefined {
+  let current: unknown = contributions?.entities;
+
+  for (const segment of path) {
+    if (typeof current !== 'object' || current === null || Array.isArray(current)) {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+
+  return isAuthoringEntityDescriptor(current) ? current : undefined;
 }
 
 /**

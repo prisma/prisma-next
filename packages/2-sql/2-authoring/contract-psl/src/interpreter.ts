@@ -11,9 +11,10 @@ import type {
 } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
-  AuthoringTypeConstructorDescriptor,
+  AuthoringEntityContext,
+  AuthoringEntityDescriptor,
 } from '@prisma-next/framework-components/authoring';
-import { instantiateAuthoringTypeConstructor } from '@prisma-next/framework-components/authoring';
+import { instantiateAuthoringEntity } from '@prisma-next/framework-components/authoring';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaultRegistry,
@@ -29,7 +30,7 @@ import type {
   PslModel,
   PslNamedTypeDeclaration,
 } from '@prisma-next/psl-parser';
-import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { SqlEnumType, type StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
   buildSqlContractFromDefinition,
   type ForeignKeyNode,
@@ -55,7 +56,7 @@ import {
 import type { ColumnDescriptor } from './psl-column-resolution';
 import {
   checkUncomposedNamespace,
-  getAuthoringTypeConstructor,
+  getAuthoringEntity,
   instantiatePslTypeConstructor,
   reportUncomposedNamespace,
   resolveDbNativeTypeAttribute,
@@ -158,16 +159,38 @@ function mapParserDiagnostics(document: ParsePslDocumentResult): ContractSourceD
 interface ProcessEnumDeclarationsInput {
   readonly enums: readonly PslEnum[];
   readonly sourceId: string;
-  readonly enumTypeConstructor: AuthoringTypeConstructorDescriptor | undefined;
+  readonly enumEntityDescriptor: AuthoringEntityDescriptor | undefined;
+  readonly entityContext: AuthoringEntityContext;
   readonly diagnostics: ContractSourceDiagnostic[];
 }
 
 function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
-  readonly storageTypes: Record<string, StorageTypeInstance>;
+  readonly storageTypes: Record<string, StorageTypeInstance | SqlEnumType>;
   readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
 } {
-  const storageTypes: Record<string, StorageTypeInstance> = {};
+  const storageTypes: Record<string, StorageTypeInstance | SqlEnumType> = {};
   const enumTypeDescriptors = new Map<string, ColumnDescriptor>();
+
+  if (input.enums.length === 0) {
+    return { storageTypes, enumTypeDescriptors };
+  }
+
+  if (!input.enumEntityDescriptor) {
+    // The PSL `enum X { … }` syntax only resolves when the active
+    // pack composition contributes an `entities.enum` factory (the
+    // Postgres target pack does so today). Without the contribution
+    // we surface a diagnostic per declaration rather than silently
+    // swallowing the syntax.
+    for (const enumDeclaration of input.enums) {
+      input.diagnostics.push({
+        code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
+        message: `Enum "${enumDeclaration.name}" requires the active target pack to contribute an entities.enum helper`,
+        sourceId: input.sourceId,
+        span: enumDeclaration.span,
+      });
+    }
+    return { storageTypes, enumTypeDescriptors };
+  }
 
   for (const enumDeclaration of input.enums) {
     const nativeType = parseMapName({
@@ -178,29 +201,29 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
       entityLabel: `Enum "${enumDeclaration.name}"`,
       span: enumDeclaration.span,
     });
-    const enumStorageType = input.enumTypeConstructor
-      ? instantiateAuthoringTypeConstructor(input.enumTypeConstructor, [
-          nativeType,
-          enumDeclaration.values.map((value) => value.name),
-        ])
-      : {
-          codecId: 'pg/enum@1',
-          nativeType,
-          typeParams: { values: enumDeclaration.values.map((value) => value.name) },
-        };
+    const values = enumDeclaration.values.map((value) => value.name);
+    const constructed = instantiateAuthoringEntity(
+      'entities.enum',
+      input.enumEntityDescriptor,
+      [{ name: enumDeclaration.name, nativeType, values }],
+      input.entityContext,
+    );
+    if (!(constructed instanceof SqlEnumType)) {
+      input.diagnostics.push({
+        code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
+        message: `Enum "${enumDeclaration.name}": entities.enum factory must return a SqlEnumType subclass instance`,
+        sourceId: input.sourceId,
+        span: enumDeclaration.span,
+      });
+      continue;
+    }
     const descriptor: ColumnDescriptor = {
-      codecId: enumStorageType.codecId,
-      nativeType: enumStorageType.nativeType,
+      codecId: constructed.codecBinding.codecId,
+      nativeType: constructed.nativeType,
       typeRef: enumDeclaration.name,
     };
     enumTypeDescriptors.set(enumDeclaration.name, descriptor);
-    storageTypes[enumDeclaration.name] = {
-      codecId: enumStorageType.codecId,
-      nativeType: enumStorageType.nativeType,
-      typeParams: enumStorageType.typeParams ?? {
-        values: enumDeclaration.values.map((value) => value.name),
-      },
-    };
+    storageTypes[enumDeclaration.name] = constructed;
   }
 
   return { storageTypes, enumTypeDescriptors };
@@ -282,10 +305,10 @@ function validateNamedTypeAttributes(input: {
 }
 
 function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput): {
-  readonly storageTypes: Record<string, StorageTypeInstance>;
+  readonly storageTypes: Record<string, StorageTypeInstance | SqlEnumType>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
 } {
-  const storageTypes: Record<string, StorageTypeInstance> = {};
+  const storageTypes: Record<string, StorageTypeInstance | SqlEnumType> = {};
   const namedTypeDescriptors = new Map<string, ColumnDescriptor>();
 
   for (const declaration of input.declarations) {
@@ -1284,7 +1307,11 @@ export function interpretPslDocumentToSqlContract(
   const enumResult = processEnumDeclarations({
     enums,
     sourceId,
-    enumTypeConstructor: getAuthoringTypeConstructor(input.authoringContributions, ['enum']),
+    enumEntityDescriptor: getAuthoringEntity(input.authoringContributions, ['enum']),
+    entityContext: {
+      family: input.target.familyId,
+      target: input.target.targetId,
+    },
     diagnostics,
   });
 

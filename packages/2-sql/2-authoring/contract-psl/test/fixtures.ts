@@ -1,5 +1,8 @@
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
-import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import type {
+  AuthoringContributions,
+  AuthoringEntityNamespace,
+} from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
@@ -7,6 +10,42 @@ import type {
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
+import { SqlEnumType } from '@prisma-next/sql-contract/types';
+
+/**
+ * Layer-isolated `SqlEnumType` subclass for `sql-contract-psl` unit tests.
+ * Stays in the test fixture so the interpreter package never depends on a
+ * real target pack; production targets (e.g. Postgres) ship their own
+ * `SqlEnumType` subclass and contribute it through `entities.enum`.
+ */
+export class TestSqlEnumType extends SqlEnumType {
+  readonly name: string;
+  readonly nativeType: string;
+  readonly values: readonly string[];
+
+  constructor(input: { name: string; nativeType?: string; values: readonly string[] }) {
+    super();
+    this.name = input.name;
+    this.nativeType = input.nativeType ?? input.name;
+    this.values = Object.freeze([...input.values]);
+  }
+
+  get codecBinding() {
+    return {
+      codecId: 'test/enum@1',
+      typeParams: { values: this.values },
+    } as const;
+  }
+}
+
+export const testEnumEntityContributions = {
+  enum: {
+    kind: 'entity' as const,
+    output: {
+      factory: (input: { name: string; values: readonly string[] }) => new TestSqlEnumType(input),
+    },
+  },
+} as const satisfies AuthoringEntityNamespace;
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;

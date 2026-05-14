@@ -2,7 +2,11 @@ import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next
 import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import type { ReferentialAction, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type {
+  ReferentialAction,
+  SqlEnumType,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 
 export type { ExecutionMutationDefaultPhases };
 
@@ -97,7 +101,7 @@ export interface ContractDefinition {
   readonly capabilities?: Record<string, Record<string, boolean>>;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
-  readonly storageTypes?: Record<string, StorageTypeInstance>;
+  readonly storageTypes?: Record<string, StorageTypeInstance | SqlEnumType>;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
 }

@@ -41,7 +41,12 @@ export abstract class SqlNode extends SchemaNodeBase {
       value: 'sql',
       writable: false,
       enumerable: false,
-      configurable: false,
+      // configurable so per-leaf subclasses (e.g. SqlEnumType) can
+      // override `kind` with their narrower enumerable literal via
+      // a class-field initializer. SqlNode itself never needs to
+      // mutate the property again, so configurability has no
+      // surface impact at this layer.
+      configurable: true,
     });
   }
 }

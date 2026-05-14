@@ -5,11 +5,13 @@ import {
   createBuiltinLikeControlMutationDefaults,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  testEnumEntityContributions,
 } from './fixtures';
 
 const baseInput = {
   target: postgresTarget,
   scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  authoringContributions: { entities: testEnumEntityContributions, type: {}, field: {} },
 } as const;
 
 describe('interpretPslDocumentToSqlContract types', () => {
@@ -154,14 +156,16 @@ model User {
     expect(result.value.storage).toMatchObject({
       types: {
         UserRole: {
-          codecId: 'pg/enum@1',
+          kind: 'sql-enum-type',
+          name: 'UserRole',
           nativeType: 'user_role',
-          typeParams: { values: ['USER', 'ADMIN'] },
+          values: ['USER', 'ADMIN'],
         },
         Role: {
-          codecId: 'pg/enum@1',
+          kind: 'sql-enum-type',
+          name: 'Role',
           nativeType: 'Role',
-          typeParams: { values: ['OWNER'] },
+          values: ['OWNER'],
         },
       },
     });
@@ -171,13 +175,13 @@ model User {
           columns: {
             id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
             role: {
-              codecId: 'pg/enum@1',
+              codecId: 'test/enum@1',
               nativeType: 'user_role',
               nullable: false,
               typeRef: 'UserRole',
             },
             legacyRole: {
-              codecId: 'pg/enum@1',
+              codecId: 'test/enum@1',
               nativeType: 'Role',
               nullable: false,
               typeRef: 'Role',

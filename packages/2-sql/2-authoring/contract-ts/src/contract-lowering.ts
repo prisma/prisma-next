@@ -1,5 +1,5 @@
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
-import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { SqlEnumType, type StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ContractDefinition,
@@ -52,15 +52,15 @@ type RuntimeModelSpec = {
 };
 
 type RuntimeCollection = {
-  readonly storageTypes: Record<string, StorageTypeInstance>;
+  readonly storageTypes: Record<string, StorageTypeInstance | SqlEnumType>;
   readonly models: Record<string, RuntimeModel>;
   readonly modelSpecs: ReadonlyMap<string, RuntimeModelSpec>;
 };
 
 function buildStorageTypeReverseLookup(
-  storageTypes: Record<string, StorageTypeInstance>,
-): ReadonlyMap<StorageTypeInstance, string> {
-  const lookup = new Map<StorageTypeInstance, string>();
+  storageTypes: Record<string, StorageTypeInstance | SqlEnumType>,
+): ReadonlyMap<StorageTypeInstance | SqlEnumType, string> {
+  const lookup = new Map<StorageTypeInstance | SqlEnumType, string>();
   for (const [key, instance] of Object.entries(storageTypes)) {
     lookup.set(instance, key);
   }
@@ -71,8 +71,8 @@ function resolveFieldDescriptor(
   modelName: string,
   fieldName: string,
   fieldState: FieldStateOf<ScalarFieldBuilder>,
-  storageTypes: Record<string, StorageTypeInstance>,
-  storageTypeReverseLookup: ReadonlyMap<StorageTypeInstance, string>,
+  storageTypes: Record<string, StorageTypeInstance | SqlEnumType>,
+  storageTypeReverseLookup: ReadonlyMap<StorageTypeInstance | SqlEnumType, string>,
 ): ColumnTypeDescriptor {
   if ('descriptor' in fieldState && fieldState.descriptor) {
     return fieldState.descriptor;
@@ -82,7 +82,7 @@ function resolveFieldDescriptor(
     const typeRef =
       typeof fieldState.typeRef === 'string'
         ? fieldState.typeRef
-        : storageTypeReverseLookup.get(fieldState.typeRef as StorageTypeInstance);
+        : storageTypeReverseLookup.get(fieldState.typeRef as StorageTypeInstance | SqlEnumType);
 
     if (!typeRef) {
       throw new Error(
@@ -97,8 +97,12 @@ function resolveFieldDescriptor(
       );
     }
 
+    const codecId =
+      referencedType instanceof SqlEnumType
+        ? referencedType.codecBinding.codecId
+        : referencedType.codecId;
     return {
-      codecId: referencedType.codecId,
+      codecId,
       nativeType: referencedType.nativeType,
       typeRef,
     };
@@ -538,8 +542,8 @@ function resolveForeignKeyNodes(
 function resolveModelNode(
   spec: RuntimeModelSpec,
   allSpecs: ReadonlyMap<string, RuntimeModelSpec>,
-  storageTypes: Record<string, StorageTypeInstance>,
-  storageTypeReverseLookup: ReadonlyMap<StorageTypeInstance, string>,
+  storageTypes: Record<string, StorageTypeInstance | SqlEnumType>,
+  storageTypeReverseLookup: ReadonlyMap<StorageTypeInstance | SqlEnumType, string>,
 ): ModelNode {
   const fields: FieldNode[] = [];
 
@@ -607,7 +611,10 @@ function resolveModelNode(
 }
 
 function collectRuntimeModelSpecs(definition: ContractInput): RuntimeCollection {
-  const storageTypes = { ...(definition.types ?? {}) } as Record<string, StorageTypeInstance>;
+  const storageTypes = { ...(definition.types ?? {}) } as Record<
+    string,
+    StorageTypeInstance | SqlEnumType
+  >;
   const models = { ...(definition.models ?? {}) } as Record<string, RuntimeModel>;
 
   emitTypedNamedTypeFallbackWarnings(models, storageTypes);

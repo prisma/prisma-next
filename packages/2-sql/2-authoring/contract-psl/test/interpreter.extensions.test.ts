@@ -6,6 +6,7 @@ import {
   pgvectorExtensionPack,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  testEnumEntityContributions,
 } from './fixtures';
 
 const baseInput = {
@@ -160,18 +161,8 @@ model Document {
       document,
       composedExtensionPacks: ['pgvector'],
       authoringContributions: {
+        entities: testEnumEntityContributions,
         type: {
-          enum: {
-            kind: 'typeConstructor',
-            args: [{ kind: 'string' }, { kind: 'stringArray' }],
-            output: {
-              codecId: 'custom/enum@1',
-              nativeType: { kind: 'arg', index: 0 },
-              typeParams: {
-                values: { kind: 'arg', index: 1 },
-              },
-            },
-          },
           pgvector: {
             Vector: {
               kind: 'typeConstructor',
@@ -194,9 +185,10 @@ model Document {
     expect(result.value.storage).toMatchObject({
       types: {
         Role: {
-          codecId: 'custom/enum@1',
+          kind: 'sql-enum-type',
+          name: 'Role',
           nativeType: 'Role',
-          typeParams: { values: ['USER', 'ADMIN'] },
+          values: ['USER', 'ADMIN'],
         },
         Embedding1536: {
           codecId: 'custom/vector@1',
@@ -208,7 +200,7 @@ model Document {
         document: {
           columns: {
             role: {
-              codecId: 'custom/enum@1',
+              codecId: 'test/enum@1',
               nativeType: 'Role',
               typeRef: 'Role',
             },

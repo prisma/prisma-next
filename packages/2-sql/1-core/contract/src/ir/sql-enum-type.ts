@@ -50,19 +50,4 @@ export abstract class SqlEnumType extends SqlNode {
     readonly codecId: string;
     readonly typeParams: { readonly values: readonly string[] };
   };
-
-  constructor() {
-    super();
-    // Re-install `kind` as an enumerable own property so JSON.stringify
-    // surfaces it (the `SqlNode` base installs a non-enumerable `'sql'`
-    // own property; per-leaf earned discriminators override that with
-    // an enumerable narrower literal so consumers reading raw JSON can
-    // dispatch on `kind === 'sql-enum-type'`).
-    Object.defineProperty(this, 'kind', {
-      value: 'sql-enum-type',
-      writable: false,
-      enumerable: true,
-      configurable: false,
-    });
-  }
 }
