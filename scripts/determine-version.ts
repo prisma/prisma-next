@@ -1,8 +1,28 @@
 #!/usr/bin/env node
 
+/**
+ * Composes the version + dist-tag the publish workflow will use.
+ *
+ * The base version comes from the root `package.json` (the
+ * source-of-truth introduced by the package.json-versioning refactor).
+ * This script is responsible only for the suffix and dist-tag
+ * appropriate to the GitHub event:
+ *
+ * - `push`              → `<base>-dev.N`, dist-tag `dev`
+ *                          (where N is the next available build number,
+ *                          discovered by querying npm).
+ * - `workflow_dispatch` → `<base>` (no suffix), dist-tag from
+ *                          `INPUT_DIST_TAG` (defaults to `latest`).
+ *
+ * Outputs `version` and `tag` to `$GITHUB_OUTPUT` for downstream
+ * workflow steps to consume.
+ */
+
 import { execSync } from 'node:child_process';
-import { appendFileSync } from 'node:fs';
-import { computeNextMinor } from './determine-version-utils.ts';
+import { appendFileSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { assertCanonicalBase } from './determine-version-utils.ts';
 
 const PACKAGE_NAME = process.argv[2] ?? '@prisma-next/contract';
 
@@ -11,16 +31,27 @@ interface VersionResult {
   tag: string;
 }
 
+const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+
+function readRootVersion(): string {
+  const pkgPath = path.join(rootDir, 'package.json');
+  const parsed = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version?: unknown };
+  if (typeof parsed.version !== 'string' || parsed.version.length === 0) {
+    throw new Error(
+      `Root package.json (${pkgPath}) is missing a \`version\` field. ` +
+        'The publish pipeline now reads the version directly from the workspace root; ' +
+        'set it (e.g. `pnpm bump-minor`) before publishing.',
+    );
+  }
+  return parsed.version;
+}
+
 function run(command: string): string | undefined {
   try {
     return execSync(command, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
   } catch {
     return undefined;
   }
-}
-
-function getLatestStableVersion(): string {
-  return run(`npm view "${PACKAGE_NAME}" dist-tags.latest`) ?? '0.0.0';
 }
 
 function getLatestDevVersion(): string | undefined {
@@ -36,11 +67,9 @@ function determineDevVersion(baseVersion: string): VersionResult {
     const match = latestDevVersion.match(devPattern);
 
     if (match) {
-      const devBase = match[1];
-      const lastBuild = Number.parseInt(match[2], 10);
-
+      const [, devBase, build] = match;
       if (devBase === baseVersion) {
-        buildNumber = lastBuild + 1;
+        buildNumber = Number.parseInt(build, 10) + 1;
       }
     }
   }
@@ -54,42 +83,35 @@ function determineDevVersion(baseVersion: string): VersionResult {
 function writeGitHubOutput(result: VersionResult): void {
   const outputFile = process.env.GITHUB_OUTPUT;
   if (outputFile) {
-    // Use heredoc syntax to safely write to GITHUB_OUTPUT (prevents injection)
     appendFileSync(outputFile, `version<<EOF\n${result.version}\nEOF\n`);
     appendFileSync(outputFile, `tag<<EOF\n${result.tag}\nEOF\n`);
   }
 }
 
 const eventName = process.env.GITHUB_EVENT_NAME;
-const inputVersion = process.env.INPUT_VERSION;
-const inputTag = process.env.INPUT_TAG;
+const inputDistTag = process.env.INPUT_DIST_TAG;
 
-console.log(`Event: ${eventName}`);
+const baseVersion = readRootVersion();
+assertCanonicalBase(baseVersion);
 
-const latestStable = getLatestStableVersion();
-console.log(`Latest stable version: ${latestStable}`);
-
-const baseVersion = computeNextMinor(latestStable);
-console.log(`Base version for dev builds: ${baseVersion}`);
+console.log(`Event:                 ${eventName}`);
+console.log(`Base version (root):   ${baseVersion}`);
 
 let result: VersionResult;
 
 switch (eventName) {
   case 'workflow_dispatch':
-    if (!inputVersion || !inputTag) {
-      throw new Error('INPUT_VERSION and INPUT_TAG are required for workflow_dispatch');
-    }
-    result = { version: inputVersion, tag: inputTag };
+    result = { version: baseVersion, tag: inputDistTag ?? 'latest' };
     break;
 
   case 'push':
     result = determineDevVersion(baseVersion);
-    console.log(`Dev version: ${result.version}`);
     break;
 
   default:
     throw new Error(`don't know how to handle event ${eventName}`);
 }
 
-console.log(`\nOutput: version=${result.version}, tag=${result.tag}`);
+console.log(`Resolved version:      ${result.version}`);
+console.log(`Resolved dist-tag:     ${result.tag}`);
 writeGitHubOutput(result);
