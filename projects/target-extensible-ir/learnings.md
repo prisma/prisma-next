@@ -118,3 +118,18 @@ Mongo's per-class enumerable literal kinds remain the right pattern when each le
 - If the family has no polymorphic dispatch today: the family base declares a non-enumerable `kind` initialised in its constructor; subclasses inherit it; pre-lift fixtures stay friction-free; future polymorphic-dispatch consumers earn per-leaf literal overrides at that moment.
 
 Decision recorded at `wip/unattended-decisions.md § 16`.
+
+## Pattern: workspace-wide `pnpm typecheck` is the standing implementer gate (escapee discipline)
+
+**Shape.** Per-touched-package typecheck (`pnpm --filter <pkg> typecheck`) is *necessary but not sufficient* — it doesn't catch downstream consumers that import types from the touched package and now break. Every M3 round (R2, R3a, R3b) and the M3.5 R1 round surfaced a downstream-consumer typecheck escapee that the per-touched-package gate missed but workspace-wide `pnpm typecheck` would have caught. Examples:
+
+- M3 R2: pre-existing `adapter-mongo` `'family' is declared but its value is never read` surfaced when SqlControlTargetDescriptor gained new properties; per-package gate missed it because adapter-mongo wasn't directly modified.
+- M3 R3a: stale `dist/` from `family-sql` / `target-postgres` / `target-sqlite` cascaded into the workspace typecheck of downstream consumers.
+- M3 R3b: contravariant-parameter mismatch at the `side-by-side-contracts` integration test boundary surfaced workspace-wide.
+- M3.5 R1: `AssembledAuthoringContributions.entities` made required, regressing two `sql-contract-psl/test/provider.test.ts` call sites that consumed `pgvectorAuthoringContributions` (typed `as const satisfies AuthoringContributions` without `entities`).
+
+**Why it matters.** TypeScript's structural typing means any change to a published interface ripples through every downstream consumer. The per-touched-package gate sees only the package owning the type; the workspace gate sees every consumer. Implementers who declare done after the per-touched-package gate ship escapees that the next round's reviewer (or a luckily-timed orchestrator gate run) catches mid-cycle, requiring a fix-commit cycle that breaks the round's clean commit chain.
+
+**Action.** **Workspace-wide `pnpm typecheck` is the standing final gate** for every implementer round before reporting done. If the workspace typecheck fails on stale `dist/` from a published-types change, run the targeted rebuilds (`pnpm --filter <changed-pkg> build`) then re-typecheck. The cost is one extra typecheck run per round (~10-30s); the benefit is no escapees handed to the reviewer or to subsequent rounds.
+
+This pattern was promoted from "implementer recommendation" to "standing implementer gate" at M3.5 R1b close-out after the M3 + M3.5 R1 rounds repeatedly demonstrated the necessity. Reviewers re-run workspace typecheck independently as part of their gate set; implementers running it before declaring done eliminates the round-extending fix-commit cycle.
