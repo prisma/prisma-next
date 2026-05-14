@@ -25,13 +25,19 @@ BASE_BRANCH=${BASE_BRANCH:-main}
    - `git status -sb`
    - If there are uncommitted changes, explicitly call out that `gh pr create` can proceed but those changes will not be in the PR.
 
-### Step 2: Ask for Linear Ticket
+### Step 2: Resolve the Linear Ticket
 
-Ask the user for the Linear ticket URL (e.g., `https://linear.app/prisma-company/issue/TML-1859/pn-add-more-parameterized-types`).
+Resolve the Linear ticket from context — **do not ask the user**. The ticket is almost always derivable from one of:
 
-Extract from the URL:
-- `$TICKET_ID` — the ticket identifier (e.g., `TML-1859`)
-- `$SLUG` — the trailing slug (e.g., `pn-add-more-parameterized-types`)
+1. **The branch name.** Most branches are named `tml-NNNN-…` (lower-case form of the Linear identifier). The current ticket is whatever matches `(?i)\b(TML-\d+)\b` in `git rev-parse --abbrev-ref HEAD`. Use the trailing slug from the branch name verbatim as `$SLUG`.
+2. **The conversation context.** If the user previously linked or named a ticket in this conversation, use that.
+3. **The most recent commit messages on the branch.** Look for a `Refs: TML-NNNN` or `(TML-NNNN)` trailer / mention in `git log "$BASE_BRANCH..HEAD"`.
+
+Extract:
+- `$TICKET_ID` — the canonical upper-case identifier (e.g., `TML-1859`)
+- `$SLUG` — the trailing slug used in Linear URLs (e.g., `pn-add-more-parameterized-types`); take it directly from the branch name's trailing portion when available
+
+Only ask the user if **all three** sources fail to yield an identifier. In that case, ask once with a concrete proposal (e.g. "I couldn't infer a Linear ticket from the branch `xyz` or the recent commits — which ticket does this PR close?").
 
 ### Step 3: Compose the PR Title
 
@@ -109,11 +115,12 @@ The PR description must follow a **decision-led, narrative** structure. A teamma
    - Use GitHub-friendly relative paths (e.g. `path/to/file.ts`); strip local-editor suffixes like `:12-34`.
 4. Apply the **forbidden / discouraged patterns** check to the draft before showing it to the user.
 
-### Step 5: Confirm and Create
+### Step 5: Push and Create
 
-1. Present the full title and description to the user for review.
-2. After approval, ensure the branch is pushed to remote (`git push -u origin HEAD` if needed).
-3. Create the PR using the body file:
+Open the PR directly — **do not ask the user to confirm the title or body first**. The skill's quality bar is the structure and forbidden-patterns checklist above; running through that in your own head is the gate, not a confirmation prompt. (If the user wants changes after the fact, they will tell you and you can edit the PR via `gh pr edit`.)
+
+1. Ensure the branch is pushed to remote (`git push -u origin HEAD` if needed).
+2. Create the PR using the body file:
 
 ```bash
 gh pr create --title "$TICKET_ID: <title>" --body-file wip/pr-<num>-body.md
@@ -121,7 +128,7 @@ gh pr create --title "$TICKET_ID: <title>" --body-file wip/pr-<num>-body.md
 
 (Use `--body-file` rather than a heredoc to avoid quoting/escaping pitfalls with backticks and code samples.)
 
-4. Return the PR URL.
+3. Return the PR URL to the user.
 
 ## Don't Do
 
@@ -130,6 +137,6 @@ gh pr create --title "$TICKET_ID: <title>" --body-file wip/pr-<num>-body.md
 3. Don't open the description with prose — after the Linear close line, the body must move straight into `## At a glance` and its real code sample.
 4. Don't bury substantive secondary changes (e.g. framework reorders alongside a feature) — enumerate them in `## Decision`.
 5. Don't end the description with "non-goals" — end with `## Alternatives considered`, framed as decisions you weighed.
-6. Don't create the PR without showing the user the title and description first.
-7. Don't guess the Linear ticket number — always ask.
+6. Don't ask the user to confirm the PR title or body — open the PR. They can ask you to edit it after.
+7. Don't ask the user for the Linear ticket — infer it from the branch name, conversation, or recent commits per Step 2. Only ask if all three sources genuinely fail.
 8. Don't use the conventional-commit `type(scope):` title format — that's the old format. The current format is `$TICKET_ID: <title>`.
