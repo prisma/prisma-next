@@ -2,7 +2,7 @@
 
 ## Status
 
-**Shaping, near-complete.** This document captures the design decisions for the published usage skill described as task 3 in [`spec.md`](spec.md). Open questions are largely resolved after a competitive survey of Drizzle, Sequelize, TypeORM, Kysely, Active Record, and Convex (surveys in [`references/competitive-survey/`](references/competitive-survey/)). The remaining open question is the content-rotation policy; everything else is locked. When that's settled, the content moves to `specs/usage-skill.spec.md` in the project-spec shape and this file is deleted.
+**Shaping complete.** This document captures the design decisions for the published usage skill described as task 3 in [`spec.md`](spec.md). All decisions are locked after a competitive survey of Drizzle, Sequelize, TypeORM, Kysely, Active Record, and Convex (surveys in [`references/competitive-survey/`](references/competitive-survey/)). Ready to convert to `specs/usage-skill.spec.md` in the project-spec shape; this file is deleted after that.
 
 ## What we're designing
 
@@ -213,14 +213,20 @@ The existing hand-rolled template at [`packages/1-framework/3-tooling/cli/src/co
 
 Validation is dogfood, not unit tests. The agent's behavior is the bar.
 
-## Open questions
+### Content-rotation policy — co-location + PR-template; defer the rest
 
-1. **Content-rotation policy.** As PN evolves, skill content goes stale. Whether rotation is a CODEOWNERS expectation, a PR-template item, or a separate authoring quality gate is deferred. The upgrade-skill mechanism handles user-side recipe rotation but not the usage skill's body.
+As PN evolves, skill content goes stale. Minimum-viable policy for the 0.x phase:
+
+1. **Co-location + PR-template item.** Skill source lives in `packages/0-shared/agent-skill/` in this repo (settled under [Source location](#source-location)). Every PR that changes a user-facing surface (CLI, public APIs, config fields, error codes, glossary terms) must either touch `packages/0-shared/agent-skill/` *or* state in the PR description why no skill update is needed. Implemented as a PR-template item; not CI-enforced.
+2. **Extend upgrade-recipe coverage to skill coverage.** The recipe-coverage check from [`specs/upgrade-skill.spec.md`](specs/upgrade-skill.spec.md) FR13/FR14 extends to the skill package: any breaking-change PR that requires a recipe also requires a skill update in the same PR. The exact mechanism for the skill-side check is settled when [`specs/usage-skill.spec.md`](specs/usage-skill.spec.md) is written (see follow-ups).
+
+Deferred until the 0.x churn slows: reverse-CODEOWNERS, scheduled freshness rotation, CI-enforced fingerprinting, dogfooded journey tests in CI. Revisit then.
 
 ## Follow-ups raised during shaping
 
 - ~~Stale Kysely references in the architecture docs.~~ **Resolved** in commit `5908394` ("docs: strip stale Kysely lane references").
 - **Product question.** Where do validations, callbacks, scopes, and similar ORM-shaped concerns eventually live in PN? Captured as "What PN doesn't do yet" entries in the relevant skills today; revisit when the product roadmap addresses them.
+- **Cross-spec wiring for the recipe-coverage check.** When [`specs/usage-skill.spec.md`](specs/usage-skill.spec.md) is authored, extend the upgrade-skill recipe-coverage check (FR13/FR14 in [`specs/upgrade-skill.spec.md`](specs/upgrade-skill.spec.md)) to also require a skill update on any breaking-change PR. Decide there whether to amend the upgrade-skill spec or keep the skill-side requirement local to the usage-skill spec.
 
 ## Cluster scope — per-skill inventory
 
@@ -400,6 +406,6 @@ Per-error-domain reference files in `references/`:
 
 ## Next steps
 
-1. Resolve the content-rotation policy (the last open question).
-2. Convert this design doc into `specs/usage-skill.spec.md` in the project-spec shape.
+1. Convert this design doc into `specs/usage-skill.spec.md` in the project-spec shape (problem / approach / FRs / NFRs / ACs).
+2. While doing so, settle the cross-spec wiring noted in [Follow-ups](#follow-ups-raised-during-shaping).
 3. Hand the spec off for implementation alongside the upgrade-skill mechanism work.
