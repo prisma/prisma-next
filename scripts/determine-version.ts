@@ -2,7 +2,6 @@
 
 import { execSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
-import { findNextPrBuildNumber } from './determine-version-utils.ts';
 
 const PACKAGE_NAME = process.argv[2] ?? '@prisma-next/contract';
 
@@ -27,12 +26,6 @@ function getLatestDevVersion(): string | undefined {
   return run(`npm view "${PACKAGE_NAME}" dist-tags.dev`);
 }
 
-function getPrVersions(): string[] {
-  const json = run(`npm view "${PACKAGE_NAME}@pr" versions --json`);
-  if (!json) return [];
-  return JSON.parse(json);
-}
-
 function parseVersion(version: string): { major: number; minor: number; patch: number } {
   const [major, minor, patch] = version.split('-')[0].split('.').map(Number);
   return { major, minor, patch };
@@ -41,16 +34,6 @@ function parseVersion(version: string): { major: number; minor: number; patch: n
 function calculateNextStableVersion(latestStable: string): string {
   const { major, minor } = parseVersion(latestStable);
   return `${major}.${minor + 1}.0`;
-}
-
-function determinePrVersion(baseVersion: string, prNumber: string): VersionResult {
-  const prVersions = getPrVersions();
-  const buildNumber = findNextPrBuildNumber(prVersions, prNumber);
-
-  return {
-    version: `${baseVersion}-pr.${prNumber}.${buildNumber}`,
-    tag: 'pr',
-  };
 }
 
 function determineDevVersion(baseVersion: string): VersionResult {
@@ -89,7 +72,6 @@ function writeGitHubOutput(result: VersionResult): void {
 const eventName = process.env.GITHUB_EVENT_NAME;
 const inputVersion = process.env.INPUT_VERSION;
 const inputTag = process.env.INPUT_TAG;
-const prNumber = process.env.PR_NUMBER;
 
 console.log(`Event: ${eventName}`);
 
@@ -107,14 +89,6 @@ switch (eventName) {
       throw new Error('INPUT_VERSION and INPUT_TAG are required for workflow_dispatch');
     }
     result = { version: inputVersion, tag: inputTag };
-    break;
-
-  case 'pull_request':
-    if (!prNumber) {
-      throw new Error('PR_NUMBER is required for pull_request events');
-    }
-    result = determinePrVersion(baseVersion, prNumber);
-    console.log(`PR version: ${result.version}`);
     break;
 
   case 'push':
