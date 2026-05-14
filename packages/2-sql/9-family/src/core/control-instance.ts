@@ -10,7 +10,6 @@ import type {
   ControlStack,
   CoreSchemaView,
   MigrationPlanOperation,
-  OperationContext,
   OperationPreview,
   OperationPreviewCapable,
   PslContractInferCapable,
@@ -180,18 +179,6 @@ interface SqlFamilyInstanceState {
   readonly typeMetadataRegistry: SqlTypeMetadataRegistry;
 }
 
-export interface SchemaVerifyOptions {
-  readonly driver: ControlDriverInstance<'sql', string>;
-  readonly contract: unknown;
-  readonly strict: boolean;
-  readonly context?: OperationContext;
-  /**
-   * Active framework components participating in this composition.
-   * All components must have matching familyId ('sql') and targetId.
-   */
-  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
-}
-
 export interface SqlControlFamilyInstance
   extends ControlFamilyInstance<'sql', SqlSchemaIR>,
     SchemaViewCapable<SqlSchemaIR>,
@@ -208,15 +195,14 @@ export interface SqlControlFamilyInstance
     readonly configPath?: string;
   }): Promise<VerifyDatabaseResult>;
 
-  schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult>;
-
   /**
    * Verify a contract against an already-introspected schema slice.
    *
-   * Used by the aggregate verifier to invoke per-member verification
-   * with the live schema pre-projected to the member's claimed slice
-   * via `projectSchemaToSpace`. Closes F23 — without per-member
-   * pre-projection, single-contract verifiers see other-space tables
+   * Callers that need to verify against the live database compose
+   * `introspect({ driver })` + `verifySchema({ contract, schema, ... })`.
+   * The aggregate verifier projects each member's claimed slice via
+   * `projectSchemaToSpace` and hands the projected slice in — this
+   * keeps per-member verification from surfacing sibling-space tables
    * as `extras`.
    */
   verifySchema(options: {
@@ -509,26 +495,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       });
     },
 
-    async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
-      const { driver, contract: contractInput, strict, context, frameworkComponents } = options;
-
-      const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup);
-
-      const controlAdapter = getControlAdapter();
-      const schemaIR = await controlAdapter.introspect(driver, contractInput);
-
-      return verifySqlSchema({
-        contract,
-        schema: schemaIR,
-        strict,
-        ...ifDefined('context', context),
-        typeMetadataRegistry,
-        frameworkComponents,
-        // Wire up target-specific normalizers if available
-        ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
-        ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
-      });
-    },
     verifySchema(options: {
       readonly contract: unknown;
       readonly schema: SqlSchemaIR;
