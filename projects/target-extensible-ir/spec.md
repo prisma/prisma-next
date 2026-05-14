@@ -502,7 +502,7 @@ The two tables are deliberately parallel: a developer who reads the SQL Postgres
 - **FR9.** Enum types are first-class IR nodes (`abstract class SqlEnumType extends SqlNode` at the family layer; `class PostgresEnumType extends SqlEnumType` at the target layer; analogous for any other SQL target that supports enums).
 - **FR10.** Enum verification dispatches via the new IR pattern, not via `codecHooks.verifyType` / `expandNativeType`. The codec-hook glue specific to enums is removed; codecs continue to own their generic verification responsibilities for non-enum types.
 - **FR11.** Existing enum migrations (`CreateEnumTypeCall`, `AddEnumValuesCall`, `DropEnumTypeCall`) consume the IR nodes directly without an intermediate translation layer.
-- **FR12.** The authoring DSL surface for enums is preserved; users continue to declare enums the same way they do today. Internal lowering routes through the new IR.
+- **FR12.** The authoring DSL surface for enums is *semantically* preserved; users continue to declare enums and the resulting Contract IR carries equivalent enum-shaped data. Concretely: PSL `enum X { … }` syntax is unchanged; the TS authoring surface evolves from the legacy `type.enum(name, values)` shape to the canonical `entities.enum({ name, values })` shape — the intentional outcome of the M3.5 entities-mechanism (every contributed entity takes `helpers.entities.<name>(input)` shape; preserving a parallel `type.enum` shim would be the backward-compat pattern this project rejects per `.cursor/rules/no-backward-compatibility.md`). Internal lowering routes through the new IR for both surfaces. (Adjudicated at `wip/unattended-decisions.md § 19`.)
 
 ### Namespace (new concept)
 
