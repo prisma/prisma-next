@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   driverCreate: vi.fn(),
   driverConnect: vi.fn(),
   driverClose: vi.fn(),
-  validateContract: vi.fn(),
+  deserializeContract: vi.fn(),
   poolCtor: vi.fn(),
   clientCtor: vi.fn(),
   runtimeClose: vi.fn(),
@@ -28,8 +28,12 @@ vi.mock('@prisma-next/sql-runtime', () => ({
   createRuntime: mocks.createRuntime,
 }));
 
-vi.mock('@prisma-next/sql-contract/validate', () => ({
-  validateContract: mocks.validateContract,
+vi.mock('@prisma-next/family-sql/ir', () => ({
+  SqlContractSerializer: class {
+    deserializeContract(value: unknown) {
+      return mocks.deserializeContract(value);
+    }
+  },
 }));
 
 vi.mock('@prisma-next/sql-builder/runtime', () => ({
@@ -78,7 +82,7 @@ describe('postgresServerless', () => {
     mocks.driverCreate.mockReset();
     mocks.driverConnect.mockReset();
     mocks.driverClose.mockReset();
-    mocks.validateContract.mockReset();
+    mocks.deserializeContract.mockReset();
     mocks.poolCtor.mockReset();
     mocks.clientCtor.mockReset();
     mocks.sqlBuilder.mockReset();
@@ -109,7 +113,7 @@ describe('postgresServerless', () => {
       id: 'runtime-instance',
       close: mocks.runtimeClose,
     }));
-    mocks.validateContract.mockReturnValue(contract);
+    mocks.deserializeContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
   });
 
@@ -314,14 +318,14 @@ describe('postgresServerless', () => {
     const contractJson = { models: {} };
     postgresServerless({ contractJson });
 
-    expect(mocks.validateContract).toHaveBeenCalledTimes(1);
-    expect(mocks.validateContract).toHaveBeenCalledWith(contractJson, expect.anything());
+    expect(mocks.deserializeContract).toHaveBeenCalledTimes(1);
+    expect(mocks.deserializeContract).toHaveBeenCalledWith(contractJson);
   });
 
   it('validates direct contract input', () => {
     postgresServerless({ contract });
 
-    expect(mocks.validateContract).toHaveBeenCalledTimes(1);
-    expect(mocks.validateContract).toHaveBeenCalledWith(contract, expect.anything());
+    expect(mocks.deserializeContract).toHaveBeenCalledTimes(1);
+    expect(mocks.deserializeContract).toHaveBeenCalledWith(contract);
   });
 });

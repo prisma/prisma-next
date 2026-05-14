@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   sqlBuilder: vi.fn(),
   driverCreate: vi.fn(),
   driverConnect: vi.fn(),
-  validateContract: vi.fn(),
+  deserializeContract: vi.fn(),
   poolCtor: vi.fn(),
 }));
 
@@ -27,8 +27,12 @@ vi.mock('@prisma-next/sql-runtime', () => ({
   withTransaction: mocks.withTransaction,
 }));
 
-vi.mock('@prisma-next/sql-contract/validate', () => ({
-  validateContract: mocks.validateContract,
+vi.mock('@prisma-next/family-sql/ir', () => ({
+  SqlContractSerializer: class {
+    deserializeContract(value: unknown) {
+      return mocks.deserializeContract(value);
+    }
+  },
 }));
 
 vi.mock('@prisma-next/sql-builder/runtime', () => ({
@@ -77,7 +81,7 @@ describe('postgres', () => {
     mocks.withTransaction.mockReset();
     mocks.driverCreate.mockReset();
     mocks.driverConnect.mockReset();
-    mocks.validateContract.mockReset();
+    mocks.deserializeContract.mockReset();
     mocks.poolCtor.mockReset();
     mocks.sqlBuilder.mockReset();
 
@@ -97,7 +101,7 @@ describe('postgres', () => {
     mocks.driverConnect.mockResolvedValue(undefined);
     mocks.driverCreate.mockReturnValue({ id: 'driver-instance', connect: mocks.driverConnect });
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
-    mocks.validateContract.mockReturnValue(contract);
+    mocks.deserializeContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
     mocks.withTransaction.mockImplementation(
       async (_runtime: unknown, fn: (ctx: unknown) => unknown) => {
@@ -111,7 +115,7 @@ describe('postgres', () => {
   });
 
   // Regression: postgres({...}) must remain synchronous (it only consumes
-  // build-time codec methods via validateContract / type maps). If construction
+  // build-time codec methods via deserializeContract / type maps). If construction
   // becomes Promise-returning, this assignment loses its synchronous type and
   // every call site needs `await postgres(...)`.
   it('returns a synchronous client (sync regression)', () => {
@@ -297,8 +301,8 @@ describe('postgres', () => {
       url: 'postgres://localhost:5432/db',
     });
 
-    expect(mocks.validateContract).toHaveBeenCalledTimes(1);
-    expect(mocks.validateContract).toHaveBeenCalledWith(contractJson, expect.anything());
+    expect(mocks.deserializeContract).toHaveBeenCalledTimes(1);
+    expect(mocks.deserializeContract).toHaveBeenCalledWith(contractJson);
   });
 
   it('validates direct contract input', () => {
@@ -307,8 +311,8 @@ describe('postgres', () => {
       url: 'postgres://localhost:5432/db',
     });
 
-    expect(mocks.validateContract).toHaveBeenCalledTimes(1);
-    expect(mocks.validateContract).toHaveBeenCalledWith(contract, expect.anything());
+    expect(mocks.deserializeContract).toHaveBeenCalledTimes(1);
+    expect(mocks.deserializeContract).toHaveBeenCalledWith(contract);
   });
 
   it('creates pool from url with explicit defaults', () => {

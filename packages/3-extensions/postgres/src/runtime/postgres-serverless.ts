@@ -3,12 +3,11 @@ import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver, {
   type PostgresDriverCreateOptions,
 } from '@prisma-next/driver-postgres/runtime';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import type {
   ExecutionContext,
   Runtime,
@@ -68,11 +67,13 @@ function hasContractJson<TContract extends Contract<SqlStorage>>(
   return 'contractJson' in options;
 }
 
+const sqlSerializer = new SqlContractSerializer();
+
 function resolveContract<TContract extends Contract<SqlStorage>>(
   options: PostgresServerlessOptions<TContract>,
 ): TContract {
   const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
-  return validateContract<TContract>(contractInput, emptyCodecLookup);
+  return sqlSerializer.deserializeContract(contractInput) as TContract;
 }
 
 function validateConnectionString(url: string): string {
