@@ -16,8 +16,8 @@ function sha256Hex(input: string): string {
 
 /**
  * Content-addressed migration hash over (metadata envelope sans
- * contracts/hints/signature, ops). See ADR 199 — Storage-only migration
- * identity for the rationale: contracts are anchored separately by the
+ * contracts/hints, ops). See ADR 199 — Storage-only migration identity
+ * for the rationale: contracts are anchored separately by the
  * storage-hash bookends inside the envelope; planner hints are advisory
  * and must not affect identity.
  *
@@ -46,7 +46,6 @@ export function computeMigrationHash(
 ): string {
   const {
     migrationHash: _migrationHash,
-    signature: _signature,
     fromContract: _fromContract,
     toContract: _toContract,
     hints: _hints,
