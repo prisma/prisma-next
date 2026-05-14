@@ -29,8 +29,8 @@ Pre-`1.0` minors are not strictly backwards-compatible, in line with SemVer's al
 
 The npm registry exposes Prisma Next under three dist-tags:
 
-- **`latest`** — the most recent stable release. After a `pnpm bump-minor` PR merges, a maintainer dispatches the publish workflow with `dist-tag=latest` to cut a new release. This is the default any `npm install @prisma-next/...` resolves to.
-- **`dev`** — every push to `main` produces a `<base>-dev.N` tarball under this tag, where `N` is the next available build number for the current `<base>` (the root `package.json` `version` field). These exist so we can pin reproductions, install internal CI runs, or hand someone a "try `npm install @prisma-next/postgres@dev` to get the bleeding edge" link without producing a `latest`-tagged release every commit. They are not promised to be stable and may be yanked freely.
+- **`latest`** — the most recent stable release. Cut automatically: when a `pnpm bump-minor` PR merges to `main`, the resulting push changes the root `package.json` `version`, and the publish workflow recognises that as a release bump and publishes `<base>` under `latest` (and creates a matching GitHub Release). This is the default any `npm install @prisma-next/...` resolves to.
+- **`dev`** — every push to `main` *that doesn't change the root `version`* produces a `<base>-dev.N` tarball under this tag, where `N` is the next available build number for the current `<base>` (the root `package.json` `version` field). These exist so we can pin reproductions, install internal CI runs, or hand someone a "try `npm install @prisma-next/postgres@dev` to get the bleeding edge" link without producing a `latest`-tagged release every commit. They are not promised to be stable and may be yanked freely.
 - **`beta`** — reserved for hand-cut release candidates ahead of significant changes. Routine releases do not use this tag.
 
 The `pr` dist-tag was used historically to publish per-PR previews; PR previews now go through [`pkg.pr.new`](https://pkg.pr.new) ([`.github/workflows/preview-publish.yml`](../../.github/workflows/preview-publish.yml)) instead. The legacy `pr` tag is left as-is on the registry for now; cleanup is out of scope for this page.
@@ -51,8 +51,9 @@ The release cadence is one PR per minor. A maintainer:
 
 1. **Pulls `main`** locally (any worktree; the script reads from `git show HEAD:package.json` so the working tree state doesn't matter).
 2. **Runs the `publish-npm-version` skill** (see [`.agents/skills/publish-npm-version/SKILL.md`](../../.agents/skills/publish-npm-version/SKILL.md)). The skill drives `pnpm bump-minor` and opens a PR in the maintainer's name; using a skill rather than a GitHub workflow ensures the PR carries real maintainer credentials so CI runs on it normally (PRs opened by `GITHUB_TOKEN` from a workflow do not trigger downstream workflows).
-3. **Reviews and merges the PR.** This is the gate where humans verify there are no in-flight breaking changes that need release-notes attention.
-4. **Dispatches the [`Publish to npm`](../../.github/workflows/publish.yml) workflow** from `main` with `dist-tag=latest` and `dry-run=false`. The workflow reads the (now-bumped) root version, builds, packs, and publishes every workspace package in lockstep. It also creates a GitHub Release tagged `v<version>` with auto-generated notes from the merged PRs since the previous release.
+3. **Reviews and merges the PR.** This is the gate where humans verify there are no in-flight breaking changes that need release-notes attention. The merge itself is the publish trigger: the resulting push to `main` carries the bumped root `version`, the publish workflow detects the change, and publishes `<version>` under dist-tag `latest` plus a matching GitHub Release. No separate dispatch step is required.
+
+If the publish needs to be re-run (transient registry failure, etc.), a maintainer can dispatch the [`Publish to npm`](../../.github/workflows/publish.yml) workflow from `main` with `dist-tag=latest` and `dry-run=false`; the workflow re-publishes the version currently committed at HEAD. This is the same path used to cut a hand-rolled `beta` (`dist-tag=beta`).
 
 The dry-run path of the same workflow can be invoked from any branch (`dry-run=true`, the input default) to validate that the publish pipeline still works after touching `publish.yml`, `set-version.ts`, `determine-version.ts`, or any of the build scripts. A dry-run exercises `pnpm publish --dry-run` against every workspace package, runs the `check:publish-deps` gate, and skips the registry publish + GitHub Release.
 
@@ -63,8 +64,7 @@ Patches are not part of the routine cadence, but if a freshly-published `latest`
 1. Branch from `main` (this procedure assumes `main` is still on the same minor that needs the patch — maintenance branches for older minors are out of scope; see [Non-goals](#non-goals) below).
 2. Land the fix as a small PR.
 3. On a follow-up PR, run `node scripts/set-version.ts <major>.<minor>.<patch+1>` to advance every workspace package to the patch version.
-4. Merge to `main`.
-5. Dispatch the publish workflow from `main` with `dist-tag=latest` and `dry-run=false`.
+4. Merge to `main`. The merge changes the root `version` and auto-publishes `latest` via the same path as a minor bump — no separate dispatch is required.
 
 The skill is not used for patches because the bump shape is different (`patch+1`, not `minor+1`); the explicit `set-version.ts` invocation is the procedure.
 

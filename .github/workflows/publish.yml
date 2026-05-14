@@ -5,6 +5,15 @@ name: Publish to npm
 #   Maintainers advance it via `pnpm bump-minor` (see
 #   docs/oss/versioning.md). This workflow can never publish a version
 #   other than what is committed at HEAD.
+#
+# Trigger model:
+#   - push to `main` with the root `version` unchanged → publish
+#     `<base>-dev.N` under dist-tag `dev`.
+#   - push to `main` with the root `version` changed   → publish `<base>`
+#     under dist-tag `latest` and create a GitHub Release. This is how a
+#     merged `chore(release): ...` PR auto-ships.
+#   - workflow_dispatch                                 → publish `<base>`
+#     under the chosen dist-tag (default `latest`); also the dry-run path.
 
 on:
   push:
@@ -44,6 +53,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Need history reaching `github.event.before` so `determine-version.ts`
+          # can compare the root `package.json` version at that ref to HEAD and
+          # decide whether this push is a release bump (publish `latest`) or a
+          # routine commit (publish `dev`). A multi-commit push can place
+          # `before` arbitrarily far back, so fetch the full history.
+          fetch-depth: 0
 
       - name: Setup mise
         uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
@@ -64,6 +80,11 @@ jobs:
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           INPUT_DIST_TAG: ${{ github.event.inputs.dist-tag }}
+          # `before` is the ref `main` pointed at before this push.
+          # `determine-version.ts` reads the root `package.json` at that ref
+          # to detect release bumps. Empty for `workflow_dispatch`, which
+          # the script also handles.
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: node scripts/determine-version.ts
 
       - name: Set package versions

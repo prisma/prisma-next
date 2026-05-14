@@ -3,10 +3,11 @@ name: publish-npm-version
 description: >-
   Cuts the next minor release of Prisma Next: bumps the root package.json
   version, propagates it to every workspace package, and opens a PR titled
-  "chore(release): bump to <next-version>". The maintainer reviews and merges
-  the PR; a separate workflow_dispatch of `Publish to npm` then ships the
-  new version. Use when a maintainer asks to "cut the next minor", "bump to
-  the next version", "open a release PR", or "prepare a publish PR".
+  "chore(release): bump to <next-version>". When the maintainer merges the
+  PR, the `Publish to npm` workflow runs automatically and ships the new
+  version to npm under dist-tag `latest`, plus a matching GitHub Release.
+  Use when a maintainer asks to "cut the next minor", "bump to the next
+  version", "open a release PR", or "prepare a publish PR".
 ---
 
 # Publish next npm version
@@ -27,7 +28,8 @@ running this skill. It covers:
 - The source-of-truth model (root `package.json` `version`).
 - The lockstep guarantee (every workspace package matches the root).
 - The dist-tag convention (`latest` / `dev` / `beta`).
-- The full release procedure (this skill is step 2 of 4).
+- The full release procedure (this skill is step 2 of 3; merging the PR
+  is the publish trigger — there is no separate dispatch step).
 - The emergency-patch path (this skill does **not** handle patches).
 
 This SKILL.md covers only the mechanics of step 2 — opening the bump PR.
@@ -87,13 +89,15 @@ auto-resolve — a clean release branch is the maintainer's responsibility.
      for context.
    - Surface any release-notes-worthy changes the maintainer flagged in
      the pre-flight check (or state explicitly that none were flagged).
-   - Remind the merger that the **publish step is separate**: after this
-     PR merges, dispatch the `Publish to npm` workflow from `main` with
-     `dist-tag=latest` and `dry-run=false`.
+   - Note that **merging this PR ships the release**: the resulting push
+     to `main` carries the bumped root `version`, the `Publish to npm`
+     workflow detects the change and publishes `<new>` under dist-tag
+     `latest`, and a matching GitHub Release is created automatically.
 
 7. **Stop and report the PR URL** to the maintainer. Do not merge the PR
    yourself; the merge is a human gate where someone confirms the release
-   notes are acceptable.
+   notes are acceptable. (Merging triggers the publish — there is no
+   separate dispatch step.)
 
 ## Idempotency
 
@@ -106,10 +110,12 @@ not stack bumps.
 
 ## Out of scope
 
-- **Publishing to npm.** The publish step is a separate dispatch of the
-  `Publish to npm` workflow on `main`. This skill stops at "PR opened".
+- **Merging the PR.** The skill stops at "PR opened" so a human can
+  confirm the release notes. Merging is what triggers the actual publish,
+  but it remains a human gate by design.
 - **Patch releases.** Patches use a different bump shape (`patch+1` from
   a release tag); the manual procedure in `docs/oss/versioning.md`
   applies.
-- **Pre-release / beta tags.** The `beta` dist-tag is hand-cut; this skill
-  always advances to a stable minor.
+- **Pre-release / beta tags.** The `beta` dist-tag is hand-cut via a
+  manual `workflow_dispatch` of `Publish to npm`; this skill always
+  advances to a stable minor.
