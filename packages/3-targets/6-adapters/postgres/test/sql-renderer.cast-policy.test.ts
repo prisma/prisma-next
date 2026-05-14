@@ -1,7 +1,7 @@
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { RuntimeExtensionDescriptor } from '@prisma-next/framework-components/execution';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   BinaryExpr,
   ColumnRef,
@@ -44,37 +44,34 @@ function lookupOf(
   };
 }
 
-const baseContract = validateContract<PostgresContract>(
-  {
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: 'sha256:cast-policy-test',
-    roots: {},
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-    storage: {
-      storageHash: 'sha256:cast-policy',
-      tables: {
-        user: {
-          columns: {
-            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            tag: { codecId: 'app/test-foo@1', nativeType: 'foo', nullable: false },
-            score: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            note: { codecId: 'pg/enum@1', nativeType: 'tag', nullable: false },
-            geo: { codecId: 'app/geography@1', nativeType: 'geography', nullable: false },
-            profile: { codecId: 'arktype/json@1', nativeType: 'jsonb', nullable: false },
-          },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
+const baseContract = new SqlContractSerializer().deserializeContract({
+  target: 'postgres',
+  targetFamily: 'sql',
+  profileHash: 'sha256:cast-policy-test',
+  roots: {},
+  capabilities: {},
+  extensionPacks: {},
+  meta: {},
+  storage: {
+    storageHash: 'sha256:cast-policy',
+    tables: {
+      user: {
+        columns: {
+          id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          tag: { codecId: 'app/test-foo@1', nativeType: 'foo', nullable: false },
+          score: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          note: { codecId: 'pg/enum@1', nativeType: 'tag', nullable: false },
+          geo: { codecId: 'app/geography@1', nativeType: 'geography', nullable: false },
+          profile: { codecId: 'arktype/json@1', nativeType: 'jsonb', nullable: false },
         },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
-    models: {},
   },
-  emptyLookup,
-);
+  models: {},
+}) as PostgresContract;
 
 function selectWithParam(column: string, codecId: string | undefined, value: unknown) {
   const ref =

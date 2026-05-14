@@ -1,8 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
@@ -16,7 +15,7 @@ export function isSelectAst(ast: unknown): ast is SelectAst {
   return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'select';
 }
 
-const baseTestContract = validateContract<Contract>(contractJson, emptyCodecLookup);
+const baseTestContract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
 
 export type TestContract = Contract;
 

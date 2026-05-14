@@ -1,6 +1,5 @@
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import { validateContract } from '@prisma-next/sql-contract/validate';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   BinaryExpr,
   ColumnRef,
@@ -12,13 +11,6 @@ import {
 import { describe, expect, it } from 'vitest';
 import { createComposedPostgresAdapter } from './helpers/composed-adapter';
 
-const emptyLookup: CodecLookup = {
-  get: () => undefined,
-  targetTypesFor: () => undefined,
-  metaFor: () => undefined,
-  renderOutputTypeFor: () => undefined,
-};
-
 describe('pgvector cast policy', () => {
   it('emits $1::vector when pgvector is installed via stack.extensionPacks', async () => {
     // Regression: `pgvectorRuntimeDescriptor` must expose its codecs via `types.codecTypes.codecDescriptors` so the adapter's runtime-plane codec lookup resolves `pg/vector@1` and the renderer emits the `::vector` cast. If the descriptor stops surfacing those codecs, the rendered SQL silently regresses to bare `$1`.
@@ -26,33 +18,30 @@ describe('pgvector cast policy', () => {
 
     const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
 
-    const vectorContract = validateContract<PostgresContract>(
-      {
-        target: 'postgres',
-        targetFamily: 'sql',
-        profileHash: 'sha256:vector-cast-policy',
-        roots: {},
-        capabilities: {},
-        extensionPacks: {},
-        meta: {},
-        storage: {
-          storageHash: 'sha256:vector-cast-policy',
-          tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                vec: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
-              },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
+    const vectorContract = new SqlContractSerializer().deserializeContract({
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: 'sha256:vector-cast-policy',
+      roots: {},
+      capabilities: {},
+      extensionPacks: {},
+      meta: {},
+      storage: {
+        storageHash: 'sha256:vector-cast-policy',
+        tables: {
+          user: {
+            columns: {
+              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              vec: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
             },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
         },
-        models: {},
       },
-      emptyLookup,
-    );
+      models: {},
+    }) as PostgresContract;
 
     const ast = SelectAst.from(TableSource.named('user'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])

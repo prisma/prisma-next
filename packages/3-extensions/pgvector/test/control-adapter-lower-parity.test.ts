@@ -1,6 +1,5 @@
 import type { PostgresContract } from '@prisma-next/adapter-postgres/types';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import { validateContract } from '@prisma-next/sql-contract/validate';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   type AnyQueryAst,
   BinaryExpr,
@@ -18,33 +17,30 @@ import {
   createComposedPostgresControlAdapter,
 } from './helpers/composed-adapter';
 
-const contract = validateContract<PostgresContract>(
-  {
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: 'sha256:test-profile',
-    roots: {},
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-    storage: {
-      storageHash: 'sha256:test-core',
-      tables: {
-        user: {
-          columns: {
-            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
-          },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
+const contract = new SqlContractSerializer().deserializeContract({
+  target: 'postgres',
+  targetFamily: 'sql',
+  profileHash: 'sha256:test-profile',
+  roots: {},
+  capabilities: {},
+  extensionPacks: {},
+  meta: {},
+  storage: {
+    storageHash: 'sha256:test-core',
+    tables: {
+      user: {
+        columns: {
+          id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
         },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
-    models: {},
   },
-  emptyCodecLookup,
-);
+  models: {},
+}) as PostgresContract;
 
 // Compose a stack with pgvector on both planes so the runtime and control
 // adapters' codec lookups both contain `pg/vector@1`. The parity assertion

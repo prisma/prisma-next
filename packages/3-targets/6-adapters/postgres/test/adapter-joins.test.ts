@@ -1,5 +1,4 @@
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import { validateContract } from '@prisma-next/sql-contract/validate';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   AndExpr,
   BinaryExpr,
@@ -15,52 +14,49 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
 
-const contract = validateContract<PostgresContract>(
-  {
-    target: 'postgres',
-    targetFamily: 'sql',
-    profileHash: 'sha256:test-profile',
-    roots: {},
-    capabilities: {},
-    extensionPacks: {},
-    meta: {},
-    storage: {
-      storageHash: 'sha256:test-core',
-      tables: {
-        user: {
-          columns: {
-            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-          },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
+const contract = new SqlContractSerializer().deserializeContract({
+  target: 'postgres',
+  targetFamily: 'sql',
+  profileHash: 'sha256:test-profile',
+  roots: {},
+  capabilities: {},
+  extensionPacks: {},
+  meta: {},
+  storage: {
+    storageHash: 'sha256:test-core',
+    tables: {
+      user: {
+        columns: {
+          id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
         },
-        post: {
-          columns: {
-            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-          },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+      post: {
+        columns: {
+          id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          userId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          title: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
         },
-        comment: {
-          columns: {
-            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-            postId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-          },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
+      },
+      comment: {
+        columns: {
+          id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          postId: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
         },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
     },
-    models: {},
   },
-  emptyCodecLookup,
-);
+  models: {},
+}) as PostgresContract;
 
 describe('Postgres adapter join rendering', () => {
   const adapter = createPostgresAdapter();
