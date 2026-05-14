@@ -8,14 +8,14 @@ import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces'
 import { timeouts } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
-import testContractSpaceExtension from './contract-space-fixture/control';
+import testContractSpaceExtension from '../contract-space-fixture/control';
 import {
   executeCommand,
   getExitCode,
   setupCommandMocks,
   setupTestDirectoryFromFixtures,
   withTempDir,
-} from './utils/cli-test-helpers';
+} from '../utils/cli-test-helpers';
 
 /**
  * End-to-end coverage for `migration status` with the `--space <id>`
