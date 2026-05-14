@@ -718,6 +718,40 @@ model OrderItem {
       ).toBe(true);
     });
 
+    // Regression: PSL `@@index([a, b, c])` must lower to
+    // `indexes: [{ columns: ['a', 'b', 'c'] }]` in the contract IR with
+    // the column order from the attribute preserved. Verification and
+    // DDL emission are both order-sensitive, so any reshuffle here
+    // breaks `prisma-next db init` (TML-2516) on a fresh database.
+    it('preserves composite @@index column order even when it differs from field order', () => {
+      const document = parsePslDocument({
+        schema: `model SyncRun {
+  id Int @id
+  startedAt DateTime
+  source String
+  entity String
+  @@index([source, entity, startedAt])
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.storage).toMatchObject({
+        tables: {
+          syncRun: {
+            indexes: [{ columns: ['source', 'entity', 'startedAt'] }],
+          },
+        },
+      });
+    });
+
     it('accepts @@index without type or options (existing behaviour unchanged)', () => {
       const document = parsePslDocument({
         schema: `model Doc {
