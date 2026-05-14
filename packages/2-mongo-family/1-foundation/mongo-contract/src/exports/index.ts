@@ -68,6 +68,4 @@ export type {
   PolymorphicIndexScope,
 } from '../polymorphic-index-scope';
 export { applyPolymorphicScopeToMongoIndex } from '../polymorphic-index-scope';
-export type { MongoContractIndices, ValidatedMongoContract } from '../validate-mongo-contract';
-export { validateMongoContract } from '../validate-mongo-contract';
 export { validateMongoStorage } from '../validate-storage';
