@@ -1,10 +1,9 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
+import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
 
-describe('validateContract edge cases', () => {
+describe('SqlContractSerializer edge cases', () => {
   it('handles storage with null tables', () => {
     const contractInput = {
       schemaVersion: '1',
@@ -22,7 +21,7 @@ describe('validateContract edge cases', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup)).toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('handles storage without tables property', () => {
@@ -39,7 +38,7 @@ describe('validateContract edge cases', () => {
       storage: { storageHash: 'sha256:test' },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup)).toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('rejects models with null relations', () => {
@@ -77,7 +76,7 @@ describe('validateContract edge cases', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup)).toThrow(
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow(
       /relations/,
     );
   });
@@ -107,7 +106,7 @@ describe('validateContract edge cases', () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
     // This will fail validation, but normalization should handle it
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup)).toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow();
   });
 
   it('rejects relation targeting non-existent model', () => {
@@ -150,7 +149,7 @@ describe('validateContract edge cases', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup)).toThrow(
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow(
       /targets "Post" which does not exist/,
     );
   });
@@ -195,7 +194,7 @@ describe('validateContract edge cases', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup)).toThrow(
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow(
       /does not exist in models/,
     );
   });
@@ -260,8 +259,6 @@ describe('validateContract edge cases', () => {
         },
       },
     };
-    expect(() =>
-      validateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup),
-    ).not.toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).not.toThrow();
   });
 });

@@ -1,7 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
+import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import { describe, expect, it } from 'vitest';
 
 function validContractInput(overrides?: Record<string, unknown>) {
@@ -33,9 +32,9 @@ function validContractInput(overrides?: Record<string, unknown>) {
   };
 }
 
-describe('validateContract validation', () => {
+describe('SqlContractSerializer structural validation', () => {
   it('accepts a valid contract with explicit nullable', () => {
-    const contract = validateContract<Contract<SqlStorage>>(validContractInput(), emptyCodecLookup);
+    const contract = validateSqlContractFully<Contract<SqlStorage>>(validContractInput());
     expect(contract.storage.tables['User']?.columns['id']?.nullable).toBe(false);
   });
 
@@ -55,7 +54,7 @@ describe('validateContract validation', () => {
         },
       },
     });
-    expect(() => validateContract<Contract<SqlStorage>>(input, emptyCodecLookup)).toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).toThrow();
   });
 
   it('rejects missing indexes array', () => {
@@ -74,7 +73,7 @@ describe('validateContract validation', () => {
         },
       },
     });
-    expect(() => validateContract<Contract<SqlStorage>>(input, emptyCodecLookup)).toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).toThrow();
   });
 
   it('rejects missing foreignKeys array', () => {
@@ -93,11 +92,11 @@ describe('validateContract validation', () => {
         },
       },
     });
-    expect(() => validateContract<Contract<SqlStorage>>(input, emptyCodecLookup)).toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).toThrow();
   });
 
   it('accepts table with columns present', () => {
-    const contract = validateContract<Contract<SqlStorage>>(validContractInput(), emptyCodecLookup);
+    const contract = validateSqlContractFully<Contract<SqlStorage>>(validContractInput());
     expect(contract.storage.tables['User']).toBeDefined();
   });
 
@@ -115,7 +114,7 @@ describe('validateContract validation', () => {
         },
       },
     });
-    expect(() => validateContract<Contract<SqlStorage>>(input, emptyCodecLookup)).toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).toThrow();
   });
 
   it('rejects table with null columns', () => {
@@ -135,7 +134,7 @@ describe('validateContract validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(input, emptyCodecLookup)).toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).toThrow();
   });
 
   it('accepts table with empty columns object', () => {
@@ -152,7 +151,7 @@ describe('validateContract validation', () => {
         },
       },
     });
-    expect(() => validateContract<Contract<SqlStorage>>(input, emptyCodecLookup)).not.toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).not.toThrow();
   });
 
   it('rejects table missing columns in multi-table contract', () => {
@@ -180,7 +179,7 @@ describe('validateContract validation', () => {
       },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     } as any;
-    expect(() => validateContract<Contract<SqlStorage>>(input, emptyCodecLookup)).toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).toThrow();
   });
 
   it('accepts model without relations (optional field)', () => {
@@ -194,21 +193,21 @@ describe('validateContract validation', () => {
         },
       },
     });
-    expect(() => validateContract<Contract<SqlStorage>>(input, emptyCodecLookup)).not.toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).not.toThrow();
   });
 
   it('accepts contract with extensionPacks', () => {
-    const contract = validateContract<Contract<SqlStorage>>(validContractInput(), emptyCodecLookup);
+    const contract = validateSqlContractFully<Contract<SqlStorage>>(validContractInput());
     expect(contract.extensionPacks).toEqual({});
   });
 
   it('accepts contract with capabilities', () => {
-    const contract = validateContract<Contract<SqlStorage>>(validContractInput(), emptyCodecLookup);
+    const contract = validateSqlContractFully<Contract<SqlStorage>>(validContractInput());
     expect(contract.capabilities).toEqual({});
   });
 
   it('accepts contract with meta', () => {
-    const contract = validateContract<Contract<SqlStorage>>(validContractInput(), emptyCodecLookup);
+    const contract = validateSqlContractFully<Contract<SqlStorage>>(validContractInput());
     expect(contract.meta).toEqual({});
   });
 
@@ -244,7 +243,7 @@ describe('validateContract validation', () => {
         },
       },
     });
-    expect(() => validateContract<Contract<SqlStorage>>(input, emptyCodecLookup)).not.toThrow();
+    expect(() => validateSqlContractFully<Contract<SqlStorage>>(input)).not.toThrow();
   });
 
   it('validates models with relations', () => {
@@ -309,7 +308,7 @@ describe('validateContract validation', () => {
         },
       },
     });
-    const contract = validateContract<Contract<SqlStorage>>(input, emptyCodecLookup);
+    const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
@@ -374,7 +373,7 @@ describe('validateContract validation', () => {
         },
       },
     });
-    const contract = validateContract<Contract<SqlStorage>>(input, emptyCodecLookup);
+    const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
     expect((contract.models['User'] as { relations?: unknown })['relations']).toEqual({
       posts: {
         to: 'Post',
@@ -416,7 +415,7 @@ describe('validateContract validation', () => {
         },
       },
     });
-    const contract = validateContract<Contract<SqlStorage>>(input, emptyCodecLookup);
+    const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
     const fk = contract.storage.tables['post']?.foreignKeys[0];
     expect(fk?.constraint).toBe(true);
     expect(fk?.index).toBe(true);
@@ -454,7 +453,7 @@ describe('validateContract validation', () => {
         },
       },
     });
-    const contract = validateContract<Contract<SqlStorage>>(input, emptyCodecLookup);
+    const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
     const fk = contract.storage.tables['post']?.foreignKeys[0];
     expect(fk?.constraint).toBe(false);
     expect(fk?.index).toBe(true);

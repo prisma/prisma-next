@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateSqlContract } from '@prisma-next/sql-contract/validators';
+import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import type { JsonObject } from '@prisma-next/utils/json';
 
 /**
@@ -46,13 +46,17 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   }
 
   /**
-   * Family-shared structural validation (arktype). Validates the JSON
-   * envelope against the SQL contract schema and returns the validated
-   * flat-data shape. Subclasses can override to add target-specific
-   * structural checks before hydration.
+   * Family-shared validation pipeline (delegates to
+   * `validateSqlContractFully` in `@prisma-next/sql-contract/validators`):
+   * structural arktype + framework-shared domain + SQL storage
+   * logical-consistency + SQL storage semantic + model ↔ storage
+   * reference checks. Subclasses override to add target-specific
+   * structural checks before hydration; the family default suffices
+   * for targets whose contract shape is the SQL-shared shape
+   * (Postgres, SQLite today).
    */
   protected parseSqlContractStructure(json: unknown): Contract<SqlStorage> {
-    return validateSqlContract<Contract<SqlStorage>>(json);
+    return validateSqlContractFully<Contract<SqlStorage>>(json);
   }
 
   /**
