@@ -8,6 +8,18 @@ import type {
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
+import {
+  createEntityHelpersFromNamespace,
+  type EntityHelpersFromNamespace,
+  type ExtractAuthoringNamespaceFromPack,
+  type MergeExtensionAuthoringNamespaces,
+} from '@prisma-next/contract-authoring';
+import type { AuthoringEntityNamespace } from '@prisma-next/framework-components/authoring';
+import {
+  assertNoCrossRegistryCollisions,
+  isAuthoringEntityDescriptor,
+  mergeAuthoringNamespaces,
+} from '@prisma-next/framework-components/authoring';
 import type {
   ExtensionPackRef,
   FamilyPackRef,
@@ -527,13 +539,68 @@ export type MongoContractResult<Definition> = MongoContractWithTypeMaps<
   MongoTypeMaps<CodecTypesFromDefinition<Definition>>
 >;
 
-type ContractAuthoringHelpers = {
+type ExtractEntitiesNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
+  Pack,
+  'entities',
+  Record<never, never>
+>;
+
+type MergeExtensionEntityNamespaces<ExtensionPacks> = MergeExtensionAuthoringNamespaces<
+  ExtensionPacks,
+  'entities'
+>;
+
+export type ContractAuthoringHelpers<
+  Family extends FamilyPackRef<string> = FamilyPackRef<string>,
+  Target extends TargetPackRef<string, string> = TargetPackRef<string, string>,
+  ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
+> = {
+  readonly entities: EntityHelpersFromNamespace<
+    ExtractEntitiesNamespaceFromPack<Family> &
+      ExtractEntitiesNamespaceFromPack<Target> &
+      MergeExtensionEntityNamespaces<ExtensionPacks>
+  >;
   readonly field: typeof field;
   readonly index: typeof index;
   readonly model: typeof model;
   readonly rel: typeof rel;
   readonly valueObject: typeof valueObject;
 };
+
+type AuthoringComponent = {
+  readonly authoring?: { readonly entities?: unknown };
+};
+
+function extractEntitiesNamespace(component: AuthoringComponent): AuthoringEntityNamespace {
+  return (component.authoring?.entities ?? {}) as AuthoringEntityNamespace;
+}
+
+function composeMongoEntityHelpers(
+  family: FamilyPackRef<string>,
+  target: TargetPackRef<string, string>,
+  extensionPacks: Record<string, ExtensionPackRef<string, string>> | undefined,
+): Record<string, unknown> {
+  const components: readonly AuthoringComponent[] = [
+    family,
+    target,
+    ...Object.values(extensionPacks ?? {}),
+  ];
+  const merged: Record<string, unknown> = {};
+  for (const component of components) {
+    const ns = extractEntitiesNamespace(component);
+    if (Object.keys(ns).length > 0) {
+      mergeAuthoringNamespaces(merged, ns, [], isAuthoringEntityDescriptor, 'entity');
+    }
+  }
+  // Mongo authoring does not yet ship contributed field / type namespaces in
+  // the TS DSL surface, but the cross-registry guard mirrors SQL's call so
+  // any future field / type contributions surface a structurally identical
+  // collision error.
+  assertNoCrossRegistryCollisions({}, {}, merged as AuthoringEntityNamespace);
+  return createEntityHelpersFromNamespace(merged as AuthoringEntityNamespace, {
+    ctx: { family: family.familyId, target: target.targetId },
+  });
+}
 
 export type ContractScaffold<
   Family extends FamilyPackRef<string>,
@@ -566,7 +633,10 @@ export type ContractFactory<
   Models extends Record<string, AnyModelBuilder> = Record<never, never>,
   ValueObjects extends Record<string, AnyValueObjectBuilder> = Record<never, never>,
   Roots extends Record<string, ModelNameInput> | undefined = undefined,
-> = (helpers: ContractAuthoringHelpers) => {
+  Family extends FamilyPackRef<string> = FamilyPackRef<string>,
+  Target extends TargetPackRef<string, string> = TargetPackRef<string, string>,
+  ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
+> = (helpers: ContractAuthoringHelpers<Family, Target, ExtensionPacks>) => {
   readonly models?: Models;
   readonly valueObjects?: ValueObjects;
   readonly roots?: Roots;
@@ -1466,9 +1536,9 @@ export function defineContract<
 >(definition: Definition): MongoContractResult<Definition>;
 export function defineContract<
   const Definition extends ContractScaffold<
-    FamilyPackRef<string>,
-    TargetPackRef<string, string>,
-    Record<string, ExtensionPackRef<string, string>> | undefined,
+    Family,
+    Target,
+    ExtensionPacks,
     ContractCapabilities | undefined,
     Record<string, ModelNameInput> | undefined
   >,
@@ -1477,9 +1547,14 @@ export function defineContract<
     readonly valueObjects?: Record<string, AnyValueObjectBuilder>;
     readonly roots?: Record<string, ModelNameInput>;
   },
+  const Family extends FamilyPackRef<string> = FamilyPackRef<string>,
+  const Target extends TargetPackRef<string, string> = TargetPackRef<string, string>,
+  const ExtensionPacks extends
+    | Record<string, ExtensionPackRef<string, string>>
+    | undefined = undefined,
 >(
   definition: Definition,
-  factory: (_helpers: ContractAuthoringHelpers) => Built,
+  factory: (helpers: ContractAuthoringHelpers<Family, Target, ExtensionPacks>) => Built,
 ): MongoContractResult<Definition & Built>;
 export function defineContract(
   definition: ContractScaffold<
@@ -1505,8 +1580,22 @@ export function defineContract(
     return buildContractFromDefinition(definition);
   }
 
+  const entities = composeMongoEntityHelpers(
+    definition.family,
+    definition.target,
+    definition.extensionPacks,
+  );
+  const helpers = {
+    entities,
+    field,
+    index,
+    model,
+    rel,
+    valueObject,
+  } as unknown as ContractAuthoringHelpers;
+
   return buildContractFromDefinition({
     ...definition,
-    ...factory({ field, index, model, rel, valueObject }),
+    ...factory(helpers),
   });
 }
