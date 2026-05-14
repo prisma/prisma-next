@@ -18,6 +18,7 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/errors": "workspace:*",
+    "@prisma-next/family-mongo": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/ts-render": "workspace:*",
@@ -51,7 +52,6 @@
     "./migration": "./dist/migration.mjs",
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
-    "./schema-verify": "./dist/schema-verify.mjs",
     "./package.json": "./package.json"
   },
   "repository": {

@@ -1,5 +1,6 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import { errorRunnerFailed } from '@prisma-next/errors/execution';
+import { verifyMongoSchema } from '@prisma-next/family-mongo/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import {
   APP_SPACE_ID,
@@ -26,7 +27,6 @@ import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { FilterEvaluator } from './filter-evaluator';
 import { deserializeMongoOps } from './mongo-ops-serializer';
-import { verifyMongoSchema } from './schema-verify/verify-mongo-schema';
 
 const READ_ONLY_CHECK_COMMAND_KINDS: ReadonlySet<string> = new Set(['aggregate', 'rawAggregate']);
 

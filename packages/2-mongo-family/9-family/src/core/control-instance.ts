@@ -28,13 +28,14 @@ import {
 } from '@prisma-next/framework-components/control';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import { formatMongoOperations, type MongoTargetContract } from '@prisma-next/target-mongo/control';
-import { verifyMongoSchema } from '@prisma-next/target-mongo/schema-verify';
+import type { MongoTargetContract } from '@prisma-next/target-mongo/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Db } from 'mongodb';
 import type { MongoControlExtensionDescriptor } from './control-types';
 import { mongoTargetDescriptor } from './mongo-target-descriptor';
+import { mongoOperationsToPreview } from './operation-preview';
 import { mongoSchemaToView } from './schema-to-view';
+import { verifyMongoSchema } from './schema-verify/verify-mongo-schema';
 
 export interface MongoControlFamilyInstance
   extends ControlFamilyInstance<'mongo', MongoSchemaIR>,
@@ -325,12 +326,7 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
   }
 
   toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview {
-    return {
-      statements: formatMongoOperations(operations).map((text) => ({
-        text,
-        language: 'mongodb-shell',
-      })),
-    };
+    return mongoOperationsToPreview(operations);
   }
 }
 

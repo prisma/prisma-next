@@ -1,11 +1,13 @@
+import {
+  canonicalizeSchemasForVerification,
+  contractToMongoSchemaIR,
+  diffMongoSchemas,
+} from '@prisma-next/family-mongo/control';
 import type { SchemaIssue, SchemaVerifyOptions } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import { MongoSchemaVerifierBase } from '@prisma-next/mongo-contract/ir';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import { contractToMongoSchemaIR } from './contract-to-schema';
 import type { MongoTargetContract } from './mongo-target-contract';
-import { diffMongoSchemas } from './schema-diff';
-import { canonicalizeSchemasForVerification } from './schema-verify/canonicalize-introspection';
 
 /**
  * Mongo target `SchemaVerifier` concretion. Extends the family base's

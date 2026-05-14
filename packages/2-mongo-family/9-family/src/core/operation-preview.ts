@@ -1,4 +1,7 @@
-import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import type {
+  MigrationPlanOperation,
+  OperationPreview,
+} from '@prisma-next/framework-components/control';
 import type {
   CollModCommand,
   CreateCollectionCommand,
@@ -109,4 +112,20 @@ export function formatMongoOperations(operations: readonly MigrationPlanOperatio
     }
   }
   return statements;
+}
+
+/**
+ * Wraps `formatMongoOperations` into the family-agnostic
+ * `OperationPreview` shape. Each statement carries
+ * `language: 'mongodb-shell'`. Mirrors `sqlOperationsToPreview`.
+ */
+export function mongoOperationsToPreview(
+  operations: readonly MigrationPlanOperation[],
+): OperationPreview {
+  return {
+    statements: formatMongoOperations(operations).map((text) => ({
+      text,
+      language: 'mongodb-shell',
+    })),
+  };
 }

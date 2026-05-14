@@ -2,7 +2,10 @@ import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/con
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
-import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
+import {
+  contractToMongoSchemaIR,
+  createMongoFamilyInstance,
+} from '@prisma-next/family-mongo/control';
 import {
   MongoCollection,
   type MongoCollectionInput,
@@ -10,7 +13,6 @@ import {
 } from '@prisma-next/mongo-contract';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import {
-  contractToMongoSchemaIR,
   MongoMigrationPlanner,
   MongoMigrationRunner,
   serializeMongoOps,

@@ -7,7 +7,7 @@ import {
   type MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
 import { describe, expect, it } from 'vitest';
-import { formatMongoOperations } from '../src/core/ddl-formatter';
+import { formatMongoOperations } from '../src/core/operation-preview';
 
 describe('formatMongoOperations', () => {
   it('formats createIndex with unique option', () => {

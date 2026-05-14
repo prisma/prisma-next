@@ -1,2 +1,4 @@
-export type { VerifyMongoSchemaOptions } from '@prisma-next/target-mongo/schema-verify';
-export { verifyMongoSchema } from '@prisma-next/target-mongo/schema-verify';
+export {
+  type VerifyMongoSchemaOptions,
+  verifyMongoSchema,
+} from '../core/schema-verify/verify-mongo-schema';

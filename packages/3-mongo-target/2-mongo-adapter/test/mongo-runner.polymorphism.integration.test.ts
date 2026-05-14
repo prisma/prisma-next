@@ -1,4 +1,5 @@
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import { verifyMongoSchema } from '@prisma-next/family-mongo/schema-verify';
 import type {
   ControlFamilyInstance,
   MigrationPlan,
@@ -13,7 +14,6 @@ import {
   MongoMigrationRunner,
   serializeMongoOps,
 } from '@prisma-next/target-mongo/control';
-import { verifyMongoSchema } from '@prisma-next/target-mongo/schema-verify';
 import { type Db, MongoClient, MongoServerError } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';

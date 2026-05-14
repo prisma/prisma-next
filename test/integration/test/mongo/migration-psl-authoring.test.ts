@@ -2,14 +2,16 @@ import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/con
 import type { JsonValue } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
-import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
+import {
+  contractToMongoSchemaIR,
+  createMongoFamilyInstance,
+} from '@prisma-next/family-mongo/control';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import {
-  contractToMongoSchemaIR,
   MongoMigrationPlanner,
   MongoMigrationRunner,
   serializeMongoOps,

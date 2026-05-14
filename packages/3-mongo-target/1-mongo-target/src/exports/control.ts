@@ -1,5 +1,3 @@
-export { contractToMongoSchemaIR } from '../core/contract-to-schema';
-export { formatMongoOperations } from '../core/ddl-formatter';
 export { FilterEvaluator } from '../core/filter-evaluator';
 export {
   deserializeMongoOp,
