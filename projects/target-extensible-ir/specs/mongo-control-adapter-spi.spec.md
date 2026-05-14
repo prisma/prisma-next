@@ -3,6 +3,8 @@
 > **Status (M2.5).** Originally filed as a standalone project at `projects/relocate-mongo-target-descriptor/spec.md` (TML-2505), framed as a flat file relocation of `mongo-target-descriptor.ts` from family-mongo into target-mongo. Promoted to in-scope for `target-extensible-ir` as M2.5 in `wip/unattended-decisions.md § 9`. Pre-M2.5-R1 reconnaissance (recorded in `§ 11`) surfaced that the descriptor relocation alone could not satisfy the original AC — `family-mongo`'s `control-instance.ts` carries seven additional runtime call sites that import target/adapter symbols, none of which are reachable by moving one file. The spec was rewritten around the correct architectural shape — **mirror SQL's adapter-SPI dispatch pattern**, with the descriptor relocation as one chapter in a larger reshape. See `wip/unattended-decisions.md § 11` for the user-validated reasoning trail and the SQL pattern verification.
 >
 > File renamed from `relocate-mongo-target-descriptor.spec.md` to reflect the corrected scope. The original framing is preserved in the decision log; cross-references in `plan.md § M2.5` and the unattended-decisions log are updated.
+>
+> **TML-2464 AC #7 absorbed (recorded in `wip/unattended-decisions.md § 12`).** TML-2464 (`tml-2464-strip-single-spacemulti-space-branching-once-every-target-is`) is paused on user instruction until `target-extensible-ir` lands. Its branch carries 6 commits, three of which deliver AC #7 — the cross-family rename `schemaVerifyAgainstSchema → verifySchema`, the compose `introspect + verifySchema` at call sites, and the removal of the async `schemaVerify` from `ControlFamilyInstance`. Cherry-pick probe of those three commits onto `target-extensible-ir` HEAD: `b4548c1b3` (rename) and `e6c9d1563` (compose) auto-merge cleanly; `d0712a45e` (async removal) conflicts in `family-mongo/control-instance.ts` with M2 R1's descriptor-dispatch helpers — exactly the file M2.5 rewrites. The conflict is mechanical and the rewrite is M2.5's job, so M2.5 absorbs all three deliveries inline (§ 0 below) rather than cherry-picking. Result: M2.5 lands the SPI dispatch using the new `verifySchema` naming and the async-removed family interface; TML-2464 resumes against a smaller scope (ACs #1-6 + #8 — multi-space stripping + `Aggregate` qualifier removal) when `target-extensible-ir` merges.
 
 ## Summary
 
@@ -34,6 +36,16 @@ The original spec (filename: `relocate-mongo-target-descriptor.spec.md`) framed 
 ## Changes
 
 The work is structured as a single coherent reshape — the SPI definition, the adapter implementation, the family-instance dispatch refactor, the file moves, and the package.json severance all interlock and need to land together to keep the workspace compiling. The implementer round can sequence them as separate commits but they constitute one milestone.
+
+### 0. Absorb TML-2464 AC #7 (rename + async-`schemaVerify` removal)
+
+These deliverables come from TML-2464 (currently paused) and are folded in here so M2.5 can use the new naming throughout. They are mechanically small; their value is naming consistency with the post-`target-extensible-ir` codebase TML-2464 will produce when it resumes.
+
+- **Rename `ControlFamilyInstance.schemaVerifyAgainstSchema` → `verifySchema`** (sync, takes pre-projected `schema` slice). Cross-family rename. Files touched (per TML-2464 commit `b4548c1b3`): `packages/1-framework/1-core/framework-components/src/control/control-instances.ts`, `packages/1-framework/3-tooling/cli/src/control-api/operations/db-verify.ts`, `packages/1-framework/3-tooling/cli/test/config-types.test.ts`, `packages/2-mongo-family/9-family/src/core/control-instance.ts`, `packages/2-sql/9-family/src/core/control-instance.ts`. Implementer can cherry-pick `b4548c1b3` from the `tml-2464-strip-single-spacemulti-space-branching-once-every-target-is` branch (clean auto-merge) and drop the project-doc additions (`projects/migration-runner-target-layer/{spec,plan}.md`) — those belong to TML-2464, not this project.
+- **Compose `introspect + verifySchema` at family-verify call sites** (per TML-2464 commit `e6c9d1563`). Test-only changes; cherry-pick clean. Drop project-doc additions as above.
+- **Remove async `schemaVerify` from `ControlFamilyInstance`** and from the SQL family-instance + Mongo family-instance implementations (per TML-2464 commit `d0712a45e`). The Mongo half is naturally absorbed by § 5 below — when refactoring `family-mongo/control-instance.ts` to dispatch via the SPI, the async `schemaVerify` method is deleted; its single internal use case (the legacy `db verify` CLI path) is rewritten to compose `introspect + verifySchema`. The SQL half is a smaller mechanical pass — delete `MongoFamilyInstance.schemaVerify`'s SQL counterpart at `packages/2-sql/9-family/src/core/control-instance.ts:124-186` and update the callers per TML-2464's diff (CLI `db-verify` operation already uses `verifySchema` after the § 0a rename).
+
+After § 0 lands, the framework declares one synchronous schema-verification primitive (`verifySchema`); both family implementations match. § 5 (Mongo dispatch refactor) then rewrites Mongo's `verifySchema` body to dispatch via the SPI's `introspectSchema` + family-shared `verifyMongoSchema` helper. SQL's `verifySchema` body is unchanged by this milestone (it already dispatches through `verifySqlSchema`).
 
 ### 1. Define `MongoControlAdapter` SPI at `family-mongo`
 
@@ -85,6 +97,8 @@ Every direct import of a target/adapter symbol becomes an SPI dispatch:
 
 The control-stack lookup that returns the bound `MongoControlAdapter` mirrors SQL's `getControlAdapter()` helper at `packages/2-sql/9-family/src/core/control-instance.ts:258-261` — match the SQL surface naming (`getControlAdapter()` returning the typed instance, throwing a structured error if the adapter is missing or not a `MongoControlAdapter`).
 
+The `verifySchema` method (post-§ 0 rename) loses the async `schemaVerify` sibling delivered in § 0; its body is rewritten to: validate the contract via `validateMongoContract`, return a synchronous `verifyMongoSchema(...)` call against the pre-projected `schema` slice. The (now-deleted) async `schemaVerify` method's one internal use case at the legacy `db verify` CLI path is rewritten to compose `getControlAdapter().introspectSchema(driver)` + `verifySchema(...)` — matching the SQL family's flow at `packages/2-sql/9-family/src/core/control-instance.ts` and the test composition pattern landed by TML-2464 commit `e6c9d1563`.
+
 ### 6. Relocate the three Mongo SPI bases from foundation back to family
 
 The M2 R1 workaround placed `MongoContractSerializerBase`, `MongoSchemaVerifierBase`, and `abstract class MongoStorageBase` at `packages/2-mongo-family/1-foundation/mongo-contract/src/ir/` because `family-mongo → target-mongo` was inverted. With the inversion severed via § 1-5, the bases belong at the family layer per the architectural-principles ADR (Principle 2 — cross-target consistency; SQL's bases live at family). Move:
@@ -128,6 +142,7 @@ The family's public re-exports (e.g. `mongoTargetDescriptor`, `MongoControlTarge
 
 ## Acceptance criteria
 
+- **TML-2464 AC #7 absorbed.** `ControlFamilyInstance.schemaVerifyAgainstSchema` is renamed to `verifySchema` across framework + sql-family + mongo-family + cli. The async `schemaVerify` method is removed from `ControlFamilyInstance` and from both family implementations. Call sites compose `introspect + verifySchema` where the legacy combined call existed.
 - **Dep severance.** `cat packages/2-mongo-family/9-family/package.json | rg "target-mongo|adapter-mongo|driver-mongo"` returns zero hits in the `dependencies` block.
 - **`MongoControlAdapter` SPI exists.** `packages/2-mongo-family/9-family/src/core/control-adapter.ts` declares the interface; `packages/2-mongo-family/9-family/src/exports/control-adapter.ts` re-exports it.
 - **`MongoControlAdapterImpl`** (or factory equivalent) at `mongo-adapter` implements the SPI. The adapter's runner-deps construction goes through it.
