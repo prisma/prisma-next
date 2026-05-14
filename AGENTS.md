@@ -153,6 +153,7 @@ const contract = validateContract<Contract>(contractJson);
 - Split monolith into modules: `.cursor/plans/split-into-modules.md`
 - Fix import violation: `.cursor/plans/fix-import-violation.md`
 - Shape and deliver a project (spec → plan → implement): `.agents/rules/drive-project-workflow.mdc` (artifacts live under `projects/`, see `projects/README.md`)
+- Cut the next npm minor release: `.agents/skills/publish-npm-version/SKILL.md` (procedure documented in [`docs/oss/versioning.md`](docs/oss/versioning.md))
 
 ## Subsystem Deep Dives
 

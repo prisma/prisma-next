@@ -36,4 +36,5 @@ This directory contains the primary documentation for the repository.
 - [OSS posture overview](./oss/README.md) — index of governance, supply-chain, and contribution policies
 - [Governance](./oss/governance.md) — maintainer team, decision-making, DCO basis
 - [Supply chain](./oss/supply-chain.md) — license validation, NOTICE audit, npm provenance, Dependabot cooldown
+- [Versioning](./oss/versioning.md) — source of truth, lockstep, dist-tag convention, release procedure
 
