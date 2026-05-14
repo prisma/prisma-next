@@ -2,7 +2,7 @@ import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types'
 import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
-  AuthoringEntityDescriptor,
+  AuthoringEntityTypeDescriptor,
   AuthoringFieldPresetDescriptor,
   AuthoringTypeConstructorDescriptor,
 } from '@prisma-next/framework-components/authoring';
@@ -10,7 +10,7 @@ import {
   hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
-  isAuthoringEntityDescriptor,
+  isAuthoringEntityTypeDescriptor,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
   validateAuthoringHelperArguments,
@@ -74,21 +74,21 @@ export function getAuthoringTypeConstructor(
 }
 
 /**
- * Walks `authoringContributions.entities` segment-by-segment and returns
- * the entity descriptor at the resolved path, or `undefined` if no
+ * Walks `authoringContributions.entityTypes` segment-by-segment and returns
+ * the entity type descriptor at the resolved path, or `undefined` if no
  * descriptor is registered.
  *
  * Used by the PSL interpreter to dispatch declarative entity-shaped
  * declarations (`enum`, future `namespace { … }`, …) through the
- * M3.5 entities mechanism — the descriptor's `factory` (or
+ * pack entity-type mechanism — the descriptor's `factory` (or
  * `template`) materialises the IR-class instance without the
  * interpreter knowing target-specific construction.
  */
 export function getAuthoringEntity(
   contributions: AuthoringContributions | undefined,
   path: readonly string[],
-): AuthoringEntityDescriptor | undefined {
-  let current: unknown = contributions?.entities;
+): AuthoringEntityTypeDescriptor | undefined {
+  let current: unknown = contributions?.entityTypes;
 
   for (const segment of path) {
     if (typeof current !== 'object' || current === null || Array.isArray(current)) {
@@ -97,7 +97,7 @@ export function getAuthoringEntity(
     current = (current as Record<string, unknown>)[segment];
   }
 
-  return isAuthoringEntityDescriptor(current) ? current : undefined;
+  return isAuthoringEntityTypeDescriptor(current) ? current : undefined;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { temporalAuthoringPresets } from '@prisma-next/family-sql/control';
 import type {
-  AuthoringEntityNamespace,
+  AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
   AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
@@ -10,14 +10,15 @@ import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-ty
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
 
 /**
- * Entity contributions surfaced through the M3.5 `entities` namespace.
+ * Entity type contributions surface through the runtime `helpers.entities.*`
+ * helpers (merged from each pack's `authoring.entityTypes`).
  *
  * `enum` is the first real consumer of the entities-namespace mechanism:
  * the factory constructs a `PostgresEnumType` IR-class instance from
  * the user-supplied input. Both authoring runtimes (TS DSL and PSL)
  * dispatch through this single contribution — PSL `enum Status { … }`
  * declarations are lowered by the interpreter into a factory call
- * with the parsed name + value list; TS DSL `entities.enum({...})`
+ * with the parsed name + value list; TS DSL `helpers.entities.enum({...})`
  * resolves through the same path. Removing this contribution makes
  * both surfaces fail with a "no entity helper named `enum`" type
  * error at the contract-definition site.
@@ -28,14 +29,14 @@ export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespa
  * declarative type inference. The runtime instance is still a
  * `PostgresEnumType` (so `instanceof SqlEnumType` checks in the
  * verifier / planner / serializer dispatch correctly); the type
- * erasure exists so contracts referencing `entities.enum(...)`
+ * erasure exists so contracts referencing `helpers.entities.enum(...)`
  * results in `storage.types` keep their inferred type expressible
  * without needing to import a target-internal class declaration.
  * Sharpening this to surface enum-specific narrowing in the
  * inferred contract type is a separable refinement to the
- * `EntityHelperFunction` shape (Open item — see plan).
+ * `EntityHelperFunction` shape without changing the contribution wiring.
  */
-export const postgresAuthoringEntities = {
+export const postgresAuthoringEntityTypes = {
   enum: {
     kind: 'entity',
     output: {
@@ -43,7 +44,7 @@ export const postgresAuthoringEntities = {
         new PostgresEnumType(input) as unknown as StorageTypeInstance,
     },
   },
-} as const satisfies AuthoringEntityNamespace;
+} as const satisfies AuthoringEntityTypeNamespace;
 
 /**
  * Field presets contributed by the Postgres target pack.

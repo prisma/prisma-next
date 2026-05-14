@@ -31,7 +31,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
-      authoringContributions: { entities: testEnumEntityContributions, type: {}, field: {} },
+      authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
       ...input,
     });
 

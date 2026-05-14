@@ -12,9 +12,9 @@ import type {
 import type {
   AuthoringContributions,
   AuthoringEntityContext,
-  AuthoringEntityDescriptor,
+  AuthoringEntityTypeDescriptor,
 } from '@prisma-next/framework-components/authoring';
-import { instantiateAuthoringEntity } from '@prisma-next/framework-components/authoring';
+import { instantiateAuthoringEntityType } from '@prisma-next/framework-components/authoring';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ControlMutationDefaultRegistry,
@@ -159,7 +159,7 @@ function mapParserDiagnostics(document: ParsePslDocumentResult): ContractSourceD
 interface ProcessEnumDeclarationsInput {
   readonly enums: readonly PslEnum[];
   readonly sourceId: string;
-  readonly enumEntityDescriptor: AuthoringEntityDescriptor | undefined;
+  readonly enumEntityDescriptor: AuthoringEntityTypeDescriptor | undefined;
   readonly entityContext: AuthoringEntityContext;
   readonly diagnostics: ContractSourceDiagnostic[];
 }
@@ -202,7 +202,7 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
       span: enumDeclaration.span,
     });
     const values = enumDeclaration.values.map((value) => value.name);
-    const constructed = instantiateAuthoringEntity(
+    const constructed = instantiateAuthoringEntityType(
       'entities.enum',
       input.enumEntityDescriptor,
       [{ name: enumDeclaration.name, nativeType, values }],

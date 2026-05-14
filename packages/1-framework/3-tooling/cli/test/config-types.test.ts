@@ -201,7 +201,7 @@ describe('defineConfig', () => {
     const result = await config.source.load({
       composedExtensionPacks: [],
       scalarTypeDescriptors: new Map(),
-      authoringContributions: { field: {}, type: {}, entities: {} },
+      authoringContributions: { field: {}, type: {}, entityTypes: {} },
       codecLookup: {
         get: () => undefined,
         targetTypesFor: () => undefined,

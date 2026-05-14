@@ -1,16 +1,17 @@
 import type {
   AuthoringEntityContext,
-  AuthoringEntityDescriptor,
-  AuthoringEntityNamespace,
+  AuthoringEntityTypeDescriptor,
+  AuthoringEntityTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
-import { instantiateAuthoringEntity } from '@prisma-next/framework-components/authoring';
+import { instantiateAuthoringEntityType } from '@prisma-next/framework-components/authoring';
 
 /**
  * Family-agnostic merge / instantiation scaffolding for pack-bag-driven
  * authoring contributions. The per-namespace shape (`field`, `type`,
- * `entities`) is parameterized by the discriminator key so each
+ * `entityTypes`) is parameterized by the discriminator key so each
  * namespace can reuse the same extractor + cross-pack merger without
- * re-deriving the template per family.
+ * re-deriving the template per family. Call sites map merged
+ * `entityTypes` into the user-facing `helpers.entities` runtime object.
  *
  * SQL-specific composition (the `field` / `model` / `rel` / `type` core
  * helpers, the SQL index-types merge) lives in the SQL contract-ts
@@ -23,7 +24,7 @@ export type UnionToIntersection<U> = (U extends unknown ? (value: U) => void : n
   ? I
   : never;
 
-export type AuthoringNamespaceKey = 'field' | 'type' | 'entities';
+export type AuthoringNamespaceKey = 'field' | 'type' | 'entityTypes';
 
 export type ExtractAuthoringNamespaceFromPack<
   Pack,
@@ -60,20 +61,20 @@ export type MergeExtensionAuthoringNamespaces<
  * `TypeHelpersFromNamespace` in the SQL package: leaf descriptors become
  * callable helpers; nested namespaces recurse.
  */
-type ExtractFactoryInputAndOutput<Descriptor extends AuthoringEntityDescriptor> =
+type ExtractFactoryInputAndOutput<Descriptor extends AuthoringEntityTypeDescriptor> =
   Descriptor['output'] extends {
     readonly factory: (input: infer Input, ctx: AuthoringEntityContext) => infer Output;
   }
     ? { input: Input; output: Output }
     : { input: unknown; output: unknown };
 
-export type EntityHelperFunction<Descriptor extends AuthoringEntityDescriptor> =
+export type EntityHelperFunction<Descriptor extends AuthoringEntityTypeDescriptor> =
   ExtractFactoryInputAndOutput<Descriptor> extends { input: infer Input; output: infer Output }
     ? (input: Input) => Output
     : never;
 
 export type EntityHelpersFromNamespace<Namespace> = {
-  readonly [K in keyof Namespace]: Namespace[K] extends AuthoringEntityDescriptor
+  readonly [K in keyof Namespace]: Namespace[K] extends AuthoringEntityTypeDescriptor
     ? EntityHelperFunction<Namespace[K]>
     : Namespace[K] extends Record<string, unknown>
       ? EntityHelpersFromNamespace<Namespace[K]>
@@ -85,13 +86,13 @@ export interface EntityHelperFactoryOptions {
 }
 
 /**
- * Walks an entity namespace (after cross-pack merge) and produces the
+ * Walks an entity-type namespace (after cross-pack merge) and produces the
  * runtime callable surface mirroring its tree shape. Each leaf
  * descriptor becomes a function `(input) => factory(input, ctx)`;
  * nested namespace objects recurse.
  */
 export function createEntityHelpersFromNamespace(
-  namespace: AuthoringEntityNamespace,
+  namespace: AuthoringEntityTypeNamespace,
   options: EntityHelperFactoryOptions,
   path: readonly string[] = [],
 ): Record<string, unknown> {
@@ -104,7 +105,7 @@ export function createEntityHelpersFromNamespace(
     }
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       result[key] = createEntityHelpersFromNamespace(
-        value as AuthoringEntityNamespace,
+        value as AuthoringEntityTypeNamespace,
         options,
         currentPath,
       );
@@ -113,7 +114,7 @@ export function createEntityHelpersFromNamespace(
   return result;
 }
 
-function isLeafEntityDescriptor(value: unknown): value is AuthoringEntityDescriptor {
+function isLeafEntityDescriptor(value: unknown): value is AuthoringEntityTypeDescriptor {
   return (
     typeof value === 'object' && value !== null && (value as { kind?: unknown }).kind === 'entity'
   );
@@ -121,9 +122,9 @@ function isLeafEntityDescriptor(value: unknown): value is AuthoringEntityDescrip
 
 function createEntityHelper(
   helperPath: string,
-  descriptor: AuthoringEntityDescriptor,
+  descriptor: AuthoringEntityTypeDescriptor,
   options: EntityHelperFactoryOptions,
 ): (...args: readonly unknown[]) => unknown {
   return (...args: readonly unknown[]) =>
-    instantiateAuthoringEntity(helperPath, descriptor, args, options.ctx);
+    instantiateAuthoringEntityType(helperPath, descriptor, args, options.ctx);
 }

@@ -6,14 +6,14 @@ import {
 } from '@prisma-next/contract-authoring';
 import type {
   AuthoringArgumentDescriptor,
-  AuthoringEntityNamespace,
+  AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
 import {
   assertNoCrossRegistryCollisions,
-  isAuthoringEntityDescriptor,
+  isAuthoringEntityTypeDescriptor,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
@@ -54,7 +54,7 @@ type ExtractFieldNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
 >;
 type ExtractEntitiesNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
   Pack,
-  'entities',
+  'entityTypes',
   Record<never, never>
 >;
 
@@ -68,7 +68,7 @@ type MergeExtensionFieldNamespaces<ExtensionPacks> = MergeExtensionAuthoringName
 >;
 type MergeExtensionEntityNamespaces<ExtensionPacks> = MergeExtensionAuthoringNamespaces<
   ExtensionPacks,
-  'entities'
+  'entityTypes'
 >;
 
 type StorageTypeFromDescriptor<
@@ -165,15 +165,15 @@ function extractFieldNamespace<Pack>(pack: Pack): ExtractFieldNamespaceFromPack<
 }
 
 function extractEntitiesNamespace<Pack>(pack: Pack): ExtractEntitiesNamespaceFromPack<Pack> {
-  return ((pack as { readonly authoring?: { readonly entities?: unknown } }).authoring?.entities ??
-    {}) as ExtractEntitiesNamespaceFromPack<Pack>;
+  return ((pack as { readonly authoring?: { readonly entityTypes?: unknown } }).authoring
+    ?.entityTypes ?? {}) as ExtractEntitiesNamespaceFromPack<Pack>;
 }
 
 type AuthoringComponent = {
   readonly authoring?: {
     readonly type?: unknown;
     readonly field?: unknown;
-    readonly entities?: unknown;
+    readonly entityTypes?: unknown;
   };
 };
 
@@ -201,15 +201,15 @@ function composeFieldNamespace(components: readonly AuthoringComponent[]): Autho
 
 function composeEntityNamespace(
   components: readonly AuthoringComponent[],
-): AuthoringEntityNamespace {
+): AuthoringEntityTypeNamespace {
   const merged: Record<string, unknown> = {};
   for (const component of components) {
     const ns = extractEntitiesNamespace(component);
     if (Object.keys(ns).length > 0) {
-      mergeAuthoringNamespaces(merged, ns, [], isAuthoringEntityDescriptor, 'entity');
+      mergeAuthoringNamespaces(merged, ns, [], isAuthoringEntityTypeDescriptor, 'entity');
     }
   }
-  return merged as AuthoringEntityNamespace;
+  return merged as AuthoringEntityTypeNamespace;
 }
 
 function createComposedFieldHelpers(

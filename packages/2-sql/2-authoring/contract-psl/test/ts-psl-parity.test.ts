@@ -50,7 +50,7 @@ const portablePostgresTargetPack = {
   targetId: 'postgres',
   version: '0.0.1',
   authoring: {
-    entities: testEnumEntityContributions,
+    entityTypes: testEnumEntityContributions,
     type: {},
   },
 } as const satisfies TargetPackRef<'sql', 'postgres'>;
@@ -82,7 +82,7 @@ const pgvectorExtensionPack = {
 
 const authoringContributions = {
   field: sqlFamilyPack.authoring.field,
-  entities: portablePostgresTargetPack.authoring.entities,
+  entityTypes: portablePostgresTargetPack.authoring.entityTypes,
   type: {
     ...portablePostgresTargetPack.authoring.type,
     ...pgvectorExtensionPack.authoring.type,

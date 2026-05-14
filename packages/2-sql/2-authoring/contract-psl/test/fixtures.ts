@@ -1,7 +1,7 @@
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
 import type {
   AuthoringContributions,
-  AuthoringEntityNamespace,
+  AuthoringEntityTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
@@ -16,7 +16,7 @@ import { SqlEnumType } from '@prisma-next/sql-contract/types';
  * Layer-isolated `SqlEnumType` subclass for `sql-contract-psl` unit tests.
  * Stays in the test fixture so the interpreter package never depends on a
  * real target pack; production targets (e.g. Postgres) ship their own
- * `SqlEnumType` subclass and contribute it through `entities.enum`.
+ * `SqlEnumType` subclass and contribute it through `authoring.entityTypes.enum`.
  */
 export class TestSqlEnumType extends SqlEnumType {
   readonly name: string;
@@ -45,7 +45,7 @@ export const testEnumEntityContributions = {
       factory: (input: { name: string; values: readonly string[] }) => new TestSqlEnumType(input),
     },
   },
-} as const satisfies AuthoringEntityNamespace;
+} as const satisfies AuthoringEntityTypeNamespace;
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;
@@ -139,7 +139,7 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
  * Controlled test-only descriptor — intentionally uses pg/vector@1 with maximum: 2000 rather than importing the real pgvector pack, so interpreter unit tests stay layer-isolated. Real-pack parity is covered by `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`.
  */
 export const pgvectorAuthoringContributions = {
-  entities: {},
+  entityTypes: {},
   field: {},
   type: {
     pgvector: {
@@ -231,7 +231,7 @@ export function createPostgresTestContext(
   return {
     composedExtensionPacks: [],
     scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
-    authoringContributions: { field: {}, type: {}, entities: {} },
+    authoringContributions: { field: {}, type: {}, entityTypes: {} },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
     resolvedInputs: [],

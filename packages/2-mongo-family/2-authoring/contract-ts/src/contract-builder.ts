@@ -14,10 +14,10 @@ import {
   type ExtractAuthoringNamespaceFromPack,
   type MergeExtensionAuthoringNamespaces,
 } from '@prisma-next/contract-authoring';
-import type { AuthoringEntityNamespace } from '@prisma-next/framework-components/authoring';
+import type { AuthoringEntityTypeNamespace } from '@prisma-next/framework-components/authoring';
 import {
   assertNoCrossRegistryCollisions,
-  isAuthoringEntityDescriptor,
+  isAuthoringEntityTypeDescriptor,
   mergeAuthoringNamespaces,
 } from '@prisma-next/framework-components/authoring';
 import type {
@@ -541,13 +541,13 @@ export type MongoContractResult<Definition> = MongoContractWithTypeMaps<
 
 type ExtractEntitiesNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
   Pack,
-  'entities',
+  'entityTypes',
   Record<never, never>
 >;
 
 type MergeExtensionEntityNamespaces<ExtensionPacks> = MergeExtensionAuthoringNamespaces<
   ExtensionPacks,
-  'entities'
+  'entityTypes'
 >;
 
 export type ContractAuthoringHelpers<
@@ -568,11 +568,11 @@ export type ContractAuthoringHelpers<
 };
 
 type AuthoringComponent = {
-  readonly authoring?: { readonly entities?: unknown };
+  readonly authoring?: { readonly entityTypes?: unknown };
 };
 
-function extractEntitiesNamespace(component: AuthoringComponent): AuthoringEntityNamespace {
-  return (component.authoring?.entities ?? {}) as AuthoringEntityNamespace;
+function extractEntitiesNamespace(component: AuthoringComponent): AuthoringEntityTypeNamespace {
+  return (component.authoring?.entityTypes ?? {}) as AuthoringEntityTypeNamespace;
 }
 
 function composeMongoEntityHelpers(
@@ -589,15 +589,15 @@ function composeMongoEntityHelpers(
   for (const component of components) {
     const ns = extractEntitiesNamespace(component);
     if (Object.keys(ns).length > 0) {
-      mergeAuthoringNamespaces(merged, ns, [], isAuthoringEntityDescriptor, 'entity');
+      mergeAuthoringNamespaces(merged, ns, [], isAuthoringEntityTypeDescriptor, 'entity');
     }
   }
   // Mongo authoring does not yet ship contributed field / type namespaces in
   // the TS DSL surface, but the cross-registry guard mirrors SQL's call so
   // any future field / type contributions surface a structurally identical
   // collision error.
-  assertNoCrossRegistryCollisions({}, {}, merged as AuthoringEntityNamespace);
-  return createEntityHelpersFromNamespace(merged as AuthoringEntityNamespace, {
+  assertNoCrossRegistryCollisions({}, {}, merged as AuthoringEntityTypeNamespace);
+  return createEntityHelpersFromNamespace(merged as AuthoringEntityTypeNamespace, {
     ctx: { family: family.familyId, target: target.targetId },
   });
 }

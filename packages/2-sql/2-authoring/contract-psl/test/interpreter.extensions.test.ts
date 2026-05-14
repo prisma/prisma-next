@@ -161,7 +161,7 @@ model Document {
       document,
       composedExtensionPacks: ['pgvector'],
       authoringContributions: {
-        entities: testEnumEntityContributions,
+        entityTypes: testEnumEntityContributions,
         type: {
           pgvector: {
             Vector: {

@@ -10,7 +10,7 @@ import { typescriptContract, typescriptContractFromPath } from '../src/config-ty
 const stubContext: ContractSourceContext = {
   composedExtensionPacks: [],
   scalarTypeDescriptors: new Map(),
-  authoringContributions: { field: {}, type: {}, entities: {} },
+  authoringContributions: { field: {}, type: {}, entityTypes: {} },
   codecLookup: {
     get: () => undefined,
     targetTypesFor: () => undefined,

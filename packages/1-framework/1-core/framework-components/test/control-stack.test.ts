@@ -127,7 +127,7 @@ describe('extractComponentIds', () => {
 describe('assembleAuthoringContributions', () => {
   it('returns empty namespaces for descriptors without authoring', () => {
     const result = assembleAuthoringContributions([createDescriptor()]);
-    expect(result).toEqual({ field: {}, type: {}, entities: {} });
+    expect(result).toEqual({ field: {}, type: {}, entityTypes: {} });
   });
 
   it('merges field namespaces from multiple descriptors', () => {
@@ -490,7 +490,7 @@ describe('createControlStack', () => {
     expect(state.codecTypeImports).toEqual([]);
     expect(state.queryOperationTypeImports).toEqual([]);
     expect(state.extensionIds).toEqual(['fam', 'tgt']);
-    expect(state.authoringContributions).toEqual({ field: {}, type: {}, entities: {} });
+    expect(state.authoringContributions).toEqual({ field: {}, type: {}, entityTypes: {} });
   });
 });
 

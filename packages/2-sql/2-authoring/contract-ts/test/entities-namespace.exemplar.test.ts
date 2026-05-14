@@ -76,7 +76,7 @@ const demoEntitiesExtensionPack = {
   targetId: 'postgres',
   version: '0.0.1',
   authoring: {
-    entities: {
+    entityTypes: {
       demoEntity: {
         kind: 'entity',
         output: {
