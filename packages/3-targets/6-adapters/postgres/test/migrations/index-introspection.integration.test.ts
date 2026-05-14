@@ -96,4 +96,31 @@ describe.sequential('Postgres index introspection — type and options', () => {
     expect(idx?.type).toBe('gin');
     expect(idx?.options).toEqual({ fastupdate: 'false' });
   });
+
+  // Regression: composite index columns must be reported in the order they
+  // appear in the index definition, not in the order they appear in the
+  // table. Verification compares `columns` to the contract index columns
+  // using order-sensitive equality, so a shuffled order produces a spurious
+  // `index_mismatch` and breaks `prisma-next db init` on a fresh database
+  // whenever the index column order differs from the table column order.
+  it('reports composite index columns in index order, not table order', {
+    timeout: testTimeout,
+  }, async () => {
+    await driver!.query(
+      `CREATE TABLE sync_run (
+         id int PRIMARY KEY,
+         started_at timestamptz NOT NULL,
+         source text NOT NULL,
+         entity text NOT NULL
+       )`,
+    );
+    await driver!.query(
+      'CREATE INDEX sync_run_lookup_idx ON sync_run (source, entity, started_at)',
+    );
+
+    const schema = await familyInstance.introspect({ driver: driver! });
+    const idx = schema.tables['sync_run']?.indexes.find((i) => i.name === 'sync_run_lookup_idx');
+    expect(idx).toBeDefined();
+    expect(idx?.columns).toEqual(['source', 'entity', 'started_at']);
+  });
 });

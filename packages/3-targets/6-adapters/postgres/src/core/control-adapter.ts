@@ -337,22 +337,34 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
           [schema],
         ),
-        // Query all indexes for all tables in schema (excluding constraints)
+        // Query all indexes for all tables in schema (excluding constraints).
+        // `index_position` is the column's position within the index (1-based),
+        // derived from `pg_index.indkey` so composite indexes round-trip with
+        // their declared column order intact.
         driver.query<{
           tablename: string;
           indexname: string;
           indisunique: boolean;
-          attname: string;
-          attnum: number;
+          attname: string | null;
+          index_position: number;
           amname: string | null;
           reloptions: string[] | null;
         }>(
+          // `ix.indkey` is an int2vector of column numbers in the order the
+          // columns appear in the index definition. Unnest it WITH ORDINALITY
+          // so each (index, column) row carries its position in the index,
+          // then ORDER BY that position. Without this the rows come back in
+          // table-column order (`a.attnum`), which silently shuffles the
+          // columns of any composite index whose index order differs from
+          // the table order — verification compares against the contract
+          // with order-sensitive equality and reports a spurious
+          // `index_mismatch`.
           `SELECT
            i.tablename,
            i.indexname,
            ix.indisunique,
            a.attname,
-           a.attnum,
+           k.ord AS index_position,
            am.amname,
            ic.reloptions
          FROM pg_indexes i
@@ -362,7 +374,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          JOIN pg_am am ON am.oid = ic.relam
          JOIN pg_class t ON t.oid = ix.indrelid
          JOIN pg_namespace tn ON tn.oid = t.relnamespace AND tn.nspname = $1
-         LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey) AND a.attnum > 0
+         JOIN LATERAL unnest(ix.indkey::int[]) WITH ORDINALITY AS k(attnum, ord) ON true
+         LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum AND a.attnum > 0
          WHERE i.schemaname = $1
            AND NOT EXISTS (
              SELECT 1
@@ -371,7 +384,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
                AND tc.table_name = i.tablename
                AND tc.constraint_name = i.indexname
            )
-         ORDER BY i.tablename, i.indexname, a.attnum`,
+         ORDER BY i.tablename, i.indexname, k.ord`,
           [schema],
         ),
       ]);
