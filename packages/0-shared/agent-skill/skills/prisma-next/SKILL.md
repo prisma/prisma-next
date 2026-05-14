@@ -7,16 +7,12 @@ description: Route a vague Prisma Next prompt to a specific skill. Use for "help
 
 > **Edit your data contract. Prisma handles the rest.**
 
-This skill exists to disambiguate vague Prisma Next prompts. When the user
-hasn't yet committed to a specific workflow (e.g. *"help me with Prisma
-Next"*, *"explain how Prisma Next works"*, *"I'm new to PN, where do I
-start?"*), this skill fires and routes them to the right specific skill.
+This skill exists to disambiguate vague Prisma Next prompts. When the user hasn't yet committed to a specific workflow (e.g. *"help me with Prisma Next"*, *"explain how Prisma Next works"*, *"I'm new to PN, where do I start?"*), this skill fires and routes them to the right specific skill.
 
 ## When to Use
 
 - The user has not yet stated a concrete task.
-- The user types a meta-question about Prisma Next (*"what is Prisma
-  Next?"*, *"how does PN compare to Drizzle/Prisma 7?"*).
+- The user types a meta-question about Prisma Next (*"what is Prisma Next?"*, *"how does PN compare to Drizzle/Prisma 7?"*).
 - The user asks for a tour, an overview, or a starting point.
 
 ## When Not to Use
@@ -34,8 +30,7 @@ start?"*), this skill fires and routes them to the right specific skill.
 
 ## Routing rules
 
-If the user's prompt clearly matches one of the workflow skills, route
-there directly without asking.
+If the user's prompt clearly matches one of the workflow skills, route there directly without asking.
 
 Otherwise, ask **one** disambiguating question. Pick from:
 
@@ -46,19 +41,11 @@ Otherwise, ask **one** disambiguating question. Pick from:
 - *"What error or symptom are you seeing?"* → `prisma-next-debug`.
 - *"Do you want to report this as a bug to the Prisma Next team, or is this a feature request?"* → `prisma-next-feedback`.
 
-If you still can't tell which skill applies, ask the user what they want
-to do. Do not guess.
+If you still can't tell which skill applies, ask the user what they want to do. Do not guess.
 
 ## The canonical model (one paragraph)
 
-Prisma Next is a contract-first data layer. You author a **data
-contract** (a `schema.psl` file, or a TypeScript builder). The framework
-emits machine-readable artifacts (`contract.json`, `contract.d.ts`) and
-gives you three runtime surfaces: a typed SQL query builder
-(`db.sql.from(...)`), a typed ORM client (`db.orm.User.select(...)`),
-and a raw SQL escape hatch (`db.sql.raw\`SELECT ...\``). Migrations are
-planned from the contract diff; you review them, optionally edit the
-`migration.ts` for data transforms, and apply.
+Prisma Next is a contract-first data layer. You author a **data contract** (a `schema.psl` file, or a TypeScript builder). The framework emits machine-readable artifacts (`contract.json`, `contract.d.ts`) and gives you three runtime surfaces: a typed SQL query builder (`db.sql.from(...)`), a typed ORM client (`db.orm.User.select(...)`), and a raw SQL escape hatch (`db.sql.raw\`SELECT ...\``). Migrations are planned from the contract diff; you review them, optionally edit the `migration.ts` for data transforms, and apply.
 
 Three steps the user does:
 
@@ -66,8 +53,7 @@ Three steps the user does:
 2. **The system plans the migrations for you.** (`prisma-next-migrations`)
 3. **If you need data migrations, you edit `migration.ts` and execute it.** (`prisma-next-migrations`)
 
-Everything else — queries, runtime wiring, build integration,
-debugging, feedback — sits on top of those three.
+Everything else — queries, runtime wiring, build integration, debugging, feedback — sits on top of those three.
 
 ## Checklist
 

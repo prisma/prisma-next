@@ -7,10 +7,7 @@ description: Write Prisma Next queries — pick a query interface (SQL query bui
 
 > **Edit your data contract. Prisma handles the rest.**
 
-Once the contract is in place and the DB is up to date, this skill
-covers everything you do with the data: reading, writing,
-transactions, capability-gated features, and the choice of query
-interface.
+Once the contract is in place and the DB is up to date, this skill covers everything you do with the data: reading, writing, transactions, capability-gated features, and the choice of query interface.
 
 ## When to Use
 
@@ -18,12 +15,9 @@ interface.
 - User wants to include / eager-load relations.
 - User wants to paginate, sort, filter, project.
 - User wants to wrap operations in a transaction.
-- User wants to use a capability-gated feature (`returning()`,
-  `includeMany`).
+- User wants to use a capability-gated feature (`returning()`, `includeMany`).
 - User asks about query interfaces (DSL vs ORM vs raw SQL vs TypedSQL).
-- User mentions: *query, select, where, orderBy, take, include, eager
-  load, raw SQL, transaction, returning, drizzle-style, kysely-style,
-  prisma client, db.batch*.
+- User mentions: *query, select, where, orderBy, take, include, eager load, raw SQL, transaction, returning, drizzle-style, kysely-style, prisma client, db.batch*.
 
 ## When Not to Use
 
@@ -35,21 +29,12 @@ interface.
 
 Prisma Next ships three runtime surfaces on top of one contract:
 
-- **`db.sql`** — SQL query builder. Composable, typed, returns
-  builders that you `.build()` and execute. Closest to raw SQL with
-  type safety.
-- **`db.orm`** — ORM client. Higher-level, model-shaped (`db.orm.User
-  .select(...).all()`). Default choice for most reads and writes.
-- **`db.sql.raw\`...\``** — Raw SQL escape hatch. Use when the other
-  interfaces don't cover what you need. Returns rows untyped unless
-  annotated.
-- **TypedSQL** — author a `.sql` file with typed params and result
-  types; PN compiles it into a callable function. Use for complex
-  queries you want type-checked.
+- **`db.sql`** — SQL query builder. Composable, typed, returns builders that you `.build()` and execute. Closest to raw SQL with type safety.
+- **`db.orm`** — ORM client. Higher-level, model-shaped (`db.orm.User .select(...).all()`). Default choice for most reads and writes.
+- **`db.sql.raw\`...\``** — Raw SQL escape hatch. Use when the other interfaces don't cover what you need. Returns rows untyped unless annotated.
+- **TypedSQL** — author a `.sql` file with typed params and result types; PN compiles it into a callable function. Use for complex queries you want type-checked.
 
-**Default: `db.orm`.** Fall back to `db.sql` when you need composition
-the ORM doesn't express. Fall back to raw SQL only when neither
-covers it.
+**Default: `db.orm`.** Fall back to `db.sql` when you need composition the ORM doesn't express. Fall back to raw SQL only when neither covers it.
 
 ## Decision: which query interface
 
@@ -169,9 +154,7 @@ const usersWithPosts = await db.orm.User
 
 ### `includeMany` (capability-gated)
 
-For deeply nested `1:N → 1:N` loads where each parent may have many
-children. Capability-gated: must be enabled in the contract's
-`capabilities` block.
+For deeply nested `1:N → 1:N` loads where each parent may have many children. Capability-gated: must be enabled in the contract's `capabilities` block.
 
 ```typescript
 // prisma-next.config.ts
@@ -193,8 +176,7 @@ await db.orm.User
   .all();
 ```
 
-Without the capability, `include` of a many-relation off a many-load
-errors at type-check.
+Without the capability, `include` of a many-relation off a many-load errors at type-check.
 
 ## ORM workflow — writes
 
@@ -220,8 +202,7 @@ await db.orm.User.where(u => u.deletedAt.isNotNull()).deleteMany();
 
 ### `returning()` (capability-gated)
 
-Postgres supports `RETURNING` on writes; enable to get a typed result
-back from updates / deletes without a second query.
+Postgres supports `RETURNING` on writes; enable to get a typed result back from updates / deletes without a second query.
 
 ```typescript
 // prisma-next.config.ts
@@ -257,9 +238,7 @@ const plan = db.sql
 const rows = await db.execute(plan);
 ```
 
-Use the DSL when the ORM is too high-level — explicit JOIN, set
-operations, window functions, raw expressions, or when you need
-column-level control over projection.
+Use the DSL when the ORM is too high-level — explicit JOIN, set operations, window functions, raw expressions, or when you need column-level control over projection.
 
 ### JOIN
 
@@ -285,9 +264,7 @@ const rows = await db.sql.raw<{ id: number; email: string }>`
 // Returns Array<{ id: number; email: string }>
 ```
 
-Parameters in `${...}` are bound (not interpolated as text). The type
-parameter annotates the row shape. Always parameterize; never
-interpolate user input into the SQL string.
+Parameters in `${...}` are bound (not interpolated as text). The type parameter annotates the row shape. Always parameterize; never interpolate user input into the SQL string.
 
 ## TypedSQL — author a `.sql` file
 
@@ -309,8 +286,7 @@ const rows = await activeUsers(db, { days: 7 });
 // → Array<{ id: number; email: string }>
 ```
 
-Use for queries you'd otherwise write as raw SQL but want type checked
-end-to-end.
+Use for queries you'd otherwise write as raw SQL but want type checked end-to-end.
 
 ## Transactions
 
@@ -349,8 +325,7 @@ const recent = await PostHelpers.published()
   .all();
 ```
 
-PN doesn't have ActiveRecord-style scopes built in; this pattern is the
-idiomatic substitute.
+PN doesn't have ActiveRecord-style scopes built in; this pattern is the idiomatic substitute.
 
 ## Streaming large result sets
 
@@ -368,46 +343,22 @@ for await (const row of cursor) {
 }
 ```
 
-Not all targets support streaming uniformly; PN exposes it where the
-underlying driver does (Postgres: yes; Mongo: yes via cursors).
+Not all targets support streaming uniformly; PN exposes it where the underlying driver does (Postgres: yes; Mongo: yes via cursors).
 
 ## Common Pitfalls
 
-1. **Reaching for raw SQL too soon.** The ORM covers most cases; the
-   DSL covers most of the rest. Raw SQL bypasses type safety; use it
-   as a last resort.
-2. **Using `.all()` when you wanted one row.** Returns every row
-   without a LIMIT. Use `.first()` or `.first({ pk })`.
-3. **Forgetting to enable a capability before using it.** `returning()`,
-   `includeMany`, and other capability-gated features error at type-
-   check if the capability isn't on. Enable in `prisma-next.config.ts`.
-4. **Interpolating user input into a raw SQL string.** SQL injection.
-   Always use the `${...}` template-tag binding.
-5. **Using the ORM through `db.execute(...)`** — the ORM returns its
-   results when you call `.all()` / `.first()` / etc.; you don't pass
-   the builder to `db.execute()` separately (that's for SQL DSL plans).
+1. **Reaching for raw SQL too soon.** The ORM covers most cases; the DSL covers most of the rest. Raw SQL bypasses type safety; use it as a last resort.
+2. **Using `.all()` when you wanted one row.** Returns every row without a LIMIT. Use `.first()` or `.first({ pk })`.
+3. **Forgetting to enable a capability before using it.** `returning()`, `includeMany`, and other capability-gated features error at type- check if the capability isn't on. Enable in `prisma-next.config.ts`.
+4. **Interpolating user input into a raw SQL string.** SQL injection. Always use the `${...}` template-tag binding.
+5. **Using the ORM through `db.execute(...)`** — the ORM returns its results when you call `.all()` / `.first()` / etc.; you don't pass the builder to `db.execute()` separately (that's for SQL DSL plans).
 
 ## What Prisma Next doesn't do yet
 
-- **`EXPLAIN` / query plan inspection.** Prisma Next doesn't expose an
-  `.explain()` method. Workaround: `db.sql.raw\`EXPLAIN ANALYZE
-  ${someQuery}\``. If you need first-class plan inspection, file a
-  feature request: file a feature request via the `prisma-next-feedback` skill.
-- **Prepared statements as a user-facing surface.** PN's adapters
-  prepare under the hood for parameterized queries, but you can't
-  pre-prepare a statement and re-execute by name. Workaround: use
-  TypedSQL (which compiles to a typed callable) or the raw lane. If
-  you need first-class prepared statements, file a feature request via the `prisma-next-feedback` skill.
-- **`db.batch()` / multi-statement batching.** Prisma Next runs each
-  call sequentially. Workaround: wrap in a transaction (`db.transaction`),
-  or use raw SQL with a `;`-separated statement set. If you need
-  Prisma-7-style `db.$transaction([call1, call2])` batching, file a
-  feature request: file a feature request via the `prisma-next-feedback` skill.
-- **Automatic N+1 detection.** Prisma Next does not warn when an
-  `.include()` is missing. Workaround: be deliberate about includes
-  in code review; the capability-gated `includeMany` is the manual
-  approach for explicit many-load chains. If you need automatic N+1
-  warnings, file a feature request via the `prisma-next-feedback` skill.
+- **`EXPLAIN` / query plan inspection.** Prisma Next doesn't expose an `.explain()` method. Workaround: `db.sql.raw\`EXPLAIN ANALYZE ${someQuery}\``. If you need first-class plan inspection, file a feature request: file a feature request via the `prisma-next-feedback` skill.
+- **Prepared statements as a user-facing surface.** PN's adapters prepare under the hood for parameterized queries, but you can't pre-prepare a statement and re-execute by name. Workaround: use TypedSQL (which compiles to a typed callable) or the raw lane. If you need first-class prepared statements, file a feature request via the `prisma-next-feedback` skill.
+- **`db.batch()` / multi-statement batching.** Prisma Next runs each call sequentially. Workaround: wrap in a transaction (`db.transaction`), or use raw SQL with a `;`-separated statement set. If you need Prisma-7-style `db.$transaction([call1, call2])` batching, file a feature request: file a feature request via the `prisma-next-feedback` skill.
+- **Automatic N+1 detection.** Prisma Next does not warn when an `.include()` is missing. Workaround: be deliberate about includes in code review; the capability-gated `includeMany` is the manual approach for explicit many-load chains. If you need automatic N+1 warnings, file a feature request via the `prisma-next-feedback` skill.
 
 ## Reference Files
 

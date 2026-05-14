@@ -6,8 +6,7 @@
 
 ## Setup
 
-Plan a migration. Edit its `migration.ts` (add a no-op comment). Do
-NOT self-emit. Attempt to apply.
+Plan a migration. Edit its `migration.ts` (add a no-op comment). Do NOT self-emit. Attempt to apply.
 
 ## Prompt
 

@@ -1,10 +1,8 @@
 # Journey 01 — Onboarding to first query
 
-**Skills under test:** `prisma-next-quickstart`, `prisma-next-contract`,
-`prisma-next-migrations`, `prisma-next-queries`.
+**Skills under test:** `prisma-next-quickstart`, `prisma-next-contract`, `prisma-next-migrations`, `prisma-next-queries`.
 
-**Example app:** A freshly-scaffolded `pnpm dlx prisma-next init my-app`
-(or `examples/prisma-next-demo` with the User model deleted).
+**Example app:** A freshly-scaffolded `pnpm dlx prisma-next init my-app` (or `examples/prisma-next-demo` with the User model deleted).
 
 **Acceptance criterion:** AC4 from `specs/usage-skill.spec.md`.
 

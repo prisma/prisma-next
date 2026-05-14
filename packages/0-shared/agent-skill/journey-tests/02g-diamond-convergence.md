@@ -6,8 +6,7 @@
 
 ## Setup
 
-Topic branch with a planned migration. Meanwhile, `main` advanced
-with a different migration from another developer.
+Topic branch with a planned migration. Meanwhile, `main` advanced with a different migration from another developer.
 
 ## Prompt
 
