@@ -34,14 +34,14 @@ M4's framing — "enums become first-class IR" — forces a decision on the on-d
 
 The hydration walker on the per-target `ContractSerializer` dispatches:
 
-- `kind: 'sql-enum-type'` → construct `PostgresEnumType` instance via the pack-contributed `helpers.entities.enum` factory.
+- `kind: 'sql-enum-type'` → registry routes to the `postgresAuthoringEntityTypes.enum` factory (the same factory `helpers.entities.enum` calls at authoring time), constructing a `PostgresEnumType` instance.
 - (no enumerable `kind`) → construct `StorageTypeInstance` via the existing codec-typed hydration path.
 
 The verifier walks `SqlEnumType` instances natively via the per-SPI verifier (with a small bridging adapter to the existing annotation-shape Schema IR — see § Scope below); codec-typed entries continue through codec-hook dispatch unchanged. The planner consumes `SqlEnumType` IR nodes through plain `Op` builders (`buildCreateEnumOperation`, `buildAddValueOperations`, `buildRecreateEnumOperation`) lifted verbatim from the deleted codec-hook glue.
 
 ### Hydration dispatch rule
 
-The polymorphic-value shape is reached via the per-target `ContractSerializer` SPI (see [Contract Emitter & Types § Rehydration via the per-target ContractSerializer SPI](../../../docs/architecture%20docs/subsystems/2.%20Contract%20Emitter%20&%20Types.md)). Per-target serializers inspect each `storage.types[name]` entry, dispatch on the entry's shape (presence of enumerable `kind`, value of that `kind`), and construct the right class. Future first-class kinds (`PostgresCompositeType`, `PostgresDomain`) follow the same recipe: declare an enumerable literal `kind`, register a hydration arm on the per-target serializer, contribute the entity via `helpers.entities.<name>` for authoring.
+The polymorphic-value shape is reached via the family contract-serializer SPI (see [Contract Emitter & Types § Rehydration via the per-target ContractSerializer SPI](../../../docs/architecture%20docs/subsystems/2.%20Contract%20Emitter%20&%20Types.md)). The family base inspects each `storage.types[name]` entry, reads the entry's `kind` discriminator, and dispatches through a `ReadonlyMap<discriminator, EntityHydrationFactory>` registry built from the resolved authoring contributions in scope for the contract (see [target-extensible authoring ADR § Family-layer deserializer](target-extensible-authoring.md)). Future first-class kinds (`PostgresCompositeType`, `PostgresDomain`) follow the same recipe: declare an enumerable literal `kind`, contribute the entity type via `entityTypes.<name>` (with the matching `discriminator`) on the contributing pack, and the family base routes through it without further edits — no per-kind hooks.
 
 ### Scope: Contract IR only
 
@@ -52,7 +52,7 @@ Schema IR enum representation stays annotation-shaped (`schema.annotations.pg.st
 ### What this enables
 
 - **First-class IR for enums end-to-end on the Contract IR side.** Verifier walks `SqlEnumType` instances; planner consumes them through native `Op` builders; the authoring DSL surfaces `helpers.entities.enum({ name, values })` with full type narrowing; codec-hook glue specific to enums is deleted. The codec-hook surface continues to own codec-typed concerns; first-class IR kinds own theirs.
-- **Polymorphic-value shape generalises to future target-specific named-type kinds.** Postgres composite types, domain types, range types follow the same recipe (declare `kind: 'sql-composite-type'`, register hydration arm, contribute via `helpers.entities.composite`). Each new kind is mechanical against the proven shape.
+- **Polymorphic-value shape generalises to future target-specific named-type kinds.** Postgres composite types, domain types, range types follow the same recipe (declare `kind: 'sql-composite-type'`, contribute via `entityTypes.composite` with `discriminator: 'sql-composite-type'`). Each new kind is mechanical against the proven shape; the family base routes the new kind without any new family-base code.
 - **JSON envelope blast radius is bounded.** Only first-class entries gain a `kind` field on disk; codec-typed entries inherit the family base's non-enumerable `kind` and stay byte-identical to pre-lift. The on-disk shape change is scoped to the population that actually became first-class.
 - **Cross-target consistency.** Codec-typed entries continue to work the same way across every target (the family-base non-enumerable `kind` pattern transports). First-class entries work the same way as every other target-extensible IR kind (the [three-layer polymorphic IR pattern](../../../docs/architecture%20docs/patterns/three-layer-polymorphic-ir.md)). A reader who learns one reads the other.
 

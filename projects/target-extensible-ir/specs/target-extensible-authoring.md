@@ -1,8 +1,13 @@
 # ADR (draft) — Target-extensible authoring: pack-contributed entities via descriptor + factory
 
-> **Status:** Draft, ready for promotion (lives under `projects/target-extensible-ir/specs/` while the project executes; promoted to `docs/architecture docs/adrs/` with a permanent ADR number at project close-out — after PR2 lands the namespace exemplar). The mechanism has been exercised end-to-end against the M4 enum exemplar (Postgres pack contributes `helpers.entities.enum`; the family contract-builder dispatches through it; the codec-hook glue specific to enums was deleted as the M4 round's worked example). M5a's namespace exemplar in PR2 is the final pressure test before promotion.
+> **Status:** Draft, ready for promotion (lives under `projects/target-extensible-ir/specs/` while the project executes; promoted to `docs/architecture docs/adrs/` with a permanent ADR number at project close-out — after PR2 lands the namespace exemplar). The mechanism has been exercised end-to-end against the M4 enum exemplar (Postgres pack contributes `helpers.entities.enum`; the family contract-builder dispatches through it; the family-layer deserializer dispatches through the registry; the codec-hook glue specific to enums was deleted as the M4 round's worked example). M5a's namespace exemplar in PR2 is the final pressure test before promotion.
 >
 > **Shipped at M3.5 R1 — small deviation from this draft:** the descriptor's `schema` field, as drafted below as a required `ArktypeSchema<unknown>`, ships as an optional `args?: readonly AuthoringArgumentDescriptor[]` (mirroring the existing `field` / `type` descriptor shape). For factory-output entities, the input type comes from the factory's parameter signature directly (extracted via `EntityHelperFunction<Descriptor>`'s conditional inference) and no descriptor-level input schema is needed; for template-output entities, the `args` argument-descriptor list is validated at call time by the existing `validateAuthoringHelperArguments` walker that today covers `field` / `type`. Adding a richer arktype-validated `schema` field for cross-runtime input validation is a forward-compatible addition admissible later without changing the descriptor's tagged-union shape. The lifted family-agnostic scaffolding ships in [`@prisma-next/contract-authoring/composed-helpers-scaffolding.ts`](../../../packages/1-framework/2-authoring/contract/src/composed-helpers-scaffolding.ts); SQL + Mongo contract-builders consume it; the in-tree synthetic pack exemplar at [`packages/2-sql/2-authoring/contract-ts/test/entities-namespace.exemplar.test.ts`](../../../packages/2-sql/2-authoring/contract-ts/test/entities-namespace.exemplar.test.ts) verifies the end-to-end mechanism (type narrowing, factory dispatch, JSON-cleanliness). The Mongo built-in entity construction sites (the M2 R2 hand-imported `MongoCollection` / `MongoIndex` / `MongoCollectionOptions` instantiations in [`packages/2-mongo-family/2-authoring/contract-ts/src/contract-builder.ts`](../../../packages/2-mongo-family/2-authoring/contract-ts/src/contract-builder.ts)) are **deferred** to a tracked open item per Decision 17; they're orthogonal to the mechanism and to M4 / M5a, which contribute their entities through the new mechanism regardless.
+>
+> **Refined at M7 — two PR1-review-driven changes folded into this draft:**
+>
+> 1. **Asymmetric naming `entityTypes` (contribution) vs `entities` (helpers).** The contribution slot is `AuthoringContributions.entityTypes` and the user-facing helpers slot is `helpers.entities`. PR1 review surfaced that the original symmetric `entities` naming overloaded the word in three meanings, with the contribution-surface usage conflicting with the application-domain meaning every fresh contributor reaches for first. The asymmetry reads honestly at each altitude: a pack ships entity types; a contract author constructs entities. The composed-helpers template performs the one-step rename in the type system; no runtime cost.
+> 2. **Registry-driven family-layer deserialization.** The descriptor gains a required `discriminator: string` field carrying the `kind` tag the contributed IR-class instance writes into its on-disk JSON envelope (e.g. `'sql-enum-type'`). At hydration time, the family contract-serializer dispatches through a `ReadonlyMap<discriminator, EntityHydrationFactory>` registry built from the resolved authoring contributions in scope for the contract; no per-kind hooks live on family bases. The same factory function used at authoring time is the hydration factory (input shape and JSON shape are the same for first-class entities, by construction). Adding a new pack-contributed entity type requires zero family-base changes. The pre-M7 shape (per-kind `hydrateEnumType` SPI hook with a throwing default + duck-typed `kind === 'sql-enum-type'` dispatch in the family base) was a load-bearing architectural defect surfaced by PR1 review (architect SDR § 3.3; principal-engineer F-pass) and closed in M7.
 >
 > **Project:** [target-extensible IR (TML-2459)](../spec.md). Drafted alongside the M3.5 milestone. Refined throughout M4 (enum exemplar — first real consumer) and M5a/b (namespace exemplar — greenfield consumer).
 >
@@ -10,9 +15,9 @@
 
 ## At a glance
 
-A target-extensible IR is only as extensible as the contract authoring surface that constructs it. Once the IR admits target-specific kinds (`PostgresEnumType`, `PostgresSchema`, future `PostgresRlsPolicy`, future `PostgresView`), the contract authoring surface needs a corresponding extension point so target packs can ship those kinds without hand-edited family-layer construction sites. This ADR codifies that extension point.
+A target-extensible IR is only as extensible as the contract authoring surface that constructs it AND the deserializer that reconstructs it from disk. Once the IR admits target-specific kinds (`PostgresEnumType`, `PostgresSchema`, future `PostgresRlsPolicy`, future `PostgresView`), three boundaries need extension points: (1) the contract authoring surface so target packs can ship construction helpers; (2) the deserializer so the family-layer hydration walker doesn't need to know per-kind classes; (3) the type system so user-facing helpers narrow per pack. This ADR codifies all three through one mechanism.
 
-The mechanism: extend `AuthoringContributions` with a new **`entities`** namespace. Every entity contribution is a descriptor with a **schema** (PSL/TS lowest-common-denominator description of the input shape) and an **output mechanism** that is either a declarative template (preferred where expressible — same `AuthoringTemplateValue` shape used by today's `field` / `type` outputs) or a **factory function** `(input, ctx) => SchemaNode` constructing an IR-class instance from validated input. Both authoring runtimes (PSL and TS DSL) reach the same factory through the same descriptor. Pack-bag-driven type narrowing surfaces contributed entities at `helpers.entities.<entityName>(input)` in the TS DSL via the existing `MergeExtensionXxx<Packs>` + `UnionToIntersection` template that today merges `field`, `type`, codec, and SQL index contributions.
+The mechanism: extend `AuthoringContributions` with a new **`entityTypes`** namespace. Every entity-type contribution is a descriptor with a **discriminator** (the `kind` tag the contributed IR-class instance writes into its on-disk JSON envelope), an optional **args** descriptor list (input shape — PSL/TS lowest-common-denominator), and an **output mechanism** that is either a declarative template (preferred where expressible — same `AuthoringTemplateValue` shape used by today's `field` / `type` outputs) or a **factory function** `(input) => SchemaNode` constructing an IR-class instance from validated input. Both authoring runtimes (PSL and TS DSL) reach the same factory through the same descriptor. The family-layer deserializer dispatches on the entry's `kind` discriminator through a contribution-driven registry built from the union of every pack's `entityTypes` — no per-kind hooks on family bases. Pack-bag-driven type narrowing surfaces contributed entities at `helpers.entities.<entityName>(input)` (asymmetric naming: packs ship `entityTypes`; users construct `entities`) via the existing `MergeExtensionXxx<Packs>` + `UnionToIntersection` template that today merges `field`, `type`, codec, and SQL index contributions.
 
 The `composed-authoring-helpers.ts` scaffolding ([currently SQL-only](../../../packages/2-sql/2-authoring/contract-ts/src/composed-authoring-helpers.ts)) is lifted to a family-agnostic location so both SQL and Mongo contract-builders consume the same scaffolding. Both family contract-builders are wired to surface `helpers.entities` to their `defineContract` factories. The two structural exemplars (M4 enum, M5a/b namespace) become the first real consumers — enum proves the "lift target-specific glue into a pack contribution" path; namespace proves the "introduce a new framework-level kind via a pack contribution" path.
 
@@ -23,10 +28,10 @@ The `composed-authoring-helpers.ts` scaffolding ([currently SQL-only](../../../p
 The word "entity" carries three distinct meanings in the codebase that share the term without conflict:
 
 1. **Visualisation discriminant** — `SchemaNodeKind = 'entity'` in [`packages/1-framework/1-core/framework-components/src/control/control-schema-view.ts`](../../../packages/1-framework/1-core/framework-components/src/control/control-schema-view.ts), used by CLI rendering to tag a schema-node as a top-level entity for layout. Pre-existing; unchanged by this ADR.
-2. **Contribution-kind namespace** (introduced here) — the `entities` namespace on `AuthoringContributions`. Contributions in this namespace are *kinds* of contract-authoring-domain entities packs can ship: models, namespaces, enums, future RLS policies, roles, views.
+2. **Contribution-kind namespace** (introduced here) — the `entityTypes` namespace on `AuthoringContributions`. Contributions in this namespace are *kinds* of contract-authoring-domain entities packs can ship: models, namespaces, enums, future RLS policies, roles, views.
 3. **Application-domain instance** — the user's authored `User`, `Invoice`, `Product` — *instances of* the kinds packs contribute. These are the entities the user's application is *about*.
 
-The contribution-kind namespace is meta-level: packs ship `entities.namespace`, `entities.enum`, `entities.policy` (kinds); users author `User`, `Invoice`, `Profile` (instances). The three layers share the word with no semantic conflict, but the distinction must be explicit so future readers don't conflate them.
+The contribution-kind namespace is meta-level: packs ship `entityTypes.namespace`, `entityTypes.enum`, `entityTypes.policy` (kinds); users construct `User`, `Invoice`, `Profile` (instances) via `helpers.entities.<name>(input)`. The asymmetric naming at the two surfaces (`entityTypes` for the pack contribution; `entities` for the user-facing helpers) is deliberate — each surface uses the word the consumer of *that* surface naturally reaches for. The three meanings share the root word with no semantic conflict, and the asymmetric surface naming reinforces the kind-vs-instance distinction at the points where contributors and users encounter it.
 
 ### The gap M2 R2 surfaced
 
@@ -58,31 +63,32 @@ The M3.5 placement (after M3, before M4) reflects the gap's real shape:
 
 ## Decision
 
-### `AuthoringContributions` gains an `entities` namespace
+### `AuthoringContributions` gains an `entityTypes` namespace
 
-Add `entities` next to the existing `field` and `type` namespaces on `AuthoringContributions`:
+Add `entityTypes` next to the existing `field` and `type` namespaces on `AuthoringContributions`:
 
 ```ts
 interface AuthoringContributions {
   field?: AuthoringFieldNamespace;
   type?: AuthoringTypeNamespace;
-  entities?: AuthoringEntityNamespace;  // new
+  entityTypes?: AuthoringEntityTypeNamespace;  // new
 }
 
-interface AuthoringEntityNamespace {
-  [name: string]: AuthoringEntityDescriptor;
+interface AuthoringEntityTypeNamespace {
+  [name: string]: AuthoringEntityTypeDescriptor;
 }
 
-interface AuthoringEntityDescriptor {
+interface AuthoringEntityTypeDescriptor {
   kind: 'entity';
-  schema: ArktypeSchema<unknown>;  // input shape — PSL/TS lowest common denominator
+  discriminator: string;            // kind tag the IR-class writes into its JSON envelope
+  args?: readonly AuthoringArgumentDescriptor[];  // input shape (template-output path)
   output:
     | { template: AuthoringTemplateValue }            // preferred where expressible
-    | { factory: (input, ctx) => SchemaNode };         // for class-instance outputs
+    | { factory: (input) => SchemaNode };              // for class-instance outputs
 }
 ```
 
-The descriptor's `schema` is the contract authoring runtime's input contract — the same shape PSL parses against and the TS DSL accepts as its argument. The `output.template` path covers contributions whose result can be expressed as a declarative AST (today's `field` / `type` contributions are template-shaped). The `output.factory` path covers contributions whose result is a class instance that carries methods, freeze semantics, and per-class identity — most or all `entities` contributions today, because IR-class instances are the contribution's whole point.
+The descriptor's `discriminator` is the load-bearing identifier the deserializer registry looks up at hydration time (Decision § "Family-layer deserializer dispatches through a contribution-driven registry" below). For factory-output entities, input typing comes from the factory's parameter signature; for template-output entities, the `args` argument-descriptor list is validated at call time by the existing `validateAuthoringHelperArguments` walker that today covers `field` / `type`. The `output.template` path covers contributions whose result can be expressed as a declarative AST. The `output.factory` path covers contributions whose result is a class instance that carries methods, freeze semantics, and per-class identity — most or all `entityTypes` contributions today, because IR-class instances are the contribution's whole point.
 
 ### One contribution surface for both authoring runtimes
 
@@ -90,20 +96,47 @@ Both PSL and TS DSL reach the same `output` (template or factory) through the sa
 
 This avoids the historical drift where TS DSL extensions could express things PSL extensions could not, by forcing every contribution through the lowest-common-denominator schema shape.
 
-### Pack-bag-driven type narrowing surfaces contributions at `helpers.entities.<name>`
+### Pack-bag-driven type narrowing surfaces contributions at `helpers.entities.<name>` (asymmetric naming)
 
-The `ComposedAuthoringHelpers<Family, Target, ExtensionPacks>` template gains an `entities` member that merges entity contributions across all packs in the contract's pack list. The same `MergeExtensionXxx<Packs>` + `UnionToIntersection` template that today merges `field`, `type`, codec, and SQL index contributions applies symmetrically:
+The `ComposedAuthoringHelpers<Family, Target, ExtensionPacks>` template gains an `entities` member that merges every contributing pack's `entityTypes` namespace via the existing `MergeExtensionXxx<Packs>` + `UnionToIntersection` template that today merges `field`, `type`, codec, and SQL index contributions:
 
 ```ts
 type ComposedAuthoringHelpers<F, T, P> = {
   field: MergeExtensionFields<P>;
   type: MergeExtensionTypes<P>;
-  entities: MergeExtensionEntities<P>;  // new
+  entities: MergeExtensionEntityTypes<P>;  // packs ship `entityTypes`; helpers expose `entities`
   // ...
 };
 ```
 
-The user's `defineContract` factory receives `helpers: ComposedAuthoringHelpers<Family, Target, ExtensionPacks>` as before; `helpers.entities.<entityName>(input)` is the new surface. Type narrowing on `input` follows the contributing pack's descriptor schema. Collisions across packs are detected at compose time per the existing `assertNoCrossRegistryCollisions` discipline.
+The user's `defineContract` factory receives `helpers: ComposedAuthoringHelpers<Family, Target, ExtensionPacks>` as before; `helpers.entities.<entityName>(input)` is the new surface. The asymmetric naming (`entityTypes` at contribution; `entities` at helpers) is deliberate — see Context § "What 'entity' means in this ADR". The composed-helpers template performs the one-step rename in the type system; no runtime cost. Type narrowing on `input` follows the contributing pack's descriptor schema. Collisions across packs are detected at compose time per the existing `assertNoCrossRegistryCollisions` discipline.
+
+### Family-layer deserializer dispatches through a contribution-driven registry
+
+When a family contract-serializer (e.g. `SqlContractSerializerBase`) hydrates its `storage.types` (or any other IR slot admitting pack-contributed first-class entities), it dispatches on each entry's `kind` discriminator through a `ReadonlyMap<discriminator, EntityHydrationFactory>` registry built from the resolved authoring contributions in scope for the contract:
+
+```ts
+abstract class SqlContractSerializerBase<TContract extends Contract<SqlStorage>>
+  implements ContractSerializer<TContract>
+{
+  constructor(private readonly entityRegistry: ReadonlyMap<string, EntityHydrationFactory>) {}
+
+  protected hydrateStorageTypeEntry(entry: SqlStorageTypeEntry): SqlStorageTypeEntry {
+    const kind = (entry as { kind?: unknown }).kind;
+    if (typeof kind === 'string') {
+      const factory = this.entityRegistry.get(kind);
+      if (factory) return factory(entry);
+    }
+    return entry;  // codec-typed entries pass through unchanged
+  }
+}
+```
+
+The registry is constructed at descriptor-build time from the union of every pack's `entityTypes` contributions, keyed by each contribution's `discriminator` field. The Postgres descriptor builds the registry from `postgresAuthoringEntityTypes` (and any extension packs in scope) and passes it to the `PostgresContractSerializer` constructor. The same factory function used at authoring time is the hydration factory — input shape and JSON shape are the same for first-class entities, by construction.
+
+**The family base does not import per-kind IR classes.** It does not declare per-kind `hydrateXxx` SPI hooks. It does not perform `if (kind === '<literal>')` branches on specific kinds. Adding a new pack-contributed entity type — RLS policy, role, view, future Postgres-domain entities — requires zero family-base changes. The contributing pack ships the descriptor + factory + discriminator and the registry routes through it.
+
+The pre-M7 shape (per-kind `hydrateEnumType` SPI hook with a throwing default + duck-typed `kind === 'sql-enum-type'` dispatch in the family base, plus an explicit `import { SqlEnumType }` in the family base) was a load-bearing architectural defect — the family layer carried privileged knowledge of one specific entity kind, which is exactly the smell the entities mechanism exists to eliminate. Surfaced by PR1 review (architect SDR § 3.3; principal-engineer F-pass) and closed in M7.
 
 ### Lift `composed-authoring-helpers.ts` to a family-agnostic location
 
@@ -117,15 +150,16 @@ Both `packages/2-sql/2-authoring/contract-ts` and `packages/2-mongo-family/2-aut
 
 ### What this enables
 
-- **Target packs ship IR kinds end-to-end without family-layer edits.** Postgres ships `PostgresEnumType` (M4), `PostgresSchema` (M5a), and future `PostgresRlsPolicy`, `PostgresView`, `PostgresRole` by adding entity contributions to the postgres-target pack's `authoring.entities`. The family contract-builder neither knows nor needs to know these kinds exist; it dispatches via the pack-contributed factory.
+- **Target packs ship IR kinds end-to-end without family-layer edits.** Postgres ships `PostgresEnumType` (M4), `PostgresSchema` (M5a), and future `PostgresRlsPolicy`, `PostgresView`, `PostgresRole` by adding entity-type contributions to the postgres-target pack's `authoring.entityTypes`. The family contract-builder neither knows nor needs to know these kinds exist; it dispatches via the pack-contributed factory at authoring time and via the registry at hydration time.
 - **The PSL/TS authoring drift question stops recurring.** Every contribution is a descriptor; both runtimes interpret the same descriptor; no contribution can be TS-only or PSL-only. The "what can PSL not express that TS can?" question collapses into "what does the descriptor's schema not admit?" — a shape question, not a runtime-availability question.
-- **Type narrowing scales without per-namespace machinery.** Adding the `entities` namespace is a copy of the existing `field` / `type` machinery applied to a fourth namespace. Every future namespace (if any) follows the same template.
+- **Type narrowing scales without per-namespace machinery.** Adding the `entityTypes` namespace is a copy of the existing `field` / `type` machinery applied to a fourth namespace. Every future namespace (if any) follows the same template.
+- **Family-layer deserializer hooks scale O(1) with new entity kinds.** The pre-M7 shape required a new `hydrateXxx` SPI hook on the family base (and a corresponding override on every concrete target serializer) for every new pack-contributed entity kind — O(N) hooks for N kinds, with the family base accumulating per-kind imports. The registry-driven shape adds zero hooks per new kind: the contributing pack's descriptor's `discriminator` field and `output.factory` together fully define hydration. The family base imports zero per-kind IR classes.
 - **Hand-edited family-layer construction sites disappear from the contract-builder.** The Mongo gap diagnosed at M2 R2 close-out — and the structurally identical SQL gap that surfaces at M3 — both resolve via this mechanism without further family-layer edits.
 - **Ecosystem extensibility scales.** A third-party pack (Supabase, Cockroach, third-party Postgres extensions) adds entity contributions to its own pack ref; users include the pack in their contract's pack list; the new entities surface in `helpers.entities` with full type narrowing. No fork of the framework, no fork of the family layer.
 
 ### What this costs
 
-- **A third descriptor shape coexists with two existing ones.** `field` and `type` descriptors today carry `output` as a declarative `AuthoringTemplateValue`. `entities` descriptors admit both template-output and factory-output. The dispatch on `output.kind` is one switch in the interpreter; the cost is mild but real (and TML-2513 closes it by backporting the dual-output shape to `field` and `type` so all three namespaces dispatch identically).
+- **A third descriptor shape coexists with two existing ones.** `field` and `type` descriptors today carry `output` as a declarative `AuthoringTemplateValue`. `entityTypes` descriptors admit both template-output and factory-output, and additionally require the `discriminator` field for registry dispatch. The dispatch on `output.kind` is one switch in the interpreter; the cost is mild but real (and TML-2513 closes it by backporting the dual-output shape to `field` and `type` so all three namespaces dispatch identically — `field` / `type` would not gain `discriminator`, which is specific to first-class entity hydration).
 - **Heavy-generics relocation.** Lifting `composed-authoring-helpers.ts` is a heavy-generics move. The lifted module's type parameters need to be family-agnostic; the SQL-specific composition stays where it is and re-imports. The risk is regressing type narrowing for in-tree consumers; the M3.5 validation gate calls `pnpm typecheck` workspace-wide as the regression guard.
 - **Pack-bag declaration discipline.** Users must declare pack lists at `defineContract` invocation time so the type narrowing has a packs-set to merge. Today's contracts already do this; the discipline is unchanged.
 - **PSL surface cost for greenfield kinds.** New entity kinds with no PSL precedent (M5a's namespace, future RLS policies) need PSL grammar additions. The contribution mechanism does not eliminate that work — it absorbs the construction site, not the parser. PSL grammar work remains a per-kind cost.
@@ -134,6 +168,7 @@ Both `packages/2-sql/2-authoring/contract-ts` and `packages/2-mongo-family/2-aut
 
 - **Per-target contract builder packages.** Earlier shaping considered shipping `@prisma-next/postgres-contract-ts`, `@prisma-next/sqlite-contract-ts`, etc., where each target ships its own builder that knows its concrete IR classes. Rejected: forces the user to import a different builder per target; multiplies the maintenance surface; and fragments the family-shared abstractions (`SqlTable` semantics, FK shapes) across N target packages.
 - **Hand-edited family-layer construction sites.** Once M3.5 lands, the family contract-builder must not directly import any target IR class. Direct imports become a layering smell flagged by `pnpm lint:deps` or PR review.
+- **Per-kind `hydrateXxx` SPI hooks on family bases.** Once M7 lands, the family contract-serializer must not declare per-kind hydration hooks (e.g. `hydrateEnumType`, `hydrateRlsPolicy`) and must not import per-kind IR classes. Hydration dispatches generically through the registry. New per-kind hooks become an architectural regression, equivalent to an `if (kind === '<literal>')` branch on a specific pack-contributed entity kind.
 - **Builder mixin / class-extension extension model.** A model where target packs ship classes that extend the family contract-builder's builder classes (`class PostgresContractBuilder extends SqlContractBuilder { /* adds .enum() */ }`). Rejected — see § Alternatives considered.
 - **JSON-only contributions for IR classes.** A model where pack contributions emit only JSON shapes and the framework synthesises generic IR-node wrappers from those shapes. Rejected — see § Alternatives considered.
 
@@ -194,4 +229,5 @@ Pack contributions ship descriptors with declarative-template output; the framew
 - **`ctx` parameter on the factory — pinned.** M3.5 R1 shipped factory signature `(input) => SchemaNode` without an explicit `ctx` parameter — the in-tree exemplars (enum, namespace) construct IR-class instances directly from validated input, and the factory captures any family/target context it needs through the contributing pack's closure. Close-out promotion folds this into the Decision § text. If a future consumer earns a `ctx` parameter, the signature widens additively.
 - **Backport timing for `field` and `type`.** [TML-2513](https://linear.app/prisma-company/issue/TML-2513) tracks backporting the descriptor + factory output dispatch to the existing `field` and `type` namespaces so all three dispatch identically. The backport is mechanical and is not blocking this ADR's promotion. Close-out promotion keeps this ADR scoped to `entities`; TML-2513 ships its own ADR appendix (or amends this one) when it lands.
 - **Template-shaped `entities` contributions.** M4's enum and M5a's namespace exemplars are both factory-shaped (IR-class instance output). If no in-tree `entities` contribution ever uses template output, the "templates are the lowest common denominator" framing is shape-uniformity with `field` / `type` rather than a load-bearing path for this namespace. Close-out promotion should either find a template-shaped exemplar or document that `entities` contributions are factory-shaped by nature and the template branch exists for shape-uniformity.
-- **Naming and ADR number.** This ADR is drafted as "target-extensible authoring". Candidates for the permanent name: "Pack-contributed entities and the authoring contribution shape" (descriptive but long), "Target-extensible authoring via pack contributions" (closer to the title but less specific to entities), "AuthoringContributions: the entities namespace" (technical but precise). The permanent name should be picked at close-out alongside the companion ADRs so the trio reads as a coherent set.
+- **Naming and ADR number.** This ADR is drafted as "target-extensible authoring". Candidates for the permanent name: "Pack-contributed entity types and the authoring contribution shape" (descriptive but long), "Target-extensible authoring via pack contributions" (closer to the title but less specific), "AuthoringContributions: the entityTypes namespace + registry-driven hydration" (technical but precise). The permanent name should be picked at close-out alongside the companion ADRs so the trio reads as a coherent set.
+- **Discriminator-as-static-on-IR-class alternative.** The descriptor's `discriminator: string` field is the explicit form. An alternative reads the discriminator from the IR class's static `kind` field (e.g. `PostgresEnumType.kind = 'sql-enum-type' as const`) via the descriptor's factory closure — fewer parallel sources of truth (the IR class instance's runtime `kind` and the descriptor's static `discriminator` already need to agree). Rejected for M7 because it requires every IR class targeting the registry to carry a static `kind` field plus the descriptor to declare which IR class it constructs (`irClass: typeof PostgresEnumType`); the explicit-on-descriptor form is one field, no extra type plumbing, and makes the discriminator explicit at the contribution site (where extension authors think about it). Close-out promotion may revisit if a future consumer earns the static-on-class shape.
