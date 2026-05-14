@@ -341,7 +341,7 @@ describe('family instance verify - errors', () => {
               dbUrl: connectionString,
               contractPath: join(testDirWithDb, 'output/contract.json'),
             }),
-          ).rejects.toThrow('Invalid contract structure');
+          ).rejects.toThrow(/Contract structural validation failed|Invalid contract structure/);
         } finally {
           if (existsSync(testDirWithDb)) {
             rmSync(testDirWithDb, { recursive: true, force: true });
