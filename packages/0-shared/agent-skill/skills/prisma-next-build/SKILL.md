@@ -7,55 +7,29 @@ description: Wire Prisma Next into the project's build system with the right bui
 
 > **Edit your data contract. Prisma handles the rest.**
 
-This skill covers Prisma Next's build-tool plugins — the dev-server /
-build-system integrations that re-emit contract artefacts automatically
-as the user edits the contract source. Today that's
-[`@prisma-next/vite-plugin-contract-emit`](https://github.com/prisma/prisma-next/blob/main/packages/1-framework/3-tooling/vite-plugin-contract-emit/README.md)
-for Vite 7 and Vite 8. Next.js, Webpack, esbuild, Rollup, and Turbopack
-plugins do not exist yet and are documented honestly under *What
-Prisma Next doesn't do yet*.
+This skill covers Prisma Next's build-tool plugins — the dev-server / build-system integrations that re-emit contract artefacts automatically as the user edits the contract source. Today that's [`@prisma-next/vite-plugin-contract-emit`](https://github.com/prisma/prisma-next/blob/main/packages/1-framework/3-tooling/vite-plugin-contract-emit/README.md) for Vite 7 and Vite 8. Next.js, Webpack, esbuild, Rollup, and Turbopack plugins do not exist yet and are documented honestly under *What Prisma Next doesn't do yet*.
 
 ## When to Use
 
-- User wants `prisma-next contract emit` to happen automatically as
-  they edit `schema.psl` or `prisma/contract.ts` during `vite dev`.
+- User wants `prisma-next contract emit` to happen automatically as they edit `schema.psl` or `prisma/contract.ts` during `vite dev`.
 - User asks how to wire Prisma Next into their Vite project.
-- User asks about Next.js integration, Webpack integration, or any
-  other bundler — the answer is mostly *"not yet, here's the workaround"*
-  and the skill walks them through it.
-- User mentions: *vite plugin, vite-plugin, vite.config.ts,
-  prismaVitePlugin, contract emit on save, no-emit dev, HMR, hot reload
-  contract, dev server, vite 7, vite 8*.
-- User mentions Next.js / Webpack / esbuild / Rollup / Turbopack in
-  the context of Prisma Next integration — the gap-listing path fires.
+- User asks about Next.js integration, Webpack integration, or any other bundler — the answer is mostly *"not yet, here's the workaround"* and the skill walks them through it.
+- User mentions: *vite plugin, vite-plugin, vite.config.ts, prismaVitePlugin, contract emit on save, no-emit dev, HMR, hot reload contract, dev server, vite 7, vite 8*.
+- User mentions Next.js / Webpack / esbuild / Rollup / Turbopack in the context of Prisma Next integration — the gap-listing path fires.
 
 ## When Not to Use
 
 - User wants to wire `db.ts` and middleware → `prisma-next-runtime`.
-- User wants to run `prisma-next contract emit` manually from the CLI
-  (no plugin) → `prisma-next-contract`.
-- User got an emit error and wants to debug it → `prisma-next-debug`
-  (this skill can chain to it for build-time emit failures).
-- User wants to file a feature request for an unbuilt bundler plugin
-  → `prisma-next-feedback`.
+- User wants to run `prisma-next contract emit` manually from the CLI (no plugin) → `prisma-next-contract`.
+- User got an emit error and wants to debug it → `prisma-next-debug` (this skill can chain to it for build-time emit failures).
+- User wants to file a feature request for an unbuilt bundler plugin → `prisma-next-feedback`.
 
 ## Key Concepts
 
-- **The plugin's job is `contract emit`, on a schedule the bundler
-  knows about.** It is *not* a runtime concern — at runtime, the
-  application reads `contract.json` / `contract.d.ts` the same way
-  whether you used a plugin or `prisma-next contract emit` from a
-  script. The plugin saves you the manual command during development.
-- **Vite 7 and Vite 8 only.** Peer range `^7.0.0 || ^8.0.0`. Vite 6
-  is not on the support matrix.
-- **`executeContractEmit` is the canonical publish path.** Custom
-  plugins for other bundlers must also call it — never re-implement
-  the load → emit → publish dance. The atomic-rename invariant
-  (`contract.d.ts` renamed before `contract.json`) and the
-  per-output FIFO queue live in `@prisma-next/cli/control-api`.
-- **No build-time / production emission.** The Vite plugin runs in
-  `vite dev` only. For `vite build` / production, run
-  `prisma-next contract emit` from a `prebuild` script.
+- **The plugin's job is `contract emit`, on a schedule the bundler knows about.** It is *not* a runtime concern — at runtime, the application reads `contract.json` / `contract.d.ts` the same way whether you used a plugin or `prisma-next contract emit` from a script. The plugin saves you the manual command during development.
+- **Vite 7 and Vite 8 only.** Peer range `^7.0.0 || ^8.0.0`. Vite 6 is not on the support matrix.
+- **`executeContractEmit` is the canonical publish path.** Custom plugins for other bundlers must also call it — never re-implement the load → emit → publish dance. The atomic-rename invariant (`contract.d.ts` renamed before `contract.json`) and the per-output FIFO queue live in `@prisma-next/cli/control-api`.
+- **No build-time / production emission.** The Vite plugin runs in `vite dev` only. For `vite build` / production, run `prisma-next contract emit` from a `prebuild` script.
 
 ## Workflow — Vite (the supported path)
 
@@ -79,8 +53,7 @@ do I need the vite plugin?
 pnpm add -D @prisma-next/vite-plugin-contract-emit
 ```
 
-(Or `npm install --save-dev`, `yarn add -D`, `bun add -d` — use what
-the project's package manager is.)
+(Or `npm install --save-dev`, `yarn add -D`, `bun add -d` — use what the project's package manager is.)
 
 ### 3. Wire `vite.config.ts`
 
@@ -94,9 +67,7 @@ export default defineConfig({
 });
 ```
 
-The argument is the **path to `prisma-next.config.ts` relative to
-Vite root**. Not the path to `schema.psl` or `contract.ts` —
-the plugin reads the config to discover the contract source.
+The argument is the **path to `prisma-next.config.ts` relative to Vite root**. Not the path to `schema.psl` or `contract.ts` — the plugin reads the config to discover the contract source.
 
 ### 4. Configure (optional)
 
@@ -109,26 +80,21 @@ plugins: [
 ],
 ```
 
-Set `logLevel: 'debug'` only while troubleshooting; default `'info'`
-in committed config so the dev server isn't noisy.
+Set `logLevel: 'debug'` only while troubleshooting; default `'info'` in committed config so the dev server isn't noisy.
 
 ### 5. Verify the dev loop
 
 1. Start `vite dev`.
-2. Watch for the success log: `[prisma-next] emitted contract.d.ts +
-   contract.json`.
+2. Watch for the success log: `[prisma-next] emitted contract.d.ts + contract.json`.
 3. Edit `prisma/schema.psl` (e.g. add a field to a model).
 4. Within ~150ms (the debounce), watch for a re-emit log line.
-5. Type-check your application code that uses the new field — should
-   pass without restarting the dev server.
+5. Type-check your application code that uses the new field — should pass without restarting the dev server.
 
-If the plugin warns about *config-only watching*, see
-[Common Pitfalls](#common-pitfalls).
+If the plugin warns about *config-only watching*, see [Common Pitfalls](#common-pitfalls).
 
 ### 6. CI / production builds
 
-The plugin does **not** run during `vite build`. For CI and production
-deploys, run `prisma-next contract emit` as a prebuild step:
+The plugin does **not** run during `vite build`. For CI and production deploys, run `prisma-next contract emit` as a prebuild step:
 
 ```json
 // package.json
@@ -144,10 +110,7 @@ deploys, run `prisma-next contract emit` as a prebuild step:
 
 ## Workflow — React Router v7 Framework Mode
 
-The Vite plugin is compatible with `@react-router/dev/vite`. Both
-plugins are listed in `vite.config.ts`; there's no ordering
-constraint between them today, and the Prisma Next plugin's
-re-emit fires alongside React Router's own SSR re-load.
+The Vite plugin is compatible with `@react-router/dev/vite`. Both plugins are listed in `vite.config.ts`; there's no ordering constraint between them today, and the Prisma Next plugin's re-emit fires alongside React Router's own SSR re-load.
 
 ```typescript
 import { reactRouter } from '@react-router/dev/vite';
@@ -161,89 +124,37 @@ export default defineConfig({
 });
 ```
 
-See [`examples/react-router-demo`](https://github.com/prisma/prisma-next/tree/main/examples/react-router-demo)
-for the canonical configuration plus a smoke test that proves the
-dev loop.
+See [`examples/react-router-demo`](https://github.com/prisma/prisma-next/tree/main/examples/react-router-demo) for the canonical configuration plus a smoke test that proves the dev loop.
 
 ## Common Pitfalls
 
-1. **Pointing the plugin at `schema.psl` instead of
-   `prisma-next.config.ts`.** The argument is the config path. The
-   plugin reads the config to find the contract source.
+1. **Pointing the plugin at `schema.psl` instead of `prisma-next.config.ts`.** The argument is the config path. The plugin reads the config to find the contract source.
 2. **Vite 6 or earlier.** Not supported. Upgrade Vite to 7 or 8.
-3. **The plugin warns: *"watching only the config; loader resolved
-   inputs unavailable."*** The plugin couldn't resolve
-   `contract.source.inputs` from the loader. The fallback watches
-   only `prisma-next.config.ts` itself, so contract edits won't
-   re-emit. Causes: the config file throws during loading; the
-   contract source path resolves outside the Vite root. Fix the
-   config error first, then check that the contract source path in
-   the config is relative to (or inside) the Vite root.
-4. **Expecting `vite build` to re-emit.** It doesn't. Add a
-   `prebuild` script.
-5. **Emit errors during dev**: the plugin surfaces them via Vite's
-   error overlay. Read the overlay; the underlying cause is a
-   contract authoring problem — chain to `prisma-next-debug` for
-   resolution (PSL syntax, missing namespace, conflicting
-   extensions).
-6. **Re-installing dependencies without the plugin's peer-range
-   move.** When PN bumps the plugin's peer range, you must re-run
-   `pnpm install` so the lockfile picks up the new range. A stale
-   lockfile keeps the old plugin and produces confusing version
-   mismatch warnings.
+3. **The plugin warns: *"watching only the config; loader resolved inputs unavailable."*** The plugin couldn't resolve `contract.source.inputs` from the loader. The fallback watches only `prisma-next.config.ts` itself, so contract edits won't re-emit. Causes: the config file throws during loading; the contract source path resolves outside the Vite root. Fix the config error first, then check that the contract source path in the config is relative to (or inside) the Vite root.
+4. **Expecting `vite build` to re-emit.** It doesn't. Add a `prebuild` script.
+5. **Emit errors during dev**: the plugin surfaces them via Vite's error overlay. Read the overlay; the underlying cause is a contract authoring problem — chain to `prisma-next-debug` for resolution (PSL syntax, missing namespace, conflicting extensions).
+6. **Re-installing dependencies without the plugin's peer-range move.** When PN bumps the plugin's peer range, you must re-run `pnpm install` so the lockfile picks up the new range. A stale lockfile keeps the old plugin and produces confusing version mismatch warnings.
 
 ## What Prisma Next doesn't do yet
 
-- **Next.js plugin.** No first-party `@prisma-next/next-plugin-*`
-  exists. Workaround: run `prisma-next contract emit` from a
-  `prebuild` script in `package.json` and run it manually during
-  development when the contract changes. Many Next.js projects also
-  run a dev-time `tsx --watch` against a small script that calls the
-  CLI on contract-source change. If you want a first-party Next.js
-  plugin, file a feature request via the `prisma-next-feedback`
-  skill.
-- **Webpack, esbuild, Rollup, Turbopack plugins.** None exist yet
-  as first-party. Workaround: the canonical `executeContractEmit`
-  surface lives in `@prisma-next/cli/control-api` — a small
-  per-bundler plugin can call it from the bundler's pre-build hook,
-  but PN doesn't ship one for you. The `vite-plugin-contract-emit`
-  source is the reference implementation if you want to write one
-  yourself. If you want a first-party plugin for your bundler, file
-  a feature request via the `prisma-next-feedback` skill.
-- **`vite build` integration.** The plugin runs in `vite dev` only.
-  Workaround: a `prebuild` script that runs
-  `prisma-next contract emit`. If you want the plugin to also run
-  during `vite build`, file a feature request via the
-  `prisma-next-feedback` skill.
-- **Vite 6 or earlier.** Not on the support matrix. Workaround:
-  upgrade Vite to 7 or 8. If you have a hard reason to stay on
-  Vite 6, file a feature request via the `prisma-next-feedback`
-  skill.
+- **Next.js plugin.** No first-party `@prisma-next/next-plugin-*` exists. Workaround: run `prisma-next contract emit` from a `prebuild` script in `package.json` and run it manually during development when the contract changes. Many Next.js projects also run a dev-time `tsx --watch` against a small script that calls the CLI on contract-source change. If you want a first-party Next.js plugin, file a feature request via the `prisma-next-feedback` skill.
+- **Webpack, esbuild, Rollup, Turbopack plugins.** None exist yet as first-party. Workaround: the canonical `executeContractEmit` surface lives in `@prisma-next/cli/control-api` — a small per-bundler plugin can call it from the bundler's pre-build hook, but PN doesn't ship one for you. The `vite-plugin-contract-emit` source is the reference implementation if you want to write one yourself. If you want a first-party plugin for your bundler, file a feature request via the `prisma-next-feedback` skill.
+- **`vite build` integration.** The plugin runs in `vite dev` only. Workaround: a `prebuild` script that runs `prisma-next contract emit`. If you want the plugin to also run during `vite build`, file a feature request via the `prisma-next-feedback` skill.
+- **Vite 6 or earlier.** Not on the support matrix. Workaround: upgrade Vite to 7 or 8. If you have a hard reason to stay on Vite 6, file a feature request via the `prisma-next-feedback` skill.
 
 ## Reference Files
 
-- The plugin's own README:
-  <https://github.com/prisma/prisma-next/blob/main/packages/1-framework/3-tooling/vite-plugin-contract-emit/README.md>
-  — support matrix, full API surface, architecture diagram, the
-  *canonical publish path* warning for custom plugin authors.
-- ADR 008 (Dev Auto-Emit, CI Explicit Emit) — the rationale for
-  splitting dev-time auto-emit from the explicit CI / build step.
-- ADR 032 (Dev Auto-Emit Integration) — the plugin's integration
-  contract with the CLI control API.
+- The plugin's own README: <https://github.com/prisma/prisma-next/blob/main/packages/1-framework/3-tooling/vite-plugin-contract-emit/README.md> — support matrix, full API surface, architecture diagram, the *canonical publish path* warning for custom plugin authors.
+- ADR 008 (Dev Auto-Emit, CI Explicit Emit) — the rationale for splitting dev-time auto-emit from the explicit CI / build step.
+- ADR 032 (Dev Auto-Emit Integration) — the plugin's integration contract with the CLI control API.
 
 ## Checklist
 
-- [ ] Plugin pointed at `prisma-next.config.ts` (not the contract
-      source).
+- [ ] Plugin pointed at `prisma-next.config.ts` (not the contract source).
 - [ ] Vite version 7 or 8 (`pnpm ls vite`).
 - [ ] `vite dev` log shows the initial emit on server start.
 - [ ] Editing the contract source triggers a re-emit log line.
-- [ ] `prebuild` script (or equivalent) runs
-      `prisma-next contract emit` for CI / production builds.
+- [ ] `prebuild` script (or equivalent) runs `prisma-next contract emit` for CI / production builds.
 - [ ] No `vite build` expectation that the plugin will run.
-- [ ] For non-Vite bundlers: surfaced the *What PN doesn't do yet*
-      entry and routed the user to `prisma-next-feedback` if they
-      want first-party support.
-- [ ] Did NOT confabulate a `@prisma-next/next-plugin-contract-emit`
-      package or any other bundler-specific plugin that doesn't
-      exist.
+- [ ] For non-Vite bundlers: surfaced the *What PN doesn't do yet* entry and routed the user to `prisma-next-feedback` if they want first-party support.
+- [ ] Did NOT confabulate a `@prisma-next/next-plugin-contract-emit` package or any other bundler-specific plugin that doesn't exist.

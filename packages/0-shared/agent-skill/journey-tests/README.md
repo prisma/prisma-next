@@ -1,13 +1,8 @@
 # Journey tests
 
-These are **Markdown checklists**, not automated tests. Each file
-describes a prompt, the example app to point an agent at, and the
-expected end state. Run them by hand against an agent runtime
-(Claude / Cursor / a partner-hosted runtime) with the skill set
-installed.
+These are **Markdown checklists**, not automated tests. Each file describes a prompt, the example app to point an agent at, and the expected end state. Run them by hand against an agent runtime (Claude / Cursor / a partner-hosted runtime) with the skill set installed.
 
-Cross-runtime automation against a moving model surface is its own
-research project and is deferred from this milestone.
+Cross-runtime automation against a moving model surface is its own research project and is deferred from this milestone.
 
 ## How to run a journey test
 
@@ -18,15 +13,10 @@ research project and is deferred from this milestone.
    npx skills add file:packages/0-shared/agent-skill/
    ```
 
-3. Open the project in your agent's IDE (or attach the agent via its
-   CLI).
-4. Paste the prompt verbatim. Do not paste any additional context, do
-   not paste Prisma Next documentation.
-5. Observe each step the agent takes. Tick each checklist item as the
-   agent completes it. Note any deviations.
-6. At the end, verify the success criteria. If any step is missed or
-   any criterion fails, the journey **fails** — the skill needs
-   refinement.
+3. Open the project in your agent's IDE (or attach the agent via its CLI).
+4. Paste the prompt verbatim. Do not paste any additional context, do not paste Prisma Next documentation.
+5. Observe each step the agent takes. Tick each checklist item as the agent completes it. Note any deviations.
+6. At the end, verify the success criteria. If any step is missed or any criterion fails, the journey **fails** — the skill needs refinement.
 
 ## Journey index
 

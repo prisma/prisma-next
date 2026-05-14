@@ -1,15 +1,10 @@
 # Journey 03 — Capability-gap honesty
 
-**Skills under test:** `prisma-next-contract`, `prisma-next-migrations`,
-`prisma-next-queries`, `prisma-next-build`, `prisma-next-debug`,
-`prisma-next-feedback`.
+**Skills under test:** `prisma-next-contract`, `prisma-next-migrations`, `prisma-next-queries`, `prisma-next-build`, `prisma-next-debug`, `prisma-next-feedback`.
 
 **Acceptance criterion:** AC6 from `specs/usage-skill.spec.md`.
 
-The point: when the user asks about a feature Prisma Next doesn't
-have yet, the agent must NOT confabulate an API. It must name the gap,
-suggest the workaround, and route to `prisma-next-feedback` so the
-request becomes a tracked issue.
+The point: when the user asks about a feature Prisma Next doesn't have yet, the agent must NOT confabulate an API. It must name the gap, suggest the workaround, and route to `prisma-next-feedback` so the request becomes a tracked issue.
 
 ## Prompts and expected responses
 
@@ -50,8 +45,7 @@ request becomes a tracked issue.
 > Apply pending migrations from app startup code.
 
 - [ ] Agent names the gap: no runtime-apply migrations API.
-- [ ] Agent suggests `prisma-next migration apply` from the deploy
-      pipeline.
+- [ ] Agent suggests `prisma-next migration apply` from the deploy pipeline.
 - [ ] Agent routes to `prisma-next-feedback` for the feature request.
 
 ### 03f — Next.js plugin
@@ -61,14 +55,9 @@ request becomes a tracked issue.
 - [ ] Agent loads `prisma-next-build`.
 - [ ] Agent names the gap: no first-party Next.js plugin yet.
 - [ ] Agent suggests the `prebuild` script workaround.
-- [ ] Agent routes to `prisma-next-feedback` if the user wants the
-      gap closed.
+- [ ] Agent routes to `prisma-next-feedback` if the user wants the gap closed.
 
 ## Success criteria
 
-- [ ] For each prompt, the agent named the gap, named the workaround,
-      and routed the user to `prisma-next-feedback` (not just a bare
-      URL).
-- [ ] The agent did NOT fabricate an API call against a non-existent
-      surface (`User.validates(...)`, `db.studio()`, `query.explain()`,
-      `db.applyMigrations()`, `@prisma-next/next-plugin-contract-emit`).
+- [ ] For each prompt, the agent named the gap, named the workaround, and routed the user to `prisma-next-feedback` (not just a bare URL).
+- [ ] The agent did NOT fabricate an API call against a non-existent surface (`User.validates(...)`, `db.studio()`, `query.explain()`, `db.applyMigrations()`, `@prisma-next/next-plugin-contract-emit`).

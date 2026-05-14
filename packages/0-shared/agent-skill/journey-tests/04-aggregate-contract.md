@@ -2,8 +2,7 @@
 
 **Skills under test:** `prisma-next-contract`, `prisma-next-runtime`.
 
-**Example app:** `examples/multi-extension-monorepo/` (or any
-aggregate-contract project).
+**Example app:** `examples/multi-extension-monorepo/` (or any aggregate-contract project).
 
 **Acceptance criterion:** AC9 from `specs/usage-skill.spec.md`.
 
