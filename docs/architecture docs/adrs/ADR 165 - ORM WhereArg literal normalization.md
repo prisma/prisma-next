@@ -2,7 +2,7 @@
 
 ## Context
 
-We want different “authoring surfaces” (ORM, Kysely lane, etc.) to be able to pass a filter into the ORM without importing each other’s types.
+We want different “authoring surfaces” (ORM, raw SQL, etc.) to be able to pass a filter into the ORM without importing each other’s types.
 
 To do that, the ORM accepts a union:
 
