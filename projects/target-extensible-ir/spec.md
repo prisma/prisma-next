@@ -34,9 +34,9 @@ This project keeps the on-disk JSON shape canonical but flips the in-memory IR t
 
 ```text
 Framework (1-framework/)
-  interface SchemaNode                          // bare alphabet: { kind: string }
-  abstract class SchemaNodeBase                 // centralised freeze() helper for subclasses
-    implements SchemaNode
+  interface IRNode                              // bare alphabet: { kind?: string }
+  abstract class IRNodeBase                     // centralised freeze affordance for subclasses
+    implements IRNode
   interface Namespace                           // first-class building block
   abstract class NamespaceBase                  // convenience for implementers
   interface Storage { namespaces: Record<...> } // framework promise: every IR has namespaces
@@ -44,7 +44,7 @@ Framework (1-framework/)
   interface ContractSerializer<TContract>       // round-trip SPI: deserializeContract + serializeContract
 
 Family (2-sql/, 2-mongo-family/)
-  abstract class SqlNode extends SchemaNodeBase           // SQL alphabet shape (IR node base)
+  abstract class SqlNode extends IRNodeBase               // SQL alphabet shape (IR node base)
   abstract class SqlTable extends SqlNode                 // family abstract base for IR nodes
   abstract class SqlStorage implements Storage           // adds family-shape fields (tables, …)
   abstract class SqlContractSerializerBase                // family abstract base per SPI
@@ -55,7 +55,7 @@ Family (2-sql/, 2-mongo-family/)
 Target (3-targets/postgres/, 3-targets/sqlite/, 3-mongo-target/)
   class PostgresSchema extends NamespaceBase              // target concretion of framework concept
   class PostgresTable extends SqlTable                    // target concretion of family abstract
-  class PostgresRlsPolicy extends SchemaNodeBase          // target-only kind, no family parent
+  class PostgresRlsPolicy extends IRNodeBase              // target-only kind, no family parent
   class PostgresContractSerializer                        // concrete SPI implementer
     extends SqlContractSerializerBase
   class PostgresSchemaVerifier                            // concrete SPI implementer
@@ -511,8 +511,8 @@ The two tables are deliberately parallel: a developer who reads the SQL Postgres
 
 ### Namespace (new concept)
 
-- **FR13.** `Namespace` is a framework-level interface with a convenience abstract base. The framework `Storage` interface carries `readonly namespaces: Record<string, Namespace>` so the FR15 invariant ("every storage object belongs to a namespace") is enforced at the type level for every family. Postgres ships `PostgresSchema extends NamespaceBase` (the named-schema concretion); SQLite ships its singleton concretion; Mongo ships `MongoTargetDatabase extends NamespaceBase` mapping to the connection's `db` field.
-- **FR14.** A reserved sentinel namespace id `__unspecified__` represents connection-bound binding. The sentinel is realised per-target as a **singleton subclass** of that target's Namespace concretion (e.g. `class PostgresUnspecifiedSchema extends PostgresSchema` with `readonly id = '__unspecified__' as const`, exposed via a stable static reference `PostgresSchema.unspecified`). The subclass overrides the namespace's serialization methods to elide the namespace qualifier in emitted DDL; call sites stay polymorphic (no `if (namespace.id === '__unspecified__')` branches anywhere). Targets without native namespacing use the singleton as their default. Targets with native namespacing accept the singleton for multi-tenancy / connection-context-resolved contracts.
+- **FR13.** `Namespace` is a framework-level interface with a convenience abstract base; both extend the framework IR-node alphabet (`interface Namespace extends IRNode`, `abstract class NamespaceBase extends IRNodeBase implements Namespace`). The framework `Storage` interface (`interface Storage extends IRNode`) carries `readonly namespaces: Record<string, Namespace>` so the FR15 invariant ("every storage object belongs to a namespace") is enforced at the type level for every family — and the framework's own IR-node alphabet describes Storage as a typed IR node, not an unprefixed structural promise. Postgres ships `PostgresSchema extends NamespaceBase` (the named-schema concretion); SQLite ships its singleton concretion; Mongo ships `MongoTargetDatabase extends NamespaceBase` mapping to the connection's `db` field. **PR1 lands the SQL-side stub:** `class SqlStorage extends SqlNode implements Storage` with `readonly namespaces` defaulted to `{ [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance }` (a family-layer placeholder); PR2's M5a swaps the placeholder for the per-target concretions. Both families honour the framework `Storage` interface from PR1 forward.
+- **FR14.** A reserved sentinel namespace id `__unspecified__` represents connection-bound binding. Exported as the framework constant `UNSPECIFIED_NAMESPACE_ID` from `@prisma-next/framework-components/ir` so call sites do not depend on the literal string. The sentinel is realised per-target as a **singleton subclass** of that target's Namespace concretion (e.g. `class PostgresUnspecifiedSchema extends PostgresSchema` with `readonly id = UNSPECIFIED_NAMESPACE_ID`, exposed via a stable static reference `PostgresSchema.unspecified`). The subclass overrides the namespace's serialization methods to elide the namespace qualifier in emitted DDL; call sites stay polymorphic (no `if (namespace.id === UNSPECIFIED_NAMESPACE_ID)` branches anywhere). Targets without native namespacing use the singleton as their default. Targets with native namespacing accept the singleton for multi-tenancy / connection-context-resolved contracts.
 - **FR15.** Every storage object in Contract IR and Schema IR belongs to a namespace. The verifier matches contract objects to schema objects via `(namespace.id, name)` rather than `name` alone.
 - **FR16.** Existing single-namespace contracts migrate to the new shape: Postgres contracts default to `__unspecified__` (the database's `search_path` resolves to `public` by default, matching today's behaviour); SQLite contracts get the singleton; Mongo contracts get their analog. The migration is mechanical and the user's authored contract semantics are preserved. Postgres users explicitly declare `public` (or any other named namespace) when they want a pinned schema; the `__unspecified__` default also enables multi-tenancy contracts where `search_path` resolves the schema per connection without any contract-level changes.
 - **FR16a.** The authoring DSL exposes namespace declarations in both PSL and the TS builder, with surfaces kept structurally parallel so moving between them is mechanical for users.

@@ -14,7 +14,7 @@ The user-facing capabilities this project delivers are: multi-schema Postgres co
 
 The project ships across **two PRs** to keep each PR's review burden manageable and to isolate risk between the proven mechanism (M1-M4) and the heavier greenfield namespace work (M5a + M5b). The project itself stays intact at `projects/target-extensible-ir/` across both PRs; only the delivery is split.
 
-- **PR1 — `target-extensible-ir` branch (current).** Ships M1 + M2 + M2.5 + M3 + M3.5 + M4 + M6. Closes the polymorphic IR + extensible authoring (entities) mechanism + first real consumer (Postgres enum exemplar) + the documentation sweep covering the IR convention + entities mechanism. Decision recorded at the M5a-pause point: M5a's pre-flight reconnaissance found the namespace work was substantial enough that bundling it into one PR with M1-M4 would double the diff and put the proven mechanism at risk if M5a hit a deeper architectural issue. The PR1 narrative stands on its own: *"Contract IR + Schema IR are now extensible per-target via 3-layer polymorphic class hierarchies; contract authoring is extensible per-target via the entities mechanism; one full exemplar (enum) demonstrates the round-trip."*
+- **PR1 — `target-extensible-ir` branch (current).** Ships M1 + M2 + M2.5 + M3 + M3.5 + M4 + M6 + **M7 (registry-driven hydration + entityTypes rename — PR1 review fixes)** + **M8 (PR1 review-findings sweep — principal-engineer findings + GH-thread comments)**. Closes the polymorphic IR + extensible authoring (entityTypes) mechanism + first real consumer (Postgres enum exemplar) + the documentation sweep covering the IR convention + entityTypes mechanism. Decision recorded at the M5a-pause point: M5a's pre-flight reconnaissance found the namespace work was substantial enough that bundling it into one PR with M1-M4 would double the diff and put the proven mechanism at risk if M5a hit a deeper architectural issue. The PR1 narrative stands on its own: *"Contract IR + Schema IR are now extensible per-target via 3-layer polymorphic class hierarchies; contract authoring is extensible per-target via the registry-driven entityTypes mechanism; one full exemplar (enum) demonstrates the round-trip; SQL stack honours the framework `Storage` interface; example apps consume the canonical façade surface."*
 - **PR2 — namespace follow-up branch (umbrella ticket TML-2520).** Branches off the merged PR1 base. Ships M5a + M5b + namespace-specific ADRs. Consumes the proven M1-M4 mechanism without depending on further changes to it. Reconnaissance at `wip/m5a-reconnaissance.md` is portable to the PR2 branch (PSL consumer cascade audit, storage-keying inventory, M2 Mongo namespace template reference).
 
 The project's close-out (delete `projects/target-extensible-ir/`, promote remaining ADRs to `docs/`, strip references) happens **after PR2 merges**, not after PR1. PR1 lands the M6 docs that cover the M1-M4 surface (IR convention + entities mechanism); PR2's docs sweep adds the namespace ADRs alongside its implementation. See § Close-out for the full sequence.
@@ -300,6 +300,101 @@ The SQL pattern (verified on disk in pre-M2.5-R1 reconnaissance, recorded in `wi
 **Validation:** workspace `pnpm typecheck`, `pnpm lint:deps`, `pnpm test:packages`, and the integration test suite all pass. Reviewer round confirms the family base no longer imports any per-kind IR class and no `hydrateXxx` per-kind hooks remain on the family base. The exemplar-test still demonstrates type narrowing + runtime construction + JSON-cleanliness; the new registry-dispatch test demonstrates the family base routing to a contributed factory by discriminator.
 
 **Round structure note.** R1 (docs) executes in-session by the orchestrator; R2 + R3 (code) delegate to an implementer subagent (one round, two commits inside it for review-clarity). R4 (review-artefact refresh) executes in-session.
+
+### M8 — PR1 review findings sweep (principal-engineer findings + GH-thread comments)
+
+**Goal:** close every PR1 review finding that has not already been folded into M7. PR1 cannot ship with the architecturally-flagged issues (asymmetric `Storage` adoption; `SchemaNode` naming; CLI per-target branching; example apps reaching past the façade; dead `validateContract` exports; transient project IDs in source) still on disk. Each finding has a concrete close; the milestone is mechanical-and-tactical, not architectural.
+
+**Sources:**
+- Principal-engineer pass: [`projects/target-extensible-ir/reviews/pr-499/code-review.md`](reviews/pr-499/code-review.md) §§ F01–F12.
+- Architect pass: [`projects/target-extensible-ir/reviews/pr-499/system-design-review.md`](reviews/pr-499/system-design-review.md) §§ B1–B3, 3.1–3.6.
+- GitHub PR #499 comments (13 inline threads opened by the user; all on PR1 surfaces).
+
+**Round structure.** Three implementer rounds (R1–R3 below). R0 (this commit) updates plan + spec docs ahead of code work. R4 closes by refreshing the review artefacts and resolving GH threads.
+
+#### R1 — mechanical / low-process fixes (one commit)
+
+Single focused commit: `chore(target-extensible-ir): PR1 review-finding mechanical fixes (F03, F05, F07, F10–F12, transient IDs, sentinel const, SerializeContract rename)`.
+
+- **F03** — `MongoTargetStorage`: replace `Object.freeze(this)` with `freezeNode(this)` ([`packages/3-mongo-target/1-mongo-target/src/core/mongo-target-storage.ts`](../../packages/3-mongo-target/1-mongo-target/src/core/mongo-target-storage.ts)). Audit `rg "Object\.freeze\(this\)" packages/` after the fix to confirm no other `SchemaNodeBase`-/`IRNodeBase`-derived class drifted.
+- **F05a** — amend [`packages/2-sql/1-core/contract/src/ir/sql-enum-type.ts (L44–L47)`](../../packages/2-sql/1-core/contract/src/ir/sql-enum-type.ts) docstring to acknowledge per-target additions ("concrete subclasses may add additional enumerable own properties (e.g. `PostgresEnumType.codecId`) when the persisted envelope demands them").
+- **F05b** — add convention-naming comment inside `SqlContractSerializerBase.serializeContract` default ("Targets that ship enumerable runtime-only fields must override this method (mirroring `MongoTargetContractSerializer.serializeContract`)").
+- **F07** — add inline `as unknown as JsonObject` justification at `MongoTargetContractSerializer.serializeContract` line 58 (mirror M2 R2 F3 closure pattern).
+- **F10** — add inline justification at `PostgresEnumType` line 61's `as unknown as TValues` cast.
+- **F11** — defensive assertion at `nativeEnumPlanCallStrategy` boundary so the "introduce + rebuild different enums in one plan" failure surfaces as a planner-time error rather than a downstream PG runtime error.
+- **F12** — refresh the `postgresPlannerStrategies` array description block at lines 673–683 to name the collapsed-strategy shape (`enumChangeCallStrategy` is gone).
+- **GH#10** — drop transient project IDs (M4, M5a) from [`packages/1-framework/1-core/framework-components/src/shared/framework-authoring.ts (L103–L107)`](../../packages/1-framework/1-core/framework-components/src/shared/framework-authoring.ts) — replace with the durable shape description (per `.cursor/rules/doc-maintenance.mdc`).
+- **GH#7** — encode `'__unspecified__'` as an exported const at the framework Namespace seam ([`packages/1-framework/1-core/framework-components/src/ir/namespace.ts`](../../packages/1-framework/1-core/framework-components/src/ir/namespace.ts)). Suggested name: `UNSPECIFIED_NAMESPACE_ID`. Switch all literal usages (Mongo target singletons + tests; future Postgres singleton in PR2) to import the const. Minimum viable: export the const + switch the in-tree singleton constructors + the framework Namespace docstring; tests can stay literal until they need refactoring for other reasons.
+- **GH#4** — rename `CanonicalSerializeContract` → `SerializeContract` workspace-wide. The `Canonical` prefix is misleading: this hook is the per-target JSON-conversion seam, not a canonicalization routine. Touches `packages/1-framework/0-foundation/contract/src/canonicalization.ts` (and rename `canonicalization.ts` → `serialize-contract.ts` if the file becomes single-purpose after F08); the type definition; the `EmitOptions.serializeContract` binding; the contract-emit CLI op import.
+- **GH#5** — review `canonicalizeContractToObject`'s public export. If only `canonicalizeContract` (the JSON-stringifying variant) is used outside the file, drop the `to-object` export; if both are needed externally, document the export-pair with a one-line justifying comment.
+
+**Validation:** workspace `pnpm typecheck`, `pnpm lint:deps`, `pnpm test:packages` — all green.
+
+#### R2 — `SchemaNode` → `IRNode` rename + Storage interface participation
+
+Single focused commit: `refactor(framework): rename SchemaNode → IRNode; Storage extends IRNode (workspace-wide)`.
+
+- **GH#8** — `SchemaNode` and `SchemaNodeBase` are the common root for *both* Contract IR and Schema IR class hierarchies. The "Schema" prefix is misleading — fresh readers infer Schema-IR-only. Rename:
+  - `interface SchemaNode` → `interface IRNode`
+  - `abstract class SchemaNodeBase` → `abstract class IRNodeBase`
+  - `freezeNode<T extends SchemaNode>` → `freezeNode<T extends IRNode>` (the helper name stays — it operates on IR nodes regardless of root naming)
+  - File rename: `schema-node.ts` → `ir-node.ts`
+  - Workspace-wide cascade: every `extends SchemaNodeBase` becomes `extends IRNodeBase`; every `import { SchemaNode, SchemaNodeBase, freezeNode }` updates; every docstring referencing `SchemaNodeBase` (notably `learnings.md`, `AGENTS.md`, the four ADR drafts, the M6 `typescript-patterns.md` and `Architecture Overview.md` updates) updates.
+- **GH#9** — `interface Storage` does not extend the IR node alphabet today, but `MongoStorageBase implements Storage` and `MongoStorageBase extends IRNodeBase` — the structural dual already holds. Tighten: declare `interface Storage extends IRNode { readonly namespaces: Readonly<Record<string, Namespace>> }`. Storage is then a typed-IR-node interface, not an unprefixed structural promise; the dispatch surface (a SchemaVerifier walks `IRNode`-typed slots) gains correct typing.
+
+**Validation:** workspace `pnpm typecheck`, `pnpm lint:deps`, `pnpm test:packages`, `pnpm test:integration` — all green. Build affected packages so downstream `.d.mts` declarations refresh. The cascade is mechanical but workspace-wide.
+
+#### R3 — SQL `Storage` participation + CLI SPI completeness + façade hygiene + dead-export cleanup
+
+Multi-commit round (the items below are independent; commit each separately for review-clarity). The implementer chooses the order; suggested grouping:
+
+**Commit A — SqlStorage implements Storage with `__unspecified__` stub (F09, partial close of architect B1).**
+- Introduce `class SqlUnspecifiedNamespace extends NamespaceBase` (singleton family-layer placeholder) at [`packages/2-sql/1-core/contract/src/ir/`](../../packages/2-sql/1-core/contract/src/ir/). PR2's M5a swaps it for `PostgresSchema.unspecified` / `SqliteUnspecifiedDatabase.instance`.
+- `class SqlStorage extends SqlNode implements Storage` — declare `readonly namespaces: Readonly<Record<string, Namespace>>` defaulted to `{ [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance }`.
+- Update arktype storage validators + every SQL test fixture / construction site that builds an `SqlStorage`-shaped object literal. Per architect F09 estimate: 30–60 file fixtures + arktype updates, bounded.
+- `architect SDR § B1` is closed at the structural level: framework `Storage` interface now honoured by both families. PR2 still owns the per-target namespace concretion (`PostgresSchema` / `SqliteUnspecifiedDatabase`) but the seam is "fill in the per-target concretion" rather than "introduce namespaces."
+
+**Commit B — CLI drops the optional/unknown SPI cast; SQL targets land their `serializeContract` SPI fully (GH#11, GH#12, GH#13).**
+- The CLI emit operation at [`packages/1-framework/3-tooling/cli/src/control-api/operations/contract-emit.ts (L237–L257)`](../../packages/1-framework/3-tooling/cli/src/control-api/operations/contract-emit.ts) currently does `(config.target as { contractSerializer?: { ... } }).contractSerializer` — defensive against the SPI being absent. Both SQL targets ship `contractSerializer` on their descriptors today (`PostgresContractSerializer` / `SqliteContractSerializer`); the cast and the optional-chain are dead. Drop them; reach the SPI through the typed descriptor surface.
+- `EmitOptions.serializeContract` becomes required at [`packages/1-framework/3-tooling/emitter/src/emit-types.ts`](../../packages/1-framework/3-tooling/emitter/src/emit-types.ts). The "test fixtures pass minimal options" workaround (the docstring at line 19 names this) is no longer load-bearing if every target ships the SPI. Update test call sites to thread the serializer (or import a real target descriptor's serializer directly — there is no in-tree fixture serializer to maintain).
+- Refresh comments at the CLI emit op to remove "as the family adopts the SPI" wording — both families are adopted now.
+
+**Commit C — `createIdentityContractSerializer` removed from production exports (GH#6).**
+- The helper is exported from `@prisma-next/framework-components/control` but is unused in production today (`rg createIdentityContractSerializer` returns only the export point + the file that defines it). Delete the function + remove the export entry. If a test in tree relied on it (re-grep against `test/`), inline the trivial identity shape into that test or delete the test if it covers SPI-shape sanity that's no longer needed.
+
+**Commit D — Standalone `validateContract` deleted; READMEs migrated to the SPI surface (F08).**
+- Delete `packages/2-sql/1-core/contract/src/validate.ts`'s `validateContract` function (keep `decodeContractDefaults` if it remains a building block; otherwise delete). Keep the framework-level twin at `packages/1-framework/0-foundation/contract/src/validate-contract.ts` (retained per M3 R3b SATISFIED note as a layering-allowed structural-validation primitive).
+- Delete `validate.test.ts` if it covers nothing else; otherwise prune to the surviving primitives.
+- Remove `"./validate": "./dist/validate.mjs"` from `packages/2-sql/1-core/contract/package.json` `exports`.
+- Update both READMEs ([`packages/2-sql/2-authoring/contract-ts/README.md` (L28, L32, L222, L225, L261)](../../packages/2-sql/2-authoring/contract-ts/README.md) and [`packages/2-sql/1-core/contract/README.md` (L120)](../../packages/2-sql/1-core/contract/README.md)) to point at the per-target descriptor pattern (`descriptor.contractSerializer.deserializeContract(json)` from `@prisma-next/target-postgres/control` etc.).
+- Spec AC12's literal "removed from the codebase" clause now passes strict reading.
+
+**Commit E — Mongo example apps stop reaching past the façade (GH#1, GH#2, GH#3).**
+- The `mongo<TContract>(...)` façade at [`packages/3-extensions/mongo/src/runtime/mongo.ts`](../../packages/3-extensions/mongo/src/runtime/mongo.ts) already wraps `MongoContractSerializer().deserializeContract(...)` and preserves `TContract` through its generic. Example apps should not reach into `@prisma-next/family-mongo/ir` directly.
+- The two example apps that violate this — [`examples/mongo-demo/src/db.ts`](../../examples/mongo-demo/src/db.ts) and [`examples/retail-store/src/db.ts`](../../examples/retail-store/src/db.ts) — also carry `as Contract` casts (GH#2, GH#3) that exist *because* they reached past the façade (the façade's `TContract` generic prevents the cast at the API surface).
+- The example apps install telemetry middleware on a hand-rolled stack — check whether the `mongo<TContract>(...)` façade accepts middleware. If yes, rewrite the examples to use the façade. If no, extend the façade with `middleware?: ReadonlyArray<Middleware>` (mirroring the Postgres façade's middleware support — verify pattern); then rewrite the examples.
+- After rewrite: `as Contract` casts are gone from the examples; `MongoContractSerializer` import is gone; the demo apps demonstrate the canonical user-facing surface.
+
+**Commit F — `introspectPostgresEnumTypes` return type narrows to the annotation shape (F02).**
+- [`packages/3-targets/6-adapters/postgres/src/core/enum-control-hooks.ts (L108–L130)`](../../packages/3-targets/6-adapters/postgres/src/core/enum-control-hooks.ts) declares `Promise<Record<string, StorageTypeInstance>>` but constructs plain object literals. The class-instance signature lies. Replace with a dedicated annotation-shape type (e.g. `PostgresStorageTypeAnnotation = { codecId: string; nativeType: string; typeParams: { values: readonly string[] } }`) declared at the Schema IR annotation seam. Schema IR enum representation lift (open item) is unaffected — the annotation shape is the right surface today.
+
+**Validation per commit:** typecheck, lint:deps, packages tests for the touched surface; full workspace test suite at the end of R3.
+
+#### R4 — review-artefact refresh + GH thread closure (in-session, orchestrator-owned)
+
+- Update [`projects/target-extensible-ir/reviews/pr-499/code-review.md`](reviews/pr-499/code-review.md) to mark F03, F05, F07, F10, F11, F12 as RESOLVED with commit SHAs; refresh F02, F08, F09 verdicts (PASS); refresh AC12 to PASS strict; refresh AC9/AC10 if doc surfaces moved.
+- Update [`projects/target-extensible-ir/reviews/pr-499/system-design-review.md`](reviews/pr-499/system-design-review.md) §§ B1, B2, B3, 3.1, 3.3 to reflect M7+M8 closures.
+- Refresh [`projects/target-extensible-ir/reviews/pr-499/walkthrough.md`](reviews/pr-499/walkthrough.md) to mention M7 + M8 closure in the sequencing.
+- Reply to each of the 13 GH PR threads with the resolution commit SHA + brief closure note; resolve the thread via `gh api`.
+- Update PR #499 description to mention M7 + M8 in the "How it fits together" sequencing.
+
+**Findings explicitly carried as open items, not closed in M8:**
+- **F01 — codec-aware default-decoding regression.** Estimated touch surface: SPI shape + framework `validateContract` + test surface. Larger than the other findings; properly belongs in a focused follow-up where the SPI evolution can be reasoned about end-to-end. Stays on the open-items list.
+- **F04 — `MongoTargetUnspecifiedDatabase` frozen-by-base trap.** Documentation-only fix is in the implementer's hands during R3 Commit A (close to the SQL singleton work; same singleton-subclass shape). If the implementer judges the doc-only fix is enough, fold into Commit A; if the structural fix (move `freezeNode` to a leaf-class `seal()`) is preferred, surface as an escalation.
+- **Architect § 3.5 (abstract-earns-existence ADR-body codification).** The two clauses of the rule ("≥2 sibling targets OR a single polymorphic-dispatch consumer") need to land in the Decision body of one of the convention/principles ADRs, not only in Open questions. Folded into the ADR draft updates as part of M8 R4 (orchestrator-owned doc edits).
+- **Architect § 3.6 (`*Base` suffix collision-vs-convention).** Cleared when the legacy `type MongoStorage` data shape is removed; not load-bearing in M8.
+- **`EntityHelperFunction<Descriptor>` literal-tuple non-propagation.** Open item; same surface as M7 F06; tracked separately.
+- **PGlite shutdown-race flakiness.** Pre-existing; not exacerbated by PR1.
 
 ## Open items
 
