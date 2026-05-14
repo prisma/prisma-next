@@ -31,6 +31,7 @@ separately-installable skills.
 - User already has a PN project and wants to add a model → `prisma-next-contract`.
 - User wants to migrate FROM a specific ORM → install `@prisma-next/migrate-from-<orm>-skill` (separate).
 - User wants to wire `db.ts` in a project that already has a contract → `prisma-next-runtime`.
+- User wants to integrate Prisma Next with a build tool (Vite plugin, Next.js, …) → `prisma-next-build`.
 
 ## Key Concepts (before any workflow)
 
@@ -41,8 +42,9 @@ separately-installable skills.
 - **Target**: the backing store. Today: `postgres` or `mongo`. Picked
   at `init` time; recorded in `prisma-next.config.ts`.
 - **Authoring mode**: how you write the contract. `psl` (Prisma Schema
-  Language) or `typescript` (programmatic builder, with an option to
-  emit-on-demand from a Vite/Next plugin).
+  Language) or `typescript` (programmatic builder, optionally paired
+  with the Vite plugin for auto-emit during `vite dev` — see the
+  `prisma-next-build` skill).
 - **`db.ts`**: the runtime entry point. Imports `@prisma-next/postgres`
   (or `mongo`), the contract, type maps, and middleware. The agent
   imports `db` from here.
@@ -136,7 +138,7 @@ separately-installable skills.
 - **TypeScript** (`prisma/contract.ts`) — a programmatic builder. Use
   when you need to reuse contract fragments across files, when your
   contract is genuinely computed (multi-tenant per-tenant variants),
-  or when you want auto-emit from a Vite/Next dev server.
+  or when you want auto-emit from the Vite dev server (`prisma-next-build`).
 
 Switch later by running `prisma-next init --reinit` and choosing the
 other authoring mode. Existing contract content is preserved in spirit
@@ -168,15 +170,14 @@ but you'll need to re-author by hand in the target language.
   Knex / a raw driver. Workaround: install the matching
   `@prisma-next/migrate-from-<orm>-skill` separately, or treat the
   source as a brownfield database and `contract infer` from it. If you
-  need a guided migration flow built-in, file a feature request:
-  <https://github.com/prisma/prisma-next/issues/new>.
+  need a guided migration flow built-in, file a feature request via the `prisma-next-feedback` skill.
 - **`prisma db push` equivalent in production.** `db update` is the
   quick path; for production, use migrations (`migration plan` +
   `apply`). PN deliberately does not offer a "push-to-prod-without-a-
   migration" surface.
 - **Studio / GUI database browser.** Use `prisma-next db schema` for a
   CLI tree-style summary. If you need an interactive UI, file a feature
-  request: <https://github.com/prisma/prisma-next/issues/new>.
+  request via the `prisma-next-feedback` skill.
 
 ## Reference Files
 

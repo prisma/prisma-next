@@ -8,7 +8,7 @@ end-to-end without re-deriving the API from documentation each time.
 
 ## What's in the box
 
-One package, eight skills. Each skill is a `SKILL.md` with its own
+One package, ten skills. Each skill is a `SKILL.md` with its own
 `description` field that an agent runtime matches against the user's prompt:
 
 | Skill | Scope |
@@ -20,7 +20,9 @@ One package, eight skills. Each skill is a `SKILL.md` with its own
 | `prisma-next-migration-review` | Deployment + concurrency — "what runs on merge?", diamond convergence. |
 | `prisma-next-queries` | Queries — SQL DSL, Raw SQL, ORM client, TypedSQL. |
 | `prisma-next-runtime` | Wiring `db.ts` — middleware, connection, environment. |
+| `prisma-next-build` | Build-system / dev-server integration — Vite plugin today, Next.js / Webpack / esbuild / Rollup are gaps named instead of fabricated. |
 | `prisma-next-debug` | Debugging — error envelopes, signal-routing to error-code references. |
+| `prisma-next-feedback` | File a bug report or feature request against Prisma Next — the canonical destination of every other skill's *What PN doesn't do yet* routing. |
 
 Every skill follows the same shape (Convex-style): preamble + canonical
 mental-model headline, *When to Use* / *When Not to Use*, *Key Concepts*,
@@ -51,7 +53,9 @@ Prisma Next is in early access (`0.x`). Each skill carries a *What Prisma
 Next doesn't do yet* section that names features the framework doesn't
 implement (model validations, lifecycle callbacks, Studio, runtime-apply
 migrations, `EXPLAIN`, prepared statements, `db.batch()`, multi-database
-routing, …) along with the workaround and a feature-request link.
+routing, Next.js plugin, …) along with the workaround and a route to the
+`prisma-next-feedback` skill so the request becomes a tracked issue
+instead of a one-line URL.
 
 The pattern is deliberate: it gives the agent something concrete to say
 when a user asks about an unbuilt feature, instead of confabulating a
