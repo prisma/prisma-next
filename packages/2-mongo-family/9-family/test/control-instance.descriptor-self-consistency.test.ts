@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
 import { createMongoFamilyInstance } from '../src/core/control-instance';
 import type { MongoControlExtensionDescriptor } from '../src/core/control-types';
-import { mongoTargetDescriptor } from '../src/core/mongo-target-descriptor';
+import { stubMongoTargetDescriptor as mongoTargetDescriptor } from './test-target-descriptor';
 
 const TARGET = 'mongo' as const;
 const TARGET_FAMILY = 'mongo' as const;

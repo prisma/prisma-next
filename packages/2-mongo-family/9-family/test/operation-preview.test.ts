@@ -6,11 +6,11 @@ import {
 } from '@prisma-next/mongo-query-ast/control';
 import { describe, expect, it } from 'vitest';
 import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
-import { mongoTargetDescriptor } from '../src/core/mongo-target-descriptor';
+import { stubMongoTargetDescriptor } from './test-target-descriptor';
 
 function instantiate() {
   return mongoFamilyDescriptor.create(
-    createControlStack({ family: mongoFamilyDescriptor, target: mongoTargetDescriptor }),
+    createControlStack({ family: mongoFamilyDescriptor, target: stubMongoTargetDescriptor }),
   );
 }
 

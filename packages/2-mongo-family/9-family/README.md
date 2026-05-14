@@ -6,7 +6,9 @@ Mongo family descriptor and family pack for Prisma Next.
 
 This package is the Mongo family integration point for both control-plane assembly and authoring-time pack composition. It provides:
 
-- the Mongo `ControlFamilyDescriptor` and `mongoTargetDescriptor` used by configs and CLI flows
+- the Mongo `ControlFamilyDescriptor` used by configs and CLI flows
+- the `MongoControlAdapter` SPI that lets adapters supply wire-level marker-ledger and introspection implementations
+- family-shared verification and operation-preview helpers (`verifyMongoSchema`, `formatMongoOperations`)
 - the pure-data Mongo family pack ref used by `contract.ts` authoring
 - a cohesive dependency surface for the Mongo family, including `@prisma-next/mongo-contract-ts`
 
@@ -14,16 +16,19 @@ This package is the Mongo family integration point for both control-plane assemb
 
 - **Control-plane assembly**: Exposes `mongoFamilyDescriptor` and `createMongoFamilyInstance()` for validation and emission flows.
 - **Family hook integration**: Wires `mongoEmission` from `@prisma-next/mongo-emitter` into the family descriptor.
-- **Target bridge**: Exposes a `mongoTargetDescriptor` built from `@prisma-next/target-mongo/pack` metadata for control-plane stacks.
+- **Adapter SPI**: Defines `MongoControlAdapter` — the contract `@prisma-next/adapter-mongo` implements for marker-ledger CAS, ledger appends, and schema introspection. `MongoControlFamilyInstance` resolves the adapter from the control stack and dispatches wire-level work through it.
+- **Family-shared verification**: Owns `verifyMongoSchema` (the structural diff against introspected `MongoSchemaIR`) and the `MongoSchemaVerifierBase` walk used by per-target verifiers.
 - **Authoring-time family pack**: Exposes `@prisma-next/family-mongo/pack` so `defineContract(...)` can bind a Mongo contract to the Mongo family without importing control-plane code.
 - **Validation and emission**: Delegates Mongo contract validation to `@prisma-next/mongo-contract` and contract emission to the shared emitter pipeline.
 
 ## Entrypoints
 
-- `./control`: control-plane entrypoint exporting `mongoFamilyDescriptor`, `mongoTargetDescriptor`, `createMongoFamilyInstance`, and `MongoControlFamilyInstance`
+- `./control`: control-plane entrypoint exporting `mongoFamilyDescriptor`, `createMongoFamilyInstance`, `MongoControlFamilyInstance`, and family-shared helpers (`contractToMongoSchemaIR`, `formatMongoOperations`, `diffMongoSchemas`)
+- `./control-adapter`: SPI surface — `MongoControlAdapter` and `MongoControlAdapterDescriptor`, implemented by `@prisma-next/adapter-mongo`
+- `./ir`: Mongo family IR abstract bases (`MongoContractSerializerBase`, `MongoSchemaVerifierBase`, `MongoStorageBase`) extended by target packages
 - `./migration`: migration authoring — `Migration` class, factory functions, and strategies (re-exported from `@prisma-next/target-mongo/migration`)
 - `./pack`: pure pack ref for TypeScript authoring flows such as `@prisma-next/mongo-contract-ts/contract-builder`
-- `./schema-verify`: re-exports the pure `verifyMongoSchema(...)` from `@prisma-next/target-mongo/schema-verify`. `MongoFamilyInstance.schemaVerify` (i.e. `db verify --schema-only`) and the `MongoMigrationRunner` post-apply verify step both call into this shared verifier, so both surfaces agree on "matches the contract" by construction
+- `./schema-verify`: family-shared `verifyMongoSchema(...)`. The CLI `db verify --schema-only` path and the `MongoMigrationRunner` post-apply verify step both call into this shared verifier, so both surfaces agree on "matches the contract" by construction
 
 ## Usage
 
@@ -31,7 +36,8 @@ This package is the Mongo family integration point for both control-plane assemb
 
 ```typescript
 import { createControlStack } from '@prisma-next/framework-components/control';
-import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
+import { mongoFamilyDescriptor } from '@prisma-next/family-mongo/control';
+import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 
 const stack = createControlStack({
   family: mongoFamilyDescriptor,
@@ -129,13 +135,19 @@ Run `node migration.ts` to produce `ops.json` and `migration.json`. Use `--dry-r
 ## Package Structure
 
 - `src/core/control-descriptor.ts`: `MongoFamilyDescriptor` implementation
-- `src/core/control-instance.ts`: `createMongoFamilyInstance()` and `MongoControlFamilyInstance`
-- `src/core/mongo-target-descriptor.ts`: pre-built control target descriptor derived from `@prisma-next/target-mongo/pack`
+- `src/core/control-instance.ts`: `createMongoFamilyInstance()` and `MongoControlFamilyInstance` — resolves the `MongoControlAdapter` from the control stack and dispatches wire-level work through it
+- `src/core/control-adapter.ts`: `MongoControlAdapter` SPI definition
+- `src/core/control-target-descriptor.ts`: `MongoControlTargetDescriptor` interface (concrete `mongoTargetDescriptor` lives in `@prisma-next/target-mongo`)
+- `src/core/ir/`: Mongo family IR abstract bases (`MongoContractSerializerBase`, `MongoSchemaVerifierBase`, `MongoStorageBase`)
+- `src/core/operation-preview.ts`: family-shared `formatMongoOperations` / `mongoOperationsToPreview`
+- `src/core/schema-verify/verify-mongo-schema.ts`: family-shared `verifyMongoSchema(...)`
 - `src/core/mongo-migration.ts`: `MongoMigration` class (fixes the `Migration<TOperation>` type parameter to `MongoMigrationPlanOperation`)
 - `src/exports/control.ts`: control-plane entrypoint
+- `src/exports/control-adapter.ts`: adapter SPI entrypoint
+- `src/exports/ir.ts`: IR abstract base entrypoint
 - `src/exports/migration.ts`: migration authoring entrypoint
 - `src/exports/pack.ts`: authoring-time family pack ref
-- `src/exports/schema-verify.ts`: schema-verify entrypoint that re-exports from `@prisma-next/target-mongo/schema-verify`
+- `src/exports/schema-verify.ts`: schema-verify entrypoint exposing the family-shared `verifyMongoSchema`
 
 ## Dependencies
 
@@ -145,4 +157,5 @@ Run `node migration.ts` to produce `ops.json` and `migration.json`. Use `--dry-r
 - `@prisma-next/mongo-contract-ts`: Mongo `contract.ts` authoring surface
 - `@prisma-next/mongo-emitter`: Mongo family emission hook
 - `@prisma-next/mongo-query-ast`: Mongo command AST types (`MongoMigrationPlanOperation`)
-- `@prisma-next/target-mongo`: Mongo target pack metadata and migration factories
+
+This package carries no runtime dependency on `@prisma-next/target-mongo`, `@prisma-next/adapter-mongo`, or `@prisma-next/driver-mongo` — those lower layers depend on the family and adapter SPI defined here, matching the layering used by the SQL family.
