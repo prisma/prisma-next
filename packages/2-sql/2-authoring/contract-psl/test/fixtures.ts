@@ -191,7 +191,7 @@ export function createPostgresTestContext(
   return {
     composedExtensionPacks: [],
     scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
-    authoringContributions: { field: {}, type: {} },
+    authoringContributions: { field: {}, type: {}, entities: {} },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
     resolvedInputs: [],
