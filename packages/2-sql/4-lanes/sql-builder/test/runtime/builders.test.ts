@@ -1,4 +1,4 @@
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import {
   AndExpr,
   BinaryExpr,
@@ -19,7 +19,7 @@ import type { Contract } from '../fixtures/generated/contract';
 // Fixture: real contract with users + posts
 // ---------------------------------------------------------------------------
 
-const sqlContract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+const sqlContract = validateSqlContractFully<Contract>(contractJson);
 
 const stubBase = {
   operations: {},
@@ -38,10 +38,10 @@ function db() {
 }
 
 function dbNoCapabilities() {
-  const noLateralContract = new SqlContractSerializer().deserializeContract({
+  const noLateralContract = validateSqlContractFully<Contract>({
     ...contractJson,
     capabilities: { sql: {}, postgres: {} },
-  }) as Contract;
+  });
   return sql({
     context: { ...stubBase, contract: noLateralContract } as unknown as ExecutionContext<
       typeof noLateralContract

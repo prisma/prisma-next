@@ -626,7 +626,7 @@ export function validateSqlContractFully<T extends Contract<SqlStorage>>(value: 
     );
   }
   validateModelStorageReferences(
-    validated as Contract<SqlStorage, Record<string, ContractModel<SqlModelStorage>>>,
+    validated as unknown as Contract<SqlStorage, Record<string, ContractModel<SqlModelStorage>>>,
   );
   return validated;
 }

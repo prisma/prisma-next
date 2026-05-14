@@ -19,6 +19,7 @@
     "@prisma-next/adapter-sqlite": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-sqlite": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/sql-builder": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
