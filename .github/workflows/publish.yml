@@ -1,20 +1,27 @@
 name: Publish to npm
 
+# Source-of-truth model:
+#   The version comes from the root `package.json` `version` field.
+#   Maintainers advance it via `pnpm bump-minor` (see
+#   docs/oss/versioning.md). This workflow can never publish a version
+#   other than what is committed at HEAD.
+
 on:
   push:
     branches: [main]
     tags: ["!**"]
   workflow_dispatch:
     inputs:
-      version:
-        description: "Version to publish (e.g., 0.1.0, 0.1.0-beta.1). Leave empty to auto-calculate."
-        required: false
-        type: string
       dist-tag:
         description: "npm dist-tag (e.g., latest, dev, beta)"
         required: true
         default: "latest"
         type: string
+      dry-run:
+        description: "Dry-run only (build + pack + lint, no npm publish, no GitHub Release)."
+        required: false
+        default: true
+        type: boolean
 
 concurrency:
   group: npm-publish
@@ -24,8 +31,12 @@ jobs:
   publish:
     name: Publish packages to npm
     runs-on: ubuntu-latest
-    # Safety net: only publish from main, even though push trigger is already constrained
-    if: github.ref == 'refs/heads/main'
+    # Only `main` may produce a real publish. A dry-run dispatch is permitted
+    # from any branch so maintainers can validate the pipeline (build + pack +
+    # publish-dep gate + `pnpm publish --dry-run`) before merging changes that
+    # touch publishing. The dry-run path performs no registry writes and skips
+    # the GitHub Release step, so non-main runs cannot affect production state.
+    if: ${{ github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.dry-run == 'true') }}
     permissions:
       contents: write # Required to create the GitHub Release + tag for stable publishes
       id-token: write # Required for npm OIDC Trusted Publishing
@@ -52,34 +63,8 @@ jobs:
         id: version
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
-          INPUT_VERSION: ${{ github.event.inputs.version }}
-          INPUT_TAG: ${{ github.event.inputs.dist-tag }}
-        run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            echo "Using provided version: $INPUT_VERSION"
-            # Validate version format (semantic versioning)
-            if ! echo "$INPUT_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'; then
-              echo "Error: Invalid version format. Must match semantic versioning (e.g., 1.0.0 or 1.0.0-beta.1)"
-              exit 1
-            fi
-            # Validate dist-tag format (alphanumeric, hyphen, underscore only)
-            if ! echo "$INPUT_TAG" | grep -qE '^[a-zA-Z0-9_-]+$'; then
-              echo "Error: Invalid dist-tag format. Must contain only alphanumeric characters, hyphens, and underscores"
-              exit 1
-            fi
-            # Use heredoc to safely write to GITHUB_OUTPUT (prevents injection)
-            {
-              echo "version<<EOF"
-              echo "$INPUT_VERSION"
-              echo "EOF"
-              echo "tag<<EOF"
-              echo "$INPUT_TAG"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-          else
-            echo "No version provided, calculating..."
-            node scripts/determine-version.ts
-          fi
+          INPUT_DIST_TAG: ${{ github.event.inputs.dist-tag }}
+        run: node scripts/determine-version.ts
 
       - name: Set package versions
         run: node scripts/set-version.ts "${{ steps.version.outputs.version }}"
@@ -87,14 +72,22 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      # Publish-time gate (FR7.1 of init follow-up): packs every publishable
-      # workspace package and verifies the resolved package.json contains no
-      # `workspace:*` or `catalog:` dependency specifiers. `pnpm publish`
-      # rewrites these on its own, but `npm publish` (and some CI flows)
-      # don't — and a single leaked specifier breaks downstream installs.
-      # This gate fails the publish before anything reaches the registry.
+      # Publish-time gate: packs every publishable workspace package and
+      # verifies the resolved package.json contains no `workspace:*` or
+      # `catalog:` dependency specifiers. `pnpm publish` rewrites these on
+      # its own, but `npm publish` (and some CI flows) don't — and a single
+      # leaked specifier breaks downstream installs. This gate fails the
+      # publish before anything reaches the registry.
       - name: Check publish dependency specifiers
         run: pnpm check:publish-deps
+
+      # Dry-run path: exercises the full publish pipeline (pack, validate
+      # tarball contents, dependency rewriting) without touching the npm
+      # registry. Use from any branch via `workflow_dispatch` to validate
+      # changes that affect publishing before merging.
+      - name: Publish packages (dry-run)
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry-run == 'true' }}
+        run: pnpm -r publish --access public --tag "${{ steps.version.outputs.tag }}" --no-git-checks --dry-run
 
       # NODE_AUTH_TOKEN is intentionally NOT set. npm detects the OIDC environment
       # (id-token: write) and authenticates via Trusted Publishing automatically.
@@ -103,6 +96,7 @@ jobs:
       # Enable npm provenance attestations for each published package.
       # This requires a public source repository (npm rejects provenance from private repos).
       - name: Publish packages
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.dry-run != 'true' }}
         env:
           NPM_CONFIG_PROVENANCE: "true"
         run: pnpm -r publish --access public --tag "${{ steps.version.outputs.tag }}" --no-git-checks
@@ -120,7 +114,7 @@ jobs:
       # `--generate-notes`, so on rerun the existing notes are preserved — that's
       # the right trade-off versus failing the rerun outright.
       - name: Create GitHub Release for stable publishes
-        if: ${{ steps.version.outputs.tag == 'latest' }}
+        if: ${{ steps.version.outputs.tag == 'latest' && (github.event_name != 'workflow_dispatch' || github.event.inputs.dry-run != 'true') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
