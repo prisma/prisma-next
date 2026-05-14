@@ -31,6 +31,24 @@ export function codecRefForStorageColumn(
         typeParams: instance.codecBinding.typeParams as unknown as JsonValue,
       };
     }
+    // Raw JSON enum envelope (`kind: 'sql-enum-type'`): hydration
+    // didn't run (e.g. user-written `migration.ts` passing
+    // `end-contract.json` directly to `createExecutionContext`). The
+    // envelope carries `codecId` + `values` as enumerable own
+    // properties on the per-target subclass, so we synthesise the
+    // codec-typed `typeParams.values` shape from there.
+    if ((instance as { kind?: string }).kind === 'sql-enum-type') {
+      const enumLike = instance as unknown as {
+        readonly codecId?: string;
+        readonly values?: readonly string[];
+      };
+      if (enumLike.codecId !== undefined) {
+        return {
+          codecId: enumLike.codecId,
+          typeParams: { values: enumLike.values ?? [] } as unknown as JsonValue,
+        };
+      }
+    }
     return { codecId: instance.codecId, typeParams: instance.typeParams as JsonValue };
   }
   if (columnDef.typeParams !== undefined) {

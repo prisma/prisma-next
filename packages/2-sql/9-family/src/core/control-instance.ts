@@ -358,6 +358,16 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     return controlAdapter;
   };
 
+  const targetSerializer = (
+    target as unknown as {
+      contractSerializer?: { deserializeContract(json: unknown): Contract<SqlStorage> };
+    }
+  ).contractSerializer;
+  const deserializeWithTargetSerializer = (contractJson: unknown): Contract<SqlStorage> => {
+    const serializer = targetSerializer ?? new SqlContractSerializer();
+    return serializer.deserializeContract(contractJson) as Contract<SqlStorage>;
+  };
+
   return {
     familyId: 'sql',
     codecTypeImports,
@@ -365,7 +375,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     typeMetadataRegistry,
 
     validateContract(contractJson: unknown): Contract {
-      return new SqlContractSerializer().deserializeContract(contractJson) as Contract<SqlStorage>;
+      return deserializeWithTargetSerializer(contractJson);
     },
 
     async verify(verifyOptions: {
@@ -384,9 +394,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       } = verifyOptions;
       const startTime = Date.now();
 
-      const contract = new SqlContractSerializer().deserializeContract(
-        rawContract,
-      ) as Contract<SqlStorage>;
+      const contract = deserializeWithTargetSerializer(rawContract) as Contract<SqlStorage>;
 
       const contractStorageHash = contract.storage.storageHash;
       const contractProfileHash = contract.profileHash;
@@ -502,9 +510,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       readonly strict: boolean;
       readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
     }): VerifyDatabaseSchemaResult {
-      const contract = new SqlContractSerializer().deserializeContract(
-        options.contract,
-      ) as Contract<SqlStorage>;
+      const contract = deserializeWithTargetSerializer(options.contract) as Contract<SqlStorage>;
       const controlAdapter = getControlAdapter();
       return verifySqlSchema({
         contract,
@@ -514,6 +520,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         frameworkComponents: options.frameworkComponents,
         ...ifDefined('normalizeDefault', controlAdapter.normalizeDefault),
         ...ifDefined('normalizeNativeType', controlAdapter.normalizeNativeType),
+        ...ifDefined('resolveExistingEnumValues', controlAdapter.resolveExistingEnumValues),
       });
     },
     async sign(options: {
@@ -525,9 +532,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const { driver, contract: contractInput, contractPath, configPath } = options;
       const startTime = Date.now();
 
-      const contract = new SqlContractSerializer().deserializeContract(
-        contractInput,
-      ) as Contract<SqlStorage>;
+      const contract = deserializeWithTargetSerializer(contractInput) as Contract<SqlStorage>;
 
       const contractStorageHash = contract.storage.storageHash;
       const contractProfileHash =

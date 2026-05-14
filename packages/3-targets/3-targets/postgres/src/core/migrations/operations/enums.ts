@@ -16,8 +16,9 @@ export function createEnumType(
   schemaName: string,
   typeName: string,
   values: readonly string[],
+  nativeType: string = typeName,
 ): Op {
-  const qualifiedType = qualifyName(schemaName, typeName);
+  const qualifiedType = qualifyName(schemaName, nativeType);
   const literalValues = values.map((v) => `'${escapeLiteral(v)}'`).join(', ');
   return {
     id: `type.${typeName}`,
@@ -26,8 +27,8 @@ export function createEnumType(
     target: targetDetails('type', typeName, schemaName),
     precheck: [
       step(
-        `ensure type "${typeName}" does not exist`,
-        enumTypeExistsCheck(schemaName, typeName, false),
+        `ensure type "${nativeType}" does not exist`,
+        enumTypeExistsCheck(schemaName, nativeType, false),
       ),
     ],
     execute: [
@@ -37,7 +38,7 @@ export function createEnumType(
       ),
     ],
     postcheck: [
-      step(`verify type "${typeName}" exists`, enumTypeExistsCheck(schemaName, typeName)),
+      step(`verify type "${nativeType}" exists`, enumTypeExistsCheck(schemaName, nativeType)),
     ],
   };
 }

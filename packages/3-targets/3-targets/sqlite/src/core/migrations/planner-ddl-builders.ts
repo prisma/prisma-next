@@ -8,10 +8,11 @@
  * see `StorageColumn` or `storageTypes`.
  */
 
-import type {
-  StorageColumn,
-  StorageTable,
-  StorageTypeInstance,
+import {
+  SqlEnumType,
+  type StorageColumn,
+  type StorageTable,
+  type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 
@@ -44,7 +45,7 @@ function assertSafeDefaultExpression(expression: string): void {
  */
 export function buildColumnTypeSql(
   column: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance> = {},
+  storageTypes: Record<string, StorageTypeInstance | SqlEnumType> = {},
 ): string {
   const resolved = resolveColumnTypeMetadata(column, storageTypes);
   assertSafeNativeType(resolved.nativeType);
@@ -123,7 +124,7 @@ type ResolvedColumnTypeMetadata = Pick<StorageColumn, 'nativeType' | 'codecId' |
 
 function resolveColumnTypeMetadata(
   column: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance>,
+  storageTypes: Record<string, StorageTypeInstance | SqlEnumType>,
 ): ResolvedColumnTypeMetadata {
   if (!column.typeRef) {
     return column;
@@ -133,6 +134,14 @@ function resolveColumnTypeMetadata(
     throw new Error(
       `Storage type "${column.typeRef}" referenced by column is not defined in storage.types.`,
     );
+  }
+  if (referencedType instanceof SqlEnumType) {
+    const binding = referencedType.codecBinding;
+    return {
+      codecId: binding.codecId,
+      nativeType: referencedType.nativeType,
+      typeParams: binding.typeParams as Record<string, unknown>,
+    };
   }
   return {
     codecId: referencedType.codecId,

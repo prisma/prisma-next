@@ -19,7 +19,7 @@ import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import {
-  asCodecTypedStorageTypes,
+  SqlEnumType,
   type SqlStorage,
   type StorageColumn,
   type StorageTypeInstance,
@@ -132,7 +132,7 @@ export interface IssuePlannerOptions {
   readonly fromContract: Contract<SqlStorage> | null;
   readonly schemaName: string;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
   /**
    * Current database schema IR. Strategies read this to detect whether a
    * structure already exists (e.g. `buildSchemaLookupMap` for shared-temp-
@@ -163,14 +163,14 @@ function toColumnSpec(
   name: string,
   column: StorageColumn,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
-  storageTypes: Readonly<Record<string, StorageTypeInstance>>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>,
 ): ColumnSpec {
   return {
     name,
     typeSql: buildColumnTypeSql(
       column,
       codecHooks as Map<string, CodecControlHooks>,
-      storageTypes as Record<string, StorageTypeInstance>,
+      storageTypes as Record<string, StorageTypeInstance | SqlEnumType>,
     ),
     defaultSql: buildColumnDefaultSql(column.default, column),
     nullable: column.nullable,
@@ -379,7 +379,7 @@ function mapIssueToCall(
             ),
           );
         const hooksMap = codecHooks as Map<string, CodecControlHooks>;
-        const typesMap = storageTypes as Record<string, StorageTypeInstance>;
+        const typesMap = storageTypes as Record<string, StorageTypeInstance | SqlEnumType>;
         const qualifiedTargetType = buildColumnTypeSql(column, hooksMap, typesMap, false);
         const formatTypeExpected = buildExpectedFormatType(column, hooksMap, typesMap);
         return ok([
@@ -507,7 +507,7 @@ function mapIssueToCall(
     case 'type_missing': {
       if (!issue.typeName)
         return notOk(issueConflict('unsupportedOperation', 'Type missing issue has no typeName'));
-      const typeInstance = asCodecTypedStorageTypes(ctx.toContract.storage.types)[issue.typeName];
+      const typeInstance = ctx.toContract.storage.types?.[issue.typeName];
       if (!typeInstance) {
         return notOk(
           issueConflict(
@@ -516,9 +516,15 @@ function mapIssueToCall(
           ),
         );
       }
-      if (typeInstance.codecId.startsWith('pg/enum')) {
-        const values = (typeInstance.typeParams['values'] ?? []) as readonly string[];
-        return ok([new CreateEnumTypeCall(schemaName, typeInstance.nativeType, values)]);
+      if (typeInstance instanceof SqlEnumType) {
+        return ok([
+          new CreateEnumTypeCall(
+            schemaName,
+            issue.typeName,
+            typeInstance.values,
+            typeInstance.nativeType,
+          ),
+        ]);
       }
       return notOk(
         issueConflict(

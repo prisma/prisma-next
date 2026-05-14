@@ -1,6 +1,6 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import { asCodecTypedStorageTypes, type SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
@@ -57,7 +57,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
 
       expect(result.ok).toBe(true);
@@ -101,7 +101,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
 
       expect(result.ok).toBe(true);
@@ -142,7 +142,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
 
       expect(result.ok).toBe(true);
@@ -199,7 +199,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
 
       expect(result.ok).toBe(true);
@@ -257,7 +257,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
 
       expect(result.ok).toBe(true);
@@ -312,7 +312,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
 
       expect(result.ok).toBe(true);
@@ -361,7 +361,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
 
       expect(result.ok).toBe(true);
@@ -439,7 +439,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
 
       expect(result.ok).toBe(true);
@@ -482,7 +482,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
 
       expect(result.ok).toBe(true);
@@ -532,7 +532,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
 
       expect(result.ok).toBe(true);
@@ -575,7 +575,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
 
       expect(result.ok).toBe(true);
@@ -620,7 +620,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
 
       expect(result.ok).toBe(false);
@@ -664,7 +664,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
         strategies: [],
       });
 
@@ -708,7 +708,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: asCodecTypedStorageTypes(toContract.storage.types),
+        storageTypes: toContract.storage.types ?? {},
       });
       if (!result.ok) throw new Error('expected ok');
 

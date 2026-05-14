@@ -43,6 +43,16 @@ export class PostgresEnumType<
   readonly name: TName;
   readonly nativeType: string;
   readonly values: TValues;
+  /**
+   * Enumerable own property so the persisted JSON envelope carries
+   * `codecId: 'pg/enum@1'` alongside `kind: 'sql-enum-type'`. The
+   * runtime path (`codecRefForStorageColumn`, `assertColumnCodecIntegrity`)
+   * receives JSON-shaped contracts (e.g. inside a user-written
+   * `migration.ts` that loads `endContract` from `end-contract.json`)
+   * and reads `codecId` directly from the envelope rather than
+   * dispatching through the prototype-only `codecBinding` accessor.
+   */
+  readonly codecId: typeof PG_ENUM_CODEC_ID = PG_ENUM_CODEC_ID;
 
   constructor(input: PostgresEnumTypeInput<TName, TValues>) {
     super();
@@ -57,26 +67,5 @@ export class PostgresEnumType<
     readonly typeParams: { readonly values: TValues };
   } {
     return { codecId: PG_ENUM_CODEC_ID, typeParams: { values: this.values } };
-  }
-
-  /**
-   * `StorageTypeInstance`-compatibility shims (Decision 18 Option B
-   * scaffolding). These are prototype-level accessors so they stay
-   * out of the JSON envelope (`JSON.stringify` only sees enumerable
-   * own properties — `kind`, `name`, `nativeType`, `values`); they
-   * exist so the existing `Record<string, StorageTypeInstance>`
-   * surfaces in the contract-builder, lowering, and authoring
-   * helpers continue to type-check during R1a without rippling the
-   * polymorphic union through the entire authoring type graph.
-   * R1b removes these once the verifier / planner walk
-   * `SqlEnumType` natively and the consuming surfaces switch to the
-   * polymorphic union explicitly.
-   */
-  get codecId(): typeof PG_ENUM_CODEC_ID {
-    return PG_ENUM_CODEC_ID;
-  }
-
-  get typeParams(): { readonly values: TValues } {
-    return { values: this.values };
   }
 }

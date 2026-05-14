@@ -6,6 +6,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { PostgresEnumType } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createDriver,
@@ -997,11 +998,11 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           },
         },
         types: {
-          status_type: {
-            codecId: 'pg/enum@1',
+          status_type: new PostgresEnumType({
+            name: 'status_type',
             nativeType: 'status_type',
-            typeParams: { values: ['active', 'inactive'] },
-          },
+            values: ['active', 'inactive'],
+          }),
         },
       },
       roots: {},
@@ -1275,11 +1276,11 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
             },
           },
           types: {
-            StatusType: {
-              codecId: 'pg/enum@1',
+            StatusType: new PostgresEnumType({
+              name: 'StatusType',
               nativeType: 'StatusType',
-              typeParams: { values: ['active', 'inactive'] },
-            },
+              values: ['active', 'inactive'],
+            }),
           },
         },
         roots: {},

@@ -18,6 +18,7 @@ import type {
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type {
+  SqlEnumType,
   SqlStorage,
   StorageColumn,
   StorageTable,
@@ -203,10 +204,13 @@ function isMissing(issue: SchemaIssue): boolean {
 export function toColumnSpec(
   name: string,
   column: StorageColumn,
-  storageTypes: Readonly<Record<string, StorageTypeInstance>>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>,
   inlineAutoincrementPrimaryKey = false,
 ): SqliteColumnSpec {
-  const typeSql = buildColumnTypeSql(column, storageTypes as Record<string, StorageTypeInstance>);
+  const typeSql = buildColumnTypeSql(
+    column,
+    storageTypes as Record<string, StorageTypeInstance | SqlEnumType>,
+  );
   const defaultSql = buildColumnDefaultSql(column.default);
   return {
     name,
@@ -225,7 +229,7 @@ export function toColumnSpec(
  */
 export function toTableSpec(
   table: StorageTable,
-  storageTypes: Readonly<Record<string, StorageTypeInstance>>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>,
 ): SqliteTableSpec {
   const columns: SqliteColumnSpec[] = Object.entries(table.columns).map(([name, column]) =>
     toColumnSpec(name, column, storageTypes, isInlineAutoincrementPrimaryKey(table, name)),
@@ -259,7 +263,7 @@ export interface IssuePlannerOptions {
   readonly toContract: Contract<SqlStorage>;
   readonly fromContract: Contract<SqlStorage> | null;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
   readonly schema?: SqlSchemaIR;
   readonly policy?: MigrationOperationPolicy;
   readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;

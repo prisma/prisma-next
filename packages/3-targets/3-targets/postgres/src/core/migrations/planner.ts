@@ -17,9 +17,9 @@ import type {
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
-import { asCodecTypedStorageTypes } from '@prisma-next/sql-contract/types';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
+import { readExistingEnumValues } from './enum-planning';
 import { planIssues } from './issue-planner';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
@@ -139,7 +139,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 
     const schemaIssues = this.collectSchemaIssues(options);
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
-    const storageTypes = asCodecTypedStorageTypes(options.contract.storage.types);
+    const storageTypes = options.contract.storage.types ?? {};
 
     const result = planIssues({
       issues: schemaIssues,
@@ -218,6 +218,8 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       frameworkComponents: options.frameworkComponents,
       normalizeDefault: parsePostgresDefault,
       normalizeNativeType: normalizeSchemaNativeType,
+      resolveExistingEnumValues: (schema, enumType) =>
+        readExistingEnumValues(schema, enumType.nativeType),
     };
     const verifyResult = verifySqlSchema(verifyOptions);
     return verifyResult.schema.issues;

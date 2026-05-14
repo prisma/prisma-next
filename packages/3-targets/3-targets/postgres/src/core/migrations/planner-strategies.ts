@@ -27,11 +27,12 @@ import type {
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import {
-  asCodecTypedStorageTypes,
+  SqlEnumType,
   type SqlStorage,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { determineEnumDiff, readExistingEnumValues } from './enum-planning';
 import {
   AddColumnCall,
   AddEnumValuesCall,
@@ -84,7 +85,7 @@ export interface StrategyContext {
   readonly fromContract: Contract<SqlStorage> | null;
   readonly schemaName: string;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
@@ -123,7 +124,7 @@ function buildColumnSpec(
   const col = ctx.toContract.storage.tables[table]?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-  const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
+  const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance | SqlEnumType>;
   return {
     name: column,
     typeSql: buildColumnTypeSql(col, mutableHooks, mutableTypes),
@@ -141,7 +142,7 @@ function buildAlterTypeOptions(
   const col = ctx.toContract.storage.tables[table]?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-  const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
+  const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance | SqlEnumType>;
   const qualifiedTargetType = buildColumnTypeSql(col, mutableHooks, mutableTypes, false);
   const formatTypeExpected = buildExpectedFormatType(col, mutableHooks, mutableTypes);
   return {
@@ -278,11 +279,13 @@ function enumRebuildCallRecipe(
   typeName: string,
   ctx: StrategyContext,
 ): readonly PostgresOpFactoryCall[] {
-  const toTypes = asCodecTypedStorageTypes(ctx.toContract.storage.types);
-  const toType = toTypes[typeName];
+  const toType = ctx.toContract.storage.types?.[typeName];
   if (!toType) return [];
+  const isEnum = toType instanceof SqlEnumType;
   const nativeType = toType.nativeType;
-  const desiredValues = (toType.typeParams['values'] ?? []) as readonly string[];
+  const desiredValues: readonly string[] = isEnum
+    ? toType.values
+    : ((toType.typeParams['values'] ?? []) as readonly string[]);
   const tempName = `${nativeType}${REBUILD_SUFFIX}`;
 
   const columnRefs: { table: string; column: string }[] = [];
@@ -365,18 +368,104 @@ export const enumChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
 // ============================================================================
 
 /**
- * Dispatches storage types through their codec's `planTypeOperations` hook.
- * Replaces the walk-schema `buildStorageTypeOperations` path: the hook is
- * the authoritative source for codec-driven DDL (enum create/rebuild/add-
- * value, custom type creation, etc.).
+ * Native walk for `SqlEnumType` instances. Runs after
+ * `enumChangeCallStrategy` so the data-allowed structured path consumes
+ * `enum_values_changed` issues first; this strategy picks up the remaining
+ * cases (typically `db update` / `db init` where the policy excludes
+ * `'data'`):
  *
- * Runs after `enumChangeCallStrategy` so the structured enum path (value
- * add, rebuild recipe) gets first pick at `enum_values_changed` issues;
- * this strategy then handles remaining `type_missing` / `enum_values_changed`
- * issues for types whose hook produced at least one op.
+ * - `type_missing` → `CreateEnumTypeCall` with the contract's desired values.
+ * - `enum_values_changed` (add-only) → one `AddEnumValuesCall` per enum.
+ * - `enum_values_changed` requiring rebuild → the create-temp / migrate
+ *   columns / drop-original / rename rebuild recipe.
+ *
+ * Walks `SqlEnumType` instances directly from `toContract.storage.types`
+ * — no codec-hook dispatch — and resolves existing values via
+ * `readExistingEnumValues`, the same Postgres bridging adapter the
+ * verifier uses.
+ */
+export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
+  const enumTypes = collectSqlEnumTypes(ctx.toContract.storage.types);
+  if (enumTypes.size === 0) return { kind: 'no_match' };
+
+  // Only process enums whose typeName still has a relevant unresolved issue
+  // in `issues`. A previous strategy (e.g. `enumChangeCallStrategy`) may
+  // have already consumed `enum_values_changed` for the same type and
+  // emitted its own rebuild recipe; re-emitting here would produce a
+  // duplicate recipe and break the apply.
+  const relevantTypeNames = new Set<string>();
+  for (const issue of issues) {
+    if ((issue.kind === 'type_missing' || issue.kind === 'enum_values_changed') && issue.typeName) {
+      relevantTypeNames.add(issue.typeName);
+    }
+  }
+
+  const calls: PostgresOpFactoryCall[] = [];
+  const handledTypeNames = new Set<string>();
+
+  for (const [typeName, enumType] of enumTypes) {
+    if (!relevantTypeNames.has(typeName)) continue;
+    const desired = enumType.values;
+    const existing = readExistingEnumValues(ctx.schema, enumType.nativeType);
+    if (!existing) {
+      calls.push(new CreateEnumTypeCall(ctx.schemaName, typeName, desired, enumType.nativeType));
+      handledTypeNames.add(typeName);
+      continue;
+    }
+    const diff = determineEnumDiff(existing, desired);
+    if (diff.kind === 'unchanged') {
+      handledTypeNames.add(typeName);
+      continue;
+    }
+    if (diff.kind === 'add_values') {
+      calls.push(new AddEnumValuesCall(ctx.schemaName, typeName, enumType.nativeType, diff.values));
+      handledTypeNames.add(typeName);
+      continue;
+    }
+    // rebuild — emit the destructive recipe directly. No `DataTransformCall`
+    // placeholder here: when `'data'` is allowed, `enumChangeCallStrategy`
+    // has already consumed this issue (with the placeholder); when it's
+    // not allowed, the rebuild's PG `USING ::text` cast surfaces any
+    // value-removal data loss as a runtime error rather than silent loss.
+    calls.push(...enumRebuildCallRecipe(typeName, ctx));
+    handledTypeNames.add(typeName);
+  }
+
+  const remaining = issues.filter(
+    (issue) =>
+      !(
+        (issue.kind === 'type_missing' || issue.kind === 'enum_values_changed') &&
+        issue.typeName &&
+        handledTypeNames.has(issue.typeName)
+      ),
+  );
+
+  if (calls.length === 0 && remaining.length === issues.length) {
+    return { kind: 'no_match' };
+  }
+  return { kind: 'match', issues: remaining, calls };
+};
+
+function collectSqlEnumTypes(storageTypes: SqlStorage['types']): ReadonlyMap<string, SqlEnumType> {
+  const result = new Map<string, SqlEnumType>();
+  for (const [name, instance] of Object.entries(storageTypes ?? {}).sort(([a], [b]) =>
+    a.localeCompare(b),
+  )) {
+    if (instance instanceof SqlEnumType) {
+      result.set(name, instance);
+    }
+  }
+  return result;
+}
+
+/**
+ * Dispatches non-enum codec-typed storage types through their codec's
+ * `planTypeOperations` hook (the authoritative source for codec-driven DDL
+ * such as custom type creation). Enum dispatch lives in
+ * `nativeEnumPlanCallStrategy` and no longer relies on codec hooks.
  */
 export const storageTypePlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
-  const storageTypes = asCodecTypedStorageTypes(ctx.toContract.storage.types);
+  const storageTypes = ctx.toContract.storage.types ?? {};
   if (Object.keys(storageTypes).length === 0) return { kind: 'no_match' };
 
   const calls: PostgresOpFactoryCall[] = [];
@@ -385,6 +474,10 @@ export const storageTypePlanCallStrategy: CallMigrationStrategy = (issues, ctx) 
   for (const [typeName, typeInstance] of Object.entries(storageTypes).sort(([a], [b]) =>
     a.localeCompare(b),
   )) {
+    // Enums walk natively in `nativeEnumPlanCallStrategy`; codec-hook
+    // dispatch here is reserved for genuinely codec-typed entries
+    // (decimal, varchar, pgvector, …).
+    if (typeInstance instanceof SqlEnumType) continue;
     const hook = ctx.codecHooks.get(typeInstance.codecId);
     if (!hook?.planTypeOperations) continue;
     const planResult = hook.planTypeOperations({
@@ -451,7 +544,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
   const schemaLookups = buildSchemaLookupMap(ctx.schema);
 
   const mutableCodecHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-  const mutableStorageTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
+  const mutableStorageTypes = ctx.storageTypes as Record<string, StorageTypeInstance | SqlEnumType>;
 
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
@@ -621,6 +714,7 @@ export const postgresPlannerStrategies: readonly CallMigrationStrategy[] = [
   notNullBackfillCallStrategy,
   typeChangeCallStrategy,
   nullableTighteningCallStrategy,
+  nativeEnumPlanCallStrategy,
   storageTypePlanCallStrategy,
   notNullAddColumnCallStrategy,
 ];

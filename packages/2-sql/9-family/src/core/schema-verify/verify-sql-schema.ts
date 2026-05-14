@@ -81,6 +81,21 @@ export interface VerifySqlSchemaOptions {
    * with contract native types (e.g., Postgres 'varchar' → 'character varying').
    */
   readonly normalizeNativeType?: NativeTypeNormalizer;
+  /**
+   * Bridging adapter that resolves the existing values for a `SqlEnumType`
+   * (looked up by its native type) from the introspected schema IR. Targets
+   * supply this so the family-level verifier can walk `SqlEnumType` instances
+   * natively without reaching into target-specific `schema.annotations`
+   * shapes itself.
+   *
+   * Returning `null` indicates the type is missing from the database; the
+   * verifier emits a `type_missing` issue. A non-null array triggers a
+   * value-set comparison against the contract's `SqlEnumType.values`.
+   */
+  readonly resolveExistingEnumValues?: (
+    schema: SqlSchemaIR,
+    enumType: SqlEnumType,
+  ) => readonly string[] | null;
 }
 
 /**
@@ -102,6 +117,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     typeMetadataRegistry,
     normalizeDefault,
     normalizeNativeType,
+    resolveExistingEnumValues,
   } = options;
   const startTime = Date.now();
 
@@ -124,32 +140,26 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
 
-  // Verify storage type instances via codec control hooks (pure, deterministic)
+  // Verify storage type instances. SqlEnumType entries are walked
+  // natively (using the bridging adapter `resolveExistingEnumValues`);
+  // remaining codec-typed entries continue to dispatch through the
+  // generic codec-hook `verifyType` path.
   const storageTypeEntries = Object.entries(storageTypes);
   if (storageTypeEntries.length > 0) {
     const typeNodes: SchemaVerificationNode[] = [];
     for (const [typeName, typeInstance] of storageTypeEntries) {
-      // Polymorphic dispatch (Decision 18, Option B): enum entries
-      // surface their per-target codec binding so the existing
-      // codec-hook verifier path stays wired in R1a; R1b removes the
-      // codec-hook branch entirely once the per-IR enum verifier
-      // walk is in place.
-      const codecId =
-        typeInstance instanceof SqlEnumType
-          ? typeInstance.codecBinding.codecId
-          : typeInstance.codecId;
-      const hook = codecHooks.get(codecId);
-      const codecHookTypeInstance: StorageTypeInstance =
-        typeInstance instanceof SqlEnumType
-          ? ({
-              codecId: typeInstance.codecBinding.codecId,
-              nativeType: typeInstance.nativeType,
-              typeParams: typeInstance.codecBinding.typeParams,
-            } as unknown as StorageTypeInstance)
-          : typeInstance;
-      const typeIssues = hook?.verifyType
-        ? hook.verifyType({ typeName, typeInstance: codecHookTypeInstance, schema })
-        : [];
+      let typeIssues: readonly SchemaIssue[];
+      if (typeInstance instanceof SqlEnumType) {
+        typeIssues = verifyEnumType({
+          typeName,
+          typeInstance,
+          schema,
+          resolveExistingEnumValues,
+        });
+      } else {
+        const hook = codecHooks.get(typeInstance.codecId);
+        typeIssues = hook?.verifyType ? hook.verifyType({ typeName, typeInstance, schema }) : [];
+      }
       if (typeIssues.length > 0) {
         issues.push(...typeIssues);
       }
@@ -231,6 +241,56 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 }
 
 type VerificationStatus = 'pass' | 'warn' | 'fail';
+
+/**
+ * Native verification walk for `SqlEnumType` instances (no codec hook).
+ *
+ * Bridges the native `SqlEnumType.values` against the introspected schema
+ * IR via the target-supplied `resolveExistingEnumValues` adapter. Without an
+ * adapter, the verifier conservatively reports the enum as missing — there
+ * is no other way for the family layer to learn about live enum types.
+ */
+function verifyEnumType(options: {
+  readonly typeName: string;
+  readonly typeInstance: SqlEnumType;
+  readonly schema: SqlSchemaIR;
+  readonly resolveExistingEnumValues?:
+    | ((schema: SqlSchemaIR, enumType: SqlEnumType) => readonly string[] | null)
+    | undefined;
+}): readonly SchemaIssue[] {
+  const { typeName, typeInstance, schema, resolveExistingEnumValues } = options;
+  const desired = typeInstance.values;
+  const existing = resolveExistingEnumValues?.(schema, typeInstance) ?? null;
+  if (!existing) {
+    return [
+      {
+        kind: 'type_missing',
+        typeName,
+        message: `Type "${typeName}" is missing from database`,
+      },
+    ];
+  }
+  if (arraysEqual(existing, desired)) {
+    return [];
+  }
+  const existingSet = new Set(existing);
+  const desiredSet = new Set(desired);
+  const addedValues = desired.filter((v) => !existingSet.has(v));
+  const removedValues = existing.filter((v) => !desiredSet.has(v));
+  const message =
+    removedValues.length === 0
+      ? `Enum type "${typeName}" needs new values: ${addedValues.join(', ')}`
+      : `Enum type "${typeName}" values changed (requires rebuild): +[${addedValues.join(', ')}] -[${removedValues.join(', ')}]`;
+  return [
+    {
+      kind: 'enum_values_changed' as const,
+      typeName,
+      addedValues,
+      removedValues,
+      message,
+    },
+  ];
+}
 
 function extractContractMetadata(contract: Contract<SqlStorage>): {
   contractStorageHash: SqlStorage['storageHash'];

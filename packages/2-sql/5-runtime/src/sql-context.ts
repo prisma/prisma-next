@@ -24,7 +24,11 @@ import {
 } from '@prisma-next/framework-components/execution';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
-import { SqlEnumType, type SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  SqlEnumType,
+  type SqlStorage,
+  type StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import {
   createSqlOperationRegistry,
   type SqlOperationDescriptors,
@@ -217,6 +221,43 @@ export function assertExecutionStackContractRequirements(
   }
 }
 
+/**
+ * Resolves codec id + typeParams for a `SqlStorage.types` entry that
+ * represents an enum, accommodating two shapes:
+ *   - hydrated `SqlEnumType` instance (uses prototype `codecBinding`)
+ *   - raw JSON envelope with `kind: 'sql-enum-type'` (carries
+ *     `codecId` as enumerable own property + `values` array)
+ * Returns `undefined` when the entry is not enum-shaped, so callers
+ * fall through to the codec-typed path.
+ */
+function readEnumViewIfApplicable(
+  typeInstance: unknown,
+): { readonly codecId: string; readonly typeParams: Record<string, unknown> } | undefined {
+  if (typeInstance instanceof SqlEnumType) {
+    return {
+      codecId: typeInstance.codecBinding.codecId,
+      typeParams: typeInstance.codecBinding.typeParams as Record<string, unknown>,
+    };
+  }
+  if (
+    typeof typeInstance === 'object' &&
+    typeInstance !== null &&
+    (typeInstance as { kind?: string }).kind === 'sql-enum-type'
+  ) {
+    const enumLike = typeInstance as {
+      readonly codecId?: string;
+      readonly values?: readonly string[];
+    };
+    if (enumLike.codecId !== undefined) {
+      return {
+        codecId: enumLike.codecId,
+        typeParams: { values: enumLike.values ?? [] },
+      };
+    }
+  }
+  return undefined;
+}
+
 function validateTypeParams(
   typeParams: Record<string, unknown>,
   descriptor: RuntimeParameterizedCodecDescriptor,
@@ -315,14 +356,11 @@ function initializeTypeHelpers(
   const typeRefSites = collectTypeRefSites(storage);
 
   for (const [typeName, typeInstance] of Object.entries(storageTypes)) {
-    const codecId =
-      typeInstance instanceof SqlEnumType
-        ? typeInstance.codecBinding.codecId
-        : typeInstance.codecId;
-    const typeParams =
-      typeInstance instanceof SqlEnumType
-        ? (typeInstance.codecBinding.typeParams as Record<string, unknown>)
-        : typeInstance.typeParams;
+    const enumView = readEnumViewIfApplicable(typeInstance);
+    const codecId = enumView ? enumView.codecId : (typeInstance as StorageTypeInstance).codecId;
+    const typeParams = enumView
+      ? enumView.typeParams
+      : (typeInstance as StorageTypeInstance).typeParams;
     const descriptor = codecDescriptors.get(codecId);
 
     if (!descriptor) {
@@ -465,16 +503,16 @@ function buildContractCodecRegistry(
 
   const typeRefSites = collectTypeRefSites(contract.storage);
   for (const [typeName, typeInstance] of Object.entries(contract.storage.types ?? {})) {
-    const ref: CodecRef =
-      typeInstance instanceof SqlEnumType
-        ? {
-            codecId: typeInstance.codecBinding.codecId,
-            typeParams: typeInstance.codecBinding.typeParams as unknown as JsonValue,
-          }
-        : {
-            codecId: typeInstance.codecId,
-            typeParams: typeInstance.typeParams as JsonValue,
-          };
+    const enumView = readEnumViewIfApplicable(typeInstance);
+    const ref: CodecRef = enumView
+      ? {
+          codecId: enumView.codecId,
+          typeParams: enumView.typeParams as unknown as JsonValue,
+        }
+      : {
+          codecId: (typeInstance as StorageTypeInstance).codecId,
+          typeParams: (typeInstance as StorageTypeInstance).typeParams as JsonValue,
+        };
     const key = refKeyOf(ref);
     const sites = typeRefSites.get(typeName) ?? [];
     const existing = usedAtByKey.get(key);

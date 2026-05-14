@@ -5,7 +5,7 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
-import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { SqlEnumType, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { buildSqlContractFromDefinition } from './build-contract';
 import {
   type ComposedAuthoringHelpers,
@@ -44,7 +44,7 @@ type ModelLike = {
 type ContractDefinition<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
-  Types extends Record<string, StorageTypeInstance>,
+  Types extends Record<string, StorageTypeInstance | SqlEnumType>,
   Models extends Record<string, ModelLike>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
   Capabilities extends Record<string, Record<string, boolean>> | undefined,
@@ -86,7 +86,7 @@ type ContractScaffold<
 type ContractFactory<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
-  Types extends Record<string, StorageTypeInstance>,
+  Types extends Record<string, StorageTypeInstance | SqlEnumType>,
   Models extends Record<string, ModelLike>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
 > = (helpers: ComposedAuthoringHelpers<Family, Target, ExtensionPacks>) => {
@@ -159,7 +159,7 @@ function buildContractFromDsl(
 export function defineContract<
   const Family extends FamilyPackRef<string>,
   const Target extends TargetPackRef<'sql', string>,
-  const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
+  const Types extends Record<string, StorageTypeInstance | SqlEnumType> = Record<never, never>,
   const Models extends Record<string, ModelLike> = Record<never, never>,
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
@@ -196,7 +196,7 @@ export function defineContract<
 export function defineContract<
   const Family extends FamilyPackRef<string>,
   const Target extends TargetPackRef<'sql', string>,
-  const Types extends Record<string, StorageTypeInstance> = Record<never, never>,
+  const Types extends Record<string, StorageTypeInstance | SqlEnumType> = Record<never, never>,
   const Models extends Record<string, ModelLike> = Record<never, never>,
   const ExtensionPacks extends
     | Record<string, ExtensionPackRef<'sql', string>>
@@ -234,7 +234,7 @@ export function defineContract(
   factory?: ContractFactory<
     FamilyPackRef<string>,
     TargetPackRef<'sql', string>,
-    Record<string, StorageTypeInstance>,
+    Record<string, StorageTypeInstance | SqlEnumType>,
     Record<string, ModelLike>,
     Record<string, ExtensionPackRef<'sql', string>> | undefined
   >,

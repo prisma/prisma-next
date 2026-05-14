@@ -1,5 +1,9 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
-import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import {
+  SqlEnumType,
+  type StorageColumn,
+  type StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 /**
@@ -10,12 +14,24 @@ import { ifDefined } from '@prisma-next/utils/defined';
 export function resolveIdentityValue(
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
-  storageTypes: Record<string, StorageTypeInstance> = {},
+  storageTypes: Record<string, StorageTypeInstance | SqlEnumType> = {},
 ): string | null {
   const referencedType = column.typeRef ? storageTypes[column.typeRef] : undefined;
-  const codecId = referencedType?.codecId ?? column.codecId;
+  const referencedBinding =
+    referencedType instanceof SqlEnumType ? referencedType.codecBinding : undefined;
+  const codecId =
+    referencedBinding?.codecId ??
+    (referencedType && !(referencedType instanceof SqlEnumType)
+      ? referencedType.codecId
+      : undefined) ??
+    column.codecId;
   const nativeType = referencedType?.nativeType ?? column.nativeType;
-  const typeParams = referencedType?.typeParams ?? column.typeParams;
+  const typeParams =
+    (referencedBinding?.typeParams as Record<string, unknown> | undefined) ??
+    (referencedType && !(referencedType instanceof SqlEnumType)
+      ? referencedType.typeParams
+      : undefined) ??
+    column.typeParams;
 
   if (codecId) {
     const hookDefault = codecHooks.get(codecId)?.resolveIdentityValue?.({

@@ -17,7 +17,6 @@ import type {
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
-import { asCodecTypedStorageTypes } from '@prisma-next/sql-contract/types';
 import { parseSqliteDefault } from '../default-normalizer';
 import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
@@ -99,7 +98,7 @@ export class SqliteMigrationPlanner
 
     const schemaIssues = this.collectSchemaIssues(options);
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
-    const storageTypes = asCodecTypedStorageTypes(options.contract.storage.types);
+    const storageTypes = options.contract.storage.types ?? {};
 
     const result = planIssues({
       issues: schemaIssues,

@@ -139,7 +139,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:a6df4595908c566f5eff18d0eb1025fd026a6dce4beae2f9b86e6073899a7e71",
+    "storageHash": "sha256:6e10ac0b197fed00a87c1836c53b7af31d3c23d8e75e3903c16d9c9cd805a80b",
     "tables": {
       "post": {
         "columns": {
@@ -262,10 +262,10 @@
       },
       "Role": {
         "codecId": "pg/enum@1",
+        "kind": "sql-enum-type",
+        "name": "Role",
         "nativeType": "Role",
-        "typeParams": {
-          "values": ["USER", "ADMIN"]
-        }
+        "values": ["USER", "ADMIN"]
       }
     }
   },
