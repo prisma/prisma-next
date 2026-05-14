@@ -104,11 +104,14 @@ describe('family instance schemaVerify', () => {
           const frameworkComponents: ReadonlyArray<
             TargetBoundComponentDescriptor<'sql', 'postgres'>
           > = [postgres, postgresAdapter];
-          const result = await familyInstance.schemaVerify({
+          const schema = await familyInstance.introspect({
             driver,
             contract: validatedContract,
+          });
+          const result = familyInstance.verifySchema({
+            contract: validatedContract,
+            schema,
             strict: false,
-            context: { contractPath: './contract.json' },
             frameworkComponents,
           });
 
@@ -186,11 +189,14 @@ describe('family instance schemaVerify', () => {
           const frameworkComponents: ReadonlyArray<
             TargetBoundComponentDescriptor<'sql', 'postgres'>
           > = [postgres, postgresAdapter];
-          const result = await familyInstance.schemaVerify({
+          const schema = await familyInstance.introspect({
             driver,
             contract: validatedContract,
+          });
+          const result = familyInstance.verifySchema({
+            contract: validatedContract,
+            schema,
             strict: false,
-            context: { contractPath: './contract.json' },
             frameworkComponents,
           });
 
@@ -262,11 +268,14 @@ describe('family instance schemaVerify', () => {
           const frameworkComponents: ReadonlyArray<
             TargetBoundComponentDescriptor<'sql', 'postgres'>
           > = [postgres, postgresAdapter];
-          const result = await familyInstance.schemaVerify({
+          const schema = await familyInstance.introspect({
             driver,
             contract: validatedContract,
+          });
+          const result = familyInstance.verifySchema({
+            contract: validatedContract,
+            schema,
             strict: false,
-            context: { contractPath: './contract.json' },
             frameworkComponents,
           });
 

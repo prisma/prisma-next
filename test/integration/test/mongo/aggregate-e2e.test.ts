@@ -299,11 +299,15 @@ describe(
         // surface as strict-mode extras; non-strict elides those
         // warnings while genuine drift on a contract-declared index
         // still escalates to a failure.
-        const extVerify = await instance.schemaVerify({
-          driver: makeDriver(driver),
+        const extDriver = makeDriver(driver);
+        const extSchema = await instance.introspect({
+          driver: extDriver,
           contract: extContract,
+        });
+        const extVerify = instance.verifySchema({
+          contract: extContract,
+          schema: extSchema,
           strict: false,
-          contractPath: '/test/ext/contract.json',
           frameworkComponents: [],
         });
         expect(extVerify.ok).toBe(false);

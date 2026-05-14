@@ -161,11 +161,15 @@ describe(
         await db.collection('users').createIndex({ email: 1 }, { unique: true });
 
         const instance = createInstance();
-        const result = await instance.schemaVerify({
-          driver: makeDriver(),
+        const driver = makeDriver();
+        const schema = await instance.introspect({
+          driver,
           contract: baseContract,
+        });
+        const result = instance.verifySchema({
+          contract: baseContract,
+          schema,
           strict: false,
-          contractPath: '/test/contract.json',
           frameworkComponents: [],
         });
 
@@ -177,11 +181,15 @@ describe(
         await db.createCollection('users');
 
         const instance = createInstance();
-        const result = await instance.schemaVerify({
-          driver: makeDriver(),
+        const driver = makeDriver();
+        const schema = await instance.introspect({
+          driver,
           contract: baseContract,
+        });
+        const result = instance.verifySchema({
+          contract: baseContract,
+          schema,
           strict: false,
-          contractPath: '/test/contract.json',
           frameworkComponents: [],
         });
 
@@ -196,11 +204,15 @@ describe(
         await db.collection('users').createIndex({ createdAt: -1 });
 
         const instance = createInstance();
-        const result = await instance.schemaVerify({
-          driver: makeDriver(),
+        const driver = makeDriver();
+        const schema = await instance.introspect({
+          driver,
           contract: baseContract,
+        });
+        const result = instance.verifySchema({
+          contract: baseContract,
+          schema,
           strict: false,
-          contractPath: '/test/contract.json',
           frameworkComponents: [],
         });
 
@@ -214,11 +226,15 @@ describe(
         await db.collection('users').createIndex({ createdAt: -1 });
 
         const instance = createInstance();
-        const result = await instance.schemaVerify({
-          driver: makeDriver(),
+        const driver = makeDriver();
+        const schema = await instance.introspect({
+          driver,
           contract: baseContract,
+        });
+        const result = instance.verifySchema({
+          contract: baseContract,
+          schema,
           strict: true,
-          contractPath: '/test/contract.json',
           frameworkComponents: [],
         });
 
@@ -228,11 +244,15 @@ describe(
 
       it('fails when expected collection is missing', async () => {
         const instance = createInstance();
-        const result = await instance.schemaVerify({
-          driver: makeDriver(),
+        const driver = makeDriver();
+        const schema = await instance.introspect({
+          driver,
           contract: baseContract,
+        });
+        const result = instance.verifySchema({
+          contract: baseContract,
+          schema,
           strict: false,
-          contractPath: '/test/contract.json',
           frameworkComponents: [],
         });
 

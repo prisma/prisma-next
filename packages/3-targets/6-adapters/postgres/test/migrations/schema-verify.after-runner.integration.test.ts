@@ -97,9 +97,13 @@ describe.sequential('Schema verification after runner - integration', () => {
     it('returns ok: true', { timeout: testTimeout }, async () => {
       await runSuccessfulMigration(driver!);
 
-      const result = await familyInstance.schemaVerify({
+      const schema = await familyInstance.introspect({
         driver: driver!,
-        contract: contract,
+        contract,
+      });
+      const result = familyInstance.verifySchema({
+        contract,
+        schema,
         strict: false,
         frameworkComponents,
       });
@@ -148,9 +152,13 @@ describe.sequential('Schema verification after runner - integration', () => {
 
       await runSuccessfulMigrationForContract(driver!, contractWithDefaults);
 
-      const result = await familyInstance.schemaVerify({
+      const schema = await familyInstance.introspect({
         driver: driver!,
         contract: contractWithDefaults,
+      });
+      const result = familyInstance.verifySchema({
+        contract: contractWithDefaults,
+        schema,
         strict: false,
         frameworkComponents,
       });
@@ -210,9 +218,13 @@ describe.sequential('Schema verification after runner - integration', () => {
         await runSuccessfulMigrationForContract(driver!, enumContract);
 
         // Also verify via familyInstance.schemaVerify for completeness
-        const result = await familyInstance.schemaVerify({
+        const schema = await familyInstance.introspect({
           driver: driver!,
           contract: enumContract,
+        });
+        const result = familyInstance.verifySchema({
+          contract: enumContract,
+          schema,
           strict: false,
           frameworkComponents,
         });
@@ -230,9 +242,13 @@ describe.sequential('Schema verification after runner - integration', () => {
       // Mutate the database: make email nullable (was NOT NULL)
       await driver!.query('ALTER TABLE "user" ALTER COLUMN email DROP NOT NULL');
 
-      const result = await familyInstance.schemaVerify({
+      const schema = await familyInstance.introspect({
         driver: driver!,
-        contract: contract,
+        contract,
+      });
+      const result = familyInstance.verifySchema({
+        contract,
+        schema,
         strict: false,
         frameworkComponents,
       });
@@ -253,9 +269,13 @@ describe.sequential('Schema verification after runner - integration', () => {
       // Mutate the database: drop the email column
       await driver!.query('ALTER TABLE "user" DROP COLUMN email');
 
-      const result = await familyInstance.schemaVerify({
+      const schema = await familyInstance.introspect({
         driver: driver!,
-        contract: contract,
+        contract,
+      });
+      const result = familyInstance.verifySchema({
+        contract,
+        schema,
         strict: false,
         frameworkComponents,
       });
@@ -277,9 +297,13 @@ describe.sequential('Schema verification after runner - integration', () => {
       // PostgreSQL allows this type change
       await driver!.query('ALTER TABLE "user" ALTER COLUMN email TYPE varchar(255)');
 
-      const result = await familyInstance.schemaVerify({
+      const schema = await familyInstance.introspect({
         driver: driver!,
-        contract: contract,
+        contract,
+      });
+      const result = familyInstance.verifySchema({
+        contract,
+        schema,
         strict: false,
         frameworkComponents,
       });

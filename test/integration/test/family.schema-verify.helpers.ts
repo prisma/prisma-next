@@ -87,7 +87,7 @@ export async function withDriver<T>(
 }
 
 /**
- * Runs schemaVerify and returns the result.
+ * Introspects the live schema and verifies it against the contract.
  */
 export async function runSchemaVerify(
   connectionString: string,
@@ -105,11 +105,11 @@ export async function runSchemaVerify(
       postgresAdapter,
       ...(options.extensions ?? []),
     ];
-    return familyInstance.schemaVerify({
-      driver,
+    const schema = await familyInstance.introspect({ driver, contract: validatedContract });
+    return familyInstance.verifySchema({
       contract: validatedContract,
+      schema,
       strict: options.strict ?? false,
-      context: { contractPath: './contract.json' },
       frameworkComponents,
     });
   });
