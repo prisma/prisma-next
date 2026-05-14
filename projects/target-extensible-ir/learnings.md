@@ -133,3 +133,21 @@ Decision recorded at `wip/unattended-decisions.md § 16`.
 **Action.** **Workspace-wide `pnpm typecheck` is the standing final gate** for every implementer round before reporting done. If the workspace typecheck fails on stale `dist/` from a published-types change, run the targeted rebuilds (`pnpm --filter <changed-pkg> build`) then re-typecheck. The cost is one extra typecheck run per round (~10-30s); the benefit is no escapees handed to the reviewer or to subsequent rounds.
 
 This pattern was promoted from "implementer recommendation" to "standing implementer gate" at M3.5 R1b close-out after the M3 + M3.5 R1 rounds repeatedly demonstrated the necessity. Reviewers re-run workspace typecheck independently as part of their gate set; implementers running it before declaring done eliminates the round-extending fix-commit cycle.
+
+## Pattern: planner-strategy `recipe` flag is dependency-ordering-aware (recipe vs dep bucket)
+
+**Shape.** Postgres planner strategies emit `Op` calls grouped into either a `recipe` (contiguous sequence that must run together; e.g. `createTemp → alter → drop → rename` for an enum rebuild) or the planner's `dep` bucket (loose calls that the planner orders by dependency). Strategies signal this via the `recipe: boolean` field on their `match` return value. Discovered at M4 R1c: the choice is **per-emission**, not per-strategy.
+
+**Why it matters.** Returning `recipe: true` unconditionally for the collapsed `nativeEnumPlanCallStrategy` regressed the initial-apply path: `CreateEnumTypeCall` landed at the recipe slot *after* `CreateTableCall`, so `CREATE TABLE` referencing the new enum failed with `type "status" does not exist`. The fix is dynamic — the strategy decides per-call:
+
+- Pure create / add-values walks → `recipe: false` → `CreateEnumTypeCall` hoists to `dep` bucket → runs before tables (correct dependency ordering).
+- Rebuild walks (`createTemp → alter → drop → rename`) → `recipe: true` → contiguous recipe slot is preserved (correct atomicity).
+
+**Action.** When writing or modifying a planner strategy that emits multiple `Op` builder kinds, decide `recipe` per-emission based on whether the emitted calls have inter-call ordering dependencies that the dep bucket can't express:
+
+- If the emission is a single call that the planner's dep ordering can place correctly relative to other strategies' calls (typical for `Create*` / `Drop*` of independent objects) → `recipe: false`.
+- If the emission is a multi-call sequence whose internal ordering is not encoded as dep edges (typical for swap-style rebuilds: temp → migrate → drop → rename) → `recipe: true`.
+
+**Edge case to surface in code comments.** A single plan that needs both a brand-new object (recipe-false slot) and a rebuild on a different object of the same kind (recipe-true slot) is unrepresentable in the current single-strategy single-match model — would need two `match` returns or a more expressive return shape. Today's strategy walks all enum issues in one pass, so this edge case isn't reachable; record the limitation in comments at the strategy site so the next collapsed-strategy author hits the surface signal rather than rediscovering it.
+
+**Architectural smell pointer.** The fact that a strategy needs a per-emission `recipe` flag suggests the underlying abstraction conflates two responsibilities: emitting `Op` calls and declaring their inter-call ordering constraints. A cleaner shape might separate "emit calls" from "declare a recipe boundary around these calls" — but the current shape is workable as long as strategies are dynamic about it. Worth revisiting if a future milestone earns a multi-recipe single-strategy emission case.
