@@ -11,10 +11,10 @@ import { MongoTargetStorage } from './mongo-target-storage';
  * class instance.
  *
  * The class instance carries the family-promised `namespaces` field;
- * default namespaces is `{ __unspecified__: MongoTargetUnspecifiedDatabase.instance }`
+ * default namespaces is `{ [UNSPECIFIED_NAMESPACE_ID]: MongoTargetUnspecifiedDatabase.instance }`
  * (the storage class's own default), so contracts authored before
- * multi-namespace support (M5a) bind to the unspecified singleton
- * without the call site declaring anything.
+ * multi-namespace support bind to the unspecified singleton without
+ * the call site declaring anything.
  *
  * `validated.storage.collections` already carries `MongoCollection` IR
  * class instances by the time this method runs — the family-base
@@ -38,9 +38,9 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
    * for its live-instance API but that don't belong in the persisted
    * envelope: `MongoTargetStorage.namespaces` is a Namespace-class
    * map the verifier and runtime walk; the persisted shape omits it
-   * (today's contracts have a single implicit `__unspecified__`
-   * namespace; M5a introduces explicit per-collection assignment
-   * which will surface in JSON via a different field).
+   * (today's contracts have a single implicit unspecified namespace;
+   * future explicit per-collection assignment will surface in JSON
+   * via a different field).
    *
    * Constructing the JsonObject here — rather than relying on
    * non-enumerable property tricks at the storage class — keeps the
@@ -49,6 +49,13 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
    */
   override serializeContract(contract: MongoTargetContract): JsonObject {
     const { storage, ...rest } = contract;
+    // `as unknown as JsonObject` because the returned literal mixes
+    // `MongoCollection` class instances under `storage.collections` with
+    // the JSON-clean remainder of the contract envelope. The class
+    // instances are JSON-clean by construction (their `kind` literal is
+    // enumerable; nested IR shapes are normalised by the constructor),
+    // so the canonical-stringify pass produces correct output, but the
+    // structural type system doesn't know `MongoCollection` is JSON-safe.
     return {
       ...rest,
       storage: {

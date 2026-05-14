@@ -1,4 +1,8 @@
-import { freezeNode, NamespaceBase } from '@prisma-next/framework-components/ir';
+import {
+  freezeNode,
+  NamespaceBase,
+  UNSPECIFIED_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 
 /**
  * Mongo target `Namespace` concretion. In Mongo the "namespace" concept
@@ -9,7 +13,7 @@ import { freezeNode, NamespaceBase } from '@prisma-next/framework-components/ir'
  * namespace for its qualifier (e.g. `"<db>.<collection>"`) and consumes
  * the result polymorphically. The unspecified singleton overrides these
  * methods to elide the prefix entirely — call sites stay polymorphic and
- * never branch on `id === '__unspecified__'`.
+ * never branch on `id === UNSPECIFIED_NAMESPACE_ID`.
  */
 export class MongoTargetDatabase extends NamespaceBase {
   readonly kind = 'database' as const;
@@ -42,8 +46,8 @@ export class MongoTargetDatabase extends NamespaceBase {
 
 /**
  * Singleton subclass for the reserved sentinel namespace id
- * `'__unspecified__'`. Overrides qualifier emission to elide the
- * database prefix — call sites that consume `qualifier()` /
+ * (`UNSPECIFIED_NAMESPACE_ID`). Overrides qualifier emission to elide
+ * the database prefix — call sites that consume `qualifier()` /
  * `qualifyCollection()` get unqualified output without branching on the
  * namespace id.
  *
@@ -56,7 +60,7 @@ export class MongoTargetUnspecifiedDatabase extends MongoTargetDatabase {
   static readonly instance: MongoTargetUnspecifiedDatabase = new MongoTargetUnspecifiedDatabase();
 
   private constructor() {
-    super('__unspecified__');
+    super(UNSPECIFIED_NAMESPACE_ID);
   }
 
   override qualifier(): string {

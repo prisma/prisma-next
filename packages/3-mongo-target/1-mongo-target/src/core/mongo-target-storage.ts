@@ -1,6 +1,10 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
 import { MongoStorageBase } from '@prisma-next/family-mongo/ir';
-import type { Namespace } from '@prisma-next/framework-components/ir';
+import {
+  freezeNode,
+  type Namespace,
+  UNSPECIFIED_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import type { MongoCollection } from '@prisma-next/mongo-contract';
 import { MongoTargetUnspecifiedDatabase } from './mongo-target-database';
 
@@ -20,7 +24,7 @@ export interface MongoTargetStorageCtor {
  *   the family base intentionally does not commit to (collections are
  *   Mongo-target-shaped, not generic across the family).
  *
- * Default namespaces is `{ __unspecified__: MongoTargetUnspecifiedDatabase.instance }`
+ * Default namespaces is `{ [UNSPECIFIED_NAMESPACE_ID]: MongoTargetUnspecifiedDatabase.instance }`
  * — all collections in a default contract live under the unspecified
  * singleton until per-collection namespace assignment lands.
  *
@@ -43,8 +47,8 @@ export class MongoTargetStorage extends MongoStorageBase {
     this.namespaces =
       options.namespaces ??
       ({
-        __unspecified__: MongoTargetUnspecifiedDatabase.instance,
+        [UNSPECIFIED_NAMESPACE_ID]: MongoTargetUnspecifiedDatabase.instance,
       } as const);
-    Object.freeze(this);
+    freezeNode(this);
   }
 }

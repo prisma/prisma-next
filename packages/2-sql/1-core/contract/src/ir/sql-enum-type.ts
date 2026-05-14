@@ -42,9 +42,11 @@ export abstract class SqlEnumType extends SqlNode {
    *
    * Declared as a prototype-level abstract accessor so it lives on
    * the prototype (not instance own-properties) and stays out of the
-   * JSON envelope automatically — only `kind`, `name`, `nativeType`,
-   * and `values` are enumerable own properties on a constructed
-   * `SqlEnumType`.
+   * JSON envelope automatically — `kind`, `name`, `nativeType`, and
+   * `values` are the enumerable own properties contributed by this
+   * family base. Concrete subclasses may add additional enumerable
+   * own properties (e.g. `PostgresEnumType.codecId`) when the
+   * persisted envelope demands them.
    */
   abstract get codecBinding(): {
     readonly codecId: string;

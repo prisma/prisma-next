@@ -58,6 +58,9 @@ export class PostgresEnumType<
     super();
     this.name = input.name;
     this.nativeType = input.nativeType ?? input.name;
+    // `Object.freeze` returns `Readonly<string[]>`, widening past the
+    // `TValues` literal tuple. Cast preserves the caller-supplied
+    // tuple shape so inferred contract types retain literal narrowing.
     this.values = Object.freeze([...input.values] as unknown as TValues);
     freezeNode(this);
   }

@@ -4,7 +4,7 @@ import mongoAdapter from '@prisma-next/adapter-mongo/control';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { ContractSourceContext } from '@prisma-next/cli/config-types';
 import { enrichContract } from '@prisma-next/cli/control-api';
-import type { CanonicalSerializeContract } from '@prisma-next/contract/hashing';
+import type { SerializeContract } from '@prisma-next/contract/hashing';
 import type { Contract } from '@prisma-next/contract/types';
 import { emit } from '@prisma-next/emitter';
 import { mongoFamilyDescriptor } from '@prisma-next/family-mongo/control';
@@ -246,7 +246,7 @@ describe('side-by-side contract examples', () => {
       };
       expect(stripValidatorFields(normalizedTs)).toEqual(stripValidatorFields(normalizedPsl));
 
-      const mongoSerializeContract: CanonicalSerializeContract = (contract) =>
+      const mongoSerializeContract: SerializeContract = (contract) =>
         mongoTargetDescriptor.contractSerializer.serializeContract(contract as MongoTargetContract);
       const emittedTs = await emit(normalizedTs, mongoStack, mongoFamilyDescriptor.emission, {
         serializeContract: mongoSerializeContract,

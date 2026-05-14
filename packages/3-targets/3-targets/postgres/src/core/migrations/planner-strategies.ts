@@ -359,6 +359,8 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
 
   const calls: PostgresOpFactoryCall[] = [];
   const handledTypeNames = new Set<string>();
+  const introducedTypeNames = new Set<string>();
+  const rebuiltTypeNames = new Set<string>();
   let emittedRebuildRecipe = false;
 
   for (const [typeName, enumType] of enumTypes) {
@@ -367,6 +369,7 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
     if (!existing) {
       calls.push(new CreateEnumTypeCall(ctx.schemaName, typeName, desired, enumType.nativeType));
       handledTypeNames.add(typeName);
+      introducedTypeNames.add(typeName);
       continue;
     }
     const diff = determineEnumDiff(existing, desired);
@@ -391,6 +394,22 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
     calls.push(...enumRebuildCallRecipe(typeName, ctx));
     emittedRebuildRecipe = true;
     handledTypeNames.add(typeName);
+    rebuiltTypeNames.add(typeName);
+  }
+
+  // The strategy emits a single `recipe` flag for the entire pass,
+  // which routes every emitted call to either the contiguous recipe
+  // slot (rebuild path) or the `dep` bucket (introduce / add-values
+  // path). A plan that needs both shapes simultaneously cannot be
+  // expressed today — the introduced `CreateEnumTypeCall` would land
+  // in the recipe slot and any `CreateTableCall` referencing the new
+  // enum would fail at runtime with a confusing `type "X" does not
+  // exist` error. Surface the unrepresentable case here as a
+  // planner-time error so the failure mode is loud, not silent.
+  if (introducedTypeNames.size > 0 && rebuiltTypeNames.size > 0) {
+    throw new Error(
+      `nativeEnumPlanCallStrategy: cannot emit both a brand-new enum and a rebuild on a different enum in the same plan; the single recipe flag cannot route them to different buckets. Introduced: [${[...introducedTypeNames].sort().join(', ')}]; rebuilt: [${[...rebuiltTypeNames].sort().join(', ')}]. Split the strategy or grow the \`match\` return type before this case lands.`,
+    );
   }
 
   const remaining = issues.filter(
@@ -683,6 +702,13 @@ function canUseSharedTemporaryDefaultStrategy(options: {
  *   `db init` it emits the rebuild recipe without the data-transform
  *   placeholder so value-removal data loss surfaces as a runtime cast
  *   error rather than silent loss.
+ *
+ * Enum dispatch is unified into a single strategy: the
+ * `nativeEnumPlanCallStrategy` decides per-emission whether to emit a
+ * rebuild recipe (`recipe: true`, contiguous slot) or hoist the call
+ * into the `dep` bucket (`recipe: false`, so a brand-new
+ * `CreateEnumTypeCall` runs before any `CreateTableCall` referencing
+ * it). Codec-typed entries continue through `storageTypePlanCallStrategy`.
  */
 export const postgresPlannerStrategies: readonly CallMigrationStrategy[] = [
   notNullBackfillCallStrategy,

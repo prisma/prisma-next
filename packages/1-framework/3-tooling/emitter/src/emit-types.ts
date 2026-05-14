@@ -1,4 +1,4 @@
-import type { CanonicalSerializeContract } from '@prisma-next/contract/hashing';
+import type { SerializeContract } from '@prisma-next/contract/hashing';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 
@@ -26,7 +26,7 @@ export interface EmitOptions {
    * via property enumerability. Optional for back-compat with test
    * call sites that emit JSON-clean contracts and don't need a hook.
    */
-  readonly serializeContract?: CanonicalSerializeContract;
+  readonly serializeContract?: SerializeContract;
 }
 
 export interface EmitResult {

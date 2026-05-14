@@ -101,9 +101,10 @@ export type AuthoringFieldNamespace = {
 };
 
 /**
- * Context surfaced to entity factories at call time. Currently a placeholder —
- * sharpened as M4 (enum exemplar) and M5a (namespace exemplar) discover what
- * the factory actually needs to read (codec lookup, namespace registry, …).
+ * Context surfaced to entity-type factories at call time. Currently a
+ * placeholder — sharpened as concrete consumers (enum, namespace, …)
+ * discover what the factory actually needs to read (codec lookup,
+ * namespace registry, …).
  */
 export interface AuthoringEntityContext {
   readonly family: string;

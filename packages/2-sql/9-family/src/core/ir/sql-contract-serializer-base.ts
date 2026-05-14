@@ -44,6 +44,10 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   }
 
   serializeContract(contract: TContract): JsonObject {
+    // Targets that ship enumerable runtime-only fields must override
+    // this method (mirroring `MongoTargetContractSerializer.serializeContract`)
+    // to construct the persisted envelope explicitly; the default identity
+    // works only when every enumerable own property belongs in the JSON.
     return contract as unknown as JsonObject;
   }
 

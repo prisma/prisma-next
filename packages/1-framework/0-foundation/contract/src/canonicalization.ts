@@ -12,7 +12,7 @@ import type { Contract } from './contract-types';
  * canonical-key ordering / default-omission / sort steps. Targets whose
  * contract is JSON-clean by construction return the contract unchanged.
  */
-export type CanonicalSerializeContract = (contract: Contract) => JsonObject;
+export type SerializeContract = (contract: Contract) => JsonObject;
 
 const TOP_LEVEL_ORDER = [
   'schemaVersion',
@@ -265,9 +265,14 @@ export interface CanonicalizeContractOptions {
    * fields stay invisible to the canonicalization walk by virtue of
    * the per-target serializer not putting them in the JSON shape.
    */
-  readonly serializeContract?: CanonicalSerializeContract;
+  readonly serializeContract?: SerializeContract;
 }
 
+/**
+ * Object-form variant of {@link canonicalizeContract}. Exported because the
+ * emitter writes the canonical contract through a separate JSON-stringify
+ * pass and consumes the structured object directly.
+ */
 export function canonicalizeContractToObject(
   contract: Contract,
   options?: CanonicalizeContractOptions,

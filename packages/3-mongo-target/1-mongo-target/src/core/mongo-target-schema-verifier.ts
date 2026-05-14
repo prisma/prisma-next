@@ -16,20 +16,19 @@ import type { MongoTargetContract } from './mongo-target-contract';
  * helpers (`contractToMongoSchemaIR`, `canonicalizeSchemasForVerification`,
  * `diffMongoSchemas`) so production verification behaviour is unchanged.
  *
- * M2 R1 invariant: every Mongo contract carries exactly one namespace
- * (`__unspecified__`, materialised as `MongoTargetUnspecifiedDatabase`),
- * so the family-base namespace walk dispatches exactly once and the
- * per-namespace body runs the existing whole-schema diff. M5a will
- * introduce per-collection namespace assignment; this hook will then
- * project the diff to the namespace's owned collections.
+ * Today's invariant: every Mongo contract carries exactly one
+ * namespace (the unspecified singleton, materialised as
+ * `MongoTargetUnspecifiedDatabase`), so the family-base namespace walk
+ * dispatches exactly once and the per-namespace body runs the existing
+ * whole-schema diff. Future per-collection namespace assignment will
+ * have this hook project the diff to the namespace's owned collections.
  *
  * `verifyTargetExtensions` returns the empty list — Mongo has no
  * target-only kinds today.
  *
  * Strict diff mode is `false` for SPI-routed calls; production
  * verification today still goes through `verifyMongoSchema` which
- * receives strict from the CLI. Slice 6 doesn't migrate
- * `schemaVerify`'s call sites; that happens in a later round.
+ * receives strict from the CLI.
  */
 export class MongoTargetSchemaVerifier extends MongoSchemaVerifierBase<
   MongoTargetContract,
