@@ -349,44 +349,68 @@ describe('SQL contract validators', () => {
     });
 
     it('rejects FK missing constraint field', () => {
-      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
-      const rawContract = createContract<SqlStorage>({
+      const rawContract = createContract({
         storage: {
           tables: {
-            user: userTable,
-            post: table(
-              { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
-              {
-                pk: pk('id'),
-                fks: [fk(['userId'], 'user', ['id'])],
+            user: {
+              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+            post: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
               },
-            ),
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  columns: ['userId'],
+                  references: { table: 'user', columns: ['id'] },
+                  index: true,
+                },
+              ],
+            },
           },
         },
       });
-      const postFk = rawContract.storage.tables['post']?.foreignKeys[0] as Record<string, unknown>;
-      delete postFk['constraint'];
       expect(() => validateSqlContract(rawContract)).toThrow();
     });
 
     it('rejects FK missing index field', () => {
-      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
-      const rawContract = createContract<SqlStorage>({
+      const rawContract = createContract({
         storage: {
           tables: {
-            user: userTable,
-            post: table(
-              { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
-              {
-                pk: pk('id'),
-                fks: [fk(['userId'], 'user', ['id'])],
+            user: {
+              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+            post: {
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
               },
-            ),
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  columns: ['userId'],
+                  references: { table: 'user', columns: ['id'] },
+                  constraint: true,
+                },
+              ],
+            },
           },
         },
       });
-      const postFk = rawContract.storage.tables['post']?.foreignKeys[0] as Record<string, unknown>;
-      delete postFk['index'];
       expect(() => validateSqlContract(rawContract)).toThrow();
     });
 

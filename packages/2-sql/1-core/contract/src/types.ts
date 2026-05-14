@@ -1,108 +1,33 @@
-import type { ColumnDefault, StorageBase } from '@prisma-next/contract/types';
 import type { CodecTrait } from '@prisma-next/framework-components/codec';
 
-/**
- * A column definition in storage.
- *
- * `typeParams` is optional because most columns use non-parameterized types.
- * Columns with parameterized types can either inline `typeParams` or reference
- * a named {@link StorageTypeInstance} via `typeRef`.
- */
-export type StorageColumn = {
-  readonly nativeType: string;
-  readonly codecId: string;
-  readonly nullable: boolean;
-  /**
-   * Opaque, codec-owned JS/type parameters.
-   * The codec that owns `codecId` defines the shape and semantics.
-   * Mutually exclusive with `typeRef`.
-   */
-  readonly typeParams?: Record<string, unknown>;
-  /**
-   * Reference to a named type instance in `storage.types`.
-   * Mutually exclusive with `typeParams`.
-   */
-  readonly typeRef?: string;
-  /**
-   * Default value for the column.
-   * Can be a literal value or database function.
-   */
-  readonly default?: ColumnDefault;
-};
-
-export type PrimaryKey = {
-  readonly columns: readonly string[];
-  readonly name?: string;
-};
-
-export type UniqueConstraint = {
-  readonly columns: readonly string[];
-  readonly name?: string;
-};
-
-export type Index = {
-  readonly columns: readonly string[];
-  readonly name?: string;
-  readonly type?: string;
-  readonly options?: Record<string, unknown>;
-};
-
-export type ForeignKeyReferences = {
-  readonly table: string;
-  readonly columns: readonly string[];
-};
-
-export type ReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
+export {
+  ForeignKey,
+  type ForeignKeyInput,
+  type ReferentialAction,
+} from './ir/foreign-key';
+export {
+  ForeignKeyReferences,
+  type ForeignKeyReferencesInput,
+} from './ir/foreign-key-references';
+export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
+export { Index, type IndexInput } from './ir/sql-index';
+export { SqlNode } from './ir/sql-node';
+export { SqlStorage, type SqlStorageInput } from './ir/sql-storage';
+export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
+export { StorageTable, type StorageTableInput } from './ir/storage-table';
+export {
+  StorageTypeInstance,
+  type StorageTypeInstanceInput,
+} from './ir/storage-type-instance';
+export {
+  UniqueConstraint,
+  type UniqueConstraintInput,
+} from './ir/unique-constraint';
 
 export type ForeignKeyOptions = {
   readonly name?: string;
-  readonly onDelete?: ReferentialAction;
-  readonly onUpdate?: ReferentialAction;
-};
-
-export type ForeignKey = {
-  readonly columns: readonly string[];
-  readonly references: ForeignKeyReferences;
-  readonly name?: string;
-  readonly onDelete?: ReferentialAction;
-  readonly onUpdate?: ReferentialAction;
-  /** Whether to emit FK constraint DDL (ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY). */
-  readonly constraint: boolean;
-  /** Whether to emit a backing index for the FK columns. */
-  readonly index: boolean;
-};
-
-export type StorageTable = {
-  readonly columns: Record<string, StorageColumn>;
-  readonly primaryKey?: PrimaryKey;
-  readonly uniques: ReadonlyArray<UniqueConstraint>;
-  readonly indexes: ReadonlyArray<Index>;
-  readonly foreignKeys: ReadonlyArray<ForeignKey>;
-};
-
-/**
- * A named, parameterized type instance.
- * These are registered in `storage.types` for reuse across columns
- * and to enable ergonomic schema surfaces like `schema.types.MyType`.
- *
- * Unlike {@link StorageColumn}, `typeParams` is required here because
- * `StorageTypeInstance` exists specifically to define reusable parameterized types.
- * A type instance without parameters would be redundant—columns can reference
- * the codec directly via `codecId`.
- */
-export type StorageTypeInstance = {
-  readonly codecId: string;
-  readonly nativeType: string;
-  readonly typeParams: Record<string, unknown>;
-};
-
-export type SqlStorage<THash extends string = string> = StorageBase<THash> & {
-  readonly tables: Record<string, StorageTable>;
-  /**
-   * Named type instances for parameterized/custom types.
-   * Columns can reference these via `typeRef`.
-   */
-  readonly types?: Record<string, StorageTypeInstance>;
+  readonly onDelete?: import('./ir/foreign-key').ReferentialAction;
+  readonly onUpdate?: import('./ir/foreign-key').ReferentialAction;
 };
 
 export type SqlModelFieldStorage = {

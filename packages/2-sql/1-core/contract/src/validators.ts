@@ -2,13 +2,13 @@ import type { Contract } from '@prisma-next/contract/types';
 import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { type } from 'arktype';
 import type {
-  ForeignKey,
-  ForeignKeyReferences,
-  PrimaryKey,
+  ForeignKeyInput,
+  ForeignKeyReferencesInput,
+  PrimaryKeyInput,
   ReferentialAction,
   SqlStorage,
-  StorageTypeInstance,
-  UniqueConstraint,
+  StorageTypeInstanceInput,
+  UniqueConstraintInput,
 } from './types';
 
 type ColumnDefaultLiteral = {
@@ -77,18 +77,18 @@ const StorageColumnSchema = type({
   return true;
 });
 
-const StorageTypeInstanceSchema = type.declare<StorageTypeInstance>().type({
+const StorageTypeInstanceSchema = type.declare<StorageTypeInstanceInput>().type({
   codecId: 'string',
   nativeType: 'string',
   typeParams: 'Record<string, unknown>',
 });
 
-const PrimaryKeySchema = type.declare<PrimaryKey>().type({
+const PrimaryKeySchema = type.declare<PrimaryKeyInput>().type({
   columns: type.string.array().readonly(),
   'name?': 'string',
 });
 
-const UniqueConstraintSchema = type.declare<UniqueConstraint>().type({
+const UniqueConstraintSchema = type.declare<UniqueConstraintInput>().type({
   columns: type.string.array().readonly(),
   'name?': 'string',
 });
@@ -100,7 +100,7 @@ export const IndexSchema = type({
   'options?': 'Record<string, unknown>',
 });
 
-export const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferences>().type({
+export const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferencesInput>().type({
   table: 'string',
   columns: type.string.array().readonly(),
 });
@@ -109,7 +109,7 @@ export const ReferentialActionSchema = type
   .declare<ReferentialAction>()
   .type("'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'");
 
-export const ForeignKeySchema = type.declare<ForeignKey>().type({
+export const ForeignKeySchema = type.declare<ForeignKeyInput>().type({
   columns: type.string.array().readonly(),
   references: ForeignKeyReferencesSchema,
   'name?': 'string',
