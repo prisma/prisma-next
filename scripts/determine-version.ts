@@ -2,6 +2,7 @@
 
 import { execSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
+import { computeNextMinor } from './determine-version-utils.ts';
 
 const PACKAGE_NAME = process.argv[2] ?? '@prisma-next/contract';
 
@@ -24,16 +25,6 @@ function getLatestStableVersion(): string {
 
 function getLatestDevVersion(): string | undefined {
   return run(`npm view "${PACKAGE_NAME}" dist-tags.dev`);
-}
-
-function parseVersion(version: string): { major: number; minor: number; patch: number } {
-  const [major, minor, patch] = version.split('-')[0].split('.').map(Number);
-  return { major, minor, patch };
-}
-
-function calculateNextStableVersion(latestStable: string): string {
-  const { major, minor } = parseVersion(latestStable);
-  return `${major}.${minor + 1}.0`;
 }
 
 function determineDevVersion(baseVersion: string): VersionResult {
@@ -78,7 +69,7 @@ console.log(`Event: ${eventName}`);
 const latestStable = getLatestStableVersion();
 console.log(`Latest stable version: ${latestStable}`);
 
-const baseVersion = calculateNextStableVersion(latestStable);
+const baseVersion = computeNextMinor(latestStable);
 console.log(`Base version for dev builds: ${baseVersion}`);
 
 let result: VersionResult;
