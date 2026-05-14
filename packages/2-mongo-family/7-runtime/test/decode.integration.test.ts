@@ -1,6 +1,6 @@
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { isRuntimeError } from '@prisma-next/framework-components/runtime';
 import { mongoCodec } from '@prisma-next/mongo-codec';
-import { validateMongoContract } from '@prisma-next/mongo-contract';
 import type { MongoResultShape } from '@prisma-next/mongo-query-ast/execution';
 import {
   AggregateCommand,
@@ -20,7 +20,9 @@ import { withMongod } from './setup';
 describe('Mongo runtime decode integration', () => {
   it('typed read returns decoded _id, dates, and vector array', async () => {
     await withMongod(async (ctx) => {
-      const { contract } = validateMongoContract<TDecodeFixtureContract>(decodeFixtureContractJson);
+      const contract = new MongoContractSerializer().deserializeContract(
+        decodeFixtureContractJson,
+      ) as TDecodeFixtureContract;
       const createdAt = new Date('2024-01-15T12:00:00.000Z');
       const vec = [0.1, 0.2, 0.3];
       const insert = await ctx.client.db(ctx.dbName).collection('users').insertOne({

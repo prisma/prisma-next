@@ -1,14 +1,13 @@
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import postgresServerless from '@prisma-next/postgres/serverless';
 import { sql } from '@prisma-next/sql-builder/runtime';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { contract } from './sql-builder/fixtures/contract';
 import type { Contract } from './sql-builder/fixtures/generated/contract';
 
-const sqlContract = validateContract<Contract>(contract, emptyCodecLookup);
+const sqlContract = new SqlContractSerializer().deserializeContract(contract) as Contract;
 
 describe(
   'runtime verify-marker: missing marker table',

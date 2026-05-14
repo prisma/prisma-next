@@ -5,12 +5,11 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql, { type SqlControlFamilyInstance } from '@prisma-next/family-sql/control';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { beforeAll } from 'vitest';
@@ -19,7 +18,7 @@ import { beforeAll } from 'vitest';
 export { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 export type { CodecTypes } from '@prisma-next/target-postgres/codec-types';
 export { postgresAdapter, postgresDriver, sql, postgres };
-export { validateContract };
+export { SqlContractSerializer };
 export type { Contract, SqlStorage };
 export { default as sqlFamily } from '@prisma-next/family-sql/pack';
 export { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
@@ -99,7 +98,9 @@ export async function runSchemaVerify(
 ) {
   return withDriver(connectionString, async (driver) => {
     const familyInstance = createFamilyInstance(options.extensions);
-    const validatedContract = validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup);
+    const validatedContract = new SqlContractSerializer().deserializeContract(
+      contract,
+    ) as Contract<SqlStorage>;
     const frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>> = [
       postgres,
       postgresAdapter,

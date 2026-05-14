@@ -1,5 +1,4 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type {
   TargetBoundComponentDescriptor,
   TargetDescriptor,
@@ -29,7 +28,6 @@ import type { TypesImportSpec } from '@prisma-next/framework-components/emission
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract as sqlValidateContract } from '@prisma-next/sql-contract/validate';
 import type {
   AnyQueryAst,
   LoweredStatement,
@@ -44,6 +42,7 @@ import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { SqlControlAdapter } from './control-adapter';
+import { SqlContractSerializer } from './ir/sql-contract-serializer';
 import type {
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
@@ -366,7 +365,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     typeMetadataRegistry,
 
     validateContract(contractJson: unknown): Contract {
-      return sqlValidateContract<Contract<SqlStorage>>(contractJson, emptyCodecLookup);
+      return new SqlContractSerializer().deserializeContract(contractJson) as Contract<SqlStorage>;
     },
 
     async verify(verifyOptions: {
@@ -385,7 +384,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       } = verifyOptions;
       const startTime = Date.now();
 
-      const contract = sqlValidateContract<Contract<SqlStorage>>(rawContract, emptyCodecLookup);
+      const contract = new SqlContractSerializer().deserializeContract(
+        rawContract,
+      ) as Contract<SqlStorage>;
 
       const contractStorageHash = contract.storage.storageHash;
       const contractProfileHash = contract.profileHash;
@@ -501,10 +502,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       readonly strict: boolean;
       readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
     }): VerifyDatabaseSchemaResult {
-      const contract = sqlValidateContract<Contract<SqlStorage>>(
+      const contract = new SqlContractSerializer().deserializeContract(
         options.contract,
-        emptyCodecLookup,
-      );
+      ) as Contract<SqlStorage>;
       const controlAdapter = getControlAdapter();
       return verifySqlSchema({
         contract,
@@ -525,7 +525,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const { driver, contract: contractInput, contractPath, configPath } = options;
       const startTime = Date.now();
 
-      const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup);
+      const contract = new SqlContractSerializer().deserializeContract(
+        contractInput,
+      ) as Contract<SqlStorage>;
 
       const contractStorageHash = contract.storage.storageHash;
       const contractProfileHash =

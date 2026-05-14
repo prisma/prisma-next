@@ -1,5 +1,4 @@
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import { validateContract } from '@prisma-next/sql-contract/validate';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Contract } from '../prisma/contract.d';
@@ -7,7 +6,7 @@ import contractJson from '../prisma/contract.json' with { type: 'json' };
 import { App } from './App';
 
 function renderApp(json: unknown) {
-  const contract = validateContract<Contract>(json, emptyCodecLookup);
+  const contract = new SqlContractSerializer().deserializeContract(json) as Contract;
   root.render(
     <StrictMode>
       <App contract={contract} />

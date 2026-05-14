@@ -5,11 +5,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   createExecutionContext,
   createRuntime,
@@ -33,7 +32,7 @@ interface Harness {
 
 async function buildHarness(verify: RuntimeVerifyOptions): Promise<Harness> {
   const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8')) as unknown;
-  const contract = validateContract<Contract>(contractJson, emptyCodecLookup);
+  const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
 
   const testDir = mkdtempSync(join(tmpdir(), 'prisma-sqlite-verify-marker-'));
   const dbPath = join(testDir, 'test.db');

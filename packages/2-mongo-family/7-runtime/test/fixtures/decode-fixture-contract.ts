@@ -8,10 +8,9 @@ import type {
  * Shared fixture contract for the decode integration tests.
  *
  * Lives in a typed `.ts` so it can drive `mongoQuery<TContract>(...)` row-type
- * inference end-to-end. Call sites validate the JSON via
- * `validateMongoContract(decodeFixtureContractJson)` to keep the runtime
- * structural shape honest, then thread `TContract` through `mongoQuery` for
- * the type-level path.
+ * inference end-to-end. Call sites validate the JSON via the Mongo contract
+ * serializer SPI to keep the runtime structural shape honest, then thread
+ * `TContract` through `mongoQuery` for the type-level path.
  *
  * `User` is a flat scalar shape; `Post` has a `userId` reference to `User`
  * so the `include('user')` end-to-end test can exercise the `$lookup` path.

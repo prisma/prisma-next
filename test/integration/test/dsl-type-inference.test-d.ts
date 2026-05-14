@@ -1,9 +1,8 @@
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgresPack from '@prisma-next/target-postgres/pack';
@@ -69,31 +68,28 @@ test('model table name is a literal string', () => {
   expectTypeOf(singleModelContract.models.User.storage.table).toEqualTypeOf<'user'>();
 });
 
-// -- validateContract preserves literals ------------------------------------
+// -- deserializeContract preserves literals ------------------------------------
 
-test('validateContract preserves table name literals', () => {
-  const validated = validateContract<typeof singleModelContract>(
+test('deserializeContract preserves table name literals', () => {
+  const validated = new SqlContractSerializer().deserializeContract(
     singleModelContract,
-    emptyCodecLookup,
-  );
+  ) as typeof singleModelContract;
   expectTypeOf<keyof typeof validated.storage.tables>().toEqualTypeOf<'user'>();
 });
 
-test('validateContract preserves model name literals', () => {
-  const validated = validateContract<typeof singleModelContract>(
+test('deserializeContract preserves model name literals', () => {
+  const validated = new SqlContractSerializer().deserializeContract(
     singleModelContract,
-    emptyCodecLookup,
-  );
+  ) as typeof singleModelContract;
   expectTypeOf<keyof typeof validated.models>().toEqualTypeOf<'User'>();
 });
 
 // -- sql() dot access works with inferred contract --------------------------
 
 test('sql() exposes table as a literal-keyed property', () => {
-  const validated = validateContract<typeof singleModelContract>(
+  const validated = new SqlContractSerializer().deserializeContract(
     singleModelContract,
-    emptyCodecLookup,
-  );
+  ) as typeof singleModelContract;
   const context = createTestContext(validated, createStubAdapter());
   const db = sql({ context });
 
@@ -101,10 +97,9 @@ test('sql() exposes table as a literal-keyed property', () => {
 });
 
 test('ResultType inference produces literal field keys', () => {
-  const validated = validateContract<typeof singleModelContract>(
+  const validated = new SqlContractSerializer().deserializeContract(
     singleModelContract,
-    emptyCodecLookup,
-  );
+  ) as typeof singleModelContract;
   const context = createTestContext(validated, createStubAdapter());
   const db = sql({ context });
   const plan = db.user.select('id', 'email').build();
@@ -139,10 +134,9 @@ test('multi-model contract preserves column literals per table', () => {
 });
 
 test('multi-model sql() dot access works for all tables', () => {
-  const validated = validateContract<typeof multiModelContract>(
+  const validated = new SqlContractSerializer().deserializeContract(
     multiModelContract,
-    emptyCodecLookup,
-  );
+  ) as typeof multiModelContract;
   const context = createTestContext(validated, createStubAdapter());
   const db = sql({ context });
 

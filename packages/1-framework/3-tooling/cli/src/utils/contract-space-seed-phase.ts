@@ -193,7 +193,7 @@ function buildPlaceholderContractDts(spaceId: string): string {
     ' * alongside `contract.json` and `refs/head.json`. A typed `.d.ts`',
     ' * rendering pass for extension contracts is tracked separately;',
     ' * until that ships, consumers should import `contract.json`',
-    ' * directly with `validateContract<…>(…)`.',
+    ' * and pass it through the target descriptor’s `contractSerializer`.',
     ' */',
     'export {};',
     '',

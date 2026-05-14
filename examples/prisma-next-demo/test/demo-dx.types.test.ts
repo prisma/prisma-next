@@ -7,8 +7,7 @@
  * Spec: agent-os/specs/2026-02-15-runtime-dx-ir-shaped-contract-mappings-on-executioncontext/spec.md
  */
 
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import { validateContract } from '@prisma-next/sql-contract/validate';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract, TypeMaps } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
@@ -19,8 +18,8 @@ test('contract.d.ts exports Contract and TypeMaps separately', () => {
   expectTypeOf<TypeMaps>().toHaveProperty('queryOperationTypes');
 });
 
-test('validateContract<Contract> output is assignable to visualization shape', () => {
-  const contract = validateContract<Contract>(contractJson, emptyCodecLookup);
+test('SPI deserializeContract output is assignable to visualization shape', () => {
+  const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
 
   expectTypeOf(contract.models).toHaveProperty('User');
   expectTypeOf(contract.models).toHaveProperty('Post');

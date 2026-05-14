@@ -6,15 +6,14 @@ import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import { emit } from '@prisma-next/emitter';
 import sql from '@prisma-next/family-sql/control';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import sqlFamily from '@prisma-next/family-sql/pack';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import {
   APP_SPACE_ID,
   createControlStack,
   type VerifyDatabaseResult,
 } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
@@ -84,7 +83,7 @@ async function emitContract(
   writeFileSync(contractDtsPath, emitResult.contractDts, 'utf-8');
 
   const contractJson = JSON.parse(emitResult.contractJson) as Record<string, unknown>;
-  return validateContract<Contract<SqlStorage>>(contractJson, emptyCodecLookup);
+  return new SqlContractSerializer().deserializeContract(contractJson) as Contract<SqlStorage>;
 }
 
 /**

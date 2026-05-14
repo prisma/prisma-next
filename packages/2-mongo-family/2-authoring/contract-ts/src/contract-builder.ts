@@ -29,7 +29,6 @@ import {
   type MongoIndexOptionsInput,
   type MongoStorage,
   type MongoTypeMaps,
-  validateMongoContract,
 } from '@prisma-next/mongo-contract';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 
@@ -1450,8 +1449,6 @@ function buildContractFromDefinition<
     }),
     meta: {},
   } satisfies MongoContract;
-
-  validateMongoContract(builtContract);
 
   return builtContract as MongoContractResult<Definition>;
 }

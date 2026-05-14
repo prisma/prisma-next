@@ -1,13 +1,12 @@
 #!/usr/bin/env -S node
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import postgres from '@prisma-next/postgres/runtime';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import { Migration, MigrationCLI, setNotNull } from '@prisma-next/target-postgres/migration';
 import type { Contract } from './end-contract';
 import endContractJson from './end-contract.json' with { type: 'json' };
 
-const endContract = validateContract<Contract>(endContractJson, emptyCodecLookup);
+const endContract = new SqlContractSerializer().deserializeContract(endContractJson) as Contract;
 const db = postgres<Contract>({ contractJson: endContractJson, extensions: [pgvector] });
 
 export default class M extends Migration {

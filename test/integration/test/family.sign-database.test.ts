@@ -3,15 +3,14 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import sqlFamily from '@prisma-next/family-sql/pack';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import {
   APP_SPACE_ID,
   createControlStack,
   type SignDatabaseResult,
 } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import {
   ensureSchemaStatement,
@@ -100,10 +99,9 @@ describe('family instance sign', () => {
         }
 
         const contract = createTestContract();
-        const validatedContract = validateContract<Contract<SqlStorage>>(
+        const validatedContract = new SqlContractSerializer().deserializeContract(
           contract,
-          emptyCodecLookup,
-        );
+        ) as Contract<SqlStorage>;
 
         const driver = await postgresDriver.create(connectionString);
         try {
@@ -189,10 +187,9 @@ describe('family instance sign', () => {
         }
 
         const contract = createTestContract();
-        const validatedContract = validateContract<Contract<SqlStorage>>(
+        const validatedContract = new SqlContractSerializer().deserializeContract(
           contract,
-          emptyCodecLookup,
-        );
+        ) as Contract<SqlStorage>;
 
         const driver = await postgresDriver.create(connectionString);
         try {
@@ -256,10 +253,9 @@ describe('family instance sign', () => {
         });
 
         const contract = createTestContract();
-        const validatedContract = validateContract<Contract<SqlStorage>>(
+        const validatedContract = new SqlContractSerializer().deserializeContract(
           contract,
-          emptyCodecLookup,
-        );
+        ) as Contract<SqlStorage>;
 
         const driver = await postgresDriver.create(connectionString);
         try {
@@ -322,10 +318,9 @@ describe('family instance sign', () => {
         }
 
         const contract = createTestContract();
-        const validatedContract = validateContract<Contract<SqlStorage>>(
+        const validatedContract = new SqlContractSerializer().deserializeContract(
           contract,
-          emptyCodecLookup,
-        );
+        ) as Contract<SqlStorage>;
 
         const driver = await postgresDriver.create(connectionString);
         try {

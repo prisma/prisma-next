@@ -20,11 +20,12 @@ import {
   VERIFY_CODE_TARGET_MISMATCH,
 } from '@prisma-next/framework-components/control';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
-import { type MongoContract, validateMongoContract } from '@prisma-next/mongo-contract';
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { MongoControlAdapter, MongoControlAdapterDescriptor } from './control-adapter';
 import type { MongoControlExtensionDescriptor } from './control-types';
+import { MongoContractSerializer } from './ir/mongo-contract-serializer';
 import { mongoOperationsToPreview } from './operation-preview';
 import { mongoSchemaToView } from './schema-to-view';
 import { verifyMongoSchema } from './schema-verify/verify-mongo-schema';
@@ -49,7 +50,7 @@ function deserializeMongoContract(contractJson: unknown): MongoContract {
   // hash/target fields off the validated shape, so the unwrapped
   // `MongoContract` is sufficient here and avoids a family→target
   // runtime dep.
-  return validateMongoContract<MongoContract>(contractJson).contract;
+  return new MongoContractSerializer().deserializeContract(contractJson);
 }
 
 /**

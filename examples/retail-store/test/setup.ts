@@ -1,6 +1,6 @@
 import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import { validateMongoContract } from '@prisma-next/mongo-contract';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { mongoOrm, mongoRaw } from '@prisma-next/mongo-orm';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
 import {
@@ -18,7 +18,7 @@ import type { Contract } from '../src/contract';
 import contractJson from '../src/contract.json' with { type: 'json' };
 import type { Db } from '../src/db';
 
-const { contract } = validateMongoContract<Contract>(contractJson);
+const contract = new MongoContractSerializer().deserializeContract(contractJson) as Contract;
 const query = mongoQuery<Contract>({ contractJson });
 const raw = mongoRaw({ contract });
 

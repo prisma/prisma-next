@@ -12,14 +12,13 @@ import arktypeJsonRuntime from '@prisma-next/extension-arktype-json/runtime';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import sql from '@prisma-next/family-sql/control';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { createTestRuntimeFromClient } from '@prisma-next/integration-tests/test/utils';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgres from '@prisma-next/target-postgres/control';
 import { withClient, withDevDatabase } from '@prisma-next/test-utils';
@@ -57,7 +56,7 @@ export async function loadContractFromDisk<
   TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
 >(contractJsonPath: string): Promise<TContract> {
   const contractJson = await loadRawContractFromDisk(contractJsonPath);
-  return validateContract<TContract>(contractJson, emptyCodecLookup);
+  return new SqlContractSerializer().deserializeContract(contractJson) as TContract;
 }
 
 async function loadRawContractFromDisk(contractJsonPath: string): Promise<Record<string, unknown>> {
@@ -101,7 +100,7 @@ export async function emitAndVerifyContract(
     );
   }
 
-  return validateContract<Contract<SqlStorage>>(emittedContract, emptyCodecLookup);
+  return new SqlContractSerializer().deserializeContract(emittedContract) as Contract<SqlStorage>;
 }
 
 /**
@@ -252,7 +251,7 @@ export async function withTestRuntime<TContract extends Contract<SqlStorage>>(
   callback: (ctx: TestRuntimeContext<TContract>) => Promise<void>,
 ): Promise<void> {
   const contractJson = await loadRawContractFromDisk(contractJsonPath);
-  const contract = validateContract<TContract>(contractJson, emptyCodecLookup);
+  const contract = new SqlContractSerializer().deserializeContract(contractJson) as TContract;
 
   await withDevDatabase(async ({ connectionString }) => {
     await withE2eMigrationsDir(async (migrationsDir) => {

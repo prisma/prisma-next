@@ -1,12 +1,12 @@
 import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
-import { validateMongoContract } from '@prisma-next/mongo-contract';
 import type { MongoOrmClient, MongoQueryPlan } from '@prisma-next/mongo-orm';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
@@ -89,7 +89,7 @@ function resolveContract<TContract extends MongoContractWithTypeMaps<MongoContra
   options: MongoOptions<TContract>,
 ): TContract {
   const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
-  return validateMongoContract<TContract>(contractInput).contract;
+  return new MongoContractSerializer().deserializeContract(contractInput) as TContract;
 }
 
 /**

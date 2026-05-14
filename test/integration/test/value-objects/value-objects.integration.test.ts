@@ -1,5 +1,5 @@
 import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
-import { validateMongoContract } from '@prisma-next/mongo-contract';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { parsePslDocument } from '@prisma-next/psl-parser';
@@ -91,7 +91,7 @@ describeWithMongoDB('value objects: end-to-end Mongo', (ctx) => {
     const userFields = contract.models['User']!.fields as Record<string, ContractField>;
     expect(userFields['homeAddress']!.type.kind).toBe('valueObject');
 
-    const validated = validateMongoContract(contract);
+    const validated = { contract: new MongoContractSerializer().deserializeContract(contract) };
 
     const orm = mongoOrm({ contract: validated.contract, executor: ctx.runtime });
     const userCollection = orm['user']!;
@@ -122,7 +122,7 @@ describeWithMongoDB('value objects: end-to-end Mongo', (ctx) => {
     const result = interpretMongoPsl(mongoPsl);
     if (!result.ok) throw new Error(`Interpretation failed: ${result.failure.summary}`);
 
-    const validated = validateMongoContract(result.value);
+    const validated = { contract: new MongoContractSerializer().deserializeContract(result.value) };
     const orm = mongoOrm({ contract: validated.contract, executor: ctx.runtime });
     const userCollection = orm['user']!;
 
@@ -160,7 +160,7 @@ type Address {
     const result = interpretMongoPsl(schema);
     if (!result.ok) throw new Error(`Interpretation failed: ${result.failure.summary}`);
 
-    const validated = validateMongoContract(result.value);
+    const validated = { contract: new MongoContractSerializer().deserializeContract(result.value) };
     const orm = mongoOrm({ contract: validated.contract, executor: ctx.runtime });
     const userCollection = orm['user']!;
 

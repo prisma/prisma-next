@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   createMongoRuntime: vi.fn(),
   driverFromConnection: vi.fn(),
   driverFromDb: vi.fn(),
-  validateMongoContract: vi.fn(),
+  deserializeContract: vi.fn(),
   mongoOrm: vi.fn(),
   mongoQuery: vi.fn(),
 }));
@@ -42,8 +42,10 @@ vi.mock('@prisma-next/driver-mongo', () => ({
   },
 }));
 
-vi.mock('@prisma-next/mongo-contract', () => ({
-  validateMongoContract: mocks.validateMongoContract,
+vi.mock('@prisma-next/family-mongo/ir', () => ({
+  MongoContractSerializer: vi.fn().mockImplementation(() => ({
+    deserializeContract: mocks.deserializeContract,
+  })),
 }));
 
 vi.mock('@prisma-next/mongo-orm', () => ({
@@ -67,7 +69,7 @@ describe('mongo() facade', () => {
       if (typeof fn === 'function' && 'mockReset' in fn) fn.mockReset();
     }
 
-    mocks.validateMongoContract.mockReturnValue({ contract: fakeContract });
+    mocks.deserializeContract.mockReturnValue(fakeContract);
     mocks.createMongoExecutionStack.mockReturnValue({ id: 'stack-instance' });
     mocks.createMongoExecutionContext.mockReturnValue({ id: 'context-instance' });
     mocks.driverFromConnection.mockResolvedValue({ id: 'driver-from-url' });
@@ -398,12 +400,12 @@ describe('mongo() facade', () => {
     await expect(db.runtime()).rejects.toThrow('Mongo client is closed');
   });
 
-  it('validates the contract via validateMongoContract for both authoring modes', () => {
+  it('validates the contract via the SPI deserializer for both authoring modes', () => {
     const json = { models: {} };
     mongo({ contractJson: json, url: 'mongodb://localhost:27017/mydb' });
-    expect(mocks.validateMongoContract).toHaveBeenLastCalledWith(json);
+    expect(mocks.deserializeContract).toHaveBeenLastCalledWith(json);
 
     mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
-    expect(mocks.validateMongoContract).toHaveBeenLastCalledWith(fakeContract);
+    expect(mocks.deserializeContract).toHaveBeenLastCalledWith(fakeContract);
   });
 });

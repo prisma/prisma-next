@@ -3,12 +3,11 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql, { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import sqlFamily from '@prisma-next/family-sql/pack';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgres from '@prisma-next/target-postgres/control';
 import postgresPack from '@prisma-next/target-postgres/pack';
@@ -255,10 +254,9 @@ describe('referential actions integration', () => {
               }),
             );
 
-            const validatedContract = validateContract<Contract<SqlStorage>>(
+            const validatedContract = new SqlContractSerializer().deserializeContract(
               contract,
-              emptyCodecLookup,
-            );
+            ) as Contract<SqlStorage>;
             const schema = await familyInstance.introspect({
               driver,
               contract: validatedContract,
@@ -354,10 +352,9 @@ describe('referential actions integration', () => {
               }),
             );
 
-            const validatedContract = validateContract<Contract<SqlStorage>>(
+            const validatedContract = new SqlContractSerializer().deserializeContract(
               contract,
-              emptyCodecLookup,
-            );
+            ) as Contract<SqlStorage>;
             const schema = await familyInstance.introspect({
               driver,
               contract: validatedContract,
@@ -431,10 +428,9 @@ describe('referential actions integration', () => {
               }),
             );
 
-            const validatedContract = validateContract<Contract<SqlStorage>>(
+            const validatedContract = new SqlContractSerializer().deserializeContract(
               contract,
-              emptyCodecLookup,
-            );
+            ) as Contract<SqlStorage>;
             const schema = await familyInstance.introspect({
               driver,
               contract: validatedContract,
@@ -530,10 +526,9 @@ describe('referential actions integration', () => {
               }),
             );
 
-            const validatedContract = validateContract<Contract<SqlStorage>>(
+            const validatedContract = new SqlContractSerializer().deserializeContract(
               contract,
-              emptyCodecLookup,
-            );
+            ) as Contract<SqlStorage>;
             const schema = await familyInstance.introspect({
               driver,
               contract: validatedContract,
@@ -602,10 +597,9 @@ describe('referential actions integration', () => {
           models: { User, Post },
         });
 
-        const validatedContract = validateContract<Contract<SqlStorage>>(
+        const validatedContract = new SqlContractSerializer().deserializeContract(
           contract,
-          emptyCodecLookup,
-        );
+        ) as Contract<SqlStorage>;
         const familyInstance = sql.create(
           createControlStack({
             family: sql,
