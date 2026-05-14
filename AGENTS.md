@@ -90,7 +90,8 @@ pnpm lint:deps             # Validate layering/imports
 
 - **Type Parameter Pattern**: JSON imports lose literal types. Use `.d.ts` for precise types, `validateContract()` for runtime validation
 - **ExecutionContext**: Encapsulates contract, codecs, operations, and types. Pass to `schema()`, `sql()`, `orm()`
-- **Interface-Based Design**: Export interfaces and factory functions, not classes
+- **Interface + factory pattern for stateful services**: Stateful services (registries, runtimes, adapters, drivers) are exposed through an interface plus a `createX()` factory; the implementing class stays package-private. Consumers depend on the interface, never the implementation. Pattern reference: [`docs/architecture docs/patterns/interface-plus-factory.md`](docs/architecture%20docs/patterns/interface-plus-factory.md).
+- **Three-layer polymorphic IR for AST/IR class hierarchies**: AST/IR nodes (Contract IR, Schema IR, migration ops) are organised as framework interface → family abstract base → target concrete classes. Concrete classes are publicly exported as the target's IR alphabet; `freezeNode(this)` is called in the constructor. Target packs contribute new entity kinds via `AuthoringContributions.entities` (see [`docs/reference/typescript-patterns.md`](docs/reference/typescript-patterns.md) § "AST/IR class hierarchies"). Pattern references: [`three-layer-polymorphic-ir.md`](docs/architecture%20docs/patterns/three-layer-polymorphic-ir.md), [`frozen-class-ast.md`](docs/architecture%20docs/patterns/frozen-class-ast.md), [`json-canonical-class-in-memory.md`](docs/architecture%20docs/patterns/json-canonical-class-in-memory.md).
 - **Capability Gating**: Features like `includeMany` and `returning()` require capabilities in contract
 
 ### Package Organization
