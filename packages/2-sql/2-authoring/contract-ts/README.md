@@ -16,7 +16,7 @@ This package is part of the SQL family namespace (`packages/2-sql/2-authoring/co
 
 - the SQL contract DSL centered on `defineContract(...)`
 - the base structural helpers exported from `./contract-builder`: `field.column(...)`, `field.generated(...)`, `field.namedType(...)`, plus `model(...)` and `rel.*`
-- an optional callback overload that exposes pack-composed helper namespaces such as `field.id.uuidv7()`, `field.text()`, `field.temporal.createdAt()`, `field.temporal.updatedAt()`, and `type.enum(...)`
+- an optional callback overload that exposes pack-composed helper namespaces such as `field.id.uuidv7()`, `field.text()`, `field.temporal.createdAt()`, `field.temporal.updatedAt()`, and `entities.enum({ name, values })`
 - lowering from authored model definitions into the canonical SQL `Contract`
 
 ## Responsibilities
@@ -123,10 +123,10 @@ export const contract = defineContract(
     target: postgresPack,
     extensionPacks: { pgvector },
   },
-  ({ type, field, model, rel }) => {
+  ({ type, entities, field, model, rel }) => {
     const types = {
       ShortName: type.sql.String(35),
-      Role: type.enum('role', ['USER', 'ADMIN'] as const),
+      Role: entities.enum({ name: 'role', values: ['USER', 'ADMIN'] as const }),
       Embedding1536: type.pgvector.Vector(1536),
     } as const;
 
