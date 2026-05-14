@@ -38,15 +38,13 @@ const output = execSync('pnpm list -r --json', {
 const workspacePackages: PnpmPackage[] = JSON.parse(output);
 
 let updatedCount = 0;
-let skippedCount = 0;
 
+// Every workspace package — publishable, private, and the workspace
+// root — gets the same version. Lockstep is the invariant that lets a
+// single read of the root `package.json` answer "what version are we
+// shipping right now?"; if private packages drifted, that invariant
+// would be silently violated by direct invocations of this script.
 for (const pkg of workspacePackages) {
-  if (pkg.private) {
-    console.log(`Skipping private package: ${pkg.name}`);
-    skippedCount++;
-    continue;
-  }
-
   const packageJsonPath = path.join(pkg.path, 'package.json');
   const content = await fs.readFile(packageJsonPath, 'utf-8');
   const packageJson: PackageJson = JSON.parse(content);
@@ -58,4 +56,4 @@ for (const pkg of workspacePackages) {
   updatedCount++;
 }
 
-console.log(`\nDone! Updated ${updatedCount} packages, skipped ${skippedCount}.`);
+console.log(`\nDone! Updated ${updatedCount} packages.`);
