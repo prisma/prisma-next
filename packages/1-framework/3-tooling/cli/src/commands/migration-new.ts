@@ -32,6 +32,7 @@ import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import {
   CliStructuredError,
+  errorFileNotFound,
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
@@ -217,10 +218,22 @@ async function executeMigrationNewCommand(
       const sourceArtifacts = getEmittedArtifactPaths(
         join(fromContractSourceDir, 'end-contract.json'),
       );
-      await copyFilesWithRename(packageDir, [
-        { sourcePath: sourceArtifacts.jsonPath, destName: 'start-contract.json' },
-        { sourcePath: sourceArtifacts.dtsPath, destName: 'start-contract.d.ts' },
-      ]);
+      try {
+        await copyFilesWithRename(packageDir, [
+          { sourcePath: sourceArtifacts.jsonPath, destName: 'start-contract.json' },
+          { sourcePath: sourceArtifacts.dtsPath, destName: 'start-contract.d.ts' },
+        ]);
+      } catch (error) {
+        if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
+          return notOk(
+            errorFileNotFound(sourceArtifacts.jsonPath, {
+              why: `Predecessor migration is missing its destination contract snapshot at ${sourceArtifacts.jsonPath}`,
+              fix: 'Re-emit the predecessor migration (`prisma-next migration plan` from its source) so its sibling `end-contract.json` is restored, then re-run this command.',
+            }),
+          );
+        }
+        throw error;
+      }
     }
 
     const stack = createControlStack(config);
