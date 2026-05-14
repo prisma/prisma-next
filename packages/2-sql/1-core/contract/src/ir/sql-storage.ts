@@ -72,5 +72,14 @@ function normaliseTypeEntry(entry: SqlStorageTypeEntry): StorageTypeInstance | S
   if (entry instanceof SqlEnumType || entry instanceof StorageTypeInstance) {
     return entry;
   }
+  if (
+    typeof entry === 'object' &&
+    entry !== null &&
+    (entry as { kind?: unknown }).kind === 'sql-enum-type'
+  ) {
+    throw new Error(
+      'Encountered raw sql-enum-type JSON in storage.types without serializer hydration; use a target ContractSerializer that registers the matching entity-type factory.',
+    );
+  }
   return new StorageTypeInstance(entry);
 }

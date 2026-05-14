@@ -41,6 +41,7 @@ export class TestSqlEnumType extends SqlEnumType {
 export const testEnumEntityContributions = {
   enum: {
     kind: 'entity' as const,
+    discriminator: 'sql-enum-type',
     output: {
       factory: (input: { name: string; values: readonly string[] }) => new TestSqlEnumType(input),
     },

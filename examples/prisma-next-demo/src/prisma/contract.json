@@ -388,7 +388,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:6cee6146eaf257ce236bf1144efb238a1087e45a62e04a8104a55d490d9029f4",
+    "storageHash": "sha256:c03a441edfa8cbc2f940ab5b11a38be97faa4cb9b85e3ae009e958eadeec102f",
     "tables": {
       "bug": {
         "columns": {
@@ -616,13 +616,13 @@
       },
       "user_type": {
         "codecId": "pg/enum@1",
+        "kind": "sql-enum-type",
+        "name": "user_type",
         "nativeType": "user_type",
-        "typeParams": {
-          "values": [
-            "admin",
-            "user"
-          ]
-        }
+        "values": [
+          "admin",
+          "user"
+        ]
       }
     }
   },

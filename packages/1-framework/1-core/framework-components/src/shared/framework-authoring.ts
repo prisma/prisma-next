@@ -132,6 +132,7 @@ export interface AuthoringEntityTypeFactoryOutput<Input = never, Output = unknow
 
 export interface AuthoringEntityTypeDescriptor<Input = never, Output = unknown> {
   readonly kind: 'entity';
+  readonly discriminator: string;
   readonly args?: readonly AuthoringArgumentDescriptor[];
   readonly output:
     | AuthoringEntityTypeTemplateOutput
@@ -198,6 +199,10 @@ export function isAuthoringEntityTypeDescriptor(
     value === null ||
     (value as { kind?: unknown }).kind !== 'entity'
   ) {
+    return false;
+  }
+  const discriminator = (value as { discriminator?: unknown }).discriminator;
+  if (typeof discriminator !== 'string' || discriminator.length === 0) {
     return false;
   }
   const output = (value as { output?: unknown }).output;

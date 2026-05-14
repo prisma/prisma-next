@@ -39,6 +39,7 @@ export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespa
 export const postgresAuthoringEntityTypes = {
   enum: {
     kind: 'entity',
+    discriminator: 'sql-enum-type',
     output: {
       factory: (input: PostgresEnumTypeInput): StorageTypeInstance =>
         new PostgresEnumType(input) as unknown as StorageTypeInstance,

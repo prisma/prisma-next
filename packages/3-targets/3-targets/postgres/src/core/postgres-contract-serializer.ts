@@ -1,17 +1,45 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  SqlContractSerializerBase,
+  type SqlEntityHydrationFactory,
+} from '@prisma-next/family-sql/ir';
+import type { AuthoringEntityContext } from '@prisma-next/framework-components/authoring';
+import type { SqlStorage, SqlStorageTypeEntry } from '@prisma-next/sql-contract/types';
+import { postgresAuthoringEntityTypes } from './authoring';
 import { PostgresEnumType } from './postgres-enum-type';
+
+function buildPostgresEntityTypeRegistry(): ReadonlyMap<string, SqlEntityHydrationFactory> {
+  const ctx: AuthoringEntityContext = { family: 'sql', target: 'postgres' };
+  const registry = new Map<string, SqlEntityHydrationFactory>();
+  for (const descriptor of Object.values(postgresAuthoringEntityTypes)) {
+    if (descriptor.kind !== 'entity') {
+      continue;
+    }
+    if (!('factory' in descriptor.output)) {
+      continue;
+    }
+    const factory = descriptor.output.factory as (
+      input: never,
+      ctx: AuthoringEntityContext,
+    ) => SqlStorageTypeEntry;
+    registry.set(descriptor.discriminator, (entry) => {
+      if (entry instanceof PostgresEnumType) {
+        return entry;
+      }
+      return factory(entry as never, ctx);
+    });
+  }
+  return registry;
+}
 
 /**
  * Postgres target `ContractSerializer` concretion. Inherits the full
  * SQL-family deserialization pipeline (structural validation +
  * hydration walker that materialises the SQL Contract IR class
- * hierarchy from the validated JSON envelope). Postgres-specific
- * concretion is limited to the `hydrateEnumType` hook — it
- * constructs `PostgresEnumType` instances from validated enum
- * entries (Decision 18, Option B); codec-typed entries continue to
- * fall through to `StorageTypeInstance` via the family base.
+ * hierarchy from the validated JSON envelope). Polymorphic
+ * `storage.types` entries hydrate through the pack contribution registry
+ * keyed by each entity type's declared `discriminator` (matching the
+ * enumerable `kind` on the persisted JSON envelope).
  *
  * `serializeContract` falls through to the family-base default —
  * Postgres' contract is JSON-clean today (`PostgresEnumType`
@@ -21,15 +49,7 @@ import { PostgresEnumType } from './postgres-enum-type';
  * this is the home for stripping them from the persisted envelope.
  */
 export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
-  protected override hydrateEnumType(entry: {
-    readonly name: string;
-    readonly nativeType: string;
-    readonly values: readonly string[];
-  }): PostgresEnumType {
-    return new PostgresEnumType({
-      name: entry.name,
-      nativeType: entry.nativeType,
-      values: entry.values,
-    });
+  constructor() {
+    super(buildPostgresEntityTypeRegistry());
   }
 }

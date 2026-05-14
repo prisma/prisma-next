@@ -1,11 +1,16 @@
 import { createSqlContract } from '@prisma-next/contract/testing';
-import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
+import type { Contract } from '@prisma-next/contract/types';
+import {
+  SqlContractSerializerBase,
+  type SqlEntityHydrationFactory,
+} from '@prisma-next/family-sql/ir';
 import {
   ForeignKey,
   PrimaryKey,
   SqlStorage,
   StorageColumn,
   StorageTable,
+  StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
@@ -102,6 +107,40 @@ describe('PostgresContractSerializer', () => {
     expect(reparsed.storage).not.toHaveProperty('kind');
     expect(reparsed.storage.tables.user).not.toHaveProperty('kind');
     expect(reparsed.storage.tables.user.columns.id).not.toHaveProperty('kind');
+  });
+
+  it('hydrates storage.types entries via the family registry dispatch path', () => {
+    const sentinel = new StorageTypeInstance({
+      codecId: 'test/fake-test-entity@1',
+      nativeType: 'fake-test-entity',
+      typeParams: { proof: true },
+    });
+
+    const registry = new Map<string, SqlEntityHydrationFactory>([
+      ['fake-test-entity', () => sentinel],
+    ]);
+
+    class RegistryDispatchProbeSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
+      constructor() {
+        super(registry);
+      }
+
+      protected override parseSqlContractStructure(_json: unknown): Contract<SqlStorage> {
+        const base = createSqlContract() as unknown as Contract<SqlStorage>;
+        return {
+          ...base,
+          storage: {
+            ...base.storage,
+            types: {
+              fake_thing: { kind: 'fake-test-entity' as const },
+            },
+          },
+        } as unknown as Contract<SqlStorage>;
+      }
+    }
+
+    const contract = new RegistryDispatchProbeSerializer().deserializeContract({});
+    expect(contract.storage.types?.['fake_thing']).toBe(sentinel);
   });
 });
 

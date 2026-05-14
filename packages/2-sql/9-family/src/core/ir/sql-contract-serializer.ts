@@ -5,11 +5,14 @@ import { SqlContractSerializerBase } from './sql-contract-serializer-base';
 /**
  * Default SQL family `ContractSerializer` concretion. Inherits the
  * full SQL-shared deserialization pipeline (structural validation +
- * IR-class hydration) without target-specific construction. Targets
- * that share the family's contract shape today (Postgres, SQLite)
- * mirror this class with a per-target subclass so the descriptor
- * surfaces a target-specific identity for narrowing; family-level
- * call sites (family-instance methods, family-layer tests that
- * exercise SQL-shared validation) instantiate this default directly.
+ * IR-class hydration) without pack-registered `storage.types`
+ * hydration factories — targets that emit polymorphic JSON outside the
+ * codec-typed envelope wire a target-specific subclass with a populated
+ * registry (see Postgres). Family-level call sites instantiate this
+ * default directly when no target serializer is supplied.
  */
-export class SqlContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {}
+export class SqlContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
+  constructor() {
+    super(new Map());
+  }
+}

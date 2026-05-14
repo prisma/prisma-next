@@ -79,6 +79,7 @@ const demoEntitiesExtensionPack = {
     entityTypes: {
       demoEntity: {
         kind: 'entity',
+        discriminator: 'demo-entity',
         output: {
           factory: (input: DemoEntityInput): DemoEntity => new DemoEntity(input),
         },

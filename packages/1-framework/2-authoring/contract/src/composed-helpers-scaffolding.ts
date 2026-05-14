@@ -115,9 +115,15 @@ export function createEntityHelpersFromNamespace(
 }
 
 function isLeafEntityDescriptor(value: unknown): value is AuthoringEntityTypeDescriptor {
-  return (
-    typeof value === 'object' && value !== null && (value as { kind?: unknown }).kind === 'entity'
-  );
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    (value as { kind?: unknown }).kind !== 'entity'
+  ) {
+    return false;
+  }
+  const discriminator = (value as { discriminator?: unknown }).discriminator;
+  return typeof discriminator === 'string' && discriminator.length > 0;
 }
 
 function createEntityHelper(
