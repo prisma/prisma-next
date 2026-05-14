@@ -32,5 +32,6 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
-  }
+  },
+  "version": "0.7.0"
 }

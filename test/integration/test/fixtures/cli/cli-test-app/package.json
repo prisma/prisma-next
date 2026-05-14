@@ -9,5 +9,6 @@
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
     "pg": "catalog:"
-  }
+  },
+  "version": "0.7.0"
 }
