@@ -11,7 +11,6 @@ import {
   PG_BOOL_CODEC_ID,
   PG_BYTEA_CODEC_ID,
   PG_CHAR_CODEC_ID,
-  PG_ENUM_CODEC_ID,
   PG_FLOAT_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
@@ -39,7 +38,6 @@ import {
 } from '@prisma-next/target-postgres/codec-ids';
 import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 import type { QueryOperationTypes } from '../types/operation-types';
-import { pgEnumControlHooks } from './enum-control-hooks';
 
 // ============================================================================ Helper functions for reducing boilerplate ============================================================================
 
@@ -212,7 +210,6 @@ export const postgresAdapterDescriptorMeta = {
         [PG_TIME_CODEC_ID]: precisionHooks,
         [PG_TIMETZ_CODEC_ID]: precisionHooks,
         [PG_INTERVAL_CODEC_ID]: precisionHooks,
-        [PG_ENUM_CODEC_ID]: pgEnumControlHooks,
         [PG_JSON_CODEC_ID]: identityHooks,
         [PG_JSONB_CODEC_ID]: identityHooks,
         [PG_BYTEA_CODEC_ID]: identityHooks,
