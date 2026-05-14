@@ -100,9 +100,38 @@ export type AuthoringFieldNamespace = {
   readonly [name: string]: AuthoringFieldPresetDescriptor | AuthoringFieldNamespace;
 };
 
+/**
+ * Context surfaced to entity factories at call time. Currently a placeholder —
+ * sharpened as M4 (enum exemplar) and M5a (namespace exemplar) discover what
+ * the factory actually needs to read (codec lookup, namespace registry, …).
+ */
+export interface AuthoringEntityContext {
+  readonly family: string;
+  readonly target: string;
+}
+
+export interface AuthoringEntityTemplateOutput {
+  readonly template: AuthoringTemplateValue;
+}
+
+export interface AuthoringEntityFactoryOutput<Input = unknown, Output = unknown> {
+  readonly factory: (input: Input, ctx: AuthoringEntityContext) => Output;
+}
+
+export interface AuthoringEntityDescriptor<Input = unknown, Output = unknown> {
+  readonly kind: 'entity';
+  readonly args?: readonly AuthoringArgumentDescriptor[];
+  readonly output: AuthoringEntityTemplateOutput | AuthoringEntityFactoryOutput<Input, Output>;
+}
+
+export type AuthoringEntityNamespace = {
+  readonly [name: string]: AuthoringEntityDescriptor | AuthoringEntityNamespace;
+};
+
 export interface AuthoringContributions {
   readonly type?: AuthoringTypeNamespace;
   readonly field?: AuthoringFieldNamespace;
+  readonly entities?: AuthoringEntityNamespace;
 }
 
 export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
@@ -145,6 +174,23 @@ export function isAuthoringFieldPresetDescriptor(
     typeof (value as { output?: unknown }).output === 'object' &&
     (value as { output?: unknown }).output !== null
   );
+}
+
+export function isAuthoringEntityDescriptor(value: unknown): value is AuthoringEntityDescriptor {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    (value as { kind?: unknown }).kind !== 'entity'
+  ) {
+    return false;
+  }
+  const output = (value as { output?: unknown }).output;
+  if (typeof output !== 'object' || output === null) {
+    return false;
+  }
+  const factory = (output as { factory?: unknown }).factory;
+  const template = (output as { template?: unknown }).template;
+  return typeof factory === 'function' || template !== undefined;
 }
 
 /**
@@ -263,27 +309,33 @@ function collectAuthoringLeafPaths(
 export function assertNoCrossRegistryCollisions(
   typeNamespace: AuthoringTypeNamespace,
   fieldNamespace: AuthoringFieldNamespace,
+  entityNamespace: AuthoringEntityNamespace = {},
 ): void {
   const typePaths = new Set(
     collectAuthoringLeafPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
   );
+  const fieldPaths = new Set(
+    collectAuthoringLeafPaths(fieldNamespace, isAuthoringFieldPresetDescriptor),
+  );
+  const entityPaths = new Set(
+    collectAuthoringLeafPaths(entityNamespace, isAuthoringEntityDescriptor),
+  );
   // Within-registry duplicate detection is handled upstream by the merge
   // walker (`mergeAuthoringNamespaces` in control-stack.ts and
   // `mergeHelperNamespaces` in composed-authoring-helpers.ts), which throws
-  // on same-path registrations within either registry before this check
-  // runs. This function only handles the cross-registry case — and an
-  // empty type namespace makes a cross-registry collision structurally
-  // impossible, so the early-out is sound.
-  if (typePaths.size === 0) {
-    return;
-  }
-  for (const fieldPath of collectAuthoringLeafPaths(
-    fieldNamespace,
-    isAuthoringFieldPresetDescriptor,
-  )) {
+  // on same-path registrations within any single registry before this check
+  // runs. This function only handles the cross-registry case.
+  for (const fieldPath of fieldPaths) {
     if (typePaths.has(fieldPath)) {
       throw new Error(
-        `Ambiguous authoring registry path "${fieldPath}". The same path is registered as both a type constructor and a field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type.`,
+        `Ambiguous authoring registry path "${fieldPath}". The same path is registered as both a type constructor and a field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entities.`,
+      );
+    }
+  }
+  for (const entityPath of entityPaths) {
+    if (typePaths.has(entityPath) || fieldPaths.has(entityPath)) {
+      throw new Error(
+        `Ambiguous authoring registry path "${entityPath}". The same path is registered as an entity contribution AND as a type constructor or field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entities.`,
       );
     }
   }
@@ -531,6 +583,20 @@ export function instantiateAuthoringTypeConstructor(
   readonly typeParams?: Record<string, unknown>;
 } {
   return resolveAuthoringStorageTypeTemplate(descriptor.output, args);
+}
+
+export function instantiateAuthoringEntity(
+  helperPath: string,
+  descriptor: AuthoringEntityDescriptor,
+  args: readonly unknown[],
+  ctx: AuthoringEntityContext,
+): unknown {
+  validateAuthoringHelperArguments(helperPath, descriptor.args, args);
+  if ('factory' in descriptor.output) {
+    const input = args[0];
+    return descriptor.output.factory(input, ctx);
+  }
+  return resolveAuthoringTemplateValue(descriptor.output.template, args);
 }
 
 export function instantiateAuthoringFieldPreset(
