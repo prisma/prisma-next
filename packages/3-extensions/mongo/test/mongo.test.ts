@@ -43,9 +43,11 @@ vi.mock('@prisma-next/driver-mongo', () => ({
 }));
 
 vi.mock('@prisma-next/family-mongo/ir', () => ({
-  MongoContractSerializer: vi.fn().mockImplementation(() => ({
-    deserializeContract: mocks.deserializeContract,
-  })),
+  MongoContractSerializer: class {
+    deserializeContract(json: unknown) {
+      return mocks.deserializeContract(json);
+    }
+  },
 }));
 
 vi.mock('@prisma-next/mongo-orm', () => ({
