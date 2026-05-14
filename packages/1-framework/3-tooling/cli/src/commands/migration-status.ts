@@ -1195,39 +1195,39 @@ export function formatStatusSummary(result: MigrationStatusResult, colorize: boo
     }
   }
 
-  // Per-space section. Suppressed when there's no extension space —
-  // the legacy single-space output already covers the app member.
-  // When extensions exist, render every space (including the app)
-  // for consistency, plus a cross-space pending total + apply hint.
-  if (result.spaces?.some((s) => s.kind === 'extension')) {
-    const total = result.totalPendingAcrossSpaces ?? 0;
+  // Default view: surface only extension spaces with pending work.
+  // The app space is already covered by the main summary above;
+  // extension spaces with `pendingCount === 0` are quiescent and
+  // intentionally invisible so the default view answers "what will
+  // `migration apply` do?" as tersely as possible. JSON consumers
+  // continue to see every space via `result.spaces`.
+  const pendingExtensions =
+    result.spaces?.filter((s) => s.kind === 'extension' && (s.pendingCount ?? 0) > 0) ?? [];
+  if (pendingExtensions.length > 0) {
     lines.push('');
-    lines.push(c(dim, 'spaces'));
-    for (const space of result.spaces) {
-      lines.push(formatSpaceLine(space, c));
-    }
-    if (total > 0) {
-      lines.push('');
-      lines.push(
-        `${c(yellow, '⧗')} ${total} pending migration(s) across ${result.spaces.length} space(s) — run 'prisma-next migration apply' to apply`,
-      );
+    for (const space of pendingExtensions) {
+      lines.push(formatPendingExtensionLine(space, c));
     }
   }
 
   return lines.join('\n');
 }
 
-function formatSpaceLine(
+/**
+ * One-line "this extension space has pending work" entry for the
+ * default view of `migration status`.
+ *
+ * Shape (pinned by the spec): glyph (pending), kind tag, space id,
+ * pending count, marker hash, head hash. Hashes truncated to 8 chars
+ * to match the rest of the CLI's hash-display convention.
+ */
+function formatPendingExtensionLine(
   space: MigrationStatusSpaceEntry,
   c: (fn: (s: string) => string, s: string) => string,
 ): string {
-  const glyph = (() => {
-    if (space.status === 'up-to-date' || space.status === 'no-marker') return c(cyan, '✓');
-    if (space.status === 'pending') return c(yellow, '⧗');
-    if (space.status === 'unreachable' || space.status === 'never-planned') return c(magenta, '✗');
-    return ' ';
-  })();
-  const tag = space.kind === 'app' ? '[app]' : '[ext]';
+  const glyph = c(yellow, '⧗');
+  const tag = c(dim, '[ext]');
+  const pending = `${space.pendingCount} pending`;
   const head = space.headHash.slice(0, 8);
   const marker =
     space.markerHash === undefined
@@ -1235,13 +1235,7 @@ function formatSpaceLine(
       : space.markerHash === null
         ? '(no marker)'
         : space.markerHash.slice(0, 8);
-  const pending =
-    space.pendingCount === undefined
-      ? ''
-      : space.pendingCount === 0
-        ? c(dim, ' (up to date)')
-        : c(yellow, ` (${space.pendingCount} pending)`);
-  return `  ${glyph} ${c(dim, tag)} ${space.spaceId} → head ${c(dim, head)}, marker ${c(dim, marker)}${pending}`;
+  return `${glyph} ${tag} ${space.spaceId} — ${pending} (marker ${c(dim, marker)}, head ${c(dim, head)})`;
 }
 
 function formatInvariantList(ids: readonly string[]): string {
