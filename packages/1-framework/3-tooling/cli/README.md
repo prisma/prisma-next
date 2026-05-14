@@ -988,34 +988,47 @@ prisma-next migration show [target] [--config <path>] [--json] [-v] [-q] [--colo
 
 ### `prisma-next migration status`
 
-Show the migration graph and applied status. Adapts based on context:
+Answer "what is `migration apply` going to do?" against the application's contract space and every loaded extension space. Adapts based on context:
 
 - **With DB connection**: Shows applied/pending markers and "you are here" indicators
 - **Without DB connection**: Shows the graph structure from disk only
 - **With `--ref`**: Targets a specific ref instead of the contract hash; all refs from `refs.json` are rendered on the graph
+- **With `--space <id>`**: Focuses output on a single contract space — default is `app`, pass an extension id to status that extension's history instead
 
 ```bash
-prisma-next migration status [--db <url>] [--ref <name>] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
+prisma-next migration status [--db <url>] [--ref <name>] [--space <id>] [--graph] [--limit <n>] [--all] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 **Options:**
 - `--db <url>`: Database connection string (enables online mode)
-- `--ref <name>`: Target a named ref from `migrations/refs.json` instead of the current contract hash
+- `--ref <name>`: Target a named ref from `migrations/refs.json` instead of the current contract hash (app-space only — combining `--ref` with `--space <non-app>` fails with `PN-CLI-5021`)
+- `--space <id>`: Focus on a single contract space (default: `app`). Pass an extension id to render that space's graph and history. Unknown ids fail with `PN-CLI-5020` and the error envelope lists every loaded space id under `meta.known`.
+- `--graph`: Render the focused space's full migration graph with every branch
+- `--limit <n>`: Cap the rendered history of the focused space (default: 10)
+- `--all`: Render the focused space's full history (disables truncation)
 - `--config <path>`: Path to `prisma-next.config.ts`
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
 - `-v, --verbose`: Verbose output
 
-**What it does:**
-1. Reads migration packages from disk and reconstructs the migration graph
-2. Loads all refs from `migrations/refs.json` (if present) and renders them on the graph
-3. If `--ref` is provided, uses the ref's hash as the target instead of the contract hash; the active ref is highlighted in bold, other refs are dimmed
-4. If a DB connection is available, reads the marker to determine applied/pending status and shows distance from the ref target (e.g., "2 edge(s) behind ref")
-5. Displays the graph with `◄ DB`, `◄ Contract`, and `◄ ref:<name>` markers
-6. Shows operation summaries with destructive operation highlighting
+**Default view (focused on app-space):**
+1. Loads every contract space from disk (the application plus every schema-contributing extension declared in `prisma-next.config.ts`) and reconstructs each space's migration graph
+2. Loads all refs from `migrations/refs.json` (if present) and renders them on the app-space graph
+3. If `--ref` is provided, uses the ref's hash as the app-space target instead of the contract hash; the active ref is highlighted in bold, other refs are dimmed
+4. If a DB connection is available, reads each space's marker row to determine applied/pending status and shows distance from the target (e.g., "2 edge(s) behind ref")
+5. Displays the app-space graph with `◄ DB`, `◄ Contract`, and `◄ ref:<name>` markers and shows operation summaries with destructive operation highlighting
+6. **Lists each extension space whose `pendingCount > 0`** at the bottom of the rendered output. Extension spaces that are already up-to-date stay invisible — this keeps the default view focused on what `migration apply` will actually do
 7. In `--ref` mode, the `CONTRACT.AHEAD` warning is suppressed — contract being ahead of a ref target is expected in multi-environment workflows
 
-**Branched graphs:** When the migration graph has multiple branches (divergence), status reports an `AMBIGUOUS_TARGET` error with the divergence point and branch details. Use `--ref` to target a specific branch.
+**Focused view (`--space <ext-id>`):**
+1. Loads the same aggregate, then renders only the requested extension's graph, history, and online-mode diagnostics (`MIGRATION.NO_MARKER`, `MIGRATION.MARKER_NOT_IN_HISTORY`, `MIGRATION.UP_TO_DATE`, `MIGRATION.DATABASE_BEHIND`).
+2. `--graph` / `--limit` / `--all` apply to the focused extension's graph and history.
+3. App-space–only fields (`refs`, `requiredInvariants`, `activeRefHash`, `activeRefName`) are omitted from the result. `--ref` is rejected (`PN-CLI-5021`) because refs are an app-space concept.
+4. When the extension's graph is empty the command emits a single-line summary ("no migrations on disk for contract space `<id>`") and exits zero.
+
+**JSON output** always includes the full `spaces[]` aggregate (one row per loaded contract space, with `markerHash` / `pendingCount` populated when online) regardless of `--space`, so programmatic consumers see the whole picture even when the human-readable view is filtered.
+
+**Branched graphs:** When the focused space's migration graph has multiple branches (divergence), status reports an `AMBIGUOUS_TARGET` error with the divergence point and branch details. For the app-space, use `--ref` to target a specific branch.
 
 ### `prisma-next migration apply`
 
