@@ -319,7 +319,7 @@ Not applicable in April: streaming subscriptions (validated in the SQL runtime w
 
 **Status**: Not started
 
-**Why it matters**: Multiple systems have Postgres implementation details baked in (Kysely lane, migration planning, etc.). Supporting a second SQL target forces us to decouple target-specific assumptions from the core, which is a prerequisite for contributors building new SQL targets. SQLite also unlocks the path to Cloudflare D1 (SQLite-at-the-edge), which is a strategic target for edge framework support (see [framework integration analysis](../reference/framework-integration-analysis.md)).
+**Why it matters**: Multiple systems have Postgres implementation details baked in (migration planning, lane lowering, etc.). Supporting a second SQL target forces us to decouple target-specific assumptions from the core, which is a prerequisite for contributors building new SQL targets. SQLite also unlocks the path to Cloudflare D1 (SQLite-at-the-edge), which is a strategic target for edge framework support (see [framework integration analysis](../reference/framework-integration-analysis.md)).
 
 **Key risk**: Postgres-specific assumptions may be deeply embedded across many layers. The value of this workstream is discovering every coupling point in one pass — each layer's assumptions are exposed by the next layer downstream.
 

@@ -1,5 +1,8 @@
 # ADR 162 — Kysely lane emits PN SQL AST for plugin inspection
 
+> **Status:** Superseded. The Kysely lane was removed from Prisma Next. This ADR is retained for historical context only. See [ADR-INDEX.md](../ADR-INDEX.md) for the current lane set.
+
+
 ```mermaid
 sequenceDiagram
   autonumber

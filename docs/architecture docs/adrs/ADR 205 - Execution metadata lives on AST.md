@@ -123,4 +123,3 @@ Middleware test fixtures that construct plans with hand-written `annotations.cod
 - [ADR 018 — Plan Annotations Schema](ADR%20018%20-%20Plan%20Annotations%20Schema.md)
 - [ADR 019 — TypedSQL as Separate CLI](ADR%20019%20-%20TypedSQL%20as%20Separate%20CLI.md)
 - [ADR 030 — Result decoding & codecs registry](ADR%20030%20-%20Result%20decoding%20%26%20codecs%20registry.md)
-- [ADR 162 — Kysely lane emits PN SQL AST](ADR%20162%20-%20Kysely%20lane%20emits%20PN%20SQL%20AST.md)
