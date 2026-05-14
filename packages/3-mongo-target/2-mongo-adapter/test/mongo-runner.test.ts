@@ -1,3 +1,4 @@
+import { initMarker, readMarker } from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import type {
   ControlFamilyInstance,
@@ -12,10 +13,8 @@ import {
   MongoSchemaIR,
 } from '@prisma-next/mongo-schema-ir';
 import {
-  initMarker,
   MongoMigrationPlanner,
   MongoMigrationRunner,
-  readMarker,
   serializeMongoOps,
 } from '@prisma-next/target-mongo/control';
 import { type Db, MongoClient } from 'mongodb';

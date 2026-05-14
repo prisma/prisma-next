@@ -1,7 +1,7 @@
+import { initMarker } from '@prisma-next/adapter-mongo/control';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import { initMarker } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';

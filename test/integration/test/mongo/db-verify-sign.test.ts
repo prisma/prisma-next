@@ -1,4 +1,4 @@
-import { createMongoControlDriver } from '@prisma-next/adapter-mongo/control';
+import { createMongoControlDriver, initMarker } from '@prisma-next/adapter-mongo/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import {
   createMongoFamilyInstance,
@@ -7,7 +7,6 @@ import {
 } from '@prisma-next/family-mongo/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { MongoCollection, type MongoContract, MongoIndex } from '@prisma-next/mongo-contract';
-import { initMarker } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';

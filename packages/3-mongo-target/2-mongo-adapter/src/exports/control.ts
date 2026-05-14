@@ -3,6 +3,13 @@ import type { ControlAdapterDescriptor } from '@prisma-next/framework-components
 export { MongoCommandExecutor, MongoInspectionExecutor } from '../core/command-executor';
 export { introspectSchema } from '../core/introspect-schema';
 export {
+  initMarker,
+  readAllMarkers,
+  readMarker,
+  updateMarker,
+  writeLedgerEntry,
+} from '../core/marker-ledger';
+export {
   createMongoControlDriver,
   type MongoControlDriverInstance,
 } from '../core/mongo-control-driver';

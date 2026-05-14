@@ -1,4 +1,4 @@
-import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
+import { createMongoRunnerDeps, extractDb, readMarker } from '@prisma-next/adapter-mongo/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
@@ -9,7 +9,6 @@ import {
   contractToMongoSchemaIR,
   MongoMigrationPlanner,
   MongoMigrationRunner,
-  readMarker,
   serializeMongoOps,
 } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';

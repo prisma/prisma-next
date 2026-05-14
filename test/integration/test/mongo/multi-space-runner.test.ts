@@ -1,3 +1,4 @@
+import { readAllMarkers, readMarker } from '@prisma-next/adapter-mongo/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
@@ -15,8 +16,6 @@ import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/c
 import {
   contractToMongoSchemaIR,
   MongoMigrationPlanner,
-  readAllMarkers,
-  readMarker,
   serializeMongoOps,
 } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';

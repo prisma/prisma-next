@@ -2,13 +2,6 @@ export { contractToMongoSchemaIR } from '../core/contract-to-schema';
 export { formatMongoOperations } from '../core/ddl-formatter';
 export { FilterEvaluator } from '../core/filter-evaluator';
 export {
-  initMarker,
-  readAllMarkers,
-  readMarker,
-  updateMarker,
-  writeLedgerEntry,
-} from '../core/marker-ledger';
-export {
   deserializeMongoOp,
   deserializeMongoOps,
   serializeMongoOps,

@@ -1,4 +1,10 @@
-import { introspectSchema } from '@prisma-next/adapter-mongo/control';
+import {
+  initMarker,
+  introspectSchema,
+  readAllMarkers,
+  readMarker,
+  updateMarker,
+} from '@prisma-next/adapter-mongo/control';
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -22,14 +28,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import {
-  formatMongoOperations,
-  initMarker,
-  type MongoTargetContract,
-  readAllMarkers,
-  readMarker,
-  updateMarker,
-} from '@prisma-next/target-mongo/control';
+import { formatMongoOperations, type MongoTargetContract } from '@prisma-next/target-mongo/control';
 import { verifyMongoSchema } from '@prisma-next/target-mongo/schema-verify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Db } from 'mongodb';

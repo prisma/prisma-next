@@ -4,16 +4,11 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import {
-  initMarker,
-  type MongoRunnerDependencies,
-  readMarker,
-  updateMarker,
-  writeLedgerEntry,
-} from '@prisma-next/target-mongo/control';
+import type { MongoRunnerDependencies } from '@prisma-next/target-mongo/control';
 import type { Db } from 'mongodb';
 import { createMongoAdapter } from '../mongo-adapter';
 import { MongoCommandExecutor, MongoInspectionExecutor } from './command-executor';
+import { initMarker, readMarker, updateMarker, writeLedgerEntry } from './marker-ledger';
 
 export function extractDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
   const mongoDriver = driver as ControlDriverInstance<'mongo', 'mongo'> & { db?: Db };
