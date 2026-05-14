@@ -194,6 +194,34 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
+  it('loads a package whose directory holds only migration.json + ops.json', async () => {
+    // Runner-side independence: the migration loader must not require
+    // sibling `start-contract.json` / `end-contract.json` files to be
+    // present on disk. Contracts are author-time conveniences, not
+    // structural inputs to the runner. The stored manifest carries the
+    // storage-hash bookends (`from`, `to`) which is all the runner needs
+    // to walk the migration graph.
+    const { readdir } = await import('node:fs/promises');
+    const dir = join(tmpDir, '20260225T1430_runner_independent');
+    await writeTestPackage(dir);
+
+    expect((await readdir(dir)).sort()).toEqual(['migration.json', 'ops.json']);
+
+    const pkg = await readMigrationPackage(dir);
+    expect(pkg.dirName).toBe('20260225T1430_runner_independent');
+    expect(pkg.metadata.migrationHash).toBeDefined();
+  });
+
+  it('readMigrationsDir loads packages whose directories hold only migration.json + ops.json', async () => {
+    const baselineDir = join(tmpDir, '20260225T1430_a');
+    const followupDir = join(tmpDir, '20260225T1500_b');
+    await writeTestPackage(baselineDir);
+    await writeTestPackage(followupDir);
+
+    const packages = await readMigrationsDir(tmpDir);
+    expect(packages.map((p) => p.dirName).sort()).toEqual(['20260225T1430_a', '20260225T1500_b']);
+  });
+
   it('accepts `from: null` (baseline manifest)', async () => {
     const dir = join(tmpDir, '20260225T1430_baseline');
     await writeTestPackage(dir, { from: null });
