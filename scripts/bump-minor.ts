@@ -17,7 +17,7 @@
  * responsible for: branch creation, commit, and PR opening.
  */
 
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertCanonicalBase, computeNextMinor } from './determine-version-utils.ts';
@@ -50,7 +50,7 @@ console.log(`Next minor version:          ${nextVersion}`);
 console.log('');
 
 const setVersionScript = path.join(rootDir, 'scripts', 'set-version.ts');
-execSync(`node "${setVersionScript}" "${nextVersion}"`, {
+execFileSync('node', [setVersionScript, nextVersion], {
   cwd: rootDir,
   stdio: 'inherit',
 });

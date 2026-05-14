@@ -1,6 +1,7 @@
-// This module is intentionally pure. All npm/dist-tag I/O lives in the
-// callers (`scripts/determine-version.ts`, `scripts/bump-minor.ts`); this
-// file is reserved for deterministic, vitest-friendly helpers.
+// This module is intentionally pure. All npm/dist-tag I/O and filesystem
+// reads live in the callers (`scripts/determine-version.ts`,
+// `scripts/bump-minor.ts`); this file is reserved for deterministic
+// helpers exercised under `node --test` from `pnpm test:scripts`.
 
 const CANONICAL_BASE_PATTERN = /^\d+\.\d+\.\d+$/;
 

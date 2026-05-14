@@ -29,7 +29,7 @@ Pre-`1.0` minors are not strictly backwards-compatible, in line with SemVer's al
 
 The npm registry exposes Prisma Next under three dist-tags:
 
-- **`latest`** — the most recent stable release. Each merge of a `pnpm bump-minor` PR cuts a new `latest` via `workflow_dispatch`. This is the default any `npm install @prisma-next/...` resolves to.
+- **`latest`** — the most recent stable release. After a `pnpm bump-minor` PR merges, a maintainer dispatches the publish workflow with `dist-tag=latest` to cut a new release. This is the default any `npm install @prisma-next/...` resolves to.
 - **`dev`** — every push to `main` produces a `<base>-dev.N` tarball under this tag, where `N` is the next available build number for the current `<base>` (the root `package.json` `version` field). These exist so we can pin reproductions, install internal CI runs, or hand someone a "try `npm install @prisma-next/postgres@dev` to get the bleeding edge" link without producing a `latest`-tagged release every commit. They are not promised to be stable and may be yanked freely.
 - **`beta`** — reserved for hand-cut release candidates ahead of significant changes. Routine releases do not use this tag.
 
@@ -60,13 +60,19 @@ The dry-run path of the same workflow can be invoked from any branch (`dry-run=t
 
 Patches are not part of the routine cadence, but if a freshly-published `latest` ships a regression that must be addressed before the next minor:
 
-1. Branch from the release tag (`v<version>`).
+1. Branch from `main` (this procedure assumes `main` is still on the same minor that needs the patch — maintenance branches for older minors are out of scope; see [Non-goals](#non-goals) below).
 2. Land the fix as a small PR.
-3. Hand-edit the root `package.json` `version` to `<major>.<minor>.<patch+1>` and run `node scripts/set-version.ts <new-version>` to propagate.
-4. Merge to `main` (or to a release branch if `main` has already moved on).
-5. Dispatch the publish workflow.
+3. On a follow-up PR, run `node scripts/set-version.ts <major>.<minor>.<patch+1>` to advance every workspace package to the patch version.
+4. Merge to `main`.
+5. Dispatch the publish workflow from `main` with `dist-tag=latest` and `dry-run=false`.
 
-The skill is not used for patches because the bump shape is different (`patch+1`, not `minor+1`); the manual edit + `set-version.ts` invocation is the procedure.
+The skill is not used for patches because the bump shape is different (`patch+1`, not `minor+1`); the explicit `set-version.ts` invocation is the procedure.
+
+## Non-goals
+
+- **Maintenance branches for older minors.** If a critical bug is found in `0.7.x` after `0.8.0` has shipped, this procedure does not cover it. The team would cut a maintenance branch by hand, but no tooling supports that flow today.
+- **Pre-release / release-candidate cadence.** The `beta` dist-tag exists, but cutting beta releases is hand-edited rather than scripted. If a beta cadence becomes routine, that's a follow-up.
+- **Independent per-package versioning.** Lockstep is the invariant. Per-package versions would require redesigning `set-version.ts` and the publish flow.
 
 ## Why a skill, not a workflow
 
