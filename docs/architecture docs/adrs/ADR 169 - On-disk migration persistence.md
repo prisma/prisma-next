@@ -1,5 +1,14 @@
 # ADR 169 — On-disk migration persistence
 
+## Status
+
+**Partially superseded** by [ADR 199 — Storage-only migration identity](./ADR%20199%20-%20Storage-only%20migration%20identity.md) and [ADR 197 — Migration packages snapshot their own contract](./ADR%20197%20-%20Migration%20packages%20snapshot%20their%20own%20contract.md). Two pieces of the original design no longer match the implementation:
+
+- **Migration identity (section 3 below).** `migrationId` is now computed from `(strippedManifest, ops)` only. The full source and destination contract IRs are not part of the hash input. ADR 199 captures the storage-only identity model.
+- **Contracts embedded in the manifest (section 7 below).** `migration.json` no longer inlines `fromContract` / `toContract`. The full contract IRs live as sibling `start-contract.json` / `end-contract.json` files next to the manifest (the snapshot convention from ADR 197); the manifest itself records only the storage-hash bookends. The author-time data-migration code reads the snapshots through TypeScript imports. The change was driven by TML-2512; the runner-independence property — apply only needs `migration.json` + `ops.json` per package — is locked in by regression tests in `@prisma-next/migration-tools`.
+
+The rest of the body — offline planning via contract-to-schemaIR conversion, graph-topology ordering, direct SQL on disk, transactional apply with resume semantics, and "from" contract resolution — remains accurate.
+
 ## Context
 
 Prisma Next models migrations as directed edges between contract hashes (ADR 001). The planner, runner, marker, and ledger infrastructure existed for `db init` (bootstrap a fresh DB from a contract) and `db update` (push changes to a live DB). However, there was no way to persist migration edges to disk, which is required for:
