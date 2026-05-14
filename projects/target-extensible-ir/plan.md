@@ -213,7 +213,7 @@ The SQL pattern (verified on disk in pre-M2.5-R1 reconnaissance, recorded in `wi
 - Filtered SQLite test gate: `pnpm --filter '@prisma-next/target-sqlite' test` (verify SQLite enum-emulation via CHECK constraints stays untouched).
 - Integration tests: `pnpm test:integration` (PGlite-flake re-runs allowed per documented pattern).
 - AC2 grep guard: `rg "pgEnumControlHooks|PG_ENUM_CODEC_ID" packages/3-targets/6-adapters/postgres/src/core/descriptor-meta.ts` returns zero hits (or only deleted-import lines). The `verify-sql-schema.ts` enum-branch grep guard is satisfied today (zero hits) and needs no follow-up.
-- Mechanism-consumption check: removing the `entities.enum` contribution from the Postgres pack causes existing enum tests to fail with "no entity helper named `enum`" type errors (verify by `git stash` + filtered typecheck).
+- Mechanism-consumption check: removing the `entities.enum` contribution from the Postgres pack causes the PSL interpreter to emit one missing-helper diagnostic per enum declaration (paraphrasing: "Enum \"X\" requires the active target pack to contribute an entities.enum helper"). Verify by `git stash` of the contribution + running the PSL parity case. The original wording promised a TypeScript "no entity helper named `enum`" type error; that variant doesn't fire in-tree because no TS consumer types directly against `helpers.entities.enum` (PSL is the only consumer and dispatches via string lookup through `instantiateAuthoringEntity`). The PSL-runtime diagnostic is the load-bearing signal; PSL parity tests carry the regression net.
 
 ### M5a — Namespace exemplar (new concept) + authoring DSL
 
