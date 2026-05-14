@@ -4,7 +4,12 @@ import type {
   GenerateContractTypesOptions,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
-import type { SqlModelStorage, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  SqlEnumType,
+  type SqlModelStorage,
+  type SqlStorage,
+  type StorageTable,
+} from '@prisma-next/sql-contract/types';
 import { assertDefined } from '@prisma-next/utils/assertions';
 
 function serializeTypeParamsLiteral(params: Record<string, unknown> | undefined): string {
@@ -313,7 +318,11 @@ export const sqlEmission = {
 
     if (column.typeRef) {
       const typeInstance = storage.types?.[column.typeRef];
-      return typeInstance?.typeParams;
+      if (typeInstance === undefined) return undefined;
+      if (typeInstance instanceof SqlEnumType) {
+        return { values: typeInstance.values };
+      }
+      return typeInstance.typeParams;
     }
     return column.typeParams;
   },
@@ -368,6 +377,15 @@ function generateStorageTypesType(types: SqlStorage['types']): string {
 
   const typeEntries: string[] = [];
   for (const [typeName, typeInstance] of Object.entries(types)) {
+    if (typeInstance instanceof SqlEnumType) {
+      const nameLit = serializeValue(typeInstance.name);
+      const nativeType = serializeValue(typeInstance.nativeType);
+      const valuesLit = `readonly [${typeInstance.values.map((v) => serializeValue(v)).join(', ')}]`;
+      typeEntries.push(
+        `readonly ${typeName}: { readonly kind: 'sql-enum-type'; readonly name: ${nameLit}; readonly nativeType: ${nativeType}; readonly values: ${valuesLit} }`,
+      );
+      continue;
+    }
     const codecId = serializeValue(typeInstance.codecId);
     const nativeType = serializeValue(typeInstance.nativeType);
     const typeParamsStr = serializeTypeParamsLiteral(typeInstance.typeParams);

@@ -85,6 +85,24 @@ const StorageTypeInstanceSchema = type.declare<StorageTypeInstanceInput>().type(
   typeParams: 'Record<string, unknown>',
 });
 
+/**
+ * Polymorphic enum-type entry under `storage.types[name]` (Decision 18,
+ * Option B). Carries an enumerable literal `kind: 'sql-enum-type'`
+ * discriminator so the per-target hydration walker can dispatch
+ * cleanly back to a typed IR-class instance (`PostgresEnumType`)
+ * during `deserializeContract`. Codec-typed entries continue to
+ * match `StorageTypeInstanceSchema` and inherit the family-level
+ * non-enumerable `kind` unchanged.
+ */
+const SqlEnumTypeSchema = type({
+  kind: "'sql-enum-type'",
+  name: 'string',
+  nativeType: 'string',
+  values: type.string.array().readonly(),
+});
+
+const StorageTypeEntrySchema = SqlEnumTypeSchema.or(StorageTypeInstanceSchema);
+
 const PrimaryKeySchema = type.declare<PrimaryKeyInput>().type({
   columns: type.string.array().readonly(),
   'name?': 'string',
@@ -134,7 +152,7 @@ const StorageSchema = type({
   '+': 'reject',
   storageHash: 'string',
   tables: type({ '[string]': StorageTableSchema }),
-  'types?': type({ '[string]': StorageTypeInstanceSchema }),
+  'types?': type({ '[string]': StorageTypeEntrySchema }),
 });
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {

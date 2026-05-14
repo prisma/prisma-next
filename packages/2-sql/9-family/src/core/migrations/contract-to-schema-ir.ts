@@ -1,13 +1,14 @@
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
-import type {
-  ForeignKey,
-  Index,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-  StorageTypeInstance,
-  UniqueConstraint,
+import {
+  type ForeignKey,
+  type Index,
+  SqlEnumType,
+  type SqlStorage,
+  type StorageColumn,
+  type StorageTable,
+  type StorageTypeInstance,
+  type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type {
@@ -51,7 +52,7 @@ export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => str
 function convertColumn(
   name: string,
   column: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance>,
+  storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
 ): SqlColumnIR {
@@ -82,9 +83,18 @@ function convertColumn(
   };
 }
 
+/**
+ * `storageTypes` is polymorphic per Decision 18 (Option B) — codec-typed
+ * entries are `StorageTypeInstance`; enum entries are `SqlEnumType`
+ * subclass instances. Both shapes resolve into the same
+ * `(codecId, nativeType, typeParams)` triplet at the column-resolution
+ * boundary so downstream walks stay uniform.
+ */
+type ResolvedStorageTypes = Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
+
 function resolveColumnTypeMetadata(
   column: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance>,
+  storageTypes: ResolvedStorageTypes,
 ): Pick<StorageColumn, 'codecId' | 'nativeType' | 'typeParams'> {
   if (!column.typeRef) {
     return column;
@@ -94,6 +104,13 @@ function resolveColumnTypeMetadata(
     throw new Error(
       `Column references storage type "${column.typeRef}" but it is not defined in storage.types.`,
     );
+  }
+  if (referenced instanceof SqlEnumType) {
+    return {
+      codecId: referenced.codecBinding.codecId,
+      nativeType: referenced.nativeType,
+      typeParams: referenced.codecBinding.typeParams as Record<string, unknown>,
+    };
   }
   return {
     codecId: referenced.codecId,
@@ -129,7 +146,7 @@ function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
 function convertTable(
   name: string,
   table: StorageTable,
-  storageTypes: Record<string, StorageTypeInstance>,
+  storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
 ): SqlTableIR {

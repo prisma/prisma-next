@@ -26,7 +26,11 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import {
+  asCodecTypedStorageTypes,
+  type SqlStorage,
+  type StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import {
   AddColumnCall,
@@ -274,7 +278,8 @@ function enumRebuildCallRecipe(
   typeName: string,
   ctx: StrategyContext,
 ): readonly PostgresOpFactoryCall[] {
-  const toType = ctx.toContract.storage.types?.[typeName];
+  const toTypes = asCodecTypedStorageTypes(ctx.toContract.storage.types);
+  const toType = toTypes[typeName];
   if (!toType) return [];
   const nativeType = toType.nativeType;
   const desiredValues = (toType.typeParams['values'] ?? []) as readonly string[];
@@ -371,7 +376,7 @@ export const enumChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
  * issues for types whose hook produced at least one op.
  */
 export const storageTypePlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
-  const storageTypes = ctx.toContract.storage.types ?? {};
+  const storageTypes = asCodecTypedStorageTypes(ctx.toContract.storage.types);
   if (Object.keys(storageTypes).length === 0) return { kind: 'no_match' };
 
   const calls: PostgresOpFactoryCall[] = [];

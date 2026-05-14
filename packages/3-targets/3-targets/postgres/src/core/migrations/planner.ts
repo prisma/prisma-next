@@ -17,6 +17,7 @@ import type {
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
+import { asCodecTypedStorageTypes } from '@prisma-next/sql-contract/types';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
@@ -138,7 +139,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 
     const schemaIssues = this.collectSchemaIssues(options);
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
-    const storageTypes = options.contract.storage.types ?? {};
+    const storageTypes = asCodecTypedStorageTypes(options.contract.storage.types);
 
     const result = planIssues({
       issues: schemaIssues,

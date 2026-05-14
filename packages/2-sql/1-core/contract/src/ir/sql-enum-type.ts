@@ -31,6 +31,26 @@ export abstract class SqlEnumType extends SqlNode {
   abstract readonly nativeType: string;
   abstract readonly values: readonly string[];
 
+  /**
+   * Per-target codec binding used to wire columns whose `typeRef`
+   * resolves to this enum. The runtime / lowering pipeline still
+   * routes enum columns through the existing per-target codec
+   * (Postgres → `pg/enum@1`); this binding lives on the IR class so
+   * family-shared code (e.g. `codecRefForStorageColumn`,
+   * lane-time codec resolution) can dispatch uniformly without
+   * importing target-specific codec ids.
+   *
+   * Declared as a prototype-level abstract accessor so it lives on
+   * the prototype (not instance own-properties) and stays out of the
+   * JSON envelope automatically — only `kind`, `name`, `nativeType`,
+   * and `values` are enumerable own properties on a constructed
+   * `SqlEnumType`.
+   */
+  abstract get codecBinding(): {
+    readonly codecId: string;
+    readonly typeParams: { readonly values: readonly string[] };
+  };
+
   constructor() {
     super();
     // Re-install `kind` as an enumerable own property so JSON.stringify

@@ -24,7 +24,7 @@ import {
 } from '@prisma-next/framework-components/execution';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlEnumType, type SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   createSqlOperationRegistry,
   type SqlOperationDescriptors,
@@ -315,7 +315,15 @@ function initializeTypeHelpers(
   const typeRefSites = collectTypeRefSites(storage);
 
   for (const [typeName, typeInstance] of Object.entries(storageTypes)) {
-    const descriptor = codecDescriptors.get(typeInstance.codecId);
+    const codecId =
+      typeInstance instanceof SqlEnumType
+        ? typeInstance.codecBinding.codecId
+        : typeInstance.codecId;
+    const typeParams =
+      typeInstance instanceof SqlEnumType
+        ? (typeInstance.codecBinding.typeParams as Record<string, unknown>)
+        : typeInstance.typeParams;
+    const descriptor = codecDescriptors.get(codecId);
 
     if (!descriptor) {
       // No parameterized descriptor for this codec id — store the raw type instance for callers that need typeParams metadata.
@@ -323,7 +331,7 @@ function initializeTypeHelpers(
       continue;
     }
 
-    const validatedParams = validateTypeParams(typeInstance.typeParams, descriptor, {
+    const validatedParams = validateTypeParams(typeParams, descriptor, {
       typeName,
     });
 
@@ -457,10 +465,16 @@ function buildContractCodecRegistry(
 
   const typeRefSites = collectTypeRefSites(contract.storage);
   for (const [typeName, typeInstance] of Object.entries(contract.storage.types ?? {})) {
-    const ref: CodecRef = {
-      codecId: typeInstance.codecId,
-      typeParams: typeInstance.typeParams as JsonValue,
-    };
+    const ref: CodecRef =
+      typeInstance instanceof SqlEnumType
+        ? {
+            codecId: typeInstance.codecBinding.codecId,
+            typeParams: typeInstance.codecBinding.typeParams as unknown as JsonValue,
+          }
+        : {
+            codecId: typeInstance.codecId,
+            typeParams: typeInstance.typeParams as JsonValue,
+          };
     const key = refKeyOf(ref);
     const sites = typeRefSites.get(typeName) ?? [];
     const existing = usedAtByKey.get(key);

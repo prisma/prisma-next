@@ -14,10 +14,11 @@ import type {
   SchemaVerificationNode,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import type {
-  SqlStorage,
-  StorageColumn,
-  StorageTypeInstance,
+import {
+  SqlEnumType,
+  type SqlStorage,
+  type StorageColumn,
+  type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
@@ -128,9 +129,26 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
   if (storageTypeEntries.length > 0) {
     const typeNodes: SchemaVerificationNode[] = [];
     for (const [typeName, typeInstance] of storageTypeEntries) {
-      const hook = codecHooks.get(typeInstance.codecId);
+      // Polymorphic dispatch (Decision 18, Option B): enum entries
+      // surface their per-target codec binding so the existing
+      // codec-hook verifier path stays wired in R1a; R1b removes the
+      // codec-hook branch entirely once the per-IR enum verifier
+      // walk is in place.
+      const codecId =
+        typeInstance instanceof SqlEnumType
+          ? typeInstance.codecBinding.codecId
+          : typeInstance.codecId;
+      const hook = codecHooks.get(codecId);
+      const codecHookTypeInstance: StorageTypeInstance =
+        typeInstance instanceof SqlEnumType
+          ? ({
+              codecId: typeInstance.codecBinding.codecId,
+              nativeType: typeInstance.nativeType,
+              typeParams: typeInstance.codecBinding.typeParams,
+            } as unknown as StorageTypeInstance)
+          : typeInstance;
       const typeIssues = hook?.verifyType
-        ? hook.verifyType({ typeName, typeInstance, schema })
+        ? hook.verifyType({ typeName, typeInstance: codecHookTypeInstance, schema })
         : [];
       if (typeIssues.length > 0) {
         issues.push(...typeIssues);
@@ -235,7 +253,7 @@ function verifySchemaTables(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
-  storageTypes: Record<string, StorageTypeInstance>;
+  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
@@ -329,7 +347,7 @@ function verifyTableChildren(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
-  storageTypes: Record<string, StorageTypeInstance>;
+  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode[] {
@@ -487,7 +505,7 @@ function collectContractColumnNodes(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
-  storageTypes: Record<string, StorageTypeInstance>;
+  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode[] {
@@ -594,7 +612,7 @@ function verifyColumn(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
-  storageTypes: Record<string, StorageTypeInstance>;
+  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode {
@@ -937,7 +955,7 @@ function validateFrameworkComponentsForExtensions(
  */
 function renderExpectedNativeType(
   contractColumn: Contract<SqlStorage>['storage']['tables'][string]['columns'][string],
-  storageTypes: Record<string, StorageTypeInstance>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>,
   codecHooks: Map<string, CodecControlHooks>,
   context?: {
     readonly tableName: string;
@@ -967,7 +985,7 @@ function renderExpectedNativeType(
 
 function resolveContractColumnTypeMetadata(
   contractColumn: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>,
   context?: {
     readonly tableName: string;
     readonly columnName: string;
@@ -987,6 +1005,13 @@ function resolveContractColumnTypeMetadata(
     );
   }
 
+  if (referencedType instanceof SqlEnumType) {
+    return {
+      codecId: referencedType.codecBinding.codecId,
+      nativeType: referencedType.nativeType,
+      typeParams: referencedType.codecBinding.typeParams as Record<string, unknown>,
+    };
+  }
   return {
     codecId: referencedType.codecId,
     nativeType: referencedType.nativeType,

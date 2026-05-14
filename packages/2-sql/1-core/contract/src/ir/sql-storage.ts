@@ -1,13 +1,26 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
 import { freezeNode } from '@prisma-next/framework-components/ir';
+import { SqlEnumType } from './sql-enum-type';
 import { SqlNode } from './sql-node';
 import { StorageTable, type StorageTableInput } from './storage-table';
 import { StorageTypeInstance, type StorageTypeInstanceInput } from './storage-type-instance';
 
+/**
+ * Polymorphic value type for `SqlStorage.types` entries (Decision 18,
+ * Option B). Existing codec-typed entries (decimal, varchar, pgvector)
+ * stay shape-compatible with `StorageTypeInstance | StorageTypeInstanceInput`;
+ * enum entries arrive as concrete `SqlEnumType` subclass instances
+ * (constructed by the per-target entity factory) and pass through the
+ * normaliser unchanged. Hydration dispatches on the enumerable
+ * `kind: 'sql-enum-type'` discriminator (per Decision 16) when
+ * reconstructing from the on-disk JSON envelope.
+ */
+export type SqlStorageTypeEntry = SqlEnumType | StorageTypeInstance | StorageTypeInstanceInput;
+
 export interface SqlStorageInput<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
   readonly tables: Record<string, StorageTable | StorageTableInput>;
-  readonly types?: Record<string, StorageTypeInstance | StorageTypeInstanceInput>;
+  readonly types?: Record<string, SqlStorageTypeEntry>;
 }
 
 /**
@@ -21,11 +34,17 @@ export interface SqlStorageInput<THash extends string = string> {
  *
  * The constructor normalises nested IR-class fields (`tables`, optional
  * `types`) into class instances so downstream walks see a uniform AST.
+ * `types` is polymorphic per Decision 18 Option B — codec-typed
+ * entries become `StorageTypeInstance` instances; entries that are
+ * already a `SqlEnumType` subclass instance pass through; hydration
+ * of raw JSON enum entries (carrying `kind === 'sql-enum-type'`) is
+ * the per-target serializer's responsibility (so the family base
+ * does not import target-specific subclasses).
  */
 export class SqlStorage<THash extends string = string> extends SqlNode {
   readonly storageHash: StorageHashBase<THash>;
   readonly tables: Readonly<Record<string, StorageTable>>;
-  declare readonly types?: Readonly<Record<string, StorageTypeInstance>>;
+  declare readonly types?: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
 
   constructor(input: SqlStorageInput<THash>) {
     super();
@@ -41,13 +60,17 @@ export class SqlStorage<THash extends string = string> extends SqlNode {
     if (input.types !== undefined) {
       this.types = Object.freeze(
         Object.fromEntries(
-          Object.entries(input.types).map(([name, ti]) => [
-            name,
-            ti instanceof StorageTypeInstance ? ti : new StorageTypeInstance(ti),
-          ]),
+          Object.entries(input.types).map(([name, ti]) => [name, normaliseTypeEntry(ti)]),
         ),
       );
     }
     freezeNode(this);
   }
+}
+
+function normaliseTypeEntry(entry: SqlStorageTypeEntry): StorageTypeInstance | SqlEnumType {
+  if (entry instanceof SqlEnumType || entry instanceof StorageTypeInstance) {
+    return entry;
+  }
+  return new StorageTypeInstance(entry);
 }

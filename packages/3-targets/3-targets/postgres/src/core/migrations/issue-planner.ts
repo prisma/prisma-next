@@ -18,10 +18,11 @@ import type {
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import type {
-  SqlStorage,
-  StorageColumn,
-  StorageTypeInstance,
+import {
+  asCodecTypedStorageTypes,
+  type SqlStorage,
+  type StorageColumn,
+  type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
@@ -506,7 +507,7 @@ function mapIssueToCall(
     case 'type_missing': {
       if (!issue.typeName)
         return notOk(issueConflict('unsupportedOperation', 'Type missing issue has no typeName'));
-      const typeInstance = ctx.toContract.storage.types?.[issue.typeName];
+      const typeInstance = asCodecTypedStorageTypes(ctx.toContract.storage.types)[issue.typeName];
       if (!typeInstance) {
         return notOk(
           issueConflict(

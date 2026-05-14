@@ -1,6 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlEnumType, SqlStorage, type SqlStorageTypeEntry } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import type { JsonObject } from '@prisma-next/utils/json';
 
@@ -68,12 +68,85 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
    * `ForeignKeyReferences`, and `StorageTypeInstance`. The rest of the
    * contract envelope (target identity, hashes, capabilities, models,
    * meta, …) is JSON-clean primitive data and passes through unchanged.
+   *
+   * Polymorphic `storage.types` entries (Decision 18, Option B) are
+   * normalised before the `SqlStorage` constructor runs: entries with
+   * an enumerable `kind === 'sql-enum-type'` discriminator are routed
+   * through `hydrateEnumType` so the per-target serializer can
+   * construct its concrete `SqlEnumType` subclass (e.g.
+   * `PostgresEnumType`) without forcing the family base to import
+   * target-specific classes. Codec-typed entries pass through
+   * unchanged and become `StorageTypeInstance` instances inside
+   * `SqlStorage`'s normaliser.
    */
   protected hydrateSqlStorage(validated: Contract<SqlStorage>): Contract<SqlStorage> {
+    const types = validated.storage.types;
+    const hydratedTypes =
+      types !== undefined
+        ? Object.fromEntries(
+            Object.entries(types).map(([name, entry]) => [
+              name,
+              this.hydrateStorageTypeEntry(entry),
+            ]),
+          )
+        : undefined;
+
     return {
       ...validated,
-      storage: new SqlStorage(validated.storage),
+      storage: new SqlStorage({
+        ...validated.storage,
+        ...(hydratedTypes !== undefined ? { types: hydratedTypes } : {}),
+      }),
     };
+  }
+
+  /**
+   * Per-entry hydration dispatcher for `storage.types`. Family default
+   * walks raw JSON entries to detect the `kind === 'sql-enum-type'`
+   * discriminator and forwards to `hydrateEnumType` for the concrete
+   * subclass; codec-typed entries pass through to the
+   * `SqlStorage`-internal `StorageTypeInstance` normaliser.
+   *
+   * Class-instance entries (e.g. tests handing in already-constructed
+   * `SqlEnumType` / `StorageTypeInstance` instances) pass through
+   * unchanged.
+   */
+  protected hydrateStorageTypeEntry(entry: SqlStorageTypeEntry): SqlStorageTypeEntry {
+    if (entry instanceof SqlEnumType) {
+      return entry;
+    }
+    if (
+      typeof entry === 'object' &&
+      entry !== null &&
+      (entry as { kind?: unknown }).kind === 'sql-enum-type'
+    ) {
+      return this.hydrateEnumType(
+        entry as unknown as {
+          readonly name: string;
+          readonly nativeType: string;
+          readonly values: readonly string[];
+        },
+      );
+    }
+    return entry;
+  }
+
+  /**
+   * Per-target hook that constructs the concrete `SqlEnumType`
+   * subclass instance from a validated raw enum entry. Default
+   * implementation throws to surface the wiring gap loudly — every
+   * SQL target that admits enum entries must override this to
+   * construct its concrete subclass (e.g. Postgres returns
+   * `new PostgresEnumType(...)`).
+   */
+  protected hydrateEnumType(_entry: {
+    readonly name: string;
+    readonly nativeType: string;
+    readonly values: readonly string[];
+  }): SqlEnumType {
+    throw new Error(
+      'SqlContractSerializerBase.hydrateEnumType not implemented: the target serializer must override this hook to construct its concrete SqlEnumType subclass',
+    );
   }
 
   /**

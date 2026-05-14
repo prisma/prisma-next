@@ -24,6 +24,7 @@ export type {
   SqlModelStorage,
   SqlQueryOperationTypes,
   SqlStorageInput,
+  SqlStorageTypeEntry,
   StorageColumnInput,
   StorageTableInput,
   StorageTypeInstanceInput,
@@ -33,6 +34,7 @@ export type {
 } from '../types';
 export {
   applyFkDefaults,
+  asCodecTypedStorageTypes,
   DEFAULT_FK_CONSTRAINT,
   DEFAULT_FK_INDEX,
   ForeignKey,

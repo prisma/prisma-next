@@ -13,13 +13,18 @@ export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export { SqlEnumType } from './ir/sql-enum-type';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
-export { SqlStorage, type SqlStorageInput } from './ir/sql-storage';
+export {
+  SqlStorage,
+  type SqlStorageInput,
+  type SqlStorageTypeEntry,
+} from './ir/sql-storage';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
 export { StorageTable, type StorageTableInput } from './ir/storage-table';
 export {
   StorageTypeInstance,
   type StorageTypeInstanceInput,
 } from './ir/storage-type-instance';
+export { asCodecTypedStorageTypes } from './ir/storage-types-view';
 export {
   UniqueConstraint,
   type UniqueConstraintInput,
