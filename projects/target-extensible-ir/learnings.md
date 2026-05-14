@@ -98,3 +98,23 @@ These are not findings (M1 closed clean) but design choices the M2 reviewer shou
 **Concrete consequence.** `MongoTargetStorage.namespaces` is now a normal enumerable class field; `MongoTargetContractSerializer.serializeContract` constructs a stripped JsonObject (`storage: { storageHash, collections }`). Future SQL targets that gain runtime-only IR fields (e.g. `SqlStorage.namespaces` in M5a) follow the same pattern: override `serializeContract` to construct the persisted shape; do not reach for `defineProperty`.
 
 **Action.** When introducing a new IR node class with runtime-only fields, override the family `ContractSerializer.serializeContract` to elide the field from the JsonObject. Do not use non-enumerable property tricks at the class layer.
+
+## Pattern: framework-level required-`kind` discriminator is unearned under union-narrowing dispatch
+
+**Shape.** The original `SchemaNodeBase` declared `abstract readonly kind: string` — every concrete IR class had to satisfy a required string-typed discriminator. Under M3 R3a the implementer attempted to flip the SQL Contract IR from flat-data interfaces to family-shared concrete classes; the required-`kind` contract forced ~200-500 mechanical edit sites across the workspace (tests, fixtures, emitted contract.d.ts envelopes) to add `kind` properties to literal storage shapes that had never carried one. Decision 16 flipped the framework declaration to `abstract readonly kind?: string` — optional at the framework level. The R3a cascade collapsed to three trivial test edits and the round landed cleanly.
+
+**Why it matters.** No framework consumer dispatches on `SchemaNode.kind` at the BASE type. Every `.kind === '...'` site in the workspace narrows through a discriminated union of leaves where each leaf carries its own literal `kind`; the leaf literal narrows the optional-string base on instances of that leaf, regardless of whether the base contract is required or optional. The Mongo precedent (per-class enumerable literal `kind = 'mongo-collection' as const`) keeps working unchanged because the leaf literal dominates the union narrowing. The required-`kind` contract was therefore unearned at the framework level — same "abstract earns ≥2 consumers that share behavior" rule that drives single-target family collapse, applied recursively to the framework discriminator contract.
+
+**The non-enumerable family-level kind trick.** For a family that has no polymorphic dispatch today (SQL: every verifier/serializer walks by structural position, not by `kind`), the family base (`SqlNode`, `SqlSchemaIRNode`) carries a single non-enumerable own `kind` property installed in its constructor via `Object.defineProperty(this, 'kind', { enumerable: false, ... })`. This achieves three properties simultaneously without per-class boilerplate:
+
+1. `JSON.stringify(node)` produces the canonical pre-lift JSON envelope shape (no `kind` field) — the on-disk serialization matches the pre-flip envelope exactly, so persisted contract.json files and arktype validators stay unchanged.
+2. Test assertions using `toEqual({...})` against pre-lift flat shapes continue to pass — vitest's structural comparison only inspects enumerable own properties.
+3. Direct access (`node.kind`) and runtime narrowing (`if (node.kind === 'sql')`) still work, so future polymorphic dispatch can begin reading `kind` without a runtime change.
+
+Mongo's per-class enumerable literal kinds remain the right pattern when each leaf encodes dispatch-relevant information that callers need to see in JSON envelopes (`kind: 'mongo-collection'` is meaningful to callers reading raw contract.json). The non-enumerable family-level kind is the right pattern when the family-level kind carries no dispatch-relevant information and the family's value is in keeping pre-lift fixtures friction-free.
+
+**Action.** When introducing a new IR class hierarchy:
+- If the family has polymorphic dispatch today (verifiers/walkers dispatch on `kind`): each leaf class declares an enumerable literal `kind = 'family-leaf' as const`; the family base remains the framework's optional `kind?: string`.
+- If the family has no polymorphic dispatch today: the family base declares a non-enumerable `kind` initialised in its constructor; subclasses inherit it; pre-lift fixtures stay friction-free; future polymorphic-dispatch consumers earn per-leaf literal overrides at that moment.
+
+Decision recorded at `wip/unattended-decisions.md § 16`.
