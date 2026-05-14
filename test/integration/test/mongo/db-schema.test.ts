@@ -1,4 +1,4 @@
-import { introspectSchema } from '@prisma-next/adapter-mongo/control';
+import mongoAdapterDescriptor, { introspectSchema } from '@prisma-next/adapter-mongo/control';
 import {
   createMongoFamilyInstance,
   mongoFamilyDescriptor,
@@ -14,6 +14,7 @@ function createInstance() {
   const stack = createControlStack({
     family: mongoFamilyDescriptor,
     target: mongoTargetDescriptor,
+    adapter: mongoAdapterDescriptor,
   });
   return createMongoFamilyInstance(stack);
 }

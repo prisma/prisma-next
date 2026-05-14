@@ -98,6 +98,6 @@ export function createMongoRunnerDeps(
       writeLedgerEntry: (space, entry) =>
         controlAdapter.writeLedgerEntry(controlDriver, space, entry),
     },
-    introspectSchema: () => family.introspect({ driver: controlDriver }),
+    introspectSchema: () => controlAdapter.introspectSchema(controlDriver),
   };
 }

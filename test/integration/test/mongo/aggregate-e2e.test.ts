@@ -1,4 +1,7 @@
-import { createMongoControlDriver, readAllMarkers } from '@prisma-next/adapter-mongo/control';
+import mongoAdapterDescriptor, {
+  createMongoControlDriver,
+  readAllMarkers,
+} from '@prisma-next/adapter-mongo/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
@@ -120,6 +123,7 @@ function createInstance() {
   const stack = createControlStack({
     family: mongoFamilyDescriptor,
     target: mongoTargetDescriptor,
+    adapter: mongoAdapterDescriptor,
   });
   return createMongoFamilyInstance(stack);
 }

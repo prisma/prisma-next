@@ -25,7 +25,7 @@ export { createMongoAdapter } from '../mongo-adapter';
 import { mongoCodecDescriptors } from '../core/codecs';
 import { MongoControlAdapterImpl } from '../core/mongo-control-adapter';
 
-const mongoAdapterDescriptor: MongoControlAdapterDescriptor<'mongo'> = {
+export const mongoAdapterDescriptor: MongoControlAdapterDescriptor<'mongo'> = {
   kind: 'adapter',
   id: 'mongo',
   familyId: 'mongo',
