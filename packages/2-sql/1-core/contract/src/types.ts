@@ -10,6 +10,7 @@ export {
   type ForeignKeyReferencesInput,
 } from './ir/foreign-key-references';
 export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
+export { SqlEnumType } from './ir/sql-enum-type';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
 export { SqlStorage, type SqlStorageInput } from './ir/sql-storage';

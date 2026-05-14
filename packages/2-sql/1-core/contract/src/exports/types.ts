@@ -39,6 +39,7 @@ export {
   ForeignKeyReferences,
   Index,
   PrimaryKey,
+  SqlEnumType,
   SqlNode,
   SqlStorage,
   StorageColumn,
