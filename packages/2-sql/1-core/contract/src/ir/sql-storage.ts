@@ -11,14 +11,13 @@ export interface SqlStorageInput<THash extends string = string> {
 }
 
 /**
- * SQL Contract IR root node for the `storage` field. Lifted from the
- * pre-R3 flat-data `type SqlStorage<THash>` to a class extending
- * {@link SqlNode} per FR18.
+ * SQL Contract IR root node for the `storage` field.
  *
- * Single concrete family-layer class (no target subclass) per Decision
- * 14. Both Postgres and SQLite consume this same class today; per-target
- * subclasses arrive in M5a when each target's `namespaces` storage
- * earns its target-specific shape.
+ * Single concrete family-shared class — both Postgres and SQLite
+ * consume this same class today. A future milestone introduces
+ * per-target storage subclasses when each target's namespace shape
+ * earns its target-specific concretion (target-specific derived
+ * fields, target-specific storage extensions).
  *
  * The constructor normalises nested IR-class fields (`tables`, optional
  * `types`) into class instances so downstream walks see a uniform AST.

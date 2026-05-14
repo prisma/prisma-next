@@ -7,13 +7,11 @@ export interface ForeignKeyReferencesInput {
 }
 
 /**
- * SQL Contract IR node for the referenced side of a foreign key. Lifted
- * from the pre-R3 flat-data `type ForeignKeyReferences` to a class
- * extending {@link SqlNode} per FR18.
+ * SQL Contract IR node for the referenced side of a foreign key.
  *
- * The cross-namespace shape (referenced-namespace coordinate on top of
- * `(table, columns)`) is M5b's load-bearing addition; the class is
- * shaped today around single-namespace references.
+ * The class is shaped around single-namespace references today; a
+ * future milestone introduces a cross-namespace coordinate on top of
+ * `(table, columns)` when namespace-keyed storage lands.
  */
 export class ForeignKeyReferences extends SqlNode {
   readonly table: string;

@@ -11,7 +11,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
  *
  * `serializeContract` falls through to the family-base default —
  * SQLite's contract is JSON-clean today. Once target-only fields land
- * (e.g. per-target namespaces) this is the home for stripping them
- * from the persisted envelope.
+ * (e.g. per-target derived storage fields) this is the home for
+ * stripping them from the persisted envelope.
  */
 export class SqliteContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {}

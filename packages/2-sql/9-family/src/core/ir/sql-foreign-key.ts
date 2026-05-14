@@ -1,16 +1,17 @@
 import { SqlNode } from './sql-node';
 
 /**
- * SQL family foreign-key IR base. Carries the local-column list and the
- * referenced (namespace.id, table, column) coordinate. The
- * namespace-aware reference shape is M5b's load-bearing addition; M1
- * declares the abstract field shape but defers concrete coordinate types
- * to the target layer so M5b can introduce the cross-namespace coordinate
- * as a target concretion without reshaping the family base.
+ * SQL family foreign-key IR base. Placeholder abstract for future
+ * SQL-family foreign-key subclasses; today the family-shared concrete
+ * foreign-key class lives at `@prisma-next/sql-contract/types` as
+ * `ForeignKey` (one class shared by all SQL targets).
  *
- * The reference coordinate is intentionally kept as an opaque
- * `SqlForeignKeyReference` shape on the base; targets may carry richer
- * fields (e.g. `onDelete` / `onUpdate` actions, action match modes).
+ * A future milestone introduces a namespace-aware reference shape
+ * (cross-namespace coordinates on top of `(table, columns)`) when
+ * namespace-keyed storage lands; the reference coordinate is
+ * intentionally kept opaque on the base so targets can carry richer
+ * fields (`onDelete` / `onUpdate` actions, action match modes) without
+ * reshaping the family base.
  */
 export abstract class SqlForeignKey extends SqlNode {
   abstract readonly columns: readonly string[];

@@ -16,8 +16,6 @@ export interface StorageTableInput {
 
 /**
  * SQL Contract IR node for a single table entry in `SqlStorage.tables`.
- * Lifted from the pre-R3 flat-data `type StorageTable` to a class
- * extending {@link SqlNode} per FR18.
  *
  * The constructor normalises nested IR-class fields (columns, primary
  * key, uniques, indexes, foreign keys) into the appropriate class
@@ -26,8 +24,9 @@ export interface StorageTableInput {
  *
  * The table's `name` is not on the class — tables are keyed by name in
  * the parent `SqlStorage.tables: Record<string, StorageTable>` map.
- * M5a's namespace-aware re-keying will add a `namespaceId` field at
- * that milestone; today's single-namespace shape needs neither field.
+ * A future namespace-aware milestone will add a `namespaceId` field
+ * when namespace-keyed storage lands; today's single-namespace shape
+ * needs neither field.
  */
 export class StorageTable extends SqlNode {
   readonly columns: Readonly<Record<string, StorageColumn>>;

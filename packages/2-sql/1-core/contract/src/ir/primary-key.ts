@@ -7,9 +7,7 @@ export interface PrimaryKeyInput {
 }
 
 /**
- * SQL Contract IR node for a table's primary-key constraint. Lifted
- * from the pre-R3 flat-data `type PrimaryKey` to a class extending
- * {@link SqlNode} per FR18.
+ * SQL Contract IR node for a table's primary-key constraint.
  */
 export class PrimaryKey extends SqlNode {
   readonly columns: readonly string[];

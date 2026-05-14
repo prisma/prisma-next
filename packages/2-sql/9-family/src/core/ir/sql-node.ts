@@ -1,13 +1,14 @@
 import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
 
 /**
- * SQL family IR-node base. Commits to the framework's SchemaNode contract
- * (string-typed `kind`) and inherits the framework's freeze() helper.
+ * SQL family IR-node base. Placeholder abstract for future SQL-family
+ * IR-node subclasses; today the family-shared concrete IR-node base
+ * lives at `@prisma-next/sql-contract/types` as `SqlNode` (one class
+ * shared by all SQL targets, carrying the family-level
+ * `kind = 'sql'` discriminator).
  *
- * Concrete IR node bases for SQL — `SqlTable`, `SqlColumn`, `SqlForeignKey`,
- * `SqlIndex`, `SqlPrimaryKey`, `SqlUnique`, `SqlEnumType` (M4) — extend this
- * class and declare their own `kind` discriminant. Targets (Postgres,
- * SQLite, …) extend the per-shape base classes with target-specific
- * concrete classes (see M3).
+ * Future per-shape SQL-family abstracts (e.g. an enum-type base when a
+ * polymorphic walker earns it) extend this class and declare their own
+ * narrower `kind` literals.
  */
 export abstract class SqlNode extends SchemaNodeBase {}

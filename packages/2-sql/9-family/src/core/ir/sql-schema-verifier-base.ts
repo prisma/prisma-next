@@ -18,10 +18,12 @@ import type {
  * envelope shape so concrete subclasses focus on target-specific
  * verification logic.
  *
- * M1 ships only the shell. The SQL-shared walk lands in M3 alongside
- * Postgres + SQLite IR-class concretions; the protected hooks are
- * declared here so target subclasses (`PostgresSchemaVerifier`,
- * `SqliteSchemaVerifier`) compile against a stable base API.
+ * The protected hooks (`verifyCommonSqlSchema`,
+ * `verifyTargetExtensions`) carry the stable base API that target
+ * subclasses (`PostgresSchemaVerifier`, `SqliteSchemaVerifier`)
+ * compile against; the SQL-shared walk implementation will be lifted
+ * into this base when the verifier behaviour migrates off the
+ * legacy adapter shells.
  */
 export abstract class SqlSchemaVerifierBase<TContract, TSchema>
   implements SchemaVerifier<TContract, TSchema>
@@ -34,10 +36,10 @@ export abstract class SqlSchemaVerifierBase<TContract, TSchema>
   }
 
   /**
-   * SQL-shared verification — table/column/FK/unique/index walks keyed by
-   * `(namespace.id, name)`. M1 ships the abstract hook; the M3 commit
-   * provides the family-shared implementation in subclasses (or, more
-   * likely, lifts a shared helper into this base).
+   * SQL-shared verification — table/column/FK/unique/index walks keyed
+   * by `(namespace.id, name)`. Concrete subclasses provide the
+   * family-shared implementation today; a future iteration will lift
+   * the shared walk into this base.
    */
   protected abstract verifyCommonSqlSchema(
     options: SchemaVerifyOptions<TContract, TSchema>,

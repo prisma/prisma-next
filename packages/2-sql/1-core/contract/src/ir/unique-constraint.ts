@@ -7,9 +7,7 @@ export interface UniqueConstraintInput {
 }
 
 /**
- * SQL Contract IR node for a table-level unique constraint. Lifted from
- * the pre-R3 flat-data `type UniqueConstraint` to a class extending
- * {@link SqlNode} per FR18.
+ * SQL Contract IR node for a table-level unique constraint.
  */
 export class UniqueConstraint extends SqlNode {
   readonly columns: readonly string[];

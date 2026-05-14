@@ -17,9 +17,7 @@ export interface ForeignKeyInput {
 }
 
 /**
- * SQL Contract IR node for a table-level foreign-key declaration. Lifted
- * from the pre-R3 flat-data `type ForeignKey` to a class extending
- * {@link SqlNode} per FR18.
+ * SQL Contract IR node for a table-level foreign-key declaration.
  *
  * The nested `references` field is normalised to a
  * {@link ForeignKeyReferences} instance inside the constructor so

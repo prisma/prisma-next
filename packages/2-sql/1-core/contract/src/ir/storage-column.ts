@@ -23,14 +23,12 @@ export interface StorageColumnInput {
 
 /**
  * SQL Contract IR node for a single column entry in `StorageTable.columns`.
- * Lifted from the pre-R3 flat-data `interface StorageColumn` to a class
- * extending {@link SqlNode} per FR18.
  *
- * Single concrete family-layer class (no target subclass) per the
- * Decision 14 family-shared-shape rule. The class type accepts any
- * caller that constructs via `new StorageColumn(input)`; literal
- * construction sites must pass through the constructor or the SPI
- * hydration walker.
+ * Single concrete family-shared class — every SQL target reads the
+ * same column shape today, so there is no per-target subclass. The
+ * class type accepts any caller that constructs via
+ * `new StorageColumn(input)`; literal construction sites must pass
+ * through the constructor or the family-base hydration walker.
  *
  * The column's `name` is not on the class — columns are keyed by name
  * in the parent `StorageTable.columns: Record<string, StorageColumn>`

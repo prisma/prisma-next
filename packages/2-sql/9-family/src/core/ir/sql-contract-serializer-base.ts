@@ -18,8 +18,7 @@ import type { JsonObject } from '@prisma-next/utils/json';
  *    data and passes through unchanged.
  * 3. `constructTargetContract` is the target-specific extension hook;
  *    defaults to identity. Targets that need to attach target-only
- *    fields (e.g. per-target namespaces in a future milestone) override
- *    it.
+ *    fields (e.g. target-specific derived storage fields) override it.
  *
  * Default `serializeContract` is identity over the contract — concrete
  * SQL targets ship JSON-clean class instances, so the contract value
