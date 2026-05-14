@@ -1,32 +1,20 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateSqlContract } from '@prisma-next/sql-contract/validators';
 
 /**
- * Postgres target `ContractSerializer` concretion. Plugs into the
- * SQL-shared deserialization pipeline at `constructTargetContract`.
- *
- * The structural-validation step delegates to the existing
- * `validateSqlContract` arktype-backed validator from `sql-contract`;
- * `constructTargetContract` returns the validated flat-data shape
- * unchanged. The IR-class hierarchy lift (`PostgresStorage`,
- * `PostgresTable`, …) lands in the next round; at that point this
- * subclass walks the validated tree to construct the class instances.
+ * Postgres target `ContractSerializer` concretion. Inherits the full
+ * SQL-family deserialization pipeline (structural validation +
+ * hydration walker that materialises the SQL Contract IR class
+ * hierarchy from the validated JSON envelope). Today's Postgres
+ * contract shape is the family-shared shape; no target-specific
+ * construction step is needed and `constructTargetContract` falls
+ * through to the family-base identity default.
  *
  * `serializeContract` falls through to the family-base default —
- * Postgres' flat-data contract is JSON-clean today, so no on-the-way-out
- * canonicalization is needed. The runtime-only field convention
- * established for Mongo carries over: once the IR-class hierarchy adds
- * runtime-only fields (e.g. `PostgresStorage.namespaces`) this method
- * is the home for stripping them from the persisted envelope.
+ * Postgres' contract is JSON-clean today, so no on-the-way-out
+ * canonicalization is needed. Once target-only fields land (e.g.
+ * per-target namespaces in a future milestone) this is the home for
+ * stripping them from the persisted envelope.
  */
-export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {
-  protected parseSqlContractStructure(json: unknown): Contract<SqlStorage> {
-    return validateSqlContract<Contract<SqlStorage>>(json);
-  }
-
-  protected constructTargetContract(validated: unknown): Contract<SqlStorage> {
-    return validated as Contract<SqlStorage>;
-  }
-}
+export class PostgresContractSerializer extends SqlContractSerializerBase<Contract<SqlStorage>> {}

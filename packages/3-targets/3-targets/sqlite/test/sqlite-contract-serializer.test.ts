@@ -1,11 +1,32 @@
 import { createSqlContract } from '@prisma-next/contract/testing';
 import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
+import { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import sqliteControlTargetDescriptor from '../src/core/control-target';
 import { SqliteContractSerializer } from '../src/core/sqlite-contract-serializer';
 
 function makeValidContractJson() {
   return createSqlContract({ target: 'sqlite' });
+}
+
+function makeContractWithTablesJson() {
+  return createSqlContract({
+    target: 'sqlite',
+    storage: {
+      tables: {
+        user: {
+          columns: {
+            id: { nativeType: 'INTEGER', codecId: 'sqlite/integer@1', nullable: false },
+            email: { nativeType: 'TEXT', codecId: 'sqlite/text@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
+        },
+      },
+    },
+  });
 }
 
 describe('SqliteContractSerializer', () => {
@@ -21,6 +42,16 @@ describe('SqliteContractSerializer', () => {
     expect(contract.storage.tables).toEqual({});
   });
 
+  it('hydrates JSON storage into the SQL Contract IR class hierarchy', () => {
+    const serializer = new SqliteContractSerializer();
+    const contract = serializer.deserializeContract(makeContractWithTablesJson());
+
+    expect(contract.storage).toBeInstanceOf(SqlStorage);
+    const userTable = contract.storage.tables['user'];
+    expect(userTable).toBeInstanceOf(StorageTable);
+    expect(userTable?.columns['id']).toBeInstanceOf(StorageColumn);
+  });
+
   it('rejects an invalid contract (family-shared structural validation runs)', () => {
     const serializer = new SqliteContractSerializer();
     const bad = { ...makeValidContractJson(), targetFamily: 'mongo' };
@@ -29,12 +60,12 @@ describe('SqliteContractSerializer', () => {
 
   it('serializeContract round-trips a JSON-clean contract', () => {
     const serializer = new SqliteContractSerializer();
-    const contract = serializer.deserializeContract(makeValidContractJson());
+    const contract = serializer.deserializeContract(makeContractWithTablesJson());
     const json = serializer.serializeContract(contract);
-    expect(JSON.parse(JSON.stringify(json))).toMatchObject({
-      targetFamily: 'sql',
-      storage: { tables: {} },
-    });
+    const reparsed = JSON.parse(JSON.stringify(json));
+    expect(reparsed.storage).not.toHaveProperty('kind');
+    expect(reparsed.storage.tables.user).not.toHaveProperty('kind');
+    expect(reparsed.storage.tables.user.columns.id).not.toHaveProperty('kind');
   });
 });
 
