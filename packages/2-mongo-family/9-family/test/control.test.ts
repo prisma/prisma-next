@@ -105,18 +105,16 @@ describe('createMongoFamilyInstance', () => {
     ).rejects.toThrow();
   });
 
-  it('schemaVerify() requires a valid contract', async () => {
+  it('verifySchema() requires a valid contract', () => {
     const instance = createMongoFamilyInstance(createMinimalControlStack());
-    const fakeDriver = {} as Parameters<typeof instance.schemaVerify>[0]['driver'];
-    await expect(
-      instance.schemaVerify({
-        driver: fakeDriver,
+    expect(() =>
+      instance.verifySchema({
         contract: {},
+        schema: { collections: [] } as MongoSchemaIR,
         strict: false,
-        contractPath: '/test',
         frameworkComponents: [],
       }),
-    ).rejects.toThrow();
+    ).toThrow();
   });
 
   it('sign() requires a valid contract', async () => {
@@ -127,11 +125,11 @@ describe('createMongoFamilyInstance', () => {
     ).rejects.toThrow();
   });
 
-  it('introspect() delegates to introspectSchema', async () => {
+  it('introspect() requires an adapter on the control stack', async () => {
     const instance = createMongoFamilyInstance(createMinimalControlStack());
     const fakeDriver = {} as Parameters<typeof instance.introspect>[0]['driver'];
     await expect(instance.introspect({ driver: fakeDriver })).rejects.toThrow(
-      'does not expose a db property',
+      'Mongo family requires an adapter',
     );
   });
 

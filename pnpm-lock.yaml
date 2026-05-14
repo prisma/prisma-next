@@ -3381,6 +3381,9 @@ importers:
       '@prisma-next/errors':
         specifier: workspace:*
         version: link:../../1-framework/1-core/errors
+      '@prisma-next/family-mongo':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/9-family
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
@@ -3451,6 +3454,9 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
+      '@prisma-next/family-mongo':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/9-family
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components

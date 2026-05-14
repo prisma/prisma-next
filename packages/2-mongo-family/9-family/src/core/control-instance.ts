@@ -1,10 +1,3 @@
-import {
-  initMarker,
-  introspectSchema,
-  readAllMarkers,
-  readMarker,
-  updateMarker,
-} from '@prisma-next/adapter-mongo/control';
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -27,10 +20,10 @@ import {
   VERIFY_CODE_TARGET_MISMATCH,
 } from '@prisma-next/framework-components/control';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import type { MongoTargetContract } from '@prisma-next/target-mongo/control';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { Db } from 'mongodb';
+import type { MongoControlAdapter, MongoControlAdapterDescriptor } from './control-adapter';
 import type { MongoControlExtensionDescriptor } from './control-types';
 import { mongoTargetDescriptor } from './mongo-target-descriptor';
 import { mongoOperationsToPreview } from './operation-preview';
@@ -49,24 +42,15 @@ export interface MongoControlFamilyInstance
   validateContract(contractJson: unknown): Contract;
 }
 
-function extractDb(driver: ControlDriverInstance<'mongo', string>): Db {
-  const mongoDriver = driver as ControlDriverInstance<'mongo', string> & { db?: Db };
-  if (!mongoDriver.db) {
-    throw new Error(
-      'Mongo control driver does not expose a db property. ' +
-        'Use createMongoControlDriver() from @prisma-next/adapter-mongo/control.',
-    );
-  }
-  return mongoDriver.db;
-}
-
-function deserializeMongoContract(contractJson: unknown): MongoTargetContract {
-  return mongoTargetDescriptor.contractSerializer.deserializeContract(contractJson);
+function deserializeMongoContract(contractJson: unknown): MongoContract {
+  return mongoTargetDescriptor.contractSerializer.deserializeContract(
+    contractJson,
+  ) as unknown as MongoContract;
 }
 
 /**
  * Family-method contract input. By the time control-plane methods
- * (`verify`, `schemaVerify`, `sign`, …) are invoked through the CLI
+ * (`verify`, `verifySchema`, `sign`, …) are invoked through the CLI
  * control client (`client.ts`), the input has already been threaded
  * through `familyInstance.validateContract` (which delegates to
  * `mongoTargetDescriptor.contractSerializer.deserializeContract`). The
@@ -80,254 +64,21 @@ function deserializeMongoContract(contractJson: unknown): MongoTargetContract {
  * leaking it to the framework). This helper recovers the validated
  * shape with a single narrow cast.
  */
-function asValidatedMongoContract(contract: unknown): MongoTargetContract {
-  return contract as MongoTargetContract;
+function asValidatedMongoContract(contract: unknown): MongoContract {
+  return contract as MongoContract;
 }
 
-class MongoFamilyInstance implements MongoControlFamilyInstance {
-  readonly familyId = 'mongo' as const;
-
-  validateContract(contractJson: unknown): Contract {
-    // The class form (MongoTargetContract) and the framework Contract are
-    // structurally compatible — same fields, just a class instance on the
-    // storage envelope. The cast preserves the framework signature.
-    return deserializeMongoContract(contractJson) as unknown as Contract;
-  }
-
-  async verify(options: {
-    readonly driver: ControlDriverInstance<'mongo', string>;
-    readonly contract: unknown;
-    readonly expectedTargetId: string;
-    readonly contractPath: string;
-    readonly configPath?: string;
-  }): Promise<VerifyDatabaseResult> {
-    const { driver, contract: rawContract, expectedTargetId, contractPath, configPath } = options;
-    const startTime = Date.now();
-
-    const contract = asValidatedMongoContract(rawContract);
-
-    const contractStorageHash = contract.storage.storageHash;
-    const contractProfileHash = contract.profileHash;
-    const contractTarget = contract.target;
-
-    const baseOpts = {
-      contractStorageHash,
-      contractProfileHash,
-      expectedTargetId,
-      contractPath,
-      ...ifDefined('configPath', configPath),
-    };
-
-    if (contractTarget !== expectedTargetId) {
-      return buildVerifyResult({
-        ...baseOpts,
-        ok: false,
-        code: VERIFY_CODE_TARGET_MISMATCH,
-        summary: 'Target mismatch',
-        actualTargetId: contractTarget,
-        totalTime: Date.now() - startTime,
-      });
-    }
-
-    const db = extractDb(driver);
-    const marker = await readMarker(db, APP_SPACE_ID);
-
-    if (!marker) {
-      return buildVerifyResult({
-        ...baseOpts,
-        ok: false,
-        code: VERIFY_CODE_MARKER_MISSING,
-        summary: 'Marker missing',
-        totalTime: Date.now() - startTime,
-      });
-    }
-
-    if (marker.storageHash !== contractStorageHash) {
-      return buildVerifyResult({
-        ...baseOpts,
-        ok: false,
-        code: VERIFY_CODE_HASH_MISMATCH,
-        summary: 'Hash mismatch',
-        marker,
-        totalTime: Date.now() - startTime,
-      });
-    }
-
-    if (contractProfileHash && marker.profileHash !== contractProfileHash) {
-      return buildVerifyResult({
-        ...baseOpts,
-        ok: false,
-        code: VERIFY_CODE_HASH_MISMATCH,
-        summary: 'Hash mismatch',
-        marker,
-        totalTime: Date.now() - startTime,
-      });
-    }
-
-    return buildVerifyResult({
-      ...baseOpts,
-      ok: true,
-      summary: 'Database matches contract',
-      marker,
-      totalTime: Date.now() - startTime,
-    });
-  }
-
-  async schemaVerify(options: {
-    readonly driver: ControlDriverInstance<'mongo', string>;
-    readonly contract: unknown;
-    readonly strict: boolean;
-    readonly contractPath: string;
-    readonly configPath?: string;
-    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', string>>;
-  }): Promise<VerifyDatabaseSchemaResult> {
-    const { driver, contract: rawContract, strict, contractPath, configPath } = options;
-
-    const contract = asValidatedMongoContract(rawContract);
-
-    const db = extractDb(driver);
-    const liveIR = await introspectSchema(db);
-
-    return verifyMongoSchema({
-      contract,
-      schema: liveIR,
-      strict,
-      frameworkComponents: options.frameworkComponents,
-      context: {
-        contractPath,
-        ...ifDefined('configPath', configPath),
-      },
-    });
-  }
-
-  verifySchema(options: {
-    readonly contract: unknown;
-    readonly schema: MongoSchemaIR;
-    readonly strict: boolean;
-    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', string>>;
-  }): VerifyDatabaseSchemaResult {
-    const contract = asValidatedMongoContract(options.contract);
-    return verifyMongoSchema({
-      contract,
-      schema: options.schema,
-      strict: options.strict,
-      frameworkComponents: options.frameworkComponents,
-    });
-  }
-
-  async sign(options: {
-    readonly driver: ControlDriverInstance<'mongo', string>;
-    readonly contract: unknown;
-    readonly contractPath: string;
-    readonly configPath?: string;
-  }): Promise<SignDatabaseResult> {
-    const { driver, contract: rawContract, contractPath, configPath } = options;
-    const startTime = Date.now();
-
-    const contract = asValidatedMongoContract(rawContract);
-
-    const contractStorageHash = contract.storage.storageHash;
-    const contractProfileHash = contract.profileHash;
-
-    const db = extractDb(driver);
-
-    const existingMarker = await readMarker(db, APP_SPACE_ID);
-
-    let markerCreated = false;
-    let markerUpdated = false;
-    let previousHashes: { storageHash?: string; profileHash?: string } | undefined;
-
-    if (!existingMarker) {
-      await initMarker(db, APP_SPACE_ID, {
-        storageHash: contractStorageHash,
-        profileHash: contractProfileHash,
-      });
-      markerCreated = true;
-    } else {
-      const storageHashMatches = existingMarker.storageHash === contractStorageHash;
-      const profileHashMatches = existingMarker.profileHash === contractProfileHash;
-
-      if (!storageHashMatches || !profileHashMatches) {
-        previousHashes = {
-          storageHash: existingMarker.storageHash,
-          profileHash: existingMarker.profileHash,
-        };
-        const updated = await updateMarker(db, APP_SPACE_ID, existingMarker.storageHash, {
-          storageHash: contractStorageHash,
-          profileHash: contractProfileHash,
-        });
-        if (!updated) {
-          throw new Error('CAS conflict: marker was modified by another process during sign');
-        }
-        markerUpdated = true;
-      }
-    }
-
-    let summary: string;
-    if (markerCreated) {
-      summary = 'Database signed (marker created)';
-    } else if (markerUpdated) {
-      summary = `Database signed (marker updated from ${previousHashes?.storageHash ?? 'unknown'})`;
-    } else {
-      summary = 'Database already signed with this contract';
-    }
-
-    return {
-      ok: true,
-      summary,
-      contract: {
-        storageHash: contractStorageHash,
-        profileHash: contractProfileHash,
-      },
-      target: {
-        expected: contract.target,
-        actual: contract.target,
-      },
-      marker: {
-        created: markerCreated,
-        updated: markerUpdated,
-        ...ifDefined('previous', previousHashes),
-      },
-      meta: {
-        contractPath,
-        ...ifDefined('configPath', configPath),
-      },
-      timings: {
-        total: Date.now() - startTime,
-      },
-    };
-  }
-
-  async readMarker(options: {
-    readonly driver: ControlDriverInstance<'mongo', string>;
-    readonly space: string;
-  }): Promise<ContractMarkerRecord | null> {
-    const db = extractDb(options.driver);
-    return readMarker(db, options.space);
-  }
-
-  async readAllMarkers(options: {
-    readonly driver: ControlDriverInstance<'mongo', string>;
-  }): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
-    const db = extractDb(options.driver);
-    return readAllMarkers(db);
-  }
-
-  async introspect(options: {
-    readonly driver: ControlDriverInstance<'mongo', string>;
-    readonly contract?: unknown;
-  }): Promise<MongoSchemaIR> {
-    const db = extractDb(options.driver);
-    return introspectSchema(db);
-  }
-
-  toSchemaView(schema: MongoSchemaIR): CoreSchemaView {
-    return mongoSchemaToView(schema);
-  }
-
-  toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview {
-    return mongoOperationsToPreview(operations);
-  }
+function isMongoControlAdapter(value: unknown): value is MongoControlAdapter<'mongo'> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'readMarker' in value &&
+    typeof (value as { readMarker: unknown }).readMarker === 'function' &&
+    'readAllMarkers' in value &&
+    typeof (value as { readAllMarkers: unknown }).readAllMarkers === 'function' &&
+    'introspectSchema' in value &&
+    typeof (value as { introspectSchema: unknown }).introspectSchema === 'function'
+  );
 }
 
 function buildVerifyResult(opts: {
@@ -394,5 +145,233 @@ export function createMongoFamilyInstance(controlStack: ControlStack): MongoCont
       });
     }
   }
-  return new MongoFamilyInstance();
+
+  // Mongo dispatch surface. Every wire-level operation routes through
+  // the adapter resolved from the control stack; the family carries no
+  // direct imports of target/adapter/driver internals. Mirrors the SQL
+  // family's `getControlAdapter()` helper.
+  const adapter = controlStack.adapter as MongoControlAdapterDescriptor<'mongo'> | undefined;
+  const getControlAdapter = (): MongoControlAdapter<'mongo'> => {
+    if (!adapter) {
+      throw new Error('Mongo family requires an adapter descriptor in ControlStack');
+    }
+    const controlAdapter = adapter.create(controlStack as ControlStack<'mongo', 'mongo'>);
+    if (!isMongoControlAdapter(controlAdapter)) {
+      throw new Error(
+        'Adapter does not implement MongoControlAdapter (missing readMarker, readAllMarkers, or introspectSchema)',
+      );
+    }
+    return controlAdapter;
+  };
+
+  // The family-level driver type is `ControlDriverInstance<'mongo', string>`,
+  // but the SPI methods are typed against `<'mongo', 'mongo'>`. Today's only
+  // Mongo target is `'mongo'`, so the runtime values are identical; the cast
+  // satisfies the structural type-system mismatch on `targetId`.
+  const asMongoDriver = (
+    driver: ControlDriverInstance<'mongo', string>,
+  ): ControlDriverInstance<'mongo', 'mongo'> => driver as ControlDriverInstance<'mongo', 'mongo'>;
+
+  return {
+    familyId: 'mongo' as const,
+
+    validateContract(contractJson: unknown): Contract {
+      // The deserialized class form (MongoTargetContract, owned by
+      // target-mongo) and the framework Contract are structurally
+      // compatible — same fields, just a class instance on the storage
+      // envelope. The cast preserves the framework signature.
+      return deserializeMongoContract(contractJson) as unknown as Contract;
+    },
+
+    async verify(options): Promise<VerifyDatabaseResult> {
+      const { driver, contract: rawContract, expectedTargetId, contractPath, configPath } = options;
+      const startTime = Date.now();
+
+      const contract = asValidatedMongoContract(rawContract);
+
+      const contractStorageHash = contract.storage.storageHash;
+      const contractProfileHash = contract.profileHash;
+      const contractTarget = contract.target;
+
+      const baseOpts = {
+        contractStorageHash,
+        contractProfileHash,
+        expectedTargetId,
+        contractPath,
+        ...ifDefined('configPath', configPath),
+      };
+
+      if (contractTarget !== expectedTargetId) {
+        return buildVerifyResult({
+          ...baseOpts,
+          ok: false,
+          code: VERIFY_CODE_TARGET_MISMATCH,
+          summary: 'Target mismatch',
+          actualTargetId: contractTarget,
+          totalTime: Date.now() - startTime,
+        });
+      }
+
+      const marker = await getControlAdapter().readMarker(asMongoDriver(driver), APP_SPACE_ID);
+
+      if (!marker) {
+        return buildVerifyResult({
+          ...baseOpts,
+          ok: false,
+          code: VERIFY_CODE_MARKER_MISSING,
+          summary: 'Marker missing',
+          totalTime: Date.now() - startTime,
+        });
+      }
+
+      if (marker.storageHash !== contractStorageHash) {
+        return buildVerifyResult({
+          ...baseOpts,
+          ok: false,
+          code: VERIFY_CODE_HASH_MISMATCH,
+          summary: 'Hash mismatch',
+          marker,
+          totalTime: Date.now() - startTime,
+        });
+      }
+
+      if (contractProfileHash && marker.profileHash !== contractProfileHash) {
+        return buildVerifyResult({
+          ...baseOpts,
+          ok: false,
+          code: VERIFY_CODE_HASH_MISMATCH,
+          summary: 'Hash mismatch',
+          marker,
+          totalTime: Date.now() - startTime,
+        });
+      }
+
+      return buildVerifyResult({
+        ...baseOpts,
+        ok: true,
+        summary: 'Database matches contract',
+        marker,
+        totalTime: Date.now() - startTime,
+      });
+    },
+
+    verifySchema(options: {
+      readonly contract: unknown;
+      readonly schema: MongoSchemaIR;
+      readonly strict: boolean;
+      readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', string>>;
+    }): VerifyDatabaseSchemaResult {
+      const contract = asValidatedMongoContract(options.contract);
+      return verifyMongoSchema({
+        contract,
+        schema: options.schema,
+        strict: options.strict,
+        frameworkComponents: options.frameworkComponents,
+      });
+    },
+
+    async sign(options): Promise<SignDatabaseResult> {
+      const { driver, contract: rawContract, contractPath, configPath } = options;
+      const startTime = Date.now();
+
+      const contract = asValidatedMongoContract(rawContract);
+
+      const contractStorageHash = contract.storage.storageHash;
+      const contractProfileHash = contract.profileHash;
+
+      const controlAdapter = getControlAdapter();
+      const mongoDriver = asMongoDriver(driver);
+
+      const existingMarker = await controlAdapter.readMarker(mongoDriver, APP_SPACE_ID);
+
+      let markerCreated = false;
+      let markerUpdated = false;
+      let previousHashes: { storageHash?: string; profileHash?: string } | undefined;
+
+      if (!existingMarker) {
+        await controlAdapter.initMarker(mongoDriver, APP_SPACE_ID, {
+          storageHash: contractStorageHash,
+          profileHash: contractProfileHash,
+        });
+        markerCreated = true;
+      } else {
+        const storageHashMatches = existingMarker.storageHash === contractStorageHash;
+        const profileHashMatches = existingMarker.profileHash === contractProfileHash;
+
+        if (!storageHashMatches || !profileHashMatches) {
+          previousHashes = {
+            storageHash: existingMarker.storageHash,
+            profileHash: existingMarker.profileHash,
+          };
+          const updated = await controlAdapter.updateMarker(
+            mongoDriver,
+            APP_SPACE_ID,
+            existingMarker.storageHash,
+            {
+              storageHash: contractStorageHash,
+              profileHash: contractProfileHash,
+            },
+          );
+          if (!updated) {
+            throw new Error('CAS conflict: marker was modified by another process during sign');
+          }
+          markerUpdated = true;
+        }
+      }
+
+      let summary: string;
+      if (markerCreated) {
+        summary = 'Database signed (marker created)';
+      } else if (markerUpdated) {
+        summary = `Database signed (marker updated from ${previousHashes?.storageHash ?? 'unknown'})`;
+      } else {
+        summary = 'Database already signed with this contract';
+      }
+
+      return {
+        ok: true,
+        summary,
+        contract: {
+          storageHash: contractStorageHash,
+          profileHash: contractProfileHash,
+        },
+        target: {
+          expected: contract.target,
+          actual: contract.target,
+        },
+        marker: {
+          created: markerCreated,
+          updated: markerUpdated,
+          ...ifDefined('previous', previousHashes),
+        },
+        meta: {
+          contractPath,
+          ...ifDefined('configPath', configPath),
+        },
+        timings: {
+          total: Date.now() - startTime,
+        },
+      };
+    },
+
+    async readMarker(options): Promise<ContractMarkerRecord | null> {
+      return getControlAdapter().readMarker(asMongoDriver(options.driver), options.space);
+    },
+
+    async readAllMarkers(options): Promise<ReadonlyMap<string, ContractMarkerRecord>> {
+      return getControlAdapter().readAllMarkers(asMongoDriver(options.driver));
+    },
+
+    async introspect(options): Promise<MongoSchemaIR> {
+      return getControlAdapter().introspectSchema(asMongoDriver(options.driver));
+    },
+
+    toSchemaView(schema: MongoSchemaIR): CoreSchemaView {
+      return mongoSchemaToView(schema);
+    },
+
+    toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview {
+      return mongoOperationsToPreview(operations);
+    },
+  };
 }
