@@ -1110,6 +1110,12 @@ async function executeMigrationStatusCommand(
         ],
       });
     }
+    // Populate `spaces[]` from the loaded aggregate even on the no-app-
+    // bundles early-return path. Marker state is unknown at this point
+    // (the DB read happens further down), so the per-space rows surface
+    // with `pendingCount` / `markerHash` absent — but JSON consumers still
+    // get the canonical list of loaded spaces.
+    const earlySpaces = aggregate ? deriveStatusSpaceRows(aggregate, null) : [];
     return ok({
       ok: true,
       mode: dbConnection && hasDriver ? 'online' : 'offline',
@@ -1119,6 +1125,7 @@ async function executeMigrationStatusCommand(
       summary: 'No migrations found',
       diagnostics,
       requiredInvariants,
+      spaces: earlySpaces,
     });
   }
 
