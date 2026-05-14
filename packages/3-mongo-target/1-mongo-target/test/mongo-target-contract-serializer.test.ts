@@ -57,10 +57,14 @@ describe('MongoTargetContractSerializer', () => {
     expect(() => serializer.deserializeContract(bad)).toThrow();
   });
 
-  it('serializeContract is identity over the contract envelope', () => {
+  it('serializeContract strips runtime-only storage.namespaces from the on-disk envelope', () => {
     const serializer = new MongoTargetContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
-    expect(serializer.serializeContract(contract)).toBe(contract);
+    const json = serializer.serializeContract(contract) as {
+      storage: Record<string, unknown>;
+    };
+    expect(json.storage).not.toHaveProperty('namespaces');
+    expect(json.storage).toHaveProperty('collections');
   });
 
   describe('JSON round-trip fidelity', () => {

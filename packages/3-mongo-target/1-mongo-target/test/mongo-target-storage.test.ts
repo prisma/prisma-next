@@ -54,24 +54,14 @@ describe('MongoTargetStorage', () => {
     expect(Object.isFrozen(storage)).toBe(true);
   });
 
-  // `namespaces` is part of the class API but intentionally not part of
-  // the on-disk JSON envelope. Emission walks `Object.entries(contract)`
-  // and feeds the result through `JSON.stringify`; a class-form storage
-  // re-validated as JSON must round-trip without exposing `namespaces`.
-  it('omits namespaces from JSON.stringify (runtime-only class field)', () => {
-    const storage = new MongoTargetStorage({
-      storageHash: hash,
-      collections: { events: new MongoCollection({ indexes: [] }) },
-    });
-    const parsed = JSON.parse(JSON.stringify(storage)) as Record<string, unknown>;
-    expect(parsed).not.toHaveProperty('namespaces');
-    expect(parsed).toHaveProperty('storageHash');
-    expect(parsed).toHaveProperty('collections');
-  });
-
-  it('omits namespaces from Object.entries / Object.keys', () => {
+  // Stripping runtime-only class API fields from the on-disk envelope
+  // is the SPI's responsibility (`MongoTargetContractSerializer.serializeContract`),
+  // not the storage class's. The storage class declares `namespaces`
+  // as a normal enumerable field so the live class API is uniform;
+  // the serializer constructs the persisted JsonObject explicitly.
+  it('exposes namespaces as a normal enumerable class field', () => {
     const storage = new MongoTargetStorage({ storageHash: hash, collections: {} });
-    expect(Object.keys(storage)).not.toContain('namespaces');
+    expect(Object.keys(storage)).toContain('namespaces');
     expect(storage.namespaces['__unspecified__']).toBe(MongoTargetUnspecifiedDatabase.instance);
   });
 });

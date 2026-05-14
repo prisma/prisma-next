@@ -245,8 +245,16 @@ describe('side-by-side contract examples', () => {
       };
       expect(stripValidatorFields(normalizedTs)).toEqual(stripValidatorFields(normalizedPsl));
 
-      const emittedTs = await emit(normalizedTs, mongoStack, mongoFamilyDescriptor.emission);
-      const emittedPsl = await emit(normalizedPsl, mongoStack, mongoFamilyDescriptor.emission);
+      const mongoSerializeContract =
+        mongoTargetDescriptor.contractSerializer.serializeContract.bind(
+          mongoTargetDescriptor.contractSerializer,
+        );
+      const emittedTs = await emit(normalizedTs, mongoStack, mongoFamilyDescriptor.emission, {
+        serializeContract: mongoSerializeContract,
+      });
+      const emittedPsl = await emit(normalizedPsl, mongoStack, mongoFamilyDescriptor.emission, {
+        serializeContract: mongoSerializeContract,
+      });
 
       const stripForComparison = (json: string) => {
         const parsed = JSON.parse(json) as Record<string, unknown>;

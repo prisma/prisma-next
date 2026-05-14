@@ -1,7 +1,18 @@
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { JsonObject } from '@prisma-next/utils/json';
 
 import type { Contract } from './contract-types';
+
+/**
+ * Per-target contract serializer hook. The framework canonicalizer uses
+ * this to convert an in-memory contract (which may carry class-instance
+ * IR nodes whose runtime-only fields must not appear in the on-disk
+ * envelope) into a plain JsonObject before applying the family-agnostic
+ * canonical-key ordering / default-omission / sort steps. Targets whose
+ * contract is JSON-clean by construction return the contract unchanged.
+ */
+export type CanonicalSerializeContract = (contract: Contract) => JsonObject;
 
 const TOP_LEVEL_ORDER = [
   'schemaVersion',
@@ -240,23 +251,43 @@ export function orderTopLevel(obj: Record<string, unknown>): Record<string, unkn
   return ordered;
 }
 
+export interface CanonicalizeContractOptions {
+  readonly schemaVersion?: string;
+  /**
+   * Per-target hook that converts the in-memory contract (which may
+   * carry class-instance IR nodes) into a plain JsonObject before the
+   * family-agnostic canonicalization steps run. When omitted, the
+   * contract is treated as a JsonObject directly — appropriate for
+   * targets whose IR is already JSON-clean.
+   *
+   * Routing through the hook is what lets each target decide which
+   * fields appear in the on-disk envelope; runtime-only class API
+   * fields stay invisible to the canonicalization walk by virtue of
+   * the per-target serializer not putting them in the JSON shape.
+   */
+  readonly serializeContract?: CanonicalSerializeContract;
+}
+
 export function canonicalizeContractToObject(
   contract: Contract,
-  options?: { schemaVersion?: string },
+  options?: CanonicalizeContractOptions,
 ): Record<string, unknown> {
+  const serialized = options?.serializeContract
+    ? options.serializeContract(contract)
+    : (contract as unknown as JsonObject);
   const normalized: Record<string, unknown> = {
     ...ifDefined('schemaVersion', options?.schemaVersion),
-    targetFamily: contract.targetFamily,
-    target: contract.target,
-    profileHash: contract.profileHash,
-    roots: contract.roots,
-    models: contract.models,
-    ...ifDefined('valueObjects', contract.valueObjects),
-    storage: contract.storage,
-    ...ifDefined('execution', contract.execution),
-    extensionPacks: contract.extensionPacks,
-    capabilities: contract.capabilities,
-    meta: contract.meta,
+    targetFamily: serialized['targetFamily'],
+    target: serialized['target'],
+    profileHash: serialized['profileHash'],
+    roots: serialized['roots'],
+    models: serialized['models'],
+    ...ifDefined('valueObjects', serialized['valueObjects']),
+    storage: serialized['storage'],
+    ...ifDefined('execution', serialized['execution']),
+    extensionPacks: serialized['extensionPacks'],
+    capabilities: serialized['capabilities'],
+    meta: serialized['meta'],
   };
   const withDefaultsOmitted = omitDefaults(normalized, []) as Record<string, unknown>;
   const withSortedIndexes = sortIndexesAndUniques(withDefaultsOmitted['storage']);
@@ -267,7 +298,7 @@ export function canonicalizeContractToObject(
 
 export function canonicalizeContract(
   contract: Contract,
-  options?: { schemaVersion?: string },
+  options?: CanonicalizeContractOptions,
 ): string {
   return JSON.stringify(canonicalizeContractToObject(contract, options), null, 2);
 }

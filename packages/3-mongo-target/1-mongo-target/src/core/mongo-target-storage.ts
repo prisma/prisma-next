@@ -22,36 +22,29 @@ export interface MongoTargetStorageCtor {
  *
  * Default namespaces is `{ __unspecified__: MongoTargetUnspecifiedDatabase.instance }`
  * — all collections in a default contract live under the unspecified
- * singleton until M5a introduces per-collection namespace assignment.
+ * singleton until per-collection namespace assignment lands.
+ *
+ * The on-disk JSON envelope omits `namespaces` (and any future
+ * runtime-only class API field). The framework canonicalizer routes
+ * through the per-target `ContractSerializer.serializeContract`
+ * (`MongoTargetContractSerializer`) which constructs the persisted
+ * JsonObject explicitly, so the storage class can declare runtime
+ * fields freely without leaking them into emitted JSON.
  */
 export class MongoTargetStorage extends MongoStorageBase {
   readonly storageHash: StorageHashBase<string>;
   readonly collections: Readonly<Record<string, MongoCollection>>;
-
-  // `namespaces` is part of the class API (every IR carries namespaces —
-  // see Storage / MongoStorageBase) but is intentionally NOT part of the
-  // on-disk JSON envelope. Holding it through a non-enumerable property
-  // keeps `JSON.stringify(storage)` and `Object.entries(storage)` (the
-  // path `canonicalizeContractToObject` walks during emission) free of
-  // the runtime-only field, while preserving direct property access.
-  // The IR-node class flip in M2 R2 will keep this same convention for
-  // class-internal hooks.
-  readonly namespaces!: Readonly<Record<string, Namespace>>;
+  readonly namespaces: Readonly<Record<string, Namespace>>;
 
   constructor(options: MongoTargetStorageCtor) {
     super();
     this.storageHash = options.storageHash;
     this.collections = options.collections;
-    Object.defineProperty(this, 'namespaces', {
-      value:
-        options.namespaces ??
-        ({
-          __unspecified__: MongoTargetUnspecifiedDatabase.instance,
-        } as const),
-      enumerable: false,
-      writable: false,
-      configurable: false,
-    });
+    this.namespaces =
+      options.namespaces ??
+      ({
+        __unspecified__: MongoTargetUnspecifiedDatabase.instance,
+      } as const);
     Object.freeze(this);
   }
 }

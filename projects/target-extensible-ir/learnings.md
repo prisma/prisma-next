@@ -88,3 +88,13 @@ These are not findings (M1 closed clean) but design choices the M2 reviewer shou
 - **Before performing a checkpoint:** the orchestrator says "Reaching a high-reasoning-effort checkpoint: `<checkpoint #N>` — `<one-line description>`. Recommend upgrading my configuration before I proceed." and waits for the user's confirmation before continuing.
 - **After completing a checkpoint:** the orchestrator says "Checkpoint complete. Recommend downgrading back to Medium for the next stretch." so the user can flip back.
 - **If the orchestrator unexpectedly hits a body of work that requires high reasoning** (e.g. a routine triage turns out to be a replan trigger): the orchestrator pauses, surfaces the discovery, and recommends the upgrade before continuing.
+
+## Emit-side canonicalization routes through the per-target ContractSerializer SPI (audit outcome at M3 entry)
+
+**Shape.** `canonicalizeContractToObject` accepts an optional `serializeContract: (contract: Contract) => JsonObject` hook. The framework `emit()` forwards it from `EmitOptions.serializeContract`; the CLI `executeContractEmit` reads it from `descriptor.contractSerializer.serializeContract` (when present) and passes it through. The framework canonicalizer uses the hook to convert the in-memory contract — which may carry class-instance IR nodes whose runtime-only fields must not appear on disk — into a plain JsonObject before applying the family-agnostic key-ordering / default-omission / sort steps.
+
+**Why it matters.** Before this lift, target storage classes hid runtime-only fields from the emitter walk via `Object.defineProperty(..., enumerable: false)`. That pattern multiplies per class-internal field as the IR class hierarchy grows, and inverts the architectural responsibility (target classes guess at what the emitter walks rather than the SPI declaring the on-disk shape). With the lift, the per-target `serializeContract` override owns the "what's on disk" decision; storage classes declare runtime fields freely.
+
+**Concrete consequence.** `MongoTargetStorage.namespaces` is now a normal enumerable class field; `MongoTargetContractSerializer.serializeContract` constructs a stripped JsonObject (`storage: { storageHash, collections }`). Future SQL targets that gain runtime-only IR fields (e.g. `SqlStorage.namespaces` in M5a) follow the same pattern: override `serializeContract` to construct the persisted shape; do not reach for `defineProperty`.
+
+**Action.** When introducing a new IR node class with runtime-only fields, override the family `ContractSerializer.serializeContract` to elide the field from the JsonObject. Do not use non-enumerable property tricks at the class layer.

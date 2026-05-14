@@ -4,6 +4,7 @@ import { emit, getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { JsonObject } from '@prisma-next/utils/json';
 import { dirname } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
@@ -233,8 +234,27 @@ export async function executeContractEmit(
       );
       const enrichedIR = enrichContract(validatedContract.value as Contract, frameworkComponents);
       familyInstance.validateContract(enrichedIR);
+      // Targets that compose a `contractSerializer` SPI on their
+      // descriptor (Mongo today; SQL targets land their own as the
+      // family adopts the SPI) own the in-memory → on-disk JSON
+      // conversion. Threading the serializer here lets the framework
+      // canonicalizer operate on a target-produced JsonObject rather
+      // than walking the in-memory contract directly with
+      // `Object.entries`, which would otherwise leak runtime-only
+      // class API fields into the on-disk envelope.
+      const targetSerializer = (
+        config.target as {
+          contractSerializer?: { serializeContract: (c: Contract) => JsonObject };
+        }
+      ).contractSerializer;
+      const serializeContract = targetSerializer
+        ? (c: Contract) => targetSerializer.serializeContract(c)
+        : undefined;
       emitResult = await unlessAborted(
-        emit(enrichedIR, stack, config.family.emission, { outputJsonPath }),
+        emit(enrichedIR, stack, config.family.emission, {
+          outputJsonPath,
+          ...ifDefined('serializeContract', serializeContract),
+        }),
       );
     } catch (error) {
       endSpan(onProgress, 'emit', 'error');
