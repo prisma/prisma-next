@@ -17,5 +17,5 @@ import { SchemaNodeBase } from '@prisma-next/framework-components/ir';
  * a base-class refactor.
  */
 export abstract class SqlNode extends SchemaNodeBase {
-  readonly kind: string = 'sql';
+  readonly kind?: string = 'sql';
 }
