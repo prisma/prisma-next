@@ -800,12 +800,13 @@ export function planIssues(
     return notOk(conflicts);
   }
 
-  // Recipe strategies (`enumChangeCallStrategy`, `notNullBackfillCallStrategy`,
-  // etc.) emit a cohesive sequence that must stay contiguous. They are
-  // inserted at a single pattern slot. Non-recipe pattern strategies
-  // (`dependencyInstallCallStrategy`, `storageTypePlanCallStrategy`,
-  // `notNullAddColumnCallStrategy`) produce individually classifiable calls
-  // that slot into DDL buckets alongside default-mapped calls.
+  // Recipe strategies (`nativeEnumPlanCallStrategy`,
+  // `notNullBackfillCallStrategy`, etc.) emit a cohesive sequence that must
+  // stay contiguous. They are inserted at a single pattern slot. Non-recipe
+  // pattern strategies (`dependencyInstallCallStrategy`,
+  // `storageTypePlanCallStrategy`, `notNullAddColumnCallStrategy`) produce
+  // individually classifiable calls that slot into DDL buckets alongside
+  // default-mapped calls.
   const combinedBucketable = [...gatedDefault, ...gatedBucketable];
   const byCategory = (cat: CallCategory) =>
     combinedBucketable.filter((c) => classifyCall(c) === cat);
