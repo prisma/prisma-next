@@ -20,12 +20,11 @@ import {
   VERIFY_CODE_TARGET_MISMATCH,
 } from '@prisma-next/framework-components/control';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
-import type { MongoContract } from '@prisma-next/mongo-contract';
+import { type MongoContract, validateMongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { MongoControlAdapter, MongoControlAdapterDescriptor } from './control-adapter';
 import type { MongoControlExtensionDescriptor } from './control-types';
-import { mongoTargetDescriptor } from './mongo-target-descriptor';
 import { mongoOperationsToPreview } from './operation-preview';
 import { mongoSchemaToView } from './schema-to-view';
 import { verifyMongoSchema } from './schema-verify/verify-mongo-schema';
@@ -35,29 +34,32 @@ export interface MongoControlFamilyInstance
     SchemaViewCapable<MongoSchemaIR>,
     OperationPreviewCapable {
   /**
-   * Deprecated since M2 R1; kept on the public surface for SQL parity
-   * until FR8 finishes for all targets. Internally delegates to
-   * `mongoTargetDescriptor.contractSerializer.deserializeContract`.
+   * Validates the JSON contract envelope structurally and returns it
+   * cast to the framework `Contract` shape. The per-target serializer
+   * (held on the Mongo target descriptor) does the class-form wrap for
+   * downstream consumers; the family only needs the validated data.
    */
   validateContract(contractJson: unknown): Contract;
 }
 
 function deserializeMongoContract(contractJson: unknown): MongoContract {
-  return mongoTargetDescriptor.contractSerializer.deserializeContract(
-    contractJson,
-  ) as unknown as MongoContract;
+  // Structural validation only — the per-target serializer wraps the
+  // result in a class-form `MongoTargetContract` for downstream
+  // consumers (CLI, runner). The family-instance methods only read
+  // hash/target fields off the validated shape, so the unwrapped
+  // `MongoContract` is sufficient here and avoids a family→target
+  // runtime dep.
+  return validateMongoContract<MongoContract>(contractJson).contract;
 }
 
 /**
  * Family-method contract input. By the time control-plane methods
  * (`verify`, `verifySchema`, `sign`, …) are invoked through the CLI
  * control client (`client.ts`), the input has already been threaded
- * through `familyInstance.validateContract` (which delegates to
- * `mongoTargetDescriptor.contractSerializer.deserializeContract`). The
- * value is therefore a class-form `MongoTargetContract` carrying a
- * `MongoTargetStorage` envelope with `namespaces` populated, and must
- * NOT be re-fed through `deserializeContract` (arktype rejects the
- * extra `namespaces` key on the JSON envelope shape).
+ * through `familyInstance.validateContract`. The value is therefore a
+ * class-form `MongoTargetContract` (or a structurally-equivalent
+ * envelope post-deserialization) and must NOT be re-fed through
+ * structural validation (arktype rejects extra keys like `namespaces`).
  *
  * The parameter type on the framework SPI is `unknown` for variance
  * reasons (so the family can express its own contract type without

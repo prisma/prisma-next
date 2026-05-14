@@ -3,10 +3,10 @@ import { coreHash, profileHash } from '@prisma-next/contract/types';
 import {
   createMongoFamilyInstance,
   mongoFamilyDescriptor,
-  mongoTargetDescriptor,
 } from '@prisma-next/family-mongo/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { MongoCollection, type MongoContract, MongoIndex } from '@prisma-next/mongo-contract';
+import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';

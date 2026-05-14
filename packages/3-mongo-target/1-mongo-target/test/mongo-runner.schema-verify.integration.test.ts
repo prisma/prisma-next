@@ -1,4 +1,9 @@
-import { readMarker } from '@prisma-next/adapter-mongo/control';
+import {
+  createMongoControlDriver,
+  createMongoRunnerDeps,
+  introspectSchema,
+  readMarker,
+} from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import type {
   ControlFamilyInstance,
@@ -7,17 +12,12 @@ import type {
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import {
-  MongoMigrationPlanner,
-  MongoMigrationRunner,
-  serializeMongoOps,
-} from '@prisma-next/target-mongo/control';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { introspectSchema } from '../src/core/introspect-schema';
-import { createMongoControlDriver } from '../src/core/mongo-control-driver';
-import { createMongoRunnerDeps } from '../src/core/runner-deps';
+import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
+import { MongoMigrationPlanner } from '../src/core/mongo-planner';
+import { MongoMigrationRunner } from '../src/core/mongo-runner';
 
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;

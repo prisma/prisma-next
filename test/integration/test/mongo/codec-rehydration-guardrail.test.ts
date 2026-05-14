@@ -4,7 +4,6 @@ import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
   contractToMongoSchemaIR,
   createMongoFamilyInstance,
-  mongoTargetDescriptor,
 } from '@prisma-next/family-mongo/control';
 import {
   APP_SPACE_ID,
@@ -14,7 +13,11 @@ import {
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
-import { MongoMigrationPlanner, serializeMongoOps } from '@prisma-next/target-mongo/control';
+import {
+  MongoMigrationPlanner,
+  mongoTargetDescriptor,
+  serializeMongoOps,
+} from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';

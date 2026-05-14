@@ -1,8 +1,8 @@
 import type { SchemaIssue, SchemaVerifyOptions } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
-import { MongoSchemaVerifierBase } from '../src/ir/mongo-schema-verifier-base';
-import { MongoStorageBase } from '../src/ir/mongo-storage';
+import { MongoSchemaVerifierBase } from '../src/core/ir/mongo-schema-verifier-base';
+import { MongoStorageBase } from '../src/core/ir/mongo-storage';
 
 class FakeNamespace implements Namespace {
   readonly kind = 'fake-namespace' as const;

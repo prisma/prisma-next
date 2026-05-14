@@ -1,3 +1,4 @@
+export { mongoTargetDescriptor } from '../core/control-target';
 export { FilterEvaluator } from '../core/filter-evaluator';
 export {
   deserializeMongoOp,

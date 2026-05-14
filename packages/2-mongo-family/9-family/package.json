@@ -13,9 +13,7 @@
     "clean": "rm -rf dist coverage"
   },
   "dependencies": {
-    "@prisma-next/adapter-mongo": "workspace:*",
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/driver-mongo": "workspace:*",
     "@prisma-next/emitter": "workspace:*",
     "@prisma-next/errors": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
@@ -24,7 +22,6 @@
     "@prisma-next/mongo-emitter": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
     "@prisma-next/mongo-schema-ir": "workspace:*",
-    "@prisma-next/target-mongo": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "mongodb": "catalog:",
     "pathe": "^2.0.3"

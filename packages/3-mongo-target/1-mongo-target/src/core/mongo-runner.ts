@@ -1,3 +1,4 @@
+import type { MarkerOperations, MongoRunnerDependencies } from '@prisma-next/adapter-mongo/control';
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import { errorRunnerFailed } from '@prisma-next/errors/execution';
 import { verifyMongoSchema } from '@prisma-next/family-mongo/schema-verify';
@@ -18,7 +19,6 @@ import type {
   AnyMongoMigrationOperation,
   MongoDataTransformCheck,
   MongoDataTransformOperation,
-  MongoDdlCommandVisitor,
   MongoInspectionCommandVisitor,
   MongoMigrationCheck,
   MongoMigrationPlanOperation,
@@ -30,49 +30,7 @@ import { deserializeMongoOps } from './mongo-ops-serializer';
 
 const READ_ONLY_CHECK_COMMAND_KINDS: ReadonlySet<string> = new Set(['aggregate', 'rawAggregate']);
 
-/**
- * Marker / ledger operations the Mongo runner depends on. Every method
- * takes a `space` parameter so each loaded contract space addresses its
- * own marker row independently — see ADR 212 for the per-space
- * mechanism.
- */
-export interface MarkerOperations {
-  readMarker(space: string): Promise<ContractMarkerRecord | null>;
-  initMarker(
-    space: string,
-    destination: {
-      readonly storageHash: string;
-      readonly profileHash: string;
-      readonly invariants?: readonly string[];
-    },
-  ): Promise<void>;
-  updateMarker(
-    space: string,
-    expectedFrom: string,
-    destination: {
-      readonly storageHash: string;
-      readonly profileHash: string;
-      readonly invariants?: readonly string[];
-    },
-  ): Promise<boolean>;
-  writeLedgerEntry(
-    space: string,
-    entry: {
-      readonly edgeId: string;
-      readonly from: string;
-      readonly to: string;
-    },
-  ): Promise<void>;
-}
-
-export interface MongoRunnerDependencies {
-  readonly commandExecutor: MongoDdlCommandVisitor<Promise<void>>;
-  readonly inspectionExecutor: MongoInspectionCommandVisitor<Promise<Record<string, unknown>[]>>;
-  readonly adapter: MongoAdapter;
-  readonly driver: MongoDriver;
-  readonly markerOps: MarkerOperations;
-  readonly introspectSchema: () => Promise<MongoSchemaIR>;
-}
+export type { MarkerOperations, MongoRunnerDependencies };
 
 export interface MongoMigrationRunnerExecuteOptions {
   readonly plan: MigrationPlan;

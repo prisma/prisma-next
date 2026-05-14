@@ -1,11 +1,15 @@
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { MongoControlAdapter } from '@prisma-next/family-mongo/control-adapter';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
 } from '@prisma-next/framework-components/control';
-import type { MongoDriver } from '@prisma-next/mongo-lowering';
+import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
+import type {
+  MongoDdlCommandVisitor,
+  MongoInspectionCommandVisitor,
+} from '@prisma-next/mongo-query-ast/control';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import type { MongoRunnerDependencies } from '@prisma-next/target-mongo/control';
 import type { Db } from 'mongodb';
 import { createMongoAdapter } from '../mongo-adapter';
 import { MongoCommandExecutor, MongoInspectionExecutor } from './command-executor';
@@ -20,6 +24,50 @@ export function extractDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
     );
   }
   return mongoDriver.db;
+}
+
+/**
+ * Marker / ledger operations the Mongo runner depends on. Every method
+ * takes a `space` parameter so each loaded contract space addresses its
+ * own marker row independently — see ADR 212 for the per-space
+ * mechanism.
+ */
+export interface MarkerOperations {
+  readMarker(space: string): Promise<ContractMarkerRecord | null>;
+  initMarker(
+    space: string,
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
+  ): Promise<void>;
+  updateMarker(
+    space: string,
+    expectedFrom: string,
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
+  ): Promise<boolean>;
+  writeLedgerEntry(
+    space: string,
+    entry: {
+      readonly edgeId: string;
+      readonly from: string;
+      readonly to: string;
+    },
+  ): Promise<void>;
+}
+
+export interface MongoRunnerDependencies {
+  readonly commandExecutor: MongoDdlCommandVisitor<Promise<void>>;
+  readonly inspectionExecutor: MongoInspectionCommandVisitor<Promise<Record<string, unknown>[]>>;
+  readonly adapter: MongoAdapter;
+  readonly driver: MongoDriver;
+  readonly markerOps: MarkerOperations;
+  readonly introspectSchema: () => Promise<MongoSchemaIR>;
 }
 
 /**

@@ -1,9 +1,16 @@
-import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
+import {
+  createMongoRunnerDeps,
+  extractDb,
+  type MongoRunnerDependencies,
+} from '@prisma-next/adapter-mongo/control';
 import type { Contract } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import type {
-  ContractSerializer,
-  MigratableTargetDescriptor,
+  MongoControlFamilyInstance,
+  MongoControlTargetDescriptor,
+} from '@prisma-next/family-mongo/control';
+import { contractToMongoSchemaIR } from '@prisma-next/family-mongo/control';
+import type {
   MigrationRunner,
   MigrationRunnerResult,
   MigrationRunnerSuccessValue,
@@ -11,7 +18,6 @@ import type {
   MultiSpaceRunnerFailure,
   MultiSpaceRunnerPerSpaceOptions,
   MultiSpaceRunnerResult,
-  SchemaVerifier,
 } from '@prisma-next/framework-components/control';
 import {
   type ContractSpaceMember,
@@ -20,38 +26,15 @@ import {
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaCollection } from '@prisma-next/mongo-schema-ir';
 import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import {
-  contractToMongoSchemaIR,
-  MongoMigrationPlanner,
-  MongoMigrationRunner,
-  type MongoMigrationRunnerExecuteOptions,
-  type MongoRunnerDependencies,
-  type MongoTargetContract,
-  MongoTargetContractSerializer,
-  MongoTargetSchemaVerifier,
-} from '@prisma-next/target-mongo/control';
-import mongoTargetDescriptorMeta from '@prisma-next/target-mongo/pack';
 import { notOk, ok } from '@prisma-next/utils/result';
-import type { MongoControlFamilyInstance } from './control-instance';
+import { mongoTargetDescriptorMeta } from './descriptor-meta';
+import { MongoMigrationPlanner } from './mongo-planner';
+import { MongoMigrationRunner, type MongoMigrationRunnerExecuteOptions } from './mongo-runner';
+import type { MongoTargetContract } from './mongo-target-contract';
+import { MongoTargetContractSerializer } from './mongo-target-contract-serializer';
+import { MongoTargetSchemaVerifier } from './mongo-target-schema-verifier';
 
-/**
- * Mongo target control descriptor type. Extends the framework's
- * MigratableTargetDescriptor with two named SPI properties next to the
- * existing `migrations` capability:
- *
- * - `contractSerializer` — JSON ⇄ class boundary for Mongo contracts.
- * - `schemaVerifier` — per-target verifier walking MongoTargetContract +
- *   MongoSchemaIR.
- *
- * No new `Target<TContract, TSchema>` aggregator interface is introduced;
- * the descriptor itself IS the aggregator. SQL targets pick up the same
- * pattern in M3.
- */
-export interface MongoControlTargetDescriptor
-  extends MigratableTargetDescriptor<'mongo', 'mongo', MongoControlFamilyInstance> {
-  readonly contractSerializer: ContractSerializer<MongoTargetContract>;
-  readonly schemaVerifier: SchemaVerifier<MongoTargetContract, MongoSchemaIR>;
-}
+export type { MongoControlTargetDescriptor };
 
 /**
  * `migration.ts` default-exports a `Migration` subclass whose `operations`
@@ -63,7 +46,7 @@ export interface MongoControlTargetDescriptor
  * `migration.ts` directly (via `node migration.ts`) to self-emit
  * `ops.json` and attest the `migrationHash`.
  */
-export const mongoTargetDescriptor: MongoControlTargetDescriptor = {
+export const mongoTargetDescriptor: MongoControlTargetDescriptor<MongoTargetContract> = {
   ...mongoTargetDescriptorMeta,
   contractSerializer: new MongoTargetContractSerializer(),
   schemaVerifier: new MongoTargetSchemaVerifier(),

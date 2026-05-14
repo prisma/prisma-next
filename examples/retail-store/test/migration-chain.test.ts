@@ -7,9 +7,9 @@ import {
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
+import { verifyMongoSchema } from '@prisma-next/family-mongo/schema-verify';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { MongoMigrationRunner } from '@prisma-next/target-mongo/control';
-import { verifyMongoSchema } from '@prisma-next/target-mongo/schema-verify';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';

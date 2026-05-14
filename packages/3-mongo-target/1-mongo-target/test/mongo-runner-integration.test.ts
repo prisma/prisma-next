@@ -1,4 +1,10 @@
-import { initMarker, readMarker } from '@prisma-next/adapter-mongo/control';
+import {
+  createMongoControlDriver,
+  createMongoRunnerDeps,
+  initMarker,
+  introspectSchema,
+  readMarker,
+} from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import type {
   ControlFamilyInstance,
@@ -12,17 +18,12 @@ import {
   MongoSchemaIndex,
   MongoSchemaIR,
 } from '@prisma-next/mongo-schema-ir';
-import {
-  MongoMigrationPlanner,
-  MongoMigrationRunner,
-  serializeMongoOps,
-} from '@prisma-next/target-mongo/control';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { introspectSchema } from '../src/core/introspect-schema';
-import { createMongoControlDriver } from '../src/core/mongo-control-driver';
-import { createMongoRunnerDeps } from '../src/core/runner-deps';
+import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
+import { MongoMigrationPlanner } from '../src/core/mongo-planner';
+import { MongoMigrationRunner } from '../src/core/mongo-runner';
 
 let replSet: MongoMemoryReplSet;
 let client: MongoClient;
@@ -689,7 +690,7 @@ describe('MongoMigrationRunner - data transforms', () => {
 
 describe('MongoMigrationRunner - E2E round-trip', () => {
   it('serialize → deserialize → execute mixed DDL + data transform', async () => {
-    const { dataTransform } = await import('@prisma-next/target-mongo/migration');
+    const { dataTransform } = await import('../src/exports/migration');
     const { RawUpdateManyCommand, RawAggregateCommand } = await import(
       '@prisma-next/mongo-query-ast/execution'
     );

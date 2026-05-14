@@ -1,7 +1,7 @@
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { JsonObject } from '@prisma-next/utils/json';
 import { describe, expect, it } from 'vitest';
-import type { MongoContract } from '../src/contract-types';
-import { MongoContractSerializerBase } from '../src/ir/mongo-contract-serializer-base';
+import { MongoContractSerializerBase } from '../src/core/ir/mongo-contract-serializer-base';
 
 function makeValidContractJson() {
   return {
