@@ -227,8 +227,6 @@ function buildSyntheticBaselineMigration(): MigrationPackage {
   const baseMetadata = {
     from: pgvectorBaselineMigration.metadata.from,
     to: pgvectorBaselineMigration.metadata.to,
-    fromContract: pgvectorBaselineMigration.metadata.fromContract,
-    toContract: pgvectorBaselineMigration.metadata.toContract,
     hints: pgvectorBaselineMigration.metadata.hints,
     labels: pgvectorBaselineMigration.metadata.labels,
     providedInvariants: pgvectorBaselineMigration.metadata.providedInvariants,

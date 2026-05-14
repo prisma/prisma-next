@@ -166,7 +166,6 @@ async function writeExtensionContractSpaceArtefacts(args: {
   readonly fromHash: string | null;
   readonly toHash: string;
   readonly ops: readonly MigrationPlanOperation[];
-  readonly toContract: Contract<SqlStorage>;
   readonly providedInvariants: readonly string[];
 }): Promise<ContractSpaceArtefactSetup> {
   const migrationsDir = join(args.tmpDir, 'migrations');
@@ -182,8 +181,6 @@ async function writeExtensionContractSpaceArtefacts(args: {
   const baseMeta = {
     from: args.fromHash,
     to: args.toHash,
-    fromContract: null,
-    toContract: args.toContract,
     hints: { used: [], applied: [], plannerVersion: '2.0.0' },
     labels: [],
     providedInvariants: [...args.providedInvariants],
@@ -263,7 +260,6 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       fromHash: null,
       toHash: extContractV1.storage.storageHash,
       ops: buildBaselineOps(),
-      toContract: extContractV1,
       providedInvariants: [],
     });
   }
@@ -351,8 +347,6 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       const baseMeta = {
         from: extContractV1.storage.storageHash,
         to: extContractV2.storage.storageHash,
-        fromContract: null,
-        toContract: extContractV2,
         hints: { used: [], applied: [], plannerVersion: '2.0.0' },
         labels: [],
         providedInvariants: [],
@@ -620,8 +614,6 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       const baseMeta = {
         from: extContractV1.storage.storageHash,
         to: extContractV2.storage.storageHash,
-        fromContract: null,
-        toContract: extContractV2,
         hints: { used: [], applied: [], plannerVersion: '2.0.0' },
         labels: [],
         providedInvariants: [],

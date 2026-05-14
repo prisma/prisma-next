@@ -376,7 +376,7 @@ describe('migration plan command', () => {
       mocks.loadMigrationPackages.mockResolvedValue({
         bundles: [
           {
-            metadata: { migrationHash: 'sha256:prev-id', to: OLD_HASH, toContract: {} },
+            metadata: { migrationHash: 'sha256:prev-id', to: OLD_HASH },
             dirPath: '/tmp/test/migrations/20260301T0900_prev',
             dirName: '20260301T0900_prev',
           },
