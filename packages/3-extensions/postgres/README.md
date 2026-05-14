@@ -126,7 +126,7 @@ Each `connect()` call constructs a fresh `pg.Client` and a fresh `Runtime`. No `
 - `@prisma-next/driver-postgres` for driver descriptor
 - `@prisma-next/sql-builder` for `sql(...)`
 - `@prisma-next/sql-orm-client` for `orm(...)`
-- `@prisma-next/sql-contract` for `validateContract(...)` and contract types
+- `@prisma-next/sql-contract` for contract types (contract validation now flows through the `ContractSerializer` SPI surfaced by the SQL family target descriptor; the `postgres<Contract>(...)` facade wraps it)
 - `pg` for `Pool` construction (URL / `pgPool` binding on the Node factory) and `Client` construction (`pgClient` binding on the Node factory; per-`connect()` on the serverless facade)
 
 ## Architecture
