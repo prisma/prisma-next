@@ -114,11 +114,23 @@ export interface AuthoringEntityTemplateOutput {
   readonly template: AuthoringTemplateValue;
 }
 
-export interface AuthoringEntityFactoryOutput<Input = unknown, Output = unknown> {
+/**
+ * Default `Input = never` is load-bearing for pack-bag-driven type
+ * narrowing. Factory parameter positions are contravariant, so a pack
+ * literal declaring `factory: (input: DemoEntityInput) => DemoEntity`
+ * is only assignable to the base descriptor's factory shape if the
+ * base's input is `never` (the bottom of the contravariant position).
+ * The concrete input/output types are recovered at the helper-derivation
+ * site via `EntityHelperFunction<Descriptor>`'s conditional inference,
+ * which reads them from the pack's `as const` literal factory signature
+ * — the base widening does not erase the literal because `satisfies`
+ * does not widen the declared type.
+ */
+export interface AuthoringEntityFactoryOutput<Input = never, Output = unknown> {
   readonly factory: (input: Input, ctx: AuthoringEntityContext) => Output;
 }
 
-export interface AuthoringEntityDescriptor<Input = unknown, Output = unknown> {
+export interface AuthoringEntityDescriptor<Input = never, Output = unknown> {
   readonly kind: 'entity';
   readonly args?: readonly AuthoringArgumentDescriptor[];
   readonly output: AuthoringEntityTemplateOutput | AuthoringEntityFactoryOutput<Input, Output>;
@@ -599,7 +611,17 @@ export function instantiateAuthoringEntity(
   // entities (which mirror field/type's declarative argument shape).
   if ('factory' in descriptor.output) {
     const input = args[0];
-    return descriptor.output.factory(input, ctx);
+    // The base `AuthoringEntityDescriptor`'s factory is typed
+    // `(input: never, ctx) => unknown` so concrete pack-literal factories
+    // with narrower input types remain assignable through the
+    // contravariant position (see the type's docstring). The runtime
+    // delegates input validation to the pack's factory itself, so we
+    // forward the supplied input here without a static input contract.
+    const factory = descriptor.output.factory as (
+      input: unknown,
+      ctx: AuthoringEntityContext,
+    ) => unknown;
+    return factory(input, ctx);
   }
   validateAuthoringHelperArguments(helperPath, descriptor.args, args);
   return resolveAuthoringTemplateValue(descriptor.output.template, args);
