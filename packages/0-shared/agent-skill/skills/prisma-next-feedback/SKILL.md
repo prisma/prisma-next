@@ -174,17 +174,19 @@ Areas mirror the cluster of skills: `cli`, `contract`, `migration`, `query`, `ru
 
 ### 6. Submit (issue path only)
 
-Preferred:
+Preferred. Two steps:
 
-```bash
-gh issue create \
-  --repo prisma/prisma-next \
-  --title "<title>" \
-  --body-file <(cat <<'EOF'
-<the rendered body>
-EOF
-)
-```
+1. **Write the rendered body to a temporary file.** Use your file-write tool (the same tool you'd use to create any other file on disk) to write the body to e.g. `wip/pn-issue-body.md` or `/tmp/pn-issue-body.md`. The body content is just the markdown produced in step 3 of this workflow — no surrounding shell quoting, no heredoc.
+2. **Reference that file from `gh`.** Run:
+
+   ```bash
+   gh issue create \
+     --repo prisma/prisma-next \
+     --title "<title>" \
+     --body-file <path-from-step-1>
+   ```
+
+**Anti-pattern (do not do this):** inlining the body via `--body "$(cat <<EOF …)"` or `--body-file <(cat <<EOF …)`. Those one-liners reliably leak literal `cat <<'EOF'` / `EOF` markers into the issue body when the agent reuses the template verbatim with the body interpolated. Always write the body to a real file first and pass the path.
 
 If `gh` is not installed: open the prefilled new-issue URL in the browser:
 
