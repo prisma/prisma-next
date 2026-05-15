@@ -19,13 +19,13 @@ A `prisma-next init`-scaffolded project (any target).
 - [ ] Agent produces a minimal reproduction:
   - A small `schema.psl` excerpt (renamed to neutral domain names like `User`, `Post`).
   - The exact command (`prisma-next migration plan --name no-op`) and its full output.
-  - Steps to reproduce as a numbered list.
+  - A numbered list of steps to reproduce.
 - [ ] Agent collects the environment block:
   - Prisma Next version (from `pnpm ls @prisma-next/postgres` or similar).
   - Node version (`node -v`).
   - Package manager + version.
   - OS.
-- [ ] Agent renders the issue body in the structured shape from FR19b: *Summary / Environment / Steps to reproduce / Expected / Actual / Workaround*.
+- [ ] Agent renders the issue body using the bug-report fields from `.github/ISSUE_TEMPLATE/bug_report.yml`: *Package and version / What happened? / What did you expect to happen? / Minimal reproduction / Environment / Additional context*.
 - [ ] Agent renders a conventional-commit title: `bug(cli): migration plan exits 0 when there is no diff`.
 - [ ] Agent surfaces the rendered title + body to the user for confirmation **before** submitting.
 - [ ] On user confirmation, agent submits via `gh issue create` (preferred) or opens the prefilled new-issue URL in the browser.
@@ -35,7 +35,7 @@ A `prisma-next init`-scaffolded project (any target).
 
 - [ ] No `DATABASE_URL` strings or secrets in the body.
 - [ ] No customer-domain model names in the body.
-- [ ] Body contains all required fields (Summary, Environment, Reproduction, Expected, Actual, Workaround).
+- [ ] Body contains all required fields named in the bug-report issue form (`Package and version`, `What happened?`, `What did you expect to happen?`, `Minimal reproduction`, `Environment`).
 - [ ] Title is in conventional-commit form.
 - [ ] User was prompted for confirmation before submission.
 - [ ] Issue submitted to `prisma/prisma-next` (verified by URL in the agent's response).

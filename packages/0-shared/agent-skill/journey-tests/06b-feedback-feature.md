@@ -26,8 +26,8 @@ Second prompt (after the user says yes to the route):
 - [ ] On the routing offer, the agent surfaces the *What PN doesn't do yet* entry plus the offer to file via `prisma-next-feedback`.
 - [ ] On the second prompt, `prisma-next-feedback` fires.
 - [ ] Agent classifies as **feature request** (not a bug).
-- [ ] Agent produces the body in the feature-request shape: *Desired behaviour* / *Where the gap surfaces* / *Workaround today*.
-- [ ] *Where the gap surfaces* references back to `prisma-next-contract`'s *What PN doesn't do yet* entry on validations.
+- [ ] Agent produces the body using the feature-request fields from `.github/ISSUE_TEMPLATE/feature_request.yml`: *What problem are you trying to solve?* / *Proposed solution* / *Alternatives considered* / *Scope and impact*.
+- [ ] *Alternatives considered* references back to `prisma-next-contract`'s *What PN doesn't do yet* entry on validations (arktype / zod workaround).
 - [ ] Title in `feat(area): summary` form, e.g. `feat(contract): first-class field-level validations in PSL`.
 - [ ] User is prompted for confirmation before submission.
 - [ ] On user confirmation, submitted via `gh issue create` or via the prefilled new-issue URL.
@@ -35,6 +35,6 @@ Second prompt (after the user says yes to the route):
 ## Success criteria
 
 - [ ] No fabricated `@validates` API in any prose or code the agent produces.
-- [ ] Body's *Workaround today* references arktype / zod (matching the source skill's gap entry).
-- [ ] Body's *Where the gap surfaces* references the source skill (`prisma-next-contract`).
+- [ ] Body's *Alternatives considered* references arktype / zod (matching the source skill's gap entry).
+- [ ] Body's *What problem are you trying to solve?* references the source skill (`prisma-next-contract`).
 - [ ] User confirmation step happened before submission.

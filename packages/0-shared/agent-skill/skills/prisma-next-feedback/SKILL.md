@@ -107,59 +107,67 @@ For **feature requests**, additionally:
 
 ### 3. Render the body
 
-The repository may or may not yet have GitHub Issue Forms (`.github/ISSUE_TEMPLATE/*.yml`). The skill produces the body in the following structured shape regardless — when the forms exist, the fields map onto them cleanly; when they don't, the structured shape gives the framework team a parseable artifact.
+The repository ships GitHub Issue Forms (`.github/ISSUE_TEMPLATE/bug_report.yml` and `feature_request.yml`). When the user lands on <https://github.com/prisma/prisma-next/issues/new/choose> they pick the matching template and fill in the form fields; the skill produces the body in the same structured shape so it maps onto the form one-to-one (and so `gh issue create --body-file` produces a parseable artifact even when the form isn't in play).
 
-```markdown
-## Summary
+Bug-report body shape (fields named to match `.github/ISSUE_TEMPLATE/bug_report.yml`):
 
-<one-sentence summary>
+~~~markdown
+## Package and version
 
-## Environment
+<e.g. @prisma-next/postgres@0.5.2>
 
-- Prisma Next: <version>
-- Node: <version>
-- Package manager: <pnpm/npm/yarn/bun/deno> <version>
-- OS: <darwin/linux/win32> <version>
+## What happened?
 
-## Steps to reproduce
+<one-sentence summary plus the relevant output line, secrets redacted>
+
+## What did you expect to happen?
+
+<one sentence>
+
+## Minimal reproduction
 
 1. <step one>
 2. <step two>
 3. <step three>
 
-## Expected behaviour
+```ts
+// schema.psl excerpt + the query / command that fails
+```
 
-<one sentence>
+## Environment
 
-## Actual behaviour
+- Node: <version>
+- OS: <darwin/linux/win32> <version>
+- Package manager: <pnpm/npm/yarn/bun/deno> <version>
+- Database: <Postgres / Mongo> <version>
 
-<one sentence + relevant output line>
-
-## Workaround
-
-<one sentence, or "none">
-
-## Notes
+## Additional context
 
 <optional — link to source skill's capability-gap entry, related
 issue number, partner extension involved>
+~~~
+
+Feature-request body shape (fields named to match `.github/ISSUE_TEMPLATE/feature_request.yml`):
+
+~~~markdown
+## What problem are you trying to solve?
+
+<paragraph — the use case or pain point this would address>
+
+## Proposed solution
+
+```ts
+// imagined usage of the API / behaviour you'd want
 ```
 
-For **feature requests**, replace *Steps to reproduce / Expected / Actual* with:
+## Alternatives considered
 
-```markdown
-## Desired behaviour
+<sentence or two — what you tried with the current API and why it didn't work>
 
-<paragraph — the API shape you'd want>
+## Scope and impact
 
-## Where the gap surfaces
-
-<which skill / workflow brought you here>
-
-## Workaround today
-
-<sentence — the existing workaround from the capability-gap entry>
-```
+<which package(s) this would touch; target-specific implications>
+~~~
 
 ### 4. Title (issue path only)
 
@@ -227,9 +235,7 @@ When step 1 picked the Discord channel:
 
 ## What Prisma Next doesn't do yet
 
-- **First-class GitHub Issue Forms** (`.github/ISSUE_TEMPLATE/*.yml`). The repository may not yet expose them. Until it does, the skill produces the structured body inline. If you want first-class issue forms in the repository, file a feature request — via this skill, of course.
 - **In-product feedback channel.** No `prisma-next feedback` CLI command. The GitHub Issues page is the canonical surface. If you want a CLI-side feedback command, file a feature request via this skill.
-- **Anonymous / telemetry-driven bug capture.** Prisma Next does not phone home and does not collect crash reports. The user controls every report. If you want to enable opt-in telemetry, file a feature request via this skill.
 
 ## Reference Files
 
