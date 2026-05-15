@@ -229,6 +229,9 @@ importers:
       '@prisma-next/middleware-telemetry':
         specifier: workspace:*
         version: link:../../packages/3-extensions/middleware-telemetry
+      '@prisma-next/mongo':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/mongo
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/1-foundation/mongo-contract
@@ -954,6 +957,9 @@ importers:
       '@prisma-next/middleware-telemetry':
         specifier: workspace:*
         version: link:../../packages/3-extensions/middleware-telemetry
+      '@prisma-next/mongo':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/mongo
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/1-foundation/mongo-contract
@@ -2925,6 +2931,9 @@ importers:
       '@prisma-next/target-mongo':
         specifier: workspace:*
         version: link:../../3-mongo-target/1-mongo-target
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/utils
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0

@@ -10,13 +10,14 @@ import type {
 import type { MongoOrmClient, MongoQueryPlan } from '@prisma-next/mongo-orm';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
-import type { MongoRuntime } from '@prisma-next/mongo-runtime';
+import type { MongoMiddleware, MongoRuntime } from '@prisma-next/mongo-runtime';
 import {
   createMongoExecutionContext,
   createMongoExecutionStack,
   createMongoRuntime,
 } from '@prisma-next/mongo-runtime';
 import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type MongoBinding,
   type MongoBindingInput,
@@ -39,6 +40,10 @@ export interface MongoClient<
 
 export interface MongoOptionsBase {
   readonly mode?: 'strict' | 'permissive';
+  /**
+   * Optional middleware chain applied to every Mongo execution.
+   */
+  readonly middleware?: readonly MongoMiddleware[];
 }
 
 export interface MongoBindingOptions {
@@ -136,6 +141,7 @@ export default function mongo<
       context,
       driver,
       ...(options.mode !== undefined ? { mode: options.mode } : {}),
+      ...ifDefined('middleware', options.middleware),
     });
   };
 

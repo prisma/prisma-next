@@ -29,6 +29,7 @@
     "@prisma-next/mongo-query-builder": "workspace:*",
     "@prisma-next/mongo-runtime": "workspace:*",
     "@prisma-next/target-mongo": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "mongodb": "catalog:",
     "pathe": "^2.0.3"
   },

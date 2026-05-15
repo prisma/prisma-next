@@ -22,6 +22,7 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-mongo": "workspace:*",
     "@prisma-next/middleware-telemetry": "workspace:*",
+    "@prisma-next/mongo": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-orm": "workspace:*",
     "@prisma-next/mongo-query-builder": "workspace:*",

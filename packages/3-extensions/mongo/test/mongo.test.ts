@@ -410,4 +410,29 @@ describe('mongo() facade', () => {
     mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
     expect(mocks.deserializeContract).toHaveBeenLastCalledWith(fakeContract);
   });
+
+  it('threads the middleware option to createMongoRuntime', async () => {
+    const fakeMiddleware = { id: 'mw-a' };
+    const db = mongo({
+      contract: fakeContract,
+      url: 'mongodb://localhost:27017/mydb',
+      middleware: [fakeMiddleware as never],
+    });
+
+    await db.runtime();
+
+    expect(mocks.createMongoRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.createMongoRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({ middleware: [fakeMiddleware] }),
+    );
+  });
+
+  it('omits middleware from createMongoRuntime args when not configured', async () => {
+    const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+
+    await db.runtime();
+
+    const runtimeArgs = mocks.createMongoRuntime.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(runtimeArgs).not.toHaveProperty('middleware');
+  });
 });
