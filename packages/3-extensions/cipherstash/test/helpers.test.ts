@@ -252,7 +252,7 @@ describe('cipherstashJsonbPathQueryFirst — AST shape and SQL snapshot', () => 
     expect(lowered.sql).toMatchInlineSnapshot(
       `"SELECT eql_v2.jsonb_path_query_first("user"."payload", $1) AS "first_email" FROM "user""`,
     );
-    expect(lowered.params).toEqual(['$.user.email']);
+    expect(lowered.params).toEqual([{ kind: 'literal', value: '$.user.email' }]);
   });
 });
 
@@ -271,7 +271,7 @@ describe('cipherstashJsonbGet — AST shape and SQL snapshot', () => {
     expect(lowered.sql).toMatchInlineSnapshot(
       `"SELECT eql_v2."->"("user"."payload", $1) AS "email_field" FROM "user""`,
     );
-    expect(lowered.params).toEqual(['email']);
+    expect(lowered.params).toEqual([{ kind: 'literal', value: 'email' }]);
   });
 });
 

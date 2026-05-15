@@ -9,7 +9,7 @@ export function deriveParamsFromAst(ast: AnyQueryAst): {
   params: unknown[];
 } {
   return {
-    params: collectOrderedParamRefs(ast).map((p) => p.value),
+    params: collectOrderedParamRefs(ast).map((p) => (p.kind === 'param-ref' ? p.value : undefined)),
   };
 }
 

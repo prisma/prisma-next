@@ -3,6 +3,15 @@ export interface SqlExecuteRequest {
   readonly params?: readonly unknown[];
 }
 
+export interface PreparedExecuteRequest {
+  readonly sql: string;
+  readonly params: readonly unknown[];
+  readonly handle: {
+    get(): unknown;
+    set(value: unknown): void;
+  };
+}
+
 export interface SqlQueryResult<Row = Record<string, unknown>> {
   readonly rows: ReadonlyArray<Row>;
   readonly rowCount?: number | null;
@@ -64,6 +73,9 @@ export interface SqlTransaction extends SqlQueryable {
 
 export interface SqlQueryable {
   execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row>;
+  executePrepared<Row = Record<string, unknown>>(
+    request: PreparedExecuteRequest,
+  ): AsyncIterable<Row>;
   explain?(request: SqlExecuteRequest): Promise<SqlExplainResult>;
   query<Row = Record<string, unknown>>(
     sql: string,

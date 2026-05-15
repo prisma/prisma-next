@@ -10,7 +10,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
-import { decodeRow } from '../src/codecs/decoding';
+import { buildDecodeContext, decodeRow } from '../src/codecs/decoding';
 import { defineTestCodec } from './test-codec';
 import { buildTestContractCodecs } from './utils';
 
@@ -75,7 +75,11 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
     const controller = new AbortController();
     const rowCtx: SqlCodecCallContext = { signal: controller.signal };
-    await decodeRow({ a: 'A', b: 'B' }, p, rowCtx, buildTestContractCodecs(registry));
+    await decodeRow(
+      { a: 'A', b: 'B' },
+      buildDecodeContext(p.ast, buildTestContractCodecs(registry)),
+      rowCtx,
+    );
 
     expect(observed).toHaveLength(2);
     expect(observed[0]).toBe(controller.signal);
@@ -103,9 +107,8 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
     await decodeRow(
       { email: 'email', total: 'total' },
-      p,
+      buildDecodeContext(p.ast, buildTestContractCodecs(registry)),
       { signal: new AbortController().signal },
-      buildTestContractCodecs(registry),
     );
 
     expect(observed).toEqual([
@@ -134,9 +137,8 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
     await decodeRow(
       { secret: 'wire' },
-      p,
+      buildDecodeContext(p.ast, buildTestContractCodecs(registry)),
       { signal: new AbortController().signal },
-      buildTestContractCodecs(registry),
     );
 
     expect(observed?.column).toEqual({ table: 'user', name: 'secret' });
@@ -167,7 +169,11 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
       column: { table: 'stale', name: 'stale' },
     };
 
-    await decodeRow({ agg: '1' }, p, rowCtx, buildTestContractCodecs(registry));
+    await decodeRow(
+      { agg: '1' },
+      buildDecodeContext(p.ast, buildTestContractCodecs(registry)),
+      rowCtx,
+    );
 
     expect(observed).toBeDefined();
     expect(observed?.column).toBeUndefined();
@@ -196,7 +202,11 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
       column: { table: 'stale', name: 'stale' },
     };
 
-    await decodeRow({ computed: 'wire' }, p, rowCtx, buildTestContractCodecs(registry));
+    await decodeRow(
+      { computed: 'wire' },
+      buildDecodeContext(p.ast, buildTestContractCodecs(registry)),
+      rowCtx,
+    );
 
     expect(observed).toBeDefined();
     expect(observed?.column).toBeUndefined();
@@ -220,7 +230,11 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
     const p = buildPlan([columnProjection('x', 'users', 'x', 'test/single-arg-author@1')]);
 
-    const result = await decodeRow({ x: 'wire' }, p, {}, buildTestContractCodecs(registry));
+    const result = await decodeRow(
+      { x: 'wire' },
+      buildDecodeContext(p.ast, buildTestContractCodecs(registry)),
+      {},
+    );
     expect(result).toEqual({ x: 'wire' });
     expect(invoked).toBe(1);
     expect(receivedWire).toBe('wire');
@@ -250,12 +264,9 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     controller.abort(reason);
 
     await expect(
-      decodeRow(
-        { a: '1', b: '2' },
-        p,
-        { signal: controller.signal },
-        buildTestContractCodecs(registry),
-      ),
+      decodeRow({ a: '1', b: '2' }, buildDecodeContext(p.ast, buildTestContractCodecs(registry)), {
+        signal: controller.signal,
+      }),
     ).rejects.toMatchObject({
       code: 'RUNTIME.ABORTED',
       details: { phase: 'decode' },
@@ -281,9 +292,8 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     const reason = new Error('mid-decode abort');
     const promise = decodeRow(
       { x: 'wire' },
-      p,
+      buildDecodeContext(p.ast, buildTestContractCodecs(registry)),
       { signal: controller.signal },
-      buildTestContractCodecs(registry),
     );
 
     queueMicrotask(() => controller.abort(reason));
@@ -313,12 +323,9 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     const p = buildPlan([columnProjection('x', 'users', 'x', 'test/explody@1')]);
 
     await expect(
-      decodeRow(
-        { x: 'wire' },
-        p,
-        { signal: new AbortController().signal },
-        buildTestContractCodecs(registry),
-      ),
+      decodeRow({ x: 'wire' }, buildDecodeContext(p.ast, buildTestContractCodecs(registry)), {
+        signal: new AbortController().signal,
+      }),
     ).rejects.toMatchObject({
       code: 'RUNTIME.DECODE_FAILED',
       cause,
@@ -344,9 +351,8 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
     await decodeRow(
       { email: 'wire' },
-      p,
+      buildDecodeContext(p.ast, buildTestContractCodecs(registry)),
       { signal: new AbortController().signal },
-      buildTestContractCodecs(registry),
     );
 
     // SqlColumnRef shape `{ table, name }` projected from the ColumnRef shape `{ table, column }` the resolver returns — same source, one resolution per cell.

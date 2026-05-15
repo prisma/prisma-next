@@ -5,6 +5,7 @@ import type {
   ExpressionBuilder,
   ExtractScopeFields,
   FieldProxy,
+  TraitExpression,
   WithField,
   WithFields,
 } from '../expression';
@@ -103,9 +104,13 @@ export interface WithJoin<QC extends QueryContext, AvailableScope extends Scope,
   >;
 }
 
-export interface WithPagination {
-  limit(count: number): this;
-  offset(count: number): this;
+export type PaginationValue<QC extends QueryContext> =
+  | number
+  | TraitExpression<readonly ['numeric'], false, QC['codecTypes']>;
+
+export interface WithPagination<QC extends QueryContext> {
+  limit(count: PaginationValue<QC>): this;
+  offset(count: PaginationValue<QC>): this;
 }
 
 export interface WithDistinct {

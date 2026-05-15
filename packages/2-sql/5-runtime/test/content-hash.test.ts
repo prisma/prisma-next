@@ -2,6 +2,7 @@ import type { PlanMeta } from '@prisma-next/contract/types';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import { computeSqlContentHash } from '../src/content-hash';
+import { stubAst } from './utils';
 
 function makeMeta(overrides?: Partial<PlanMeta>): PlanMeta {
   return {
@@ -20,6 +21,7 @@ function makeExec(overrides?: {
   return {
     sql: overrides?.sql ?? 'select 1',
     params: overrides?.params ?? [],
+    ast: stubAst(),
     meta: makeMeta(overrides?.meta),
   };
 }

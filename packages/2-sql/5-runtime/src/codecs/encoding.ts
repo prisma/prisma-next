@@ -5,6 +5,7 @@ import {
   runtimeError,
 } from '@prisma-next/framework-components/runtime';
 import {
+  type AnyQueryAst,
   type Codec,
   type CodecRef,
   type ContractCodecRegistry,
@@ -13,7 +14,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 
-interface ParamMetadata {
+export interface ParamMetadata {
   readonly codec: CodecRef | undefined;
   readonly name: string | undefined;
 }
@@ -22,6 +23,19 @@ const NO_METADATA: ParamMetadata = Object.freeze({
   codec: undefined,
   name: undefined,
 });
+
+// Indexed by Postgres-style deduped slot order (matches the adapter's
+// `collectOrderedParamRefs` walk). For SQLite's non-deduped renderer,
+// `lowered.params` has one entry per occurrence: positions past
+// `refs.length` fall back to `NO_METADATA` in encodeParamsWithMetadata,
+// so codec'd repeats round-trip unchanged — a limitation that will be
+// revisited when SQLite prepared statements ship and each adapter
+// carries codec metadata on its `LoweredParam` slots directly.
+export function deriveParamMetadata(ast: AnyQueryAst): readonly ParamMetadata[] {
+  return collectOrderedParamRefs(ast).map((ref): ParamMetadata => {
+    return { codec: ref.codec, name: ref.name };
+  });
+}
 
 function resolveParamCodec(
   metadata: ParamMetadata,
@@ -123,30 +137,25 @@ export async function encodeParams(
   ctx: SqlCodecCallContext,
   contractCodecs?: ContractCodecRegistry,
 ): Promise<readonly unknown[]> {
+  return encodeParamsWithMetadata(plan.params, deriveParamMetadata(plan.ast), ctx, contractCodecs);
+}
+
+export async function encodeParamsWithMetadata(
+  values: readonly unknown[],
+  metadata: readonly ParamMetadata[],
+  ctx: SqlCodecCallContext,
+  contractCodecs?: ContractCodecRegistry,
+): Promise<readonly unknown[]> {
   checkAborted(ctx, 'encode');
   const signal = ctx.signal;
 
-  if (plan.params.length === 0) {
-    return plan.params;
+  if (values.length === 0) {
+    return values;
   }
 
-  const paramCount = plan.params.length;
-  const metadata: ParamMetadata[] = new Array(paramCount).fill(NO_METADATA);
-
-  if (plan.ast) {
-    const refs = collectOrderedParamRefs(plan.ast);
-    for (let i = 0; i < paramCount && i < refs.length; i++) {
-      const ref = refs[i];
-      if (ref) {
-        metadata[i] = { codec: ref.codec, name: ref.name };
-      }
-    }
-  }
-
-  const tasks: Promise<unknown>[] = new Array(paramCount);
-  for (let i = 0; i < paramCount; i++) {
-    tasks[i] = encodeParamValue(plan.params[i], metadata[i] ?? NO_METADATA, i, ctx, contractCodecs);
-  }
+  const tasks = values.map((value, i) =>
+    encodeParamValue(value, metadata[i] ?? NO_METADATA, i, ctx, contractCodecs),
+  );
 
   const settled = await raceAgainstAbort(Promise.all(tasks), signal, 'encode');
   return Object.freeze(settled);

@@ -8,7 +8,7 @@ import type { AnyQueryAst } from './ast/types';
  * The plan carries:
  * - `sql` — the rendered SQL text
  * - `params` — the bound parameter list
- * - `ast` — optional pre-lowering AST, retained for telemetry / debugging
+ * - `ast` — the pre-lowering AST, retained for decoding / telemetry / middleware
  * - `meta` — family-agnostic plan metadata (target, lane, hashes, ...)
  * - `_row` — phantom row type, propagated from the originating `SqlQueryPlan`
  *
@@ -24,5 +24,5 @@ import type { AnyQueryAst } from './ast/types';
 export interface SqlExecutionPlan<Row = unknown> extends ExecutionPlan<Row> {
   readonly sql: string;
   readonly params: readonly unknown[];
-  readonly ast?: AnyQueryAst;
+  readonly ast: AnyQueryAst;
 }

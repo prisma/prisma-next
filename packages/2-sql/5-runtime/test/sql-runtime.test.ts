@@ -30,7 +30,7 @@ import { createExecutionContext, createSqlExecutionStack } from '../src/sql-cont
 import { createRuntime, withTransaction } from '../src/sql-runtime';
 import { createAsyncSecretCodec, decryptSecret } from './seeded-secret-codec';
 import { defineTestCodec } from './test-codec';
-import { descriptorsFromCodecs } from './utils';
+import { descriptorsFromCodecs, stubAst } from './utils';
 
 const runtimeSecretSeed = 'sql-runtime-secret';
 
@@ -86,7 +86,11 @@ function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
       readMarker: async () => ({ kind: 'absent' as const }),
     },
     lower(ast: SelectAst) {
-      const params = [...new Set(ast.collectParamRefs())].map((ref) => ref.value);
+      const params = [...new Set(ast.collectParamRefs())].map((ref) =>
+        ref.kind === 'prepared-param-ref'
+          ? { kind: 'bind' as const, name: ref.name }
+          : { kind: 'literal' as const, value: ref.value },
+      );
       return Object.freeze({ sql: JSON.stringify(ast), params });
     },
   };
@@ -111,6 +115,7 @@ function createMockDriver(): MockSqlDriver {
 
   const transaction = {
     execute: transactionExecute,
+    executePrepared: transactionExecute,
     query,
     commit: vi.fn().mockResolvedValue(undefined),
     rollback: vi.fn().mockResolvedValue(undefined),
@@ -118,6 +123,7 @@ function createMockDriver(): MockSqlDriver {
 
   const connection = {
     execute: connectionExecute,
+    executePrepared: connectionExecute,
     query,
     release: vi.fn().mockResolvedValue(undefined),
     destroy: vi.fn().mockResolvedValue(undefined),
@@ -128,6 +134,7 @@ function createMockDriver(): MockSqlDriver {
 
   const driver: SqlDriver = {
     execute: rootExecute,
+    executePrepared: rootExecute,
     query,
     connect: vi.fn().mockImplementation(async (_binding?: undefined) => undefined),
     acquireConnection: vi.fn().mockResolvedValue(connection),
@@ -218,6 +225,7 @@ function createRawExecutionPlan<Row = Record<string, unknown>>(
   return {
     sql: 'select 1',
     params: [],
+    ast: stubAst(),
     ...overrides,
     meta: {
       target: testContract.target,

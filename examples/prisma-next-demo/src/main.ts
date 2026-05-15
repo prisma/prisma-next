@@ -12,6 +12,10 @@
  * - users [limit]              List users with optional limit
  * - user <id>                  Get user by ID
  * - posts <userId>             Get posts for a user
+ * - user-by-email-prepared <email> [<email> ...]
+ *                              Build a `PreparedStatement` once and reuse it for
+ *                              each email — single lower(), single beforeCompile(),
+ *                              repeated execute()
  * - repo-users [limit]         Users via ORM client API
  * - repo-admins [limit]        Admin users via custom collection scope
  * - repo-user <email>          Find a user by email via ORM client first()
@@ -79,6 +83,7 @@ import { db } from './prisma/db';
 import { crossAuthorSimilarity } from './queries/cross-author-similarity';
 import { deleteWithoutWhere } from './queries/delete-without-where';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
+import { getUserByEmailPrepared } from './queries/get-user-by-email-prepared';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
 import { getUsers } from './queries/get-users';
@@ -121,6 +126,14 @@ async function main() {
       const posts = await getUserPosts(userIdStr);
 
       console.log(JSON.stringify(posts, null, 2));
+    } else if (cmd === 'user-by-email-prepared') {
+      if (args.length === 0) {
+        console.error('Usage: pnpm start -- user-by-email-prepared <email> [<email> ...]');
+        process.exit(1);
+      }
+      const results = await getUserByEmailPrepared(args);
+
+      console.log(JSON.stringify(results, null, 2));
     } else if (cmd === 'repo-users') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
       const users = await ormClientGetUsers(limit, runtime);

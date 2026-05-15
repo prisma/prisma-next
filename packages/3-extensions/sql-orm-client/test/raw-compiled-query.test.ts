@@ -37,6 +37,7 @@ describe('execute query plan', () => {
     const plan: SqlExecutionPlan<{ id: number }> = {
       sql: 'select 1',
       params: [],
+      ast: SelectAst.from(TableSource.named('stub')),
       meta: {
         target: 'postgres',
         targetFamily: 'sql',

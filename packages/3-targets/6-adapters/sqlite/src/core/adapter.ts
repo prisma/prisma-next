@@ -17,6 +17,7 @@ import type {
   JsonObjectExpr,
   ListExpression,
   LiteralExpr,
+  LoweredParam,
   LowererContext,
   MarkerReadResult,
   NullCheckExpr,
@@ -73,9 +74,13 @@ export function renderLoweredSql(
   contract: SqliteContract,
 ): SqliteLoweredStatement {
   const collectedParamRefs = ast.collectParamRefs();
-  const params: unknown[] = [];
+  const params: LoweredParam[] = [];
   for (const ref of collectedParamRefs) {
-    params.push(ref.value);
+    params.push(
+      ref.kind === 'prepared-param-ref'
+        ? { kind: 'bind', name: ref.name }
+        : { kind: 'literal', value: ref.value },
+    );
   }
 
   let sql: string;
@@ -101,6 +106,16 @@ export function renderLoweredSql(
   return Object.freeze({ sql, params });
 }
 
+function renderLimitOffset(
+  keyword: 'LIMIT' | 'OFFSET',
+  value: SelectAst['limit'] | SelectAst['offset'],
+  contract?: SqliteContract,
+): string {
+  if (value === undefined) return '';
+  if (typeof value === 'number') return `${keyword} ${value}`;
+  return `${keyword} ${renderExpr(value, contract)}`;
+}
+
 function renderSelect(ast: SelectAst, contract?: SqliteContract): string {
   const distinctPrefix = ast.distinct ? 'DISTINCT ' : '';
   const selectClause = `SELECT ${distinctPrefix}${renderProjection(ast.projection, contract)}`;
@@ -120,8 +135,8 @@ function renderSelect(ast: SelectAst, contract?: SqliteContract): string {
         .map((order) => `${renderExpr(order.expr, contract)} ${order.dir.toUpperCase()}`)
         .join(', ')}`
     : '';
-  const limitClause = typeof ast.limit === 'number' ? `LIMIT ${ast.limit}` : '';
-  const offsetClause = typeof ast.offset === 'number' ? `OFFSET ${ast.offset}` : '';
+  const limitClause = renderLimitOffset('LIMIT', ast.limit, contract);
+  const offsetClause = renderLimitOffset('OFFSET', ast.offset, contract);
 
   return [
     selectClause,
@@ -210,6 +225,7 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
     case 'not':
       return `NOT (${renderExpr(node.expr, contract)})`;
     case 'param-ref':
+    case 'prepared-param-ref':
       return '?';
     case 'literal':
       return renderLiteral(node);
@@ -306,6 +322,7 @@ function renderBinary(expr: BinaryExpr, contract?: SqliteContract): string {
       right = renderColumn(rightNode);
       break;
     case 'param-ref':
+    case 'prepared-param-ref':
       right = '?';
       break;
     default:
@@ -334,7 +351,7 @@ function renderListLiteral(expr: ListExpression): string {
   }
   const values = expr.values
     .map((v) => {
-      if (v.kind === 'param-ref') return '?';
+      if (v.kind === 'param-ref' || v.kind === 'prepared-param-ref') return '?';
       if (v.kind === 'literal') return renderLiteral(v);
       return renderExpr(v);
     })
@@ -398,6 +415,7 @@ function renderJoinOn(on: JoinOnExpr, contract?: SqliteContract): string {
 function renderInsertValue(value: InsertValue): string {
   switch (value.kind) {
     case 'param-ref':
+    case 'prepared-param-ref':
       return '?';
     case 'column-ref':
       return renderColumn(value);
@@ -453,7 +471,7 @@ function renderInsert(ast: InsertAst): string {
       case 'do-update-set': {
         const updates = Object.entries(action.set).map(([colName, value]) => {
           const target = quoteIdentifier(colName);
-          if (value.kind === 'param-ref') {
+          if (value.kind === 'param-ref' || value.kind === 'prepared-param-ref') {
             return `${target} = ?`;
           }
           return `${target} = ${renderColumn(value)}`;
@@ -478,6 +496,7 @@ function renderUpdate(ast: UpdateAst, contract: SqliteContract): string {
     let value: string;
     switch (val.kind) {
       case 'param-ref':
+      case 'prepared-param-ref':
         value = '?';
         break;
       case 'column-ref':
