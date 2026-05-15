@@ -63,6 +63,36 @@ After the rewrite, the same ground is covered by one *Key Concepts* block that n
 
 Read the diff if you want a before/after; read the rewrite itself if you want the template for new workflow sections.
 
+### Show façade-only imports in user-authored code
+
+**The principle: every import a user types in their own source files comes from `@prisma-next/<target>/<subpath>` or `@prisma-next/extension-<name>/<subpath>`. A user's `package.json` lists exactly one façade per target plus one façade per extension. They never see `@prisma-next/cli/*`, `@prisma-next/family-*`, `@prisma-next/target-*`, `@prisma-next/adapter-*`, `@prisma-next/driver-*`, `@prisma-next/sql-contract-*`, or `@prisma-next/mongo-contract-*` in a file they own.**
+
+The façade packages exist for this reason. `@prisma-next/postgres/config` exposes a `defineConfig({ contract, db, extensions, migrations })` that bakes in `family`/`target`/`adapter`/`driver` and auto-routes `.prisma` vs `.ts` contract paths — so the user writes two imports instead of seven. `@prisma-next/postgres/contract-builder` re-exports the TS-builder surface. `@prisma-next/postgres/control` exposes `createPostgresControlClient({ connection, extensionPacks })` instead of asking the user to compose a `createControlClient` call from five internal pieces. `@prisma-next/postgres/runtime` does the same for the runtime client.
+
+A skill that teaches the verbose form has handed the agent a worse mental model than the API is actually capable of. When the user follows the skill's example into their own code, their `package.json` grows seven `@prisma-next/*` entries instead of one. Upgrades are now seven-way coordinated instead of one-line. The drift compounds.
+
+**Verify each user-authored import:**
+
+```bash
+rg "from '@prisma-next/" packages/0-shared/agent-skill/skills/<skill>/SKILL.md \
+  | rg -v '@prisma-next/(postgres|mongo|sqlite|extension-)' \
+  | rg -v 'framework-rendered'
+```
+
+Anything that prints is a likely defect: a user-authored example is importing from an internal package. Either rewrite it onto the façade, or annotate the surrounding prose so it reads as framework-rendered rather than user-typed.
+
+**The framework-rendered exception.** Some files in a user's project are written *by* the framework, not by the user — chiefly `migrations/<scope>/<timestamp>/migration.ts`, which `prisma-next migration create` renders. Those files currently import from `@prisma-next/target-postgres/migration` because the postgres façade does not yet expose a `/migration` subpath (tracked in Linear `TML-2526`). A skill describing those files should:
+
+1. Make explicit that the imports are framework-managed.
+2. Not show those imports as if the user typed them.
+3. Route the gap to `prisma-next-feedback` and reference `TML-2526` in *What Prisma Next doesn't do yet*.
+
+When `TML-2526` lands, the framework renderer and the skill switch to `@prisma-next/postgres/migration` in lockstep. Until then, the framework-rendered-but-internal-imports case is the only sanctioned exception to façade-only imports — and the skill must name it as an exception, not normalise it.
+
+**Worked example — the contract skill re-audit.** Commit `e41f02c1b` (`docs(agent-skill): re-audit contract skill — façade-only imports`) rewrote every user-authored example in `prisma-next-contract/SKILL.md` against the façade. The `prisma-next.config.ts` example went from seven imports across `@prisma-next/{cli,adapter-postgres,driver-postgres,family-sql,target-postgres,sql-contract-psl}` to two imports from `@prisma-next/{postgres/config, extension-pgvector/control}`. The TS builder example moved off `@prisma-next/sql-contract-ts/contract-builder` onto `@prisma-next/postgres/contract-builder`, and uses `@prisma-next/postgres/family` and `@prisma-next/postgres/target` as the `family`/`target` packs (a less-obvious façade subpath worth knowing about). Read the diff for a before/after.
+
+Commit `bf742221c` (`examples: migrate to @prisma-next/<target> façade imports`) does the same migration across nine example apps in `examples/`. Those apps are the canonical worked references; cite them when a skill needs a concrete example to point at.
+
 ### Other authoring rules
 
 These are well-trodden but worth listing in one place:
