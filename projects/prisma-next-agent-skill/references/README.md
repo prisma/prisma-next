@@ -1,4 +1,13 @@
-# Reference skills — patterns to learn from
+# Project references
+
+This directory holds reference material for the agent-skill project. Two kinds of content:
+
+- **[`workflows-catalog.md`](./workflows-catalog.md)** — the canonical list of Prisma Next user workflows the skill cluster codifies, grouped by skill. Audience: devrel writing user-facing documentation. Each skill's capability-gap block doubles as the *"known limitations"* source for the corresponding doc section.
+- **Competitive survey clones (below)** — local clones of well-established `SKILL.md` repos kept on disk for pattern study, plus a written competitive survey of other ORMs' agent-facing surfaces under [`competitive-survey/`](./competitive-survey/).
+
+---
+
+## Reference skills — patterns to learn from
 
 Local clones of well-established `SKILL.md` repos, kept on disk for pattern study so we don't redesign Prisma Next's agent skill from first principles. The clones themselves are gitignored (see `.gitignore`); refresh them with `git -C <repo> pull` whenever you want a newer snapshot.
 
