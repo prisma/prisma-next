@@ -75,11 +75,13 @@ A skill that teaches the verbose form has handed the agent a worse mental model 
 
 ```bash
 rg "from '@prisma-next/" packages/0-shared/agent-skill/skills/<skill>/SKILL.md \
-  | rg -v '@prisma-next/(postgres|mongo|sqlite|extension-)' \
+  | rg -v '@prisma-next/(postgres|mongo|sqlite|extension-|[a-z]+-plugin-)' \
   | rg -v 'framework-rendered'
 ```
 
 Anything that prints is a likely defect: a user-authored example is importing from an internal package. Either rewrite it onto the façade, or annotate the surrounding prose so it reads as framework-rendered rather than user-typed.
+
+The exclusion list covers the three sanctioned sources of user-authored `@prisma-next/*` imports: target façades (`postgres`, `mongo`, `sqlite`), extension façades (`extension-<name>`), and build-tool plugin packages (`<bundler>-plugin-<purpose>`, e.g. `@prisma-next/vite-plugin-contract-emit`). Build-tool plugins are themselves one-package-per-integration façades — they ship their own public surface and are not internal to a target package.
 
 **The framework-rendered exception.** Some files in a user's project are written *by* the framework, not by the user — chiefly `migrations/<scope>/<timestamp>/migration.ts`, which `prisma-next migration create` renders. Those files currently import from `@prisma-next/target-postgres/migration` because the postgres façade does not yet expose a `/migration` subpath (tracked in Linear `TML-2526`). A skill describing those files should:
 
