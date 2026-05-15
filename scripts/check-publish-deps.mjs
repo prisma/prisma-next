@@ -1,19 +1,30 @@
 #!/usr/bin/env node
-// Publish-time CI gate (FR7.1).
+// Publish-time CI gate.
 //
 // For every publishable package, packs the tarball that `pnpm publish` would
-// upload to the registry and verifies the tarball's `package.json` contains
-// no `workspace:*` or `catalog:` dependency specifiers in any dependency
-// field. Such specifiers are pnpm-internal protocols and are meaningless
-// (and typically install-breaking) for downstream npm/pnpm/yarn consumers.
+// upload to the registry and runs two checks against the tarball's
+// `package.json`:
 //
-// `pnpm publish` rewrites these protocols on its own, but `npm publish` and
-// some CI flows do not. This gate catches the resulting leaks at publish
-// time so the only fix is "use pnpm publish" rather than "release a broken
-// package and patch it on the registry afterwards".
+//   1. `workspace:` / `catalog:` leak check. Both are pnpm-internal
+//      protocols, meaningless on the registry and install-breaking for
+//      downstream npm/pnpm/yarn consumers. `pnpm publish` rewrites them on
+//      its own, but `npm publish` and some CI flows do not — this catches
+//      the leak before the broken tarball reaches the registry. Covers
+//      every dep field.
+//
+//   2. `@prisma-next/*` exact-pin check. Every `@prisma-next/*` entry in
+//      `dependencies`, `peerDependencies`, and `optionalDependencies`
+//      (the three fields that ship to consumers; `devDependencies` is
+//      skipped) must be a single exact version `X.Y.Z` (with an optional
+//      semver pre-release suffix). Carets, tildes, ranges, and wildcards
+//      all fail. Combined with the `workspace:<X.Y.Z>` literal-version
+//      form in the source manifests, this is the mechanism that gives
+//      every published `@prisma-next/*` package an exact pin on its
+//      siblings, which is what `prisma-next-check-pins` exploits on the
+//      consumer side.
 //
 // Usage:
-//   node scripts/check-publish-deps.mjs           — exit 1 on any leak
+//   node scripts/check-publish-deps.mjs           — exit 1 on any violation
 //   node scripts/check-publish-deps.mjs --json    — same, with JSON report
 //
 // Wired into `.github/workflows/publish.yml` immediately before the publish
@@ -31,6 +42,18 @@ const DEP_FIELDS = /** @type {const} */ ([
   'peerDependencies',
   'optionalDependencies',
 ]);
+
+// `@prisma-next/*` exact-pin check looks only at the three fields that
+// ship to consumers. devDependencies aren't installed by consumers so
+// imprecise specs there don't affect the type-identity invariant the
+// pin check enforces.
+const SHIPPED_DEP_FIELDS = /** @type {const} */ ([
+  'dependencies',
+  'peerDependencies',
+  'optionalDependencies',
+]);
+
+const EXACT_VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 
 /**
  * Returns true if `spec` is a published-tarball-poisoning specifier
@@ -65,6 +88,45 @@ export function findLeaks(pkgJson) {
     }
   }
   return leaks;
+}
+
+/**
+ * Returns true if `spec` is a clean exact-version specifier
+ * (`X.Y.Z` or `X.Y.Z-<prerelease>`). Carets, tildes, ranges, and
+ * wildcards return false. Anything non-string returns false.
+ *
+ * Exported for unit tests.
+ */
+export function isExactPnVersion(spec) {
+  return typeof spec === 'string' && EXACT_VERSION_RE.test(spec);
+}
+
+/**
+ * Walks `dependencies`, `peerDependencies`, and `optionalDependencies`
+ * on a package.json-shaped object and returns the list of
+ * `(field, name, spec)` triples where the `@prisma-next/*` entry is
+ * not pinned to an exact version. Specs already flagged by
+ * {@link isLeak} are skipped — those are reported by the leak rule
+ * to avoid double-attribution noise. Pure / side-effect-free.
+ *
+ * @param {Record<string, unknown>} pkgJson
+ * @returns {Array<{ field: string; name: string; spec: string }>}
+ */
+export function findPnPinViolations(pkgJson) {
+  const violations = [];
+  for (const field of SHIPPED_DEP_FIELDS) {
+    const deps = pkgJson[field];
+    if (!deps || typeof deps !== 'object') continue;
+    for (const [name, spec] of Object.entries(deps)) {
+      if (!name.startsWith('@prisma-next/')) continue;
+      if (typeof spec !== 'string') continue;
+      if (isLeak(spec)) continue; // reported by the leak rule
+      if (!isExactPnVersion(spec)) {
+        violations.push({ field, name, spec });
+      }
+    }
+  }
+  return violations;
 }
 
 function readPackedManifest(tgzPath) {
@@ -174,7 +236,14 @@ export function runCheck({ argv = process.argv.slice(2), io = {} } = {}) {
     }
 
     const tarballs = new Set(readDir(dest).filter((f) => f.endsWith('.tgz')));
-    /** @type {Array<{ pkg: string; tarball: string; leaks: ReturnType<typeof findLeaks> }>} */
+    /**
+     * @type {Array<{
+     *   pkg: string;
+     *   tarball: string;
+     *   leaks: ReturnType<typeof findLeaks>;
+     *   pnPinViolations: ReturnType<typeof findPnPinViolations>;
+     * }>}
+     */
     const offenders = [];
 
     for (const dir of dirs) {
@@ -186,8 +255,9 @@ export function runCheck({ argv = process.argv.slice(2), io = {} } = {}) {
       }
       const packed = readPacked(join(dest, tarballName));
       const leaks = findLeaks(packed);
-      if (leaks.length > 0) {
-        offenders.push({ pkg: sourcePkg.name, tarball: tarballName, leaks });
+      const pnPinViolations = findPnPinViolations(packed);
+      if (leaks.length > 0 || pnPinViolations.length > 0) {
+        offenders.push({ pkg: sourcePkg.name, tarball: tarballName, leaks, pnPinViolations });
       }
     }
 
@@ -195,21 +265,29 @@ export function runCheck({ argv = process.argv.slice(2), io = {} } = {}) {
       stdoutWrite(`${JSON.stringify({ ok: offenders.length === 0, offenders }, null, 2)}\n`);
     } else if (offenders.length === 0) {
       stderrWrite(
-        `\nOK — no workspace:* / catalog: leaks in ${dirs.length} publishable packages.\n`,
+        `\nOK — no workspace:/catalog: leaks and no @prisma-next/* pin violations in ${dirs.length} publishable packages.\n`,
       );
     } else {
       stderrWrite(
-        `\nFAIL — ${offenders.length} publishable package(s) leak workspace:* / catalog: into the published tarball:\n`,
+        `\nFAIL — ${offenders.length} publishable package(s) have publish-time violations:\n`,
       );
       for (const o of offenders) {
         stderrWrite(`\n  ${o.pkg}\n`);
         for (const l of o.leaks) {
-          stderrWrite(`    ${l.field}.${l.name} = ${l.spec}\n`);
+          stderrWrite(`    [leak]     ${l.field}.${l.name} = ${l.spec}\n`);
+        }
+        for (const v of o.pnPinViolations) {
+          stderrWrite(`    [pin]      ${v.field}.${v.name} = ${v.spec}\n`);
         }
       }
       stderrWrite(
-        '\nPublish via `pnpm publish` (which rewrites these specifiers) rather than `npm publish`,\n' +
-          'or convert the offending dependency to a real version range.\n',
+        '\n  [leak] specs are pnpm-internal (workspace:/catalog:) and break consumer installs.\n' +
+          '         Publish via `pnpm publish` (which rewrites them) rather than `npm publish`,\n' +
+          '         or convert the dependency to a real version range.\n' +
+          '  [pin]  every @prisma-next/* entry in dependencies/peer/optional must be a single\n' +
+          '         exact version `X.Y.Z` (a pre-release suffix is permitted). Carets, tildes,\n' +
+          '         ranges, and wildcards are rejected so consumer installs see the exact\n' +
+          '         @prisma-next/* graph this release validated against.\n',
       );
     }
 
