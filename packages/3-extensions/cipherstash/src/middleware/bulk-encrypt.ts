@@ -47,6 +47,7 @@ import type {
   DefaultValueExpr,
   InsertAst,
   ParamRef,
+  PreparedParamRef,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import type {
@@ -191,7 +192,7 @@ function stampUpdate(ast: UpdateAst): void {
 }
 
 function stampParamRefIfEnvelope(
-  value: ColumnRef | ParamRef | DefaultValueExpr,
+  value: ColumnRef | ParamRef | DefaultValueExpr | PreparedParamRef,
   table: string,
   column: string,
 ): void {

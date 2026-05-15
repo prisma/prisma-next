@@ -6,6 +6,9 @@ function createMockDriverWithVoidBinding(): SqlDriver {
     async *execute(_request: SqlExecuteRequest) {
       yield { id: 1 };
     },
+    async *executePrepared(_request: { sql: string; params: readonly unknown[] }) {
+      yield { id: 1 };
+    },
     query: async () => ({ rows: [] as ReadonlyArray<Record<string, unknown>>, rowCount: 0 }),
   };
 

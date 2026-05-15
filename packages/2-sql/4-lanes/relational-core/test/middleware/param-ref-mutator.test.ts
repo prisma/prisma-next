@@ -4,6 +4,7 @@ import {
   BinaryExpr,
   ColumnRef,
   ParamRef,
+  PreparedParamRef,
   ProjectionItem,
   SelectAst,
   TableSource,
@@ -128,6 +129,77 @@ describe('createSqlParamRefMutator entries()', () => {
     const mutator = createSqlParamRefMutator(astless);
 
     expect([...mutator.entries()]).toEqual([]);
+  });
+
+  it('surfaces PreparedParamRef positions with their codecId and slot value', () => {
+    const ref = PreparedParamRef.of('userId', { codecId: 'pg/int4@1' });
+    const where = AndExpr.of([BinaryExpr.eq(ColumnRef.of('user', 'id'), ref)]);
+    const ast = SelectAst.from(TableSource.named('user'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withWhere(where);
+    const plan: SqlExecutionPlan = {
+      sql: 'select "id" from "user" where ...',
+      params: [42],
+      ast,
+      meta: {} as SqlExecutionPlan['meta'],
+    };
+
+    const mutator = createSqlParamRefMutator(plan);
+    const [entry] = [...mutator.entries()];
+
+    expect(entry?.codecId).toBe('pg/int4@1');
+    expect(entry?.value).toBe(42);
+  });
+
+  it('replaceValue overrides a PreparedParamRef slot, visible on re-walk', () => {
+    const ref = PreparedParamRef.of('userId', { codecId: 'pg/int4@1' });
+    const where = AndExpr.of([BinaryExpr.eq(ColumnRef.of('user', 'id'), ref)]);
+    const ast = SelectAst.from(TableSource.named('user'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withWhere(where);
+    const plan: SqlExecutionPlan = {
+      sql: 'select "id" from "user" where ...',
+      params: [1],
+      ast,
+      meta: {} as SqlExecutionPlan['meta'],
+    };
+
+    const mutator = createSqlParamRefMutator(plan);
+    const [first] = [...mutator.entries()];
+    if (!first) throw new Error('expected one entry');
+    if (first.codecId === undefined) {
+      mutator.replaceValue(first.ref, 999);
+    } else {
+      mutator.replaceValue(first.ref, 999);
+    }
+
+    const [reWalked] = [...mutator.entries()];
+    expect(reWalked?.value).toBe(999);
+    expect(mutator.currentParams()).toEqual([999]);
+  });
+
+  it('yields undefined for a PreparedParamRef when the params array is shorter than the ref list', () => {
+    const a = PreparedParamRef.of('a', { codecId: 'pg/int4@1' });
+    const b = PreparedParamRef.of('b', { codecId: 'pg/int4@1' });
+    const where = AndExpr.of([
+      BinaryExpr.eq(ColumnRef.of('user', 'id'), a),
+      BinaryExpr.eq(ColumnRef.of('user', 'rank'), b),
+    ]);
+    const ast = SelectAst.from(TableSource.named('user'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withWhere(where);
+    const plan: SqlExecutionPlan = {
+      sql: 'select "id" from "user" where ...',
+      params: [1],
+      ast,
+      meta: {} as SqlExecutionPlan['meta'],
+    };
+
+    const mutator = createSqlParamRefMutator(plan);
+    const entries = [...mutator.entries()];
+
+    expect(entries[0]?.value).toBe(1);
+    expect(entries[1]?.value).toBeUndefined();
   });
 
   it('sees the mutated value when entries() is re-walked after replaceValue', () => {

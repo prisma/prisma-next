@@ -11,11 +11,10 @@ import type {
   ProjectionItem,
   SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
-import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 
 type ColumnRef = { table: string; column: string };
 
-interface DecodeContext {
+export interface DecodeContext {
   readonly aliases: ReadonlyArray<string> | undefined;
   readonly codecs: ReadonlyMap<string, Codec>;
   readonly columnRefs: ReadonlyMap<string, ColumnRef>;
@@ -24,12 +23,6 @@ interface DecodeContext {
 
 const WIRE_PREVIEW_LIMIT = 100;
 const EMPTY_INCLUDE_ALIASES: ReadonlySet<string> = new Set<string>();
-
-function isAstBackedPlan(
-  plan: SqlExecutionPlan,
-): plan is SqlExecutionPlan & { readonly ast: AnyQueryAst } {
-  return plan.ast !== undefined;
-}
 
 function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> | undefined {
   if (ast.kind === 'select') {
@@ -51,21 +44,12 @@ function resolveProjectionCodec(
   return undefined;
 }
 
-function buildDecodeContext(
-  plan: SqlExecutionPlan,
+export function buildDecodeContext(
+  ast: AnyQueryAst,
   contractCodecs: ContractCodecRegistry | undefined,
 ): DecodeContext {
-  if (!isAstBackedPlan(plan)) {
-    return {
-      aliases: undefined,
-      codecs: new Map(),
-      columnRefs: new Map(),
-      includeAliases: EMPTY_INCLUDE_ALIASES,
-    };
-  }
-
-  const projection = projectionListFromAst(plan.ast);
-  if (!projection) {
+  const projection = projectionListFromAst(ast);
+  if (!projection || projection.length === 0) {
     return {
       aliases: undefined,
       codecs: new Map(),
@@ -223,14 +207,11 @@ async function decodeField(
  */
 export async function decodeRow(
   row: Record<string, unknown>,
-  plan: SqlExecutionPlan,
+  decodeCtx: DecodeContext,
   rowCtx: SqlCodecCallContext,
-  contractCodecs?: ContractCodecRegistry,
 ): Promise<Record<string, unknown>> {
   checkAborted(rowCtx, 'decode');
   const signal = rowCtx.signal;
-
-  const decodeCtx = buildDecodeContext(plan, contractCodecs);
 
   const aliases = decodeCtx.aliases ?? Object.keys(row);
 

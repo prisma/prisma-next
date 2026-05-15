@@ -20,7 +20,7 @@ export interface GroupedQuery<
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
 > extends Subquery<RowType>,
-    WithPagination,
+    WithPagination<QC>,
     WithDistinct,
     WithAlias<RowType>,
     WithBuild<QC, RowType> {

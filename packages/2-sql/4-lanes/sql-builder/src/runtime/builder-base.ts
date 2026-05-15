@@ -8,6 +8,7 @@ import {
   type AnyExpression as AstExpression,
   collectOrderedParamRefs,
   IdentifierRef,
+  type LimitOffsetValue,
   OrderByItem,
   ProjectionItem,
   SelectAst,
@@ -68,8 +69,8 @@ export interface BuilderState {
   readonly orderBy: readonly OrderByItem[];
   readonly groupBy: readonly AstExpression[];
   readonly having: AstExpression | undefined;
-  readonly limit: number | undefined;
-  readonly offset: number | undefined;
+  readonly limit: LimitOffsetValue | undefined;
+  readonly offset: LimitOffsetValue | undefined;
   readonly distinct: true | undefined;
   readonly distinctOn: readonly AstExpression[] | undefined;
   readonly scope: Scope;
@@ -160,7 +161,9 @@ export function buildQueryPlan<Row = unknown>(
   ctx: BuilderContext,
   annotations?: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>,
 ): SqlQueryPlan<Row> {
-  const paramValues = collectOrderedParamRefs(ast).map((r) => r.value);
+  const paramValues = collectOrderedParamRefs(ast).map((r) =>
+    r.kind === 'param-ref' ? r.value : undefined,
+  );
 
   // SQL DSL has no framework-reserved namespace keys (e.g. `codecs`) in
   // scope at `.build()` time, so user annotations land verbatim here. The

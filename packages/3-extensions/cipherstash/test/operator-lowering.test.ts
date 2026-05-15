@@ -124,8 +124,9 @@ describe('cipherstash operator lowering — per-codec envelope dispatch', () => 
     );
     const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
     expect(lowered.params).toHaveLength(1);
-    const envelope = lowered.params[0];
-    expect(envelope).toBeInstanceOf(EncryptedDouble);
+    const slot = lowered.params[0];
+    if (slot?.kind !== 'literal') throw new Error('expected literal slot');
+    expect(slot.value).toBeInstanceOf(EncryptedDouble);
   });
 
   it('cipherstashGt on a bigint column wraps the value in EncryptedBigInt', () => {
@@ -136,7 +137,9 @@ describe('cipherstash operator lowering — per-codec envelope dispatch', () => 
       42n,
     );
     const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
-    expect(lowered.params[0]).toBeInstanceOf(EncryptedBigInt);
+    const slot = lowered.params[0];
+    if (slot?.kind !== 'literal') throw new Error('expected literal slot');
+    expect(slot.value).toBeInstanceOf(EncryptedBigInt);
   });
 
   it('cipherstashGt on a date column wraps the value in EncryptedDate', () => {
@@ -147,7 +150,9 @@ describe('cipherstash operator lowering — per-codec envelope dispatch', () => 
       new Date('2024-01-01'),
     );
     const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
-    expect(lowered.params[0]).toBeInstanceOf(EncryptedDate);
+    const slot = lowered.params[0];
+    if (slot?.kind !== 'literal') throw new Error('expected literal slot');
+    expect(slot.value).toBeInstanceOf(EncryptedDate);
   });
 
   it('cipherstashNe on a boolean column wraps the value in EncryptedBoolean', () => {
@@ -158,7 +163,9 @@ describe('cipherstash operator lowering — per-codec envelope dispatch', () => 
       true,
     );
     const lowered = makeAdapter().lower(selectWithWhere(predicate), { contract });
-    expect(lowered.params[0]).toBeInstanceOf(EncryptedBoolean);
+    const slot = lowered.params[0];
+    if (slot?.kind !== 'literal') throw new Error('expected literal slot');
+    expect(slot.value).toBeInstanceOf(EncryptedBoolean);
   });
 
   it('cipherstashGt rejects a non-matching plaintext type for the column codec', () => {
@@ -184,7 +191,7 @@ describe('cipherstash operator lowering — JSON path predicate', () => {
       `"SELECT "user"."id" AS "id" FROM "user" WHERE eql_v2.jsonb_path_exists("user"."payload", $1)"`,
     );
     // Path is a plain text bind — no envelope wrapping.
-    expect(lowered.params).toEqual(['$.k']);
+    expect(lowered.params).toEqual([{ kind: 'literal', value: '$.k' }]);
   });
 
   it('cipherstashJsonbPathExists rejects non-string path arguments', () => {

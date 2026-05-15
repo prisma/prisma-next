@@ -15,6 +15,8 @@ export type ScopeField = {
   codec?: CodecRef;
 };
 
+export type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
+
 /**
  * A typed SQL expression. Identity is carried by the `returnType` descriptor (inherited from `QueryOperationReturn` and narrowed to `T`) — distinct `T` makes distinct Expression types structurally. `buildAst()` materialises the underlying AST node.
  */
@@ -37,6 +39,16 @@ type CodecIdsWithTrait<
 type NullSuffix<N> = N extends true ? null : never;
 
 /**
+ * Runtime value type for a slot bound to `CodecId` with the given
+ * nullability — `CT[CodecId]['input']`, plus `null` when `Nullable` is true.
+ */
+export type CodecValue<
+  CodecId extends string,
+  Nullable extends boolean,
+  CT extends Record<string, { readonly input: unknown }>,
+> = (CodecId extends keyof CT ? CT[CodecId]['input'] : never) | NullSuffix<Nullable>;
+
+/**
  * An expression or literal value targeting a specific codec.
  *
  * Accepts any of:
@@ -48,10 +60,7 @@ export type CodecExpression<
   CodecId extends string,
   Nullable extends boolean,
   CT extends Record<string, { readonly input: unknown }>,
-> =
-  | Expression<{ codecId: CodecId; nullable: Nullable }>
-  | (CodecId extends keyof CT ? CT[CodecId]['input'] : never)
-  | NullSuffix<Nullable>;
+> = Expression<{ codecId: CodecId; nullable: Nullable }> | CodecValue<CodecId, Nullable, CT>;
 
 /**
  * An expression or literal value targeting any codec whose trait set contains all the required traits.

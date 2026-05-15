@@ -5,6 +5,7 @@ import type {
 } from '@prisma-next/framework-components/runtime';
 import { assertAnnotationsApplicable } from '@prisma-next/framework-components/runtime';
 import { DerivedTableSource, type SelectAst } from '@prisma-next/sql-relational-core/ast';
+import { toExpr } from '@prisma-next/sql-relational-core/expression';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   AggregateFunctions,
@@ -32,6 +33,7 @@ import type {
 } from '../scope';
 import type { GroupedQuery } from '../types/grouped-query';
 import type { SelectQuery } from '../types/select-query';
+import type { PaginationValue } from '../types/shared';
 import {
   BuilderBase,
   type BuilderContext,
@@ -75,12 +77,14 @@ abstract class QueryBase<
     },
   );
 
-  limit(count: number): this {
-    return this.clone(cloneState(this.state, { limit: count }));
+  limit(count: PaginationValue<QC>): this {
+    const limit = typeof count === 'number' ? count : toExpr(count);
+    return this.clone(cloneState(this.state, { limit }));
   }
 
-  offset(count: number): this {
-    return this.clone(cloneState(this.state, { offset: count }));
+  offset(count: PaginationValue<QC>): this {
+    const offset = typeof count === 'number' ? count : toExpr(count);
+    return this.clone(cloneState(this.state, { offset }));
   }
 
   distinct(): this {

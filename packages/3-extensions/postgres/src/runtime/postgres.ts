@@ -4,10 +4,16 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { ExtractCodecTypes, SqlStorage } from '@prisma-next/sql-contract/types';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
+import type { CodecTypesBase } from '@prisma-next/sql-relational-core/expression';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
+  BindSiteParams,
+  Declaration,
   ExecutionContext,
+  ParamsFromDeclaration,
+  PreparedStatement,
   Runtime,
   RuntimeVerifyOptions,
   SqlExecutionStackWithDriver,
@@ -48,6 +54,14 @@ export interface PostgresClient<TContract extends Contract<SqlStorage>> {
   connect(bindingInput?: PostgresBindingInput): Promise<Runtime>;
   runtime(): Runtime;
   transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R>;
+  prepare<
+    D extends Declaration<CT>,
+    Row,
+    CT extends CodecTypesBase = ExtractCodecTypes<TContract> & CodecTypesBase,
+  >(
+    declaration: D,
+    callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
+  ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>>;
 }
 
 export interface PostgresOptionsBase {
@@ -252,6 +266,17 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
 
     runtime() {
       return getRuntime();
+    },
+
+    prepare<
+      D extends Declaration<CT>,
+      Row,
+      CT extends CodecTypesBase = ExtractCodecTypes<TContract> & CodecTypesBase,
+    >(
+      declaration: D,
+      callback: (sql: Db<TContract>, params: BindSiteParams<D>) => SqlQueryPlan<Row>,
+    ): Promise<PreparedStatement<ParamsFromDeclaration<D, CT>, Row>> {
+      return getRuntime().prepare<D, Row, CT>(declaration, (params) => callback(sql, params));
     },
 
     transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R> {

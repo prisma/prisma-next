@@ -5,6 +5,7 @@ import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter'
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { dataTransform } from '@prisma-next/target-postgres/data-transform';
+import { litParams } from '@prisma-next/test-utils/lowered-params';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const CONTRACT_HASH = 'sha256:contract-abc';
@@ -42,7 +43,7 @@ describe('dataTransform factory', () => {
   it('lowers a single run with no check into execute-only steps', () => {
     lowerMock.mockImplementation(() => ({
       sql: 'UPDATE users SET email = $1',
-      params: ['n/a'],
+      params: litParams('n/a'),
     }));
     const op = dataTransform(
       makeContract(),
@@ -71,7 +72,7 @@ describe('dataTransform factory', () => {
     let call = 0;
     lowerMock.mockImplementation(() => ({
       sql: `STMT_${call++}`,
-      params: [1, 'x'],
+      params: litParams(1, 'x'),
     }));
     const op = dataTransform(
       makeContract(),
@@ -90,11 +91,11 @@ describe('dataTransform factory', () => {
     lowerMock
       .mockImplementationOnce(() => ({
         sql: 'SELECT 1 FROM users WHERE email IS NULL',
-        params: [],
+        params: litParams(),
       }))
       .mockImplementation(() => ({
         sql: 'UPDATE users SET email = $1',
-        params: ['n/a'],
+        params: litParams('n/a'),
       }));
     const op = dataTransform(
       makeContract(),
@@ -166,7 +167,7 @@ describe('dataTransform factory', () => {
   it('accepts a Buildable by calling build() once', () => {
     lowerMock.mockImplementation(() => ({
       sql: 'SELECT 1',
-      params: [1, 'x'],
+      params: litParams(1, 'x'),
     }));
     const build = vi.fn(() => makePlan());
     const op = dataTransform(
@@ -182,7 +183,7 @@ describe('dataTransform factory', () => {
   it('forwards the contract via LowererContext on every adapter.lower call', () => {
     const contract = makeContract();
     const adapter = makeAdapter();
-    lowerMock.mockReturnValue({ sql: 'X', params: [] });
+    lowerMock.mockReturnValue({ sql: 'X', params: litParams() });
     dataTransform(contract, 'forwards-contract', { run: () => makePlan() }, adapter);
     expect(lowerMock).toHaveBeenCalled();
     for (const [, ctx] of lowerMock.mock.calls) {
@@ -191,7 +192,7 @@ describe('dataTransform factory', () => {
   });
 
   it('forwards invariantId onto the op when supplied', () => {
-    lowerMock.mockReturnValue({ sql: 'X', params: [] });
+    lowerMock.mockReturnValue({ sql: 'X', params: litParams() });
     const op = dataTransform(
       makeContract(),
       'backfill-emails',
@@ -202,7 +203,7 @@ describe('dataTransform factory', () => {
   });
 
   it('omits invariantId when not supplied', () => {
-    lowerMock.mockReturnValue({ sql: 'X', params: [] });
+    lowerMock.mockReturnValue({ sql: 'X', params: litParams() });
     const op = dataTransform(
       makeContract(),
       'no-invariant',

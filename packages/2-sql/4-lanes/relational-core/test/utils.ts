@@ -17,7 +17,8 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
     },
     lower(ast: SelectAst, ctx: { contract: Contract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);
-      return Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] });
+      const params = (ctx.params ?? []).map((value) => ({ kind: 'literal' as const, value }));
+      return Object.freeze({ sql: sqlText, params });
     },
   };
 }

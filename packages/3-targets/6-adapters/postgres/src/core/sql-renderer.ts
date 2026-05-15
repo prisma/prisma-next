@@ -4,6 +4,7 @@ import {
   type AggregateExpr,
   type AnyExpression,
   type AnyFromSource,
+  type AnyParamRef,
   type AnyQueryAst,
   type BinaryExpr,
   type ColumnRef,
@@ -17,10 +18,10 @@ import {
   type JsonObjectExpr,
   type ListExpression,
   LiteralExpr,
+  type LoweredParam,
   type NullCheckExpr,
   type OperationExpr,
   type OrderByItem,
-  type ParamRef,
   type ProjectionItem,
   type RawSqlExpr,
   type SelectAst,
@@ -106,7 +107,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Per-render carrier threaded through every helper. Bundles the param-index map (for `$N` numbering) and the assembled-stack `codecLookup` (for cast policy at the `renderTypedParam` chokepoint). Carrying both on a single value keeps helper signatures stable.
  */
 interface ParamIndexMap {
-  readonly indexMap: Map<ParamRef, number>;
+  readonly indexMap: Map<AnyParamRef, number>;
   readonly codecLookup: CodecLookup;
 }
 
@@ -119,12 +120,14 @@ export function renderLoweredSql(
   ast: AnyQueryAst,
   contract: PostgresContract,
   codecLookup: CodecLookup,
-): { readonly sql: string; readonly params: readonly unknown[] } {
+): { readonly sql: string; readonly params: readonly LoweredParam[] } {
   const orderedRefs = collectOrderedParamRefs(ast);
-  const indexMap = new Map<ParamRef, number>();
-  const params: unknown[] = orderedRefs.map((ref, i) => {
+  const indexMap = new Map<AnyParamRef, number>();
+  const params: LoweredParam[] = orderedRefs.map((ref, i) => {
     indexMap.set(ref, i + 1);
-    return ref.value;
+    return ref.kind === 'prepared-param-ref'
+      ? { kind: 'bind', name: ref.name }
+      : { kind: 'literal', value: ref.value };
   });
   const pim: ParamIndexMap = { indexMap, codecLookup };
 
@@ -156,6 +159,17 @@ export function renderLoweredSql(
   return Object.freeze({ sql, params: Object.freeze(params) });
 }
 
+function renderLimitOffset(
+  keyword: 'LIMIT' | 'OFFSET',
+  value: SelectAst['limit'] | SelectAst['offset'],
+  contract: PostgresContract,
+  pim: ParamIndexMap,
+): string {
+  if (value === undefined) return '';
+  if (typeof value === 'number') return `${keyword} ${value}`;
+  return `${keyword} ${renderExpr(value, contract, pim)}`;
+}
+
 function renderSelect(ast: SelectAst, contract: PostgresContract, pim: ParamIndexMap): string {
   const selectClause = `SELECT ${renderDistinctPrefix(ast.distinct, ast.distinctOn, contract, pim)}${renderProjection(
     ast.projection,
@@ -181,8 +195,8 @@ function renderSelect(ast: SelectAst, contract: PostgresContract, pim: ParamInde
         })
         .join(', ')}`
     : '';
-  const limitClause = typeof ast.limit === 'number' ? `LIMIT ${ast.limit}` : '';
-  const offsetClause = typeof ast.offset === 'number' ? `OFFSET ${ast.offset}` : '';
+  const limitClause = renderLimitOffset('LIMIT', ast.limit, contract, pim);
+  const offsetClause = renderLimitOffset('OFFSET', ast.offset, contract, pim);
 
   const clauses = [
     selectClause,
@@ -316,6 +330,7 @@ function isAtomicExpressionKind(kind: AnyExpression['kind']): boolean {
     case 'column-ref':
     case 'identifier-ref':
     case 'param-ref':
+    case 'prepared-param-ref':
     case 'literal':
     case 'aggregate':
     case 'json-object':
@@ -362,6 +377,7 @@ function renderBinary(expr: BinaryExpr, contract: PostgresContract, pim: ParamIn
       right = renderColumn(rightNode);
       break;
     case 'param-ref':
+    case 'prepared-param-ref':
       right = renderParamRef(rightNode, pim);
       break;
     default:
@@ -394,7 +410,9 @@ function renderListLiteral(
   }
   const values = expr.values
     .map((v) => {
-      if (v.kind === 'param-ref') return renderParamRef(v, pim);
+      if (v.kind === 'param-ref' || v.kind === 'prepared-param-ref') {
+        return renderParamRef(v, pim);
+      }
       if (v.kind === 'literal') return renderLiteral(v);
       return renderExpr(v, contract, pim);
     })
@@ -503,6 +521,7 @@ function renderExpr(expr: AnyExpression, contract: PostgresContract, pim: ParamI
     case 'not':
       return `NOT (${renderExpr(node.expr, contract, pim)})`;
     case 'param-ref':
+    case 'prepared-param-ref':
       return renderParamRef(node, pim);
     case 'literal':
       return renderLiteral(node);
@@ -516,10 +535,13 @@ function renderExpr(expr: AnyExpression, contract: PostgresContract, pim: ParamI
   }
 }
 
-function renderParamRef(ref: ParamRef, pim: ParamIndexMap): string {
+function renderParamRef(ref: AnyParamRef, pim: ParamIndexMap): string {
   const index = pim.indexMap.get(ref);
   if (index === undefined) {
     throw new Error('ParamRef not found in index map');
+  }
+  if (ref.kind === 'prepared-param-ref') {
+    return renderTypedParam(index, ref.codec.codecId, pim.codecLookup);
   }
   if (ref.codec === undefined) {
     throw runtimeError(
@@ -643,6 +665,7 @@ function renderInsertValue(value: InsertValue | undefined, pim: ParamIndexMap): 
 
   switch (value.kind) {
     case 'param-ref':
+    case 'prepared-param-ref':
       return renderParamRef(value, pim);
     case 'column-ref':
       return renderColumn(value);
@@ -708,7 +731,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
             }
             const updates = updateEntries.map(([colName, value]) => {
               const target = quoteIdentifier(colName);
-              if (value.kind === 'param-ref') {
+              if (value.kind === 'param-ref' || value.kind === 'prepared-param-ref') {
                 return `${target} = ${renderParamRef(value, pim)}`;
               }
               return `${target} = ${renderColumn(value)}`;
@@ -741,6 +764,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract, pim: ParamInde
     let value: string;
     switch (val.kind) {
       case 'param-ref':
+      case 'prepared-param-ref':
         value = renderParamRef(val, pim);
         break;
       case 'column-ref':

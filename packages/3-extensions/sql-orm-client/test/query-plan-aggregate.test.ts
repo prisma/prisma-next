@@ -191,7 +191,9 @@ describe('query plan aggregate', () => {
     expect(plan.params).toEqual([100]);
     const params = [...new Set(plan.ast.collectParamRefs())];
     expect(params).toHaveLength(1);
-    expect(params[0]?.codec?.codecId).toBe('pg/int4@1');
+    const firstParam = params[0];
+    if (firstParam?.kind !== 'param-ref') throw new Error('expected param-ref');
+    expect(firstParam.codec?.codecId).toBe('pg/int4@1');
   });
 
   it('stamps min/max ProjectionItem.codec from the underlying column', () => {
