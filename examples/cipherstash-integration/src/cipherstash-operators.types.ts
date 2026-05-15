@@ -50,7 +50,7 @@ void db.orm.User.where((u) => u.email.cipherstashIlike('%@example.com'));
 //
 // (The SQL accessor name follows the table's database name, which
 // the schema maps to `users` via `@@map("users")` — see the
-// reserved-word workaround in `prisma/schema.prisma`.)
+// reserved-word workaround in `src/prisma/contract.prisma`.)
 void db.sql.users
   .select('id')
   .where((f, fns) => fns.cipherstashEq(f.email, 'alice@example.com'))

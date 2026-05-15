@@ -1,7 +1,7 @@
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import paradedb from '@prisma-next/extension-paradedb/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
-import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract } from '@prisma-next/postgres/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
 export const contract = defineContract(

@@ -21,6 +21,7 @@
     "@prisma-next/target-mongo": "workspace:0.7.0",
     "@prisma-next/contract": "workspace:0.7.0",
     "@prisma-next/driver-mongo": "workspace:0.7.0",
+    "@prisma-next/mongo": "workspace:0.7.0",
     "@prisma-next/mongo-contract": "workspace:0.7.0",
     "@prisma-next/mongo-orm": "workspace:0.7.0",
     "@prisma-next/mongo-query-builder": "workspace:0.7.0",

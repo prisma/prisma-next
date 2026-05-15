@@ -17,7 +17,7 @@ The cipherstash extension contributes its own contract space (`migrations/cipher
 
 | Path                        | Purpose                                                                              |
 | --------------------------- | ------------------------------------------------------------------------------------ |
-| `prisma/schema.prisma`      | Application schema (one `User` model with one `cipherstash.EncryptedString` column). |
+| `src/prisma/contract.prisma`      | Application schema (one `User` model with one `cipherstash.EncryptedString` column). |
 | `prisma-next.config.ts`     | Wires `cipherstash` into `extensionPacks`, points at the schema and migrations dir.  |
 | `src/sdk.ts`                | **Demo-only** stub `CipherstashSdk`; replace with a real client.                     |
 | `src/db.ts`                 | Composes `postgres()` with the cipherstash runtime descriptor + middleware.          |
@@ -49,7 +49,7 @@ These steps need no database.
 ## Step-by-step
 
 ```bash
-# Generate the contract JSON + .d.ts from prisma/schema.prisma
+# Generate the contract JSON + .d.ts from src/prisma/contract.prisma
 pnpm emit
 
 # Generate or refresh the migration plan

@@ -30,7 +30,7 @@ Routes implemented in [`src/worker.ts`](src/worker.ts):
 
 ```
 examples/prisma-next-cloudflare-worker/
-├── prisma/schema.prisma                # Demo schema minus pgvector
+├── src/prisma/contract.prisma                # Demo schema minus pgvector
 ├── src/
 │   ├── worker.ts                       # `fetch` handler — all routes
 │   ├── prisma/db.ts                    # Module-scope postgresServerless client
