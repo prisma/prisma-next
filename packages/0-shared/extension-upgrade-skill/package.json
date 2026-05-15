@@ -11,6 +11,9 @@
   "bin": {
     "prisma-next-check-pins": "./bin/prisma-next-check-pins.mjs"
   },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
   "files": [
     "SKILL.md",
     "README.md",
