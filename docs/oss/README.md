@@ -12,10 +12,11 @@ These pages are written for maintainers and curious contributors who want to und
 | Reporting a vulnerability | [`SECURITY.md`](../../SECURITY.md) |
 | A current or prospective maintainer | [Governance](./governance.md) |
 | Curious about supply-chain hygiene | [Supply chain](./supply-chain.md) |
+| Reasoning about the version contract (consumer or extension author) | [Versioning](./versioning.md) |
 | Cutting a release (or auditing how) | [Versioning](./versioning.md) |
 
 ## Pages in this directory
 
 - [`governance.md`](./governance.md) — Maintainer team, decision-making model, DCO basis, ADR pointer.
 - [`supply-chain.md`](./supply-chain.md) — License declarations, NOTICE audit, npm provenance, Dependabot soak window.
-- [`versioning.md`](./versioning.md) — Source-of-truth model, lockstep guarantee, dist-tag convention, release procedure.
+- [`versioning.md`](./versioning.md) — Pre-1.0 cadence and breaking-change policy, lockstep contract (and what it means for skill/extension authors), dist-tag convention, release procedure.
