@@ -105,7 +105,7 @@ For **feature requests**, additionally:
 - **Where the gap surfaces today** — which skill's *What PN doesn't do yet* entry triggered the request, or the workflow the user was trying to complete.
 - **Current workaround**, if any — one sentence (and the skill body the user is following may already say this).
 
-### 3. Render the body
+### 4. Render the body
 
 The repository ships GitHub Issue Forms (`.github/ISSUE_TEMPLATE/bug_report.yml` and `feature_request.yml`). When the user lands on <https://github.com/prisma/prisma-next/issues/new/choose> they pick the matching template and fill in the form fields; the skill produces the body in the same structured shape so it maps onto the form one-to-one (and so `gh issue create --body-file` produces a parseable artifact even when the form isn't in play).
 
@@ -169,22 +169,22 @@ Feature-request body shape (fields named to match `.github/ISSUE_TEMPLATE/featur
 <which package(s) this would touch; target-specific implications>
 ~~~
 
-### 4. Title (issue path only)
+### 5. Title (issue path only)
 
 - **Bug**: `bug(<area>): <one-line summary>` — e.g. `bug(cli): migration plan exits 0 when there is no diff`.
 - **Feature request**: `feat(<area>): <one-line summary>` — e.g. `feat(build): first-party Next.js plugin for contract emit`.
 
 Areas mirror the cluster of skills: `cli`, `contract`, `migration`, `query`, `runtime`, `build`, `error`, `docs`.
 
-### 5. Surface for confirmation (issue path only)
+### 6. Surface for confirmation (issue path only)
 
 **Never auto-submit.** The agent shows the rendered title and body to the user and asks: *"This looks good to file. Shall I submit it to GitHub?"*. Submission only happens after explicit user approval.
 
-### 6. Submit (issue path only)
+### 7. Submit (issue path only)
 
 Preferred. Two steps:
 
-1. **Write the rendered body to a temporary file.** Use your file-write tool (the same tool you'd use to create any other file on disk) to write the body to e.g. `wip/pn-issue-body.md` or `/tmp/pn-issue-body.md`. The body content is just the markdown produced in step 3 of this workflow — no surrounding shell quoting, no heredoc.
+1. **Write the rendered body to a temporary file.** Use your file-write tool (the same tool you'd use to create any other file on disk) to write the body to e.g. `wip/pn-issue-body.md` or `/tmp/pn-issue-body.md`. The body content is just the markdown produced in step 4 of this workflow — no surrounding shell quoting, no heredoc.
 2. **Reference that file from `gh`.** Run:
 
    ```bash
@@ -204,9 +204,9 @@ https://github.com/prisma/prisma-next/issues/new/choose
 
 …and instruct the user to paste the rendered body. The agent can copy the body to the clipboard via `pbcopy` (macOS), `xclip` (Linux), or by simply printing it in the chat for the user to copy.
 
-### 7. Route to Discord (Q&A / design-feedback / direct-team-contact path)
+### 8. Route to Discord (Q&A / design-feedback / direct-team-contact path)
 
-When step 1 picked the Discord channel:
+When step 1 picked the Discord channel (steps 2–7 do not apply):
 
 1. **Surface the link.** Give the user the canonical invite: <https://pris.ly/discord>. Suggest the channel that fits the question:
    - General usage / Q&A → the public `#help` or `#prisma-next` channel (channel naming evolves; the invite landing page lists current channels).
@@ -219,7 +219,7 @@ When step 1 picked the Discord channel:
 3. **Do not auto-post.** The agent surfaces the drafted message to the user — *"here's an opening message you can paste into Discord; want to adjust before sending?"* — and lets the user decide whether to paste it as-is, edit it, or pick a different framing.
 4. **Set expectations honestly.** Discord is synchronous and best-effort. Bugs and concrete feature requests should land in GitHub regardless (use the issue path); Discord is for the conversation that gets you to *"yes, this is a bug, file it"* or *"yes, this should be a feature, file it"*.
 
-### 8. Follow up
+### 9. Follow up
 
 - **Issue path**: record the issue URL in the user's project notes (or in the project's `wip/` if there is one) so a later upgrade or related work can reference it. If the bug is the symptom of an old version of Prisma Next, suggest the user run `prisma-next-upgrade` (the separately-installed upgrade skill) — many bugs are fixed in newer releases.
 - **Discord path**: once the conversation on Discord settles into a concrete bug or a concrete feature request, return to step 1 of this skill and file the issue (the Discord thread becomes the *Notes* / *Where the gap surfaces* reference in the issue body).
