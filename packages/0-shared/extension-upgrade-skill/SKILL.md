@@ -63,7 +63,7 @@ Apply each step in order, fully: bump, install, run instructions, check pins, va
 
 For each `(from, to)` step in the chain:
 
-1. **Bump `@prisma-next/*` deps.** Rewrite every `@prisma-next/*` entry in the extension's `package.json` to the exact `<to>` version (no caret, no tilde, no `workspace:` specifier in a published spec — see the exact-pin rule below). All entries advance to the same version. Cover whichever dep field(s) the extension uses today — `dependencies` and/or `peerDependencies` — and any `optionalDependencies`. Also update the `@prisma-next/extension-upgrade-skill` entry itself to `<to>` (so the skill content matches the target).
+1. **Bump `@prisma-next/*` deps.** Rewrite every `@prisma-next/*` entry in the extension's `package.json` to the exact `<to>` version (no caret, no tilde, no `workspace:` specifier in a published spec — see the exact-pin rule below). All entries advance to the same version. Cover whichever dep field(s) the extension uses today — `dependencies` and/or `peerDependencies` — and any `optionalDependencies`. Keep `@prisma-next/extension-upgrade-skill` at `@latest` per Step 0 (do not rewrite it to `<to>`).
 
 2. **Install.** Run `pnpm install` (or the project's lockfile-managing command). The extension's source is now broken against the new SPI — the upgrade instructions for `<from> → <to>` exist to fix it.
 
