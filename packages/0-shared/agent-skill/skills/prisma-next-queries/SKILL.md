@@ -1,150 +1,133 @@
 ---
 name: prisma-next-queries
-description: Write Prisma Next queries — pick a query interface (SQL query builder, ORM client, Raw SQL, TypedSQL), select/filter/sort/paginate, include relations, INSERT/UPDATE/DELETE, transactions, capability-gated features. Use for query, where, select, orderBy, take, limit, include, eager loading, raw SQL, transaction, returning, includeMany, EXPLAIN, prepared statements, drizzle, kysely, prisma client, db.batch.
+description: Write Prisma Next queries — pick a lane (`db.orm.<Model>` for CRUD and includes, `db.sql.<table>` SQL builder for set-builder shapes the ORM doesn't express), filter / project / sort / paginate, eager-load relations with `.include(...)`, transactions via `db.transaction(...)`, aggregates via `.aggregate(...)`. Use for query, where, select, orderBy, take, skip, include, eager load, first, all, count, aggregate, create, update, delete, upsert, returning, transaction, db.transaction, drizzle-style, kysely-style, prisma client.
 ---
 
 # Prisma Next — Queries
 
 > **Edit your data contract. Prisma handles the rest.**
 
-Once the contract is in place and the DB is up to date, this skill covers everything you do with the data: reading, writing, transactions, capability-gated features, and the choice of query interface.
+Once the contract is emitted and the DB is up to date, this skill covers everything you do *with* the data: reading, writing, eager-loading relations, aggregating, and the choice between the ORM and the SQL builder.
 
 ## When to Use
 
 - User wants to read, write, update, or delete data.
 - User wants to include / eager-load relations.
 - User wants to paginate, sort, filter, project.
-- User wants to wrap operations in a transaction.
-- User wants to use a capability-gated feature (`returning()`, `includeMany`).
-- User asks about query interfaces (DSL vs ORM vs raw SQL vs TypedSQL).
-- User mentions: *query, select, where, orderBy, take, include, eager load, raw SQL, transaction, returning, drizzle-style, kysely-style, prisma client, db.batch*.
+- User wants to wrap operations in a transaction (`db.transaction(...)`).
+- User wants to aggregate (`count`, `sum`, `avg`, …).
+- User asks about query lanes (ORM vs SQL builder).
+- User mentions: *query, select, where, orderBy, take, skip, include, eager load, first, all, count, aggregate, create, update, delete, upsert, returning, drizzle-style, kysely-style, prisma client*.
 
 ## When Not to Use
 
-- User wants to add/change a model → `prisma-next-contract`.
+- User wants to add / change a model → `prisma-next-contract`.
 - User wants to wire `db.ts` or add middleware → `prisma-next-runtime`.
-- User wants to debug a query failure → `prisma-next-debug`.
+- User wants to debug a query failure (structured error envelope) → `prisma-next-debug`.
 
-## Key Concepts (before any workflow)
+## Key Concepts
 
-Prisma Next ships three runtime surfaces on top of one contract:
+Prisma Next ships **two** query lanes on top of one contract today, both reached through the same `db` value from `prisma/db.ts` (which the `@prisma-next/<target>/runtime` façade returns):
 
-- **`db.sql`** — SQL query builder. Composable, typed, returns builders that you `.build()` and execute. Closest to raw SQL with type safety.
-- **`db.orm`** — ORM client. Higher-level, model-shaped (`db.orm.User .select(...).all()`). Default choice for most reads and writes.
-- **`db.sql.raw\`...\``** — Raw SQL escape hatch. Use when the other interfaces don't cover what you need. Returns rows untyped unless annotated.
-- **TypedSQL** — author a `.sql` file with typed params and result types; PN compiles it into a callable function. Use for complex queries you want type-checked.
+- **`db.orm.<Model>`** — the ORM. Model-shaped (`db.orm.User`), fluent (`.where(...).select(...).orderBy(...).all()`), fully typed against `Contract`. Default lane for CRUD with relations.
+- **`db.sql.<table>`** — the SQL builder. Table-shaped (`db.sql.user`, lowercase by storage name), produces a *plan* you execute through the runtime. Use when the ORM is too high-level — explicit `JOIN`, computed projections that aren't model fields, set operations, window functions.
 
-**Default: `db.orm`.** Fall back to `db.sql` when you need composition the ORM doesn't express. Fall back to raw SQL only when neither covers it.
+The two lanes share the same contract, the same connection, and the same transaction context — they compose cleanly. Reach for the ORM first; drop to `db.sql` when the ORM is too high-level. The lane choice is local: a single query function picks one lane, not the whole app.
 
-## Decision: which query interface
+**Lane decision table:**
 
 | Need | Choose | Why |
 |---|---|---|
-| Standard CRUD with relations | **ORM (`db.orm`)** | Highest ergonomics, fully typed, model-shaped. |
-| Complex JOIN, window function, CTE | **SQL DSL (`db.sql.from(...)`)** | Composable + typed without writing SQL strings. |
-| Postgres-specific feature (LATERAL, FILTER, aggregates) | **SQL DSL** if expressible, else **Raw SQL** | DSL first; raw is the escape hatch. |
-| Performance-tuned query with EXPLAIN | **Raw SQL** | EXPLAIN integration isn't first-class (see capability gaps). |
-| Reusable parameterised query | **TypedSQL** | Compiles a `.sql` file into a typed callable. |
-| Bulk inserts / mutations | **ORM `createMany` / SQL DSL `insert`** | Either works; ORM is simpler. |
+| Standard CRUD with relations | **ORM (`db.orm.<Model>`)** | Highest ergonomics; fully typed; model-shaped. |
+| Eager-load related records | **ORM `.include(...)`** | Composes with `.where` / `.select` / `.orderBy` / `.take` per branch. |
+| Aggregate (count, sum, avg) | **ORM `.aggregate(...)`** | Typed result; works with grouping (`.groupBy(...).aggregate(...)`). |
+| `INSERT ... RETURNING` / `UPDATE ... RETURNING` typed result | **ORM mutations** (returns updated rows) or **`db.sql.<t>.insert(...).returning(...)`** | ORM returns inserted/updated rows; SQL builder exposes `.returning(...)` explicitly. |
+| Computed projection (e.g. `ST_DistanceSphere(location, point) AS meters`) alongside model fields | **SQL builder (`db.sql.<t>`)** | The ORM projects model fields; arbitrary expression projection is the SQL builder's seam. |
+| Complex `JOIN`, set operation, window function | **SQL builder** | The ORM doesn't express arbitrary joins. |
+| Postgres-specific feature (`LATERAL`, `FILTER`, custom aggregates) | **SQL builder**, falling back to extension operators when the extension provides them | DSL first; extensions can contribute operators (`postgis`, `pgvector`, `cipherstash`). |
 
-## ORM workflow — basic reads
+## Workflow — ORM reads
+
+The concept: `db.orm.<Model>` returns a *collection* you compose method-by-method. Each call returns a new collection (immutable chaining); the terminal verb (`.all()` / `.first()` / `.count()` / `.aggregate(...)`) issues the query. Predicates are lambdas over a field proxy: `u.field.<op>(value)`.
 
 ```typescript
 import { db } from './prisma/db';
 
-// Find one record by primary key
-const user = await db.orm.User.first({ id: 42 });
-// Returns { id: number; email: string; ... } | null
+// Find one record by primary key shorthand.
+const user = await db.orm.User.first({ id: userId });
+// Returns the full row or `null`.
 
-// Find one matching a predicate
+// Find one matching a predicate.
 const alice = await db.orm.User
-  .where(u => u.email.eq('alice@example.com'))
+  .where((u) => u.email.eq('alice@example.com'))
   .first();
 
-// Find many
+// Find many with projection, sort, and limit.
 const recentUsers = await db.orm.User
   .select('id', 'email', 'createdAt')
-  .orderBy(u => u.createdAt.desc())
+  .orderBy((u) => u.createdAt.desc())
   .take(10)
   .all();
 ```
 
-### Predicates (`.where(...)`)
-
-`u => u.field.<op>(value)` — operators include:
-
-- `.eq(v)`, `.neq(v)` — equality.
-- `.lt(v)`, `.lte(v)`, `.gt(v)`, `.gte(v)` — comparisons.
-- `.ilike(v)`, `.like(v)` — string match (case-insensitive / case-sensitive).
-- `.in([v1, v2, ...])` — set membership.
-- `.isNull()`, `.isNotNull()` — null checks.
-
-Combine with `and(...)` / `or(...)`:
+**Predicates** (`.where(...)`) come in two forms:
 
 ```typescript
-import { and, or } from '@prisma-next/postgres/runtime';
+// Lambda form — full expression power.
+db.orm.User.where((u) => u.email.eq('alice@example.com'));
+
+// Shorthand object form — equality on the named fields.
+db.orm.User.where({ kind: 'admin' });
+```
+
+Operators on the field proxy include `.eq`, `.neq`, `.lt`, `.lte`, `.gt`, `.gte`, `.like`, `.ilike`, `.in([...])`, `.isNull()`, `.isNotNull()`. Extensions add target-specific operators on extension-typed columns (`pgvector`'s `.cosineDistance(...)`, `postgis`'s `.within(...)` / `.intersectsBbox(...)` / `.distanceSphere(...)`, `cipherstash`'s `.cipherstashEq(...)` / `.cipherstashGt(...)` / …).
+
+**Combinators** (`and`, `or`, `not`) compose predicates, and **relation predicates** (`.some(...)`, `.none(...)`, `.every(...)`) recurse into a relation. These currently come from the internal `@prisma-next/sql-orm-client` package — see *What Prisma Next doesn't do yet* for the façade-completeness gap:
+
+```typescript
+import { and, or, not } from '@prisma-next/sql-orm-client';
 
 await db.orm.User
-  .where(u => or(
-    u.role.eq('ADMIN'),
-    and(u.role.eq('USER'), u.email.ilike('%@example.com')),
-  ))
+  .where((u) =>
+    and(
+      or(u.kind.eq('admin'), u.email.ilike('%@example.com')),
+      not(u.posts.none((p) => p.title.ilike('%draft%'))),
+    ),
+  )
   .all();
 ```
 
-### Projection (`.select(...)`)
-
-```typescript
-// Pass field names — return type is narrowed.
-await db.orm.User.select('id', 'email').all();
-// → Array<{ id: number; email: string }>
-
-// Omit `.select` to return every field.
-await db.orm.User.first({ id: 42 });
-// → { id, email, name, role, ... } | null
-```
-
-### Sorting and pagination
+**Sorting and pagination.** `.orderBy(...)` accepts a single lambda or an array of lambdas (each calling `.asc()` / `.desc()` on a field). `.take(n)` limits; `.skip(n)` offsets.
 
 ```typescript
 await db.orm.Post
-  .where(p => p.authorId.eq(userId))
-  .orderBy(p => p.createdAt.desc())
+  .where((p) => p.authorId.eq(userId))
+  .orderBy([(p) => p.createdAt.desc(), (p) => p.id.desc()])
   .take(20)
   .all();
 
-// Cursor pagination: order by an indexed unique column, take + filter.
+// Cursor pagination — order by an indexed unique column and filter past the cursor.
 const cursor = lastPostFromPreviousPage.createdAt;
 await db.orm.Post
-  .where(p => p.createdAt.lt(cursor))
-  .orderBy(p => p.createdAt.desc())
+  .where((p) => p.createdAt.lt(cursor))
+  .orderBy((p) => p.createdAt.desc())
   .take(20)
   .all();
 ```
 
-### `.first()` vs `.first({ id })` vs `.all()`
+**`.first()` vs `.first({ pk })` vs `.all()`.** Use `.first()` for a single row (issues a `LIMIT 1`); use `.first({ pk })` for primary-key lookups; reserve `.all()` for the genuine many case (no implicit `LIMIT`).
+
+## Workflow — Eager-loading relations (`.include`)
+
+The concept: `.include('<relation>', (branch) => branch.<chain>)` adds a relation branch to the parent query. The branch is its own collection — compose `.where` / `.select` / `.orderBy` / `.take` on it just like the parent.
 
 ```typescript
-// Bad: .all() and array-destructure when you want one record.
-const [user] = await db.orm.User.where(u => u.id.eq(42)).all();
-// Inefficient; runs without a LIMIT.
-
-// Good: use .first() with a predicate.
-const user = await db.orm.User.where(u => u.id.eq(42)).first();
-
-// Better when looking up by primary key: .first({ pk-fields }).
-const user = await db.orm.User.first({ id: 42 });
-```
-
-### Include relations (`.include(...)`)
-
-```typescript
-const usersWithPosts = await db.orm.User
+await db.orm.User
   .select('id', 'email')
-  .include('posts', post =>
+  .include('posts', (post) =>
     post
       .select('id', 'title', 'createdAt')
-      .orderBy(p => p.createdAt.desc())
+      .orderBy((p) => p.createdAt.desc())
       .take(5),
   )
   .take(10)
@@ -152,228 +135,189 @@ const usersWithPosts = await db.orm.User
 // → Array<{ id, email, posts: Array<{ id, title, createdAt }> }>
 ```
 
-### `includeMany` (capability-gated)
+Nested `1:N → 1:N` includes (e.g. `User → posts → comments`) require the contract to advertise the `lateral` + `jsonAgg` capabilities for the active target. The Postgres adapter advertises both by default, so most apps get this for free; if the type system rejects a nested include with a *missing capability* error, route to `prisma-next-debug`.
 
-For deeply nested `1:N → 1:N` loads where each parent may have many children. Capability-gated: must be enabled in the contract's `capabilities` block.
-
-```typescript
-// prisma-next.config.ts
-import { definePnConfig } from '@prisma-next/postgres/config';
-
-export default definePnConfig({
-  // ...
-  capabilities: {
-    includeMany: true,
-  },
-});
-```
-
-Then:
+## Workflow — ORM writes
 
 ```typescript
+// Create — returns the inserted row.
+const user = await db.orm.User.create({ id, email, displayName, kind, createdAt });
+
+// Create with selected return — narrows the return shape.
+const summary = await db.orm.User
+  .select('id', 'email', 'kind')
+  .create({ id, email, displayName, kind, createdAt });
+
+// Update by predicate.
+await db.orm.User.where({ id }).update({ email: newEmail });
+
+// Update with selected return.
 await db.orm.User
-  .include('posts', post => post.include('comments', c => c.all()))
-  .all();
-```
+  .where({ id })
+  .select('id', 'email', 'kind')
+  .update({ email: newEmail });
 
-Without the capability, `include` of a many-relation off a many-load errors at type-check.
+// Delete by predicate.
+await db.orm.User.where({ id }).delete();
 
-## ORM workflow — writes
-
-```typescript
-// Insert
-const user = await db.orm.User.create({ email: 'alice@example.com' });
-// Returns the inserted row.
-
-// Update by primary key
-await db.orm.User.update({ id: 42 }, { email: 'alice+new@example.com' });
-
-// Update many
+// Upsert — typed by the create branch's shape.
 await db.orm.User
-  .where(u => u.role.eq('USER'))
-  .update({ role: 'GUEST' });
-
-// Delete by primary key
-await db.orm.User.delete({ id: 42 });
-
-// Delete many
-await db.orm.User.where(u => u.deletedAt.isNotNull()).deleteMany();
+  .select('id', 'email', 'kind', 'createdAt')
+  .upsert({
+    create: { id, email, displayName, kind, createdAt: new Date() },
+    update: { email, displayName, kind },
+  });
 ```
 
-### `returning()` (capability-gated)
+The ORM returns inserted / updated rows by default. The `.returning(...)` selector lives on the SQL builder (next section), where you build a plan and execute it explicitly.
 
-Postgres supports `RETURNING` on writes; enable to get a typed result back from updates / deletes without a second query.
+## Workflow — Aggregates
 
 ```typescript
-// prisma-next.config.ts
-capabilities: { returning: true }
+const totals = await db.orm.User.aggregate((aggregate) => ({
+  totalUsers: aggregate.count(),
+}));
+
+const adminTotals = await db.orm.User
+  .where({ kind: 'admin' })
+  .aggregate((aggregate) => ({
+    adminUsers: aggregate.count(),
+  }));
+
+// Group-by + aggregate.
+const byKind = await db.orm.User
+  .groupBy('kind')
+  .having((having) => having.count().gte(minUsers))
+  .aggregate((aggregate) => ({
+    totalUsers: aggregate.count(),
+  }));
 ```
 
-Then:
+`aggregate` exposes `.count()`, `.sum(field)`, `.avg(field)`, `.min(field)`, `.max(field)`. Project the aggregates into named result keys; the result type narrows accordingly.
 
-```typescript
-const updated = await db.orm.User
-  .where(u => u.role.eq('USER'))
-  .update({ role: 'GUEST' })
-  .returning('id', 'email');
-// → Array<{ id: number; email: string }>
-```
+## Workflow — SQL builder (`db.sql.<table>`)
 
-## SQL DSL workflow — `db.sql`
-
-```typescript
-const tables = db.schema.tables;
-
-const plan = db.sql
-  .from(tables.user)
-  .select({
-    id: tables.user.columns.id,
-    email: tables.user.columns.email,
-  })
-  .where(tables.user.columns.role.eq('ADMIN'))
-  .orderBy(tables.user.columns.createdAt.desc())
-  .limit(10)
-  .build();
-
-const rows = await db.execute(plan);
-```
-
-Use the DSL when the ORM is too high-level — explicit JOIN, set operations, window functions, raw expressions, or when you need column-level control over projection.
-
-### JOIN
-
-```typescript
-db.sql
-  .from(tables.user)
-  .innerJoin(tables.post, tables.post.columns.authorId.eq(tables.user.columns.id))
-  .select({
-    userEmail: tables.user.columns.email,
-    postTitle: tables.post.columns.title,
-  })
-  .build();
-```
-
-## Raw SQL with annotations
+The concept: `db.sql.<table>` is a table-shaped builder that produces a *plan*. The plan is a serialisable description of the query (AST + parameters); you execute it through the runtime with `db.runtime().execute(plan)`. The builder gives you the lanes the ORM doesn't express — explicit `JOIN`, arbitrary expression projection, target-specific operations through extension helpers — without dropping to raw SQL.
 
 ```typescript
 import { db } from './prisma/db';
 
-const rows = await db.sql.raw<{ id: number; email: string }>`
-  SELECT id, email FROM "user" WHERE role = ${'ADMIN'}
-`;
-// Returns Array<{ id: number; email: string }>
+// Select with predicate and limit.
+const plan = db.sql.post
+  .select('id', 'title', 'userId', 'createdAt')
+  .where((f, fns) => fns.eq(f.userId, userId))
+  .limit(limit)
+  .build();
+
+const rows = await db.runtime().execute(plan);
 ```
 
-Parameters in `${...}` are bound (not interpolated as text). The type parameter annotates the row shape. Always parameterize; never interpolate user input into the SQL string.
+The `.where(...)` callback receives `(fields, fns)` — `fields` is the field proxy (column references), `fns` is the operator namespace (`fns.eq`, `fns.ne`, `fns.gt`, …). Extensions inject extension-shaped helpers into the same `fns` namespace (`fns.distanceSphere`, `fns.cosineDistance`, etc.).
 
-## TypedSQL — author a `.sql` file
-
-```sql
--- src/queries/active-users.sql
--- @param days Int
--- @returns { id: Int, email: String }
-SELECT id, email
-FROM "user"
-WHERE "lastSeen" > NOW() - INTERVAL ':days days';
-```
-
-PN compiles `active-users.sql` into a typed callable at emit time:
+### `INSERT` / `UPDATE` / `DELETE` with `RETURNING`
 
 ```typescript
-import { activeUsers } from './queries/active-users.generated';
+// Insert and return selected columns.
+const plan = db.sql.user
+  .insert({ email })
+  .returning('id', 'email')
+  .build();
+const [row] = await db.runtime().execute(plan);
 
-const rows = await activeUsers(db, { days: 7 });
-// → Array<{ id: number; email: string }>
+// Update with predicate and returning.
+const updatePlan = db.sql.user
+  .update({ email: newEmail })
+  .where((f, fns) => fns.eq(f.id, userId))
+  .returning('id', 'email')
+  .build();
+const rows = await db.runtime().execute(updatePlan);
+
+// Delete with predicate.
+const deletePlan = db.sql.user
+  .delete()
+  .where((f, fns) => fns.eq(f.id, userId))
+  .build();
+await db.runtime().execute(deletePlan);
 ```
 
-Use for queries you'd otherwise write as raw SQL but want type checked end-to-end.
+`.returning(...)` requires the target adapter to advertise the `returning` capability. The Postgres adapter advertises it by default.
 
-## Transactions
+### Computed projections and joins
+
+```typescript
+// Project a computed expression alongside model fields.
+const plan = db.sql.cafe
+  .select('id', 'name')
+  .select('meters', (f, fns) => fns.distanceSphere(f.location, point))
+  .orderBy((f, fns) => fns.distanceSphere(f.location, point), { direction: 'asc' })
+  .orderBy((f) => f.id, { direction: 'asc' })
+  .limit(limit)
+  .build();
+const rows = await db.runtime().execute(plan);
+
+// Self-join with an alias.
+db.sql.post
+  .innerJoin(db.sql.post.as('p2'), (f, fns) => fns.ne(f.p1.userId, f.p2.userId))
+  // ...
+  .build();
+```
+
+## Workflow — Transactions
+
+The concept: `db.transaction(fn)` opens a transaction and passes a `tx` context to the callback. `tx.orm` and `tx.sql` mirror `db.orm` / `db.sql` but ride the same transaction; `tx.execute(plan)` executes a SQL-builder plan within it. The transaction commits on the callback's successful return and rolls back on any thrown error.
 
 ```typescript
 await db.transaction(async (tx) => {
-  const user = await tx.orm.User.create({ email: 'bob@example.com' });
-  await tx.orm.Post.create({ authorId: user.id, title: 'hello' });
-  // If any throw, both insert ops roll back.
+  const user = await tx.orm.User.create({ id, email });
+  await tx.orm.Post.create({ userId: user.id, title: 'hello' });
+
+  // SQL-builder plan inside the transaction.
+  const plan = tx.sql.post.update({ status: 'archived' })
+    .where((f, fns) => fns.lt(f.createdAt, cutoff))
+    .build();
+  await tx.execute(plan);
+
+  // If anything throws, all three operations roll back.
 });
 ```
 
-- `tx` exposes the same `orm`, `sql`, `execute` surfaces as `db`.
-- The transaction commits on the callback's successful return.
-- Any thrown error rolls back.
-
-## Custom ORM collections
-
-Add domain helpers without leaving the ORM surface:
-
-```typescript
-// src/orm-extensions/post-helpers.ts
-import { db } from '../prisma/db';
-
-export const PostHelpers = {
-  published: () =>
-    db.orm.Post.where(p => p.status.eq('published')),
-
-  byAuthor: (authorId: number) =>
-    db.orm.Post.where(p => p.authorId.eq(authorId)),
-};
-
-// Usage
-const recent = await PostHelpers.published()
-  .orderBy(p => p.createdAt.desc())
-  .take(20)
-  .all();
-```
-
-PN doesn't have ActiveRecord-style scopes built in; this pattern is the idiomatic substitute.
-
-## Streaming large result sets
-
-For result sets too large to materialize:
-
-```typescript
-const cursor = db.sql
-  .from(tables.event)
-  .select(tables.event.columns.payload)
-  .orderBy(tables.event.columns.id.asc())
-  .stream();
-
-for await (const row of cursor) {
-  process(row.payload);
-}
-```
-
-Not all targets support streaming uniformly; PN exposes it where the underlying driver does (Postgres: yes; Mongo: yes via cursors).
+The callback's return value passes through `db.transaction(...)`. Capture inserted ids out of the callback and use them downstream after commit.
 
 ## Common Pitfalls
 
-1. **Reaching for raw SQL too soon.** The ORM covers most cases; the DSL covers most of the rest. Raw SQL bypasses type safety; use it as a last resort.
-2. **Using `.all()` when you wanted one row.** Returns every row without a LIMIT. Use `.first()` or `.first({ pk })`.
-3. **Forgetting to enable a capability before using it.** `returning()`, `includeMany`, and other capability-gated features error at type-check if the capability isn't on. Enable in `prisma-next.config.ts`.
-4. **Interpolating user input into a raw SQL string.** SQL injection. Always use the `${...}` template-tag binding.
-5. **Using the ORM through `db.execute(...)`** — the ORM returns its results when you call `.all()` / `.first()` / etc.; you don't pass the builder to `db.execute()` separately (that's for SQL DSL plans).
+1. **Reaching for `db.sql` when `db.orm` would have done.** The ORM covers most CRUD shapes; the SQL builder is the seam for the shapes it doesn't. Default to the ORM.
+2. **Using `.all()` when you wanted one row.** `.all()` issues no implicit `LIMIT`. Use `.first()` (issues `LIMIT 1`) or `.first({ pk })`.
+3. **Importing `and` / `or` / `not` from a façade subpath.** The combinators currently live in `@prisma-next/sql-orm-client` — an internal package. See *What Prisma Next doesn't do yet*.
+4. **Trying to `db.sql.from(tables.user)`.** That surface does not exist. The builder is table-shaped: `db.sql.<tableName>.select(...)`. There is no `db.schema.tables` either.
+5. **Trying to `db.execute(plan)` directly.** Plans execute through the runtime: `db.runtime().execute(plan)`. Inside a transaction, use `tx.execute(plan)`.
+6. **Setting `capabilities: { includeMany: true }` in `prisma-next.config.ts`.** `defineConfig` does not take `capabilities`. Capabilities are declared by the active adapter and become part of the emitted contract; the Postgres adapter advertises `lateral`, `jsonAgg`, and `returning` out of the box. Enable extension capabilities through `extensions: [...]` in the config (see `prisma-next-contract`).
+7. **Confabulating a `db.sql.raw\`...\``, TypedSQL, or `.stream()` surface.** None of those exist today. See *What Prisma Next doesn't do yet*.
+8. **Mixing the ORM mutation return with `db.execute(plan)`.** The ORM's terminal verbs (`.create`, `.update`, `.delete`, `.first`, `.all`, `.aggregate`) issue the query themselves and return rows. Don't pass the builder to `db.runtime().execute(...)` — that's for SQL-builder plans.
 
 ## What Prisma Next doesn't do yet
 
-- **`EXPLAIN` / query plan inspection.** Prisma Next doesn't expose an `.explain()` method. Workaround: `db.sql.raw\`EXPLAIN ANALYZE ${someQuery}\``. If you need first-class plan inspection, file a feature request: file a feature request via the `prisma-next-feedback` skill.
-- **Prepared statements as a user-facing surface.** PN's adapters prepare under the hood for parameterized queries, but you can't pre-prepare a statement and re-execute by name. Workaround: use TypedSQL (which compiles to a typed callable) or the raw lane. If you need first-class prepared statements, file a feature request via the `prisma-next-feedback` skill.
-- **`db.batch()` / multi-statement batching.** Prisma Next runs each call sequentially. Workaround: wrap in a transaction (`db.transaction`), or use raw SQL with a `;`-separated statement set. If you need Prisma-7-style `db.$transaction([call1, call2])` batching, file a feature request: file a feature request via the `prisma-next-feedback` skill.
-- **Automatic N+1 detection.** Prisma Next does not warn when an `.include()` is missing. Workaround: be deliberate about includes in code review; the capability-gated `includeMany` is the manual approach for explicit many-load chains. If you need automatic N+1 warnings, file a feature request via the `prisma-next-feedback` skill.
+- **`and` / `or` / `not` combinators in the postgres façade.** The combinators currently import from `@prisma-next/sql-orm-client` (an internal package). Tracked alongside other façade-completeness gaps in Linear `TML-2526`. Workaround today: import them from `@prisma-next/sql-orm-client` directly, the way the example apps do. If you want them on `@prisma-next/postgres/runtime`, file a feature request via `prisma-next-feedback`.
+- **A raw-SQL lane.** Prisma Next does not currently expose a user-facing raw-SQL surface (no `db.sql.raw\`SELECT ...\``). Workaround: model the query through the SQL builder or — for shapes the builder can't yet express — file a feature request via `prisma-next-feedback` describing the shape so the team can decide whether to grow the builder or ship a raw lane.
+- **TypedSQL (`.sql` files compiled into typed callables).** Not implemented. Workaround: stick to the SQL builder; for repeated queries, extract a function that returns the built plan and call `db.runtime().execute(plan)` at the call site. If you want a `.sql`-file compile path, file a feature request via `prisma-next-feedback`.
+- **`EXPLAIN` / query-plan inspection.** Prisma Next does not expose an `.explain()` method. Workaround: connect a `pg.Pool` you control via the runtime's `pg:` binding (see `prisma-next-runtime`) and issue `EXPLAIN ANALYZE` through it. If you want a first-class plan-inspection surface, file a feature request via `prisma-next-feedback`.
+- **Streaming large result sets.** No `.stream()` cursor today. Workaround: paginate via `.skip(n).take(m)` for moderate sizes; for very large sets, hold a `pg.Client` from the runtime's `pg:` binding and stream through it directly. If you want a built-in streaming surface, file a feature request via `prisma-next-feedback`.
+- **Multi-statement batching (Prisma-7-style `db.$transaction([call1, call2])`).** Prisma Next runs each call sequentially. Workaround: wrap atomically-related work in `db.transaction(async (tx) => { ... })`. If you want batch-as-array semantics, file a feature request via `prisma-next-feedback`.
+- **Automatic N+1 detection.** Prisma Next does not warn when an `.include(...)` is missing. Workaround: be deliberate about `.include(...)` in code review; the `lints` middleware (see `prisma-next-runtime`) catches the more common authoring slips (missing `WHERE` on a `DELETE` / `UPDATE`, missing `LIMIT` on a `SELECT`).
 
 ## Reference Files
 
-- `references/orm-api.md` — full ORM client API (`.where`, `.select`, `.orderBy`, `.include`, mutations).
-- `references/sql-dsl-api.md` — SQL query builder.
-- `references/typed-sql.md` — TypedSQL annotations + compile flow.
-- `references/predicate-operators.md` — every `.<op>` predicate operators support.
-- `references/capability-gates.md` — list of capability-gated features and how to enable them.
+This skill is intentionally body-only. The authoritative surfaces are:
+
+- The example queries under [`examples/prisma-next-demo/src/orm-client/`](https://github.com/prisma/prisma-next/tree/main/examples/prisma-next-demo/src/orm-client) and [`examples/prisma-next-demo/src/queries/`](https://github.com/prisma/prisma-next/tree/main/examples/prisma-next-demo/src/queries) — the canonical worked references for ORM and SQL-builder shapes respectively.
+- The ORM client source under `packages/3-extensions/sql-orm-client/src/` for the full collection method surface.
+- The SQL builder source under `packages/2-sql/4-lanes/sql-builder/src/` for the builder method surface.
 
 ## Checklist
 
-- [ ] Chose the right query interface (ORM first; DSL when ORM is too high-level; raw SQL last).
+- [ ] Chose the right lane (ORM by default; SQL builder for set-builder shapes the ORM doesn't express).
 - [ ] Used `.first()` / `.first({ pk })` for single-row reads — not `.all()`.
-- [ ] Parameterized any raw SQL (no string interpolation of user input).
-- [ ] Enabled capabilities (`returning`, `includeMany`) in `prisma-next.config.ts` if needed.
-- [ ] Wrapped multi-statement work in a transaction where atomicity matters.
-- [ ] Did NOT confabulate `EXPLAIN`, `db.batch()`, or prepared statements — pointed at the capability-gap section instead.
-- [ ] Did NOT use raw SQL for something the ORM or DSL covers.
+- [ ] For ORM combinators, imported `and` / `or` / `not` from the (currently internal) `@prisma-next/sql-orm-client` and noted the gap to the user.
+- [ ] Executed SQL-builder plans via `db.runtime().execute(plan)` (or `tx.execute(plan)` inside a transaction).
+- [ ] Wrapped multi-statement work in `db.transaction(async (tx) => { ... })` where atomicity matters.
+- [ ] Did NOT confabulate `db.sql.raw`, TypedSQL, `.stream()`, `db.batch`, a `capabilities` field on `defineConfig`, or a `db.sql.from(tables.user)` API — routed to *What Prisma Next doesn't do yet* / `prisma-next-feedback` instead.
+- [ ] Did NOT use the SQL builder for something the ORM cleanly expresses.
