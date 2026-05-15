@@ -7,10 +7,17 @@ Cross-runtime automation against a moving model surface is its own research proj
 ## How to run a journey test
 
 1. Check out the example app named at the top of the journey file.
-2. Install the skill at the project level:
+2. Install the skill at the project level. The path below is monorepo-relative, so this command must be run **from the `prisma-next` repo root** (not from the example app):
 
    ```bash
+   # from the prisma-next repo root
    npx skills add file:packages/0-shared/agent-skill/
+   ```
+
+   Or, once `@prisma-next/agent-skill` is published to npm, install from anywhere by package name:
+
+   ```bash
+   npx skills add @prisma-next/agent-skill
    ```
 
 3. Open the project in your agent's IDE (or attach the agent via its CLI).
@@ -32,7 +39,6 @@ Cross-runtime automation against a moving model surface is its own research proj
 | [`02g-diamond-convergence.md`](02g-diamond-convergence.md) | migration-review, migrations | AC5g |
 | [`02h-query-interface.md`](02h-query-interface.md) | queries | AC5h |
 | [`03-capability-gaps.md`](03-capability-gaps.md) | contract, migrations, queries, build, debug, feedback | AC6 |
-| [`04-aggregate-contract.md`](04-aggregate-contract.md) | contract, runtime | AC9 |
 | [`05-build-vite.md`](05-build-vite.md) | build | AC8b |
 | [`05b-build-nextjs-gap.md`](05b-build-nextjs-gap.md) | build, feedback | AC8b (Next.js path) |
 | [`06-feedback-bug.md`](06-feedback-bug.md) | feedback | AC8c (bug path) |
