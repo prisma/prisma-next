@@ -25,7 +25,7 @@ Test types and the ACs each covers:
   - `prisma-next-check-pins` running against an in-repo extension's `package.json` after the m5 migration. Covers AC25 transitively (the same exact-pin shape).
 
 - **Manual / inspection.**
-  - Existence of placeholder `instructions.md` at `packages/0-shared/upgrade-skill/upgrades/0.6-to-0.7/` and `packages/0-shared/extension-upgrade-skill/upgrades/0.6-to-0.7/`. Covers AC28.
+  - Existence of placeholder `instructions.md` at `packages/0-shared/upgrade-skill/upgrades/0.7-to-0.8/` and `packages/0-shared/extension-upgrade-skill/upgrades/0.7-to-0.8/`. Covers AC28.
   - Inspection of `packages/0-shared/upgrade-skill/SKILL.md` for pre-flight prose. Covers AC22.
   - Inspection of both skill `package.json` files for cross-dep absence. Covers AC23.
 
@@ -57,12 +57,12 @@ Each milestone's gate is named explicitly below.
   - `package.json` declaring `name: "@prisma-next/upgrade-skill"`, `version: "0.7.0"`, `type: "module"`, `private: false`, `publishConfig: { access: "public", provenance: true }`, no `dependencies`, no `peerDependencies`, `files: ["SKILL.md", "upgrades", "README.md"]`.
   - `SKILL.md` carrying FR3 entry-point content + FR16 Step 0 ensure-latest + FR17 version detection + FR18 transition chain + FR19 role detection (user) + FR20 per-step flow + FR27 SKILL.md-prose pre-flight (covers AC22).
   - `README.md` (consumer-facing summary; references CLI install via `npx skills add`).
-  - `upgrades/0.6-to-0.7/instructions.md` placeholder with frontmatter `from: "0.6"`, `to: "0.7"`, `changes: []`. Empty body. (Covers AC28.)
+  - `upgrades/0.7-to-0.8/instructions.md` placeholder with frontmatter `from: "0.7"`, `to: "0.8"`, `changes: []`. Empty body. (Covers AC28.)
 - **m1.2.** Create `packages/0-shared/extension-upgrade-skill/` with:
   - `package.json` declaring `name: "@prisma-next/extension-upgrade-skill"`, `version: "0.7.0"`, `type: "module"`, `private: false`, `publishConfig: { access: "public", provenance: true }`, `bin: { "prisma-next-check-pins": "./bin/prisma-next-check-pins.mjs" }`, no `dependencies`, no `peerDependencies`, `files: ["SKILL.md", "upgrades", "bin", "README.md"]`.
   - `SKILL.md` carrying FR3 entry-point content + Step 0 ensure-latest + FR17 version detection + FR18 transition chain + FR19 role detection (extension-author) + FR20 per-step flow including `pnpm exec prisma-next-check-pins` after the bump step.
   - `README.md`.
-  - `upgrades/0.6-to-0.7/instructions.md` placeholder with empty `changes: []`.
+  - `upgrades/0.7-to-0.8/instructions.md` placeholder with empty `changes: []`.
   - `bin/prisma-next-check-pins.mjs` stub that exits 0 with no output (real implementation lands in m2).
 - **m1.3.** Add the two packages to the workspace via `pnpm-workspace.yaml` if it doesn't already cover `packages/0-shared/*`. (Spot-check: read `pnpm-workspace.yaml` for the `packages/0-shared/*` glob; if absent, add it alongside `packages/0-config/*`.)
 - **m1.4.** Confirm the new tier `0-shared` is consistent with `architecture.config.json`'s pattern of unregistered tiers (per `0-config` precedent). If `dependency-cruiser.config.mjs` enumerates tiers explicitly, ensure `0-shared` is either treated identically to `0-config` or has its own no-incoming/no-outgoing rule.
