@@ -27,7 +27,7 @@ This skill is about *reviewing* migrations, not authoring them. It covers the qu
 
 - **Migration ref**: a named pointer to an environment's expected state. Stored in `migrations/refs.json`. Each ref records: the env name (e.g. `staging`), the `DATABASE_URL` env-var name (e.g. `STAGING_DATABASE_URL`), and the marker hash the env is currently at.
 - **From / to hash**: every migration carries a "from" hash (the contract hash it migrates *from*) and a "to" hash (the contract hash it migrates *to*). Migrations chain through these hashes; the database's marker must match a migration's "from" hash for that migration to apply.
-- **Migration graph**: the DAG of migrations from each environment's current marker forward to the contract head. Linear in the common case; branches when concurrent topic branches each add a migration off the same parent.
+- **Migration graph**: the graph of migrations from each environment's current marker forward to the contract head. Linear in the common case; branches when concurrent topic branches each add a migration off the same parent.
 - **Diamond convergence**: two topic branches each add a migration off the same parent. The second to merge has to converge — either by pure rebase (if the schema deltas are compatible) or by re-planning.
 
 ## Workflow — "What's about to run on merge?"
