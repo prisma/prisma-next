@@ -79,7 +79,8 @@ export async function runProjectLevelSkillInstall(ctx: {
     throw errorInitSkillInstallFailed({
       skillInstallCommand: command,
       filesWritten: ctx.filesWritten,
-      cause: readChildStderr(err) || (err instanceof Error ? err.message : String(err)),
+      cause:
+        redactSecrets(readChildStderr(err)) || (err instanceof Error ? err.message : String(err)),
     });
   }
 }
@@ -104,7 +105,8 @@ export async function runUserLevelSkillInstall(ctx: {
     await exec(file, args, { cwd: ctx.baseDir });
     return { ok: true, command };
   } catch (err) {
-    const cause = readChildStderr(err) || (err instanceof Error ? err.message : String(err));
+    const cause =
+      redactSecrets(readChildStderr(err)) || (err instanceof Error ? err.message : String(err));
     return {
       ok: false,
       command,
@@ -123,6 +125,21 @@ function readChildStderr(err: unknown): string {
     return String((err as { stderr: string }).stderr ?? '');
   }
   return '';
+}
+
+/**
+ * Strips credentials from a `scheme://user:pass@host/...` URL anywhere
+ * in `stderr`. Package-manager stderr regularly contains credentialed
+ * registry URLs (private npm registries, GitHub Packages tokens), and
+ * those bubble into the structured `errorInitSkillInstallFailed`
+ * envelope plus user-level warnings — both of which end up in logs and
+ * CI output. Redact at the boundary so we never re-emit a secret.
+ *
+ * Exported for unit tests.
+ */
+export function redactSecrets(stderr: string): string {
+  if (!stderr) return stderr;
+  return stderr.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)([^/@\s]+)@/g, '$1***@');
 }
 
 // -------------------------------------------------------------------
@@ -216,8 +233,8 @@ export function writeMarker(state: InitMarkerState, path: string = markerFilePat
 // -------------------------------------------------------------------
 
 /**
- * The hand-rolled template's filesystem destination from before this
- * change. Removed on every `init --reinit` so an upgraded project
- * doesn't keep a stale skill stub.
+ * Hand-rolled skill stub path that init must not leave behind. Removed
+ * on every init run so a project's `.agents/skills/prisma-next/` does
+ * not shadow the published `@prisma-next/agent-skill` package.
  */
 export const LEGACY_SKILL_FILE = '.agents/skills/prisma-next/SKILL.md';

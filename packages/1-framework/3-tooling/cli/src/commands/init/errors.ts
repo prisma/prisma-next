@@ -258,7 +258,7 @@ export function errorInitSkillInstallFailed(options: {
     why: `\`${options.skillInstallCommand}\` exited with an error: ${options.cause}`,
     fix:
       'Either:\n' +
-      `  - Re-run \`prisma-next init --no-skill ${options.filesWritten.length > 0 ? '--reinit --force' : ''}\` to skip the skill install for this run, or\n` +
+      `  - Re-run \`prisma-next init --no-skill${options.filesWritten.length > 0 ? ' --force' : ''}\` to skip the skill install for this run, or\n` +
       `  - Fix the underlying issue (network, npm registry, \`npx skills\` on PATH) and install manually:\n      ${options.skillInstallCommand}`,
     docsUrl: 'https://prisma-next.dev/docs/cli/init#agent-skill',
     meta: {
