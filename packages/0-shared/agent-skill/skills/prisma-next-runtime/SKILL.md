@@ -201,7 +201,7 @@ If a project needs to switch its underlying target:
 
 ## Build-system / dev-server integration
 
-If you want contract artefacts to re-emit automatically while the dev server is running (instead of running `prisma-next contract emit` by hand each time the contract source changes), reach for the build-tool plugin from `prisma-next-build`:
+If you want contract artifacts to re-emit automatically while the dev server is running (instead of running `prisma-next contract emit` by hand each time the contract source changes), reach for the build-tool plugin from `prisma-next-build`:
 
 - **Vite**: install `@prisma-next/vite-plugin-contract-emit` and register `prismaVitePlugin('prisma-next.config.ts')` in `vite.config.ts`.
 - **Next.js, Webpack, esbuild, Rollup, Turbopack**: no first-party plugin yet — the workaround is a `prebuild` script that runs `prisma-next contract emit`. See `prisma-next-build` for the walkthrough.

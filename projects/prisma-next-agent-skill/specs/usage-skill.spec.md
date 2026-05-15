@@ -392,7 +392,7 @@ Each skill's content is bounded by the inventory below. *Bullets are workflows* 
   - Install [`@prisma-next/vite-plugin-contract-emit`](../../../packages/1-framework/3-tooling/vite-plugin-contract-emit/README.md) (Vite 7 or 8).
   - Wire `prismaVitePlugin('prisma-next.config.ts')` into `vite.config.ts`.
   - Configure the plugin: `debounceMs`, `logLevel` (`silent` / `info` / `debug`).
-  - Verify the dev loop: start the dev server, edit `schema.psl`, see the contract artefacts re-emit (success log line) without a manual command.
+  - Verify the dev loop: start the dev server, edit `schema.psl`, see the contract artifacts re-emit (success log line) without a manual command.
   - Recover when the plugin warns about config-only watching (the loader could not resolve `contract.source.inputs`).
   - Read an error overlay produced by an emit failure (PSL syntax, missing namespace, conflicting extensions); chain to `prisma-next-debug` for resolution.
   - Verify the published-pair invariant (`contract.d.ts` renamed before `contract.json`) is happening — the user does not need to do anything beyond letting the plugin run.
@@ -539,7 +539,7 @@ Each skill's content is bounded by the inventory below. *Bullets are workflows* 
 - **AC8b. `prisma-next-build` covers the Vite plugin end-to-end.** An agent with the skill installed, given a fresh Vite + React project that has run `prisma-next init` (project-level skill installed), receives the prompt *"set up automatic contract emission during `vite dev`"* and:
   - Installs `@prisma-next/vite-plugin-contract-emit` as a devDependency.
   - Edits `vite.config.ts` to register `prismaVitePlugin('prisma-next.config.ts')`.
-  - Starts `vite dev`, edits the contract source, and demonstrates that the contract artefacts regenerate without a manual `prisma-next contract emit` step.
+  - Starts `vite dev`, edits the contract source, and demonstrates that the contract artifacts regenerate without a manual `prisma-next contract emit` step.
 
   For the Next.js prompt — *"do the same in Next.js"* — the agent surfaces the *What PN doesn't do yet* entry (no first-party Next.js plugin yet), recommends the `prebuild` script workaround, and routes the user to `prisma-next-feedback` if they want the gap closed. Verified by running the journey test `journey-tests/05-build-vite.md` and `journey-tests/05b-build-nextjs-gap.md`. Covers FR18b.
 

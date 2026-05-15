@@ -7,7 +7,7 @@ description: Wire Prisma Next into the project's build system with the right bui
 
 > **Edit your data contract. Prisma handles the rest.**
 
-This skill covers Prisma Next's build-tool plugins — the dev-server / build-system integrations that re-emit contract artefacts automatically as the user edits the contract source. Today that's [`@prisma-next/vite-plugin-contract-emit`](https://github.com/prisma/prisma-next/blob/main/packages/1-framework/3-tooling/vite-plugin-contract-emit/README.md) for Vite 7 and Vite 8. Next.js, Webpack, esbuild, Rollup, and Turbopack plugins do not exist yet and are documented honestly under *What Prisma Next doesn't do yet*.
+This skill covers Prisma Next's build-tool plugins — the dev-server / build-system integrations that re-emit contract artifacts automatically as the user edits the contract source. Today that's [`@prisma-next/vite-plugin-contract-emit`](https://github.com/prisma/prisma-next/blob/main/packages/1-framework/3-tooling/vite-plugin-contract-emit/README.md) for Vite 7 and Vite 8. Next.js, Webpack, esbuild, Rollup, and Turbopack plugins do not exist yet and are documented honestly under *What Prisma Next doesn't do yet*.
 
 ## When to Use
 

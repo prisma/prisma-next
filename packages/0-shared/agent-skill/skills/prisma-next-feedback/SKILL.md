@@ -32,7 +32,7 @@ Canonical channels:
 ## Key Concepts
 
 - **Three channels, one decision.** GitHub Issues (bugs + concrete feature requests), Prisma Discord (Q&A, design feedback, direct team contact), or another in-cluster skill (when the question turns out to be a workflow question, not a hand-off-to-team question). The skill's first move is the channel decision; everything else follows.
-- **Public artefact.** GitHub issues *and* Discord messages are world-readable and archived. The body / message must not contain `DATABASE_URL` strings, internal company schema fragments, customer data in sample rows, or any other content the user wouldn't share publicly. The agent redacts before either kind of submission.
+- **Public artifact.** GitHub issues *and* Discord messages are world-readable and archived. The body / message must not contain `DATABASE_URL` strings, internal company schema fragments, customer data in sample rows, or any other content the user wouldn't share publicly. The agent redacts before either kind of submission.
 - **Bug vs feature vs question.** A *bug* is "documented surface behaved unexpectedly". A *feature request* is "I want a capability that doesn't exist". A *question* is "I want to discuss X with someone, or I'm not sure this is a bug at all". Many capability-gap routes are feature requests; many extension-author prompts are questions.
 - **The framework team needs to reproduce (issues only).** A bug report without a reproduction is much harder to act on. Where possible, the agent produces a minimal repro the team can re-run locally — ideally a small change against [`examples/prisma-next-demo`](https://github.com/prisma/prisma-next/tree/main/examples/prisma-next-demo), which the team already has checked out. Discord Q&A doesn't require a full repro — a short code snippet plus the question is usually enough.
 
@@ -70,7 +70,7 @@ The user is filing a GitHub issue. Is it a bug or a feature request?
 - The `fix` field of an error envelope was misleading or wrong.
 - A published TypeScript signature doesn't match runtime behaviour.
 - The planner refused a migration that should have been valid (or accepted one that shouldn't have been).
-- The contract emit produced an artefact that doesn't load at runtime.
+- The contract emit produced an artifact that doesn't load at runtime.
 - Any other case where the documented surface did the wrong thing.
 
 **Feature request** if any of:
@@ -107,7 +107,7 @@ For **feature requests**, additionally:
 
 ### 3. Render the body
 
-The repository may or may not yet have GitHub Issue Forms (`.github/ISSUE_TEMPLATE/*.yml`). The skill produces the body in the following structured shape regardless — when the forms exist, the fields map onto them cleanly; when they don't, the structured shape gives the framework team a parseable artefact.
+The repository may or may not yet have GitHub Issue Forms (`.github/ISSUE_TEMPLATE/*.yml`). The skill produces the body in the following structured shape regardless — when the forms exist, the fields map onto them cleanly; when they don't, the structured shape gives the framework team a parseable artifact.
 
 ```markdown
 ## Summary
@@ -216,7 +216,7 @@ When step 1 picked the Discord channel:
 
 ## Common Pitfalls
 
-1. **Auto-submitting without confirmation.** Always show the body first. The user owns the public-facing artefact, not the agent.
+1. **Auto-submitting without confirmation.** Always show the body first. The user owns the public-facing artifact, not the agent.
 2. **Pasting `DATABASE_URL` or other secrets into the body.** `redact` aggressively. Replace with `postgresql://USER:PASS@HOST/DB` placeholders.
 3. **Pasting a customer's domain schema.** Rename models and fields to neutral names before the body goes into a public issue.
 4. **Filing a documentation question as a bug.** Documentation questions belong in another skill or in a GitHub Discussion (if the repo enables them). Bugs are about the surface misbehaving.
