@@ -15,9 +15,6 @@ import type { JsonObject } from '@prisma-next/utils/json';
  * Implementers compose this SPI as a named property on their target
  * descriptor (`descriptor.contractSerializer`); the descriptor itself
  * remains the aggregator of all per-target SPIs.
- *
- * Test stub: see `createIdentityContractSerializer` for tests that don't
- * exercise serialization.
  */
 export interface ContractSerializer<TContract> {
   /**
@@ -37,20 +34,4 @@ export interface ContractSerializer<TContract> {
    * fields, normalizing numeric encodings) do that work here.
    */
   serializeContract(contract: TContract): JsonObject;
-}
-
-/**
- * Identity-function `ContractSerializer` for tests that don't exercise
- * serialization. Construct contracts in test code as plain objects, satisfy
- * the SPI shape, and reach for a real target descriptor's serializer when
- * a test actually walks the JSON ⇄ class-hierarchy boundary.
- */
-export function createIdentityContractSerializer<TContract>(): ContractSerializer<TContract> {
-  return {
-    deserializeContract: (json: unknown): TContract => json as TContract,
-    // Most targets' contract class fields are JSON-clean by construction —
-    // the cast asserts that and is the same shape the family abstract
-    // bases use as the default `serializeContract` implementation.
-    serializeContract: (contract: TContract): JsonObject => contract as unknown as JsonObject,
-  };
 }

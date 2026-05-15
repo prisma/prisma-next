@@ -1,6 +1,5 @@
 export type { ImportRequirement } from '@prisma-next/ts-render';
 export type { ContractSerializer } from '../control/contract-serializer';
-export { createIdentityContractSerializer } from '../control/contract-serializer';
 export type {
   MigratableTargetDescriptor,
   OperationPreviewCapable,
