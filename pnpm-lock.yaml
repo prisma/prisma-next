@@ -232,6 +232,9 @@ importers:
       '@prisma-next/middleware-cache':
         specifier: workspace:0.7.0
         version: link:../../packages/3-extensions/middleware-cache
+      '@prisma-next/mongo':
+        specifier: workspace:0.7.0
+        version: link:../../packages/3-extensions/mongo
       '@prisma-next/mongo-contract':
         specifier: workspace:0.7.0
         version: link:../../packages/2-mongo-family/1-foundation/mongo-contract
@@ -332,6 +335,9 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:0.7.0
         version: link:../../packages/1-framework/3-tooling/migration
+      '@prisma-next/postgres':
+        specifier: workspace:0.7.0
+        version: link:../../packages/3-extensions/postgres
       '@prisma-next/sql-contract':
         specifier: workspace:0.7.0
         version: link:../../packages/2-sql/1-core/contract
@@ -948,6 +954,9 @@ importers:
       '@prisma-next/driver-mongo':
         specifier: workspace:0.7.0
         version: link:../../packages/3-mongo-target/3-mongo-driver
+      '@prisma-next/mongo':
+        specifier: workspace:0.7.0
+        version: link:../../packages/3-extensions/mongo
       '@prisma-next/mongo-contract':
         specifier: workspace:0.7.0
         version: link:../../packages/2-mongo-family/1-foundation/mongo-contract

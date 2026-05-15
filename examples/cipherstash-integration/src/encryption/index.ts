@@ -10,7 +10,7 @@
  *
  * Schema parity: every encrypted column declared here must mirror the SQL
  * column the framework hits at query time. The example app maps
- * `User.email` to the `users.email` column (see `prisma/schema.prisma`'s
+ * `User.email` to the `users.email` column (see `src/prisma/contract.prisma`'s
  * `@@map("users")`); if that mapping changes, keep this file in sync.
  *
  * Required env vars (see `.env.example`):
@@ -27,7 +27,7 @@ import { Encryption } from '@cipherstash/stack';
 import type { EncryptionClient } from '@cipherstash/stack/client';
 import { encryptedColumn, encryptedTable } from '@cipherstash/stack/schema';
 
-// Per-column search-config matches `prisma/schema.prisma`. The PSL
+// Per-column search-config matches `src/prisma/contract.prisma`. The PSL
 // constructors default every search-index flag to `true`, so the
 // stack-side schema below mirrors the maximal index surface for each
 // codec id. Mismatches here surface at runtime as ZeroKMS rejecting
@@ -40,7 +40,7 @@ import { encryptedColumn, encryptedTable } from '@cipherstash/stack/schema';
 // observed during lowering, which already collapses through
 // `@map(...)` to the physical SQL column. Keeping the stack schema
 // keyed by physical names keeps the SDK lookup in `sdk.ts` a single
-// identity map. The `@map` redirections in `prisma/schema.prisma`
+// identity map. The `@map` redirections in `src/prisma/contract.prisma`
 // are a workaround for an EQL bundle camelCase quoting bug
 // (see `test/e2e/README.md`).
 export const users = encryptedTable('users', {
