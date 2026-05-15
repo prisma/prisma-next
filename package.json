@@ -32,7 +32,7 @@
     "lint:docs": "node scripts/validate-package-readmes.mjs",
     "lint:manifests": "node scripts/validate-package-manifests.mjs",
     "lint:workflows": "node scripts/lint-workflow-triggers.mjs",
-    "test:scripts": "node --test scripts/lint-workflow-triggers.test.mjs scripts/determine-version-utils.test.ts scripts/check-upgrade-coverage.test.mjs",
+    "test:scripts": "node --test scripts/lint-workflow-triggers.test.mjs scripts/determine-version-utils.test.ts scripts/check-upgrade-coverage.test.mjs scripts/set-version-utils.test.ts",
     "bump-minor": "node scripts/bump-minor.ts",
     "check:publish-deps": "node scripts/check-publish-deps.mjs",
     "check:upgrade-coverage": "node scripts/check-upgrade-coverage.mjs",
@@ -48,7 +48,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
-    "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:0.7.0",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "^4.0.17",
     "dependency-cruiser": "^16.3.3",
