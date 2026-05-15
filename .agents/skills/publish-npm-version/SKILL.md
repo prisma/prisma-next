@@ -82,7 +82,7 @@ If either precondition is unmet, stop and surface the issue. Do **not** try to a
 7. **Open the PR** with `gh pr create`. Use the title:
 
    ```
-   chore(release): bump to <version>
+   Bump to version <version>
    ```
 
    The body should:
