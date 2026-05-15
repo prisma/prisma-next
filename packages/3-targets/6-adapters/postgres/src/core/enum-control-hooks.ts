@@ -1,6 +1,18 @@
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
-import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { PG_ENUM_CODEC_ID } from '@prisma-next/target-postgres/codec-ids';
+
+/**
+ * Codec-typed annotation shape that the introspector writes under
+ * `schema.annotations.pg.storageTypes[<typeName>]`. Distinct from
+ * `StorageTypeInstance` because the introspector emits a plain literal
+ * (no class-instance API surface): only the fields downstream consumers
+ * actually read from the introspected envelope.
+ */
+export interface PostgresEnumStorageTypeAnnotation {
+  readonly codecId: typeof PG_ENUM_CODEC_ID;
+  readonly nativeType: string;
+  readonly typeParams: { readonly values: readonly string[] };
+}
 
 /**
  * Postgres enum introspection.
@@ -101,17 +113,16 @@ function parseArrayElements(input: string): string[] {
 
 /**
  * Reads enum types from the live Postgres schema and returns them in
- * the codec-typed `Record<string, StorageTypeInstance>` shape consumed
- * by `control-adapter.ts` (which writes them under
- * `schema.annotations.pg.storageTypes`).
+ * the codec-typed annotation shape consumed by `control-adapter.ts`
+ * (which writes them under `schema.annotations.pg.storageTypes`).
  */
 export async function introspectPostgresEnumTypes(options: {
   readonly driver: ControlDriverInstance<'sql', 'postgres'>;
   readonly schemaName?: string;
-}): Promise<Record<string, StorageTypeInstance>> {
+}): Promise<Record<string, PostgresEnumStorageTypeAnnotation>> {
   const namespace = options.schemaName ?? 'public';
   const result = await options.driver.query<EnumRow>(ENUM_INTROSPECT_QUERY, [namespace]);
-  const types: Record<string, StorageTypeInstance> = {};
+  const types: Record<string, PostgresEnumStorageTypeAnnotation> = {};
   for (const row of result.rows) {
     const values = parsePostgresArray(row.values);
     if (!values) {
