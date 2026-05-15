@@ -182,23 +182,19 @@ See `prisma-next-migrations` for the broader context.
 
 Symptom: `migration plan` produces a destructive plan you didn't expect. E.g. dropping + adding a column you intended to rename.
 
-Cause: the rename wasn't hinted. Fix in the contract:
+Cause: PN doesn't have an in-contract rename hint today. The planner sees a column drop and a column add as two unrelated operations.
 
-```prisma
-// Before:
-model User {
-  emailAddress String @unique
-}
+Recovery: hand-edit `migration.ts` so the destructive `DROP COLUMN` + `ADD COLUMN` becomes a `RENAME COLUMN`, then self-emit and apply:
 
-// After:
-model User {
-  emailAddress String @unique @hint(was: "email")
-}
+```bash
+# 1. Edit migrations/<dir>/migration.ts — replace the drop+add with a RENAME COLUMN op.
+node migrations/<dir>/migration.ts   # self-emit; ops.json is regenerated.
+pnpm prisma-next migration apply
 ```
 
-Re-emit, re-plan. The planner now sees the rename.
+See `prisma-next-migrations` for the hand-edit workflow and the two-migration "keep, backfill, drop" alternative for production. For other planner ambiguity (column-type changes, table splits), `migration show <name>` shows the proposed plan; hand-author the same way.
 
-For more complex planner ambiguity (column-type changes, table splits), use `migration show <name>` to inspect what's proposed and hand-author the migration if needed (see `prisma-next-migrations`).
+If you want a first-class in-contract rename hint, file a feature request via the `prisma-next-feedback` skill.
 
 ## How to ask for help
 

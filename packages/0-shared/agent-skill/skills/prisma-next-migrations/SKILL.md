@@ -206,7 +206,7 @@ When `db update` or `migration apply` proposes a destructive op (DROP COLUMN, DR
 2. **Skipping the data transform.** If a placeholder is left in, `apply` fails with a runtime error. Always fill placeholders and self-emit.
 3. **Editing `ops.json` directly.** It's the canonical artifact, not the source. Edit `migration.ts`, then self-emit.
 4. **Forgetting to self-emit after editing `migration.ts`.** The next `apply` either uses the stale `ops.json` or fails with `HASH_MISMATCH`. Always self-emit.
-5. **Renaming without `@hint(was: "...")` in the contract.** The migration plans a destructive drop+add. Add the hint in `prisma-next-contract` and re-emit.
+5. **Renaming and expecting the planner to detect it.** PN doesn't have an in-contract rename hint today; the planner emits a destructive drop+add. Hand-edit `migration.ts` to rewrite the destructive op as a `RENAME COLUMN` (or use the two-migration keep / backfill / drop pattern for production), then self-emit. See `prisma-next-contract` § *Edit a field — rename*.
 
 ## What Prisma Next doesn't do yet
 
