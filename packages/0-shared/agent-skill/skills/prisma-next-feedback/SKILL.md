@@ -93,7 +93,7 @@ For **bug reports**, additionally:
 
 - **The exact command** that misbehaved (e.g. `prisma-next migration plan --name add-email`).
 - **The full output**, with `-v` if a structured error envelope is involved. Redact `DATABASE_URL` and any other secrets.
-- **A minimal `schema.psl` / `prisma/contract.ts` excerpt** that reproduces the issue. Strip unrelated models. Rename customer domain concepts to neutral names (`User`, `Post`, `Tag`) before pasting.
+- **A minimal `schema.psl` / `prisma/contract.ts` excerpt** that reproduces the issue. Strip unrelated models. Keep the original model and field names from the user's contract when they don't expose anything compromising — a faithful excerpt is much easier for the framework team (and future readers of the issue) to reason about than a re-themed one. Only rename to neutral placeholders (`User`, `Post`, `Tag`) when the original names would leak confidential domain detail (product names, internal codenames, customer identifiers, regulated-data field names).
 - **Steps to reproduce**, as a numbered list.
 - **Expected behaviour** — one sentence.
 - **Actual behaviour** — one sentence plus the relevant output line.
@@ -218,7 +218,7 @@ When step 1 picked the Discord channel:
 
 1. **Auto-submitting without confirmation.** Always show the body first. The user owns the public-facing artifact, not the agent.
 2. **Pasting `DATABASE_URL` or other secrets into the body.** `redact` aggressively. Replace with `postgresql://USER:PASS@HOST/DB` placeholders.
-3. **Pasting a customer's domain schema.** Rename models and fields to neutral names before the body goes into a public issue.
+3. **Pasting a customer's confidential domain schema.** When original model and field names would leak confidential information (product codenames, customer identifiers, regulated-data fields), rename to neutral placeholders before the body goes into a public issue. Otherwise, keep the original names — a faithful excerpt is easier for the framework team to reason about than a re-themed one. Over-renaming is its own readability cost.
 4. **Filing a documentation question as a bug.** Documentation questions belong in another skill or in a GitHub Discussion (if the repo enables them). Bugs are about the surface misbehaving.
 5. **Conflating bug + feature in one issue.** File two. Mixed issues are hard to triage and hard to close.
 6. **Filing without a version.** "I'm using Prisma Next, it's broken" without the version makes triage hopeless. The version is the cheapest piece of context to capture; always include it.
@@ -239,7 +239,7 @@ When step 1 picked the Discord channel:
 - [ ] Classified as bug or feature request (not both in one issue).
 - [ ] Environment block present: PN version, Node, package manager, OS.
 - [ ] Reproduction is minimal, public-safe, secret-free.
-- [ ] Schema fragments renamed to neutral domain names.
+- [ ] Schema fragments use original names where safe; renamed to neutral placeholders only where original names would leak confidential domain detail.
 - [ ] Title in conventional-commit form (`bug(area): …` / `feat(area): …`).
 - [ ] Body shown to the user for confirmation before submission.
 - [ ] Submitted via `gh issue create` (preferred) or via the prefilled new-issue URL.
