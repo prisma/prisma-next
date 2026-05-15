@@ -6,6 +6,7 @@ import type {
 } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { IndexTypeRegistration } from '@prisma-next/sql-contract/index-types';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
   ContractWithTypeMaps,
   Index,
@@ -515,6 +516,7 @@ type BuiltStorage<Definition> = {
   readonly storageHash: StorageHashBase<string>;
   readonly tables: BuiltStorageTables<Definition>;
   readonly types: DefinitionTypes<Definition>;
+  readonly namespaces: Readonly<Record<string, Namespace>>;
 };
 
 type FieldOutputType<

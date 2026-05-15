@@ -1,11 +1,13 @@
 import { coreHash } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
 import { ColumnRef, IdentifierRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { tableToScope } from '../../src/runtime/builder-base';
 import { ExpressionImpl } from '../../src/runtime/expression-impl';
 import { createFieldProxy } from '../../src/runtime/field-proxy';
 import { joinedScope, usersScope } from './test-helpers';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 describe('createFieldProxy', () => {
   it('top-level field access produces IdentifierRef', () => {
@@ -82,6 +84,7 @@ describe('createFieldProxy', () => {
         },
       },
       storageHash: coreHash('sha256:h'),
+      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
     };
     const scope = tableToScope('post_alias', table, { storage, tableName: 'Post' });
     expect(scope.namespaces['post_alias']?.['embedding']?.codec).toEqual({

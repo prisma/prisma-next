@@ -1,5 +1,7 @@
 import { type Contract, profileHash, type StorageHashBase } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { verifySqlSchema } from '../src/core/schema-verify/verify-sql-schema';
 import {
@@ -63,6 +65,7 @@ describe('verifySqlSchema - basic', () => {
               foreignKeys: [],
             },
           },
+          namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
         },
         models: {},
         roots: {},
@@ -214,6 +217,7 @@ describe('verifySqlSchema - basic', () => {
               foreignKeys: [],
             },
           },
+          namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
         },
         models: {},
         roots: {},

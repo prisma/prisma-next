@@ -344,6 +344,11 @@
     }
   },
   "storage": {
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
     "storageHash": "sha256:ef60397fa7c54ebec35f413b333aff536c8236c28a97a179f3f6c120e5d167ac",
     "tables": {
       "comments": {

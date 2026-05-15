@@ -4,7 +4,7 @@ import type {
   CodecDescriptor,
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
-import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
@@ -52,7 +52,7 @@ function createParamTypesTestContract(
     profileHash: profileHash('sha256:test'),
     models: {},
     roots: {},
-    storage: {
+    storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
       tables: {
         test: {
@@ -66,7 +66,7 @@ function createParamTypesTestContract(
         },
       },
       ...ifDefined('types', options?.types),
-    },
+    }),
     extensionPacks: {},
     capabilities: {},
     meta: {},

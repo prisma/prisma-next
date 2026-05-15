@@ -43,6 +43,7 @@ export {
   SqlEnumType,
   SqlNode,
   SqlStorage,
+  SqlUnspecifiedNamespace,
   StorageColumn,
   StorageTable,
   StorageTypeInstance,

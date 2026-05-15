@@ -2,7 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
-import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
@@ -81,7 +81,7 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
       profileHash: profileHash('sha256:test'),
       models: {},
       roots: {},
-      storage: { storageHash: coreHash('sha256:test'), tables },
+      storage: new SqlStorage({ storageHash: coreHash('sha256:test'), tables }),
       extensionPacks: {},
       capabilities: {},
       meta: {},
@@ -185,7 +185,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
       };
     }
 
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: coreHash('sha256:test'),
       tables,
       ...ifDefined(
@@ -203,7 +203,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
             )
           : undefined,
       ),
-    };
+    });
 
     return {
       targetFamily: 'sql',
@@ -431,7 +431,7 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
       profileHash: profileHash('sha256:test'),
       models: {},
       roots: {},
-      storage: { storageHash: coreHash('sha256:test'), tables },
+      storage: new SqlStorage({ storageHash: coreHash('sha256:test'), tables }),
       extensionPacks: {},
       capabilities: {},
       meta: {},

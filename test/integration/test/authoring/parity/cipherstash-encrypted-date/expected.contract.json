@@ -43,7 +43,12 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:ad982d5a4b10e4a6fbf89b59f201fbe427b6c3eeb7a53a9dac0d80376e56d589",
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
+    "storageHash": "sha256:cae93135248039e274b6177d6483f95944ee6c2403b58becc8d35998f68629bb",
     "tables": {
       "user": {
         "columns": {

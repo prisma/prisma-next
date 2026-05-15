@@ -1,7 +1,13 @@
 import type { StorageHashBase } from '@prisma-next/contract/types';
-import { freezeNode } from '@prisma-next/framework-components/ir';
+import {
+  freezeNode,
+  type Namespace,
+  type Storage,
+  UNSPECIFIED_NAMESPACE_ID,
+} from '@prisma-next/framework-components/ir';
 import { SqlEnumType } from './sql-enum-type';
 import { SqlNode } from './sql-node';
+import { SqlUnspecifiedNamespace } from './sql-unspecified-namespace';
 import { StorageTable, type StorageTableInput } from './storage-table';
 import { StorageTypeInstance, type StorageTypeInstanceInput } from './storage-type-instance';
 
@@ -17,20 +23,33 @@ import { StorageTypeInstance, type StorageTypeInstanceInput } from './storage-ty
  */
 export type SqlStorageTypeEntry = SqlEnumType | StorageTypeInstance | StorageTypeInstanceInput;
 
+const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
+  [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance,
+});
+
 export interface SqlStorageInput<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
   readonly tables: Record<string, StorageTable | StorageTableInput>;
   readonly types?: Record<string, SqlStorageTypeEntry>;
+  readonly namespaces?: Readonly<Record<string, Namespace>>;
 }
 
 /**
  * SQL Contract IR root node for the `storage` field.
  *
  * Single concrete family-shared class — both Postgres and SQLite
- * consume this same class today. A future milestone introduces
- * per-target storage subclasses when each target's namespace shape
- * earns its target-specific concretion (target-specific derived
- * fields, target-specific storage extensions).
+ * consume this same class today. Per-target storage subclasses are
+ * introduced when each target's namespace shape earns its
+ * target-specific concretion (target-specific derived fields,
+ * target-specific storage extensions).
+ *
+ * Honours the framework `Storage` interface: every SQL IR carries a
+ * `namespaces` map keyed by namespace id. The default singleton
+ * (`{ [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance }`)
+ * binds every contract authored before per-target namespace concretions
+ * land; per-target namespace classes (`PostgresSchema.unspecified`,
+ * `SqliteUnspecifiedDatabase.instance`) earn their slots when each
+ * target's namespace shape lands.
  *
  * The constructor normalises nested IR-class fields (`tables`, optional
  * `types`) into class instances so downstream walks see a uniform AST.
@@ -41,9 +60,10 @@ export interface SqlStorageInput<THash extends string = string> {
  * the per-target serializer's responsibility (so the family base
  * does not import target-specific subclasses).
  */
-export class SqlStorage<THash extends string = string> extends SqlNode {
+export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
   readonly tables: Readonly<Record<string, StorageTable>>;
+  readonly namespaces: Readonly<Record<string, Namespace>>;
   declare readonly types?: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
 
   constructor(input: SqlStorageInput<THash>) {
@@ -57,6 +77,7 @@ export class SqlStorage<THash extends string = string> extends SqlNode {
         ]),
       ),
     );
+    this.namespaces = input.namespaces ?? DEFAULT_NAMESPACES;
     if (input.types !== undefined) {
       this.types = Object.freeze(
         Object.fromEntries(

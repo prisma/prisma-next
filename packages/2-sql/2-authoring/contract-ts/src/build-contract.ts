@@ -25,11 +25,13 @@ import {
 } from '@prisma-next/sql-contract/index-types';
 import {
   applyFkDefaults,
-  type SqlStorage,
+  SqlStorage,
+  SqlUnspecifiedNamespace,
   type StorageColumn,
   type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
@@ -391,11 +393,12 @@ export function buildSqlContractFromDefinition(
   const storageWithoutHash = {
     tables: storageTables,
     types: storageTypes,
+    namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
   };
   const storageHash: StorageHashBase<string> = definition.storageHash
     ? coreHash(definition.storageHash)
     : computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
-  const storage: SqlStorage = { ...storageWithoutHash, storageHash };
+  const storage = new SqlStorage({ ...storageWithoutHash, storageHash });
 
   const executionSection =
     executionDefaults.length > 0

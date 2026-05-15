@@ -2,7 +2,8 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import { extractQueryOperationTypeImports } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { SqlUnspecifiedNamespace, type SqlStorage } from '@prisma-next/sql-contract/types';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { describe, expect, it } from 'vitest';
 
@@ -13,7 +14,11 @@ describe('emitter + postgres adapter descriptor', () => {
       targetFamily: 'sql',
       roots: {},
       models: {},
-      storage: { storageHash: 'storage:sha256:test' as never, tables: {} },
+      storage: {
+        storageHash: 'storage:sha256:test' as never,
+        tables: {},
+        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      },
       capabilities: {},
       extensionPacks: {},
       profileHash: 'profile:sha256:test' as never,

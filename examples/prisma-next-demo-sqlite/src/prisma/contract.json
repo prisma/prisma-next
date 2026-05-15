@@ -145,6 +145,11 @@
     }
   },
   "storage": {
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
     "storageHash": "sha256:e24794a683382da0d74efb644461a150560e3fbde9cea38126586bab96bbdaad",
     "tables": {
       "post": {

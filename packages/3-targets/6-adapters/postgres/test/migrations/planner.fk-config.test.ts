@@ -2,9 +2,11 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { describe, expect, it } from 'vitest';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 function createFkTestContract(fkConfig: {
   constraint: boolean;
@@ -47,6 +49,7 @@ function createFkTestContract(fkConfig: {
           ],
         },
       },
+      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
     },
     roots: {},
     models: {},

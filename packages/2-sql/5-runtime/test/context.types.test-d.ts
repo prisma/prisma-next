@@ -29,6 +29,7 @@ type TestContract = Contract<
         readonly typeParams: { readonly length: 1536 };
       };
     };
+    readonly namespaces: { readonly __unspecified__: { readonly id: '__unspecified__' } };
   },
   Record<string, never>
 >;

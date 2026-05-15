@@ -12,7 +12,7 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import {
   applyFkDefaults,
   type ReferentialAction,
-  type SqlStorage,
+  SqlStorage,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type {
@@ -41,11 +41,11 @@ export function createTestContract(
     targetFamily: 'sql',
     roots: {},
     profileHash: profileHash('sha256:test'),
-    storage: {
+    storage: new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables,
       ...ifDefined('types', storageTypes),
-    },
+    }),
     models: {},
     capabilities: {},
     meta: {},

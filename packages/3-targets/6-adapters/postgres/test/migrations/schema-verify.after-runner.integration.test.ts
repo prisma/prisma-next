@@ -1,7 +1,7 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { PostgresEnumType } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -118,7 +118,7 @@ describe.sequential('Schema verification after runner - integration', () => {
         target: 'postgres',
         targetFamily: 'sql',
         profileHash: profileHash('sha256:test'),
-        storage: {
+        storage: new SqlStorage({
           storageHash: coreHash('sha256:contract-with-defaults'),
           tables: {
             user: {
@@ -143,7 +143,7 @@ describe.sequential('Schema verification after runner - integration', () => {
               foreignKeys: [],
             },
           },
-        },
+        }),
         roots: {},
         models: {},
         capabilities: {},
@@ -180,7 +180,7 @@ describe.sequential('Schema verification after runner - integration', () => {
           target: 'postgres',
           targetFamily: 'sql',
           profileHash: profileHash('sha256:test'),
-          storage: {
+          storage: new SqlStorage({
             storageHash: coreHash('sha256:contract-enum-mixed-case'),
             tables: {
               Organization: {
@@ -206,7 +206,7 @@ describe.sequential('Schema verification after runner - integration', () => {
                 values: ['ok', 'atRisk', 'blocked'],
               }),
             },
-          },
+          }),
           roots: {},
           models: {},
           capabilities: {},

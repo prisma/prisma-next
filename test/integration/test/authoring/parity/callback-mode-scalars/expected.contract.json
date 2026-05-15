@@ -159,7 +159,12 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:615d7f6e37b15d66c64b8e500ee79877eecae9bb484d48b429f3b3c1d1e21051",
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
+    "storageHash": "sha256:9ec3a3f08422a8ae8981345bd34872bbbb5073ce98ffe8b522b21b1fce34632c",
     "tables": {
       "post": {
         "columns": {

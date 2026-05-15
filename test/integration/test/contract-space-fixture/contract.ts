@@ -1,6 +1,6 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { TEST_BOX_TABLE } from './constants';
 
 const TARGET = 'postgres' as const;
@@ -49,8 +49,8 @@ export const testContractSpaceContract: Contract<SqlStorage> = {
   extensionPacks: {},
   meta: {},
   profileHash: profileHash('synthetic-test-contract-space-profile-v1'),
-  storage: {
+  storage: new SqlStorage({
     ...storageBody,
     storageHash: coreHash(TEST_HEAD_HASH),
-  },
+  }),
 };

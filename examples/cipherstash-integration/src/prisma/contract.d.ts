@@ -135,6 +135,7 @@ type ContractBase = ContractType<
       };
     };
     readonly types: Record<string, never>;
+    readonly namespaces: { readonly __unspecified__: { readonly id: '__unspecified__' } };
     readonly storageHash: StorageHash;
   },
   {

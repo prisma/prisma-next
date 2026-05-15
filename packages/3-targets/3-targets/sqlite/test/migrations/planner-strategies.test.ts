@@ -1,6 +1,6 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import type { RecreateTableCall } from '../../src/core/migrations/op-factory-call';
@@ -17,11 +17,11 @@ function makeContract(
     target: 'sqlite',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: {
+    storage: new SqlStorage({
       storageHash: coreHash('sha256:contract'),
       tables: {},
       ...overrides,
-    },
+    }),
     roots: {},
     models: {},
     capabilities: {},

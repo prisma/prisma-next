@@ -140,6 +140,11 @@
     }
   },
   "storage": {
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
     "storageHash": "sha256:a4d4a44c54bf14eed68d613d1cff97649a3f1fe617345839d968aad16a901221",
     "tables": {
       "cafe": {

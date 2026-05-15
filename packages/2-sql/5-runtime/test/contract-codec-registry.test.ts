@@ -5,7 +5,7 @@ import type {
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
@@ -136,11 +136,11 @@ function createTestContract(
     profileHash: profileHash('sha256:test'),
     models: {},
     roots: {},
-    storage: {
+    storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
       tables: tableEntries,
       ...ifDefined('types', types),
-    },
+    }),
     extensionPacks: {},
     capabilities: {},
     meta: {},

@@ -148,11 +148,25 @@ const StorageTableSchema = type({
   foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
+/**
+ * Namespace entry under `storage.namespaces[id]`. SQL contracts honour
+ * the framework `Storage.namespaces` invariant from PR1; today every
+ * contract binds to the singleton placeholder
+ * (`SqlUnspecifiedNamespace.instance`) and the persisted shape carries
+ * just the namespace id. Per-target namespace concretions
+ * (`PostgresSchema`, `SqliteUnspecifiedDatabase`) can additively grow
+ * the persisted shape when they earn their slots.
+ */
+const NamespaceEntrySchema = type({
+  id: 'string',
+});
+
 const StorageSchema = type({
   '+': 'reject',
   storageHash: 'string',
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeEntrySchema }),
+  'namespaces?': type({ '[string]': NamespaceEntrySchema }),
 });
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {

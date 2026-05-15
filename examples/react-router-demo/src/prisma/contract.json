@@ -132,6 +132,11 @@
     }
   },
   "storage": {
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
     "storageHash": "sha256:95d1e4f76e8e6f94d9a37229ee0a62dfd4c3afe603cf09d39e5c37766dd66b92",
     "tables": {
       "post": {

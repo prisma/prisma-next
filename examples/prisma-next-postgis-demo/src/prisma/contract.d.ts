@@ -171,6 +171,7 @@ type ContractBase = ContractType<
         readonly typeParams: { readonly srid: 4326 };
       };
     };
+    readonly namespaces: { readonly __unspecified__: { readonly id: '__unspecified__' } };
     readonly storageHash: StorageHash;
   },
   {

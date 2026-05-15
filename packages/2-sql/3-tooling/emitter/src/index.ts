@@ -274,7 +274,9 @@ export const sqlEmission = {
 
     const typesType = generateStorageTypesType(storage.types);
 
-    return `{ readonly tables: { ${tables.join('; ')} }; readonly types: ${typesType}; readonly storageHash: ${storageHashTypeName} }`;
+    const namespacesType = generateStorageNamespacesType(storage.namespaces);
+
+    return `{ readonly tables: { ${tables.join('; ')} }; readonly types: ${typesType}; readonly namespaces: ${namespacesType}; readonly storageHash: ${storageHashTypeName} }`;
   },
 
   generateModelStorageType(_modelName: string, model: ContractModel): string {
@@ -400,4 +402,16 @@ function generateStorageTypesType(types: SqlStorage['types']): string {
   }
 
   return `{ ${typeEntries.join('; ')} }`;
+}
+
+function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): string {
+  const entries = Object.entries(namespaces ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  if (entries.length === 0) {
+    return 'Record<string, never>';
+  }
+  const parts: string[] = [];
+  for (const [name, ns] of entries) {
+    parts.push(`readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)} }`);
+  }
+  return `{ ${parts.join('; ')} }`;
 }

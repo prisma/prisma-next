@@ -14,7 +14,7 @@ import type {
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -56,7 +56,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
     target: 'sqlite',
     targetFamily: 'sql',
     profileHash: profileHash(`sha256:ext-test-v${version}`),
-    storage: {
+    storage: new SqlStorage({
       storageHash: coreHash(`sha256:ext-contract-v${version}`),
       tables: {
         _ext_helper: {
@@ -74,7 +74,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
           foreignKeys: [],
         },
       },
-    },
+    }),
     roots: {},
     models: {},
     capabilities: {},
@@ -448,7 +448,7 @@ describe(
 
       const hookedAppContract: Contract<SqlStorage> = {
         ...appContract,
-        storage: {
+        storage: new SqlStorage({
           ...appContract.storage,
           storageHash: coreHash('sha256:app-with-hooked-email'),
           tables: {
@@ -464,7 +464,7 @@ describe(
               },
             },
           },
-        },
+        }),
         profileHash: profileHash('sha256:app-with-hooked-email'),
       };
 

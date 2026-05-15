@@ -22,7 +22,6 @@ export type ProfileHash =
   ProfileHashBase<'sha256:213031a5ce861b455f22bc065769080ea0357fabcb999de0190524ecd32531f7'>;
 
 export type CodecTypes = SqliteTypes;
-export type OperationTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = Record<string, never>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
@@ -59,7 +58,6 @@ export type FieldInputTypes = {
 };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
-  OperationTypes,
   QueryOperationTypes,
   FieldOutputTypes,
   FieldInputTypes
@@ -139,6 +137,7 @@ type ContractBase = ContractType<
       };
     };
     readonly types: Record<string, never>;
+    readonly namespaces: { readonly __unspecified__: { readonly id: '__unspecified__' } };
     readonly storageHash: StorageHash;
   },
   {

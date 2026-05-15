@@ -3,10 +3,12 @@ import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import type { SqlRuntimeExtensionDescriptor } from '../src/sql-context';
 import { createStubAdapter, createTestContext } from './utils';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 /**
  * Build-time integrity check that surfaces (codecId, isParameterized, typeParams) mismatches in `storage.tables[t].columns[c]` before any AST-bound codec resolution can mask them. The legacy "tolerate codec references without params" patterns silently skipped malformed columns; the integrity check throws explicit envelope codes instead.
@@ -134,6 +136,7 @@ describe('createExecutionContext — column codec integrity', () => {
           foreignKeys: [],
         },
       },
+      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
     };
     return {
       targetFamily: 'sql',
@@ -285,6 +288,7 @@ describe('createExecutionContext — column codec integrity', () => {
           typeParams: { length: 1536 },
         },
       },
+      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
     };
     const contract: Contract<SqlStorage> = {
       targetFamily: 'sql',

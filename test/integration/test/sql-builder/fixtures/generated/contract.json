@@ -313,7 +313,12 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:a3560bb03dbb07c70c7a8d4aaf79628b2a61091159042e6d664408d220ddea1f",
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
+    "storageHash": "sha256:c9b9a1832a0eb1bdc946c8d8326fe9f1b0f7a25edb7cebb0258a815a7e908f8e",
     "tables": {
       "articles": {
         "columns": {

@@ -1,10 +1,12 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
 import type { AdapterProfile } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import { SqlFamilyAdapter } from '../src/sql-family-adapter';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 // Minimal test contract
 const testContract: Contract<SqlStorage> = {
@@ -13,7 +15,8 @@ const testContract: Contract<SqlStorage> = {
   profileHash: profileHash('sha256:test-hash'),
   models: {},
   roots: {},
-  storage: { storageHash: coreHash('sha256:test-hash'), tables: {} },
+  storage: { storageHash: coreHash('sha256:test-hash'), tables: {},
+  namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance } },
   extensionPacks: {},
   capabilities: {},
   meta: {},

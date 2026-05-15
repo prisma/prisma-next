@@ -35,6 +35,7 @@ type CreateInputContract = Contract<
         foreignKeys: [];
       };
     };
+    namespaces: { __unspecified__: { id: '__unspecified__' } };
   },
   {
     User: {
