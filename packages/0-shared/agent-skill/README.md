@@ -19,9 +19,9 @@ One package, ten skills. Each skill is a `SKILL.md` with its own `description` f
 | `prisma-next-runtime` | Wiring `db.ts` — middleware, connection, environment. |
 | `prisma-next-build` | Build-system / dev-server integration — Vite plugin today, Next.js / Webpack / esbuild / Rollup are gaps named instead of fabricated. |
 | `prisma-next-debug` | Debugging — error envelopes, signal-routing to error-code references. |
-| `prisma-next-feedback` | File a bug report or feature request against Prisma Next — the canonical destination of every other skill's *What PN doesn't do yet* routing. |
+| `prisma-next-feedback` | Hand a question or report off to the team — file a GitHub issue (bug or feature request), or route Q&A / design feedback / direct-team-contact (extension authors included) to the Prisma Discord. The canonical destination of every other skill's *What PN doesn't do yet* routing. |
 
-Every skill follows the same shape (Convex-style): preamble + canonical mental-model headline, *When to Use* / *When Not to Use*, *Key Concepts*, *Workflow*, *Common Pitfalls*, **What Prisma Next doesn't do yet**, *Reference Files*, and *Checklist*.
+Every skill follows the same shape: preamble + canonical mental-model headline, *When to Use* / *When Not to Use*, *Key Concepts*, *Workflow*, *Common Pitfalls*, **What Prisma Next doesn't do yet**, *Reference Files*, and *Checklist*.
 
 ## Install
 
