@@ -10,7 +10,8 @@ import {
   SqlStorage,
   StorageColumn,
   StorageTable,
-  StorageTypeInstance,
+  type StorageTypeInstance,
+  toStorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
@@ -110,7 +111,7 @@ describe('PostgresContractSerializer', () => {
   });
 
   it('hydrates storage.types entries via the family registry dispatch path', () => {
-    const sentinel = new StorageTypeInstance({
+    const sentinel: StorageTypeInstance = toStorageTypeInstance({
       codecId: 'test/fake-test-entity@1',
       nativeType: 'fake-test-entity',
       typeParams: { proof: true },

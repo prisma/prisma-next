@@ -13,6 +13,7 @@ import postgresPack from '@prisma-next/target-postgres/pack';
 
 const types = {
   Email: {
+    kind: 'codec-instance',
     codecId: 'pg/text@1',
     nativeType: 'text',
     typeParams: {},

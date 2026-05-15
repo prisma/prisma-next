@@ -4,6 +4,7 @@ import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contr
 import postgresPack from '@prisma-next/target-postgres/pack';
 
 const embedding1536Type = {
+  kind: 'codec-instance',
   codecId: 'pg/vector@1',
   nativeType: 'vector',
   typeParams: { length: 1536 },

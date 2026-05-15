@@ -1,10 +1,10 @@
 import type { ColumnDefault, Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { profileHash } from '@prisma-next/contract/types';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { DefaultRenderer } from '../src/core/migrations/contract-to-schema-ir';
 import {
   contractToSchemaIR as contractToSchemaIRImpl,
@@ -119,6 +119,7 @@ describe('contractToSchemaIR', () => {
       },
       types: {
         MyVector: {
+          kind: 'codec-instance',
           codecId: 'pgvector/vector@1',
           nativeType: 'vector',
           typeParams: { dimensions: 1536 },
@@ -203,6 +204,7 @@ describe('contractToSchemaIR', () => {
       },
       types: {
         Embedding1536: {
+          kind: 'codec-instance',
           codecId: 'pg/vector@1',
           nativeType: 'vector',
           typeParams: { length: 1536 },
@@ -469,6 +471,7 @@ describe('contractToSchemaIR', () => {
       },
       types: {
         Embedding: {
+          kind: 'codec-instance',
           codecId: 'pgvector/vector@1',
           nativeType: 'vector',
           typeParams: { dimensions: 1536 },
@@ -502,6 +505,7 @@ describe('contractToSchemaIR', () => {
       },
       types: {
         Embedding: {
+          kind: 'codec-instance',
           codecId: 'pgvector/vector@1',
           nativeType: 'vector',
           typeParams: { dimensions: 1536 },

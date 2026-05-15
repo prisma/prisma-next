@@ -11,16 +11,8 @@
         "id": "__unspecified__"
       }
     },
-    "storageHash": "sha256:e2287958ce0d2bfeb74508669ea4a060c13355cdc72db3a840969e8ba20be530",
-    "tables": {},
-    "types": {
-      "geometry": {
-        "codecId": "pg/geometry@1",
-        "kind": "codec-instance",
-        "nativeType": "geometry",
-        "typeParams": {}
-      }
-    }
+    "storageHash": "sha256:63dcc51de85b0e7beca2231e8d93483e02ad385069a6418802fe2dcf77677b98",
+    "tables": {}
   },
   "capabilities": {
     "postgres": {

@@ -285,6 +285,7 @@ describe('NOT NULL column without default uses temporary default', () => {
         frameworkComponents: [pgvectorDescriptor],
         extraStorageTypes: {
           Embedding3: {
+            kind: 'codec-instance',
             codecId: 'pg/vector@1',
             nativeType: 'vector',
             typeParams: { length: 3 },

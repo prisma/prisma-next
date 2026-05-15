@@ -144,7 +144,7 @@
         "id": "__unspecified__"
       }
     },
-    "storageHash": "sha256:a1f148000f6a389fcfd09a0124456d4a3c8054de3408a0aba839500656c56d64",
+    "storageHash": "sha256:40564f5dced2831a3dcfeb370d9aa13d40a1936770f234dc5349cf78478eb97e",
     "tables": {
       "post": {
         "columns": {
@@ -262,6 +262,7 @@
     "types": {
       "Email": {
         "codecId": "pg/text@1",
+        "kind": "codec-instance",
         "nativeType": "text",
         "typeParams": {}
       },

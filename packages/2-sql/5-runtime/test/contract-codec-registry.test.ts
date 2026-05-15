@@ -115,7 +115,7 @@ function createTestContract(
       }
     >
   >,
-  types?: SqlStorage['types'],
+  types?: Record<string, import('@prisma-next/sql-contract/types').SqlStorageTypeEntry>,
 ): Contract<SqlStorage> {
   const tableEntries = Object.fromEntries(
     Object.entries(tables).map(([tableName, columns]) => [
@@ -192,6 +192,7 @@ describe('ContractCodecRegistry', () => {
       },
       {
         Vector1536: {
+          kind: 'codec-instance',
           codecId: 'pg/vector@1',
           nativeType: 'vector',
           typeParams: { length: 1536 },

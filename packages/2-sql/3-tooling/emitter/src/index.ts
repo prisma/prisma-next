@@ -9,6 +9,7 @@ import {
   type SqlModelStorage,
   type SqlStorage,
   type StorageTable,
+  type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { assertDefined } from '@prisma-next/utils/assertions';
 
@@ -324,7 +325,12 @@ export const sqlEmission = {
       if (typeInstance instanceof SqlEnumType) {
         return { values: typeInstance.values };
       }
-      return typeInstance.typeParams;
+      // Fall back to structural codec-triple access when the literal
+      // bypasses the runtime normaliser (e.g. test fixtures or
+      // hand-written descriptor inputs that omit the
+      // `kind: 'codec-instance'` discriminator).
+      const codecShape = typeInstance as Partial<StorageTypeInstance>;
+      return codecShape.typeParams;
     }
     return column.typeParams;
   },
@@ -388,16 +394,37 @@ function generateStorageTypesType(types: SqlStorage['types']): string {
         // expects a mutable `Record` shape for key iteration only.
         binding.typeParams as unknown as Record<string, unknown>,
       );
+      // Emit the resolved codec view (kind: 'codec-instance') so the
+      // emitted .d.ts shape stays uniform across slot variants and
+      // satisfies the polymorphic slot's structural alphabet. The
+      // persisted JSON envelope still carries the IR's narrower kind
+      // discriminator; the d.ts is the type-level codec-resolved view.
       typeEntries.push(
-        `readonly ${typeName}: { readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
+        `readonly ${typeName}: { readonly kind: 'codec-instance'; readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
       );
       continue;
     }
-    const codecId = serializeValue(typeInstance.codecId);
-    const nativeType = serializeValue(typeInstance.nativeType);
-    const typeParamsStr = serializeTypeParamsLiteral(typeInstance.typeParams);
+    // The slot is polymorphic at the framework level; codec-instance
+    // entries are the only non-IR-class kind today. The runtime
+    // `SqlStorage` constructor stamps `kind: 'codec-instance'` on
+    // plain codec triples; the emitter is forgiving about literal
+    // inputs that bypass the constructor (test fixtures, hand-written
+    // descriptors) and treats anything with the codec-triple shape as
+    // a codec-instance.
+    const codecInstanceShape = typeInstance as Partial<StorageTypeInstance>;
+    if (
+      typeof codecInstanceShape.codecId !== 'string' ||
+      typeof codecInstanceShape.nativeType !== 'string'
+    ) {
+      throw new Error(
+        `Unknown storage type kind for "${typeName}"; expected a codec-instance triple or a known IR-class kind.`,
+      );
+    }
+    const codecId = serializeValue(codecInstanceShape.codecId);
+    const nativeType = serializeValue(codecInstanceShape.nativeType);
+    const typeParamsStr = serializeTypeParamsLiteral(codecInstanceShape.typeParams);
     typeEntries.push(
-      `readonly ${typeName}: { readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
+      `readonly ${typeName}: { readonly kind: 'codec-instance'; readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
     );
   }
 

@@ -178,6 +178,7 @@ const pgvectorExtensionPack = {
 
 const roleTypes = {
   Role: {
+    kind: 'codec-instance',
     codecId: 'pg/enum@1',
     nativeType: 'role',
     typeParams: { values: ['USER', 'ADMIN'] },
@@ -574,6 +575,7 @@ describe('contract DSL helper vocabulary', () => {
     );
 
     expect(contract.storage.types?.Role).toEqual({
+      kind: 'codec-instance',
       codecId: 'pg/enum@1',
       nativeType: 'role',
       typeParams: { values: ['USER', 'ADMIN'] },
@@ -661,6 +663,7 @@ describe('contract DSL helper vocabulary', () => {
     );
 
     expect(contract.storage.types?.Embedding1536).toEqual({
+      kind: 'codec-instance',
       codecId: 'pg/vector@1',
       nativeType: 'vector',
       typeParams: { length: 1536 },

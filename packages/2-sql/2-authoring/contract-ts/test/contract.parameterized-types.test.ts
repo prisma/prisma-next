@@ -180,6 +180,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           },
           types: {
             Vector1536: {
+              kind: 'codec-instance',
               codecId: 'pg/vector@1',
               nativeType: 'vector(1536)',
               typeParams: { length: 1536 },
@@ -219,6 +220,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           },
           types: {
             Vector1536: {
+              kind: 'codec-instance',
               codecId: 'pg/vector@1',
               nativeType: 'vector(1536)',
               typeParams: { length: 1536 },
@@ -283,6 +285,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           },
           types: {
             Vector1536: {
+              kind: 'codec-instance',
               codecId: 'pg/vector@1',
               nativeType: 'vector(1536)',
               typeParams: { length: 1536 },
@@ -331,6 +334,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           ...baseContractInput.storage,
           types: {
             Vector1536: {
+              kind: 'codec-instance',
               codecId: 'pg/vector@1',
               nativeType: 'vector(1536)',
               typeParams: { length: 1536 },
@@ -342,6 +346,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const result = validateSqlContractFully<TestContract>(input);
       expect(result.storage.types).toEqual({
         Vector1536: {
+          kind: 'codec-instance',
           codecId: 'pg/vector@1',
           nativeType: 'vector(1536)',
           typeParams: { length: 1536 },
@@ -356,11 +361,13 @@ describe('SqlContractSerializer parameterized type fields', () => {
           ...baseContractInput.storage,
           types: {
             Vector1536: {
+              kind: 'codec-instance',
               codecId: 'pg/vector@1',
               nativeType: 'vector(1536)',
               typeParams: { length: 1536 },
             },
             Vector768: {
+              kind: 'codec-instance',
               codecId: 'pg/vector@1',
               nativeType: 'vector(768)',
               typeParams: { length: 768 },
@@ -385,6 +392,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           ...baseContractInput.storage,
           types: {
             Vector1536: {
+              kind: 'codec-instance',
               nativeType: 'vector(1536)',
               typeParams: { length: 1536 },
             },
@@ -402,6 +410,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           ...baseContractInput.storage,
           types: {
             Vector1536: {
+              kind: 'codec-instance',
               codecId: 'pg/vector@1',
               typeParams: { length: 1536 },
             },
@@ -419,6 +428,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           ...baseContractInput.storage,
           types: {
             Vector1536: {
+              kind: 'codec-instance',
               codecId: 'pg/vector@1',
               nativeType: 'vector(1536)',
             },
@@ -448,6 +458,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           ...baseContractInput.storage,
           types: {
             Vector1536: {
+              kind: 'codec-instance',
               codecId: 'pg/vector@1',
               nativeType: 'vector(1536)',
               typeParams: [1536],
@@ -485,6 +496,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           },
           types: {
             Role: {
+              kind: 'codec-instance',
               codecId: 'pg/enum@1',
               nativeType: 'role',
               typeParams: { values: ['USER'] },
@@ -520,6 +532,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           },
           types: {
             Role: {
+              kind: 'codec-instance',
               codecId: 'pg/enum@1',
               nativeType: 'role',
               typeParams: { values: ['USER'] },
@@ -555,6 +568,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
           },
           types: {
             Role: {
+              kind: 'codec-instance',
               codecId: 'pg/enum@1',
               nativeType: 'role',
               typeParams: { values: ['USER'] },

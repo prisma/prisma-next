@@ -4,7 +4,7 @@ import type {
   CodecDescriptor,
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
-import { SqlStorage, type StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { SqlStorage, type SqlStorageTypeEntry } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
@@ -33,7 +33,7 @@ function vectorCodecInstance(meta?: Record<string, unknown>): Codec {
 
 function createParamTypesTestContract(
   options?: Partial<{
-    types: Record<string, StorageTypeInstance>;
+    types: Record<string, SqlStorageTypeEntry>;
     tableColumns: Record<
       string,
       {
@@ -89,6 +89,7 @@ describe('parameterized types', () => {
       const contract = createParamTypesTestContract({
         types: {
           Vector1536: {
+            kind: 'codec-instance',
             codecId: 'pg/vector@1',
             nativeType: 'vector',
             typeParams: { length: 1536 },
@@ -99,6 +100,7 @@ describe('parameterized types', () => {
 
       expect(context.contract.storage.types).toEqual({
         Vector1536: {
+          kind: 'codec-instance',
           codecId: 'pg/vector@1',
           nativeType: 'vector',
           typeParams: { length: 1536 },
@@ -149,6 +151,7 @@ describe('parameterized types', () => {
       const contract = createParamTypesTestContract({
         types: {
           Vector1536: {
+            kind: 'codec-instance',
             codecId: 'pg/vector@1',
             nativeType: 'vector',
             typeParams: { length: 1536 },
@@ -167,6 +170,7 @@ describe('parameterized types', () => {
       const contract = createParamTypesTestContract({
         types: {
           InvalidVector: {
+            kind: 'codec-instance',
             codecId: 'pg/vector@1',
             nativeType: 'vector',
             typeParams: { length: 'not-a-number' },
@@ -199,6 +203,7 @@ describe('parameterized types', () => {
       const contract = createParamTypesTestContract({
         types: {
           InvalidVector: {
+            kind: 'codec-instance',
             codecId: 'pg/vector@1',
             nativeType: 'vector',
             typeParams: {},
@@ -268,6 +273,7 @@ describe('parameterized types', () => {
       const contract = createParamTypesTestContract({
         types: {
           Vector1536: {
+            kind: 'codec-instance',
             codecId: 'pg/vector@1',
             nativeType: 'vector',
             typeParams: { length: 1536 },
@@ -306,6 +312,7 @@ describe('parameterized types', () => {
       const contract = createParamTypesTestContract({
         types: {
           Vector1536: {
+            kind: 'codec-instance',
             codecId: 'pg/vector@1',
             nativeType: 'vector',
             typeParams: { length: 1536 },
@@ -337,6 +344,7 @@ describe('parameterized types', () => {
       const contract = createParamTypesTestContract({
         types: {
           Vector1536: {
+            kind: 'codec-instance',
             codecId: 'pg/vector@1',
             nativeType: 'vector',
             typeParams: { length: 1536 },
@@ -347,6 +355,7 @@ describe('parameterized types', () => {
       const context = createTestContext(contract, createStubAdapter());
 
       expect(context.types['Vector1536']).toEqual({
+        kind: 'codec-instance',
         codecId: 'pg/vector@1',
         nativeType: 'vector',
         typeParams: { length: 1536 },

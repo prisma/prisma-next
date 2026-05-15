@@ -386,13 +386,6 @@
             "name": "Image"
           }
         },
-        "primaryCategory": {
-          "nullable": false,
-          "type": {
-            "codecId": "mongo/string@1",
-            "kind": "scalar"
-          }
-        },
         "name": {
           "nullable": false,
           "type": {
@@ -405,6 +398,13 @@
           "type": {
             "kind": "valueObject",
             "name": "Price"
+          }
+        },
+        "primaryCategory": {
+          "nullable": false,
+          "type": {
+            "codecId": "mongo/string@1",
+            "kind": "scalar"
           }
         },
         "status": {
@@ -758,9 +758,11 @@
                 "field": "userId"
               }
             ],
+            "kind": "mongo-index",
             "unique": true
           }
         ],
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -832,6 +834,7 @@
               "userId"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
@@ -848,7 +851,8 @@
                 "direction": -1,
                 "field": "timestamp"
               }
-            ]
+            ],
+            "kind": "mongo-index"
           },
           {
             "expireAfterSeconds": 7776000,
@@ -857,9 +861,11 @@
                 "direction": 1,
                 "field": "timestamp"
               }
-            ]
+            ],
+            "kind": "mongo-index"
           }
         ],
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -956,6 +962,7 @@
               "userId"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
@@ -968,7 +975,8 @@
                 "direction": 1,
                 "field": "orderId"
               }
-            ]
+            ],
+            "kind": "mongo-index"
           },
           {
             "keys": [
@@ -977,9 +985,11 @@
                 "field": "issuedAt"
               }
             ],
+            "kind": "mongo-index",
             "sparse": true
           }
         ],
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -1039,6 +1049,7 @@
               "total"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
@@ -1059,9 +1070,11 @@
                 "direction": 1,
                 "field": "country"
               }
-            ]
+            ],
+            "kind": "mongo-index"
           }
         ],
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -1094,6 +1107,7 @@
               "streetAndNumber"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
@@ -1106,9 +1120,11 @@
                 "direction": 1,
                 "field": "userId"
               }
-            ]
+            ],
+            "kind": "mongo-index"
           }
         ],
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -1207,6 +1223,7 @@
               "userId"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
@@ -1224,6 +1241,7 @@
                 "field": "description"
               }
             ],
+            "kind": "mongo-index",
             "weights": {
               "description": 1,
               "name": 10
@@ -1239,7 +1257,8 @@
                 "direction": 1,
                 "field": "subCategory"
               }
-            ]
+            ],
+            "kind": "mongo-index"
           },
           {
             "keys": [
@@ -1251,7 +1270,8 @@
                 "direction": 1,
                 "field": "articleType"
               }
-            ]
+            ],
+            "kind": "mongo-index"
           },
           {
             "keys": [
@@ -1259,9 +1279,11 @@
                 "direction": "hashed",
                 "field": "code"
               }
-            ]
+            ],
+            "kind": "mongo-index"
           }
         ],
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -1298,9 +1320,6 @@
                   "url"
                 ]
               },
-              "primaryCategory": {
-                "bsonType": "string"
-              },
               "name": {
                 "bsonType": "string"
               },
@@ -1319,6 +1338,9 @@
                   "currency"
                 ]
               },
+              "primaryCategory": {
+                "bsonType": "string"
+              },
               "status": {
                 "bsonType": "string"
               },
@@ -1333,13 +1355,14 @@
               "code",
               "description",
               "image",
-              "primaryCategory",
               "name",
               "price",
+              "primaryCategory",
               "status",
               "subCategory"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
@@ -1353,9 +1376,11 @@
                 "field": "email"
               }
             ],
+            "kind": "mongo-index",
             "unique": true
           }
         ],
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -1406,12 +1431,13 @@
               "name"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
       }
     },
-    "storageHash": "sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65"
+    "storageHash": "sha256:2ac66455b4ca8c2c4b9b9fac053e4740de89d871f3e773e0353dcef71536b63f"
   },
   "capabilities": {},
   "extensionPacks": {},

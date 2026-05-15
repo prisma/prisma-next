@@ -27,6 +27,7 @@ export type {
   SqlStorageTypeEntry,
   StorageColumnInput,
   StorageTableInput,
+  StorageTypeInstance,
   StorageTypeInstanceInput,
   TypeMaps,
   TypeMapsPhantomKey,
@@ -34,11 +35,13 @@ export type {
 } from '../types';
 export {
   applyFkDefaults,
+  CODEC_INSTANCE_KIND,
   DEFAULT_FK_CONSTRAINT,
   DEFAULT_FK_INDEX,
   ForeignKey,
   ForeignKeyReferences,
   Index,
+  isStorageTypeInstance,
   PrimaryKey,
   SqlEnumType,
   SqlNode,
@@ -46,6 +49,6 @@ export {
   SqlUnspecifiedNamespace,
   StorageColumn,
   StorageTable,
-  StorageTypeInstance,
+  toStorageTypeInstance,
   UniqueConstraint,
 } from '../types';

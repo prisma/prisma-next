@@ -75,6 +75,7 @@ type StorageTypeFromDescriptor<
   Descriptor extends AuthoringTypeConstructorDescriptor,
   Args extends readonly unknown[],
 > = {
+  readonly kind: 'codec-instance';
   readonly codecId: ResolveTemplateValue<Descriptor['output']['codecId'], Args>;
   readonly nativeType: ResolveTemplateValue<Descriptor['output']['nativeType'], Args>;
 } & (Descriptor['output'] extends {
@@ -83,7 +84,7 @@ type StorageTypeFromDescriptor<
   ? {
       readonly typeParams: ResolveTemplateValue<TypeParams, Args>;
     }
-  : Record<never, never>);
+  : { readonly typeParams: Record<never, never> });
 
 type TypeHelperFunction<Descriptor extends AuthoringTypeConstructorDescriptor> =
   Descriptor extends { readonly args: infer Args extends readonly AuthoringArgumentDescriptor[] }

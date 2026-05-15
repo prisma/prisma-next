@@ -9,17 +9,21 @@ import { SqlEnumType } from './sql-enum-type';
 import { SqlNode } from './sql-node';
 import { SqlUnspecifiedNamespace } from './sql-unspecified-namespace';
 import { StorageTable, type StorageTableInput } from './storage-table';
-import { StorageTypeInstance, type StorageTypeInstanceInput } from './storage-type-instance';
+import {
+  isStorageTypeInstance,
+  type StorageTypeInstance,
+  type StorageTypeInstanceInput,
+  toStorageTypeInstance,
+} from './storage-type-instance';
 
 /**
  * Polymorphic value type for `SqlStorage.types` entries (Decision 18,
- * Option B). Existing codec-typed entries (decimal, varchar, pgvector)
- * stay shape-compatible with `StorageTypeInstance | StorageTypeInstanceInput`;
- * enum entries arrive as concrete `SqlEnumType` subclass instances
- * (constructed by the per-target entity factory) and pass through the
- * normaliser unchanged. Hydration dispatches on the enumerable
- * `kind: 'sql-enum-type'` discriminator (per Decision 16) when
- * reconstructing from the on-disk JSON envelope.
+ * Option B). The slot's framework alphabet is `StorageType` — codec
+ * triples (carrying `kind: 'codec-instance'`) and class-instance kinds
+ * (e.g. `PostgresEnumType` with its narrower discriminator) both
+ * satisfy that contract. {@link StorageTypeInstanceInput} is accepted on
+ * the construction side so callers may pass raw codec triples and let
+ * the constructor stamp the discriminator.
  */
 export type SqlStorageTypeEntry = SqlEnumType | StorageTypeInstance | StorageTypeInstanceInput;
 
@@ -53,18 +57,23 @@ export interface SqlStorageInput<THash extends string = string> {
  *
  * The constructor normalises nested IR-class fields (`tables`, optional
  * `types`) into class instances so downstream walks see a uniform AST.
- * `types` is polymorphic per Decision 18 Option B — codec-typed
- * entries become `StorageTypeInstance` instances; entries that are
- * already a `SqlEnumType` subclass instance pass through; hydration
- * of raw JSON enum entries (carrying `kind === 'sql-enum-type'`) is
- * the per-target serializer's responsibility (so the family base
- * does not import target-specific subclasses).
+ * `types` is polymorphic per Decision 18 Option B: codec-triple inputs
+ * are stamped with `kind: 'codec-instance'`; class-instance kinds
+ * (e.g. `SqlEnumType` subclasses) pass through; hydration of raw JSON
+ * class-instance entries (carrying their narrower `kind` literal) is
+ * the per-target serializer's responsibility (so the family base does
+ * not import target-specific subclasses).
  */
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
   readonly tables: Readonly<Record<string, StorageTable>>;
   readonly namespaces: Readonly<Record<string, Namespace>>;
-  declare readonly types?: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
+  // The slot is structurally polymorphic at the framework level
+  // (every variant extends `StorageType` from
+  // `@prisma-next/framework-components/ir`); SQL declares the concrete
+  // union it ships today. Future SQL-family variants (e.g. PR2's
+  // namespace concretion if it joins the slot) widen this union.
+  declare readonly types?: Readonly<Record<string, SqlEnumType | StorageTypeInstance>>;
 
   constructor(input: SqlStorageInput<THash>) {
     super();
@@ -89,8 +98,11 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
   }
 }
 
-function normaliseTypeEntry(entry: SqlStorageTypeEntry): StorageTypeInstance | SqlEnumType {
-  if (entry instanceof SqlEnumType || entry instanceof StorageTypeInstance) {
+function normaliseTypeEntry(entry: SqlStorageTypeEntry): SqlEnumType | StorageTypeInstance {
+  if (entry instanceof SqlEnumType) {
+    return entry;
+  }
+  if (isStorageTypeInstance(entry)) {
     return entry;
   }
   if (
@@ -102,5 +114,5 @@ function normaliseTypeEntry(entry: SqlStorageTypeEntry): StorageTypeInstance | S
       'Encountered raw sql-enum-type JSON in storage.types without serializer hydration; use a target ContractSerializer that registers the matching entity-type factory.',
     );
   }
-  return new StorageTypeInstance(entry);
+  return toStorageTypeInstance(entry);
 }

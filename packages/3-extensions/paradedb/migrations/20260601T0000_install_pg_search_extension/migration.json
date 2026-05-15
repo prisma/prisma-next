@@ -1,6 +1,6 @@
 {
   "from": null,
-  "to": "sha256:7d13ea93bd4726b9962c00ced807a79149e3ff69e0a47d936c0e82f39a637393",
+  "to": "sha256:63dcc51de85b0e7beca2231e8d93483e02ad385069a6418802fe2dcf77677b98",
   "labels": [],
   "providedInvariants": ["paradedb:install-pg-search-v1"],
   "createdAt": "2026-06-01T00:00:00.000Z",
@@ -13,7 +13,12 @@
     "roots": {},
     "models": {},
     "storage": {
-      "storageHash": "sha256:7d13ea93bd4726b9962c00ced807a79149e3ff69e0a47d936c0e82f39a637393",
+      "namespaces": {
+        "__unspecified__": {
+          "id": "__unspecified__"
+        }
+      },
+      "storageHash": "sha256:63dcc51de85b0e7beca2231e8d93483e02ad385069a6418802fe2dcf77677b98",
       "tables": {}
     },
     "capabilities": {

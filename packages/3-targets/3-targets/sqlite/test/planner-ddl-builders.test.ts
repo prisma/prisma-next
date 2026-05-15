@@ -39,7 +39,12 @@ describe('buildColumnTypeSql', () => {
   it('resolves typeRef against storageTypes', () => {
     const column = makeColumn({ nativeType: 'unused', typeRef: 'my_type' });
     const sql = buildColumnTypeSql(column, {
-      my_type: { codecId: 'sqlite/text@1', nativeType: 'text', typeParams: {} },
+      my_type: {
+        kind: 'codec-instance',
+        codecId: 'sqlite/text@1',
+        nativeType: 'text',
+        typeParams: {},
+      },
     });
     expect(sql).toBe('TEXT');
   });

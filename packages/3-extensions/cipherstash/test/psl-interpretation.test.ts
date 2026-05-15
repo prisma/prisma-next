@@ -284,6 +284,7 @@ model User {
     // column carries `nullable` (and may carry `default`/etc.) which the
     // named-type descriptor does not.
     expect(aliasNamedType).toEqual({
+      kind: 'codec-instance',
       codecId: inlineCol['codecId'],
       nativeType: inlineCol['nativeType'],
       typeParams: inlineCol['typeParams'],

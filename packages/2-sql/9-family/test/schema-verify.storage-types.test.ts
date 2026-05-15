@@ -15,6 +15,7 @@ describe('verifySqlSchema - storage types', () => {
       {},
       {
         Role: {
+          kind: 'codec-instance',
           codecId: 'test/enum@1',
           nativeType: 'role',
           typeParams: { values: ['USER', 'ADMIN'] },

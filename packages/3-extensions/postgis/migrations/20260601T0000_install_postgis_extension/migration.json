@@ -1,6 +1,6 @@
 {
   "from": null,
-  "to": "sha256:01622b3970e0ee2a582cc4c857bca7f6ed970f21b23f44e3f2781eea0be7d5eb",
+  "to": "sha256:e2287958ce0d2bfeb74508669ea4a060c13355cdc72db3a840969e8ba20be530",
   "labels": [],
   "providedInvariants": ["postgis:install-postgis-v1"],
   "createdAt": "2026-06-01T00:00:00.000Z",
@@ -13,11 +13,17 @@
     "roots": {},
     "models": {},
     "storage": {
-      "storageHash": "sha256:01622b3970e0ee2a582cc4c857bca7f6ed970f21b23f44e3f2781eea0be7d5eb",
+      "namespaces": {
+        "__unspecified__": {
+          "id": "__unspecified__"
+        }
+      },
+      "storageHash": "sha256:e2287958ce0d2bfeb74508669ea4a060c13355cdc72db3a840969e8ba20be530",
       "tables": {},
       "types": {
         "geometry": {
           "codecId": "pg/geometry@1",
+          "kind": "codec-instance",
           "nativeType": "geometry",
           "typeParams": {}
         }

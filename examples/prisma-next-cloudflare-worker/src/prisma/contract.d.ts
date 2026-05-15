@@ -298,6 +298,7 @@ type ContractBase = ContractType<
     };
     readonly types: {
       readonly user_type: {
+        readonly kind: 'codec-instance';
         readonly codecId: 'pg/enum@1';
         readonly nativeType: 'user_type';
         readonly typeParams: { readonly values: readonly ['admin', 'user'] };

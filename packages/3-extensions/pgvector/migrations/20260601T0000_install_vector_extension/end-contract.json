@@ -6,11 +6,17 @@
   "roots": {},
   "models": {},
   "storage": {
-    "storageHash": "sha256:382dae5bb1548e62cbc449530ea08a9ce0a0dbb280401e9588642223f33783ae",
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
+    "storageHash": "sha256:401e16b37b0c5cc5d312b70de0168b89fabadbaf96619c581b468134d0a9d621",
     "tables": {},
     "types": {
       "vector": {
         "codecId": "pg/vector@1",
+        "kind": "codec-instance",
         "nativeType": "vector",
         "typeParams": {}
       }

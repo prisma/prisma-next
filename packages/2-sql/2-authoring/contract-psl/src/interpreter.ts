@@ -359,6 +359,7 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
         toNamedTypeFieldDescriptor(declaration.name, storageType),
       );
       storageTypes[declaration.name] = {
+        kind: 'codec-instance',
         codecId: storageType.codecId,
         nativeType: storageType.nativeType,
         typeParams: storageType.typeParams ?? {},
@@ -424,6 +425,7 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
         toNamedTypeFieldDescriptor(declaration.name, descriptor),
       );
       storageTypes[declaration.name] = {
+        kind: 'codec-instance',
         codecId: descriptor.codecId,
         nativeType: descriptor.nativeType,
         typeParams: descriptor.typeParams ?? {},
@@ -434,6 +436,7 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
     const descriptor = toNamedTypeFieldDescriptor(declaration.name, baseDescriptor);
     namedTypeDescriptors.set(declaration.name, descriptor);
     storageTypes[declaration.name] = {
+      kind: 'codec-instance',
       codecId: baseDescriptor.codecId,
       nativeType: baseDescriptor.nativeType,
       typeParams: {},

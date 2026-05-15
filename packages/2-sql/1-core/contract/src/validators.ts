@@ -79,20 +79,28 @@ const StorageColumnSchema = type({
   return true;
 });
 
-const StorageTypeInstanceSchema = type.declare<StorageTypeInstanceInput>().type({
-  codecId: 'string',
-  nativeType: 'string',
-  typeParams: 'Record<string, unknown>',
-});
+/**
+ * Codec-triple entry persisted under `storage.types[name]`. Carries an
+ * enumerable literal `kind: 'codec-instance'` discriminator so the
+ * polymorphic slot dispatch can distinguish codec triples from
+ * class-instance kinds (e.g. `'sql-enum-type'`) sharing the slot.
+ */
+const StorageTypeInstanceSchema = type
+  .declare<StorageTypeInstanceInput & { kind: 'codec-instance' }>()
+  .type({
+    kind: "'codec-instance'",
+    codecId: 'string',
+    nativeType: 'string',
+    typeParams: 'Record<string, unknown>',
+  });
 
 /**
  * Polymorphic enum-type entry under `storage.types[name]` (Decision 18,
  * Option B). Carries an enumerable literal `kind: 'sql-enum-type'`
  * discriminator so the per-target hydration walker can dispatch
- * cleanly back to a typed IR-class instance (`PostgresEnumType`)
- * during `deserializeContract`. Codec-typed entries continue to
- * match `StorageTypeInstanceSchema` and inherit the family-level
- * non-enumerable `kind` unchanged.
+ * cleanly back to a typed IR-class instance during
+ * `deserializeContract`. Codec-typed entries match
+ * `StorageTypeInstanceSchema` instead.
  */
 const SqlEnumTypeSchema = type({
   kind: "'sql-enum-type'",
@@ -276,7 +284,12 @@ export function validateStorage(value: unknown): SqlStorage {
     const messages = result.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Storage validation failed: ${messages}`);
   }
-  return result as SqlStorage;
+  // Arktype's inferred output type can't express the polymorphic
+  // `StorageType` slot (each variant carries a narrower `kind` literal
+  // and SqlStorage's branded `storageHash` is not visible to the
+  // schema). The runtime-validated shape matches `SqlStorage`
+  // structurally; the double cast bridges the gap.
+  return result as unknown as SqlStorage;
 }
 
 export function validateModel(value: unknown): unknown {

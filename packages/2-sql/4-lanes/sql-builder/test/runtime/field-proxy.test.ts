@@ -1,4 +1,5 @@
 import { coreHash } from '@prisma-next/contract/types';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
 import { ColumnRef, IdentifierRef } from '@prisma-next/sql-relational-core/ast';
@@ -7,7 +8,6 @@ import { tableToScope } from '../../src/runtime/builder-base';
 import { ExpressionImpl } from '../../src/runtime/expression-impl';
 import { createFieldProxy } from '../../src/runtime/field-proxy';
 import { joinedScope, usersScope } from './test-helpers';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 describe('createFieldProxy', () => {
   it('top-level field access produces IdentifierRef', () => {
@@ -78,6 +78,7 @@ describe('createFieldProxy', () => {
       tables: { Post: table },
       types: {
         Embedding1536: {
+          kind: 'codec-instance',
           codecId: 'pgvector/vector@1',
           nativeType: 'vector',
           typeParams: { length: 1536 },

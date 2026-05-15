@@ -55,6 +55,7 @@ export function createTestEnumType(
   values: readonly string[],
 ): StorageTypeInstance {
   return {
+    kind: 'codec-instance',
     codecId: 'pg/enum@1',
     nativeType,
     typeParams: { values },

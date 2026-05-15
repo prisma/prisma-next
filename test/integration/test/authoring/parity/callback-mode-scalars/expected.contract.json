@@ -164,7 +164,7 @@
         "id": "__unspecified__"
       }
     },
-    "storageHash": "sha256:9ec3a3f08422a8ae8981345bd34872bbbb5073ce98ffe8b522b21b1fce34632c",
+    "storageHash": "sha256:e151326d1cfdbe3ee67aad3c07746c9c70e809c8b7ba8d25424623bcafe8667d",
     "tables": {
       "post": {
         "columns": {
@@ -283,6 +283,7 @@
     "types": {
       "Embedding": {
         "codecId": "pg/vector@1",
+        "kind": "codec-instance",
         "nativeType": "vector",
         "typeParams": {
           "length": 1536

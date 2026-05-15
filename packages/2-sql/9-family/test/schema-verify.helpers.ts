@@ -34,7 +34,7 @@ export const emptyTypeMetadataRegistry = new Map<string, { nativeType?: string }
 export function createTestContract(
   tables: Record<string, StorageTable>,
   extensionPacks: Record<string, unknown> = {},
-  storageTypes?: SqlStorage['types'],
+  storageTypes?: Record<string, import('@prisma-next/sql-contract/types').SqlStorageTypeEntry>,
 ): Contract<SqlStorage> {
   return {
     target: 'postgres',

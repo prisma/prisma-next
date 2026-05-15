@@ -22,8 +22,11 @@ export { SqlUnspecifiedNamespace } from './ir/sql-unspecified-namespace';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
 export { StorageTable, type StorageTableInput } from './ir/storage-table';
 export {
-  StorageTypeInstance,
+  CODEC_INSTANCE_KIND,
+  isStorageTypeInstance,
+  type StorageTypeInstance,
   type StorageTypeInstanceInput,
+  toStorageTypeInstance,
 } from './ir/storage-type-instance';
 export {
   UniqueConstraint,
