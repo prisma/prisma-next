@@ -6,7 +6,7 @@ This page covers the **version contract** Prisma Next offers to its users and ec
 
 Prisma Next is in early access and is deliberately pre-`1.0`. Per [SemVer §4](https://semver.org/#spec-item-4), the `0.x` range carries no backwards-compatibility promise, and we use that latitude. Concretely:
 
-- **Breaking changes ship in regular minor bumps.** A `0.7.0 → 0.8.0` upgrade may include API removals, semantic changes to existing APIs, or contract-format changes.
+- **Breaking changes ship in regular minor bumps.** A `0.7.0` to `0.8.0` upgrade may include API removals, semantic changes to existing APIs, or contract-format changes.
 - **Releases are frequent.** The cadence is "ship a minor whenever the next batch of work is cohesive enough to warrant one", not a fixed weekly/monthly schedule. Expect minors more often than you would expect them from a 1.x project.
 - **There are no patch releases of older minors.** Once `0.8.0` ships, `0.7.x` receives no further updates — no security patches, no regression fixes, no cherry-picks. If you hit a regression in the latest `latest` we may cut a `0.8.1`, but you are expected to keep up rather than pin and wait.
 - **The agent-driven upgrade skill is the long-run answer to keeping consumers current with minimal churn.** Each minor will ship with a machine-readable upgrade recipe that the skill applies; the upgrade contract — what the recipes are allowed to assume, what they're allowed to change — will be documented separately in `docs/oss/upgrade-policy.md` once that work lands. Until then, breaking changes are surfaced through release notes only.
