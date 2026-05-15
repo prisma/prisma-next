@@ -262,7 +262,6 @@ const SqlContractSchema = type({
 // includes bigint | Date (runtime-only types after decoding) which cannot be expressed
 // in Arktype's JSON validation DSL. The `as SqlStorage` cast in validateStorage() bridges
 // the gap between the JSON-safe Arktype output and the runtime TypeScript type.
-// See decodeContractDefaults() in validate.ts for the decoding step.
 
 /**
  * Validates the structural shape of SqlStorage using Arktype.

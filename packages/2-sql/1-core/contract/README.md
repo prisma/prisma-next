@@ -9,7 +9,7 @@ This package provides TypeScript type definitions, Arktype validators, and facto
 ## Responsibilities
 
 - **SQL Contract Types**: Defines SQL-specific contract types (`SqlContract`, `SqlStorage`, `StorageTable`, `SqlModelStorage`, `SqlModelFieldStorage`, `ForeignKeysConfig`) that extend framework-level contract types
-- **Contract Validation**: Provides Arktype-based structural validators and the shared `validateContract` entrypoint for runtime-safe contract validation
+- **Contract Validation**: Provides Arktype-based structural validators that the per-target `contractSerializer` SPI consumes for runtime-safe contract validation
 - **IR Factories**: Provides pure factory functions for constructing contract IR structures in tests and authoring
 - **Shared Plane Access**: Enables both migration-plane and runtime-plane packages to import SQL contract types without violating plane boundaries
 
@@ -114,18 +114,21 @@ const storage = validateStorage(storageJson);
 const model = validateModel(modelJson);
 ```
 
-Validate JSON-emitted contracts with mapping + logic checks:
+Validate JSON-emitted contracts with mapping + logic checks via the
+target descriptor's `contractSerializer` SPI:
 
 ```typescript
-import { validateContract } from '@prisma-next/sql-contract/validate';
+import postgresTarget from '@prisma-next/target-postgres/control';
 
-const contract = validateContract<Contract>(contractJson);
+const contract = postgresTarget.contractSerializer.deserializeContract(contractJson);
 ```
 
-`validateContract` returns a constructed contract that:
-- Strips `_generated` if present on input (emitter metadata is excluded from the returned value)
-- Validates model-to-storage cross-references (table existence, column existence)
-- Does not require execution stack or runtime descriptors
+`deserializeContract` parses the on-disk envelope, hydrates the SQL
+Contract IR class hierarchy (`SqlStorage` → `StorageTable` → `StorageColumn`
+/ `PrimaryKey` / …), and validates model-to-storage cross-references in
+one pass. End-user app code typically calls the canonical façade instead
+(e.g. `postgres<Contract>({ contractJson, … })`), which threads the same
+SPI internally.
 
 ### Factories
 
@@ -172,7 +175,6 @@ const c = contract({
 
 - `./types`: TypeScript type definitions
 - `./validators`: Arktype validators for structural validation
-- `./validate`: Shared `validateContract` helper for JSON imports
 - `./factories`: Factory functions for constructing contract IR
 - `./pack-types`: Shared extension/pack typing helpers
 

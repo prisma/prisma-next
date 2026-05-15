@@ -348,12 +348,6 @@ type CodecIntType = CodecTypes['pg/int4@1'];
             '@prisma-next/sql-contract/types/*': [
               `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/*`,
             ],
-            '@prisma-next/sql-contract/validate': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/validate.d.mts`,
-            ],
-            '@prisma-next/sql-contract/validate/*': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/*`,
-            ],
             '@prisma-next/family-sql/ir': [
               `${relativeToWorkspace}/packages/2-sql/9-family/dist/ir.d.mts`,
             ],
