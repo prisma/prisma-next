@@ -1,11 +1,7 @@
 /**
- * Pure planning helpers for Postgres enum types.
- *
- * Lifted verbatim from the legacy `pgEnumControlHooks.planTypeOperations`
- * codec-hook glue so the verifier and planner can walk `SqlEnumType`
- * instances natively (no codec-hook dispatch). The Op builders themselves
- * live in `./operations/enums.ts`; this module hosts the diff/rebuild
- * helpers that consume them.
+ * Pure planning helpers for Postgres enum types: the diff/rebuild logic
+ * that the verifier and planner use to walk `SqlEnumType` instances
+ * natively. Op builders live in `./operations/enums.ts`.
  */
 
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
@@ -23,16 +19,17 @@ export type EnumDiff =
   | { readonly kind: 'rebuild'; readonly removedValues: readonly string[] };
 
 /**
- * Bridging adapter — reads existing enum values for `nativeType` from the
- * Postgres-introspected `schema.annotations.pg.storageTypes` map. The
- * introspector populates this map with `Record<string, StorageTypeInstance>`
- * shaped entries (`codecId: PG_ENUM_CODEC_ID`, `typeParams.values`).
+ * Reads existing enum values for `nativeType` from the
+ * Postgres-introspected `schema.annotations.pg.storageTypes` map.
+ *
+ * Schema IR's `storageTypes` slots are always codec-typed
+ * (`{codecId: PG_ENUM_CODEC_ID, typeParams.values}`): the introspector
+ * writes that shape, and the Contract→Schema IR projector resolves
+ * `SqlEnumType` instances down to the same codec-typed triple before
+ * they ever land in Schema IR. There is no second on-disk shape to
+ * accept here.
  *
  * Returns `null` when no enum entry exists for the given native type.
- *
- * Schema IR retains the codec-typed annotation shape per Decision 18; this
- * function is the small (~20 LOC) translation between that shape and the
- * native `SqlEnumType` walk.
  */
 export function readExistingEnumValues(
   schema: SqlSchemaIR,
@@ -45,26 +42,15 @@ export function readExistingEnumValues(
         string,
         {
           codecId?: string;
-          kind?: string;
-          values?: unknown;
           typeParams?: { values?: unknown };
         }
       >
     | undefined;
   const existing = storageTypes?.[nativeType];
-  if (!existing) {
+  if (!existing || existing.codecId !== PG_ENUM_CODEC_ID) {
     return null;
   }
-  // Two annotation shapes are accepted: live-introspection codec-typed
-  // entries (`{codecId: PG_ENUM_CODEC_ID, typeParams.values}`) and
-  // synthesised-from-contract `SqlEnumType` entries (`{kind:
-  // 'sql-enum-type', values}`). Both flow through the same Postgres
-  // `storage.types` annotation slot today.
-  const enumValues =
-    existing.kind === 'sql-enum-type' ? existing.values : existing.typeParams?.values;
-  if (existing.kind !== 'sql-enum-type' && existing.codecId !== PG_ENUM_CODEC_ID) {
-    return null;
-  }
+  const enumValues = existing.typeParams?.values;
   if (!Array.isArray(enumValues) || !enumValues.every((v) => typeof v === 'string')) {
     return null;
   }
