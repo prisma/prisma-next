@@ -30,12 +30,14 @@ export function codecRefForStorageColumn(
     const instance = storage.types?.[columnDef.typeRef];
     if (!instance) return undefined;
     if (isPostgresEnumStorageEntry(instance)) {
-      // Both the live IR-class instance (with `codecBinding` accessor)
-      // and the raw JSON envelope (with enumerable `codecId` +
-      // `values` own properties) satisfy the structural shape; reading
-      // them directly off the structural fields keeps this dispatch
-      // path layered against the framework-shared alphabet rather than
-      // a target-specific class import.
+      // Canonical path: the entry is a live `PostgresEnumType` IR
+      // instance reached through the per-target serializer's
+      // hydration. Raw JSON envelopes carrying `kind: 'postgres-enum'`
+      // never reach this site — `SqlStorage.normaliseTypeEntry`
+      // rejects them upstream (F09). Read `codecId` and `values` off
+      // the structural shape (enumerable own properties on the live
+      // instance) so the dispatch stays layered against the family
+      // alphabet rather than a target-specific class import.
       return {
         codecId: instance.codecId,
         typeParams: { values: instance.values } as unknown as JsonValue,

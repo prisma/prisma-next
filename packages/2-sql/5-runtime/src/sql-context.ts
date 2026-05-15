@@ -223,12 +223,15 @@ export function assertExecutionStackContractRequirements(
 
 /**
  * Resolves codec id + typeParams for a `SqlStorage.types` entry that
- * represents an enum, accommodating two shapes:
- *   - hydrated Postgres-enum IR instance (uses prototype `codecBinding`)
- *   - raw JSON envelope with `kind: 'postgres-enum'` (carries
- *     `codecId` as enumerable own property + `values` array)
- * Returns `undefined` when the entry is not enum-shaped, so callers
- * fall through to the codec-typed path.
+ * represents an enum. The canonical contract path always pipes raw JSON
+ * through the `SqlStorage` constructor, which rejects raw
+ * `kind: 'postgres-enum'` envelopes that bypass the per-target
+ * `ContractSerializer.deserializeContract` hydration. By the time this
+ * function runs, the entry is a live IR-class instance that
+ * structurally satisfies `PostgresEnumStorageEntry` — `codecId` and
+ * `values` are enumerable own properties on the instance. Returns
+ * `undefined` when the entry is not enum-shaped, so callers fall
+ * through to the codec-typed path.
  */
 function readEnumViewIfApplicable(
   typeInstance: unknown,
