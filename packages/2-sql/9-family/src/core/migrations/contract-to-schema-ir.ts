@@ -303,13 +303,28 @@ function deriveAnnotations(
 ): SqlAnnotations | undefined {
   const types = storage.types as ResolvedStorageTypes | undefined;
   if (!types || Object.keys(types).length === 0) return undefined;
-  // Re-key by nativeType to match the structure produced by introspection.
-  // The polymorphic slot's known variants (codec-instance + postgres-enum)
-  // both carry `nativeType` as an enumerable own property; unknown future
-  // kinds without a `nativeType` are skipped rather than crashing.
-  const byNativeType: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+  // Re-key by nativeType, normalising every variant to the codec-typed
+  // annotation shape `{codecId, nativeType, typeParams}` produced by the
+  // adapter introspector (`introspectPostgresEnumTypes` writes that shape;
+  // see also `enum-planning.ts § readExistingEnumValues`, which reads
+  // `existing.codecId` + `existing.typeParams.values`). Without this
+  // normalisation, the projector would emit the raw
+  // `PostgresEnumStorageEntry` shape (top-level `values`, no `typeParams`)
+  // and downstream Schema IR consumers that walk the codec-typed shape
+  // would see enum entries as new (e.g. the planner emits a fresh
+  // `CreateEnumTypeCall` instead of the rebuild recipe). Unknown future
+  // kinds without `nativeType` are skipped rather than crashing.
+  const byNativeType: Record<string, StorageTypeInstance> = {};
   for (const typeInstance of Object.values(types)) {
-    if (isPostgresEnumStorageEntry(typeInstance) || isStorageTypeInstance(typeInstance)) {
+    if (isPostgresEnumStorageEntry(typeInstance)) {
+      byNativeType[typeInstance.nativeType] = {
+        codecId: typeInstance.codecId,
+        nativeType: typeInstance.nativeType,
+        typeParams: { values: typeInstance.values },
+      };
+      continue;
+    }
+    if (isStorageTypeInstance(typeInstance)) {
       byNativeType[typeInstance.nativeType] = typeInstance;
     }
   }
