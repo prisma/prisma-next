@@ -8,6 +8,7 @@ import { formatErrorJson, formatErrorOutput } from '../../utils/formatters/error
 import type { GlobalFlags } from '../../utils/global-flags';
 import { TerminalUI } from '../../utils/terminal-ui';
 import {
+  formatSkillInstallCommand,
   LEGACY_SKILL_FILE,
   markerFilePath,
   runProjectLevelSkillInstall,
@@ -184,11 +185,10 @@ export async function runInit(
   // and missing-on-disk-at-write-time is tolerated.
   const filesToDelete: string[] = inputs.reinit ? [...findStaleArtefacts(baseDir, schemaDir)] : [];
 
-  // Legacy hand-rolled skill file from before `init` delegated to
-  // `npx skills add @prisma-next/agent-skill`. Always queued for
-  // deletion (not gated on `--reinit`) so a project initialised by
-  // an older `init` doesn't keep a stale stub once the user upgrades
-  // and reruns `init`.
+  // `init` delegates the skill to `npx skills add @prisma-next/agent-skill`,
+  // so a hand-rolled `.agents/skills/prisma-next/SKILL.md` in the project
+  // would shadow the published package. Queue it for deletion on every
+  // run (not gated on `--reinit`).
   if (existsSync(join(baseDir, LEGACY_SKILL_FILE))) {
     filesToDelete.push(LEGACY_SKILL_FILE);
   }
@@ -449,13 +449,14 @@ export async function runInit(
   // potentially fails. We skip the install when the user passed
   // `--no-install` for the same reason — no `node_modules` means the
   // workspace isn't ready to consume the skill yet anyway.
+  const manualProjectSkillCommand = formatSkillInstallCommand(install.effectivePm, false);
   if (!inputs.installProjectSkill) {
     warnings.push(
-      'Skipped @prisma-next/agent-skill install (--no-skill). To install later, run `npx skills add @prisma-next/agent-skill` in this project.',
+      `Skipped @prisma-next/agent-skill install (--no-skill). To install later, run \`${manualProjectSkillCommand}\` in this project.`,
     );
   } else if (install.skipped) {
     warnings.push(
-      'Skipped @prisma-next/agent-skill install because --no-install was passed. Once you run install manually, register the skill with `npx skills add @prisma-next/agent-skill`.',
+      `Skipped @prisma-next/agent-skill install because --no-install was passed. Once you run install manually, register the skill with \`${manualProjectSkillCommand}\`.`,
     );
   } else {
     let installUserSkill = inputs.installUserSkill;

@@ -151,10 +151,7 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
     expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(true);
     expect(existsSync(join(tmpDir, 'prisma/db.ts'))).toBe(true);
     expect(existsSync(join(tmpDir, 'prisma-next.md'))).toBe(true);
-    // The hand-rolled `.agents/skills/prisma-next/SKILL.md` template is no
-    // longer emitted by init — the published `@prisma-next/agent-skill`
-    // package replaces it, and the `skills` CLI places its content under
-    // a discovery path that's the agent runtime's concern, not init's.
+    // init must not emit `.agents/skills/prisma-next/SKILL.md`.
     expect(existsSync(join(tmpDir, '.agents/skills/prisma-next/SKILL.md'))).toBe(false);
   });
 
