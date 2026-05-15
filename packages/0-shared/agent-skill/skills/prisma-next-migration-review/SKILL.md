@@ -1,6 +1,6 @@
 ---
 name: prisma-next-migration-review
-description: Review what Prisma Next migrations will run on merge or deploy, render the migration graph, resolve concurrent / diamond-convergence conflicts, and configure environment refs for CI. Use for "what migrations are going to run", "what runs on deploy", merge conflict, diamond convergence, concurrent migrations, migration status --ref, migration ref, staging, production, prisma migrate deploy preview.
+description: Review what Prisma Next migrations will run on merge or deploy, render the migration graph, resolve concurrent / diamond-convergence conflicts, and configure environment refs for CI. Use for "what migrations are going to run", "what runs on deploy", merge conflict, diamond convergence, concurrent migrations, migration status --ref, migration ref, staging, production, MIGRATION.DIVERGED, MIGRATION.NO_MARKER, MIGRATION.MARKER_NOT_IN_HISTORY, prisma migrate status, prisma migrate diff, prisma migrate resolve.
 ---
 
 # Prisma Next — Migration Review (Deployment + Concurrency)
@@ -54,6 +54,23 @@ The on-disk migrations form a directed graph: **nodes are contract hashes; edges
 - **pending** — on the path from the marker to the destination (what would run).
 - **unreachable** — on the path from `EMPTY_CONTRACT_HASH` to the destination, but the marker is on a different branch and won't reach it without first re-routing.
 
+### Diagnostic codes
+
+`migration status` emits structured diagnostics on the result envelope (`diagnostics[].code`) so the agent can branch on the code rather than parsing the prose summary. Each diagnostic also carries `severity` (`warn` or `info`), a human `message`, and `hints` — the same hints the CLI prints under the summary line.
+
+| Code | Severity | Meaning in the navigation model | Next move |
+|---|---|---|---|
+| `MIGRATION.UP_TO_DATE` | info | Marker = destination; no edges to walk. | Nothing to do. |
+| `MIGRATION.DATABASE_BEHIND` | info | Marker is an ancestor of the destination; N pending edges in between. | `migration apply --ref <name> --db $URL`. |
+| `MIGRATION.INVARIANTS_PENDING` | info | Marker reached destination structurally but missing required invariants the ref declares. | `migration apply --ref <name> --db $URL` to take a path that covers them. |
+| `MIGRATION.NO_MARKER` | warn | Online, but the database has no marker row — never initialised. | `migration apply --db $URL` (first apply writes the marker). |
+| `MIGRATION.MARKER_NOT_IN_HISTORY` | warn | Online; marker hash is not a node in the graph. The database was changed outside the migration system. | Decide which side is truth: `db sign` (accept DB as truth), `db update` (push contract to DB), `contract infer` (re-derive contract from DB), or `db verify` (inspect first). |
+| `MIGRATION.DIVERGED` | warn | Multiple valid leaves; the destination is ambiguous. | Pass `--ref <name>`, or `migration ref set <name> <hash>` to create one. |
+| `CONTRACT.AHEAD` | warn | Contract head is not in the graph — the contract was edited without re-planning. | `migration plan` to extend the graph. |
+| `CONTRACT.UNREADABLE` | warn | `contract.json` couldn't be read. | `contract emit` to regenerate it. |
+
+A CI gate should read `diagnostics` from `--json` output and decide based on `severity` plus `code`; see *Workflow — CI* below for the structure.
+
 ## Workflow — *"What's about to run on deploy?"*
 
 The user asks: *"I'm about to merge this PR. What migrations are going to run when I deploy to staging?"*
@@ -75,7 +92,7 @@ If you omit `--db`, the command runs offline: it lists the migrations on disk bu
 
 If you omit `--ref`, the destination defaults to the contract head — which answers *"is this branch's contract reachable from the database, and how?"*, not *"what runs on deploy"*. Pass the ref explicitly when the question is about a specific environment.
 
-If `migration status` flags any migration with destructive ops or a long-running operation (CREATE INDEX without `CONCURRENTLY`, ALTER COLUMN with a default fill, DROP COLUMN), surface those specifically to the user. Those are the operations that warrant manual review before deploy.
+`migration status` summarises each pending migration's operations by class (`additive`, `widening`, `data`, `destructive`) and reports a destructive-op count when destructive operations are present. Surface that count to the user before they merge or deploy — destructive operations are the class that warrants manual review.
 
 ## Workflow — *"What state is each environment at?"*
 
@@ -92,14 +109,9 @@ This used to be called *diamond convergence* in some PN docs; the situation is t
 
 Either way, the on-disk plan is stale.
 
-**Resolution: the normal core workflow.** Don't follow a special "diamond convergence procedure"; just apply Prisma Next's standard *edit → plan → apply* loop to the post-merge state:
+**Resolution.** The on-disk plan is stale because its `from` hash is no longer the head of the graph; apply the cluster's standard *edit → plan → apply* loop to the post-rebase state and the planner produces a fresh migration whose `from` matches the new head.
 
-1. Rebase the topic branch onto the new `main` so your tree has the other branch's migration.
-2. Remove your old, stale `migration.ts` (its `from` hash is no longer in the graph as you intend).
-3. Re-emit the contract, then re-plan a migration. The planner produces a fresh migration whose `from` hash matches the new head and whose `to` hash captures the union of changes.
-4. **If your old `migration.ts` had data transforms or any custom logic, port that into the new one** before applying. The planner only handles schema deltas; custom data-transform logic is your responsibility to carry across.
-
-That's it. There is no separate "revalidate" step, no special "diamond apply" flow — the diamond is just *"someone else got there first; re-plan from the new head."*
+**The one thing the planner can't do for you** is port custom data-transform logic from the abandoned `migration.ts` into the new one — schema deltas are derived from the contract, but any hand-written `data` operations are yours to carry across before applying. There is no separate "revalidate" step, no special "diamond apply" flow.
 
 ## Workflow — set, list, get, delete refs
 
@@ -130,20 +142,36 @@ CI reports: *"the recorded ref `production` is at hash X; the live DB is at hash
 
 The mismatch is a fact about *two pieces of state that disagree*. The investigation is the same regardless of which piece is wrong:
 
-- Is the **DB ahead of the ref**? Someone applied a migration outside CI without updating the ref in git. Update the ref (commit + push); audit how the out-of-band apply happened.
-- Is the **DB behind the ref**? A previous deploy was rolled back, or the DB was restored from an older backup. Decide whether to re-apply or re-route.
-- Is the **DB on a different branch**? An out-of-band schema change (manual SQL, ad-hoc migration) wrote something the migration graph doesn't model. Run `prisma-next db verify` to find the drift; decide whether the contract or the database is the source of truth.
+- **DB ahead of the ref.** Someone applied a migration outside CI without updating the ref in git. Re-record the ref with `prisma-next migration ref set <ref-name> <db-marker-hash>` (commit + push); then audit how the out-of-band apply happened.
+- **DB behind the ref.** A previous deploy was rolled back, or the DB was restored from an older backup. Either re-apply forward with `prisma-next migration apply --ref <ref-name> --db $URL`, or re-route the ref backward to match what's actually deployed with `prisma-next migration ref set <ref-name> <db-marker-hash>`. The choice is the user's — name both options.
+- **DB on a different branch.** An out-of-band schema change (manual SQL, ad-hoc migration) wrote something the migration graph doesn't model. Run `prisma-next db verify` to inspect the drift, then either `prisma-next contract infer` to re-derive the contract from the database, or edit the contract and run `prisma-next migration plan` so the database is the eventual destination.
 
 `ref set` to silently align the ref with whatever the DB happens to be at is almost never the right move. It papers over drift that you'll pay for later.
 
 ## Workflow — CI: verify a branch can advance the target environment
 
+The gate is `migration status --ref <env> --db $URL`: it computes the path from the live marker to the ref and reports it, without mutating anything. There is no `--dry-run` flag on `migration apply`; the inspect / gate step is `migration status`.
+
 ```yaml
-- run: pnpm prisma-next migration status --ref staging --db "$STAGING_DATABASE_URL"
-- run: pnpm prisma-next migration apply --ref staging --db "$STAGING_DATABASE_URL" --dry-run
+- name: Verify staging is reachable
+  run: |
+    pnpm prisma-next migration status \
+      --ref staging --db "$STAGING_DATABASE_URL" --json > status.json
+    node -e '
+      const s = JSON.parse(require("fs").readFileSync("status.json", "utf8"));
+      const warns = (s.diagnostics ?? []).filter(d => d.severity === "warn");
+      if (warns.length) {
+        console.error("Blocking diagnostics:", warns);
+        process.exit(1);
+      }
+    '
+- name: Apply
+  run: pnpm prisma-next migration apply --ref staging --db "$STAGING_DATABASE_URL"
 ```
 
-`--dry-run` validates the path against the live schema without mutating. Fails CI if the path can't apply (the marker isn't an ancestor of the ref, a destructive op needs explicit confirmation, a data-transform throws).
+`migration status` exits non-zero only on hard errors (unreadable migrations directory, unsatisfiable invariants, unreconstructable history). Diagnostics like `MIGRATION.MARKER_NOT_IN_HISTORY`, `MIGRATION.DIVERGED`, `CONTRACT.AHEAD`, and `MIGRATION.NO_MARKER` are reported on the result envelope with `severity: 'warn'` but the process exits `0` — the agent (or a CI gate) must inspect `diagnostics[]` and fail the build itself. Use `--json` so the gate parses a structured shape rather than the human summary.
+
+`migration apply` is interactive-free and has no destructive-op confirmation prompt — the safety rails that prompt for destructive changes live on `db update` (see the `prisma-next-migrations` skill). Whatever the planner put in the migration graph is what `apply` runs; review happens at `migration plan` and at `migration status` time, before the apply step.
 
 ## Common Pitfalls
 
@@ -170,6 +198,7 @@ This skill is intentionally body-only; the underlying CLI reference (`prisma-nex
 - [ ] Read the `migration status` header (it names config, ref, database) and the summary line (it names the origin/destination distance) before reading the per-edge list.
 - [ ] For concurrent-migration conflicts: re-applied the *core* workflow (edit → plan → apply) rather than following a memorised "diamond convergence" procedure. Ported any data-transform logic from the abandoned `migration.ts` over.
 - [ ] For a ref-mismatch: investigated *which* piece of state is wrong (DB ahead, DB behind, DB on a divergent branch). Did NOT `ref set` to silence the mismatch.
-- [ ] Flagged destructive ops and long-running ops in the pending list before the user merges or deploys.
+- [ ] Surfaced the destructive-op count from `migration status` (the only operation class that warrants manual review pre-deploy) before the user merges or deploys.
+- [ ] In CI: parsed `migration status --json` `diagnostics[]` and gated on `severity === 'warn'`; did NOT rely on a `--dry-run` flag on `migration apply` (no such flag exists).
 - [ ] Did NOT confuse `--ref` with database selection.
 - [ ] Did NOT confabulate a "branch diff" CLI subcommand, a `migration revalidate` step, or any other API the skill above doesn't reference.
