@@ -1,6 +1,6 @@
 ---
 name: prisma-next-runtime
-description: Wire the Prisma Next runtime — db.ts setup, middleware composition (telemetry, lints, budgets), connection configuration, per-environment config, switching targets. Use for db.ts, postgres(), mongo(), middleware, telemetry, query log, lints, budgets, DATABASE_URL, .env, connection pool, dev vs prod config, read replicas, multi-database.
+description: Wire the Prisma Next runtime — `db.ts` setup using `postgres<Contract>(...)` from `@prisma-next/postgres/runtime`, middleware composition (telemetry from `@prisma-next/middleware-telemetry`; lints and budgets), `DATABASE_URL` config, per-environment branching, switching between Postgres and Mongo façades. Use for db.ts, postgres(), mongo(), middleware, telemetry, lints, budgets, DATABASE_URL, .env, connection pool, poolOptions, dev vs prod config, transactions, db.transaction, read replicas, multi-database.
 ---
 
 # Prisma Next — Runtime (`db.ts` Wiring)
@@ -14,8 +14,9 @@ This skill covers the **runtime entry point** — `db.ts` — and how to compose
 - User is wiring up `db.ts` for the first time (post-init).
 - User wants to add middleware (telemetry, lints, budgets, custom).
 - User wants per-environment config (dev vs prod, multi-region).
-- User wants to switch targets (Postgres ↔ Mongo).
-- User mentions: *db.ts, postgres(), mongo(), middleware, telemetry, query log, lints, budgets, DATABASE_URL, .env, connection pool, dev vs prod, read replicas, multi-database*.
+- User wants to switch between the Postgres and Mongo façades.
+- User wants to wrap operations in `db.transaction(...)`.
+- User mentions: *db.ts, postgres(), mongo(), middleware, telemetry, lints, budgets, DATABASE_URL, .env, connection pool, poolOptions, dev vs prod, transactions, read replicas, multi-database*.
 
 ## When Not to Use
 
@@ -25,183 +26,197 @@ This skill covers the **runtime entry point** — `db.ts` — and how to compose
 - User wants to debug a connection / runtime error → `prisma-next-debug`.
 - User wants to file a bug or feature request → `prisma-next-feedback`.
 
-## Key Concepts (before any workflow)
+## Key Concepts
 
-- **`db.ts` is the runtime entry point.** Imports `@prisma-next/postgres` (or `mongo`), the contract artifacts (`contract.json` + the `Contract` type from `contract.d.ts`), and any middleware. Exports a `db` value the rest of your app imports.
-- **Middleware** wraps every operation. Telemetry, lints, budgets ship in `@prisma-next/postgres/middleware`; extensions can contribute more. Middleware composes in order — the first one passed runs outermost.
-- **`prisma-next.config.ts` vs `.env`**: the config file is for static config (target, contract path, extensions, capabilities); `.env` is for per-environment values (`DATABASE_URL`, secrets). Don't put secrets in the config.
-- **Build-system / dev-server integration** is a different skill: contract auto-emit during `vite dev` (and the future Next.js equivalent) is owned by `prisma-next-build`. The runtime entry point reads `contract.json` / `contract.d.ts` regardless of how they got there, so the two skills compose cleanly.
+- **`db.ts` is the runtime entry point.** Imports the runtime factory from the `@prisma-next/<target>` façade (`@prisma-next/postgres/runtime` or `@prisma-next/mongo/runtime`), the contract artefacts (`contract.json` + the `Contract` type from `contract.d.ts`), and any middleware. Exports a `db` value the rest of your app imports.
+- **The façade's runtime factory is the only surface user-authored `db.ts` imports from.** Postgres: `import postgres from '@prisma-next/postgres/runtime'`. The factory is a *default* export. The Postgres runtime factory's signature is `postgres<Contract>(options)` — a single type parameter (the `Contract` type from `contract.d.ts`), and one options object.
+- **Lazy connect.** The factory does not connect to the database synchronously. Static query surfaces (`db.sql`, `db.orm`) are available immediately; the driver / pool is instantiated on the first call that needs a runtime (or when you explicitly call `await db.connect({ url })`). This is why `db.ts` can be imported in modules that load before the env is ready.
+- **Middleware composes in order.** The first middleware in the `middleware: [...]` array runs *outermost* — it sees the operation first on the way in and last on the way out. Telemetry first means budget / lint failures show up inside telemetry spans.
+- **`prisma-next.config.ts` vs `.env`.** The config (`defineConfig({ contract, db, extensions, migrations })`) is for static project shape: contract path, installed extensions, migrations directory, default connection string. `.env` is for per-environment values (`DATABASE_URL`, secrets). The config reads `.env` automatically via `dotenv/config`. Hardcoding `DATABASE_URL` in the config file leaks credentials and bypasses per-env overrides.
+- **Build-system / dev-server integration is a separate skill.** `vite dev` auto-emit lives in `prisma-next-build`. The runtime side (this skill) reads `contract.json` / `contract.d.ts` regardless of how they got onto disk, so the two skills compose cleanly.
 
 ## Workflow — Basic `db.ts`
 
-Init scaffolds something like:
+The concept: `db.ts` is the seam between the emitted contract artefacts (target-shaped) and the runtime that executes queries against them. Three imports are load-bearing — the runtime factory, the `Contract` type (so the static query surfaces are typed), and the JSON artefact (so the runtime validates the structure at construct time).
+
+`init` scaffolds something like this (for `--target postgres`):
 
 ```typescript
 // prisma/db.ts
 import postgres from '@prisma-next/postgres/runtime';
-import type { Contract, TypeMaps } from './contract.d';
+import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-const databaseUrl = process.env['DATABASE_URL'];
-if (!databaseUrl) {
-  throw new Error('DATABASE_URL is required');
-}
-
-export const db = postgres<Contract, TypeMaps>({
+export const db = postgres<Contract>({
   contractJson,
-  url: databaseUrl,
+  url: process.env['DATABASE_URL'],
 });
 ```
 
-The `Contract` type parameter is **critical** — without it, types collapse to a generic shape. See the comment in `db.ts` for the rationale.
+Three things to know:
 
-## Add telemetry middleware
+- **`<Contract>` type parameter is load-bearing.** Without it, the static surfaces collapse to a generic shape and you lose autocomplete on model names. Always import `Contract` from the emitted `./contract.d.ts`.
+- **`with { type: 'json' }` is required.** Node's ESM JSON-import-attribute spec. Without it, the import errors.
+- **`url` is optional at construct time.** If `DATABASE_URL` is not set when `db.ts` loads, the factory still returns a client; you can call `await db.connect({ url })` later. The factory throws lazily — only when a runtime is actually needed.
+
+The Mongo façade has the same shape — `import mongo from '@prisma-next/mongo/runtime'` — and the same `db` surface.
+
+## Workflow — Telemetry middleware
+
+The concept: telemetry middleware sees every operation and emits a structured event for each (start, success, error). Pair the events with your observability stack's collector.
 
 ```typescript
 import postgres from '@prisma-next/postgres/runtime';
-import { createTelemetryMiddleware } from '@prisma-next/postgres/middleware';
-import type { Contract, TypeMaps } from './contract.d';
+import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
+import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-export const db = postgres<Contract, TypeMaps>({
+export const db = postgres<Contract>({
   contractJson,
-  url: process.env['DATABASE_URL']!,
+  url: process.env['DATABASE_URL'],
   middleware: [
-    createTelemetryMiddleware({ serviceName: 'my-app' }),
+    createTelemetryMiddleware({
+      onEvent: (event) => {
+        // forward to your collector, log, etc.
+      },
+    }),
   ],
 });
 ```
 
-Telemetry middleware emits OpenTelemetry spans for each operation. Pair with your observability stack's collector.
+`createTelemetryMiddleware` is shipped as a separate user-installable package (`@prisma-next/middleware-telemetry`), not as a `/middleware` subpath of the postgres façade. Install it directly. Run `pnpm ls @prisma-next/middleware-telemetry` to confirm it's on the lockfile.
 
-## Add lints middleware
+## Workflow — Lints and budgets middleware
 
-Lints catch common mistakes at runtime — querying without `.where` filters that should be required, returning entire tables without a limit, etc.
+The concept: lints catch authoring mistakes that survive type-check (e.g. `DELETE` without a `WHERE`, `SELECT` without a `LIMIT` on a large table); budgets enforce row-count and latency ceilings at runtime. Both surface findings through the structured-error envelope so an agent can branch on the code.
+
+These ship in the underlying SQL runtime package (`@prisma-next/sql-runtime`) and are *not* yet re-exported from the postgres façade — see *What Prisma Next doesn't do yet*. The example apps under `examples/prisma-next-demo/src/prisma/db.ts` show the canonical import.
 
 ```typescript
-import { lints } from '@prisma-next/postgres/middleware';
+import postgres from '@prisma-next/postgres/runtime';
+import { budgets, lints } from '@prisma-next/sql-runtime';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
 
-middleware: [
-  lints({
-    requireWhere: ['User', 'Order'],  // these models must have a .where()
-    maxRowsWithoutLimit: 1000,
-  }),
-];
+export const db = postgres<Contract>({
+  contractJson,
+  url: process.env['DATABASE_URL'],
+  middleware: [
+    lints({
+      severities: {
+        selectStar: 'warn',
+        noLimit: 'error',
+        deleteWithoutWhere: 'error',
+        updateWithoutWhere: 'error',
+        readOnlyMutation: 'error',
+        unindexedPredicate: 'warn',
+      },
+    }),
+    budgets({
+      maxRows: 10_000,
+      defaultTableRows: 10_000,
+      tableRows: { user: 10_000, post: 50_000 },
+      maxLatencyMs: 1_000,
+      severities: { rowCount: 'error', latency: 'warn' },
+    }),
+  ],
+});
 ```
 
-Lints throw / log on violation depending on configuration.
+For the full option surface, read the source: `packages/2-sql/5-runtime/src/middleware/lints.ts` and `.../budgets.ts`. The `severities` keys (`selectStar`, `noLimit`, `deleteWithoutWhere`, `updateWithoutWhere`, `readOnlyMutation`, `unindexedPredicate` for lints; `rowCount`, `latency` for budgets) are the source of truth; do not extrapolate to a key that ripgrep can't find.
 
-## Add budgets middleware
-
-Budgets enforce time / row-count caps per operation.
-
-```typescript
-import { budgets } from '@prisma-next/postgres/middleware';
-
-middleware: [
-  budgets({
-    maxDurationMs: 5_000,
-    maxRows: 10_000,
-  }),
-];
-```
-
-A query that exceeds either budget throws a structured error.
-
-## Compose multiple middleware
+## Workflow — Compose multiple middleware
 
 ```typescript
 middleware: [
-  createTelemetryMiddleware({ serviceName: 'my-app' }),  // outermost
-  lints({ requireWhere: ['User'] }),
-  budgets({ maxDurationMs: 5_000 }),                      // innermost
-];
+  createTelemetryMiddleware({ onEvent }),  // outermost — sees all sub-failures as inner errors
+  lints({ severities: { noLimit: 'error' } }),
+  budgets({ maxLatencyMs: 5_000 }),         // innermost — runs closest to the driver
+],
 ```
 
-Order matters: outermost wraps. Telemetry first means budgets / lints failures are captured as spans.
+Order matters: outermost wraps. Telemetry first means budget / lint failures are captured as spans (the agent can correlate the lint code with the operation in the same trace).
 
-## Add an extension-contributed middleware
+## Workflow — Configure the connection
 
-Some extensions ship middleware (e.g. an audit-log middleware). Import from the extension's `middleware` entry:
-
-```typescript
-import { auditMiddleware } from '@prisma-next/postgres-extension-audit/middleware';
-
-middleware: [
-  createTelemetryMiddleware({ serviceName: 'my-app' }),
-  auditMiddleware({ destination: 'kafka' }),
-];
-```
-
-Check the extension's README for its middleware exports.
-
-## Configure the connection
-
-Three sources of truth, in precedence order (later overrides earlier):
-
-1. **`db.connection` in `prisma-next.config.ts`** — static config the CLI uses for emit / verify. Rarely set; prefer `.env`.
-2. **`DATABASE_URL` env var (loaded from `.env` by `dotenv/config`)** — default; read by both the CLI and the runtime.
-3. **`--db <url>` CLI flag** — overrides everything else for one command. Use for one-off invocations against a different DB.
+The concept: the runtime takes one of three binding shapes — `url`, `pg` (a pre-constructed `pg.Pool` or `pg.Client`), or `binding` (an explicit kind tag). They're mutually exclusive. The `pg` form is for projects that already manage their own pool (e.g. a Lambda layer); `url` is the default. Pool tuning is `poolOptions.connectionTimeoutMillis` / `poolOptions.idleTimeoutMillis` — *not* `driverOptions`.
 
 ```typescript
-// Bad: hardcoding the URL in the config file.
-// Leaks credentials. Bypasses per-environment overrides.
-export default definePnConfig({
-  target: 'postgres',
-  contract: { path: 'prisma/schema.psl', authoring: 'psl' },
-  connection: { url: 'postgresql://app:secret@localhost/db' },
+// Default — URL string, factory constructs the pool.
+postgres<Contract>({
+  contractJson,
+  url: process.env['DATABASE_URL'],
+  poolOptions: {
+    connectionTimeoutMillis: 20_000,
+    idleTimeoutMillis: 30_000,
+  },
 });
 
-// Good: read from the env var.
-import 'dotenv/config';
-export default definePnConfig({
-  target: 'postgres',
-  contract: { path: 'prisma/schema.psl', authoring: 'psl' },
-});
-// DATABASE_URL is read by the runtime + CLI automatically.
+// BYO pool — pass a pg.Pool you already created.
+import { Pool } from 'pg';
+const pool = new Pool({ connectionString: process.env['DATABASE_URL'] });
+postgres<Contract>({ contractJson, pg: pool });
 ```
 
-## Per-environment config (dev vs prod)
+The `url` and `pg` keys are mutually exclusive at the type level; passing both errors.
 
-Use environment variables — one `DATABASE_URL` per environment. `.env` for local dev; the deploy platform's secrets for prod.
+`DATABASE_URL` lives in `.env`. The CLI reads it for emit / verify / migration commands; the runtime reads it through `process.env` at `db.ts` load time.
 
-```dotenv
-# .env (local)
-DATABASE_URL=postgresql://localhost:5432/myapp_dev
+## Workflow — Per-environment config (dev vs prod)
 
-# .env.production (set on the deploy platform, NOT committed)
-DATABASE_URL=postgresql://prod-host:5432/myapp_prod
-```
-
-For more complex per-env divergence (different middleware in dev vs prod, different lints), branch in `db.ts`:
+The concept: one `DATABASE_URL` per environment; the rest of the `db.ts` shape is the same. For middleware divergence (e.g. strict lints in dev only), branch in `db.ts` on `process.env['NODE_ENV']`.
 
 ```typescript
 const isProd = process.env['NODE_ENV'] === 'production';
 
-export const db = postgres<Contract, TypeMaps>({
+export const db = postgres<Contract>({
   contractJson,
-  url: process.env['DATABASE_URL']!,
+  url: process.env['DATABASE_URL'],
   middleware: isProd
-    ? [createTelemetryMiddleware({ serviceName: 'my-app' })]
-    : [createTelemetryMiddleware({ serviceName: 'my-app-dev' }),
-       lints({ requireWhere: ['User'] })],  // strict lints in dev
+    ? [createTelemetryMiddleware({ onEvent })]
+    : [
+        createTelemetryMiddleware({ onEvent }),
+        lints({ severities: { noLimit: 'error', deleteWithoutWhere: 'error' } }),
+      ],
 });
 ```
 
-## Switch targets (Postgres ↔ Mongo)
+`.env` for local; the deploy platform's secrets for prod. Never commit `.env`.
 
-If a project needs to switch its underlying target:
+## Workflow — Transactions
 
-1. Re-init: `pnpm prisma-next init --reinit --target mongodb` (or `--target postgres`).
-2. PN re-scaffolds `prisma-next.config.ts` and `db.ts` for the new target.
-3. Re-author the contract for the new target's idioms (Mongo uses nested documents; Postgres uses relations).
-4. `contract emit` + `db init` against the new DB.
+The concept: `db.transaction(fn)` opens a transaction, gives the callback a `tx` context with the same `sql` / `orm` surfaces as `db`, and commits on successful return / rolls back on any thrown error. Inside the callback, use `tx.sql` and `tx.orm` instead of `db.sql` / `db.orm` so the writes ride the transaction.
 
-`db.ts` ends up importing from `@prisma-next/mongo/runtime` instead of `@prisma-next/postgres/runtime`. The `db` API surface stays the same.
+```typescript
+await db.transaction(async (tx) => {
+  const user = await tx.orm.User.create({ email: 'alice@example.com' });
+  await tx.orm.Post.create({ userId: user.id, title: 'hello' });
+  // If either call throws, both inserts roll back.
+});
+```
 
-## Build-system / dev-server integration
+The callback returns whatever you return from it — the transaction wrapper passes it through. The `tx` object exposes `execute(plan)` for SQL-builder plans inside the transaction.
 
-If you want contract artifacts to re-emit automatically while the dev server is running (instead of running `prisma-next contract emit` by hand each time the contract source changes), reach for the build-tool plugin from `prisma-next-build`:
+## Workflow — Switch between Postgres and Mongo
+
+The concept: the façade selection is baked into `db.ts` (`@prisma-next/postgres` vs `@prisma-next/mongo`) and `prisma-next.config.ts` (which `defineConfig` you import from). To switch a project's target, re-run `prisma-next init` in the same directory and pick the other target — the init flow detects the existing scaffold and prompts to reinit (`--force` skips the prompt). PN re-scaffolds `prisma-next.config.ts` and `db.ts` for the new façade. The contract source needs to be re-authored for the new target's idioms (Mongo expresses nested documents; Postgres expresses relations).
+
+After the switch:
+
+```typescript
+// prisma/db.ts (Mongo)
+import mongo from '@prisma-next/mongo/runtime';
+import type { Contract } from './contract.d';
+import contractJson from './contract.json' with { type: 'json' };
+
+export const db = mongo<Contract>({ contractJson, url: process.env['DATABASE_URL'] });
+```
+
+The `db.sql` / `db.orm` surfaces stay the same in name; the operators each surface exposes are target-shaped (Mongo has no `JOIN`).
+
+## Workflow — Build-system / dev-server integration
+
+If you want contract artefacts to re-emit automatically while the dev server is running (instead of running `prisma-next contract emit` by hand each time the contract source changes), reach for the build-tool plugin from `prisma-next-build`:
 
 - **Vite**: install `@prisma-next/vite-plugin-contract-emit` and register `prismaVitePlugin('prisma-next.config.ts')` in `vite.config.ts`.
 - **Next.js, Webpack, esbuild, Rollup, Turbopack**: no first-party plugin yet — the workaround is a `prebuild` script that runs `prisma-next contract emit`. See `prisma-next-build` for the walkthrough.
@@ -211,30 +226,34 @@ The runtime side (this skill) is the same regardless: `db.ts` reads `contract.js
 ## Common Pitfalls
 
 1. **Hardcoding `DATABASE_URL` in `prisma-next.config.ts`.** Leaks credentials; bypasses per-environment overrides. Use `.env`.
-2. **Omitting the `Contract` type parameter** in `postgres<Contract, TypeMaps>(...)`. Without it, types collapse to a generic shape and you lose autocomplete for models.
-3. **Forgetting `with { type: 'json' }` on the contract import.** Required by Node's ESM JSON-import attribute spec.
-4. **Middleware order matters.** Outermost wraps; put telemetry first if you want it to capture inner-middleware errors.
-5. **Switching targets without re-emitting.** The contract artifacts are target-shaped; emit after the target change.
+2. **Omitting the `<Contract>` type parameter** in `postgres<Contract>(...)`. Without it, static surfaces collapse to a generic shape and you lose autocomplete for models. There is no second type parameter — the older two-param signature (`postgres<Contract, TypeMaps>`) is gone.
+3. **Forgetting `with { type: 'json' }` on the contract import.** Required by Node's ESM JSON-import-attribute spec.
+4. **Middleware order matters.** Outermost wraps. Put telemetry first if you want it to capture inner-middleware errors.
+5. **Importing middleware from a non-existent façade subpath.** `@prisma-next/postgres/middleware` does *not* exist. Telemetry comes from `@prisma-next/middleware-telemetry`; lints / budgets come from `@prisma-next/sql-runtime` today (see *What Prisma Next doesn't do yet*).
+6. **Confabulating lint / budget option names.** Lints take `severities` (with the six keys above), not `requireWhere` / `maxRowsWithoutLimit`. Budgets use `maxLatencyMs` (not `maxDurationMs`) plus `maxRows` / `defaultTableRows` / `tableRows`. When in doubt, read the source.
+7. **Switching targets without re-emitting.** The contract artefacts are target-shaped; emit after the target change.
 
 ## What Prisma Next doesn't do yet
 
+- **`@prisma-next/postgres/middleware` subpath.** The postgres façade re-exports the runtime factory (`./runtime`), config (`./config`), contract-builder (`./contract-builder`), control (`./control`), family (`./family`), target (`./target`), and serverless (`./serverless`) — but not middleware. Today's workaround: import `lints` and `budgets` from `@prisma-next/sql-runtime`, and `createTelemetryMiddleware` from `@prisma-next/middleware-telemetry`. Tracked alongside the broader façade-completeness work in Linear `TML-2526`; file additional gaps you hit via `prisma-next-feedback`.
 - **Multi-database routing / read replicas.** Prisma Next doesn't ship a built-in primary/replica router or shard-aware client. Workaround: configure separate `db.ts` instances per data store and call the right one in your application code. If you need first-class multi-database routing, file a feature request via the `prisma-next-feedback` skill.
-- **Connection pooling tuning as a first-class config field.** The underlying driver (`pg`, `mongodb`) accepts pool options, and you can pass them through, but PN doesn't surface them in `prisma-next.config.ts`. Workaround: pass driver options through the `postgres({ driverOptions: { ... } })` parameter. If you need first-class pool config, file a feature request via the `prisma-next-feedback` skill.
-- **Query logger middleware as a built-in.** Prisma Next doesn't ship a "log every query" middleware. Workaround: write a small custom middleware that wraps each operation and logs; or use the telemetry middleware and inspect spans. If you need a built-in query log, file a feature request via the `prisma-next-feedback` skill.
+- **Connection pooling as a first-class config field.** `poolOptions.connectionTimeoutMillis` and `poolOptions.idleTimeoutMillis` are wired through, but the rest of `pg.Pool`'s tuning surface (max connections, `allowExitOnIdle`, ssl options, …) is not exposed by name. Workaround: construct the `pg.Pool` yourself and pass it via `pg:`. If you need more pool fields surfaced on the façade, file a feature request via the `prisma-next-feedback` skill.
+- **Query logger middleware as a built-in.** Prisma Next doesn't ship a "log every query" middleware. Workaround: write a small custom middleware that wraps each operation and logs; or use `createTelemetryMiddleware` and log inside the `onEvent` callback. If you need a built-in query log, file a feature request via the `prisma-next-feedback` skill.
 
 ## Reference Files
 
-- `references/middleware-api.md` — the middleware contract; how to author a custom one.
-- `references/connection-config.md` — every connection-config option PN forwards to the driver.
-- For build-system / dev-server integration (Vite plugin, future Next.js plugin): see the `prisma-next-build` skill.
+This skill is intentionally body-only; `prisma-next init --help`, the `defineConfig` factory in `packages/3-extensions/postgres/src/config/define-config.ts`, the `postgres()` factory in `packages/3-extensions/postgres/src/runtime/postgres.ts`, and the middleware sources in `packages/2-sql/5-runtime/src/middleware/{lints,budgets}.ts` are the authoritative surfaces for option-level detail. When in doubt, read the source.
 
 ## Checklist
 
-- [ ] `db.ts` imports the runtime, the contract, the type maps with the right type parameter.
-- [ ] `with { type: 'json' }` on the contract import.
+- [ ] `db.ts` imports the runtime factory from `@prisma-next/<target>/runtime` and the `Contract` type from `./contract.d`.
+- [ ] `with { type: 'json' }` on the contract JSON import.
+- [ ] `<Contract>` is the single type parameter on `postgres<Contract>(...)` (no second parameter).
 - [ ] `DATABASE_URL` lives in `.env`, not in `prisma-next.config.ts`.
 - [ ] Middleware ordered intentionally (telemetry outermost typically).
+- [ ] `lints` / `budgets` use the verified option keys (`severities`, `maxLatencyMs`, `maxRows`, `tableRows`).
 - [ ] Per-env divergence (if any) gated by `NODE_ENV` or similar.
 - [ ] Did NOT hardcode credentials in any committed file.
-- [ ] Did NOT confabulate read-replica / multi-DB / connection-pool config — pointed at the capability-gap section and routed to `prisma-next-feedback` for the user to file a request.
+- [ ] Did NOT confabulate a `@prisma-next/postgres/middleware` subpath, a `@prisma-next/postgres-extension-audit` package, or a second type parameter on `postgres<...>`.
+- [ ] Did NOT confabulate read-replica / multi-DB / extra pool config — pointed at *What Prisma Next doesn't do yet* and routed to `prisma-next-feedback`.
 - [ ] For build-system / dev-server prompts (Vite plugin, Next.js plugin, …) routed to `prisma-next-build`.
