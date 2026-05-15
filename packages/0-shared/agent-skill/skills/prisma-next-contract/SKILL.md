@@ -1,105 +1,78 @@
 ---
 name: prisma-next-contract
-description: Edit the Prisma Next data contract — add models, fields, relations, indexes, enums, type aliases, value objects, polymorphic types (STI / MTI on SQL), install extensions. Use for schema, models, fields, attributes, validations, callbacks, soft delete, paranoid, scopes, polymorphism, discriminator, prisma schema, PSL, contract.ts, contract emit, prisma-next.config.ts, extensionPacks, pgvector, cipherstash.
+description: Edit the Prisma Next data contract — add models, fields, relations, indexes, enums, type aliases, polymorphic types (`@@discriminator` / `@@base`), use extension namespaces (`pgvector.Vector(...)`, `cipherstash.EncryptedString(...)`), wire `prisma-next.config.ts` with `defineConfig`, `prismaContract`, `typescriptContract`, and run `prisma-next contract emit`. Use for schema, models, fields, attributes, soft delete, paranoid, scopes, validations, callbacks, prisma schema, PSL, contract.prisma, contract.ts, contract.json, contract.d.ts, extensionPacks, pgvector, cipherstash, PN-CLI-4002, PN-CLI-4003, PN-CLI-4011.
 ---
 
 # Prisma Next — Contract Authoring
 
 > **Edit your data contract. Prisma handles the rest.**
 
-The data contract is the single source of truth for your data layer. You edit it; the framework handles types, migrations, queries, and runtime configuration. The three-step user model:
+The data contract is the single source of truth for your data layer. You edit a contract source — `contract.prisma` (PSL, the canonical surface) or `contract.ts` (TypeScript builder) — and the framework derives types, migrations, and runtime configuration from it. The three-step user model:
 
 1. **You edit your data contract.**
-2. **The system plans the migrations for you.**
-3. **If you need data migrations, you edit `migration.ts` and execute it.**
+2. **The system plans the migrations for you.** (`prisma-next-migrations`)
+3. **If you need data migrations, you edit `migration.ts` and execute it.** (`prisma-next-migrations`)
 
-Behind step 1 is an emission step the agent owns on the user's behalf — `prisma-next contract emit` regenerates `contract.json` (runtime IR) and `contract.d.ts` (types) from the contract source. The user does not need to think about it; the agent runs it after every contract edit (or installs the Vite plugin so the bundler runs it; see `prisma-next-build`).
+Behind step 1 the agent runs `prisma-next contract emit` after every contract edit (or installs the Vite plugin so the bundler runs it on save — see `prisma-next-build`). Emit reads the contract source through the provider declared in `prisma-next.config.ts` and writes two artefacts colocated with the source:
 
-This skill covers step 1: every authoring operation on the contract, plus configuring extensions in `prisma-next.config.ts`.
+- `contract.json` — the canonical, content-hashed Contract IR. Read by the planner, the runtime, and `db verify`.
+- `contract.d.ts` — the precise TypeScript types the runtime + lanes propagate when you import `Contract` from it.
+
+Both files are **emitted artefacts**. Edit the source; never the JSON or `.d.ts`.
 
 ## When to Use
 
 - User wants to add, change, or remove a model / field / relation.
 - User wants to add an index, unique constraint, or enum.
-- User wants to use a custom type from an extension (`pgvector.Vector(1536)`, `cipherstash.EncryptedText`).
-- User wants to install or configure an extension.
-- User is migrating between authoring modes (PSL ↔ TypeScript).
-- User mentions: *schema, fields, models, attributes, validations, callbacks, scopes, soft delete, paranoid, prisma schema, PSL, contract.ts, contract emit, extensionPacks, pgvector, cipherstash*.
+- User wants to use a custom type from an extension (`pgvector.Vector(length: 1536)`, `cipherstash.EncryptedString({...})`).
+- User wants to install or configure an extension via `extensionPacks` in `prisma-next.config.ts`.
+- User is migrating between authoring sources (PSL ↔ TypeScript builder).
+- User received `PN-CLI-4002`, `PN-CLI-4003`, or `PN-CLI-4011` from `contract emit`.
+- User mentions: *schema, fields, models, attributes, prisma schema, PSL, contract.prisma, contract.ts, contract.json, contract.d.ts, contract emit, extensionPacks, pgvector, cipherstash, validations, callbacks, soft delete, paranoid, scopes*. (The last cluster routes to *What Prisma Next doesn't do yet* below.)
 
 ## When Not to Use
 
 - User wants to apply a contract change to the DB → `prisma-next-migrations`.
 - User wants to write a query against the contract → `prisma-next-queries`.
-- User wants to wire `db.ts` → `prisma-next-runtime`.
-- User wants to set up PN for the first time → `prisma-next-quickstart`.
+- User wants to wire `db.ts` (runtime entry point, middleware, env config) → `prisma-next-runtime`.
+- User wants the Vite / bundler integration → `prisma-next-build`.
+- User wants to set up Prisma Next for the first time → `prisma-next-quickstart`.
+- User wants a deeper read of a single structured error envelope → `prisma-next-debug`.
+- User wants to file a missing-feature request → `prisma-next-feedback`.
 
-## Key Concepts (before any workflow)
+## Key Concepts
 
-- **Contract source** lives at the path declared in `prisma-next.config.ts` under `contract.path` (often `prisma/schema.psl` or `prisma/contract.ts`). Read the config first; do not assume the path.
-- **Emit step** generates `contract.json` (runtime IR) and `contract.d.ts` (types) from the contract source. Run `prisma-next contract emit` after every contract edit (or rely on the Vite plugin to run it on save; see `prisma-next-build`). The user does not need to invoke emit directly — the agent runs it.
-- **Extensions** add new type families, namespaces, and capabilities (e.g. `pgvector`, `cipherstash`). They're installed via `extensionPacks: [...]` in `prisma-next.config.ts` and referenced from the contract by their namespace (`pgvector.Vector(1536)`).
-- **Type maps** are the bridge between the contract's logical types and the user's TypeScript types. Emitted into `contract.d.ts`.
+- **Contract source.** A file the framework reads and lowers to the canonical Contract IR. Two flavours, both first-class:
+  - **`contract.prisma` (PSL)** — schema-flavoured DSL. Canonical for typical apps and brownfield Prisma users. Wired by `prismaContract('./<path>/contract.prisma', { output, target })` from `@prisma-next/sql-contract-psl/provider`.
+  - **`contract.ts` (TypeScript builder)** — programmatic authoring with `defineContract({...}, ({ field, model, rel, type }) => ({...}))` from `@prisma-next/sql-contract-ts/contract-builder` (or `@prisma-next/mongo-contract-ts/contract-builder` for Mongo). Wired by `typescriptContract(contract, '<path>/contract.json')` from `@prisma-next/sql-contract-ts/config-types`. Use when you need programmatic composition (per-tenant variants, generated fields) or constructs PSL doesn't yet express (e.g. registering a parameterised extension type — see pgvector's contract).
+- **`prisma-next.config.ts`.** Wires the family + target + adapter + driver + extension packs + contract source. Use `defineConfig({...})` from `@prisma-next/cli/config-types`. The `contract` field takes a `ContractConfig` produced by `prismaContract(...)` or `typescriptContract(...)` — there is no `contract.path` or `contract.authoring` key.
+- **Emit pipeline.** `prisma-next contract emit --config <path>?` calls `contract.source.load(context)`, validates the resulting Contract, then atomically writes `contract.json` + `contract.d.ts` to the configured output (or the provider's default — colocated with the source for both PSL and TS builder; falls back to `src/prisma/contract.json` for in-memory TS contracts with no path to anchor on).
+- **Extension namespaces.** Extensions contribute namespaced constructors (`pgvector.Vector(length: 1536)`, `cipherstash.EncryptedString({equality: true})`) and helper presets. Install them by adding the descriptor to `extensionPacks` in the **config** (`extensionPacks: [pgvector]`, array of control descriptors) and — for the TS builder — to `extensionPacks` in **`defineContract`** (`extensionPacks: { pgvector }`, record of pack descriptors). The names are intentionally the same; the data shapes differ because the two surfaces consume different descriptor types.
+- **Contract space.** Each package that emits its own contract (your app, an internal extension package, a published extension) follows the same on-disk layout: `prisma-next.config.ts` at package root; `src/contract.prisma` (or `src/contract.ts`); `src/contract.{json,d.ts}` colocated with the source; `migrations/` at package root. See `.cursor/rules/contract-space-package-layout.mdc`.
 
-## Workflow — Read the config first
+## Diagnostic codes you route on
 
-Every workflow in this skill starts with:
+`prisma-next contract emit` surfaces structured errors with stable codes; branch on `code` rather than message text.
 
-1. Read `prisma-next.config.ts`.
-2. Note: `target` (postgres / mongo), `contract.authoring` (psl / typescript), `contract.path`, `extensionPacks` (installed extensions).
-3. Open the contract source at `contract.path`.
+| Code | Meaning | Next move |
+|---|---|---|
+| `PN-CLI-4002` *Contract configuration missing* | `contract` (or `contract.output`) not in `prisma-next.config.ts`. | Add `contract: prismaContract('./contract.prisma', { output, target })` (or `typescriptContract(contract, 'output/contract.json')`) to `defineConfig({...})`. |
+| `PN-CLI-4003` *Contract validation failed* | Source loaded but the Contract IR failed structural validation. | Read `meta.diagnostics` / `meta.issues` for the offending model/field, fix the source, re-emit. |
+| `PN-CLI-4011` *Missing extension packs in config* | The contract uses a namespaced constructor (e.g. `pgvector.Vector(...)`) but `extensionPacks` in the config does not list a matching descriptor. `meta.missingExtensionPacks` names them. | Install the package, import the control descriptor, add it to `extensionPacks` in `prisma-next.config.ts`. |
 
-If `prisma-next.config.ts` is missing, route to `prisma-next-quickstart`.
+## Workflow — Read the contract source of truth
 
-## Add a model (PSL)
-
-```prisma
-// prisma/schema.psl
-model Profile {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  createdAt DateTime @default(now())
-}
-```
-
-Then:
+The concept: every contract change starts by locating the source file. The config is authoritative — the agent reads `prisma-next.config.ts` to resolve the `contract.source` provider and any extension packs already installed, then opens the source file the provider points at.
 
 ```bash
-pnpm prisma-next contract emit
+cat prisma-next.config.ts
 ```
 
-## Add a model (TypeScript builder)
+Look for the `contract:` field. `prismaContract('./...contract.prisma', ...)` → PSL source at the first argument. `typescriptContract(contract, '...')` → TS source at the file that exports `contract`. If `prisma-next.config.ts` is missing, route to `prisma-next-quickstart`.
 
-```typescript
-// prisma/contract.ts
-import { defineContract, model, field } from '@prisma-next/postgres/authoring';
+## Workflow — Edit a model / field / relation (PSL)
 
-export const contract = defineContract({
-  models: {
-    Profile: model({
-      id: field.int().id().autoincrement(),
-      email: field.string().unique(),
-      createdAt: field.datetime().default('now'),
-    }),
-  },
-});
-```
-
-Then `pnpm prisma-next contract emit` to regenerate the artifacts.
-
-## Edit a field — rename
-
-Prisma Next does not yet have a rename hint. When you rename a field in the contract, the planner sees the old column drop and the new column add as two unrelated operations: `migration plan` produces a destructive `DROP COLUMN` + `ADD COLUMN`. There is no in-contract way to tell the planner *"this is a rename, preserve the data"* today.
-
-Workarounds, in order of preference:
-
-1. **Hand-edit `migration.ts` after `migration plan`** so the destructive op becomes a `RENAME COLUMN` (or `RENAME TABLE`). Then run `node migrations/<dir>/migration.ts` to self-emit and `migration apply`. See `prisma-next-migrations` for the hand-edit workflow.
-2. **Keep the old field, add the new field, backfill in `migration.ts`, then drop the old field in a follow-up migration.** Safer for production, two deploys instead of one.
-
-If you want a first-class rename hint (e.g. `@@rename(old: "email", new: "emailAddress")` or similar), file a feature request via the `prisma-next-feedback` skill.
-
-## Add a relation
-
-Declare the relation on the owning side (the model that holds the FK column). Prisma Next adds the back-reference (`posts Post[]` on `User`) automatically — there is no need to write it by hand.
+The concept: PSL models lower to tables (or collections, on Mongo); fields lower to columns; `@relation(...)` declares the FK side. Add the relation only on the owning side — the framework derives the back-reference automatically.
 
 ```prisma
 model User {
@@ -112,181 +85,176 @@ model Post {
   title    String
   authorId Int
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@unique([title, authorId])
+  @@index([authorId])
 }
 ```
 
-After emit, the back-reference is available on the type side and in the ORM (`db.orm.User.posts.*`). Specify cascade behaviour explicitly via `onDelete` on the owning side — the default is `Restrict`.
+Then run `pnpm prisma-next contract emit` (or rely on the Vite plugin — see `prisma-next-build`). Specify cascade behaviour explicitly with `onDelete` / `onUpdate`; the default is `Restrict`.
 
-## Add a unique constraint or index
-
-```prisma
-model User {
-  id    Int    @id @default(autoincrement())
-  email String @unique               // single-field unique
-  name  String
-
-  @@unique([email, name])           // composite unique
-  @@index([name])                    // non-unique index for lookups
-}
-```
-
-## Add an enum
+PSL alias surface for repeated types lives in a top-level `types {}` block:
 
 ```prisma
-enum Role {
-  ADMIN
-  USER
-  GUEST
+types {
+  Email = String
 }
 
 model User {
-  id   Int  @id @default(autoincrement())
-  role Role @default(USER)
+  id    Int    @id @default(autoincrement())
+  email Email  @unique
 }
 ```
 
-## Add an extension-typed scalar (e.g. pgvector)
+Note: scalar lists (e.g. `String[]`) and implicit Prisma-ORM many-to-many (list nav on both sides without a join model) are rejected by the SQL interpreter — use a join model. Composite/embeddable types (`type Address { ... }` with `address Address` on a model) are not supported by the SQL contract today.
 
-1. Add the extension to `prisma-next.config.ts`:
+## Workflow — Edit a model / field / relation (TS builder)
 
-   ```typescript
-   import { definePnConfig } from '@prisma-next/postgres/config';
-   import { pgvectorPack } from '@prisma-next/postgres-extension-pgvector';
-
-   export default definePnConfig({
-     target: 'postgres',
-     contract: { path: 'prisma/schema.psl', authoring: 'psl' },
-     extensionPacks: [pgvectorPack],
-   });
-   ```
-
-2. Use the namespace in the contract:
-
-   ```prisma
-   model Document {
-     id        Int                       @id @default(autoincrement())
-     content   String
-     embedding pgvector.Vector(1536)
-   }
-   ```
-
-3. Emit. The type map in `contract.d.ts` now carries the right TS type for `embedding`.
-
-## Add a custom embeddable / value object
-
-```prisma
-type Address {
-  street  String
-  city    String
-  zip     String
-}
-
-model User {
-  id      Int     @id @default(autoincrement())
-  email   String  @unique
-  address Address
-}
-```
-
-For MongoDB, this is a nested document. For Postgres, this is a composite type or JSON column depending on extensions.
-
-## Add a polymorphic type (`@@discriminator` / `@@base`)
-
-For SQL targets, Prisma Next supports two layouts for a polymorphic type with shared and per-variant fields:
-
-- **Single-table polymorphism (STI)** — all variants share one underlying table, discriminated by a column.
-- **Multi-table polymorphism (MTI)** — the base table holds shared columns, per-variant tables hold variant-specific columns and join 1:1 to the base by primary key.
-
-The contract uses `@@base` + `@@discriminator` for both; the variant chooses the layout.
-
-```prisma
-model Animal {
-  id   Int    @id @default(autoincrement())
-  name String
-
-  @@discriminator(kind: String)
-  @@base
-}
-
-model Dog {
-  breed String
-
-  @@base(Animal)
-  @@discriminator(kind: "dog")
-}
-
-model Cat {
-  indoor Boolean
-
-  @@base(Animal)
-  @@discriminator(kind: "cat")
-}
-```
-
-Queries through `db.orm.Dog` / `db.orm.Cat` return the right variant-typed row; `db.orm.Animal` returns the union. Cross-target note: MongoDB has no schema layer to model polymorphism — variants are just documents whose shape differs by field. On Mongo, model the variants directly (or with a `kind` discriminator field in application code) instead of using `@@base` / `@@discriminator`.
-
-## Install an extension
-
-1. Install the npm package: `pnpm add @prisma-next/<extension>`.
-2. Import the extension pack and add it to `extensionPacks` in `prisma-next.config.ts`.
-3. Emit. Any new namespaces (e.g. `pgvector.*`) are now available in PSL.
-
-If the user references a namespace that isn't installed, emit fails with a structured error naming the namespace and the `extensionPacks` field where to add it.
-
-## Decision: PSL vs TS builder vs no-emit TS-first
-
-| Use case | Choose | Why |
-|---|---|---|
-| Standard project, single contract | **PSL** | Concise, familiar, well-supported. |
-| Programmatic composition (per-tenant variants, generated fields) | **TS builder** | Authoring API is TypeScript. |
-| Skip the emit step entirely | **No-emit TS-first** | Import the contract object straight from `contract.ts`. |
-
-## No-emit TS-first
-
-"No-emit" literally means **don't run `contract emit`** and **don't read `contract.json` / `contract.d.ts`**. Author the contract in TypeScript and import the contract object directly from `contract.ts` everywhere you'd otherwise import the emitted artifacts:
+The concept: same model, different authoring surface. Use the structural API (`field.column(<columnDescriptor>)`) when you need explicit storage types, or the callback overload for pack-composed helpers (`field.text()`, `field.id.uuidv7()`, `type.sql.String(35)`).
 
 ```typescript
-import { contract } from './prisma/contract';
-import postgres from '@prisma-next/postgres/runtime';
+import { textColumn, timestamptzColumn } from '@prisma-next/adapter-postgres/column-types';
+import sqlFamily from '@prisma-next/family-sql/pack';
+import { uuidv4 } from '@prisma-next/ids';
+import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
 
-const db = postgres({ contract, url: process.env['DATABASE_URL']! });
+const User = model('User', {
+  fields: {
+    id: field.generated(uuidv4()).id(),
+    email: field.column(textColumn).unique(),
+    createdAt: field.column(timestamptzColumn).defaultSql('now()'),
+  },
+}).sql({ table: 'app_user' });
+
+export const contract = defineContract({
+  family: sqlFamily,
+  target: postgresPack,
+  models: { User },
+});
 ```
 
-Trade-offs:
+Then `pnpm prisma-next contract emit`. The `field.<scalar>()` helpers (`field.text()`, `field.uuid()`, `field.id.uuidv7()`, `field.temporal.createdAt()`) are only available inside the `defineContract({...}, ({ field, ... }) => ({...}))` callback overload — outside the callback only `field.column(...)`, `field.generated(...)`, `field.namedType(...)` exist.
 
-- **Pros**: no emit step, no committed `contract.json`, types track edits to `contract.ts` as fast as `tsc --watch` updates them.
-- **Cons**: no `contract.json` for tools that consume it (CLI inspection, migration plan, runtime contract-hash verification). Anything that needs the contract IR — `prisma-next migration plan`, `prisma-next db verify`, structured-error capability gating at runtime — still needs you to emit.
+## Workflow — Add an extension-typed scalar (pgvector)
 
-The auto-emit-on-save flow (Vite plugin) is a *separate* concept — that one still emits, just on a bundler schedule rather than a manual command. If you're using Vite, install the plugin (see `prisma-next-build`); there is no reason not to.
+The concept: an extension contributes a namespace (`pgvector.*`) plus a pack descriptor. Register the pack in *both* `defineConfig.extensionPacks` (control descriptor, array form) and — for the TS builder — `defineContract.extensionPacks` (pack descriptor, record form). Then reference the namespaced constructor from the contract.
+
+`prisma-next.config.ts`:
+
+```typescript
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresDriver from '@prisma-next/driver-postgres/control';
+import sql from '@prisma-next/family-sql/control';
+import pgvector from '@prisma-next/extension-pgvector/control';
+import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
+import postgres from '@prisma-next/target-postgres/control';
+
+export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
+  driver: postgresDriver,
+  extensionPacks: [pgvector],
+  contract: prismaContract('./src/contract.prisma', {
+    output: 'src/contract.json',
+    target: postgres,
+  }),
+});
+```
+
+`src/contract.prisma`:
+
+```prisma
+model Document {
+  id        Int                          @id @default(autoincrement())
+  content   String
+  embedding pgvector.Vector(length: 1536)
+}
+```
+
+Emit. The named-type lowering puts `vector(1536)` on the column and the type map in `contract.d.ts` carries the right TS type.
+
+If you reference `pgvector.*` without registering the pack in the config, emit fails with `PN-CLI-4011` and `meta.missingExtensionPacks: ['pgvector']`.
+
+## Workflow — Polymorphism (`@@discriminator` / `@@base`)
+
+The concept (SQL targets): one base model declares the discriminator field; each variant model declares its base + discriminator value. The variant chooses STI vs MTI by **whether it sets `@@map(...)`**: no `@@map` means the variant inherits the base's table (single-table inheritance); `@@map("variant_table")` means the variant gets its own table joined 1:1 by primary key (multi-table inheritance).
+
+```prisma
+model Task {
+  id    Int    @id @default(autoincrement())
+  title String
+  type  String
+
+  @@discriminator(type)
+  @@map("tasks")
+}
+
+// STI variant — shares the `tasks` table.
+model Bug {
+  severity String
+
+  @@base(Task, "bug")
+}
+
+// MTI variant — joins to `tasks` via PK; carries its own `features` table.
+model Feature {
+  priority Int
+
+  @@base(Task, "feature")
+  @@map("features")
+}
+```
+
+Verify the polymorphism syntax against the interpreter tests if in doubt: `packages/2-sql/2-authoring/contract-psl/test/interpreter.polymorphism.test.ts`.
+
+Mongo has no schema layer, so polymorphism on Mongo is modelled by an explicit `discriminator` field on the model in the TS builder (see `@prisma-next/mongo-contract-ts/contract-builder`); `@@base` / `@@discriminator` PSL attributes are SQL-only.
+
+Querying the variants is a runtime concern — see `prisma-next-queries`.
+
+## Workflow — Brownfield introspection
+
+The concept: pull a contract source out of an existing database and continue from there. `prisma-next contract infer --db <url>` reads the live schema and writes a `contract.prisma` file. It stops there — follow it with `contract emit` and (when the schema matches a pinned hash) `db sign` as separate steps.
+
+```bash
+pnpm prisma-next contract infer --db $DATABASE_URL --output ./src/contract.prisma
+pnpm prisma-next contract emit
+```
 
 ## Common Pitfalls
 
-1. **Forgetting to emit after an edit.** Types and `contract.json` go stale; the type-checker either misses the new model or flags it as missing. Re-emit (or use the Vite plugin — see `prisma-next-build`).
-2. **Editing `contract.json` or `contract.d.ts` directly.** Both are emitted artifacts. Edit the source (`schema.psl` / `contract.ts`), not the artifacts.
-3. **Renaming a field and expecting the planner to detect it.** PN doesn't have a rename hint today; the planner sees a destructive drop+add. Hand-edit `migration.ts` after `migration plan` (see *Edit a field — rename* above and `prisma-next-migrations`).
-4. **Adding an extension namespace before installing the pack.** Emit fails with "unrecognized namespace". Install the pack and add it to `extensionPacks` first.
+1. **Forgetting to re-emit after an edit.** `contract.json` and `contract.d.ts` go stale; downstream typecheck and `migration plan` see the old shape. Re-emit, or install the Vite plugin (`prisma-next-build`).
+2. **Editing the emitted artefacts.** `contract.json` and `contract.d.ts` are emitted; edits there round-trip away on the next emit. Edit the source.
+3. **Wrong factory/import path for the TS builder.** `defineContract`, `field`, `model`, `rel` come from `@prisma-next/sql-contract-ts/contract-builder` (or `@prisma-next/mongo-contract-ts/contract-builder`). Outside the callback overload, the available field constructors are `field.column(...)`, `field.generated(...)`, `field.namedType(...)`.
+4. **`PN-CLI-4011` from a missing pack.** A namespaced constructor (`pgvector.Vector(...)`, `cipherstash.EncryptedString(...)`) requires the matching descriptor in `extensionPacks` of `defineConfig({...})`. The fix in the envelope text says "extensions"; the actual config field is `extensionPacks`.
+5. **Renaming a field and expecting the planner to detect it.** Prisma Next has no in-contract rename hint; the planner sees a destructive drop+add. Hand-edit `migration.ts` after `migration plan` (see `prisma-next-migrations`), or use the keep-then-drop two-migration pattern.
 
 ## What Prisma Next doesn't do yet
 
-- **Model validations.** Prisma Next doesn't do `email: string @validates(format: 'email')` for you. Validate in application code with arktype or zod. If you need declarative validations in the contract, file a feature request via the `prisma-next-feedback` skill.
-- **Lifecycle callbacks** (`beforeSave`, `afterCreate`, etc.). Prisma Next doesn't run hooks on model writes. Use middleware (`prisma-next-runtime`) or app code. If you need first-class lifecycle callbacks, file a feature request via the `prisma-next-feedback` skill.
-- **Soft delete / `paranoid: true`.** Prisma Next doesn't ship a built-in soft-delete column. Add a `deletedAt DateTime?` column and filter `.where(m => m.deletedAt.isNull())` in your queries (or in a middleware). If you need built-in soft delete, file a feature request via the `prisma-next-feedback` skill.
-- **Scopes / default filters.** Prisma Next doesn't have ActiveRecord- style scopes. Compose query builders yourself (e.g. a `published()` helper that returns `db.orm.Post.where(p => p.status.eq('published'))`). If you need scopes built-in, file a feature request via the `prisma-next-feedback` skill.
+- **In-contract rename hint.** No `@@rename(old: ..., new: ...)` or similar. Use the workarounds in *Common Pitfalls* #5. To request first-class rename, file via `prisma-next-feedback`.
+- **Model validations.** No declarative `@validates(...)` surface. Validate in application code (arktype). To request declarative validations in the contract, file via `prisma-next-feedback`.
+- **Lifecycle callbacks** (`beforeSave`, `afterCreate`, etc.). Not supported. Use middleware (`prisma-next-runtime`) or app code. To request lifecycle callbacks, file via `prisma-next-feedback`.
+- **Soft delete / `paranoid: true`.** No built-in soft-delete column. Add a nullable `deletedAt DateTime?` and filter explicitly in queries (or in middleware). To request built-in soft delete, file via `prisma-next-feedback`.
+- **Scopes / default filters.** No ActiveRecord-style scopes. Compose query helpers yourself. To request scopes, file via `prisma-next-feedback`.
+- **Composite / embeddable types on SQL.** PSL parses `type Foo { ... }` syntax but the SQL interpreter does not lower it to composite types or JSON columns. Use a separate model + relation, or a `Json` column with application-side schemas. To request first-class composite types, file via `prisma-next-feedback`.
+- **Implicit Prisma-ORM many-to-many.** List navigation on both sides without an explicit join model is rejected. Author the join model explicitly. To request implicit M2M, file via `prisma-next-feedback`.
 
-## Reference Files
+## Reference
 
-- `references/psl-quick-reference.md` — PSL field types, attributes, modifiers.
-- `references/ts-authoring-quick-reference.md` — TS builder API.
-- `references/extension-namespaces.md` — installed-extension namespaces and the field types each provides.
+- Run `pnpm prisma-next contract --help` for the live command surface.
+- PSL feature surface and what the interpreter accepts: `packages/2-sql/2-authoring/contract-psl/README.md`.
+- TS builder surface and the callback-helper vocabulary: `packages/2-sql/2-authoring/contract-ts/README.md`.
+- Per-package layout convention (where `contract.prisma`, `contract.json`, `contract.d.ts`, `migrations/` live): `.cursor/rules/contract-space-package-layout.mdc`.
 
 ## Checklist
 
-- [ ] Read `prisma-next.config.ts` and identified target + authoring mode + extensionPacks.
-- [ ] Edited the contract source (`schema.psl` or `contract.ts`), not an emitted artifact.
-- [ ] For renames: hand-edited `migration.ts` (or used the keep-then-drop two-migration pattern) — PN has no rename hint today.
-- [ ] For new extension namespaces: installed the package, added to `extensionPacks`, then used the namespace.
-- [ ] Ran `prisma-next contract emit` after the edit (or let the Vite plugin re-emit on save).
-- [ ] Confirmed `contract.json` and `contract.d.ts` updated.
-- [ ] Type-checked any code that depends on the new/changed models.
-- [ ] Did NOT hand-edit `contract.json` / `contract.d.ts`.
-- [ ] Did NOT silently confabulate a missing feature (validations, callbacks, soft delete, scopes, in-contract rename hint) — referred user to the capability-gap section + feature-request URL.
+- [ ] Read `prisma-next.config.ts` and identified the contract source provider (`prismaContract` vs `typescriptContract`) and the installed `extensionPacks`.
+- [ ] Edited the contract source (`contract.prisma` or `contract.ts`), not an emitted artefact.
+- [ ] For new extension namespaces: added the package, imported its control descriptor, added it to `extensionPacks` in `defineConfig({...})` (and to `defineContract({extensionPacks: {...}})` if using the TS builder).
+- [ ] For renames: hand-edited `migration.ts` after `migration plan` (or used the keep-then-drop two-migration pattern) — Prisma Next has no rename hint today.
+- [ ] Ran `pnpm prisma-next contract emit` after the edit (or let the Vite plugin re-emit on save).
+- [ ] Confirmed `contract.json` and `contract.d.ts` updated next to the source.
+- [ ] Did **not** hand-edit `contract.json` / `contract.d.ts`.
+- [ ] Did **not** confabulate a missing feature (validations, callbacks, soft delete, scopes, in-contract rename hint, composite types) — referred the user to *What Prisma Next doesn't do yet* + `prisma-next-feedback`.
