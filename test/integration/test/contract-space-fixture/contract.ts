@@ -1,5 +1,6 @@
 import { computeStorageHash } from '@prisma-next/contract/hashing';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { TEST_BOX_TABLE } from './constants';
 
@@ -17,6 +18,9 @@ const storageBody = {
       indexes: [],
       foreignKeys: [],
     },
+  },
+  namespaces: {
+    [UNSPECIFIED_NAMESPACE_ID]: { id: UNSPECIFIED_NAMESPACE_ID },
   },
 };
 
