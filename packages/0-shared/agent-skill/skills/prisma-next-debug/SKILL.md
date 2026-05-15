@@ -1,235 +1,134 @@
 ---
 name: prisma-next-debug
-description: Debug Prisma Next errors — route a symptom to a fix by reading the structured error envelope, looking up stable error codes (PN-CLI-4xxx, PN-MIG-2xxx, PN-RUN-3xxx), and finding the right recovery flow. Use for error, exception, won't typecheck, runtime error, MIGRATION.HASH_MISMATCH, drift, capability missing, planner conflict, prisma studio, EXPLAIN, query log, "my query crashed", "my emit failed", "my migration won't apply".
+description: Read a Prisma Next structured error envelope and route to the right recovery — code, domain, severity, why, fix, meta. Use for error, exception, my emit failed, my query won't typecheck, my query crashed, my migration won't apply, MIGRATION.HASH_MISMATCH, BUDGET.ROWS_EXCEEDED, BUDGET.TIME_EXCEEDED, RUNTIME.ABORTED, PLAN.HASH_MISMATCH, CONTRACT.MARKER_MISSING, PN-RUN-3001, PN-RUN-3002, PN-RUN-3030, PN-MIG-2001, PN-CLI-4011, PN-SCHEMA-0001, drift, capability missing, planner conflict, prisma studio, EXPLAIN, query log.
 ---
 
 # Prisma Next — Debug
 
 > **Edit your data contract. Prisma handles the rest.**
 
-When things break, this skill triages the symptom and routes the agent to a fix. Prisma Next emits **structured errors** with stable codes (e.g. `PN-MIG-2042`, `PN-CLI-4011`, `PN-RUN-3005`); use the codes to look up the right recovery flow.
+When a Prisma Next call fails, the framework returns a **structured envelope**. The agent's job is to read the envelope, route on the `code`, and chain to the right authoring skill for the actual fix. This skill teaches the envelope shapes and the routing — it does not duplicate sibling-skill workflows.
 
 ## When to Use
 
-- User reports an error, exception, or unexpected behavior.
-- User pastes a structured error envelope.
-- User says "my query won't typecheck", "my migration won't apply", "my emit failed", "the runtime crashes".
-- User mentions a specific error code (`PN-CLI-*`, `PN-MIG-*`, `PN-RUN-*`).
+- User pastes an error envelope (CLI failure, runtime exception, `--json` output).
+- User says *"my query won't typecheck"*, *"my migration won't apply"*, *"my emit failed"*, *"the runtime crashed"*.
+- User mentions a stable code (`PN-CLI-*`, `PN-MIG-*`, `PN-RUN-*`, `PN-SCHEMA-*`, `MIGRATION.*`, `CONTRACT.*`, `LINT.*`, `BUDGET.*`, `PLAN.*`, `RUNTIME.*`).
 - User mentions: *Studio, EXPLAIN, query log, prepared statements, drift, hash mismatch, capability, planner*.
 
 ## When Not to Use
 
-- User wants to write a new query / model / migration → the matching authoring skill.
+- User wants to author a query / model / migration → the matching authoring skill.
 - User wants to *prevent* errors (lints, budgets, type-level guards) → `prisma-next-runtime`.
+- User wants the framework changed because the surface itself is the problem (no envelope to route on, capability genuinely missing) → `prisma-next-feedback`.
 
-## Key Concepts (before any workflow)
+## Key Concepts
 
-Every Prisma Next error is a **structured envelope** with at minimum:
+### Two envelope shapes
+
+Prisma Next emits **two distinct envelopes** depending on which seam threw. Read which one you have *before* routing.
+
+**1. CLI envelope** — produced by `prisma-next ...` commands (emit, db init/update/verify/sign/schema, migration plan/apply/show/status, init). Shape (see `CliErrorEnvelope` in `packages/1-framework/1-core/errors/src/control.ts`):
 
 ```json
 {
-  "code": "PN-MIG-2042",
+  "ok": false,
+  "code": "PN-MIG-2001",
   "domain": "MIG",
-  "kind": "MIGRATION.HASH_MISMATCH",
-  "message": "human-readable summary",
-  "why": "why this happened in this case",
-  "fix": "what to do next",
-  "docsUrl": "https://prisma-next.dev/errors/PN-MIG-2042",
-  "meta": { /* code-specific context */ }
+  "severity": "error",
+  "summary": "Unfilled migration placeholder",
+  "why": "...",
+  "fix": "...",
+  "where": { "path": "...", "line": 42 },
+  "meta": { "slot": "..." },
+  "docsUrl": "https://prisma-next.dev/..."
 }
 ```
 
-When the user pastes an error, **read every field** — `why` and `fix` are the framework telling you the recovery flow.
+The full code is `PN-<domain>-<NNNN>`. Domains in use: `CLI`, `MIG`, `RUN`, `CON`, `SCHEMA`. Severity is `error | warn | info` — `migration status` exits 0 when its diagnostics are `warn`, so route on **severity + code together**, not on exit code alone.
 
-### Error-code domains
+**2. Runtime envelope** — thrown by the in-process runtime when executing a query (see `RuntimeErrorEnvelope` in `packages/1-framework/1-core/framework-components/src/execution/runtime-error.ts`):
 
-| Prefix | Domain | Skill |
+```ts
+{ name: 'RuntimeError', code: 'BUDGET.TIME_EXCEEDED', category: 'BUDGET', severity: 'error', message: '...', details: { ... } }
+```
+
+`category` is one of `PLAN | CONTRACT | LINT | BUDGET | RUNTIME` (the prefix of `code`). `details` holds the structured context (`details` is the runtime envelope's equivalent of the CLI envelope's `meta`).
+
+**3. SQL driver errors** — surface as `SqlQueryError` / `SqlConnectionError` (see `packages/2-sql/1-core/errors/`). Fields on `SqlQueryError`: `kind: 'sql_query'`, `sqlState` (Postgres SQLSTATE, e.g. `'23505'`), `constraint`, `table`, `column`, `detail`, `cause`. These are *not* `PN-*` codes — route on `sqlState` and the constraint metadata. SQL driver errors are typically wrapped by middleware before reaching the user, but raw-SQL paths can surface them directly.
+
+### Wrapped errors and `meta.code`
+
+Some commands re-wrap a downstream error into a `PN-RUN-3000` (`errorRuntime`) envelope and stash the original code on `meta.code`. The most important case: `migration apply` wraps `MigrationToolsError` (which has codes like `MIGRATION.HASH_MISMATCH`, `MIGRATION.STALE_CONTRACT_BOOKENDS`, `MIGRATION.AMBIGUOUS_TARGET`) via `mapMigrationToolsError`. The envelope you see is `code: 'PN-RUN-3000'` with `meta.code: 'MIGRATION.HASH_MISMATCH'`. **Always check `meta.code` when `code` is `PN-RUN-3000`** — that's where the routing-quality information lives.
+
+### How to ask for the full envelope
+
+If the user only pasted the human summary, ask for `--json` output (machine envelope) or re-run with `-v` (CLI prints the full structured fields). `--json` and `-v` are global flags on every CLI command.
+
+## Routing — symptom and code → next move
+
+The single source of truth: read the envelope, find the row by `code` (or `meta.code` for wrapped errors), follow the next move.
+
+| Code | Where it surfaces | Next move |
 |---|---|---|
-| `PN-CLI-4xxx` | CLI commands (init, emit, db update, migration plan/apply) | This skill + the matching authoring skill |
-| `PN-MIG-2xxx` | Migration runtime + planner | This skill → `prisma-next-migrations` |
-| `PN-RUN-3xxx` | Runtime query execution | This skill → `prisma-next-queries` / `prisma-next-runtime` |
-| `PN-CONTRACT-5xxx` | Contract emit / wiring validation | This skill → `prisma-next-contract` |
+| `PN-CLI-4001` *Config file not found* | Most `prisma-next` commands | Run `prisma-next init`, or pass `--config <path>`. |
+| `PN-CLI-4002` *Contract configuration missing* | `contract emit`, `db *` | Add `contract: { ... }` to `prisma-next.config.ts`. See `prisma-next-contract`. |
+| `PN-CLI-4003` *Contract validation failed* | `contract emit`, `db *` | Re-run `pnpm prisma-next contract emit` after fixing the contract source named in `where.path`. See `prisma-next-contract`. |
+| `PN-CLI-4005` *Database connection is required* | `db *`, `migration apply`, `migration status` | Pass `--db <url>` or set `db.connection` in `prisma-next.config.ts`. |
+| `PN-CLI-4011` *Missing extension packs in config* | `contract emit` (e.g. contract uses `pgvector.Vector(...)` but config does not list the pgvector pack) | Add the descriptors named in `meta.missingExtensionPacks` to `extensionPacks` in `prisma-next.config.ts`. See `prisma-next-contract`. |
+| `PN-CLI-4020` *Migration planning failed* | `db init`, `db update` | Inspect `meta.conflicts`. Recovery is per-conflict — chain to `prisma-next-migrations`. |
+| `PN-CLI-5002/5003/5004/…` *Init errors* | `prisma-next init` | Re-run with the missing/invalid flags listed in `meta.missingFlags` or `meta.allowed`. |
+| `PN-MIG-2001` *Unfilled migration placeholder* | `node migrations/<dir>/migration.ts` (self-emit) or `migration apply` | Edit `migration.ts`, replace the named `placeholder("<slot>")` with a real query closure, self-emit. See `prisma-next-migrations`. |
+| `PN-MIG-2002` *migration.ts not found* | Reading a migration package | Restore from version control or scaffold a fresh package with `migration plan`. |
+| `PN-MIG-2003` *Invalid default export* | Loading `migration.ts` | Use `export default class extends Migration { ... }` (or factory `() => ({ ... })`). See `prisma-next-migrations`. |
+| `PN-MIG-2005` *dataTransform contract mismatch* | Building a data-transform query plan | Pass the same `endContract` reference to both `dataTransform(endContract, …)` and the query-builder context. |
+| `PN-RUN-3001` *Database not signed* | `db verify`, runtime startup | DB has no marker yet. Run `prisma-next db init --db <url>` (baseline empty DB) or `db update --db <url>` (apply contract directly). |
+| `PN-RUN-3002` *Hash mismatch* | `db verify`, runtime startup | Marker disagrees with contract hash. Either migrate forward (`migration apply` / `db update`), or — if the DB is correct after a manual fix-up — `db sign`. See `prisma-next-migrations`. |
+| `PN-RUN-3003` *Target mismatch* | Runtime startup | Contract target ≠ config target; align them (see `meta.expected` / `meta.actual`). |
+| `PN-RUN-3004` *Schema verification failed* | `db verify` (full mode) | Inspect `meta.verificationResult`. Run `db update` to reconcile, or adjust contract. |
+| `PN-RUN-3010` *Schema verification failed (CLI surface)* | `db verify` schema-only | Same as 3004. |
+| `PN-RUN-3020` *Migration runner failed* | `migration apply`, `db update`, `db init` | Inspect `meta` for the conflict; reconcile schema drift, then re-run. Previously applied migrations are preserved. |
+| `PN-RUN-3030` *Destructive changes require confirmation* | `db update` (interactive prompt fires; non-interactive returns this code) | Re-run with `-y` (or `--yes`) to apply, or `--dry-run` to preview. **Only `db update` has this flow** — `migration apply` does not gate destructive ops on a flag. |
+| `PN-RUN-3000` *(wrapper)* | `migration apply`, others wrapping `MigrationToolsError` | Read `meta.code`. Cases: `MIGRATION.HASH_MISMATCH` (re-emit: `node migrations/<dir>/migration.ts`); `MIGRATION.AMBIGUOUS_TARGET` (concurrent migrations — `prisma-next-migration-review`); `MIGRATION.STALE_CONTRACT_BOOKENDS` (re-run `migration plan`); `MIGRATION.NO_INVARIANT_PATH` / `MIGRATION.UNKNOWN_INVARIANT` (`prisma-next-migration-review`). |
+| `PN-SCHEMA-0001` | `db verify` schema check | Live schema does not satisfy contract. `meta.verificationResult` has the diff. Run `db update` or adjust the contract. |
+| `MIGRATION.UP_TO_DATE` / `.DATABASE_BEHIND` / `.INVARIANTS_PENDING` | `migration status` `info` diagnostics | Informational; exit 0. No action needed unless `INVARIANTS_PENDING` matters for your CI gate. See `prisma-next-migration-review`. |
+| `MIGRATION.NO_MARKER` / `.MARKER_NOT_IN_HISTORY` / `.DIVERGED` / `CONTRACT.AHEAD` / `CONTRACT.UNREADABLE` | `migration status` `warn` diagnostics (exit 0; CI gates parse `--json`) | Read `severity` *and* `code`. `prisma-next-migration-review` covers the diamond/diverged/marker-out-of-history flows. |
+| `BUDGET.ROWS_EXCEEDED` / `BUDGET.TIME_EXCEEDED` | Runtime, when the `budgets` middleware is active | Tune `budgets({ maxRows, maxLatencyMs, ... })` or rewrite the query. See `prisma-next-runtime`. |
+| `LINT.SELECT_STAR` / `LINT.NO_LIMIT` / `LINT.DELETE_WITHOUT_WHERE` / `LINT.UPDATE_WITHOUT_WHERE` / `LINT.READ_ONLY_MUTATION` | Runtime, when the `lints` middleware is active | Fix the query (add a `WHERE` / `LIMIT` / explicit columns), or relax the lint config. See `prisma-next-runtime`. |
+| `PLAN.HASH_MISMATCH` | Runtime, executing a precompiled plan | The contract the plan was built against does not match the runtime contract. Re-emit, rebuild, redeploy. |
+| `CONTRACT.MARKER_MISSING` / `CONTRACT.MARKER_MISMATCH` | Runtime, marker check before executing | Same family as `PN-RUN-3001` / `PN-RUN-3002` but raised in-process by the runtime rather than a CLI. Recovery is the same. |
+| `RUNTIME.ABORTED` (`details.phase` = `encode\|decode\|stream\|beforeExecute\|afterExecute\|onRow`) | Runtime, when an `AbortSignal` fires mid-execute | Cancellation, not a bug; surface to the caller. |
+| `SqlQueryError` (no `PN-` code) | Raw-SQL paths surfacing a driver error | Inspect `sqlState` + `constraint` + `table` + `column`. Postgres `23505` = unique violation, `23503` = foreign-key violation, etc. Fix the data or the schema. |
+| TypeScript error mentioning a capability (e.g. `returning()` not on the type, `include` of a many-relation off a many-load) | Authoring-time, before any envelope fires | Capability gates are declared in the **contract** (`capabilities` block, namespaced by target/family), not in `prisma-next.config.ts`. Route to `prisma-next-contract` for capability declaration and to `prisma-next-queries` for which method gates on which capability. Re-emit (`pnpm prisma-next contract emit`) after enabling. |
+| TypeScript error mentioning a missing field/method on `db.orm.<Model>` or a stale `Contract` shape | Authoring-time | Re-emit (`pnpm prisma-next contract emit`); confirm `db.ts` instantiates with `postgres<Contract, TypeMaps>(...)` (the type parameters propagate the contract types). See `prisma-next-runtime` and `prisma-next-contract`. |
 
-## Workflow — Read the envelope first
-
-1. Get the user to paste the **full envelope**, not just the message. The `code`, `why`, `fix`, and `meta` are all load-bearing.
-2. Look up the code in the matching reference file:
-   - `references/cli-errors.md` — `PN-CLI-4xxx`
-   - `references/migration-errors.md` — `PN-MIG-2xxx`
-   - `references/runtime-errors.md` — `PN-RUN-3xxx`
-   - `references/contract-errors.md` — `PN-CONTRACT-5xxx`
-3. Follow the `fix` step. If it points at a workflow in another skill, chain to that skill.
-
-If the user gives you only the message and not the code, ask for the full envelope.
-
-## Signal-routing table — symptom → action
-
-| Symptom | Likely cause | Action |
-|---|---|---|
-| "My query won't typecheck" | Contract stale; capability missing; query-interface mismatch | See [Query won't typecheck](#query-wont-typecheck) below. |
-| "My query throws at runtime" | Read the error envelope. `PN-RUN-3xxx` codes are runtime; `PN-MIG-2xxx` codes are pre-flight checks. | See [Query throws at runtime](#query-throws-at-runtime). |
-| "Capability X isn't available" | Capability not enabled in `prisma-next.config.ts`, or the extension contributing X isn't installed | See [Capability isn't available](#capability-isnt-available). |
-| "Migration won't apply" | Marker mismatch, precondition failed, runner refused | See [Migration won't apply](#migration-wont-apply). |
-| "Emit fails" | PSL syntax, missing namespace, conflicting extensions | See [Emit fails](#emit-fails). |
-| "Contract is out of sync with DB" / drift | Manual SQL ran, or `db update` partially applied | See [Drift](#drift). |
-| `MIGRATION.HASH_MISMATCH` | `migration.ts` edited without self-emit | See [`MIGRATION.HASH_MISMATCH`](#migrationhash_mismatch). |
-| Planner-conflict failure | Rename without hint; destructive op blocked | See [Planner conflicts](#planner-conflicts). |
-
-## Query won't typecheck
-
-Common cases:
-
-1. **Contract stale.** Re-emit:
-   ```bash
-   pnpm prisma-next contract emit
-   ```
-Re-run the type-check.
-2. **`Contract` type parameter missing in `db.ts`.** Without `postgres<Contract, TypeMaps>(...)`, types collapse. Add the type parameters (see `prisma-next-runtime`).
-3. **Capability not enabled.** `returning()` / `includeMany` etc. error at type-check when the capability isn't on. See [Capability isn't available](#capability-isnt-available).
-4. **Wrong query interface.** Using `db.execute(...)` on an ORM builder (it's for SQL DSL plans). Switch to `.all()` / `.first()`.
-5. **Model literal name typo.** `db.orm.user` instead of `db.orm.User`. The ORM accessor mirrors the contract's exact casing.
-
-## Query throws at runtime
-
-1. Read the error envelope. The `code` will be `PN-RUN-3xxx` for runtime execution errors.
-2. Look up the code in `references/runtime-errors.md`. Common codes:
-   - `PN-RUN-3001` — connection refused. Check `DATABASE_URL` reachable.
-   - `PN-RUN-3005` — query timed out beyond `budgets({ maxDurationMs })`.
-   - `PN-RUN-3012` — unique-constraint violation. Inspect `meta.constraint`.
-   - `PN-RUN-3017` — foreign-key violation. Inspect `meta.referenced`.
-3. Follow the `fix` field. For data-shape errors, fix the data; for config errors, fix the runtime config (`prisma-next-runtime`).
-
-## Capability isn't available
-
-`returning()`, `includeMany`, and other capability-gated features require explicit opt-in in `prisma-next.config.ts`:
-
-```typescript
-import { definePnConfig } from '@prisma-next/postgres/config';
-
-export default definePnConfig({
-  // ...
-  capabilities: {
-    returning: true,
-    includeMany: true,
-  },
-});
-```
-
-After enabling:
-
-```bash
-pnpm prisma-next contract emit
-```
-
-Then re-run the type-check / runtime.
-
-If the capability isn't in the type-suggestions at all, an extension that contributes it may be missing. Check `extensionPacks` (see `prisma-next-contract`).
-
-## Migration won't apply
-
-1. Read the envelope. Common codes:
-   - `PN-MIG-2042` — hash mismatch. See [`MIGRATION.HASH_MISMATCH`](#migrationhash_mismatch).
-   - `PN-MIG-2031` — destructive op refused without confirmation. Re-run with `--accept-destructive` or fix the migration to be non-destructive.
-   - `PN-MIG-2025` — marker mismatch. The DB's marker isn't the migration's "from" hash. See [Drift](#drift).
-   - `PN-MIG-2018` — placeholder data-transform not filled. Edit `migration.ts`, self-emit. See `prisma-next-migrations`.
-2. For unknown codes, paste the envelope into `references/migration-errors.md` and follow the `fix`.
-
-## Emit fails
-
-Common codes:
-
-- `PN-CONTRACT-5001` — PSL syntax error. The envelope's `meta` names the line + column. Fix the PSL.
-- `PN-CONTRACT-5023` — unrecognized namespace. The contract references `pgvector.Vector(...)` but the `pgvector` extension isn't in `extensionPacks`. Add it (see `prisma-next-contract`).
-- `PN-CONTRACT-5034` — conflicting extensions. Two extensions registered the same type / namespace. Inspect both and either remove one or rename one's namespace.
-- `PN-CONTRACT-5042` — type-map collision. A field maps to two different TS types via two extensions. Disambiguate in the contract.
-
-## Drift
-
-Symptom: `db verify` reports drift. The DB doesn't match the marker.
-
-1. Inspect what's different:
-
-   ```bash
-   pnpm prisma-next db schema     # live DB
-   pnpm prisma-next migration show <latest-migration>  # what should be applied
-   ```
-
-2. Decide direction:
-   - **DB is right, contract is wrong** → edit PSL to match, emit, `db sign`.
-   - **Contract is right, DB is wrong** → `migration plan` to catch up the DB, or apply manual SQL and `db sign` after.
-
-3. Re-verify:
-   ```bash
-   pnpm prisma-next db verify
-   ```
-
-See `prisma-next-migrations` for the recovery workflows in detail.
-
-## `MIGRATION.HASH_MISMATCH`
-
-Cause: `migration.ts` was edited after the initial emit; `ops.json` is now stale.
-
-Fix:
-
-```bash
-node migrations/<dir>/migration.ts   # self-emit
-pnpm prisma-next migration apply
-```
-
-See `prisma-next-migrations` for the broader context.
-
-## Planner conflicts
-
-Symptom: `migration plan` produces a destructive plan you didn't expect. E.g. dropping + adding a column you intended to rename.
-
-Cause: PN doesn't have an in-contract rename hint today. The planner sees a column drop and a column add as two unrelated operations.
-
-Recovery: hand-edit `migration.ts` so the destructive `DROP COLUMN` + `ADD COLUMN` becomes a `RENAME COLUMN`, then self-emit and apply:
-
-```bash
-# 1. Edit migrations/<dir>/migration.ts — replace the drop+add with a RENAME COLUMN op.
-node migrations/<dir>/migration.ts   # self-emit; ops.json is regenerated.
-pnpm prisma-next migration apply
-```
-
-See `prisma-next-migrations` for the hand-edit workflow and the two-migration "keep, backfill, drop" alternative for production. For other planner ambiguity (column-type changes, table splits), `migration show <name>` shows the proposed plan; hand-author the same way.
-
-If you want a first-class in-contract rename hint, file a feature request via the `prisma-next-feedback` skill.
-
-## How to ask for help
-
-If the envelope's `fix` doesn't apply and the symptom doesn't match this skill's tables, the user should:
-
-1. Run with `-v` / `--verbose` to get the full structured envelope and the underlying driver error (if any).
-2. Open an issue: file a feature request via the `prisma-next-feedback` skill. Include the envelope, the contract source (sanitized), and the reproduction steps.
+If the envelope's `code` is not in this table, follow the envelope's `fix` field literally — it's the framework's first-party next move. If `fix` is empty or unhelpful, escalate via `prisma-next-feedback`.
 
 ## Common Pitfalls
 
-1. **Reading only the error message, not the envelope.** `why`, `fix`, and `meta` are where the recovery flow lives.
-2. **Assuming an old error code's recovery applies to a new one.** Codes are stable; recoveries differ by code. Look up each one.
-3. **Re-running `migration apply` after a partial failure without understanding what got applied.** Use `db schema` to see the live state before re-running.
-4. **Treating drift as something to silence with `db sign`.** `db sign` accepts the current state; only run it after `db verify` shows OK.
+1. **Reading only `summary`, not the rest of the envelope.** `code`, `severity`, `why`, `fix`, `meta`/`details`, and (for CLI errors) `where` are all load-bearing. The agent routes on `code`; the user sees `summary`.
+2. **Ignoring `severity`.** `migration status` emits warn-level diagnostics and **exits 0**. An agent that only checks exit code misses every concurrent-migration warning.
+3. **Skipping `meta.code` on `PN-RUN-3000`.** That envelope is a wrapper — the real code lives on `meta.code`.
+4. **Treating drift as something to silence with `db sign`.** `db sign` writes the marker from the current contract hash, but it requires schema verification to pass first. Run `db verify` before reaching for `db sign`.
+5. **Re-running `migration apply` after a partial failure without inspecting state.** `db schema --db <url>` shows the live shape; `migration status --db <url> --json` shows where the marker actually is.
 
 ## What Prisma Next doesn't do yet
 
-- **Studio / GUI database browser.** Prisma Next doesn't ship a Studio equivalent. Workaround: `prisma-next db schema` for a CLI tree, or use a third-party tool (TablePlus, DataGrip, `psql`) against your `DATABASE_URL`. If you need a built-in GUI, file a feature request via the `prisma-next-feedback` skill.
-- **First-class query logger middleware.** Prisma Next doesn't ship a built-in "log every query to stdout" middleware. Workaround: write a small custom middleware that wraps each operation and logs (see `prisma-next-runtime` for middleware composition). If you need a built-in query log, file a feature request via the `prisma-next-feedback` skill.
-- **`EXPLAIN` integration.** Prisma Next doesn't ship a `.explain()` method. Workaround: `db.sql.raw\`EXPLAIN ANALYZE ${...}\``. See `prisma-next-queries`. If you need first-class EXPLAIN, file a feature request via the `prisma-next-feedback` skill.
-- **Prepared-statement caching as a user-facing surface.** PN's adapters prepare under the hood for parameterized queries but you can't pre-prepare a statement and re-execute it by name. Workaround: use TypedSQL (see `prisma-next-queries`). If you need prepared statements as a first-class API, file a feature request via the `prisma-next-feedback` skill.
+- **Studio / GUI database browser.** No first-party Studio. Workaround: `prisma-next db schema` for a CLI tree of the live schema, or use a third-party tool (TablePlus, DataGrip, `psql`) against your `DATABASE_URL`. If you need a built-in GUI, file a feature request via `prisma-next-feedback`.
+- **First-class query logger middleware.** No built-in "log every query" middleware ships with the framework. Workaround: write a small custom middleware that wraps each operation (see `prisma-next-runtime` for middleware composition). If you need a built-in query log, file a feature request via `prisma-next-feedback`.
+- **`EXPLAIN` integration.** No first-class `.explain()` on plans. Workaround: write the EXPLAIN as a raw query (`db.sql.raw\`EXPLAIN ANALYZE ...\``; see `prisma-next-queries`). If you need first-class EXPLAIN, file a feature request via `prisma-next-feedback`.
+- **Prepared-statement caching as a user-facing surface.** Adapters prepare under the hood for parameterized queries, but you cannot pre-prepare and re-execute a statement by name. Workaround: use TypedSQL (see `prisma-next-queries`). If you need prepared statements as a first-class API, file a feature request via `prisma-next-feedback`.
 
-## Reference Files
+## Asking for help when the envelope doesn't route
 
-- `references/cli-errors.md` — every `PN-CLI-4xxx` code, what it means, and how to fix it.
-- `references/migration-errors.md` — every `PN-MIG-2xxx` code.
-- `references/runtime-errors.md` — every `PN-RUN-3xxx` code.
-- `references/contract-errors.md` — every `PN-CONTRACT-5xxx` code.
-- `references/envelope-shape.md` — fields on the structured error envelope.
+1. Re-run with `-v` (or `--json` for machine output) to get the full envelope.
+2. If the envelope is genuinely uninformative — empty `fix`, missing `meta`, generic `summary` — that's a framework affordance gap; route to `prisma-next-feedback` with the envelope, the contract source (sanitised), and the reproduction steps.
 
 ## Checklist
 
-- [ ] Got the full error envelope (not just the message).
-- [ ] Looked up the `code` in the matching `references/*-errors.md`.
-- [ ] Followed the `fix` step from the envelope.
-- [ ] Re-verified with the relevant CLI command (`db verify` / `contract emit` / `migration apply`).
-- [ ] If the symptom maps to an authoring skill, chained to that skill for the actual fix.
-- [ ] Did NOT confabulate a Studio / EXPLAIN / query log API — acknowledged the capability gap and pointed at the workaround + feature-request URL.
+- [ ] Identified which envelope shape (`CliErrorEnvelope`, `RuntimeErrorEnvelope`, `SqlQueryError`).
+- [ ] Read every field — `code`, `severity`, `why`, `fix`, `meta` (or `details`), `where` if present.
+- [ ] If `code` is `PN-RUN-3000`, also read `meta.code`.
+- [ ] Routed on `code` to the next move (and chained to the matching authoring skill where the table says so).
+- [ ] Re-verified with the relevant CLI command (`db verify`, `migration status --json`, `contract emit`, `migration apply`).
+- [ ] Did not confabulate a Studio / EXPLAIN / query-log API — used the documented workaround and routed unmet capability gaps to `prisma-next-feedback`.
