@@ -36,7 +36,7 @@ Those edits to `examples/` or `packages/3-extensions/` *are* the signal. The mat
 
 If both substrates are touched, both packages need entries (see *Cross-audience entries*).
 
-If the PR is intended as a patch (no substrate diff except the conventional generated paths — `contract.json`, `contract.d.ts`, `end-contract.json`, `end-contract.d.ts`), no entry is needed and the publish gate will skip the coverage check.
+Even consumer-invisible-looking diffs need an entry. A change to the format of `contract.json` / `contract.d.ts` (or any other emitted artefact) is itself an upgrade instruction — consumers will need to either run a codemod or re-emit. Where the substrate diff is genuinely no-op for consumers (incidental regeneration with no behavioural change), the entry can ship with `changes: []` to record that explicitly. There is no carve-out for "generated paths"; any substrate diff requires a record.
 
 ## Detection signals & routing
 
@@ -54,11 +54,11 @@ The substrate diff is the signal that an entry is required. The agent fixing the
 
 For each PR that hits one or both signals, walk these steps in order.
 
-1. **Determine the in-flight minor.** Read the `version` field from the root `package.json` on the PR branch. That value is the in-flight minor — e.g. `"0.7.0"` means the in-flight directory is `upgrades/0.6-to-0.7/`. The branch's `package.json` is the source-of-truth — do **not** consult `npm view`. If the version is a patch bump only (no `examples/` or `packages/3-extensions/` diff), skip to step 7.
+1. **Determine the in-flight transition.** Read the `version` field from the root `package.json` on the PR branch. That value is the *currently published* version (the source-of-truth `pnpm bump-minor` reads when preparing the next release). Call its minor `M`. The in-flight transition is therefore `M → M+1`, and the in-flight directory in each destination package is `upgrades/<M>-to-<M+1>/` — e.g. `"0.7.0"` in `package.json` means you're authoring into `upgrades/0.7-to-0.8/`. The branch's `package.json` is the source-of-truth — do **not** consult `npm view`. If there is no substrate diff at all, no entry is needed — skip to step 7.
 
 2. **Identify the touched substrate(s).** Compute `git diff origin/main..HEAD` restricted to `examples/` and to `packages/3-extensions/`. Each non-empty substrate corresponds to one destination package per the routing table above. The "both" case is normal — the rare PR (e.g. a structural on-disk migration shape change) touches both.
 
-3. **Find or create the directory in each destination.** For each destination package, the directory is `packages/0-shared/<package>/upgrades/<M-1>-to-<M>/` where `M` is the in-flight minor from step 1. If the directory already exists (an earlier PR on the same transition created it, or the placeholder shipped with the initial mechanism PR is still there), **do not create a duplicate** — append a new entry to the existing `instructions.md`'s `changes[]` array.
+3. **Find or create the directory in each destination.** For each destination package, the directory is `packages/0-shared/<package>/upgrades/<M>-to-<M+1>/` where `M` is the currently-published minor from step 1. If the directory already exists (an earlier PR on the same transition created it, or the placeholder shipped with the initial mechanism PR is still there), **do not create a duplicate** — append a new entry to the existing `instructions.md`'s `changes[]` array.
 
 4. **Write the entry into `instructions.md`.** Each `changes[]` entry carries an `id` (kebab-case, unique within the transition), a one-line `summary`, an optional `detection` block (glob + content predicate the consumer's agent runs to know whether the change applies to that consumer's project), and an optional `script:` reference (relative path to a colocated script next to `instructions.md`). For changes that need agent reasoning across the codebase rather than a deterministic script, the entry omits `script:` and the agent follows the prose body of `instructions.md` instead.
 
@@ -98,9 +98,9 @@ If any of those checks fail, iterate on the entry. Do not merge.
 
 The PR that introduces the breaking change must contain, in addition to the framework change itself:
 
-- **The new entry directory in each affected skill package** — `packages/0-shared/<package>/upgrades/<M-1>-to-<M>/instructions.md` plus any colocated scripts.
+- **The new entry directory in each affected skill package** — `packages/0-shared/<package>/upgrades/<M>-to-<M+1>/instructions.md` plus any colocated scripts (where `M` is the currently-published minor read from root `package.json`).
 - **The post-instructions state of every affected substrate** — these substrates would have been left broken without the entry; the entry's effect on the substrate *is* the diff that brings them back to green. The PR-branch substrate state and the validation-by-execution output state must be identical.
-- **A reference in the PR description naming each entry directory** (e.g. *"Adds entries to `packages/0-shared/upgrade-skill/upgrades/0.6-to-0.7/` and `packages/0-shared/extension-upgrade-skill/upgrades/0.6-to-0.7/`."*).
+- **A reference in the PR description naming each entry directory** (e.g. *"Adds entries to `packages/0-shared/upgrade-skill/upgrades/0.7-to-0.8/` and `packages/0-shared/extension-upgrade-skill/upgrades/0.7-to-0.8/`."*).
 
 The human reviewer + the CI gate (`pnpm check:upgrade-coverage`) both check this shape. The gate catches the structural case (substrate diff without matching entry); the reviewer catches the semantic case (entry exists but its prose / scripts don't match the framework change).
 
@@ -115,13 +115,13 @@ Bug fixes to either copy land via normal PRs. Yes, duplication carries small ong
 
 ## Rebase scenario
 
-If a version-bump PR lands on `main` mid-flight (advancing main's minor from `M` to `M+1`), your topic branch's next rebase brings the new `package.json` value with it:
+If a release PR lands on `main` mid-flight (advancing the currently-published minor from `M` to `M+1`), your topic branch's next rebase brings the new `package.json` value with it:
 
-1. Re-run step 1 of the authoring workflow. The in-flight minor is now `M+1`; the in-flight directory is `upgrades/<M>-to-<M+1>/`.
-2. Author any **new** entries (changes added on this rebase) in `upgrades/<M>-to-<M+1>/`. The new-entries-in-in-flight check (part of `pnpm check:upgrade-coverage`) blocks file *adds* in stale transition directories.
-3. **Existing entries** your branch added before the rebase to `upgrades/<M-1>-to-<M>/` may be left in place if they are genuinely about that earlier transition. The new-entries check only enforces *added* paths — modifications and removals of any transition directory are allowed (a placeholder may be turned into a real entry by appending to its `changes[]`, even if main has advanced past that transition).
+1. Re-run step 1 of the authoring workflow. The currently-published minor is now `M+1`, and the in-flight directory is `upgrades/<M+1>-to-<M+2>/`.
+2. Author any **new** entries (changes added on this rebase) in `upgrades/<M+1>-to-<M+2>/`. The new-entries check (part of `pnpm check:upgrade-coverage`) blocks file *adds* in stale transition directories.
+3. **Existing entries** your branch added before the rebase to `upgrades/<M>-to-<M+1>/` may be left in place — they describe the transition that just shipped, and modifications / removals of any transition directory are allowed (the new-entries check only enforces *added* paths).
 
-Decide per-entry whether each prior add belongs in the old transition directory or should be relocated. The rule of thumb: if the entry fixes a substrate diff that already shipped under `M`, leave it in `upgrades/<M-1>-to-<M>/`; if the entry fixes a substrate diff introduced by the further refactoring you did after the rebase, move it to `upgrades/<M>-to-<M+1>/`.
+Decide per-entry whether each prior add belongs in the just-shipped transition directory or should be relocated. The rule of thumb: if the entry fixes a substrate diff that already shipped under `M+1`, leave it in `upgrades/<M>-to-<M+1>/`; if the entry fixes a substrate diff introduced by the further refactoring you did after the rebase, move it to `upgrades/<M+1>-to-<M+2>/`.
 
 ## Out of scope
 
@@ -138,11 +138,11 @@ A PR refactors types in `@prisma-next/migration-tools`. After running `pnpm type
 
 Both substrates are touched → both skill packages need entries.
 
-1. Read root `package.json` on the PR branch → `version: "0.7.0"`. In-flight minor is `0.7`. Directory is `upgrades/0.6-to-0.7/` in each skill package.
+1. Read root `package.json` on the PR branch → `version: "0.7.0"`. Currently-published minor is `0.7`, so the in-flight transition is `0.7 → 0.8`. Directory is `upgrades/0.7-to-0.8/` in each skill package.
 2. Both substrates touched.
-3. `packages/0-shared/upgrade-skill/upgrades/0.6-to-0.7/instructions.md` already exists (placeholder shipped with the initial mechanism PR). Append a `changes[]` entry — call it `migration-metadata-shape-update`. Same for `packages/0-shared/extension-upgrade-skill/upgrades/0.6-to-0.7/instructions.md`.
+3. `packages/0-shared/upgrade-skill/upgrades/0.7-to-0.8/instructions.md` already exists (placeholder shipped with the initial mechanism PR). Append a `changes[]` entry — call it `migration-metadata-shape-update`. Same for `packages/0-shared/extension-upgrade-skill/upgrades/0.7-to-0.8/instructions.md`.
 4. The user-skill entry may be prose-only (e.g. "rename the imported type from `MigrationMetadata` to `MigrationManifest` in any consumer code"), since the user-facing fix is a simple rename.
-5. The extension-skill entry needs more work — the SPI changed shape, not just name. Author `packages/0-shared/extension-upgrade-skill/upgrades/0.6-to-0.7/update-migration-tools-imports.ts` and reference it from the entry's `script:` field. If the same transformation also applies to the example, copy the script into the user-skill package's directory too.
+5. The extension-skill entry needs more work — the SPI changed shape, not just name. Author `packages/0-shared/extension-upgrade-skill/upgrades/0.7-to-0.8/update-migration-tools-imports.ts` and reference it from the entry's `script:` field. If the same transformation also applies to the example, copy the script into the user-skill package's directory too.
 6. Validate by execution: revert `packages/3-extensions/` to pre-PR → run the extension-skill entry → verify `pnpm test --filter='./packages/3-extensions/*'` green and diff matches PR-branch state. Then revert `examples/` to pre-PR → run the user-skill entry → verify `pnpm test:examples` green and diff matches.
 7. Commit on the PR branch with both entry directories, the colocated script(s), and the matching substrate post-state.
 

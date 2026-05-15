@@ -1,20 +1,29 @@
 #!/usr/bin/env node
 // Pre-publish + PR-CI gate for the upgrade-skill mechanism.
 //
-// Enforces two related invariants on every PR and every release:
+// Enforces two related invariants on every PR and every release.
+// `package.json.version` on a given ref is the *currently published*
+// version on that ref — the value `pnpm bump-minor` reads when
+// preparing the next release. The "in-flight" transition is therefore
+// `head.minor → head.minor + 1`: the directory where breaking-change
+// entries authored on the current commit graph belong.
 //
-//   1. Coverage. If the PR's (or release's) diff touches `examples/`,
+//   1. Coverage. If the diff between prev and head touches `examples/`,
 //      the user-skill package must carry a matching upgrade-instructions
-//      directory at
-//      `packages/0-shared/upgrade-skill/upgrades/<M-1>-to-<M>/`. Same
-//      for `packages/3-extensions/` and the extension-upgrade-skill.
-//      `M` is the in-flight minor read from `package.json` on the
-//      head ref.
+//      directory. Same for `packages/3-extensions/` and the
+//      extension-upgrade-skill package. Two cases:
+//        - PR mode (head.minor === prev.minor, no bump on the branch):
+//          the diff is in-flight work; required directory is
+//          `upgrades/<head.minor>-to-<head.minor + 1>/`.
+//        - Publish mode (head.minor > prev.minor, bump landed): the
+//          diff describes everything shipping in this release;
+//          required directory is `upgrades/<prev.minor>-to-<head.minor>/`.
 //
-//   2. New-entries-go-in-the-in-flight-directory. File *adds* under
-//      either skill package's `upgrades/` tree must land in the
-//      directory keyed to `<M-1>-to-<M>`. Modifications and removals
-//      are unrestricted.
+//   2. New-entries-go-in-the-current-or-in-flight-directory. File
+//      *adds* under either skill package's `upgrades/` tree must land
+//      in either the coverage directory (above) or the in-flight
+//      directory keyed to head alone. Modifications and removals are
+//      unrestricted, so old entries can be bug-fixed in place.
 //
 // Usage:
 //   node scripts/check-upgrade-coverage.mjs [--mode pr|publish]
@@ -32,31 +41,6 @@ import { fileURLToPath } from 'node:url';
 
 const USER_SKILL_PKG = 'packages/0-shared/upgrade-skill';
 const EXT_SKILL_PKG = 'packages/0-shared/extension-upgrade-skill';
-
-// Generated artefacts at the publish surface: contract.json /
-// contract.d.ts are regenerated mechanically from the schema, and
-// end-contract.json / end-contract.d.ts mirror them for the
-// post-migration state. A pure regenerate is not a "real" substrate
-// diff and must not by itself demand an entry.
-const GENERATED_BASENAMES = new Set([
-  'contract.json',
-  'contract.d.ts',
-  'end-contract.json',
-  'end-contract.d.ts',
-]);
-
-/**
- * Returns true if `path` (relative to repo root, posix slashes) is
- * one of the generated-and-thus-excluded artefacts the substrate
- * coverage check should ignore. The exclusion is scoped to
- * `examples/**` — only generated example artefacts are skipped.
- */
-export function isGeneratedExamplePath(path) {
-  if (!path.startsWith('examples/')) return false;
-  const segments = path.split('/');
-  const basename = segments[segments.length - 1];
-  return GENERATED_BASENAMES.has(basename);
-}
 
 /**
  * Parse a `<major>.<minor>.<patch>[-<prerelease>]` version string into
@@ -77,9 +61,10 @@ export function parseVersion(spec) {
 
 /**
  * Returns the transition directory keyed to a minor bump from
- * `prev = <major>.<minor>` to `head = <major>.<minor + 1>` (or
- * across a major boundary). Used by the coverage sub-check, where
- * the "from" side is the previously-published version.
+ * `prev = <major>.<minor>` to `head = <major>.<minor>` (or across a
+ * major boundary). Used by the coverage sub-check in publish mode,
+ * where the "from" side is the previously-published version and the
+ * "to" side is the version being shipped.
  */
 export function transitionLabel(prev, head) {
   return `${prev.major}.${prev.minor}-to-${head.major}.${head.minor}`;
@@ -87,26 +72,36 @@ export function transitionLabel(prev, head) {
 
 /**
  * The "in-flight" transition directory keyed to the head version
- * alone — `(headMinor - 1) → headMinor`. Used by the new-entries
- * sub-check, which enforces that *added* files under
- * `upgrades/<X>-to-<Y>/` have `Y` matching the head's minor.
- * When head crosses a major boundary (`headMinor === 0`), the
- * head version doesn't on its own name the previous minor, so we
- * fall back to using the prev version's minor as the "from" side.
+ * alone — `head.minor → head.minor + 1`. Authoring of new
+ * upgrade-instructions entries on a feature branch goes here:
+ * `package.json` on the head ref reads the currently-published
+ * version, so the next batch of breaking-change work targets one
+ * minor up.
  */
-export function inFlightTransitionLabel(head, prev) {
-  if (head.minor === 0) {
-    return transitionLabel(prev, head);
+export function inFlightTransitionLabel(head) {
+  return `${head.major}.${head.minor}-to-${head.major}.${head.minor + 1}`;
+}
+
+/**
+ * The directory the coverage sub-check expects to find for a
+ * (prev, head) pair. In PR-mode steady-state (prev.minor === head.minor)
+ * the substrate diff is in-flight work and belongs in the in-flight
+ * directory. In publish mode (head.minor > prev.minor) the diff
+ * describes the release being shipped and belongs in `prev → head`.
+ */
+export function coverageTransitionLabel(head, prev) {
+  if (head.minor === prev.minor) {
+    return inFlightTransitionLabel(head);
   }
-  return `${head.major}.${head.minor - 1}-to-${head.major}.${head.minor}`;
+  return transitionLabel(prev, head);
 }
 
 /**
  * Parse a path under `<pkg>/upgrades/<transition>/...` and return the
  * transition segment, or null if the path does not match.
  *
- * Example: `packages/0-shared/upgrade-skill/upgrades/0.6-to-0.7/foo.ts`
- *  → `'0.6-to-0.7'`
+ * Example: `packages/0-shared/upgrade-skill/upgrades/0.7-to-0.8/foo.ts`
+ *  → `'0.7-to-0.8'`
  */
 export function parseTransitionFromPath(path) {
   const match =
@@ -137,12 +132,11 @@ function readPackageJsonAtRef(repoRoot, ref) {
   return JSON.parse(raw);
 }
 
-function diffPaths(repoRoot, prev, head, pathspecs, filter) {
+function diffPaths(repoRoot, prev, head, pathspecs) {
   const args = ['diff', '--name-only', `${prev}..${head}`, '--'];
   args.push(...pathspecs);
   const out = git(repoRoot, ...args);
-  const paths = out.split('\n').filter(Boolean);
-  return filter ? paths.filter(filter) : paths;
+  return out.split('\n').filter(Boolean);
 }
 
 function diffAddedPaths(repoRoot, prev, head, pathspecs) {
@@ -212,58 +206,50 @@ export function runCheck({ repoRoot, mode, head, prev }) {
 
   const headMinor = `${headVersion.major}.${headVersion.minor}`;
   const prevMinor = `${prevVersion.major}.${prevVersion.minor}`;
-  // Coverage sub-check uses the *publish* transition (prev → head):
-  // the entry must explain how to traverse exactly what is shipping.
-  // New-entries sub-check uses the *in-flight* transition (purely a
-  // function of head): the in-flight directory is keyed to the
-  // current minor, irrespective of whether prev was the immediate
-  // predecessor.
-  const coverageTransition = transitionLabel(prevVersion, headVersion);
-  const inflightTransition = inFlightTransitionLabel(headVersion, prevVersion);
-  const sameMinor = headMinor === prevMinor;
+  const coverageTransition = coverageTransitionLabel(headVersion, prevVersion);
+  const inflightTransition = inFlightTransitionLabel(headVersion);
 
   const violations = [];
 
-  if (!sameMinor) {
-    const examplesDiff = diffPaths(
-      repoRoot,
-      prev,
-      head,
-      ['examples/'],
-      (path) => !isGeneratedExamplePath(path),
-    );
-    if (examplesDiff.length > 0) {
-      const requiredDir = `${USER_SKILL_PKG}/upgrades/${coverageTransition}`;
-      if (!existsSync(`${repoRoot}/${requiredDir}`)) {
-        violations.push({
-          rule: 'coverage',
-          substrate: 'examples/',
-          requiredDir,
-          sampleDiffPaths: examplesDiff.slice(0, 5),
-        });
-      }
-    }
-
-    const extDiff = diffPaths(
-      repoRoot,
-      prev,
-      head,
-      ['packages/3-extensions/'],
-      (path) => !isGeneratedExamplePath(path),
-    );
-    if (extDiff.length > 0) {
-      const requiredDir = `${EXT_SKILL_PKG}/upgrades/${coverageTransition}`;
-      if (!existsSync(`${repoRoot}/${requiredDir}`)) {
-        violations.push({
-          rule: 'coverage',
-          substrate: 'packages/3-extensions/',
-          requiredDir,
-          sampleDiffPaths: extDiff.slice(0, 5),
-        });
-      }
+  // Coverage check fires whenever the substrate diff is non-empty.
+  // No carve-out for patch ranges, no carve-out for "regenerated"
+  // artefacts. A consumer-facing diff is a consumer-facing diff —
+  // record it. When the diff legitimately needs no consumer-side
+  // action (e.g. internal-only change with incidental example
+  // regeneration), the entry's `changes: []` placeholder shape says
+  // exactly that and is cheap to ship.
+  const examplesDiff = diffPaths(repoRoot, prev, head, ['examples/']);
+  if (examplesDiff.length > 0) {
+    const requiredDir = `${USER_SKILL_PKG}/upgrades/${coverageTransition}`;
+    if (!existsSync(`${repoRoot}/${requiredDir}`)) {
+      violations.push({
+        rule: 'coverage',
+        substrate: 'examples/',
+        requiredDir,
+        sampleDiffPaths: examplesDiff.slice(0, 5),
+      });
     }
   }
 
+  const extDiff = diffPaths(repoRoot, prev, head, ['packages/3-extensions/']);
+  if (extDiff.length > 0) {
+    const requiredDir = `${EXT_SKILL_PKG}/upgrades/${coverageTransition}`;
+    if (!existsSync(`${repoRoot}/${requiredDir}`)) {
+      violations.push({
+        rule: 'coverage',
+        substrate: 'packages/3-extensions/',
+        requiredDir,
+        sampleDiffPaths: extDiff.slice(0, 5),
+      });
+    }
+  }
+
+  // New-entries rule: an added file may live in either the coverage
+  // directory (the release this commit graph is preparing for, or the
+  // release just shipped in publish mode) or the in-flight directory
+  // (the next release after head). Anything in an older transition
+  // directory is stale.
+  const allowedTransitions = new Set([coverageTransition, inflightTransition]);
   const adds = diffAddedPaths(repoRoot, prev, head, [
     `${USER_SKILL_PKG}/upgrades/`,
     `${EXT_SKILL_PKG}/upgrades/`,
@@ -271,19 +257,18 @@ export function runCheck({ repoRoot, mode, head, prev }) {
   for (const path of adds) {
     const transitionInPath = parseTransitionFromPath(path);
     if (transitionInPath === null) continue; // not under a transition dir
-    if (transitionInPath !== inflightTransition) {
+    if (!allowedTransitions.has(transitionInPath)) {
       violations.push({
-        rule: 'new-entries-in-in-flight',
+        rule: 'new-entries-stale-transition',
         path,
         observedTransition: transitionInPath,
-        expectedTransition: inflightTransition,
+        allowedTransitions: [...allowedTransitions],
       });
     }
   }
 
   return {
     ok: violations.length === 0,
-    coverageSkipped: sameMinor,
     headMinor,
     prevMinor,
     coverageTransition,
@@ -308,11 +293,12 @@ function renderViolations(result, write) {
           write(`                ${p}\n`);
         }
       }
-    } else if (v.rule === 'new-entries-in-in-flight') {
+    } else if (v.rule === 'new-entries-stale-transition') {
       write(
-        `  [new-entries-in-in-flight] added ${v.path}\n` +
-          `              transition is "${v.observedTransition}" but the in-flight transition is "${v.expectedTransition}"\n` +
-          `              move the new file under packages/0-shared/<skill>/upgrades/${v.expectedTransition}/\n`,
+        `  [new-entries-stale-transition] added ${v.path}\n` +
+          `              transition is "${v.observedTransition}" but only the following are accepted:\n` +
+          `                ${v.allowedTransitions.join(', ')}\n` +
+          '              move the new file under packages/0-shared/<skill>/upgrades/<one-of-the-above>/\n',
       );
     }
   }
