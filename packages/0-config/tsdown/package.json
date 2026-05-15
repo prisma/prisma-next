@@ -7,7 +7,7 @@
   "description": "Base tsdown configuration for the monorepo",
   "license": "MIT",
   "devDependencies": {
-    "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:0.7.0",
     "tsdown": "catalog:",
     "typescript": "catalog:"
   },
