@@ -19,6 +19,21 @@ import type { Namespace } from './namespace';
  * IR-node alphabet as every other node — the structural dual already
  * holds in code (every concrete storage class extends an IR-node base);
  * the interface promotion makes the typing honest.
+ *
+ * **Persisted envelope shape is target-owned, not framework-promised.**
+ * Whether the `namespaces` map appears in the on-disk JSON envelope is
+ * a per-target decision made by `ContractSerializer.serializeContract`.
+ * Some targets emit a JSON-clean namespace shape that round-trips
+ * through `JSON.stringify` cleanly (SQL today via the family-layer
+ * identity serializer); others ship runtime-only fields on their
+ * namespace concretions and override `serializeContract` to strip
+ * them (Mongo). Future open (F16): extend the per-target
+ * `ContractSerializer` integration-test surface with an explicit
+ * envelope-shape assertion for each target, so the strip-vs-pass-through
+ * choice is locked at test time rather than implied by the override
+ * presence/absence. Earned by PR2's per-target namespace lift, when
+ * `PostgresSchema` / `SqliteUnspecifiedDatabase` start carrying
+ * target-specific fields.
  */
 export interface Storage extends IRNode {
   readonly namespaces: Readonly<Record<string, Namespace>>;

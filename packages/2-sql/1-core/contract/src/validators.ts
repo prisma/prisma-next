@@ -116,6 +116,22 @@ const PostgresEnumTypeSchema = type({
   values: type.string.array().readonly(),
 });
 
+/**
+ * Family-layer arktype validation enumerates the polymorphic shapes the
+ * SQL family ships today (codec-instance + Postgres-enum). Pack-contributed
+ * entity types ship a parallel arktype schema entry here when they
+ * introduce a new persisted shape; the registry-driven hydration seam at
+ * `SqlContractSerializerBase.hydrateStorageTypeEntry` is open, but the
+ * family-layer structural validator is closed by design — extension
+ * packs cannot inject arbitrary persisted shapes through the slot
+ * without their structural shape being known at the family layer.
+ *
+ * Future open (F13): lift `StorageTypeEntrySchema` to an `unknown`
+ * fallback and move structural diagnostics to the registry-dispatch
+ * site at hydration time. Earned by the first non-enum entityType that
+ * ships through the slot (PR2 namespace work or a post-PR2
+ * target-only entity).
+ */
 const StorageTypeEntrySchema = PostgresEnumTypeSchema.or(StorageTypeInstanceSchema);
 
 const PrimaryKeySchema = type.declare<PrimaryKeyInput>().type({

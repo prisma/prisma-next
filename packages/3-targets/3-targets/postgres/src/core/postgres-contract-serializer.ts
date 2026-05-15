@@ -8,6 +8,21 @@ import type { SqlStorage, SqlStorageTypeEntry } from '@prisma-next/sql-contract/
 import { postgresAuthoringEntityTypes } from './authoring';
 import { PostgresEnumType } from './postgres-enum-type';
 
+/**
+ * Build the hydration registry from this target pack's literal
+ * `postgresAuthoringEntityTypes`. Extension-pack-contributed entity
+ * types do not reach this registry today; the surface is honest for
+ * in-tree consumers (Postgres pack only) and the slot stays
+ * deserializable because the family-layer validator's
+ * `StorageTypeEntrySchema` only admits kinds whose factory the
+ * Postgres pack already ships.
+ *
+ * Future open (F14): lift the registry build to descriptor-composition
+ * time, threading the composed `AuthoringContributions.entityTypes`
+ * from extension packs, so a real extension pack shipping a
+ * round-trip-needing entity type can be deserialized end-to-end.
+ * Earned by the first such extension pack in tree.
+ */
 function buildPostgresEntityTypeRegistry(): ReadonlyMap<string, SqlEntityHydrationFactory> {
   const ctx: AuthoringEntityContext = { family: 'sql', target: 'postgres' };
   const registry = new Map<string, SqlEntityHydrationFactory>();
