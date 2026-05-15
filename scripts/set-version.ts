@@ -5,6 +5,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { rewriteWorkspaceDeps } from './set-version-utils.ts';
+
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 const version = process.argv[2];
@@ -50,6 +52,7 @@ for (const pkg of workspacePackages) {
   const packageJson: PackageJson = JSON.parse(content);
 
   packageJson.version = version;
+  rewriteWorkspaceDeps(packageJson, version);
   await fs.writeFile(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
 
   console.log(`Updated ${pkg.name} to ${version}`);
