@@ -665,6 +665,10 @@ class ControlClientImpl implements ControlClient {
         enrichedIR,
         this.stack!,
         this.options.family.emission,
+        {
+          serializeContract: (contract) =>
+            this.options.target.contractSerializer.serializeContract(contract),
+        },
       );
 
       onProgress?.({

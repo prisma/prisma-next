@@ -1,11 +1,33 @@
+import type { JsonObject } from '@prisma-next/utils/json';
 import { describe, expect, it } from 'vitest';
 import {
-  canonicalizeContract,
-  canonicalizeContractToObject,
+  type CanonicalizeContractOptions,
+  canonicalizeContract as canonicalizeContractRaw,
+  canonicalizeContractToObject as canonicalizeContractToObjectRaw,
   orderTopLevel,
 } from '../src/canonicalization';
 import type { Contract } from '../src/contract-types';
 import { coreHash, profileHash } from '../src/types';
+
+// Tests author JSON-clean contracts directly, so the canonicalisation
+// hook trivially passes through.
+const identityOptions = {
+  serializeContract: (c: Contract): JsonObject => c as unknown as JsonObject,
+} satisfies CanonicalizeContractOptions;
+
+function canonicalizeContractToObject(
+  contract: Contract,
+  options?: Omit<CanonicalizeContractOptions, 'serializeContract'>,
+): Record<string, unknown> {
+  return canonicalizeContractToObjectRaw(contract, { ...identityOptions, ...options });
+}
+
+function canonicalizeContract(
+  contract: Contract,
+  options?: Omit<CanonicalizeContractOptions, 'serializeContract'>,
+): string {
+  return canonicalizeContractRaw(contract, { ...identityOptions, ...options });
+}
 
 function minimal(overrides?: Record<string, unknown>): Contract {
   return {

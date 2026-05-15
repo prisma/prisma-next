@@ -1,5 +1,28 @@
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
+import type { EmissionSpi } from '@prisma-next/framework-components/emission';
+import type { JsonObject } from '@prisma-next/utils/json';
+import type { EmitOptions, EmitResult, EmitStackInput } from '../src/exports';
+import { emit as emitImpl } from '../src/exports';
+
+const identitySerialize = (c: Contract): JsonObject => c as unknown as JsonObject;
+
+/**
+ * Tests author JSON-clean contracts directly, so the canonicalisation
+ * hook trivially passes through. Production callers thread the target
+ * descriptor's `contractSerializer.serializeContract` instead.
+ */
+export function emit(
+  contract: Contract,
+  stack: EmitStackInput,
+  family: EmissionSpi,
+  options?: Omit<EmitOptions, 'serializeContract'>,
+): Promise<EmitResult> {
+  return emitImpl(contract, stack, family, {
+    ...options,
+    serializeContract: identitySerialize,
+  });
+}
 
 type TestContractOverrides = {
   target?: string;

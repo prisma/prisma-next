@@ -13,9 +13,9 @@ export async function emit(
   contract: Contract,
   stack: EmitStackInput,
   targetFamily: EmissionSpi,
-  options?: EmitOptions,
+  options: EmitOptions,
 ): Promise<EmitResult> {
-  if (options?.outputJsonPath !== undefined) {
+  if (options.outputJsonPath !== undefined) {
     getEmittedArtifactPaths(options.outputJsonPath);
   }
 
@@ -27,7 +27,7 @@ export async function emit(
 
   const canonicalized = canonicalizeContractToObject(contract, {
     schemaVersion: SCHEMA_VERSION,
-    ...ifDefined('serializeContract', options?.serializeContract),
+    serializeContract: options.serializeContract,
   });
   const contractJsonString = JSON.stringify(
     {

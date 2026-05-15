@@ -1,6 +1,13 @@
-import { canonicalizeContract } from '@prisma-next/contract/hashing';
+import { canonicalizeContract as canonicalizeContractRaw } from '@prisma-next/contract/hashing';
+import type { Contract } from '@prisma-next/contract/types';
+import type { JsonObject } from '@prisma-next/utils/json';
 import { describe, expect, it } from 'vitest';
 import { createTestContract } from './utils';
+
+const canonicalizeContract = (c: Contract): string =>
+  canonicalizeContractRaw(c, {
+    serializeContract: (input) => input as unknown as JsonObject,
+  });
 
 describe('canonicalization', () => {
   it('orders top-level sections correctly', () => {

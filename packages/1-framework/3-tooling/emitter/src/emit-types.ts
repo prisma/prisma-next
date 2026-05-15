@@ -21,12 +21,11 @@ export interface EmitOptions {
    * canonical on-disk JsonObject shape before the framework's
    * key-ordering / default-omission walk runs. Threaded from the
    * descriptor (`descriptor.contractSerializer.serializeContract`) at
-   * the CLI / control-API call site so target classes can decide what
+   * the CLI / control-API call site so target classes decide what
    * appears in the JSON envelope rather than the framework guessing
-   * via property enumerability. Optional for back-compat with test
-   * call sites that emit JSON-clean contracts and don't need a hook.
+   * via property enumerability.
    */
-  readonly serializeContract?: SerializeContract;
+  readonly serializeContract: SerializeContract;
 }
 
 export interface EmitResult {

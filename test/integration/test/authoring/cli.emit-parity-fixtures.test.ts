@@ -4,11 +4,11 @@ import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-em
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractSourceContext, PrismaNextConfig } from '@prisma-next/cli/config-types';
 import { enrichContract } from '@prisma-next/cli/control-api';
-import { emit } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { emit } from '../../utils/emit';
 import { executeCommand, setupCommandMocks } from '../utils/cli-test-helpers';
 import {
   listAuthoringDiagnosticsFixtureCases,

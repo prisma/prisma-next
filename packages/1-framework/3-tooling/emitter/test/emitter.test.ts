@@ -2,9 +2,9 @@ import type { TypesImportSpec } from '@prisma-next/framework-components/emission
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { EmitStackInput } from '../src/exports';
-import { emit, getEmittedArtifactPaths } from '../src/exports';
+import { getEmittedArtifactPaths } from '../src/exports';
 import { createMockSpi } from './mock-spi';
-import { createTestContract } from './utils';
+import { createTestContract, emit } from './utils';
 
 const mockSqlHook = createMockSpi();
 

@@ -234,26 +234,18 @@ export async function executeContractEmit(
       );
       const enrichedIR = enrichContract(validatedContract.value as Contract, frameworkComponents);
       familyInstance.validateContract(enrichedIR);
-      // Targets that compose a `contractSerializer` SPI on their
-      // descriptor (Mongo today; SQL targets land their own as the
-      // family adopts the SPI) own the in-memory → on-disk JSON
-      // conversion. Threading the serializer here lets the framework
-      // canonicalizer operate on a target-produced JsonObject rather
-      // than walking the in-memory contract directly with
-      // `Object.entries`, which would otherwise leak runtime-only
-      // class API fields into the on-disk envelope.
-      const targetSerializer = (
-        config.target as {
-          contractSerializer?: { serializeContract: (c: Contract) => JsonObject };
-        }
-      ).contractSerializer;
-      const serializeContract = targetSerializer
-        ? (c: Contract) => targetSerializer.serializeContract(c)
-        : undefined;
+      // Each target's descriptor ships a `contractSerializer` SPI; the
+      // framework canonicalizer threads its `serializeContract` so the
+      // on-disk JSON envelope is constructed by target-owned code
+      // rather than by walking the in-memory contract with
+      // `Object.entries` (which would leak runtime-only class API
+      // fields into the persisted shape).
+      const serializeContract = (c: Contract): JsonObject =>
+        config.target.contractSerializer.serializeContract(c);
       emitResult = await unlessAborted(
         emit(enrichedIR, stack, config.family.emission, {
           outputJsonPath,
-          ...ifDefined('serializeContract', serializeContract),
+          serializeContract,
         }),
       );
     } catch (error) {

@@ -103,6 +103,10 @@ function makeStack(
       version: '0.0.1',
       familyId: 'sql',
       targetId: 'postgres',
+      contractSerializer: {
+        deserializeContract: (json) => json as never,
+        serializeContract: (contract) => contract as never,
+      },
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     adapter: {

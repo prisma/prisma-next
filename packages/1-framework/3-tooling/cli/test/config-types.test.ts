@@ -80,6 +80,10 @@ describe('defineConfig', () => {
       targetId: 'postgres',
       id: 'postgres',
       version: '0.0.1',
+      contractSerializer: {
+        deserializeContract: (json) => json as never,
+        serializeContract: (contract) => contract as never,
+      },
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     adapter: {

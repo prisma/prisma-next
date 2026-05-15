@@ -256,16 +256,14 @@ export interface CanonicalizeContractOptions {
   /**
    * Per-target hook that converts the in-memory contract (which may
    * carry class-instance IR nodes) into a plain JsonObject before the
-   * family-agnostic canonicalization steps run. When omitted, the
-   * contract is treated as a JsonObject directly — appropriate for
-   * targets whose IR is already JSON-clean.
+   * family-agnostic canonicalization steps run.
    *
    * Routing through the hook is what lets each target decide which
    * fields appear in the on-disk envelope; runtime-only class API
    * fields stay invisible to the canonicalization walk by virtue of
    * the per-target serializer not putting them in the JSON shape.
    */
-  readonly serializeContract?: SerializeContract;
+  readonly serializeContract: SerializeContract;
 }
 
 /**
@@ -275,13 +273,11 @@ export interface CanonicalizeContractOptions {
  */
 export function canonicalizeContractToObject(
   contract: Contract,
-  options?: CanonicalizeContractOptions,
+  options: CanonicalizeContractOptions,
 ): Record<string, unknown> {
-  const serialized = options?.serializeContract
-    ? options.serializeContract(contract)
-    : (contract as unknown as JsonObject);
+  const serialized = options.serializeContract(contract);
   const normalized: Record<string, unknown> = {
-    ...ifDefined('schemaVersion', options?.schemaVersion),
+    ...ifDefined('schemaVersion', options.schemaVersion),
     targetFamily: serialized['targetFamily'],
     target: serialized['target'],
     profileHash: serialized['profileHash'],
@@ -303,7 +299,7 @@ export function canonicalizeContractToObject(
 
 export function canonicalizeContract(
   contract: Contract,
-  options?: CanonicalizeContractOptions,
+  options: CanonicalizeContractOptions,
 ): string {
   return JSON.stringify(canonicalizeContractToObject(contract, options), null, 2);
 }

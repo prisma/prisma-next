@@ -6,7 +6,6 @@ import type { ContractSourceContext } from '@prisma-next/cli/config-types';
 import { enrichContract } from '@prisma-next/cli/control-api';
 import type { SerializeContract } from '@prisma-next/contract/hashing';
 import type { Contract } from '@prisma-next/contract/types';
-import { emit } from '@prisma-next/emitter';
 import { mongoFamilyDescriptor } from '@prisma-next/family-mongo/control';
 import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import sql from '@prisma-next/family-sql/control';
@@ -21,6 +20,7 @@ import postgres from '@prisma-next/target-postgres/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { dirname, join } from 'pathe';
 import { describe, expect, it } from 'vitest';
+import { emit } from '../../utils/emit';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtureRootDir = join(__dirname, 'side-by-side');
@@ -170,8 +170,16 @@ describe('side-by-side contract examples', () => {
 
       expect(normalizedTs).toEqual(normalizedPsl);
 
-      const emittedTs = await emit(normalizedTs, sqlStack, sql.emission);
-      const emittedPsl = await emit(normalizedPsl, sqlStack, sql.emission);
+      const sqlSerializeContract: SerializeContract = (contract) =>
+        postgres.contractSerializer.serializeContract(
+          contract as Parameters<typeof postgres.contractSerializer.serializeContract>[0],
+        );
+      const emittedTs = await emit(normalizedTs, sqlStack, sql.emission, {
+        serializeContract: sqlSerializeContract,
+      });
+      const emittedPsl = await emit(normalizedPsl, sqlStack, sql.emission, {
+        serializeContract: sqlSerializeContract,
+      });
 
       expect(emittedTs.contractJson).toBe(emittedPsl.contractJson);
 
