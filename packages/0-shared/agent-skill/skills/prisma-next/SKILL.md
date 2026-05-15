@@ -1,6 +1,6 @@
 ---
 name: prisma-next
-description: Route a vague Prisma Next prompt to a specific skill. Use for "help me with Prisma Next", "I'm new to PN", "explain Prisma Next", "where do I start", or any open-ended question that doesn't clearly match adoption, schema, migrations, queries, runtime, or debugging.
+description: Route a vague Prisma Next prompt to the right specific skill. Use for "help me with Prisma Next", "what is Prisma Next", "explain Prisma Next", "I'm new to PN", "where do I start", "tour of Prisma Next", "Prisma Next overview", and comparison questions like "Prisma Next vs Prisma 7", "PN vs Drizzle", "PN vs Kysely", "PN vs TypeORM". Do NOT use when the prompt clearly matches a workflow skill — adoption / quickstart / brownfield introspection, schema / contract editing, migration authoring (db update / migration plan / migration apply), migration review on deploy / concurrent migrations, queries / db.orm / db.sql / TypedSQL, runtime / db.ts / middleware wiring, build / Vite plugin / Next.js plugin, debug / structured error envelopes / PN-* error codes, or feedback / bug report / feature request — load that sibling skill directly.
 ---
 
 # Prisma Next — Router
