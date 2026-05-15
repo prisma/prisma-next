@@ -1,5 +1,5 @@
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import { MongoSchemaNode } from './schema-node';
+import { MongoSchemaIRNode } from './schema-node';
 import type { MongoSchemaVisitor } from './visitor';
 
 export interface MongoSchemaValidatorOptions {
@@ -8,7 +8,7 @@ export interface MongoSchemaValidatorOptions {
   readonly validationAction: 'error' | 'warn';
 }
 
-export class MongoSchemaValidator extends MongoSchemaNode {
+export class MongoSchemaValidator extends MongoSchemaIRNode {
   readonly kind = 'validator' as const;
   readonly jsonSchema: Record<string, unknown>;
   readonly validationLevel: 'strict' | 'moderate';

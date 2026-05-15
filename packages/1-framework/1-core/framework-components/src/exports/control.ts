@@ -79,9 +79,9 @@ export {
 } from '../control/control-result-types';
 export type {
   CoreSchemaView,
-  SchemaNodeKind,
   SchemaTreeNodeOptions,
   SchemaTreeVisitor,
+  SchemaViewNodeKind,
 } from '../control/control-schema-view';
 export { SchemaTreeNode } from '../control/control-schema-view';
 export type {

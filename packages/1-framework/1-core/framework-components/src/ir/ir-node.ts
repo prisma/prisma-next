@@ -3,7 +3,7 @@
  *
  * The framework's contribution to Contract IR / Schema IR is a common
  * root for the IR class hierarchy and a freeze affordance. Family
- * abstract bases (e.g. `SqlNode`, `MongoSchemaNode`) refine the alphabet
+ * abstract bases (e.g. `SqlNode`, `MongoSchemaIRNode`) refine the alphabet
  * for their family shape; targets ship the concrete classes.
  *
  * `kind` is an optional discriminator on the base. Families and leaves

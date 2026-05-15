@@ -7,7 +7,7 @@ export { MongoSchemaCollectionOptions } from '../schema-collection-options';
 export type { MongoSchemaIndexOptions } from '../schema-index';
 export { MongoSchemaIndex } from '../schema-index';
 export { MongoSchemaIR } from '../schema-ir';
-export { MongoSchemaNode } from '../schema-node';
+export { MongoSchemaIRNode } from '../schema-node';
 export type { MongoSchemaValidatorOptions } from '../schema-validator';
 export { MongoSchemaValidator } from '../schema-validator';
 export type { AnyMongoSchemaNode } from '../types';

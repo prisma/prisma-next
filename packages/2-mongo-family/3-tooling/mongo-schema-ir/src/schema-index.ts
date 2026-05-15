@@ -1,6 +1,6 @@
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import type { MongoIndexKey } from '@prisma-next/mongo-contract';
-import { MongoSchemaNode } from './schema-node';
+import { MongoSchemaIRNode } from './schema-node';
 import type { MongoSchemaVisitor } from './visitor';
 
 export interface MongoSchemaIndexOptions {
@@ -16,7 +16,7 @@ export interface MongoSchemaIndexOptions {
   readonly language_override?: string | undefined;
 }
 
-export class MongoSchemaIndex extends MongoSchemaNode {
+export class MongoSchemaIndex extends MongoSchemaIRNode {
   readonly kind = 'index' as const;
   readonly keys: ReadonlyArray<MongoIndexKey>;
   readonly unique: boolean;

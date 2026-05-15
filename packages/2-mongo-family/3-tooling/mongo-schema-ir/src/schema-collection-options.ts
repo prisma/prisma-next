@@ -1,5 +1,5 @@
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import { MongoSchemaNode } from './schema-node';
+import { MongoSchemaIRNode } from './schema-node';
 import type { MongoSchemaVisitor } from './visitor';
 
 export interface MongoSchemaCollectionOptionsInput {
@@ -14,7 +14,7 @@ export interface MongoSchemaCollectionOptionsInput {
   readonly clusteredIndex?: { name?: string };
 }
 
-export class MongoSchemaCollectionOptions extends MongoSchemaNode {
+export class MongoSchemaCollectionOptions extends MongoSchemaIRNode {
   readonly kind = 'collectionOptions' as const;
   readonly capped?: { size: number; max?: number } | undefined;
   readonly timeseries?:
