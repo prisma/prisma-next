@@ -71,7 +71,7 @@ If either precondition is unmet, stop and surface the issue. Do **not** try to a
 
 5. **Commit.** Use the message:
 
-   ```
+   ```text
    chore(release): bump to <version>
    ```
 
@@ -81,7 +81,7 @@ If either precondition is unmet, stop and surface the issue. Do **not** try to a
 
 7. **Open the PR** with `gh pr create`. Use the title:
 
-   ```
+   ```text
    Bump to version <version>
    ```
 
