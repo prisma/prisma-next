@@ -102,13 +102,22 @@ jobs:
       - name: Check publish dependency specifiers
         run: pnpm check:publish-deps
 
+      # Both publish paths fan out across `PUBLISH_CONCURRENCY` workers
+      # (default 8) via `scripts/publish-packages.mjs`. `pnpm -r publish` is
+      # intentionally serialized (it rejects `--workspace-concurrency`
+      # outright), and the per-package npm upload + Sigstore signing
+      # round-trips dominate wall-clock time, so serial publish of ~60
+      # packages takes 5–10 minutes on CI. Fanning out brings it down by
+      # close to the concurrency factor while staying well below npm's
+      # informal abuse thresholds.
+
       # Dry-run path: exercises the full publish pipeline (pack, validate
       # tarball contents, dependency rewriting) without touching the npm
       # registry. Use from any branch via `workflow_dispatch` to validate
       # changes that affect publishing before merging.
       - name: Publish packages (dry-run)
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry-run == 'true' }}
-        run: pnpm -r publish --access public --tag "${{ steps.version.outputs.tag }}" --no-git-checks --dry-run
+        run: node scripts/publish-packages.mjs --tag "${{ steps.version.outputs.tag }}" --dry-run
 
       # NODE_AUTH_TOKEN is intentionally NOT set. npm detects the OIDC environment
       # (id-token: write) and authenticates via Trusted Publishing automatically.
@@ -120,7 +129,7 @@ jobs:
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.dry-run != 'true' }}
         env:
           NPM_CONFIG_PROVENANCE: "true"
-        run: pnpm -r publish --access public --tag "${{ steps.version.outputs.tag }}" --no-git-checks
+        run: node scripts/publish-packages.mjs --tag "${{ steps.version.outputs.tag }}"
 
       # Emit a GitHub Release for stable publishes only (dist-tag `latest`).
       # Dev / PR / beta builds publish to npm but do not produce a Release —
