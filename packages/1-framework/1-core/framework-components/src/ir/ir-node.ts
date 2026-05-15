@@ -17,7 +17,7 @@
  * through a union of leaves where each leaf carries a literal kind, so
  * requiring `kind` at the base would be unearned. Future leaves that
  * earn polymorphic dispatch override with a required literal at that
- * leaf (e.g. `override readonly kind = 'sql-enum-type' as const`).
+ * leaf (e.g. `override readonly kind = 'postgres-enum' as const`).
  *
  * `IRNodeBase` carries no methods: the freeze-and-assign affordance
  * lives in the free `freezeNode` helper below. Keeping `freezeNode` out

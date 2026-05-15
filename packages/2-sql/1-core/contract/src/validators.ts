@@ -83,7 +83,7 @@ const StorageColumnSchema = type({
  * Codec-triple entry persisted under `storage.types[name]`. Carries an
  * enumerable literal `kind: 'codec-instance'` discriminator so the
  * polymorphic slot dispatch can distinguish codec triples from
- * class-instance kinds (e.g. `'sql-enum-type'`) sharing the slot.
+ * class-instance kinds (e.g. `'postgres-enum'`) sharing the slot.
  */
 const StorageTypeInstanceSchema = type
   .declare<StorageTypeInstanceInput & { kind: 'codec-instance' }>()
@@ -96,20 +96,27 @@ const StorageTypeInstanceSchema = type
 
 /**
  * Polymorphic enum-type entry under `storage.types[name]` (Decision 18,
- * Option B). Carries an enumerable literal `kind: 'sql-enum-type'`
+ * Option B). Carries an enumerable literal `kind: 'postgres-enum'`
  * discriminator so the per-target hydration walker can dispatch
  * cleanly back to a typed IR-class instance during
- * `deserializeContract`. Codec-typed entries match
- * `StorageTypeInstanceSchema` instead.
+ * `deserializeContract`. The discriminator reflects the target
+ * altitude (Postgres only; per Decision 18 enum is target-only) — not
+ * the family altitude.
+ *
+ * The schema literal lives at the family layer today because the
+ * registry-driven validator lift (F13 open item) hasn't earned itself
+ * yet; once a second polymorphic kind ships through the slot, this
+ * structural enumeration moves to the registry-dispatch site and the
+ * per-target schemas live in their target packages.
  */
-const SqlEnumTypeSchema = type({
-  kind: "'sql-enum-type'",
+const PostgresEnumTypeSchema = type({
+  kind: "'postgres-enum'",
   name: 'string',
   nativeType: 'string',
   values: type.string.array().readonly(),
 });
 
-const StorageTypeEntrySchema = SqlEnumTypeSchema.or(StorageTypeInstanceSchema);
+const StorageTypeEntrySchema = PostgresEnumTypeSchema.or(StorageTypeInstanceSchema);
 
 const PrimaryKeySchema = type.declare<PrimaryKeyInput>().type({
   columns: type.string.array().readonly(),

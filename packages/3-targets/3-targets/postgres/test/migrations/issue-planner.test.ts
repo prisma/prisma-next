@@ -40,7 +40,7 @@ function makeSchemaWithEnum(nativeType: string, values: readonly string[]): SqlS
       pg: {
         storageTypes: {
           [nativeType]: {
-            kind: 'sql-enum-type',
+            kind: 'postgres-enum',
             codecId: 'pg/enum@1',
             nativeType,
             values,

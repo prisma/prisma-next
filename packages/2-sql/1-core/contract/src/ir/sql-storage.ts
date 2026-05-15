@@ -108,10 +108,10 @@ function normaliseTypeEntry(entry: SqlStorageTypeEntry): SqlEnumType | StorageTy
   if (
     typeof entry === 'object' &&
     entry !== null &&
-    (entry as { kind?: unknown }).kind === 'sql-enum-type'
+    (entry as { kind?: unknown }).kind === 'postgres-enum'
   ) {
     throw new Error(
-      'Encountered raw sql-enum-type JSON in storage.types without serializer hydration; use a target ContractSerializer that registers the matching entity-type factory.',
+      'Encountered raw postgres-enum JSON in storage.types without serializer hydration; use a target ContractSerializer that registers the matching entity-type factory.',
     );
   }
   return toStorageTypeInstance(entry);

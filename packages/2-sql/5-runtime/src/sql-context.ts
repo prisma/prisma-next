@@ -225,7 +225,7 @@ export function assertExecutionStackContractRequirements(
  * Resolves codec id + typeParams for a `SqlStorage.types` entry that
  * represents an enum, accommodating two shapes:
  *   - hydrated `SqlEnumType` instance (uses prototype `codecBinding`)
- *   - raw JSON envelope with `kind: 'sql-enum-type'` (carries
+ *   - raw JSON envelope with `kind: 'postgres-enum'` (carries
  *     `codecId` as enumerable own property + `values` array)
  * Returns `undefined` when the entry is not enum-shaped, so callers
  * fall through to the codec-typed path.
@@ -242,7 +242,7 @@ function readEnumViewIfApplicable(
   if (
     typeof typeInstance === 'object' &&
     typeInstance !== null &&
-    (typeInstance as { kind?: string }).kind === 'sql-enum-type'
+    (typeInstance as { kind?: string }).kind === 'postgres-enum'
   ) {
     const enumLike = typeInstance as {
       readonly codecId?: string;

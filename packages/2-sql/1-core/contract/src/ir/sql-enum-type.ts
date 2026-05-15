@@ -20,13 +20,15 @@ import { SqlNode } from './sql-node';
  * family base.
  *
  * Per Decision 16, the per-leaf `kind` discriminator is enumerable
- * (`'sql-enum-type'`) because it carries dispatch-relevant
- * information that callers need to see in the JSON envelope —
- * Option B (polymorphic `storage.types`) keys hydration on this
- * literal to construct the right subclass.
+ * (`'postgres-enum'`) because it carries dispatch-relevant information
+ * that callers need to see in the JSON envelope — Option B
+ * (polymorphic `storage.types`) keys hydration on this literal to
+ * construct the right subclass. The discriminator reflects the
+ * target altitude (Postgres only; per Decision 18 enum is target-only)
+ * rather than the family altitude.
  */
 export abstract class SqlEnumType extends SqlNode {
-  override readonly kind = 'sql-enum-type';
+  override readonly kind = 'postgres-enum';
   abstract readonly name: string;
   abstract readonly nativeType: string;
   abstract readonly values: readonly string[];

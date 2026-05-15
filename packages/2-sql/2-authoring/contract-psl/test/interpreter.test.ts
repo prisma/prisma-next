@@ -357,7 +357,7 @@ model Post {
       types: {
         Email: { codecId: 'pg/text@1', nativeType: 'text' },
         Role: {
-          kind: 'sql-enum-type',
+          kind: 'postgres-enum',
           name: 'Role',
           nativeType: 'Role',
           values: ['USER', 'ADMIN'],

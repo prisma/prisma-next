@@ -185,7 +185,7 @@ model Document {
     expect(result.value.storage).toMatchObject({
       types: {
         Role: {
-          kind: 'sql-enum-type',
+          kind: 'postgres-enum',
           name: 'Role',
           nativeType: 'Role',
           values: ['USER', 'ADMIN'],

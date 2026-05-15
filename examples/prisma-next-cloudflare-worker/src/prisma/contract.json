@@ -383,7 +383,7 @@
         "id": "__unspecified__"
       }
     },
-    "storageHash": "sha256:f76a6e7d6ca96488cbb1d5f1c3e99739f3805a04ecd9c9b8e0829bc1c3ed223f",
+    "storageHash": "sha256:15823d3626844985b4031c96aa28f09c9a50b00c88b0afa1f13a2543c4de7e4e",
     "tables": {
       "bug": {
         "columns": {
@@ -598,7 +598,7 @@
     "types": {
       "user_type": {
         "codecId": "pg/enum@1",
-        "kind": "sql-enum-type",
+        "kind": "postgres-enum",
         "name": "user_type",
         "nativeType": "user_type",
         "values": [

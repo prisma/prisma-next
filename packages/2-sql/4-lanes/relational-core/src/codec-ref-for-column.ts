@@ -35,13 +35,13 @@ export function codecRefForStorageColumn(
         typeParams: instance.codecBinding.typeParams as unknown as JsonValue,
       };
     }
-    // Raw JSON enum envelope (`kind: 'sql-enum-type'`): hydration
+    // Raw JSON enum envelope (`kind: 'postgres-enum'`): hydration
     // didn't run (e.g. user-written `migration.ts` passing
     // `end-contract.json` directly to `createExecutionContext`). The
     // envelope carries `codecId` + `values` as enumerable own
     // properties on the per-target subclass, so we synthesise the
     // codec-typed `typeParams.values` shape from there.
-    if ((instance as { kind?: string }).kind === 'sql-enum-type') {
+    if ((instance as { kind?: string }).kind === 'postgres-enum') {
       const enumLike = instance as unknown as {
         readonly codecId?: string;
         readonly values?: readonly string[];

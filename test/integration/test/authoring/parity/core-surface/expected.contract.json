@@ -144,7 +144,7 @@
         "id": "__unspecified__"
       }
     },
-    "storageHash": "sha256:40564f5dced2831a3dcfeb370d9aa13d40a1936770f234dc5349cf78478eb97e",
+    "storageHash": "sha256:ce0ecf615e38da1ccbfd231c360dbc36371b55fa9ceba69a9401a42b5b257fcf",
     "tables": {
       "post": {
         "columns": {
@@ -268,7 +268,7 @@
       },
       "Role": {
         "codecId": "pg/enum@1",
-        "kind": "sql-enum-type",
+        "kind": "postgres-enum",
         "name": "Role",
         "nativeType": "Role",
         "values": ["USER", "ADMIN"]

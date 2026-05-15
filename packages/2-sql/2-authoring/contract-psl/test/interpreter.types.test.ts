@@ -156,13 +156,13 @@ model User {
     expect(result.value.storage).toMatchObject({
       types: {
         UserRole: {
-          kind: 'sql-enum-type',
+          kind: 'postgres-enum',
           name: 'UserRole',
           nativeType: 'user_role',
           values: ['USER', 'ADMIN'],
         },
         Role: {
-          kind: 'sql-enum-type',
+          kind: 'postgres-enum',
           name: 'Role',
           nativeType: 'Role',
           values: ['OWNER'],

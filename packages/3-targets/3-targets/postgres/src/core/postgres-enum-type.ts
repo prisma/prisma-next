@@ -31,7 +31,7 @@ export interface PostgresEnumTypeInput<
  * `name`; `values` is frozen at construction time). Constructor calls
  * `freezeNode(this)` per Decision 8 — the instance is fully
  * immutable, JSON-clean, and dispatchable on its enumerable
- * `kind: 'sql-enum-type'` literal.
+ * `kind: 'postgres-enum'` literal.
  */
 /** Codec id used by Postgres enum-typed columns (text wire format). */
 const PG_ENUM_CODEC_ID = 'pg/enum@1';
@@ -45,7 +45,7 @@ export class PostgresEnumType<
   readonly values: TValues;
   /**
    * Enumerable own property so the persisted JSON envelope carries
-   * `codecId: 'pg/enum@1'` alongside `kind: 'sql-enum-type'`. The
+   * `codecId: 'pg/enum@1'` alongside `kind: 'postgres-enum'`. The
    * runtime path (`codecRefForStorageColumn`, `assertColumnCodecIntegrity`)
    * receives JSON-shaped contracts (e.g. inside a user-written
    * `migration.ts` that loads `endContract` from `end-contract.json`)
