@@ -4,7 +4,7 @@
     "alwaysApplyLines": 500,
     "alwaysApplyBytes": 20000,
     "agentsLines": 200,
-    "agentsBytes": 10000,
+    "agentsBytes": 10250,
     "totalRulesLines": 5000,
     "totalRulesBytes": 200000
   }
