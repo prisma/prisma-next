@@ -27,7 +27,7 @@ Once the contract is emitted and the DB is up to date, this skill covers everyth
 
 ## Key Concepts
 
-Prisma Next ships **two** query lanes on top of one contract today, both reached through the same `db` value from `prisma/db.ts` (which the `@prisma-next/<target>/runtime` façade returns):
+Prisma Next ships **two** query lanes on top of one contract today, both reached through the same `db` value from `src/prisma/db.ts` (which the `@prisma-next/<target>/runtime` façade returns):
 
 - **`db.orm.<Model>`** — the ORM. Model-shaped (`db.orm.User`), fluent (`.where(...).select(...).orderBy(...).all()`), fully typed against `Contract`. Default lane for CRUD with relations.
 - **`db.sql.<table>`** — the SQL builder. Table-shaped (`db.sql.user`, lowercase by storage name), produces a *plan* you execute through the runtime. Use when the ORM is too high-level — explicit `JOIN`, computed projections that aren't model fields, set operations, window functions.
@@ -51,7 +51,8 @@ The two lanes share the same contract, the same connection, and the same transac
 The concept: `db.orm.<Model>` returns a *collection* you compose method-by-method. Each call returns a new collection (immutable chaining); the terminal verb (`.all()` / `.first()` / `.count()` / `.aggregate(...)`) issues the query. Predicates are lambdas over a field proxy: `u.field.<op>(value)`.
 
 ```typescript
-import { db } from './prisma/db';
+// src/queries/users.ts — one directory deep under src/, so the import is '../prisma/db'
+import { db } from '../prisma/db';
 
 // Find one record by primary key shorthand.
 const user = await db.orm.User.first({ id: userId });
@@ -292,7 +293,8 @@ If `?? 0` is showing up on every aggregate, that's a signal you're calling `sum`
 The concept: `db.sql.<table>` is a table-shaped builder that produces a *plan*. The plan is a serialisable description of the query (AST + parameters); you execute it through the runtime with `db.runtime().execute(plan)`. The builder gives you the lanes the ORM doesn't express — explicit `JOIN`, arbitrary expression projection, target-specific operations through extension helpers — without dropping to raw SQL.
 
 ```typescript
-import { db } from './prisma/db';
+// src/queries/posts.ts — adjust the relative import to match file depth.
+import { db } from '../prisma/db';
 
 // Select with predicate and limit.
 const plan = db.sql.post

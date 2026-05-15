@@ -37,14 +37,51 @@ This skill does **not** cover migrating from another ORM (Drizzle, Prisma 6/7, S
 - **Target**: the backing store. Today: `postgres` or `mongodb`. Picked at `init` time; baked into the `@prisma-next/<target>` façade the scaffold imports from.
 - **Authoring mode**: how you write the contract. `psl` (Prisma Schema Language, default) or `typescript` (programmatic builder, optionally paired with the Vite plugin for auto-emit during `vite dev` — see `prisma-next-build`).
 - **Façade packages.** The scaffold installs exactly one façade per target — `@prisma-next/postgres` (or `@prisma-next/mongo`). User code imports from façade subpaths (`@prisma-next/postgres/config`, `@prisma-next/postgres/runtime`, `@prisma-next/postgres/contract-builder`). The façade bakes in the family / target / adapter / driver wiring; never reach past it. See `prisma-next-contract` for the full list.
-- **`db.ts`**: the runtime entry point. Scaffolded by `init` under `<schemaDir>/db.ts` (defaults to `prisma/db.ts`). Imports the contract artefacts and exports a `db` value the rest of the app uses.
+- **`db.ts`**: the runtime entry point. Lives next to the contract source at `src/prisma/db.ts`. Imports the contract artefacts and exports a `db` value the rest of the app uses.
 - **Marker**: a `pn_meta_marker` row in your database that records the contract hash. Lets PN detect drift between contract and live DB. Created by `db init` (greenfield / post-bootstrap) or `db sign` (brownfield).
+
+### Canonical on-disk layout
+
+Every application that consumes Prisma Next uses the same shape:
+
+```text
+<app-root>/
+├── prisma-next.config.ts             ← project config at repo root
+├── src/
+│   └── prisma/
+│       ├── contract.prisma           ← (or contract.ts) — schema source you author
+│       ├── contract.json             ← emitted by `contract emit` — do not edit
+│       ├── contract.d.ts             ← emitted by `contract emit` — do not edit
+│       └── db.ts                     ← runtime entry; the rest of `src/` imports from here
+└── migrations/
+    └── app/                          ← created on first `migration plan` / `db init`
+        ├── refs/head.json
+        └── <timestamp>_<slug>/
+            ├── migration.json
+            ├── ops.json
+            ├── end-contract.json
+            ├── end-contract.d.ts
+            └── migration.ts
+```
+
+Three things to internalise:
+
+- **`src/prisma/` is the home for the contract** — source + emitted artefacts + `db.ts` all colocated. The rest of `src/` imports from `./prisma/db` (or `../prisma/db`, depending on file depth).
+- **`migrations/app/`** — the `app/` segment is the consuming application's space-id. Extensions you depend on get sibling directories under `migrations/` (one per extension contract-space), but you don't write into those — only the `app/` subtree is your migrations.
+- **`prisma-next.config.ts` lives at the repo root**, not under `src/`. Every command resolves paths relative to the config's directory.
+
+**Contributors building extension packages or aggregate-root monorepo packages use a different layout** — `src/contract.{prisma,ts}` (no `prisma/` subdir) + `migrations/<timestamp>_<slug>/` (no `app/` segment). That distinction is intentional; see `prisma-next-contract` for which path applies to you.
+
+> **Heads up — `prisma-next init` currently scaffolds the wrong layout.** It writes `prisma/contract.{prisma,ts}` and `prisma/db.ts` at the repo root instead of under `src/prisma/`. Tracked as [TML-2532](https://linear.app/prisma-company/issue/TML-2532). Until the fix lands, either pass `--schema-path src/prisma/contract.prisma` to `init`, or move the scaffolded `prisma/` directory into `src/prisma/` after `init` and update the `contract` path in `prisma-next.config.ts` to match. The canonical layout above is what the demo example uses and what the rest of the framework expects.
 
 ## Your first arc — connect, write, read
 
 All three paths in this skill converge here. Once the project is scaffolded and the database is reachable, the first move is **always** the same: connect, write a row, read it back, against whatever model the contract already declares. Don't touch the contract source on this first move — extend it later, after the round-trip works.
 
+Write the snippet in a fresh file directly under `src/` (e.g. `src/first-arc.ts`) so the relative import resolves to one level deep:
+
 ```typescript
+// src/first-arc.ts
 import 'dotenv/config';
 import { db } from './prisma/db';
 
@@ -63,9 +100,9 @@ If that prints `[{ id: 1, email: 'alice@example.com' }]`, the project is wired e
 
 **Prerequisites for the arc to work.** All three paths leave these in place by the time you reach the arc:
 
-- `prisma-next.config.ts` exists and declares the target + contract source.
-- The contract source exists (a starter model from `init`, or the inferred contract from `contract infer`, or whatever the bootstrap tool generated).
-- `prisma/db.ts` exists and instantiates the runtime with the emitted contract.
+- `prisma-next.config.ts` exists at the repo root and declares the target + contract source (typically `src/prisma/contract.prisma` or `src/prisma/contract.ts`).
+- The contract source exists at `src/prisma/contract.{prisma,ts}` (a starter model from `init`, or the inferred contract from `contract infer`, or whatever the bootstrap tool generated).
+- `src/prisma/db.ts` exists and instantiates the runtime with the emitted contract.
 - `DATABASE_URL` is set in `.env` (or wherever the runtime's config tells it to look).
 - The database has been initialised (`db init`) or marker-signed (`db sign`), so the marker row exists and the schema matches the contract.
 
@@ -85,9 +122,9 @@ The first arc is **connect → write → read**, in that order. Not *edit the co
 
 Before saying anything specific, read:
 
-- `prisma-next.config.ts` — confirms target (`postgres` / `mongodb`), authoring mode (`psl` / `typescript`), extensions, migrations dir.
-- The contract source the config declares (typically `prisma/contract.prisma` or `prisma/contract.ts`) — what starter models exist.
-- `prisma/db.ts` (or wherever the config places it) — confirms the runtime entry point is wired.
+- `prisma-next.config.ts` at the repo root — confirms target (`postgres` / `mongodb`), authoring mode (`psl` / `typescript`), extensions, migrations dir.
+- The contract source the config declares (canonically `src/prisma/contract.prisma` or `src/prisma/contract.ts`; a scaffold using the pre-[TML-2532](https://linear.app/prisma-company/issue/TML-2532) layout may have it at `prisma/contract.{prisma,ts}` instead — check the `contract` field of the config) — what starter models exist.
+- `src/prisma/db.ts` (or wherever the config's `contract` field places it — `db.ts` sits beside the schema) — confirms the runtime entry point is wired.
 - `.env` / `.env.example` — is `DATABASE_URL` set?
 - Optionally `pnpm prisma-next db verify` — confirms the live DB matches the contract.
 
@@ -138,7 +175,7 @@ The flags `init` accepts (run `prisma-next init --help` for the source of truth)
 
 - `--target <db>` — `postgres` or `mongodb`.
 - `--authoring <style>` — `psl` or `typescript`.
-- `--schema-path <path>` — defaults to `prisma/contract.prisma` (or `prisma/contract.ts`).
+- `--schema-path <path>` — defaults to `prisma/contract.prisma` (or `prisma/contract.ts`). **Pass `--schema-path src/prisma/contract.prisma` (or `.../contract.ts`)** to scaffold into the canonical `src/prisma/` location directly — `init`'s default is wrong today, see [TML-2532](https://linear.app/prisma-company/issue/TML-2532).
 - `--force` — overwrite an existing scaffold without prompting (re-running init in a scaffolded directory triggers the reinit flow — `--force` skips the confirmation).
 - `--write-env` — also write `.env` (default writes only `.env.example`; `.env` stays under your control).
 - `--probe-db` — connect to `DATABASE_URL` once and check the server version against the target's minimum.
@@ -150,13 +187,24 @@ The flags `init` accepts (run `prisma-next init --help` for the source of truth)
 `init` writes (when it runs cleanly):
 
 - `prisma-next.config.ts` at the project root.
-- `prisma/contract.prisma` (or `prisma/contract.ts`) — the starter schema source.
-- `prisma/db.ts` — the runtime entry point.
+- The contract source at `--schema-path` — `src/prisma/contract.prisma` if you passed the canonical override, `prisma/contract.prisma` if you accepted the (currently-wrong) default.
+- `db.ts` in the same directory as the contract source.
 - `prisma-next.md` — a human quick-reference.
 - `.env.example` (and `.env` if `--write-env`).
 - Updates `package.json` (deps + scripts) and `tsconfig.json` (required compiler options).
 - Installs deps and runs `prisma-next contract emit` once.
 - Registers `@prisma-next/agent-skill` with the local agent runtime.
+
+**If you took `init`'s default and ended up with a top-level `prisma/` directory** (TML-2532), the cleanup is one move + one config edit:
+
+```bash
+mkdir -p src && mv prisma src/prisma
+# Then update prisma-next.config.ts so `contract` reads
+# 'src/prisma/contract.prisma' (or .ts) instead of 'prisma/contract.prisma'.
+pnpm prisma-next contract emit   # re-emits contract.json + contract.d.ts under src/prisma/
+```
+
+Do this before running `db init` — once the marker row is written, restructuring is harder.
 
 After init succeeds, the path converges on *Your first arc — connect, write, read* above. `init` has already seeded a starter contract with `User` and `Post` models (with a relation between them) and run `contract emit` once; the only remaining prerequisites are setting `DATABASE_URL` and initialising the database. Two commands:
 
@@ -181,7 +229,7 @@ pnpm dlx prisma-next init --yes --target postgres --authoring psl
 Then, with `DATABASE_URL` set in `.env`:
 
 ```bash
-pnpm prisma-next contract infer --db "$DATABASE_URL" --output prisma/contract.prisma
+pnpm prisma-next contract infer --db "$DATABASE_URL" --output src/prisma/contract.prisma
 ```
 
 (Note: the flag is `--output`, not `--out`. Run `prisma-next contract infer --help` for the full surface.)
@@ -256,7 +304,8 @@ This skill is intentionally body-only; `prisma-next init --help`, `contract infe
 - [ ] Confirmed the user's target (`postgres` / `mongodb`) and authoring mode (`psl` / `typescript`).
 - [ ] **Post-bootstrap path:** read `prisma-next.config.ts`, the contract source, `db.ts`, and `.env` before proposing anything — didn't assume what the bootstrap tool left in place.
 - [ ] **Greenfield path:** ran `prisma-next init` from the project directory — no positional project-name argument.
-- [ ] **Brownfield path:** ran `contract infer --db "$DATABASE_URL" --output prisma/contract.prisma`, reviewed the result, then `contract emit` + `db sign`.
+- [ ] **All paths:** the project ended up in the canonical `src/prisma/contract.{prisma,ts}` + `src/prisma/db.ts` + `migrations/app/` layout — including moving the scaffolded directory out of a top-level `prisma/` if `init` produced one (TML-2532).
+- [ ] **Brownfield path:** ran `contract infer --db "$DATABASE_URL" --output src/prisma/contract.prisma`, reviewed the result, then `contract emit` + `db sign`.
 - [ ] Set `DATABASE_URL` in `.env` and confirmed the value is reachable.
 - [ ] Initialised the DB (`db init` greenfield / post-bootstrap) or signed the marker (`db sign` brownfield).
 - [ ] Did NOT hand-edit `contract.json` or `contract.d.ts`.

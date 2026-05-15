@@ -32,13 +32,14 @@ Once the contract changes, you choose how the change reaches the database. This 
 ## Key Concepts
 
 - **`db update` (quick path).** Reads the emitted contract, diffs against the live DB, applies the change. Optional `--dry-run` prints the plan without executing. Interactive destructive-op confirmation (or `-y` to auto-accept). **Writes no migration directory.** Operations needing data transforms are not handled by this path — `db update` excludes the `data` operation class entirely and short-circuits where a data transform would be required. Use only against a database that has no shared history with anyone else (your local dev DB).
-- **`migration plan` (formal path).** Reads the emitted contract, diffs against the head of the on-disk migration graph, writes a new migration package under `migrations/<YYYYMMDDTHHMM>_<snake_slug>/`. If any operation needs a data transform, the package's `migration.ts` contains `placeholder(...)` calls you fill in.
-- **Migration package files** (inside each `migrations/<dir>/`):
+- **`migration plan` (formal path).** Reads the emitted contract, diffs against the head of the on-disk migration graph, writes a new migration package under `migrations/app/<YYYYMMDDTHHMM>_<snake_slug>/`. If any operation needs a data transform, the package's `migration.ts` contains `placeholder(...)` calls you fill in.
+- **The `app/` segment in migration paths is the consuming application's contract-space id.** Every migration *you* author lives under `migrations/app/`. Extensions your contract depends on get their own sibling directories (`migrations/<extension-space-id>/`) — those are managed by the extension package and you don't write into them. The `app/` segment lands automatically the first time you run `migration plan` / `db init` against an app-level config.
+- **Migration package files** (inside each `migrations/app/<dir>/`):
   - `migration.json` — manifest (metadata + `migrationHash`).
   - `ops.json` — canonical operation list. Content-addressed; `migrationHash` is computed over this.
   - `end-contract.json` and `end-contract.d.ts` — the contract this migration ends at, imported by `migration.ts` for type-safe data transforms.
   - `migration.ts` — TypeScript authoring source, **framework-rendered** by `migration plan` (or `migration new`). You edit specific holes in it (see *Fill a placeholder* below) and re-emit `ops.json` / `migration.json` by running it.
-- **Self-emit.** Running `node migrations/<dir>/migration.ts` regenerates `ops.json` and `migration.json` from the (possibly edited) TS source. This is the only supported way to update an existing migration package after edits.
+- **Self-emit.** Running `node migrations/app/<dir>/migration.ts` regenerates `ops.json` and `migration.json` from the (possibly edited) TS source. This is the only supported way to update an existing migration package after edits.
 - **`migration.ts` shape.** Framework-rendered. A class extending `Migration` (re-exported by `@prisma-next/target-postgres/migration` in the rendered import line — see the framing block below), with an `operations` getter that returns an array of factory-call values. The file ends with `MigrationCLI.run(import.meta.url, M)` so executing it self-emits.
 - **`placeholder(slot)`.** A sentinel the planner emits into the rendered `migration.ts` (imported from `@prisma-next/target-postgres/migration` on the framework-managed import line) wherever a data transform is needed. Calling `placeholder(...)` at emit time throws `PN-MIG-2001` *Unfilled migration placeholder*. The user replaces the `() => placeholder(...)` arrow with a real query-plan closure, then self-emits.
 - **`this.dataTransform(endContract, name, { check, run })`.** The data-transform factory. `check` is a rowset query whose presence-of-any-row signals "work remains"; `run` is one or more mutation queries that perform the backfill. Both are lazy closures returning query-plans built against `endContract`. The runner wraps `check` as `EXISTS(...)` for precheck and `NOT EXISTS(...)` for postcheck, so the same closure asserts both "there is work" and "the work is done".
@@ -50,7 +51,7 @@ Once the contract changes, you choose how the change reaches the database. This 
 
 ## `migration.ts` is framework-rendered, not hand-authored
 
-Files under `migrations/<scope>/<timestamp>/migration.ts` are **rendered for you** by the framework — `prisma-next migration plan` writes a populated package whenever the contract changes, and `prisma-next migration new` writes an empty scaffold when you want to author operations directly. You do not write these files from scratch. You edit specific holes the framework leaves behind — chiefly replacing `placeholder("<slot>")` sentinels with real `this.dataTransform({ check, run })` closures — then self-emit.
+Files under `migrations/<space-id>/<timestamp>/migration.ts` (for your own app, `<space-id>` is always `app/`) are **rendered for you** by the framework — `prisma-next migration plan` writes a populated package whenever the contract changes, and `prisma-next migration new` writes an empty scaffold when you want to author operations directly. You do not write these files from scratch. You edit specific holes the framework leaves behind — chiefly replacing `placeholder("<slot>")` sentinels with real `this.dataTransform({ check, run })` closures — then self-emit.
 
 The imports at the top of the rendered file currently point at `@prisma-next/target-postgres/migration`. The user-facing `@prisma-next/postgres` façade does **not** currently re-export this surface, so the rendered import deliberately reaches into the target package directly. Linear ticket [TML-2526](https://linear.app/prisma-company/issue/TML-2526) tracks closing that gap; once it lands, the renderer (and this skill) will switch to `@prisma-next/postgres/migration` in one step.
 
@@ -68,7 +69,7 @@ Until then, treat the rendered import line as framework-managed:
 | `PN-MIG-2002` *migration.ts not found* | Reading a migration package | The package is malformed. Recover from version control, or run `prisma-next migration new` for a fresh one. |
 | `PN-MIG-2003` *invalid default export* | Loading `migration.ts` | The file's default export is not a `Migration` subclass or factory function. Restore the planner-emitted scaffold from version control or re-run `migration plan` for a clean package. |
 | `PN-MIG-2005` *dataTransform contract mismatch* | Building a data-transform query plan | The query builder was instantiated with a contract reference different from the `endContract` passed to `this.dataTransform(...)`. Use the `endContract` imported at module scope for both. |
-| `MIGRATION.HASH_MISMATCH` *Migration package is corrupt* | `migration apply` (or any read of the package) | `ops.json` / `migration.json` were edited without self-emitting. Run `node migrations/<dir>/migration.ts` to re-emit, then re-apply. |
+| `MIGRATION.HASH_MISMATCH` *Migration package is corrupt* | `migration apply` (or any read of the package) | `ops.json` / `migration.json` were edited without self-emitting. Run `node migrations/app/<dir>/migration.ts` to re-emit, then re-apply. |
 | `PN-RUN-3002` *Hash mismatch* | `db verify` | The marker in `prisma_contract.marker` disagrees with the contract hash. The DB is at a different contract version than the code thinks. Either run a migration forward, or — if the DB is correct and the marker is stale after a manual fix-up — run `db sign`. |
 | `PN-RUN-3001` *Database not signed* | Any command needing a marker | The DB has no marker yet. Run `prisma-next db init --db <url>` to baseline an empty database, or `db update --db <url>` to apply the current contract directly. |
 
@@ -116,7 +117,7 @@ pnpm prisma-next migration plan --name <snake_slug>
 
 Read the result. The JSON shape exposes the queryable signals:
 
-- `dir` — the path of the new package (e.g. `migrations/20260515T1200_add_user_email/`).
+- `dir` — the path of the new package (e.g. `migrations/app/20260515T1200_add_user_email/`).
 - `pendingPlaceholders` — `true` if `migration.ts` still contains `placeholder(...)` calls.
 - `operations[].operationClass` — for spotting `destructive` and `data` ops.
 - `preview.statements` — family-agnostic textual preview.
@@ -144,7 +145,7 @@ The concept: the planner can detect *that* a data transform is needed (e.g. back
 The scaffold the planner emits looks like:
 
 ```typescript
-// migrations/20260515T1200_add_user_name/migration.ts
+// migrations/app/20260515T1200_add_user_name/migration.ts
 import endContract from './end-contract.json' with { type: 'json' };
 import { Migration, MigrationCLI, addColumn, placeholder } from '@prisma-next/target-postgres/migration';
 
@@ -201,7 +202,7 @@ MigrationCLI.run(import.meta.url, M);
 Self-emit:
 
 ```bash
-node migrations/20260515T1200_add_user_name/migration.ts
+node migrations/app/20260515T1200_add_user_name/migration.ts
 ```
 
 Self-emit regenerates `ops.json` and recomputes `migrationHash` in `migration.json`. The next `migration apply` will see a consistent package.
@@ -225,7 +226,7 @@ The factories you can call are re-exported through the same framework-rendered `
 - Raw escape hatch: `rawSql({ id, label, operationClass, target, precheck, execute, postcheck, ... })`.
 - Data transforms: `this.dataTransform(endContract, name, { check, run })` (instance method, not a free factory).
 
-Self-emit (`node migrations/<dir>/migration.ts`) after each edit.
+Self-emit (`node migrations/app/<dir>/migration.ts`) after each edit.
 
 ## Workflow — Inspect the live schema
 
@@ -293,7 +294,7 @@ pnpm prisma-next db schema --db $DATABASE_URL --json
 Fix and re-apply:
 
 ```bash
-node migrations/<dir>/migration.ts
+node migrations/app/<dir>/migration.ts
 pnpm prisma-next migration apply --db $DATABASE_URL
 ```
 
@@ -304,7 +305,7 @@ If the failure was an out-of-band side-effect that left external systems half-ch
 The concept: `migrationHash` is content-addressed. A mismatch means `migration.json`'s stored hash disagrees with the hash recomputed from `ops.json` (and metadata). The cause is almost always: someone edited `migration.ts` and forgot to self-emit. The remediation is to self-emit the offending package.
 
 ```bash
-node migrations/<dir>/migration.ts
+node migrations/app/<dir>/migration.ts
 pnpm prisma-next migration apply --db $DATABASE_URL
 ```
 
@@ -353,7 +354,7 @@ In non-interactive contexts (CI, `--no-interactive`, `--json`), the destructive-
 - [ ] For `migration plan`: ran `migration show` to review before apply.
 - [ ] Filled every `placeholder(...)` in `migration.ts` (if any), built against `endContract`.
 - [ ] `check` closures are rowset queries, not scalar aggregates.
-- [ ] Self-emitted (`node migrations/<dir>/migration.ts`) after editing the TS.
+- [ ] Self-emitted (`node migrations/app/<dir>/migration.ts`) after editing the TS.
 - [ ] Ran `migration apply` (or `db update`) and saw it complete.
 - [ ] Ran `db verify` and got an `ok` result with no diagnostics.
 - [ ] Did NOT use `db update` against a shared or production database.

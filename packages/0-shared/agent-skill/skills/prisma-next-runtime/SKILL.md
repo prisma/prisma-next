@@ -42,7 +42,7 @@ The concept: `db.ts` is the seam between the emitted contract artefacts (target-
 `init` scaffolds something like this (for `--target postgres`):
 
 ```typescript
-// prisma/db.ts
+// src/prisma/db.ts
 import postgres from '@prisma-next/postgres/runtime';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
@@ -52,6 +52,8 @@ export const db = postgres<Contract>({
   url: process.env['DATABASE_URL'],
 });
 ```
+
+(`init` currently scaffolds at `prisma/db.ts` instead — see TML-2532 in `prisma-next-quickstart`. The canonical path is `src/prisma/db.ts`; the rest of `src/` imports from `./prisma/db` or `../prisma/db` depending on depth.)
 
 Three things to know:
 
@@ -204,7 +206,7 @@ The concept: the façade selection is baked into `db.ts` (`@prisma-next/postgres
 After the switch:
 
 ```typescript
-// prisma/db.ts (Mongo)
+// src/prisma/db.ts (Mongo)
 import mongo from '@prisma-next/mongo/runtime';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
