@@ -1,13 +1,13 @@
 /**
  * Pure planning helpers for Postgres enum types: the diff/rebuild logic
- * that the verifier and planner use to walk `SqlEnumType` instances
+ * that the verifier and planner use to walk `PostgresEnumType` instances
  * natively. Op builders live in `./operations/enums.ts`.
  */
 
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
-import type { SqlEnumType } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PG_ENUM_CODEC_ID } from '../codec-ids';
+import type { PostgresEnumType } from '../postgres-enum-type';
 
 /**
  * Categorisation of how an existing enum type's values relate to the
@@ -25,7 +25,7 @@ export type EnumDiff =
  * Schema IR's `storageTypes` slots are always codec-typed
  * (`{codecId: PG_ENUM_CODEC_ID, typeParams.values}`): the introspector
  * writes that shape, and the Contract→Schema IR projector resolves
- * `SqlEnumType` instances down to the same codec-typed triple before
+ * `PostgresEnumType` instances down to the same codec-typed triple before
  * they ever land in Schema IR. There is no second on-disk shape to
  * accept here.
  *
@@ -86,8 +86,8 @@ export function determineEnumDiff(
 
 /**
  * Convenience accessor — returns the enum's desired values from a
- * `SqlEnumType` IR instance.
+ * `PostgresEnumType` IR instance.
  */
-export function getDesiredEnumValues(typeInstance: SqlEnumType): readonly string[] {
+export function getDesiredEnumValues(typeInstance: PostgresEnumType): readonly string[] {
   return typeInstance.values;
 }

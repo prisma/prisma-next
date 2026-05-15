@@ -41,11 +41,11 @@ export abstract class SqlNode extends IRNodeBase {
       value: 'sql',
       writable: false,
       enumerable: false,
-      // configurable so per-leaf subclasses (e.g. SqlEnumType) can
-      // override `kind` with their narrower enumerable literal via
-      // a class-field initializer. SqlNode itself never needs to
-      // mutate the property again, so configurability has no
-      // surface impact at this layer.
+      // configurable so per-leaf subclasses (e.g. PostgresEnumType in
+      // target-postgres) can override `kind` with their narrower
+      // enumerable literal via a class-field initializer. SqlNode
+      // itself never needs to mutate the property again, so
+      // configurability has no surface impact at this layer.
       configurable: true,
     });
   }

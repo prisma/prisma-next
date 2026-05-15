@@ -14,7 +14,10 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
-import type { SqlEnumType, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type {
+  PostgresEnumStorageEntry,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { NamedConstraintSpec } from './authoring-type-utils';
 
@@ -25,7 +28,7 @@ export type NamingConfig = {
   readonly columns?: NamingStrategy;
 };
 
-type NamedStorageTypeRef = string | StorageTypeInstance | SqlEnumType;
+type NamedStorageTypeRef = string | StorageTypeInstance | PostgresEnumStorageEntry;
 
 type NamedConstraintNameSpec<Name extends string = string> = {
   readonly name: Name;
@@ -348,7 +351,7 @@ function namedTypeField<TypeRef extends string>(
 function namedTypeField<TypeRef extends StorageTypeInstance>(
   typeRef: TypeRef,
 ): ScalarFieldBuilder<ScalarFieldState<TypeRef['codecId'], TypeRef, false, undefined>>;
-function namedTypeField<TypeRef extends SqlEnumType>(
+function namedTypeField<TypeRef extends PostgresEnumStorageEntry>(
   typeRef: TypeRef,
 ): ScalarFieldBuilder<ScalarFieldState<string, TypeRef, false, undefined>>;
 function namedTypeField(

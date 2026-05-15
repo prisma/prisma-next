@@ -1,4 +1,7 @@
-import type { SqlEnumType, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type {
+  PostgresEnumStorageEntry,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import {
   type ContractModelBuilder,
   type ModelAttributesSpec,
@@ -25,7 +28,7 @@ type RuntimeModelSpec = {
 };
 
 type RuntimeCollection = {
-  readonly storageTypes: Record<string, StorageTypeInstance | SqlEnumType>;
+  readonly storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
   readonly models: Record<string, RuntimeModel>;
   readonly modelSpecs: ReadonlyMap<string, RuntimeModelSpec>;
 };
@@ -133,7 +136,7 @@ function formatFallbackWarning(location: string, current: string, suggested: str
 
 export function emitTypedNamedTypeFallbackWarnings(
   models: Record<string, RuntimeModel>,
-  storageTypes: Record<string, StorageTypeInstance | SqlEnumType>,
+  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
 ): void {
   const warnings: string[] = [];
   const warnedFields = new Set<string>();

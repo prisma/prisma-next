@@ -10,8 +10,8 @@ import type { IndexTypeRegistration } from '@prisma-next/sql-contract/index-type
 import type {
   ContractWithTypeMaps,
   Index,
+  PostgresEnumStorageEntry,
   ReferentialAction,
-  SqlEnumType,
   StorageTypeInstance,
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
@@ -110,7 +110,10 @@ type DefinitionModels<Definition> = Definition extends {
 type DefinitionTypes<Definition> = Definition extends {
   readonly types?: unknown;
 }
-  ? Present<Definition['types']> extends Record<string, StorageTypeInstance | SqlEnumType>
+  ? Present<Definition['types']> extends Record<
+      string,
+      StorageTypeInstance | PostgresEnumStorageEntry
+    >
     ? Present<Definition['types']>
     : Record<never, never>
   : Record<never, never>;

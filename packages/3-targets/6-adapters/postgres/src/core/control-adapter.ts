@@ -3,7 +3,7 @@ import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter'
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
-import type { SqlEnumType } from '@prisma-next/sql-contract/types';
+import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   LoweredStatement,
@@ -63,14 +63,14 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly normalizeNativeType = normalizeSchemaNativeType;
 
   /**
-   * Bridges native `SqlEnumType` IR walks against the Postgres
+   * Bridges native `PostgresEnumStorageEntry` IR walks against the Postgres
    * introspection shape (`schema.annotations.pg.storageTypes`). Lets
    * the family-level schema verifier walk enum types without reaching
    * into target-specific annotation layouts itself.
    */
   readonly resolveExistingEnumValues = (
     schema: SqlSchemaIR,
-    enumType: SqlEnumType,
+    enumType: PostgresEnumStorageEntry,
   ): readonly string[] | null => readExistingEnumValues(schema, enumType.nativeType);
 
   /**

@@ -4,7 +4,7 @@ import type {
   ControlDriverInstance,
   ControlStack,
 } from '@prisma-next/framework-components/control';
-import type { SqlEnumType } from '@prisma-next/sql-contract/types';
+import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   LoweredStatement,
@@ -87,13 +87,14 @@ export interface SqlControlAdapter<TTarget extends string = string>
   /**
    * Optional bridging adapter for resolving the existing values of a
    * native enum type from the introspected schema IR. Targets supply
-   * this so the family-level schema verifier can walk `SqlEnumType`
-   * instances natively without needing to know the target-specific
-   * `schema.annotations` shape (e.g. `schema.annotations.pg.storageTypes`).
+   * this so the family-level schema verifier can walk
+   * `PostgresEnumStorageEntry` entries natively without needing to
+   * know the target-specific `schema.annotations` shape
+   * (e.g. `schema.annotations.pg.storageTypes`).
    */
   readonly resolveExistingEnumValues?: (
     schema: SqlSchemaIR,
-    enumType: SqlEnumType,
+    enumType: PostgresEnumStorageEntry,
   ) => readonly string[] | null;
 
   /**

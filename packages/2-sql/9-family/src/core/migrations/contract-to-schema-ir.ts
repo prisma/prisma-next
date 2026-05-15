@@ -3,7 +3,9 @@ import type { MigrationPlannerConflict } from '@prisma-next/framework-components
 import {
   type ForeignKey,
   type Index,
-  SqlEnumType,
+  isPostgresEnumStorageEntry,
+  isStorageTypeInstance,
+  type PostgresEnumStorageEntry,
   type SqlStorage,
   type StorageColumn,
   type StorageTable,
@@ -85,12 +87,15 @@ function convertColumn(
 
 /**
  * `storageTypes` is polymorphic per Decision 18 (Option B) — codec-typed
- * entries are `StorageTypeInstance`; enum entries are `SqlEnumType`
- * subclass instances. Both shapes resolve into the same
- * `(codecId, nativeType, typeParams)` triplet at the column-resolution
- * boundary so downstream walks stay uniform.
+ * entries match `StorageTypeInstance`; enum entries match the structural
+ * `PostgresEnumStorageEntry` shape (Postgres-only; cross-domain layering
+ * keeps target IR classes out of the family layer). Both shapes resolve
+ * into the same `(codecId, nativeType, typeParams)` triplet at the
+ * column-resolution boundary so downstream walks stay uniform.
  */
-type ResolvedStorageTypes = Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
+type ResolvedStorageTypes = Readonly<
+  Record<string, StorageTypeInstance | PostgresEnumStorageEntry>
+>;
 
 function resolveColumnTypeMetadata(
   column: StorageColumn,
@@ -105,18 +110,23 @@ function resolveColumnTypeMetadata(
       `Column references storage type "${column.typeRef}" but it is not defined in storage.types.`,
     );
   }
-  if (referenced instanceof SqlEnumType) {
+  if (isPostgresEnumStorageEntry(referenced)) {
     return {
-      codecId: referenced.codecBinding.codecId,
+      codecId: referenced.codecId,
       nativeType: referenced.nativeType,
-      typeParams: referenced.codecBinding.typeParams as Record<string, unknown>,
+      typeParams: { values: referenced.values } as Record<string, unknown>,
     };
   }
-  return {
-    codecId: referenced.codecId,
-    nativeType: referenced.nativeType,
-    typeParams: referenced.typeParams,
-  };
+  if (isStorageTypeInstance(referenced)) {
+    return {
+      codecId: referenced.codecId,
+      nativeType: referenced.nativeType,
+      typeParams: referenced.typeParams,
+    };
+  }
+  throw new Error(
+    `Storage type "${column.typeRef}" has an unknown polymorphic kind; expected codec-instance or postgres-enum.`,
+  );
 }
 
 function convertUnique(unique: UniqueConstraint): SqlUniqueIR {
@@ -267,7 +277,7 @@ export function contractToSchemaIR(
   }
 
   const storage = contract.storage;
-  const storageTypes = storage.types ?? {};
+  const storageTypes = (storage.types ?? {}) as ResolvedStorageTypes;
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {
     tables[tableName] = convertTable(
@@ -291,11 +301,17 @@ function deriveAnnotations(
   storage: SqlStorage,
   annotationNamespace: string,
 ): SqlAnnotations | undefined {
-  if (!storage.types || Object.keys(storage.types).length === 0) return undefined;
-  // Re-key by nativeType to match the structure produced by introspection
-  const byNativeType: Record<string, (typeof storage.types)[string]> = {};
-  for (const typeInstance of Object.values(storage.types)) {
-    byNativeType[typeInstance.nativeType] = typeInstance;
+  const types = storage.types as ResolvedStorageTypes | undefined;
+  if (!types || Object.keys(types).length === 0) return undefined;
+  // Re-key by nativeType to match the structure produced by introspection.
+  // The polymorphic slot's known variants (codec-instance + postgres-enum)
+  // both carry `nativeType` as an enumerable own property; unknown future
+  // kinds without a `nativeType` are skipped rather than crashing.
+  const byNativeType: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+  for (const typeInstance of Object.values(types)) {
+    if (isPostgresEnumStorageEntry(typeInstance) || isStorageTypeInstance(typeInstance)) {
+      byNativeType[typeInstance.nativeType] = typeInstance;
+    }
   }
   return { [annotationNamespace]: { storageTypes: byNativeType } };
 }

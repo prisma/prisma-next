@@ -9,7 +9,8 @@
  */
 
 import {
-  SqlEnumType,
+  isPostgresEnumStorageEntry,
+  type PostgresEnumStorageEntry,
   type StorageColumn,
   type StorageTable,
   type StorageTypeInstance,
@@ -45,7 +46,7 @@ function assertSafeDefaultExpression(expression: string): void {
  */
 export function buildColumnTypeSql(
   column: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance | SqlEnumType> = {},
+  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {},
 ): string {
   const resolved = resolveColumnTypeMetadata(column, storageTypes);
   assertSafeNativeType(resolved.nativeType);
@@ -124,7 +125,7 @@ type ResolvedColumnTypeMetadata = Pick<StorageColumn, 'nativeType' | 'codecId' |
 
 function resolveColumnTypeMetadata(
   column: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance | SqlEnumType>,
+  storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
 ): ResolvedColumnTypeMetadata {
   if (!column.typeRef) {
     return column;
@@ -135,12 +136,11 @@ function resolveColumnTypeMetadata(
       `Storage type "${column.typeRef}" referenced by column is not defined in storage.types.`,
     );
   }
-  if (referencedType instanceof SqlEnumType) {
-    const binding = referencedType.codecBinding;
+  if (isPostgresEnumStorageEntry(referencedType)) {
     return {
-      codecId: binding.codecId,
+      codecId: referencedType.codecId,
       nativeType: referencedType.nativeType,
-      typeParams: binding.typeParams as Record<string, unknown>,
+      typeParams: { values: referencedType.values } as Record<string, unknown>,
     };
   }
   return {

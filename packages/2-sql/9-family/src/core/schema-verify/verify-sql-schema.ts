@@ -15,7 +15,9 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
-  SqlEnumType,
+  isPostgresEnumStorageEntry,
+  isStorageTypeInstance,
+  type PostgresEnumStorageEntry,
   type SqlStorage,
   type StorageColumn,
   type StorageTypeInstance,
@@ -82,19 +84,19 @@ export interface VerifySqlSchemaOptions {
    */
   readonly normalizeNativeType?: NativeTypeNormalizer;
   /**
-   * Bridging adapter that resolves the existing values for a `SqlEnumType`
+   * Bridging adapter that resolves the existing values for a `PostgresEnumStorageEntry`
    * (looked up by its native type) from the introspected schema IR. Targets
-   * supply this so the family-level verifier can walk `SqlEnumType` instances
+   * supply this so the family-level verifier can walk `PostgresEnumStorageEntry` instances
    * natively without reaching into target-specific `schema.annotations`
    * shapes itself.
    *
    * Returning `null` indicates the type is missing from the database; the
    * verifier emits a `type_missing` issue. A non-null array triggers a
-   * value-set comparison against the contract's `SqlEnumType.values`.
+   * value-set comparison against the contract's `PostgresEnumStorageEntry.values`.
    */
   readonly resolveExistingEnumValues?: (
     schema: SqlSchemaIR,
-    enumType: SqlEnumType,
+    enumType: PostgresEnumStorageEntry,
   ) => readonly string[] | null;
 }
 
@@ -126,7 +128,9 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   const { contractStorageHash, contractProfileHash, contractTarget } =
     extractContractMetadata(contract);
-  const storageTypes = contract.storage.types ?? {};
+  const storageTypes = (contract.storage.types ?? {}) as Readonly<
+    Record<string, PostgresEnumStorageEntry | StorageTypeInstance>
+  >;
   const { issues, rootChildren } = verifySchemaTables({
     contract,
     schema,
@@ -140,7 +144,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
 
-  // Verify storage type instances. SqlEnumType entries are walked
+  // Verify storage type instances. PostgresEnumStorageEntry entries are walked
   // natively (using the bridging adapter `resolveExistingEnumValues`);
   // remaining codec-typed entries continue to dispatch through the
   // generic codec-hook `verifyType` path.
@@ -149,16 +153,18 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
     const typeNodes: SchemaVerificationNode[] = [];
     for (const [typeName, typeInstance] of storageTypeEntries) {
       let typeIssues: readonly SchemaIssue[];
-      if (typeInstance instanceof SqlEnumType) {
+      if (isPostgresEnumStorageEntry(typeInstance)) {
         typeIssues = verifyEnumType({
           typeName,
           typeInstance,
           schema,
           resolveExistingEnumValues,
         });
-      } else {
+      } else if (isStorageTypeInstance(typeInstance)) {
         const hook = codecHooks.get(typeInstance.codecId);
         typeIssues = hook?.verifyType ? hook.verifyType({ typeName, typeInstance, schema }) : [];
+      } else {
+        typeIssues = [];
       }
       if (typeIssues.length > 0) {
         issues.push(...typeIssues);
@@ -243,19 +249,19 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 type VerificationStatus = 'pass' | 'warn' | 'fail';
 
 /**
- * Native verification walk for `SqlEnumType` instances (no codec hook).
+ * Native verification walk for `PostgresEnumStorageEntry` instances (no codec hook).
  *
- * Bridges the native `SqlEnumType.values` against the introspected schema
+ * Bridges the native `PostgresEnumStorageEntry.values` against the introspected schema
  * IR via the target-supplied `resolveExistingEnumValues` adapter. Without an
  * adapter, the verifier conservatively reports the enum as missing — there
  * is no other way for the family layer to learn about live enum types.
  */
 function verifyEnumType(options: {
   readonly typeName: string;
-  readonly typeInstance: SqlEnumType;
+  readonly typeInstance: PostgresEnumStorageEntry;
   readonly schema: SqlSchemaIR;
   readonly resolveExistingEnumValues?:
-    | ((schema: SqlSchemaIR, enumType: SqlEnumType) => readonly string[] | null)
+    | ((schema: SqlSchemaIR, enumType: PostgresEnumStorageEntry) => readonly string[] | null)
     | undefined;
 }): readonly SchemaIssue[] {
   const { typeName, typeInstance, schema, resolveExistingEnumValues } = options;
@@ -313,7 +319,7 @@ function verifySchemaTables(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
-  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
+  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): { issues: SchemaIssue[]; rootChildren: SchemaVerificationNode[] } {
@@ -407,7 +413,7 @@ function verifyTableChildren(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
-  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
+  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode[] {
@@ -565,7 +571,7 @@ function collectContractColumnNodes(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
-  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
+  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode[] {
@@ -672,7 +678,7 @@ function verifyColumn(options: {
   strict: boolean;
   typeMetadataRegistry: ReadonlyMap<string, { nativeType?: string }>;
   codecHooks: Map<string, CodecControlHooks>;
-  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
+  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   normalizeDefault?: DefaultNormalizer;
   normalizeNativeType?: NativeTypeNormalizer;
 }): SchemaVerificationNode {
@@ -1015,7 +1021,7 @@ function validateFrameworkComponentsForExtensions(
  */
 function renderExpectedNativeType(
   contractColumn: Contract<SqlStorage>['storage']['tables'][string]['columns'][string],
-  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
   codecHooks: Map<string, CodecControlHooks>,
   context?: {
     readonly tableName: string;
@@ -1045,7 +1051,7 @@ function renderExpectedNativeType(
 
 function resolveContractColumnTypeMetadata(
   contractColumn: StorageColumn,
-  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
   context?: {
     readonly tableName: string;
     readonly columnName: string;
@@ -1065,18 +1071,23 @@ function resolveContractColumnTypeMetadata(
     );
   }
 
-  if (referencedType instanceof SqlEnumType) {
+  if (isPostgresEnumStorageEntry(referencedType)) {
     return {
-      codecId: referencedType.codecBinding.codecId,
+      codecId: referencedType.codecId,
       nativeType: referencedType.nativeType,
-      typeParams: referencedType.codecBinding.typeParams as Record<string, unknown>,
+      typeParams: { values: referencedType.values } as Record<string, unknown>,
     };
   }
-  return {
-    codecId: referencedType.codecId,
-    nativeType: referencedType.nativeType,
-    typeParams: referencedType.typeParams,
-  };
+  if (isStorageTypeInstance(referencedType)) {
+    return {
+      codecId: referencedType.codecId,
+      nativeType: referencedType.nativeType,
+      typeParams: referencedType.typeParams,
+    };
+  }
+  throw new Error(
+    `Storage type "${contractColumn.typeRef}" has an unknown polymorphic kind; expected codec-instance or postgres-enum.`,
+  );
 }
 
 /**

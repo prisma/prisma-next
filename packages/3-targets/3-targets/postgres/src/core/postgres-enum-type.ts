@@ -1,5 +1,5 @@
 import { freezeNode } from '@prisma-next/framework-components/ir';
-import { SqlEnumType } from '@prisma-next/sql-contract/types';
+import { SqlNode } from '@prisma-next/sql-contract/types';
 
 export interface PostgresEnumTypeInput<
   TName extends string = string,
@@ -20,26 +20,37 @@ export interface PostgresEnumTypeInput<
   readonly values: TValues;
 }
 
-/**
- * Postgres concretion of `SqlEnumType`. First per-target SQL IR class
- * — establishes the abstract+target split for SQL IR alongside the
- * earned polymorphic-dispatch consumers (verifier walks enum types
- * separately from codec-typed entries; planner emits `CREATE TYPE` /
- * `ALTER TYPE` operations directly from the IR).
- *
- * Carries Postgres-specific resolution (`nativeType` defaults to
- * `name`; `values` is frozen at construction time). Constructor calls
- * `freezeNode(this)` per Decision 8 — the instance is fully
- * immutable, JSON-clean, and dispatchable on its enumerable
- * `kind: 'postgres-enum'` literal.
- */
 /** Codec id used by Postgres enum-typed columns (text wire format). */
 const PG_ENUM_CODEC_ID = 'pg/enum@1';
 
+/**
+ * Postgres IR class for the `CREATE TYPE … AS ENUM` concept.
+ *
+ * Per Decision 18, enum is a target-only concept (Postgres alone today;
+ * SQLite emulates via CHECK constraints). There is no family-layer
+ * enum abstract — the abstract-earns-existence rule keeps the IR class
+ * hierarchy minimal: this class extends `SqlNode` directly and is the
+ * single concrete representation of the polymorphic `'postgres-enum'`
+ * slot variant.
+ *
+ * Carries Postgres-specific resolution (`nativeType` defaults to
+ * `name`; `values` is frozen at construction time). Constructor calls
+ * `freezeNode(this)` per Decision 8 — the instance is fully immutable,
+ * JSON-clean, and dispatchable on its enumerable `kind: 'postgres-enum'`
+ * literal.
+ *
+ * The family-layer slot dispatch (verifier, planner, lowering, etc.)
+ * narrows polymorphic `StorageType` entries via the `kind` literal
+ * (e.g. `isPostgresEnumStorageEntry`) — SQL-domain code must not import
+ * `target-postgres` directly (cross-domain layering rule). The
+ * structural interface lives at the family layer for that purpose;
+ * this class is the runtime concrete that satisfies it.
+ */
 export class PostgresEnumType<
   TName extends string = string,
   TValues extends readonly string[] = readonly string[],
-> extends SqlEnumType {
+> extends SqlNode {
+  override readonly kind = 'postgres-enum' as const;
   readonly name: TName;
   readonly nativeType: string;
   readonly values: TValues;

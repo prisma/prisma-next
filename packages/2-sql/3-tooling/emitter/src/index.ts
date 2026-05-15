@@ -5,7 +5,7 @@ import type {
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
 import {
-  SqlEnumType,
+  isPostgresEnumStorageEntry,
   type SqlModelStorage,
   type SqlStorage,
   type StorageTable,
@@ -322,7 +322,7 @@ export const sqlEmission = {
     if (column.typeRef) {
       const typeInstance = storage.types?.[column.typeRef];
       if (typeInstance === undefined) return undefined;
-      if (typeInstance instanceof SqlEnumType) {
+      if (isPostgresEnumStorageEntry(typeInstance)) {
         return { values: typeInstance.values };
       }
       // Fall back to structural codec-triple access when the literal
@@ -385,15 +385,18 @@ function generateStorageTypesType(types: SqlStorage['types']): string {
 
   const typeEntries: string[] = [];
   for (const [typeName, typeInstance] of Object.entries(types)) {
-    if (typeInstance instanceof SqlEnumType) {
-      const binding = typeInstance.codecBinding;
-      const codecId = serializeValue(binding.codecId);
-      const nativeType = serializeValue(typeInstance.nativeType);
-      const typeParamsStr = serializeTypeParamsLiteral(
-        // `codecBinding.typeParams` is a readonly structural object; the serializer
-        // expects a mutable `Record` shape for key iteration only.
-        binding.typeParams as unknown as Record<string, unknown>,
+    if (isPostgresEnumStorageEntry(typeInstance)) {
+      const codecId = serializeValue(
+        // `codecBinding.codecId` lives on the live IR-class instance;
+        // raw JSON envelopes carry `codecId` as an enumerable own
+        // property. Read the structural-shape field so the emitter
+        // works against both runtime forms.
+        typeInstance.codecId,
       );
+      const nativeType = serializeValue(typeInstance.nativeType);
+      const typeParamsStr = serializeTypeParamsLiteral({
+        values: typeInstance.values as unknown as readonly unknown[],
+      });
       // Emit the resolved codec view (kind: 'codec-instance') so the
       // emitted .d.ts shape stays uniform across slot variants and
       // satisfies the polymorphic slot's structural alphabet. The

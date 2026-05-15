@@ -1,8 +1,8 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecRef } from '@prisma-next/framework-components/codec';
 import {
+  isPostgresEnumStorageEntry,
   isStorageTypeInstance,
-  SqlEnumType,
   type SqlStorage,
 } from '@prisma-next/sql-contract/types';
 
@@ -29,29 +29,17 @@ export function codecRefForStorageColumn(
   if (columnDef.typeRef !== undefined) {
     const instance = storage.types?.[columnDef.typeRef];
     if (!instance) return undefined;
-    if (instance instanceof SqlEnumType) {
+    if (isPostgresEnumStorageEntry(instance)) {
+      // Both the live IR-class instance (with `codecBinding` accessor)
+      // and the raw JSON envelope (with enumerable `codecId` +
+      // `values` own properties) satisfy the structural shape; reading
+      // them directly off the structural fields keeps this dispatch
+      // path layered against the framework-shared alphabet rather than
+      // a target-specific class import.
       return {
-        codecId: instance.codecBinding.codecId,
-        typeParams: instance.codecBinding.typeParams as unknown as JsonValue,
+        codecId: instance.codecId,
+        typeParams: { values: instance.values } as unknown as JsonValue,
       };
-    }
-    // Raw JSON enum envelope (`kind: 'postgres-enum'`): hydration
-    // didn't run (e.g. user-written `migration.ts` passing
-    // `end-contract.json` directly to `createExecutionContext`). The
-    // envelope carries `codecId` + `values` as enumerable own
-    // properties on the per-target subclass, so we synthesise the
-    // codec-typed `typeParams.values` shape from there.
-    if ((instance as { kind?: string }).kind === 'postgres-enum') {
-      const enumLike = instance as unknown as {
-        readonly codecId?: string;
-        readonly values?: readonly string[];
-      };
-      if (enumLike.codecId !== undefined) {
-        return {
-          codecId: enumLike.codecId,
-          typeParams: { values: enumLike.values ?? [] } as unknown as JsonValue,
-        };
-      }
     }
     if (isStorageTypeInstance(instance)) {
       return { codecId: instance.codecId, typeParams: instance.typeParams as JsonValue };

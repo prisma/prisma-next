@@ -27,11 +27,13 @@ import type {
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import {
-  SqlEnumType,
+  isPostgresEnumStorageEntry,
+  type PostgresEnumStorageEntry,
   type SqlStorage,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { PostgresEnumType } from '../postgres-enum-type';
 import { determineEnumDiff, readExistingEnumValues } from './enum-planning';
 import {
   AddColumnCall,
@@ -85,7 +87,7 @@ export interface StrategyContext {
   readonly fromContract: Contract<SqlStorage> | null;
   readonly schemaName: string;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
@@ -126,7 +128,10 @@ function buildColumnSpec(
   const col = ctx.toContract.storage.tables[table]?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-  const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance | SqlEnumType>;
+  const mutableTypes = ctx.storageTypes as Record<
+    string,
+    StorageTypeInstance | PostgresEnumStorageEntry
+  >;
   return {
     name: column,
     typeSql: buildColumnTypeSql(col, mutableHooks, mutableTypes),
@@ -144,7 +149,10 @@ function buildAlterTypeOptions(
   const col = ctx.toContract.storage.tables[table]?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-  const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance | SqlEnumType>;
+  const mutableTypes = ctx.storageTypes as Record<
+    string,
+    StorageTypeInstance | PostgresEnumStorageEntry
+  >;
   const qualifiedTargetType = buildColumnTypeSql(col, mutableHooks, mutableTypes, false);
   const formatTypeExpected = buildExpectedFormatType(col, mutableHooks, mutableTypes);
   return {
@@ -283,11 +291,11 @@ function enumRebuildCallRecipe(
 ): readonly PostgresOpFactoryCall[] {
   const toType = ctx.toContract.storage.types?.[typeName];
   if (!toType) return [];
-  const isEnum = toType instanceof SqlEnumType;
+  const isEnum = isPostgresEnumStorageEntry(toType);
   const nativeType = toType.nativeType;
   const desiredValues: readonly string[] = isEnum
     ? toType.values
-    : ((toType.typeParams['values'] ?? []) as readonly string[]);
+    : (((toType as StorageTypeInstance).typeParams['values'] ?? []) as readonly string[]);
   const tempName = `${nativeType}${REBUILD_SUFFIX}`;
 
   const columnRefs: { table: string; column: string }[] = [];
@@ -320,7 +328,7 @@ function enumRebuildCallRecipe(
 // ============================================================================
 
 /**
- * Single planner strategy for `SqlEnumType` instances. Walks
+ * Single planner strategy for `PostgresEnumType` instances. Walks
  * `toContract.storage.types` directly (no codec-hook dispatch) and
  * resolves existing values via `readExistingEnumValues`, the same
  * Postgres bridging adapter the verifier uses.
@@ -352,7 +360,7 @@ function enumRebuildCallRecipe(
  * `CreateTableCall` that references the new enum.
  */
 export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
-  const enumTypes = collectSqlEnumTypes(ctx.toContract.storage.types);
+  const enumTypes = collectPostgresEnumTypes(ctx.toContract.storage.types);
   if (enumTypes.size === 0) return { kind: 'no_match' };
 
   const dataAllowed = ctx.policy.allowedOperationClasses.includes('data');
@@ -439,12 +447,14 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
   return { kind: 'match', issues: remaining, calls, recipe: emittedRebuildRecipe };
 };
 
-function collectSqlEnumTypes(storageTypes: SqlStorage['types']): ReadonlyMap<string, SqlEnumType> {
-  const result = new Map<string, SqlEnumType>();
+function collectPostgresEnumTypes(
+  storageTypes: SqlStorage['types'],
+): ReadonlyMap<string, PostgresEnumType> {
+  const result = new Map<string, PostgresEnumType>();
   for (const [name, instance] of Object.entries(storageTypes ?? {}).sort(([a], [b]) =>
     a.localeCompare(b),
   )) {
-    if (instance instanceof SqlEnumType) {
+    if (instance instanceof PostgresEnumType) {
       result.set(name, instance);
     }
   }
@@ -470,12 +480,13 @@ export const storageTypePlanCallStrategy: CallMigrationStrategy = (issues, ctx) 
     // Enums walk natively in `nativeEnumPlanCallStrategy`; codec-hook
     // dispatch here is reserved for genuinely codec-typed entries
     // (decimal, varchar, pgvector, …).
-    if (typeInstance instanceof SqlEnumType) continue;
-    const hook = ctx.codecHooks.get(typeInstance.codecId);
+    if (isPostgresEnumStorageEntry(typeInstance)) continue;
+    const codecInstance = typeInstance as StorageTypeInstance;
+    const hook = ctx.codecHooks.get(codecInstance.codecId);
     if (!hook?.planTypeOperations) continue;
     const planResult = hook.planTypeOperations({
       typeName,
-      typeInstance,
+      typeInstance: codecInstance,
       contract: ctx.toContract,
       schema: ctx.schema,
       schemaName: ctx.schemaName,
@@ -537,7 +548,10 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
   const schemaLookups = buildSchemaLookupMap(ctx.schema);
 
   const mutableCodecHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-  const mutableStorageTypes = ctx.storageTypes as Record<string, StorageTypeInstance | SqlEnumType>;
+  const mutableStorageTypes = ctx.storageTypes as Record<
+    string,
+    StorageTypeInstance | PostgresEnumType
+  >;
 
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;

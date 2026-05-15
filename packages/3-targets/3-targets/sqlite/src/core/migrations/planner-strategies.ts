@@ -21,7 +21,11 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import type { SqlEnumType, SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type {
+  PostgresEnumStorageEntry,
+  SqlStorage,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { toTableSpec } from './issue-planner';
@@ -33,7 +37,7 @@ export interface StrategyContext {
   readonly toContract: Contract<SqlStorage>;
   readonly fromContract: Contract<SqlStorage> | null;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;

@@ -30,7 +30,11 @@ import type {
   PslModel,
   PslNamedTypeDeclaration,
 } from '@prisma-next/psl-parser';
-import { SqlEnumType, type StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import {
+  isPostgresEnumStorageEntry,
+  type PostgresEnumStorageEntry,
+  type StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import {
   buildSqlContractFromDefinition,
   type ForeignKeyNode,
@@ -165,10 +169,10 @@ interface ProcessEnumDeclarationsInput {
 }
 
 function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
-  readonly storageTypes: Record<string, StorageTypeInstance | SqlEnumType>;
+  readonly storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
   readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
 } {
-  const storageTypes: Record<string, StorageTypeInstance | SqlEnumType> = {};
+  const storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
   const enumTypeDescriptors = new Map<string, ColumnDescriptor>();
 
   if (input.enums.length === 0) {
@@ -208,17 +212,17 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
       [{ name: enumDeclaration.name, nativeType, values }],
       input.entityContext,
     );
-    if (!(constructed instanceof SqlEnumType)) {
+    if (!isPostgresEnumStorageEntry(constructed)) {
       input.diagnostics.push({
         code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
-        message: `Enum "${enumDeclaration.name}": entities.enum factory must return a SqlEnumType subclass instance`,
+        message: `Enum "${enumDeclaration.name}": entities.enum factory must return a PostgresEnumStorageEntry-shaped value (kind: 'postgres-enum')`,
         sourceId: input.sourceId,
         span: enumDeclaration.span,
       });
       continue;
     }
     const descriptor: ColumnDescriptor = {
-      codecId: constructed.codecBinding.codecId,
+      codecId: constructed.codecId,
       nativeType: constructed.nativeType,
       typeRef: enumDeclaration.name,
     };
@@ -305,10 +309,10 @@ function validateNamedTypeAttributes(input: {
 }
 
 function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput): {
-  readonly storageTypes: Record<string, StorageTypeInstance | SqlEnumType>;
+  readonly storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
 } {
-  const storageTypes: Record<string, StorageTypeInstance | SqlEnumType> = {};
+  const storageTypes: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
   const namedTypeDescriptors = new Map<string, ColumnDescriptor>();
 
   for (const declaration of input.declarations) {

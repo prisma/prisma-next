@@ -3,8 +3,8 @@ import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
+  PostgresEnumStorageEntry,
   ReferentialAction,
-  SqlEnumType,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 
@@ -101,7 +101,7 @@ export interface ContractDefinition {
   readonly capabilities?: Record<string, Record<string, boolean>>;
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
-  readonly storageTypes?: Record<string, StorageTypeInstance | SqlEnumType>;
+  readonly storageTypes?: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
 }

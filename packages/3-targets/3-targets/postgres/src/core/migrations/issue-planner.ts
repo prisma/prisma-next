@@ -18,15 +18,16 @@ import type {
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import {
-  SqlEnumType,
-  type SqlStorage,
-  type StorageColumn,
-  type StorageTypeInstance,
+import type {
+  PostgresEnumStorageEntry,
+  SqlStorage,
+  StorageColumn,
+  StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
+import { PostgresEnumType } from '../postgres-enum-type';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -132,7 +133,7 @@ export interface IssuePlannerOptions {
   readonly fromContract: Contract<SqlStorage> | null;
   readonly schemaName: string;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   /**
    * Current database schema IR. Strategies read this to detect whether a
    * structure already exists (e.g. `buildSchemaLookupMap` for shared-temp-
@@ -163,14 +164,14 @@ function toColumnSpec(
   name: string,
   column: StorageColumn,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
-  storageTypes: Readonly<Record<string, StorageTypeInstance | SqlEnumType>>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
 ): ColumnSpec {
   return {
     name,
     typeSql: buildColumnTypeSql(
       column,
       codecHooks as Map<string, CodecControlHooks>,
-      storageTypes as Record<string, StorageTypeInstance | SqlEnumType>,
+      storageTypes as Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
     ),
     defaultSql: buildColumnDefaultSql(column.default, column),
     nullable: column.nullable,
@@ -379,7 +380,10 @@ function mapIssueToCall(
             ),
           );
         const hooksMap = codecHooks as Map<string, CodecControlHooks>;
-        const typesMap = storageTypes as Record<string, StorageTypeInstance | SqlEnumType>;
+        const typesMap = storageTypes as Record<
+          string,
+          StorageTypeInstance | PostgresEnumStorageEntry
+        >;
         const qualifiedTargetType = buildColumnTypeSql(column, hooksMap, typesMap, false);
         const formatTypeExpected = buildExpectedFormatType(column, hooksMap, typesMap);
         return ok([
@@ -516,7 +520,7 @@ function mapIssueToCall(
           ),
         );
       }
-      if (typeInstance instanceof SqlEnumType) {
+      if (typeInstance instanceof PostgresEnumType) {
         return ok([
           new CreateEnumTypeCall(
             schemaName,

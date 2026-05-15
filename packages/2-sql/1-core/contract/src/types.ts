@@ -9,8 +9,12 @@ export {
   ForeignKeyReferences,
   type ForeignKeyReferencesInput,
 } from './ir/foreign-key-references';
+export {
+  isPostgresEnumStorageEntry,
+  POSTGRES_ENUM_KIND,
+  type PostgresEnumStorageEntry,
+} from './ir/postgres-enum-storage-entry';
 export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
-export { SqlEnumType } from './ir/sql-enum-type';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
 export {

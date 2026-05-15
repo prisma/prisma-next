@@ -26,7 +26,8 @@ import {
 } from '@prisma-next/sql-contract/index-types';
 import {
   applyFkDefaults,
-  SqlEnumType,
+  isPostgresEnumStorageEntry,
+  type PostgresEnumStorageEntry,
   SqlStorage,
   SqlUnspecifiedNamespace,
   type StorageColumn,
@@ -397,11 +398,11 @@ export function buildSqlContractFromDefinition(
   // (which always carries the discriminator).
   const rawStorageTypes = (definition.storageTypes ?? {}) as Record<
     string,
-    StorageTypeInstance | SqlEnumType
+    StorageTypeInstance | PostgresEnumStorageEntry
   >;
   const storageTypes = Object.fromEntries(
     Object.entries(rawStorageTypes).map(([name, entry]) => {
-      if (entry instanceof SqlEnumType) return [name, entry];
+      if (isPostgresEnumStorageEntry(entry)) return [name, entry];
       if ((entry as { kind?: unknown }).kind === 'codec-instance') return [name, entry];
       return [
         name,

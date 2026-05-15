@@ -25,7 +25,7 @@ import {
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import {
-  SqlEnumType,
+  isPostgresEnumStorageEntry,
   type SqlStorage,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
@@ -224,7 +224,7 @@ export function assertExecutionStackContractRequirements(
 /**
  * Resolves codec id + typeParams for a `SqlStorage.types` entry that
  * represents an enum, accommodating two shapes:
- *   - hydrated `SqlEnumType` instance (uses prototype `codecBinding`)
+ *   - hydrated Postgres-enum IR instance (uses prototype `codecBinding`)
  *   - raw JSON envelope with `kind: 'postgres-enum'` (carries
  *     `codecId` as enumerable own property + `values` array)
  * Returns `undefined` when the entry is not enum-shaped, so callers
@@ -233,29 +233,13 @@ export function assertExecutionStackContractRequirements(
 function readEnumViewIfApplicable(
   typeInstance: unknown,
 ): { readonly codecId: string; readonly typeParams: Record<string, unknown> } | undefined {
-  if (typeInstance instanceof SqlEnumType) {
-    return {
-      codecId: typeInstance.codecBinding.codecId,
-      typeParams: typeInstance.codecBinding.typeParams as Record<string, unknown>,
-    };
+  if (!isPostgresEnumStorageEntry(typeInstance)) {
+    return undefined;
   }
-  if (
-    typeof typeInstance === 'object' &&
-    typeInstance !== null &&
-    (typeInstance as { kind?: string }).kind === 'postgres-enum'
-  ) {
-    const enumLike = typeInstance as {
-      readonly codecId?: string;
-      readonly values?: readonly string[];
-    };
-    if (enumLike.codecId !== undefined) {
-      return {
-        codecId: enumLike.codecId,
-        typeParams: { values: enumLike.values ?? [] },
-      };
-    }
-  }
-  return undefined;
+  return {
+    codecId: typeInstance.codecId,
+    typeParams: { values: typeInstance.values },
+  };
 }
 
 function validateTypeParams(

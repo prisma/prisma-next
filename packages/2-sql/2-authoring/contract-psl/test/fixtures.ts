@@ -10,29 +10,35 @@ import type {
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
-import { SqlEnumType } from '@prisma-next/sql-contract/types';
+import { freezeNode } from '@prisma-next/framework-components/ir';
+import { SqlNode } from '@prisma-next/sql-contract/types';
 
 /**
- * Layer-isolated `SqlEnumType` subclass for `sql-contract-psl` unit tests.
- * Stays in the test fixture so the interpreter package never depends on a
- * real target pack; production targets (e.g. Postgres) ship their own
- * `SqlEnumType` subclass and contribute it through `authoring.entityTypes.enum`.
+ * Layer-isolated enum-shaped IR class for `sql-contract-psl` unit tests.
+ * Stays in the test fixture so the interpreter package never depends on
+ * a real target pack; production targets (e.g. Postgres) ship their own
+ * enum IR class and contribute it through `authoring.entityTypes.enum`.
+ * Structurally satisfies `PostgresEnumStorageEntry` (carries
+ * `kind: 'postgres-enum'`, `name`, `nativeType`, `values`, `codecId`).
  */
-export class TestSqlEnumType extends SqlEnumType {
+export class TestPostgresEnumType extends SqlNode {
+  override readonly kind = 'postgres-enum' as const;
   readonly name: string;
   readonly nativeType: string;
   readonly values: readonly string[];
+  readonly codecId = 'test/enum@1' as const;
 
   constructor(input: { name: string; nativeType?: string; values: readonly string[] }) {
     super();
     this.name = input.name;
     this.nativeType = input.nativeType ?? input.name;
     this.values = Object.freeze([...input.values]);
+    freezeNode(this);
   }
 
   get codecBinding() {
     return {
-      codecId: 'test/enum@1',
+      codecId: this.codecId,
       typeParams: { values: this.values },
     } as const;
   }
@@ -43,7 +49,8 @@ export const testEnumEntityContributions = {
     kind: 'entity' as const,
     discriminator: 'postgres-enum',
     output: {
-      factory: (input: { name: string; values: readonly string[] }) => new TestSqlEnumType(input),
+      factory: (input: { name: string; values: readonly string[] }) =>
+        new TestPostgresEnumType(input),
     },
   },
 } as const satisfies AuthoringEntityTypeNamespace;

@@ -4,7 +4,7 @@ import type {
   AuthoringFieldNamespace,
   AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
-import type { SqlEnumType } from '@prisma-next/sql-contract/types';
+import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
@@ -27,20 +27,21 @@ export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespa
  * The factory constructs a `PostgresEnumType` instance natively — the
  * `SqlStorage.types` slot accepts polymorphic IR (the framework
  * `StorageType` alphabet), so no cast is needed at the contribution
- * surface. The factory's declared return type is the family-level
- * `SqlEnumType` abstract so the inferred contract type stays portable
- * (it names a type exported from `@prisma-next/sql-contract/types`,
- * a public surface every consumer already imports). Sharpening the
- * inferred contract type to surface enum-specific narrowing through
- * `EntityHelperFunction` is a separable refinement and lives outside
- * this PR.
+ * surface. The declared return type is the structural
+ * `PostgresEnumStorageEntry` so the inferred contract type stays
+ * portable (it names a type exported from
+ * `@prisma-next/sql-contract/types`, a public surface every consumer
+ * already imports). Sharpening the inferred contract type to surface
+ * enum-specific narrowing through `EntityHelperFunction` is a
+ * separable refinement and lives outside this PR.
  */
 export const postgresAuthoringEntityTypes = {
   enum: {
     kind: 'entity',
     discriminator: 'postgres-enum',
     output: {
-      factory: (input: PostgresEnumTypeInput): SqlEnumType => new PostgresEnumType(input),
+      factory: (input: PostgresEnumTypeInput): PostgresEnumStorageEntry =>
+        new PostgresEnumType(input),
     },
   },
 } as const satisfies AuthoringEntityTypeNamespace;
