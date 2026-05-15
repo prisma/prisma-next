@@ -98,26 +98,12 @@ If you want a first-class rename hint (e.g. `@@rename(old: "email", new: "emailA
 
 ## Add a relation
 
+Declare the relation on the owning side (the model that holds the FK column). Prisma Next adds the back-reference (`posts Post[]` on `User`) automatically — there is no need to write it by hand.
+
 ```prisma
-// Bad: missing back-reference. The relation is unidirectional and
-// confusing to query.
 model User {
   id    Int    @id @default(autoincrement())
   email String @unique
-}
-
-model Post {
-  id       Int    @id @default(autoincrement())
-  title    String
-  authorId Int
-  author   User   @relation(fields: [authorId], references: [id])
-}
-
-// Good: bi-directional with explicit cascade.
-model User {
-  id    Int    @id @default(autoincrement())
-  email String @unique
-  posts Post[]
 }
 
 model Post {
@@ -127,6 +113,8 @@ model Post {
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 }
 ```
+
+After emit, the back-reference is available on the type side and in the ORM (`db.orm.User.posts.*`). Specify cascade behaviour explicitly via `onDelete` on the owning side — the default is `Restrict`.
 
 ## Add a unique constraint or index
 
