@@ -165,7 +165,7 @@ export default definePnConfig({
 
 Use environment variables — one `DATABASE_URL` per environment. `.env` for local dev; the deploy platform's secrets for prod.
 
-```
+```dotenv
 # .env (local)
 DATABASE_URL=postgresql://localhost:5432/myapp_dev
 

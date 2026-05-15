@@ -349,7 +349,7 @@ Not all targets support streaming uniformly; PN exposes it where the underlying 
 
 1. **Reaching for raw SQL too soon.** The ORM covers most cases; the DSL covers most of the rest. Raw SQL bypasses type safety; use it as a last resort.
 2. **Using `.all()` when you wanted one row.** Returns every row without a LIMIT. Use `.first()` or `.first({ pk })`.
-3. **Forgetting to enable a capability before using it.** `returning()`, `includeMany`, and other capability-gated features error at type- check if the capability isn't on. Enable in `prisma-next.config.ts`.
+3. **Forgetting to enable a capability before using it.** `returning()`, `includeMany`, and other capability-gated features error at type-check if the capability isn't on. Enable in `prisma-next.config.ts`.
 4. **Interpolating user input into a raw SQL string.** SQL injection. Always use the `${...}` template-tag binding.
 5. **Using the ORM through `db.execute(...)`** — the ORM returns its results when you call `.all()` / `.first()` / etc.; you don't pass the builder to `db.execute()` separately (that's for SQL DSL plans).
 

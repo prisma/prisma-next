@@ -3,7 +3,7 @@
     {
       "glob": "packages/0-shared/agent-skill/**",
       "domain": "framework",
-      "layer": "tooling",
+      "layer": "core",
       "plane": "shared"
     },
     {

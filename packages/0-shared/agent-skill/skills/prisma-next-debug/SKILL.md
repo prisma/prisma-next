@@ -214,7 +214,7 @@ If the envelope's `fix` doesn't apply and the symptom doesn't match this skill's
 
 - **Studio / GUI database browser.** Prisma Next doesn't ship a Studio equivalent. Workaround: `prisma-next db schema` for a CLI tree, or use a third-party tool (TablePlus, DataGrip, `psql`) against your `DATABASE_URL`. If you need a built-in GUI, file a feature request via the `prisma-next-feedback` skill.
 - **First-class query logger middleware.** Prisma Next doesn't ship a built-in "log every query to stdout" middleware. Workaround: write a small custom middleware that wraps each operation and logs (see `prisma-next-runtime` for middleware composition). If you need a built-in query log, file a feature request via the `prisma-next-feedback` skill.
-- **`EXPLAIN` integration.** Prisma Next doesn't ship a `.explain()` method. Workaround: `db.sql.raw\`EXPLAIN ANALYZE ${...}\``. See `prisma-next-queries`. If you need first-class EXPLAIN, file a feature request: file a feature request via the `prisma-next-feedback` skill.
+- **`EXPLAIN` integration.** Prisma Next doesn't ship a `.explain()` method. Workaround: `db.sql.raw\`EXPLAIN ANALYZE ${...}\``. See `prisma-next-queries`. If you need first-class EXPLAIN, file a feature request via the `prisma-next-feedback` skill.
 - **Prepared-statement caching as a user-facing surface.** PN's adapters prepare under the hood for parameterized queries but you can't pre-prepare a statement and re-execute it by name. Workaround: use TypedSQL (see `prisma-next-queries`). If you need prepared statements as a first-class API, file a feature request via the `prisma-next-feedback` skill.
 
 ## Reference Files

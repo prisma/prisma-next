@@ -17,7 +17,7 @@ Topic branch with a planned migration. Meanwhile, `main` advanced with a differe
 The 5-step diamond-convergence procedure:
 
 - [ ] **1.** Rebase the topic branch onto `main` (likely already done).
-- [ ] **2.** `rm -rf` the topic branch's locally-planned migration directory.
+- [ ] **2.** Identify the exact topic-branch migration directory under `migrations/` (e.g. `migrations/20241112-add-tags/`), verify the path exists and is scoped to that directory, then delete only that directory (`rm -rf migrations/<dir>`). No unscoped `rm -rf`.
 - [ ] **3.** Run `contract emit` then `migration plan --name <slug>` to re-plan from the post-merge contract head.
 - [ ] **4.** Open the old migration from git history; port any custom data-transform logic into the new `migration.ts`.
 - [ ] **5.** Self-emit (`node migrations/<dir>/migration.ts`).
