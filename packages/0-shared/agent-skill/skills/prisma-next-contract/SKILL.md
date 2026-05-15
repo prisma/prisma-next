@@ -13,6 +13,8 @@ The data contract is the single source of truth for your data layer. You edit it
 2. **The system plans the migrations for you.**
 3. **If you need data migrations, you edit `migration.ts` and execute it.**
 
+Behind step 1 is an emission step the agent owns on the user's behalf — `prisma-next contract emit` regenerates `contract.json` (runtime IR) and `contract.d.ts` (types) from the contract source. The user does not need to think about it; the agent runs it after every contract edit (or installs the Vite plugin so the bundler runs it; see `prisma-next-build`).
+
 This skill covers step 1: every authoring operation on the contract, plus configuring extensions in `prisma-next.config.ts`.
 
 ## When to Use
@@ -34,16 +36,15 @@ This skill covers step 1: every authoring operation on the contract, plus config
 ## Key Concepts (before any workflow)
 
 - **Contract source** lives at the path declared in `prisma-next.config.ts` under `contract.path` (often `prisma/schema.psl` or `prisma/contract.ts`). Read the config first; do not assume the path.
-- **Emit step** generates `contract.json` (runtime IR) and `contract.d.ts` (types). Run `prisma-next contract emit` after every contract edit.
+- **Emit step** generates `contract.json` (runtime IR) and `contract.d.ts` (types) from the contract source. Run `prisma-next contract emit` after every contract edit (or rely on the Vite plugin to run it on save; see `prisma-next-build`). The user does not need to invoke emit directly — the agent runs it.
 - **Extensions** add new type families, namespaces, and capabilities (e.g. `pgvector`, `cipherstash`). They're installed via `extensionPacks: [...]` in `prisma-next.config.ts` and referenced from the contract by their namespace (`pgvector.Vector(1536)`).
-- **Contract spaces** are how aggregate-contract monorepos work: each package owns its own `prisma-next.config.ts`, its own contract source, and its own portion of the schema. Cross-package queries route through the aggregate contract at the monorepo root.
 - **Type maps** are the bridge between the contract's logical types and the user's TypeScript types. Emitted into `contract.d.ts`.
 
 ## Workflow — Read the config first
 
 Every workflow in this skill starts with:
 
-1. Read `prisma-next.config.ts` (the relevant one — in a monorepo, the one in the package the user is editing).
+1. Read `prisma-next.config.ts`.
 2. Note: `target` (postgres / mongo), `contract.authoring` (psl / typescript), `contract.path`, `extensionPacks` (installed extensions).
 3. Open the contract source at `contract.path`.
 
@@ -237,35 +238,26 @@ If the user references a namespace that isn't installed, emit fails with a struc
 | Use case | Choose | Why |
 |---|---|---|
 | Standard project, single contract | **PSL** | Concise, familiar, well-supported. |
-| Multi-tenant per-tenant variants | **TS builder** | Programmatic composition. |
-| Live-reload during dev | **No-emit (TS + Vite/Next plugin)** | Auto-emits on save. |
-| Aggregate-contract monorepo | **One per package** | Each package owns its space. |
+| Programmatic composition (per-tenant variants, generated fields) | **TS builder** | Authoring API is TypeScript. |
+| Skip the emit step entirely | **No-emit TS-first** | Import the contract object straight from `contract.ts`. |
 
-## No-emit (Vite / Next plugin)
+## No-emit TS-first
 
-The TypeScript authoring mode supports a "no-emit" flow where contract artifacts are derived on-demand by a build plugin, not written to disk. Configure in `vite.config.ts`:
+"No-emit" literally means **don't run `contract emit`** and **don't read `contract.json` / `contract.d.ts`**. Author the contract in TypeScript and import the contract object directly from `contract.ts` everywhere you'd otherwise import the emitted artifacts:
 
 ```typescript
-import { prismaNext } from '@prisma-next/vite';
-export default {
-  plugins: [prismaNext({ configPath: './prisma-next.config.ts' })],
-};
+import { contract } from './prisma/contract';
+import postgres from '@prisma-next/postgres/runtime';
+
+const db = postgres({ contract, url: process.env['DATABASE_URL']! });
 ```
 
-Useful when you want contract edits to flow to types without a manual `contract emit`. For production builds, still run `contract emit` explicitly.
+Trade-offs:
 
-## Aggregate-contract monorepo
+- **Pros**: no emit step, no committed `contract.json`, types track edits to `contract.ts` as fast as `tsc --watch` updates them.
+- **Cons**: no `contract.json` for tools that consume it (CLI inspection, migration plan, runtime contract-hash verification). Anything that needs the contract IR — `prisma-next migration plan`, `prisma-next db verify`, structured-error capability gating at runtime — still needs you to emit.
 
-In an aggregate-contract monorepo, each package owns its `prisma-next.config.ts` and its slice of the contract. The application root has its own `prisma-next.config.ts` that aggregates the per-package contracts.
-
-Workflow:
-
-1. Identify which package the user is editing in. Read its `prisma-next.config.ts`.
-2. Edit only that package's contract source. Do not touch other packages' contracts.
-3. Emit from the package directory: `pnpm prisma-next contract emit`.
-4. Emit at the aggregate root if you also want the aggregate `contract.d.ts` refreshed.
-
-See [ADR 212 — Contract spaces](https://github.com/prisma/prisma-next/blob/main/docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md) for the durable model.
+The auto-emit-on-save flow (Vite plugin) is a *separate* concept — that one still emits, just on a bundler schedule rather than a manual command. If you're using Vite, install the plugin (see `prisma-next-build`); there is no reason not to.
 
 ## Common Pitfalls
 
