@@ -5,7 +5,7 @@ import type {
   SchemaVerifyResult,
 } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
-import type { MongoStorageBase } from './mongo-storage';
+import type { MongoStorage } from '@prisma-next/mongo-contract';
 
 /**
  * Mongo family `SchemaVerifier` abstract base. Commits the Mongo family
@@ -29,7 +29,7 @@ import type { MongoStorageBase } from './mongo-storage';
  * list when no extensions exist over the Mongo family alphabet.
  */
 export abstract class MongoSchemaVerifierBase<
-  TContract extends { readonly storage: MongoStorageBase },
+  TContract extends { readonly storage: MongoStorage },
   TSchema,
 > implements SchemaVerifier<TContract, TSchema>
 {

@@ -19,7 +19,6 @@ export {
   MongoTargetUnspecifiedDatabase,
 } from '../core/mongo-target-database';
 export { MongoTargetSchemaVerifier } from '../core/mongo-target-schema-verifier';
-export { MongoTargetStorage } from '../core/mongo-target-storage';
 export type { CollModMeta, OpFactoryCall } from '../core/op-factory-call';
 export {
   CollModCall,

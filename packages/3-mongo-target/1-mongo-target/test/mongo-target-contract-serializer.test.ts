@@ -3,12 +3,12 @@ import {
   MongoCollection,
   MongoCollectionOptions,
   MongoIndex,
+  MongoStorage,
   MongoValidator,
 } from '@prisma-next/mongo-contract';
 import { describe, expect, it } from 'vitest';
 import { MongoTargetContractSerializer } from '../src/core/mongo-target-contract-serializer';
 import { MongoTargetUnspecifiedDatabase } from '../src/core/mongo-target-database';
-import { MongoTargetStorage } from '../src/core/mongo-target-storage';
 
 function makeValidContractJson() {
   return {
@@ -30,7 +30,7 @@ describe('MongoTargetContractSerializer', () => {
     const contract = serializer.deserializeContract(makeValidContractJson());
 
     expect(contract.targetFamily).toBe('mongo');
-    expect(contract.storage).toBeInstanceOf(MongoTargetStorage);
+    expect(contract.storage).toBeInstanceOf(MongoStorage);
   });
 
   it('default storage carries the __unspecified__ singleton namespace', () => {

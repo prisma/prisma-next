@@ -1,24 +1,25 @@
+import { coreHash } from '@prisma-next/contract/types';
 import type { SchemaIssue, SchemaVerifyOptions } from '@prisma-next/framework-components/control';
 import type { Namespace } from '@prisma-next/framework-components/ir';
+import { MongoStorage } from '@prisma-next/mongo-contract';
 import { describe, expect, it } from 'vitest';
 import { MongoSchemaVerifierBase } from '../src/core/ir/mongo-schema-verifier-base';
-import { MongoStorageBase } from '../src/core/ir/mongo-storage';
 
 class FakeNamespace implements Namespace {
   readonly kind = 'fake-namespace' as const;
   constructor(readonly id: string) {}
 }
 
-class FakeStorage extends MongoStorageBase {
-  readonly namespaces: Readonly<Record<string, Namespace>>;
-  constructor(namespaces: Readonly<Record<string, Namespace>>) {
-    super();
-    this.namespaces = namespaces;
-  }
+function makeFakeStorage(namespaces: Readonly<Record<string, Namespace>>): MongoStorage {
+  return new MongoStorage({
+    storageHash: coreHash('fake-hash'),
+    collections: {},
+    namespaces,
+  });
 }
 
 interface FakeContract {
-  readonly storage: FakeStorage;
+  readonly storage: MongoStorage;
 }
 
 interface FakeSchema {
@@ -67,7 +68,7 @@ function buildOptions(
 ): SchemaVerifyOptions<FakeContract, FakeSchema> {
   const entries = namespaceIds.map((id) => [id, new FakeNamespace(id)] as const);
   return {
-    contract: { storage: new FakeStorage(Object.fromEntries(entries)) },
+    contract: { storage: makeFakeStorage(Object.fromEntries(entries)) },
     schema: { tag: 'live-schema' },
   };
 }

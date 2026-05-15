@@ -21,9 +21,10 @@ import { type as arktypeType } from 'arktype';
  *
  * The validated value is handed to the target via the
  * `constructTargetContract` hook, which wraps the plain-JSON shape in
- * the target's class hierarchy (e.g. `MongoTargetStorage` with
- * `namespaces`). Targets that need to add structural checks beyond the
- * family default can override `parseMongoContractStructure`.
+ * the family-layer `MongoStorage` class instance (carrying the
+ * target-supplied `namespaces` map). Targets that need to add
+ * structural checks beyond the family default can override
+ * `parseMongoContractStructure`.
  *
  * Default `serializeContract` is identity over the contract — Mongo
  * target classes carry JSON-clean fields by construction, so the value
@@ -113,10 +114,11 @@ export abstract class MongoContractSerializerBase<TContract>
 
   /**
    * Target-specific class construction from the validated structural
-   * data. The target wraps the contract envelope in its own
-   * `MongoTargetStorage` class instance (`namespaces` field, target
-   * concretions, …); the leaf collection / index shapes remain plain
-   * data until the IR-node class flip lands.
+   * data. The target wraps the contract envelope in the family-layer
+   * `MongoStorage` class instance, supplying the `namespaces` map
+   * (target concretions like `MongoTargetUnspecifiedDatabase`). The
+   * leaf collection / index shapes are already family-layer IR-class
+   * instances after the hydration walk above.
    */
   protected abstract constructTargetContract(validated: MongoContract): TContract;
 }

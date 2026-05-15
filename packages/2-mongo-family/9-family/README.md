@@ -25,7 +25,7 @@ This package is the Mongo family integration point for both control-plane assemb
 
 - `./control`: control-plane entrypoint exporting `mongoFamilyDescriptor`, `createMongoFamilyInstance`, `MongoControlFamilyInstance`, and family-shared helpers (`contractToMongoSchemaIR`, `formatMongoOperations`, `diffMongoSchemas`)
 - `./control-adapter`: SPI surface — `MongoControlAdapter` and `MongoControlAdapterDescriptor`, implemented by `@prisma-next/adapter-mongo`
-- `./ir`: Mongo family IR abstract bases (`MongoContractSerializerBase`, `MongoSchemaVerifierBase`, `MongoStorageBase`) extended by target packages
+- `./ir`: Mongo family IR abstract bases (`MongoContractSerializerBase`, `MongoSchemaVerifierBase`) extended by target packages. The concrete `MongoStorage` storage class lives in the foundation package `@prisma-next/mongo-contract`.
 - `./migration`: migration authoring — `Migration` class, factory functions, and strategies (re-exported from `@prisma-next/target-mongo/migration`)
 - `./pack`: pure pack ref for TypeScript authoring flows such as `@prisma-next/mongo-contract-ts/contract-builder`
 - `./schema-verify`: family-shared `verifyMongoSchema(...)`. The CLI `db verify --schema-only` path and the `MongoMigrationRunner` post-apply verify step both call into this shared verifier, so both surfaces agree on "matches the contract" by construction
@@ -138,7 +138,7 @@ Run `node migration.ts` to produce `ops.json` and `migration.json`. Use `--dry-r
 - `src/core/control-instance.ts`: `createMongoFamilyInstance()` and `MongoControlFamilyInstance` — resolves the `MongoControlAdapter` from the control stack and dispatches wire-level work through it
 - `src/core/control-adapter.ts`: `MongoControlAdapter` SPI definition
 - `src/core/control-target-descriptor.ts`: `MongoControlTargetDescriptor` interface (concrete `mongoTargetDescriptor` lives in `@prisma-next/target-mongo`)
-- `src/core/ir/`: Mongo family IR abstract bases (`MongoContractSerializerBase`, `MongoSchemaVerifierBase`, `MongoStorageBase`)
+- `src/core/ir/`: Mongo family IR abstract bases (`MongoContractSerializerBase`, `MongoSchemaVerifierBase`); the concrete `MongoStorage` class lives at `@prisma-next/mongo-contract/ir/mongo-storage.ts`
 - `src/core/operation-preview.ts`: family-shared `formatMongoOperations` / `mongoOperationsToPreview`
 - `src/core/schema-verify/verify-mongo-schema.ts`: family-shared `verifyMongoSchema(...)`
 - `src/core/mongo-migration.ts`: `MongoMigration` class (fixes the `Migration<TOperation>` type parameter to `MongoMigrationPlanOperation`)

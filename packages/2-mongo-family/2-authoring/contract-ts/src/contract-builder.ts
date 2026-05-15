@@ -39,7 +39,7 @@ import {
   type MongoIndexFields,
   type MongoIndexInput,
   type MongoIndexOptionsInput,
-  type MongoStorage,
+  type MongoStorageShape,
   type MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
@@ -504,7 +504,7 @@ type DefinitionTargetId<Definition> = Definition extends {
   : string;
 
 type DefinitionStorage<Definition> = Simplify<
-  MongoStorage & {
+  MongoStorageShape & {
     readonly collections: StorageCollectionsFromModels<DefinitionModels<Definition>>;
     readonly storageHash: StorageHashBase<string>;
   }

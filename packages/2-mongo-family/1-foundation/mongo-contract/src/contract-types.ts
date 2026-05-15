@@ -40,10 +40,6 @@ export interface MongoIndexKey {
   readonly direction: MongoIndexKeyDirection;
 }
 
-export type MongoStorage<THash extends string = string> = StorageBase<THash> & {
-  readonly collections: Record<string, MongoCollection>;
-};
-
 export type MongoModelStorage = {
   readonly collection?: string;
   readonly relations?: Record<string, { readonly field: string }>;
@@ -51,8 +47,21 @@ export type MongoModelStorage = {
 
 export type MongoModelDefinition = ContractModel<MongoModelStorage>;
 
+/**
+ * Data-shape constraint for the Mongo family's storage block. The
+ * runtime in-memory representation is the concrete {@link MongoStorage}
+ * class from `./ir/mongo-storage`; this type is the structural superset
+ * used as the generic-parameter constraint so consumers can name
+ * `MongoContract<...>` over either the raw JSON envelope (no
+ * `namespaces` field) or a fully-constructed class instance (with
+ * `namespaces`). The class structurally satisfies this shape.
+ */
+export type MongoStorageShape<THash extends string = string> = StorageBase<THash> & {
+  readonly collections: Record<string, MongoCollection>;
+};
+
 export type MongoContract<
-  S extends MongoStorage = MongoStorage,
+  S extends MongoStorageShape = MongoStorageShape,
   M extends Record<string, MongoModelDefinition> = Record<string, MongoModelDefinition>,
 > = Contract<S, M>;
 
