@@ -4,6 +4,8 @@ Agent skills for [Prisma Next](https://github.com/prisma/prisma-next) — a smal
 
 > **Edit your data contract. Prisma handles the rest.**
 
+> **Install the version that matches your Prisma Next version.** This package ships in lockstep with the rest of Prisma Next. If `package.json` says `"@prisma-next/postgres": "0.7.0"`, install `@prisma-next/agent-skill@0.7.0`. A mismatched skill version will describe API surfaces from the wrong era and produce wrong instructions.
+
 ## What's in the box
 
 One package, ten skills. Each skill is a `SKILL.md` with its own `description` field that an agent runtime matches against the user's prompt:
@@ -49,15 +51,15 @@ The pattern is deliberate: it gives the agent something concrete to say when a u
 
 ## Versioning
 
-The package ships at the same version as the rest of Prisma Next. If your project's `package.json` says `"@prisma-next/postgres": "0.7.0"`, install `@prisma-next/agent-skill@0.7.0`. Mismatches surface in skill content that references API surfaces from the wrong era.
+The package ships at the same version as the rest of Prisma Next — keep them locked together (see the call-out at the top of this README).
 
 ## Authoring
 
-Skill sources live at `packages/0-shared/agent-skill/skills/` in the `prisma-next` monorepo. See [`projects/prisma-next-agent-skill/`](../../../projects/prisma-next-agent-skill) for the design specs.
+Skill sources live at `packages/0-shared/agent-skill/skills/` in the `prisma-next` monorepo.
 
 ## Journey tests
 
-`journey-tests/` contains Markdown checklists corresponding to each acceptance criterion in [`projects/prisma-next-agent-skill/specs/usage-skill.spec.md`](../../../projects/prisma-next-agent-skill/specs/usage-skill.spec.md). Each checklist names the prompt, the example app, and the expected end-state. Tests are run by hand against an example app and a configured agent runtime; cross-runtime automation is deferred.
+`journey-tests/` contains Markdown checklists for the workflows the skill cluster supports. Each checklist names the prompt, the example app, and the expected end-state. Tests are run by hand against an example app and a configured agent runtime; cross-runtime automation is deferred.
 
 ## License
 
