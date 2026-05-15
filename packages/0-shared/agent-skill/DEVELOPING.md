@@ -10,6 +10,32 @@ A small set of `SKILL.md` files that teach an LLM agent how to operate Prisma Ne
 
 These rules are load-bearing for the cluster. A new skill or a skill rewrite that doesn't honour them is a defect, not a style preference. Where this list differs from the general Prisma Next contributor guide, this list takes precedence *for files under `skills/`*.
 
+### Verify the tool surface as you author, not afterwards
+
+**Every CLI flag, command name, error code, config key, and file path you cite must be verified against the framework source before the sentence ships.** Authoring against an imagined tool surface — *"`migration apply --dry-run` probably exists; it's standard"* — is how the most common defect class in this cluster gets in: a confidently-worded claim about an API that doesn't ship. The agent the skill teaches will not catch it (the skill is what the agent loads instead of re-deriving the API); reviewers catch it only if they happen to check.
+
+Verify *during* drafting, not at the end. The first draft of the `prisma-next-migration-review` pilot — written with the stated goal of "verify the tool surface before authoring" — still introduced three fabricated claims: a `--dry-run` flag on `migration apply`, a "long-running operation" classifier that doesn't exist, and a destructive-op confirmation prompt on `migration apply` (the prompt lives on `db update`). None of the three were caught by the author; all three were caught only by review. The lesson is that a final "verify pass" doesn't work — the verification step has to fire *at each tool-surface claim, while drafting it*, so the temptation to extrapolate from a similar command is gone before it leaves a trace in the file.
+
+Use ripgrep against the framework source as you write. Verifying a flag:
+
+```bash
+rg "option\('--<flag>" packages/1-framework/3-tooling/cli/src/commands/<file>.ts
+```
+
+Verifying a command:
+
+```bash
+rg "new Command\('<name>'\)" packages/1-framework/3-tooling/cli/src/
+```
+
+Verifying a diagnostic code:
+
+```bash
+rg "code: '<CODE>'" packages/1-framework/3-tooling/cli/src/commands/<file>.ts
+```
+
+If the search returns nothing, the surface does not ship. Name the gap in *What Prisma Next doesn't do yet* and route the user to `prisma-next-feedback`. Do not paper over the gap with a plausible-looking incantation.
+
 ### Teach concepts, not procedures
 
 **The principle: teach the system's mental model and show the queries that reveal each piece of state. Reserve rigid step-by-step procedures for the rare case where there's literally one safe path and any deviation is costly.**
@@ -46,15 +72,14 @@ These are well-trodden but worth listing in one place:
 - **`What Prisma Next doesn't do yet` is mandatory.** It names a concrete gap, describes today's workaround, and routes to `prisma-next-feedback`. Never confabulate an API that doesn't exist.
 - **No cross-cluster references that drift.** When a skill links to a sibling skill, link by skill name, not by line range.
 - **Skill content ships in lockstep with the framework.** Stale skill content is worse than no skill. When a PR touches framework surface a skill references, the skill update is part of the PR scope, not follow-up work.
-- **Verify the tool surface before you author the workflow.** Read the actual CLI / API source for the commands the workflow uses. The migration-review pilot caught four factually-wrong tool references — they had been in the file from day one because nobody re-checked against the actual implementation. Authoring against an imagined surface is the most common defect on a first draft.
 
 ## Authoring workflow
 
 1. Read [`README.md`](./README.md) for the user-facing scope of the cluster.
 2. Read the [`skill-specialist` persona](https://github.com/prisma/ignite/blob/main/skills/.curated/drive-agent-personas/personas/skill-specialist.md) in the Ignite persona library — it's the canonical lens for skill-cluster work.
 3. Read [`skills/prisma-next-migration-review/SKILL.md`](./skills/prisma-next-migration-review/SKILL.md) for the cluster's worked example of concepts-over-procedures.
-4. Draft `SKILL.md` with:
-   - `description:` frontmatter as a matcher (CLI flags, error codes, feature names).
+4. Draft `SKILL.md`, **verifying each tool-surface claim against the framework source as you write it** (see *Verify the tool surface as you author* above for the ripgrep commands). The shape:
+   - `description:` frontmatter as a matcher (CLI flags, error codes, feature names — all verified).
    - Preamble + canonical mental-model headline.
    - *When to Use* / *When Not to Use*.
    - *Key Concepts* — name the moving parts.
@@ -63,8 +88,7 @@ These are well-trodden but worth listing in one place:
    - *What Prisma Next doesn't do yet* — concrete gap + workaround + route to `prisma-next-feedback`.
    - *Reference Files* (when applicable; the migration-review skill omits this and points at `--help` instead).
    - *Checklist*.
-5. Re-read your workflow sections against the symptoms above. Procedural? Rewrite as concept + query.
-6. Verify every command, flag, file path, and config key against the actual implementation in the framework packages. Authoring against an imagined surface is the most common first-draft defect.
+5. Re-read your workflow sections against the symptoms in *Teach concepts, not procedures*. Procedural? Rewrite as concept + query.
 
 ## Journey tests
 
