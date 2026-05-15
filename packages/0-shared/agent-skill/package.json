@@ -27,7 +27,7 @@
     "anthropic"
   ],
   "scripts": {
-    "lint": "echo 'no lint for markdown-only package'",
+    "lint": "biome check . --error-on-warnings",
     "test": "echo 'no automated tests; see journey-tests/'"
   }
 }
