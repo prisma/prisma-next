@@ -54,13 +54,9 @@ The pattern is deliberate: it gives the agent something concrete to say when a u
 
 The package ships at the same version as the rest of Prisma Next — keep them locked together (see the call-out at the top of this README).
 
-## Authoring
+## Contributing / authoring a skill
 
-Skill sources live at `packages/0-shared/agent-skill/skills/` in the `prisma-next` monorepo.
-
-## Journey tests
-
-`journey-tests/` contains Markdown checklists for the workflows the skill cluster supports. Each checklist names the prompt, the example app, and the expected end-state. Tests are run by hand against an example app and a configured agent runtime; cross-runtime automation is deferred.
+Authoring rules, cluster conventions, and the worked example for *concepts-over-procedures* live in [`DEVELOPING.md`](./DEVELOPING.md). Read that before adding or rewriting a `SKILL.md`. Skill sources live at `packages/0-shared/agent-skill/skills/` in the `prisma-next` monorepo.
 
 ## License
 
