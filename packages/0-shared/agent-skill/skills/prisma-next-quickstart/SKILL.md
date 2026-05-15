@@ -7,11 +7,11 @@ description: Adopt Prisma Next into a new project, onto an existing database, or
 
 > **Edit your data contract. Prisma handles the rest.**
 
-This skill takes the user from zero (or near-zero) to a first working query against Prisma Next. Three paths:
+This skill takes the user from zero (or near-zero) to a first working query against Prisma Next. Three paths — and they all converge on the same first arc: **connect → write → read**. Schema editing comes *after* the first arc, not before.
 
 - **Post-bootstrap orientation** — a scaffold tool (typically `npx createprisma`) just dropped the user into a working project. They're asking *"what can I do next with Prisma?"* and want to start building, not study the framework.
-- **Greenfield** — new project, fresh database. User runs `prisma-next init` themselves.
-- **Brownfield-DB** — existing database, no contract yet. Infer the contract from the database with `contract infer`, sign the marker with `db sign`, write queries.
+- **Greenfield** — new project, fresh database. User runs `prisma-next init` themselves. `init` seeds a starter contract with a sample model, so the path joins the first arc as soon as the database is initialised.
+- **Brownfield-DB** — existing database, no contract yet. Infer the contract from the database with `contract infer`, sign the marker with `db sign`, then write queries against one of the existing tables.
 
 This skill does **not** cover migrating from another ORM (Drizzle, Prisma 6/7, Sequelize, TypeORM, Kysely, Knex, raw drivers). Those are separately-installable skills.
 
@@ -38,7 +38,38 @@ This skill does **not** cover migrating from another ORM (Drizzle, Prisma 6/7, S
 - **Authoring mode**: how you write the contract. `psl` (Prisma Schema Language, default) or `typescript` (programmatic builder, optionally paired with the Vite plugin for auto-emit during `vite dev` — see `prisma-next-build`).
 - **Façade packages.** The scaffold installs exactly one façade per target — `@prisma-next/postgres` (or `@prisma-next/mongo`). User code imports from façade subpaths (`@prisma-next/postgres/config`, `@prisma-next/postgres/runtime`, `@prisma-next/postgres/contract-builder`). The façade bakes in the family / target / adapter / driver wiring; never reach past it. See `prisma-next-contract` for the full list.
 - **`db.ts`**: the runtime entry point. Scaffolded by `init` under `<schemaDir>/db.ts` (defaults to `prisma/db.ts`). Imports the contract artefacts and exports a `db` value the rest of the app uses.
-- **Marker**: a `pn_meta_marker` row in your database that records the contract hash. Lets PN detect drift between contract and live DB. Created by `db init` (greenfield) or `db sign` (brownfield).
+- **Marker**: a `pn_meta_marker` row in your database that records the contract hash. Lets PN detect drift between contract and live DB. Created by `db init` (greenfield / post-bootstrap) or `db sign` (brownfield).
+
+## Your first arc — connect, write, read
+
+All three paths in this skill converge here. Once the project is scaffolded and the database is reachable, the first move is **always** the same: connect, write a row, read it back, against whatever model the contract already declares. Don't touch the contract source on this first move — extend it later, after the round-trip works.
+
+```typescript
+import 'dotenv/config';
+import { db } from './prisma/db';
+
+// Write a row against the starter model. Adapt the field names to whatever
+// model your contract source actually declares — read it first.
+await db.orm.User.create({ email: 'alice@example.com' });
+
+// Read it back.
+const users = await db.orm.User.select('id', 'email').all();
+console.log(users);
+```
+
+If that prints `[{ id: 1, email: 'alice@example.com' }]`, the project is wired end-to-end and the user has crossed from *"I have a project"* to *"I'm building."*
+
+`db.orm.<Model>` is the default ORM lane — model-shaped, fully typed against the contract, lazily connects to the database on first use (it picks up `DATABASE_URL` from `.env` via the runtime's `dotenv/config`-loaded environment). The deeper `prisma-next-queries` skill covers the rest of the surface (filters, joins, transactions, the SQL builder, raw SQL, TypedSQL) when the user is ready.
+
+**Prerequisites for the arc to work.** All three paths leave these in place by the time you reach the arc:
+
+- `prisma-next.config.ts` exists and declares the target + contract source.
+- The contract source exists (a starter model from `init`, or the inferred contract from `contract infer`, or whatever the bootstrap tool generated).
+- `prisma/db.ts` exists and instantiates the runtime with the emitted contract.
+- `DATABASE_URL` is set in `.env` (or wherever the runtime's config tells it to look).
+- The database has been initialised (`db init`) or marker-signed (`db sign`), so the marker row exists and the schema matches the contract.
+
+The three workflows below each describe how their path gets the user to that state. After that, the arc above is the same.
 
 ## Workflow — Post-bootstrap orientation (you just ran `createprisma`)
 
@@ -60,38 +91,24 @@ Before saying anything specific, read:
 - `.env` / `.env.example` — is `DATABASE_URL` set?
 - Optionally `pnpm prisma-next db verify` — confirms the live DB matches the contract.
 
-### Step 2 — Propose the smallest first arc
+### Step 2 — Bring the project to the first-arc prerequisites
 
-Based on what's there:
+Compare what you found in Step 1 against the prerequisite list in *Your first arc — connect, write, read* above. The fastest move depends on what's missing:
 
-- **Contract has a starter model + DB is in sync.** Skip straight to write + read against the starter model.
-- **Contract has a starter model + DB hasn't been initialised yet.** Run `pnpm prisma-next db init`, then write + read.
-- **Contract is empty.** Add **one** model with **two** fields (e.g. `User { id, email }`). Run `pnpm prisma-next contract emit`, then `pnpm prisma-next db init`, then write + read.
-- **`DATABASE_URL` isn't set.** Have the user set it in `.env` (not in `prisma-next.config.ts` — see Pitfall 5). Then `db init`, write, read.
+- **All prerequisites already satisfied.** Skip to Step 3 — go straight to the arc.
+- **DB not initialised yet** (marker row missing — `db verify` reports drift between contract and DB). Run `pnpm prisma-next db init`.
+- **`DATABASE_URL` not set.** Have the user set it in `.env` (not in `prisma-next.config.ts` — see Pitfall 5), then `db init`.
+- **Contract is empty** (a bootstrap tool that didn't seed a starter model). Add **one** model with **two** fields (e.g. `User { id, email }`), run `pnpm prisma-next contract emit`, then `pnpm prisma-next db init`. Don't bloat the starter — minimal model, get the round-trip working, extend after.
 
-Concrete example, assuming the scaffold has a `User` model with at least an `email` field — adapt the fields below to whatever starter model the scaffold actually gave you (read the contract source first):
+### Step 3 — Run the first arc
 
-```typescript
-import 'dotenv/config';
-import { db } from './prisma/db';
+See *Your first arc — connect, write, read* above. Adapt the snippet's model name to whatever the contract declares.
 
-// Write a row.
-await db.orm.User.create({ email: 'alice@example.com' });
-
-// Read it back.
-const users = await db.orm.User.select('id', 'email').all();
-console.log(users);
-```
-
-Run it. If it prints `[{ id: 1, email: 'alice@example.com' }]`, the scaffold is end-to-end working and the user has crossed from *"I have a project"* to *"I'm building."*
-
-`db.orm.<Model>` is the default ORM lane — model-shaped, fully typed against the contract, lazily connects on first use. The deeper `prisma-next-queries` skill covers the rest of the surface (filters, joins, transactions, the SQL builder, raw SQL, TypedSQL) when the user is ready.
-
-### Step 3 — Orient the user to the toolbelt
+### Step 4 — Orient the user to the toolbelt
 
 Once one round-trip works, brief the user on the day-to-day commands — see *Commands you'll use day-to-day* below. Keep it short; don't lecture.
 
-### Step 4 — Ask what they want to build, then route
+### Step 5 — Ask what they want to build, then route
 
 - More queries (filters, joins, transactions, raw SQL, TypedSQL) → `prisma-next-queries`.
 - Schema changes (add a model, change a field, add a relation) → `prisma-next-contract`.
@@ -141,32 +158,14 @@ The flags `init` accepts (run `prisma-next init --help` for the source of truth)
 - Installs deps and runs `prisma-next contract emit` once.
 - Registers `@prisma-next/agent-skill` with the local agent runtime.
 
-After init succeeds:
+After init succeeds, the path converges on *Your first arc — connect, write, read* above. `init` has already seeded a starter contract with `User` and `Post` models (with a relation between them) and run `contract emit` once; the only remaining prerequisites are setting `DATABASE_URL` and initialising the database. Two commands:
 
 1. Set `DATABASE_URL` in `.env` (copy from `.env.example`).
-2. Edit the contract — add a first model. PSL example:
+2. Initialise the database: `pnpm prisma-next db init`. Creates tables, indexes, constraints, and writes the marker row — using the starter contract `init` generated.
 
-   ```prisma
-   model User {
-     id    Int    @id @default(autoincrement())
-     email String @unique
-   }
-   ```
+Then run the snippet from *Your first arc* above against the `User` model. When the user is ready to extend the contract — add more models, change fields, add relations — chain to `prisma-next-contract`. For more queries, chain to `prisma-next-queries`.
 
-3. Re-emit the contract: `pnpm prisma-next contract emit`. (Or install the Vite plugin from `prisma-next-build` so emit fires on save.)
-4. Initialise the database: `pnpm prisma-next db init`. Creates tables, indexes, constraints, and writes the marker row.
-5. Write a first query:
-
-   ```typescript
-   // src/list-users.ts
-   import { db } from '../prisma/db';
-
-   export async function listUsers() {
-     return db.orm.User.select('id', 'email').take(10).all();
-   }
-   ```
-
-For the next move — add more models, write more queries — chain to `prisma-next-contract` and `prisma-next-queries`.
+**Why this is queries-first, not schema-editing-first.** `init` ships with `User` and `Post` on purpose: the user shouldn't have to design a schema to prove their setup works. Extending the contract is the next move *after* the first arc lands, not part of getting there. If the user asks you to skip straight to *"add a Comment model"* — sure, do that — but get one query green against `User` or `Post` first if there's any doubt the project is wired correctly.
 
 ## Workflow — Brownfield-DB (existing database, no contract)
 
@@ -202,7 +201,7 @@ pnpm prisma-next db sign
 pnpm prisma-next db verify   # confirms the DB matches the contract; reports drift if not
 ```
 
-Write a first query against an existing table (same shape as the greenfield example).
+Then run the snippet from *Your first arc — connect, write, read* above, using one of your existing tables in place of the starter model. The arc is the same; only the path that got you there differs.
 
 ## Commands you'll use day-to-day
 
@@ -251,15 +250,15 @@ This skill is intentionally body-only; `prisma-next init --help`, `contract infe
 ## Checklist
 
 - [ ] Confirmed which path applies (post-bootstrap orientation / greenfield / brownfield) before proposing commands.
-- [ ] **Post-bootstrap path:** read `prisma-next.config.ts`, the contract source, `db.ts`, and `.env` *before* proposing a first move. Picked the smallest arc consistent with what's already on disk.
-- [ ] **Post-bootstrap path:** got *one* write + read round-trip working before opening any other surface (schema editing, migrations, runtime config).
+- [ ] **All paths:** brought the project to the *Your first arc* prerequisites (config, contract source, `db.ts`, `DATABASE_URL`, marker row) *before* writing application code.
+- [ ] **All paths:** ran the first arc — one `create` + one `select` against the starter (or inferred) model — and got the round-trip working green.
+- [ ] **All paths:** did *not* edit the contract source as part of the first arc. Schema extension is the *next* move, not the first.
 - [ ] Confirmed the user's target (`postgres` / `mongodb`) and authoring mode (`psl` / `typescript`).
+- [ ] **Post-bootstrap path:** read `prisma-next.config.ts`, the contract source, `db.ts`, and `.env` before proposing anything — didn't assume what the bootstrap tool left in place.
 - [ ] **Greenfield path:** ran `prisma-next init` from the project directory — no positional project-name argument.
 - [ ] **Brownfield path:** ran `contract infer --db "$DATABASE_URL" --output prisma/contract.prisma`, reviewed the result, then `contract emit` + `db sign`.
 - [ ] Set `DATABASE_URL` in `.env` and confirmed the value is reachable.
-- [ ] Ran `pnpm prisma-next contract emit` after editing the contract source.
-- [ ] Initialised the DB (`db init` greenfield) or signed the marker (`db sign` brownfield).
-- [ ] Wrote a first query against `db.orm.<Model>` and ran it green.
+- [ ] Initialised the DB (`db init` greenfield / post-bootstrap) or signed the marker (`db sign` brownfield).
 - [ ] Did NOT hand-edit `contract.json` or `contract.d.ts`.
 - [ ] Did NOT set `DATABASE_URL` in `prisma-next.config.ts`.
-- [ ] Confirmed the user understands what the *next* skill is for their workflow (typically `prisma-next-queries` after the first round-trip, then `prisma-next-contract` when they're ready to extend the schema).
+- [ ] Confirmed the user understands what the *next* skill is for their workflow (typically `prisma-next-queries` for more queries, then `prisma-next-contract` when they're ready to extend the schema).
