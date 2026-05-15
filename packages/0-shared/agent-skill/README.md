@@ -27,10 +27,11 @@ Every skill follows the same shape: preamble + canonical mental-model headline, 
 
 ## Install
 
-The skill is normally installed for you by `prisma-next init`:
+The skill is normally installed for you by `prisma-next init`, which operates in the current working directory:
 
 ```bash
-pnpm dlx prisma-next init my-app
+mkdir my-app && cd my-app
+pnpm dlx prisma-next init
 ```
 
 To install standalone (existing project, new agent runtime, or user-level):

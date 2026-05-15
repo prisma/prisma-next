@@ -20,7 +20,8 @@ The change is structurally simple: replace the FS-template emission with a subpr
 User-facing flow after the change:
 
 ```text
-$ pnpm dlx prisma-next init my-app
+$ mkdir my-app && cd my-app
+$ pnpm dlx prisma-next init
   ◇ Detected package manager: pnpm
   ◇ Scaffolding prisma-next.config.ts, prisma/schema.psl, prisma/db.ts ...
   ◇ Installing @prisma-next/postgres, @prisma-next/cli ...
@@ -30,13 +31,13 @@ $ pnpm dlx prisma-next init my-app
       prisma-next-runtime, prisma-next-debug
   ◇ Next steps: open the project in your IDE and start a chat.
 
-$ cd my-app && open .
+$ open .
 ```
 
 With `--install-user-skill`:
 
 ```text
-$ pnpm dlx prisma-next init my-app --install-user-skill
+$ pnpm dlx prisma-next init --install-user-skill
   ...
   ◇ Registering @prisma-next/agent-skill with the agent runtime
     → 8 skills registered at the project level
@@ -47,7 +48,7 @@ $ pnpm dlx prisma-next init my-app --install-user-skill
 With `--no-skill`:
 
 ```text
-$ pnpm dlx prisma-next init my-app --no-skill
+$ pnpm dlx prisma-next init --no-skill
   ...
   ◇ Skipped agent-skill installation (--no-skill).
     To install later, run `npx skills add @prisma-next/agent-skill` in this project.
@@ -219,7 +220,7 @@ This is structurally the cleanest piece of the change: removing the per-target t
 
 # Acceptance Criteria
 
-- **AC1. Default install behavior.** `pnpm dlx prisma-next init my-app` on a host with the published `@prisma-next/agent-skill` reachable on npm:
+- **AC1. Default install behavior.** `pnpm dlx prisma-next init` (run inside a fresh project directory) on a host with the published `@prisma-next/agent-skill` reachable on npm:
   - Scaffolds the project as before.
   - After the dependency install step, invokes `npx skills add @prisma-next/agent-skill` (or the package-manager equivalent).
   - The agent runtime's skill directory now contains the eight skills from `@prisma-next/agent-skill`.
@@ -229,13 +230,13 @@ This is structurally the cleanest piece of the change: removing the per-target t
 
 - **AC2. Postgres and Mongo install the same package.** Running `init` with `--target postgres` and again with `--target mongo` produces the same `npx skills add @prisma-next/agent-skill` subprocess call (same arguments) in both runs. Covers FR2, the project spec's FR13.
 
-- **AC3. `--install-user-skill` performs the user-level install.** `init my-app --install-user-skill` invokes the project-level install *and* the user-level install. The marker file is written. The skills are reachable from another project on the same host without re-running `init`. Covers FR4, FR7, the project spec's FR12.
+- **AC3. `--install-user-skill` performs the user-level install.** `init --install-user-skill` invokes the project-level install *and* the user-level install. The marker file is written. The skills are reachable from another project on the same host without re-running `init`. Covers FR4, FR7, the project spec's FR12.
 
 - **AC4. First-run interactive prompt fires.** With no marker file present, an interactive `init` run shows the Clack prompt asking about user-level install. A "yes" performs the install and writes the marker. A "no" performs no install and writes the marker. Subsequent runs do not show the prompt. Covers FR5, FR7.
 
 - **AC5. Non-interactive run does not prompt.** `init --yes my-app` (or `init` invoked from a non-TTY context like a CI pipeline) does not show the prompt, does not perform a user-level install (unless `--install-user-skill` was passed), and does not write the marker file. Covers FR6.
 
-- **AC6. `--no-skill` skips everything skill-related.** `init my-app --no-skill` does not invoke `npx skills add` at all, does not show the prompt, does not write the marker file. It emits a single info line naming the manual fallback. Exit code: `INIT_EXIT_OK`. The scaffolded project is otherwise complete. Covers FR8.
+- **AC6. `--no-skill` skips everything skill-related.** `init --no-skill` does not invoke `npx skills add` at all, does not show the prompt, does not write the marker file. It emits a single info line naming the manual fallback. Exit code: `INIT_EXIT_OK`. The scaffolded project is otherwise complete. Covers FR8.
 
 - **AC7. Skill-install failure surfaces a structured error.** Simulate a `npx skills add` failure (e.g. by mocking the subprocess to exit non-zero, or running `init` against a registry the host can't reach). `init` exits with the new `INIT_EXIT_SKILL_INSTALL_FAILED` code. The error message names the failing subcommand, names `--no-skill` as the workaround, and names the manual install command. The scaffolded project's other files remain on disk. Covers FR9, NFR1.
 

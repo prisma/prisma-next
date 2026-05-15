@@ -9,8 +9,8 @@
 A fresh Vite + React project that has run `prisma-next init`:
 
 ```bash
-pnpm dlx prisma-next init my-vite-app
-cd my-vite-app
+mkdir my-vite-app && cd my-vite-app
+pnpm dlx prisma-next init
 pnpm add vite @vitejs/plugin-react react react-dom
 ```
 

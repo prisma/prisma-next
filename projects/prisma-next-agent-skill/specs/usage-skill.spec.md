@@ -32,11 +32,12 @@ The ten skills:
 A user-facing flow, end-to-end:
 
 ```text
-$ pnpm dlx prisma-next init my-app
+$ mkdir my-app && cd my-app
+$ pnpm dlx prisma-next init
   ✓ Scaffolds prisma-next.config.ts, schema.psl, db.ts
   ✓ Installs @prisma-next/agent-skill (registers 8 skills with the agent runtime)
 
-$ cd my-app && open .
+$ open .
 
 user> "add a Profile model with a unique email field and let me list profiles"
 agent> (matches prisma-next-contract description; loads SKILL.md)
