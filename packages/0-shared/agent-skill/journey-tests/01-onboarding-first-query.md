@@ -17,7 +17,7 @@
 - [ ] Adds a `User` model with `id` (auto-increment PK) and `email` (string, unique).
 - [ ] Runs `pnpm prisma-next contract emit` (or the project-pm equivalent).
 - [ ] Plans + applies a migration (or uses `db update` for dev).
-- [ ] Writes a query handler that calls `db.orm.User.select(...).all()`.
+- [ ] Writes a query handler that calls `db.orm.User.select(...).all()` (the ORM lane is the default; the SQL builder and raw lanes are alternatives the `prisma-next-queries` skill covers).
 - [ ] Runs the handler and observes the empty array (or rows if seeded).
 
 ## Success criteria
@@ -33,5 +33,5 @@
 
 - Agent suggests `prisma migrate dev` instead of `prisma-next migration plan` / `db update`.
 - Agent forgets to `contract emit`.
-- Agent writes raw SQL instead of using `db.orm`.
-- Agent confabulates an API that doesn't exist (`db.User.findMany(...)`).
+- Agent writes raw SQL instead of using the ORM lane (`db.orm.<Model>`).
+- Agent confabulates an API that doesn't exist (`db.User.findMany(...)`, Prisma 7-style imports, `prisma generate`).
