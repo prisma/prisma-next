@@ -3,7 +3,7 @@
 // `scripts/bump-minor.ts`); this file is reserved for deterministic
 // helpers exercised under `node --test` from `pnpm test:scripts`.
 
-const CANONICAL_BASE_PATTERN = /^\d+\.\d+\.\d+$/;
+const CANONICAL_BASE_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 export interface ParsedVersion {
   major: number;

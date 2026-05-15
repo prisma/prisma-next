@@ -48,4 +48,10 @@ describe('assertCanonicalBase', () => {
   it('rejects an empty string', () => {
     assert.throws(() => assertCanonicalBase(''), /not canonical/);
   });
+
+  it('rejects components with leading zeros', () => {
+    assert.throws(() => assertCanonicalBase('01.2.3'), /not canonical/);
+    assert.throws(() => assertCanonicalBase('1.02.3'), /not canonical/);
+    assert.throws(() => assertCanonicalBase('1.2.03'), /not canonical/);
+  });
 });
