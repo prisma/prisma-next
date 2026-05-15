@@ -144,6 +144,12 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private codecRegistryValidated: boolean;
   private verified: boolean;
   private startupVerified: boolean;
+  // Shared promise for an in-flight cold-start marker read (onFirstUse /
+  // startup modes). Concurrent callers that arrive before the first one
+  // flips `verified = true` await the same promise instead of issuing
+  // their own redundant marker round-trip. Intentionally not used for
+  // `always` mode, where each call must observe a fresh marker read.
+  private verifyInFlight: Promise<void> | undefined;
   private _telemetry: RuntimeTelemetryEvent | null;
 
   constructor(options: RuntimeOptions<TContract>) {
@@ -177,6 +183,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.codecRegistryValidated = false;
     this.verified = verify.mode === 'startup' ? false : verify.mode === 'always';
     this.startupVerified = false;
+    this.verifyInFlight = undefined;
     this._telemetry = null;
 
     if (verify.mode === 'startup') {
@@ -339,11 +346,11 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       self._telemetry = null;
 
       if (!self.startupVerified && self.verify.mode === 'startup') {
-        await self.verifyMarker();
+        await self.verifyMarkerOnce();
       }
 
       if (!self.verified && self.verify.mode === 'onFirstUse') {
-        await self.verifyMarker();
+        await self.verifyMarkerOnce();
       }
 
       const startedAt = Date.now();
@@ -455,6 +462,20 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     if (!this.codecRegistryValidated) {
       validateCodecRegistryCompleteness(this.codecDescriptors, this.contract);
       this.codecRegistryValidated = true;
+    }
+  }
+
+  private async verifyMarkerOnce(): Promise<void> {
+    if (this.verifyInFlight) {
+      await this.verifyInFlight;
+      return;
+    }
+
+    this.verifyInFlight = this.verifyMarker();
+    try {
+      await this.verifyInFlight;
+    } finally {
+      this.verifyInFlight = undefined;
     }
   }
 

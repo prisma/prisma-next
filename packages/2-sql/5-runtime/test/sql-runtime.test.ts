@@ -55,6 +55,7 @@ interface DriverMockSpies {
   transactionCommit: ReturnType<typeof vi.fn>;
   transactionRollback: ReturnType<typeof vi.fn>;
   driverClose: ReturnType<typeof vi.fn>;
+  driverQuery: ReturnType<typeof vi.fn>;
 }
 
 type MockSqlDriver = SqlDriver & { __spies: DriverMockSpies };
@@ -144,6 +145,7 @@ function createMockDriver(): MockSqlDriver {
       transactionCommit: transaction.commit,
       transactionRollback: transaction.rollback,
       driverClose,
+      driverQuery: query,
     },
   });
 }
@@ -641,6 +643,174 @@ describe('createRuntime', () => {
       }),
     });
     expect(driver.__spies.rootExecute).not.toHaveBeenCalled();
+  });
+});
+
+describe('marker verification dedupe', () => {
+  // The marker reader's parser tolerates an empty row set when
+  // requireMarker is false (the runtime treats "no marker" as verified).
+  // The mock driver returns rows: [] by default, so a single marker-read
+  // round-trip is enough to flip `verified = true` for every caller that
+  // shares the in-flight verify promise.
+  const markerEmpty = { rows: [], rowCount: 0 };
+
+  /**
+   * Drains queued microtasks so concurrent `runtime.execute(...)` callers
+   * advance from the synchronous entry into their `await self.verifyMarkerOnce()`
+   * suspension point. Without this, only the first generator may have
+   * stepped past `await encodeParams` by the time we resolve the marker
+   * read, masking concurrent-arrival behavior.
+   */
+  async function flushMicrotasks(rounds = 5): Promise<void> {
+    for (let i = 0; i < rounds; i++) {
+      await Promise.resolve();
+    }
+  }
+
+  it('dedupes concurrent cold-start marker reads in onFirstUse mode', async () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    let resolveMarker: (value: typeof markerEmpty) => void = () => {};
+    const heldMarker = new Promise<typeof markerEmpty>((resolve) => {
+      resolveMarker = resolve;
+    });
+    driver.__spies.driverQuery.mockReturnValueOnce(heldMarker);
+
+    const callers = 5;
+    const promises = Array.from({ length: callers }, () =>
+      runtime.execute(createRawExecutionPlan()).toArray(),
+    );
+
+    await flushMicrotasks();
+    resolveMarker(markerEmpty);
+    await Promise.all(promises);
+
+    expect(driver.__spies.driverQuery).toHaveBeenCalledTimes(1);
+    expect(driver.__spies.rootExecute).toHaveBeenCalledTimes(callers);
+  });
+
+  it('dedupes concurrent cold-start marker reads in startup mode', async () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'startup', requireMarker: false },
+    });
+
+    let resolveMarker: (value: typeof markerEmpty) => void = () => {};
+    const heldMarker = new Promise<typeof markerEmpty>((resolve) => {
+      resolveMarker = resolve;
+    });
+    driver.__spies.driverQuery.mockReturnValueOnce(heldMarker);
+
+    const callers = 5;
+    const promises = Array.from({ length: callers }, () =>
+      runtime.execute(createRawExecutionPlan()).toArray(),
+    );
+
+    await flushMicrotasks();
+    resolveMarker(markerEmpty);
+    await Promise.all(promises);
+
+    expect(driver.__spies.driverQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips marker read for warm callers in onFirstUse mode', async () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    await runtime.execute(createRawExecutionPlan()).toArray();
+    expect(driver.__spies.driverQuery).toHaveBeenCalledTimes(1);
+
+    driver.__spies.driverQuery.mockClear();
+    await Promise.all([
+      runtime.execute(createRawExecutionPlan()).toArray(),
+      runtime.execute(createRawExecutionPlan()).toArray(),
+      runtime.execute(createRawExecutionPlan()).toArray(),
+    ]);
+
+    expect(driver.__spies.driverQuery).not.toHaveBeenCalled();
+  });
+
+  it('does not dedupe in always mode (every caller round-trips)', async () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'always', requireMarker: false },
+    });
+
+    const callers = 5;
+    const promises = Array.from({ length: callers }, () =>
+      runtime.execute(createRawExecutionPlan()).toArray(),
+    );
+    await Promise.all(promises);
+
+    expect(driver.__spies.driverQuery).toHaveBeenCalledTimes(callers);
+  });
+
+  it('shares an in-flight verify failure across concurrent callers', async () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: true },
+    });
+
+    let rejectMarker: (reason: unknown) => void = () => {};
+    const heldMarker = new Promise<typeof markerEmpty>((_resolve, reject) => {
+      rejectMarker = reject;
+    });
+    driver.__spies.driverQuery.mockReturnValueOnce(heldMarker);
+
+    const callers = 3;
+    const promises = Array.from({ length: callers }, () =>
+      runtime.execute(createRawExecutionPlan()).toArray(),
+    );
+
+    await flushMicrotasks();
+    const driverFailure = new Error('connection refused');
+    rejectMarker(driverFailure);
+
+    const results = await Promise.allSettled(promises);
+    expect(driver.__spies.driverQuery).toHaveBeenCalledTimes(1);
+    for (const result of results) {
+      expect(result.status).toBe('rejected');
+      expect((result as PromiseRejectedResult).reason).toBe(driverFailure);
+    }
+    expect(driver.__spies.rootExecute).not.toHaveBeenCalled();
+  });
+
+  it('clears the in-flight slot after a failure so the next caller retries', async () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    driver.__spies.driverQuery.mockRejectedValueOnce(new Error('transient'));
+    await expect(runtime.execute(createRawExecutionPlan()).toArray()).rejects.toThrow('transient');
+
+    // Subsequent call falls back to the default mockResolvedValue (rows: [])
+    // and verifies successfully — proving the in-flight slot was cleared.
+    await runtime.execute(createRawExecutionPlan()).toArray();
+    expect(driver.__spies.driverQuery).toHaveBeenCalledTimes(2);
   });
 });
 
