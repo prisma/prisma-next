@@ -9,257 +9,167 @@ description: Review what Prisma Next migrations will run on merge or deploy, ren
 
 This skill is about *reviewing* migrations, not authoring them. It covers the questions that come up at deploy time and when multiple developers are landing migrations concurrently.
 
+The skill teaches *the system's mental model* — what a ref is, what a marker is, what the migration graph is — and shows how to ask the system for its state. It does **not** prescribe rigid step-by-step procedures: most "review" questions are answered by understanding the model and querying the right thing. Rigid procedures are reserved for the rare case where there's literally one safe path.
+
 ## When to Use
 
 - User asks *"what migrations will run when I merge this?"* or *"what's about to run on deploy?"*.
 - User hit a concurrent-migration conflict (`main` advanced while their branch was open).
-- User wants to wire up a `staging` / `production` migration ref.
-- User wants to run a migration against an environment that isn't pointed at by the local config.
+- User wants to wire up a `staging` / `production` ref so CI can deploy against it.
+- User wants to run a migration against an environment that isn't the local dev DB.
 - User asks about CI integration for migrations.
 
 ## When Not to Use
 
 - User wants to *author* a migration → `prisma-next-migrations`.
-- User wants to fix a hash-mismatch / drift in a single env → `prisma-next-migrations` or `prisma-next-debug`.
+- User wants to fix a hash-mismatch / drift in a single env → `prisma-next-migrations` (re-plan path) or `prisma-next-debug` (envelope-driven).
 - User wants to edit the contract → `prisma-next-contract`.
 
-## Key Concepts (before any workflow)
+## Key Concepts — the navigation model
 
-- **Migration ref**: a named pointer to an environment's expected state. Stored in `migrations/refs.json`. Each ref records: the env name (e.g. `staging`), the `DATABASE_URL` env-var name (e.g. `STAGING_DATABASE_URL`), and the marker hash the env is currently at.
-- **From / to hash**: every migration carries a "from" hash (the contract hash it migrates *from*) and a "to" hash (the contract hash it migrates *to*). Migrations chain through these hashes; the database's marker must match a migration's "from" hash for that migration to apply.
-- **Migration graph**: the graph of migrations from each environment's current marker forward to the contract head. Linear in the common case; branches when concurrent topic branches each add a migration off the same parent.
-- **Diamond convergence**: two topic branches each add a migration off the same parent. The second to merge has to converge — either by pure rebase (if the schema deltas are compatible) or by re-planning.
+**Every migration question is a navigation from an *origin* to a *destination*.** Once you have this model, the rest of the skill is just "which command asks the system about which navigation."
 
-## Workflow — "What's about to run on merge?"
+### Origin
 
-The user asks: *"I'm about to merge this PR. What migrations are going to run when I deploy?"*
+The **origin** is the database's *current contract hash*. The database carries a row in PN's marker table that records *"this database is at hash X"*. When the CLI runs online (a `--db <url>` is provided, or `db.connection` is set in `prisma-next.config.ts`), PN reads the marker and that hash is the origin. Offline (no DB connection), the origin is unknown — many commands degrade to listing the on-disk migrations and skip the per-edge applied/pending status.
 
-1. Identify the target environment. Default: `staging` (or whatever the user's deploy pipeline runs first). The user may say `production`.
-2. Confirm a ref is configured for that environment:
+A live DB is therefore the authoritative source of origin. The "recorded marker" in any other artifact (refs, local cache, your assumptions) is a working copy that can drift; the live DB never does.
 
-   ```bash
-   pnpm prisma-next migration ref list
-   ```
+### Destination
 
-3. Query the migration graph against that ref:
+The **destination** is the contract hash you want the database to be at. Two ways to name a destination:
 
-   ```bash
-   pnpm prisma-next migration status --ref staging
-   ```
+- **A `--ref <name>`** — a named pointer to a hash, stored under `migrations/app/refs/<name>`. Refs are named after environments by convention (`staging`, `production`) to communicate *"this is where production is expected to be"*. The ref itself is just a hash + an optional set of required invariants; it has nothing to do with which database you connect to.
+- **The current contract head** — implicit when no `--ref` is passed. This is the hash of the current `contract.json` on disk.
 
-Output lists every migration between the env's current marker and the contract head, in order, with each migration's name, "from" hash, "to" hash, and any data-transform steps it carries.
+`--ref staging` does **not** mean "connect to the staging database." It means "navigate the database I connected to (via `--db` or config) toward whatever hash this ref points at." Database selection is orthogonal: pass `--db $STAGING_DATABASE_URL` to actually point at staging.
 
-4. If the user wants the live DB consulted (not just the recorded marker in `refs.json`), add `--db`:
+### The migration graph
 
-   ```bash
-   pnpm prisma-next migration status --ref staging --db "$STAGING_DATABASE_URL"
-   ```
+The on-disk migrations form a directed graph: **nodes are contract hashes; edges are migrations.** Each migration declares a `from` hash and a `to` hash. A migration applies only when the database's current marker matches its `from` hash; running it advances the marker to its `to` hash.
 
-This connects, reads the live marker, and reports the actual delta.
+`migration status` queries the graph for the path from origin to destination and reports per-edge status:
 
-5. Surface the list to the user. For each migration, flag any that:
-   - Contains a data transform — calls attention; transforms are not pure schema and warrant review.
-   - Contains a destructive op (DROP COLUMN, DROP TABLE) — flag and name the dropped surface.
-   - Has a long-running operation (CREATE INDEX without `CONCURRENTLY`, ALTER COLUMN with a default fill) — flag.
+- **applied** — on the path from `EMPTY_CONTRACT_HASH` to the marker (history).
+- **pending** — on the path from the marker to the destination (what would run).
+- **unreachable** — on the path from `EMPTY_CONTRACT_HASH` to the destination, but the marker is on a different branch and won't reach it without first re-routing.
 
-## Workflow — Render the migration graph from a topic branch
+## Workflow — *"What's about to run on deploy?"*
 
-Useful when the user wants to see the current branch's migration ahead of `main`:
+The user asks: *"I'm about to merge this PR. What migrations are going to run when I deploy to staging?"*
 
-1. Run `migration status` without `--ref` to see local-vs-contract-head:
-
-   ```bash
-   pnpm prisma-next migration status
-   ```
-
-2. To compare branch's `main` state against the topic-branch state, do a side-by-side:
-
-   ```bash
-   git fetch origin main
-   git switch main
-   pnpm prisma-next migration status > /tmp/main-status.txt
-   git switch -
-   pnpm prisma-next migration status > /tmp/branch-status.txt
-   diff /tmp/main-status.txt /tmp/branch-status.txt
-   ```
-
-(PN doesn't ship a built-in "branch diff" view; the workaround uses git + the status command.)
-
-## Workflow — Detect that main advanced ahead of the topic branch
-
-Symptom: the topic branch's migration was planned against a parent hash that no longer matches `main`'s head.
-
-1. Fetch and inspect:
-
-   ```bash
-   git fetch origin main
-   git log --oneline ..origin/main -- migrations/
-   ```
-
-If `main` has migrations the branch doesn't, the topic branch is behind.
-
-2. Run `migration status` against the topic branch:
-
-   ```bash
-   pnpm prisma-next migration status
-   ```
-
-If it reports "branch migration's `from` hash does not match `main`'s head", you have a concurrent-migration conflict. Resolve it (next workflow).
-
-## Workflow — Resolve a concurrent-migration conflict (diamond convergence)
-
-The user has a topic branch with a migration. `main` advanced; another team's migration landed first. Both branches diverged from the same parent. The five-step procedure:
-
-1. **Rebase the topic branch onto the new `main`.**
-
-   ```bash
-   git fetch origin main
-   git rebase origin/main
-   ```
-
-This brings the other team's migration directory into your tree. Your migration directory is still there too.
-
-2. **Delete your topic branch's locally-planned migration directory.**
-
-   ```bash
-   rm -rf migrations/<your-timestamp>-<your-slug>/
-   ```
-
-Your migration was planned against the old parent; it's no longer valid. Discard it.
-
-3. **Re-run `migration plan`.**
-
-   ```bash
-   pnpm prisma-next contract emit
-   pnpm prisma-next migration plan --name <your-slug>
-   ```
-
-This produces a new migration that captures *only* your contract delta on top of the other team's migration. The new "from" hash matches `main`'s head; the "to" hash captures your changes.
-
-4. **Port any data-transform customizations** from the original `migration.ts` into the new one.
-
-   - Open your git history (or a stash) for the original `migration.ts`. Copy any custom `runDataTransform` logic.
-   - Paste into the new `migration.ts`, adapting names if the schema shape changed.
-
-5. **Re-emit.** Self-emit from the new `migration.ts` to refresh `ops.json`:
-
-   ```bash
-   node migrations/<new-timestamp>-<your-slug>/migration.ts
-   ```
-
-Verify:
-
-   ```bash
-   pnpm prisma-next migration show <your-slug>
-   pnpm prisma-next migration status
-   ```
-
-The status should report a clean chain from `main` → your migration.
-
-There is no separate `migration revalidate` step. The flow is schema-first (re-plan from the post-merge contract head), then port data transforms by hand.
-
-The same workflow applies whether the two branches converged on the same destination hash (the schema deltas are compatible) or diverged (re-plan handles either case).
-
-## Workflow — Configure / use environment refs
-
-Refs let you keep track of multiple environments' markers without naming `DATABASE_URL` interchangeably.
-
-### Set a ref
+This is the navigation question: **origin** = staging's live marker; **destination** = the ref `staging` (or the contract head if you haven't set one). Ask the system:
 
 ```bash
-pnpm prisma-next migration ref set staging \
-  --env STAGING_DATABASE_URL \
-  --marker "$(pnpm prisma-next contract emit --hash-only)"
+pnpm prisma-next migration status --ref staging --db "$STAGING_DATABASE_URL"
 ```
 
-Records in `migrations/refs.json`:
+The command:
 
-```json
-{
-  "staging": {
-    "envVar": "STAGING_DATABASE_URL",
-    "marker": "<contract-hash>"
-  }
-}
-```
+1. Reads the staging DB's marker (the origin).
+2. Resolves `staging` to a contract hash (the destination).
+3. Renders the path between them as an ordered list of migrations, with per-edge `applied` / `pending` / `unreachable` status, and an explicit summary line of the form *"N migration(s) behind ref 'staging'"*.
+4. Prints a header that names the config, migrations directory, the active ref, and the database connection (masked) — so the framing is visible in the output.
 
-### List refs
+If you omit `--db`, the command runs offline: it lists the migrations on disk but cannot tell you what's applied, because it has no origin. That's fine for *"what's on this branch?"*; it's not fine for *"what's about to run on staging?"* — for that you need staging's live marker.
+
+If you omit `--ref`, the destination defaults to the contract head — which answers *"is this branch's contract reachable from the database, and how?"*, not *"what runs on deploy"*. Pass the ref explicitly when the question is about a specific environment.
+
+If `migration status` flags any migration with destructive ops or a long-running operation (CREATE INDEX without `CONCURRENTLY`, ALTER COLUMN with a default fill, DROP COLUMN), surface those specifically to the user. Those are the operations that warrant manual review before deploy.
+
+## Workflow — *"What state is each environment at?"*
+
+Just `migration status --db $URL` for each environment's DB. The marker (origin) comes back from the DB itself; the summary line tells you whether the environment is at the contract head, at a named ref, ahead of head, or on a divergent branch.
+
+## Concept — concurrent migrations on the same branch point
+
+This used to be called *diamond convergence* in some PN docs; the situation is the same regardless of the label.
+
+**What's happening.** Two topic branches each authored a migration off the same parent contract hash. The first branch merges to `main`; the destination ref (e.g. `production`) advances to that branch's `to` hash. Your branch's migration still has its `from` hash pointing at the *old* parent. The migration graph, after rebase, no longer has a clean path through your migration:
+
+- Your migration's `from` is no longer an ancestor of the new head.
+- Or your migration's `from` is reachable, but the path through your migration arrives at a hash that's not the union of both branches' changes.
+
+Either way, the on-disk plan is stale.
+
+**Resolution: the normal core workflow.** Don't follow a special "diamond convergence procedure"; just apply Prisma Next's standard *edit → plan → apply* loop to the post-merge state:
+
+1. Rebase the topic branch onto the new `main` so your tree has the other branch's migration.
+2. Remove your old, stale `migration.ts` (its `from` hash is no longer in the graph as you intend).
+3. Re-emit the contract, then re-plan a migration. The planner produces a fresh migration whose `from` hash matches the new head and whose `to` hash captures the union of changes.
+4. **If your old `migration.ts` had data transforms or any custom logic, port that into the new one** before applying. The planner only handles schema deltas; custom data-transform logic is your responsibility to carry across.
+
+That's it. There is no separate "revalidate" step, no special "diamond apply" flow — the diamond is just *"someone else got there first; re-plan from the new head."*
+
+## Workflow — set, list, get, delete refs
+
+Refs are small artifacts. There's no per-environment lifecycle; you just point a name at a hash.
 
 ```bash
+pnpm prisma-next migration ref set production <contract-hash>
 pnpm prisma-next migration ref list
+pnpm prisma-next migration ref get production
+pnpm prisma-next migration ref delete production
 ```
 
-### Get a ref
+`ref set` writes a file at `migrations/app/refs/<name>` carrying the hash and any required invariants. Refs are commit-friendly artifacts — keep them in git; the team agrees on what `production` points at the same way they agree on what `main` is.
+
+## Workflow — apply a migration against an environment
 
 ```bash
-pnpm prisma-next migration ref get staging
+pnpm prisma-next migration apply --ref production --db "$PRODUCTION_DATABASE_URL"
 ```
 
-### Delete a ref
+The destination is the ref's hash; the origin is the production DB's live marker. The command computes the path between them and applies each pending migration in order, advancing the marker.
 
-```bash
-pnpm prisma-next migration ref delete staging
-```
+`--db` is the environment selection knob. `--ref` is the destination-hash knob. They're independent.
 
-## Workflow — Run a migration against a ref
+## Concept — ref-mismatch on CI / deploy
 
-```bash
-pnpm prisma-next migration apply --ref staging
-```
+CI reports: *"the recorded ref `production` is at hash X; the live DB is at hash Y."*
 
-PN reads `migrations/refs.json` for `staging`, expands `$STAGING_DATABASE_URL` from the environment, and applies pending migrations against that DB.
+The mismatch is a fact about *two pieces of state that disagree*. The investigation is the same regardless of which piece is wrong:
 
-If the ref's recorded marker doesn't match the live DB's marker, PN refuses to apply and reports the mismatch. Either update the ref (`ref set` again) or investigate the drift.
+- Is the **DB ahead of the ref**? Someone applied a migration outside CI without updating the ref in git. Update the ref (commit + push); audit how the out-of-band apply happened.
+- Is the **DB behind the ref**? A previous deploy was rolled back, or the DB was restored from an older backup. Decide whether to re-apply or re-route.
+- Is the **DB on a different branch**? An out-of-band schema change (manual SQL, ad-hoc migration) wrote something the migration graph doesn't model. Run `prisma-next db verify` to find the drift; decide whether the contract or the database is the source of truth.
 
-## Decision: ref-mismatch on CI
+`ref set` to silently align the ref with whatever the DB happens to be at is almost never the right move. It papers over drift that you'll pay for later.
 
-CI reports: *"recorded ref `staging` is at hash X; live DB is at hash Y."*
-
-Possibilities:
-
-1. **The ref is stale** — someone applied a migration outside CI and didn't update `refs.json`. Fix: re-run `ref set staging` with the live marker.
-2. **The DB is out of sync** — someone changed the DB out-of-band (manual SQL, restore from backup). Fix: `db verify`, identify what's off, decide whether to update the contract or update the DB.
-3. **Concurrent apply** — another deploy ran between CI's snapshot and the apply step. Fix: re-run CI; if it consistently mismatches, investigate the deploy pipeline for races.
-
-Never blindly run `ref set` to "fix" the mismatch without understanding which of these caused it. That can mask a drift.
-
-## Workflow — CI: verify the branch can advance the target environment
-
-A common CI check: *can this branch's migration apply to staging without manual intervention?*
+## Workflow — CI: verify a branch can advance the target environment
 
 ```yaml
-# .github/workflows/migration-check.yml
 - run: pnpm prisma-next migration status --ref staging --db "$STAGING_DATABASE_URL"
-- run: pnpm prisma-next migration apply --ref staging --dry-run --db "$STAGING_DATABASE_URL"
+- run: pnpm prisma-next migration apply --ref staging --db "$STAGING_DATABASE_URL" --dry-run
 ```
 
-`--dry-run` validates the migration against the live schema without mutating. Fails CI if the migration can't apply (chain break, data- transform error, destructive op without explicit confirmation).
+`--dry-run` validates the path against the live schema without mutating. Fails CI if the path can't apply (the marker isn't an ancestor of the ref, a destructive op needs explicit confirmation, a data-transform throws).
 
 ## Common Pitfalls
 
-1. **Reading `migration status` without `--ref`.** Without a ref, you're comparing the *local* state (last apply) to the contract head — not what will run on deploy. Always pass `--ref` for deploy questions.
-2. **Trusting the recorded marker over the live DB.** The recorded marker can drift if migrations run out-of-band. For high-stakes questions, pass `--db` to consult the live DB.
-3. **Skipping the data-transform port in step 4 of diamond convergence.** Your custom transforms are gone if you don't manually port them. They're in your git history; copy them over.
-4. **Running `ref set` to silence a mismatch.** Always understand why the mismatch exists first.
+1. **Reading `migration status` without `--ref` for a deploy question.** That asks *"can this branch's contract reach the head?"*, not *"what's about to run on staging?"*. Always pass the ref when the question is about a specific environment.
+2. **Reading `migration status` without `--db` for a deploy question.** Without a live DB, you have no origin. The output lists what's on disk; it can't say what's applied on the environment. Pass `--db $URL` for any high-stakes question.
+3. **Confusing the ref with a DB connection.** `--ref staging` selects the destination hash, not the database. Pass both `--ref` and `--db` explicitly.
+4. **Treating diamond convergence as a special procedure.** It's not. It's the normal *edit → plan → apply* loop applied to the post-rebase state. The only extra step is *"port any data-transform logic from your old `migration.ts` over."*
+5. **Running `ref set` to silence a CI mismatch without understanding the cause.** That can mask out-of-band changes or rollback drift. Investigate first.
 
 ## What Prisma Next doesn't do yet
 
-- **Per-environment migration ordering control beyond the default chain.** If you need staging to skip a migration that production requires (or vice versa), the recommended path is to author the per-env divergence as two separate migrations and gate one in your deploy script. If you need first-class per-env migration routing, file a feature request via the `prisma-next-feedback` skill.
-- **A built-in "branch diff" view of migrations.** Workaround named above (run `migration status` on both branches, `diff`). If you need built-in branch comparison, file a feature request via the `prisma-next-feedback` skill.
+- **Per-environment migration ordering beyond the default chain.** If you need staging to skip a migration that production requires (or vice versa), the supported path is to author the per-env divergence as separate migrations and gate them in your deploy script. If you want first-class per-env routing, file a feature request via the `prisma-next-feedback` skill.
+- **A built-in side-by-side "branch diff" view.** There is a full-graph render (`migration status --graph`) that shows branches, but no `git diff`-style comparison between two branches' migration sets. Workaround: run `migration status` on each branch and `diff` the output. If you want a built-in branch-comparison view, file a feature request via the `prisma-next-feedback` skill.
 
 ## Reference Files
 
-- `references/refs-json-format.md` — exact shape of `migrations/refs.json`.
-- `references/diamond-convergence-walkthrough.md` — the 5-step procedure with full git + PN command output.
-- `references/ci-integration-recipes.md` — drop-in workflow files for common CI providers.
+This skill is intentionally body-only; the underlying CLI reference (`prisma-next migration status --help`, `migration apply --help`, `migration ref --help`) is the authoritative surface for flag-level detail. When in doubt, run `--help` and read the actual command's description rather than guessing from this skill.
 
 ## Checklist
 
-- [ ] Identified the target environment (staging / production / other).
-- [ ] Confirmed a ref exists for that environment, or set one.
-- [ ] Ran `migration status --ref <env>` to see what's pending.
-- [ ] For high-stakes questions, also passed `--db "$<ENV>_DATABASE_URL"` to consult the live DB.
-- [ ] Flagged data transforms, destructive ops, and long-running ops in the pending list.
-- [ ] For diamond convergence: rebased, deleted local migration, replanned, ported transforms, re-emitted.
-- [ ] Did NOT blindly `ref set` to silence a mismatch.
-- [ ] Did NOT confuse "what's applied locally" with "what will run on deploy".
+- [ ] Named both the **origin** (live DB marker) and the **destination** (ref or contract head) for the question the user asked.
+- [ ] Passed `--db $URL` whenever the question involves a specific environment.
+- [ ] Passed `--ref <name>` whenever the question is about deploying *to* a named environment, not just *from* the current branch's head.
+- [ ] Read the `migration status` header (it names config, ref, database) and the summary line (it names the origin/destination distance) before reading the per-edge list.
+- [ ] For concurrent-migration conflicts: re-applied the *core* workflow (edit → plan → apply) rather than following a memorised "diamond convergence" procedure. Ported any data-transform logic from the abandoned `migration.ts` over.
+- [ ] For a ref-mismatch: investigated *which* piece of state is wrong (DB ahead, DB behind, DB on a divergent branch). Did NOT `ref set` to silence the mismatch.
+- [ ] Flagged destructive ops and long-running ops in the pending list before the user merges or deploys.
+- [ ] Did NOT confuse `--ref` with database selection.
+- [ ] Did NOT confabulate a "branch diff" CLI subcommand, a `migration revalidate` step, or any other API the skill above doesn't reference.
