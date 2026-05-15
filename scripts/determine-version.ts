@@ -26,8 +26,8 @@
 
 import { execFileSync, execSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
-import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'pathe';
 import { assertCanonicalBase } from './determine-version-utils.ts';
 
 const PACKAGE_NAME = process.argv[2] ?? '@prisma-next/contract';
@@ -37,10 +37,10 @@ interface VersionResult {
   tag: string;
 }
 
-const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function readRootVersion(): string {
-  const pkgPath = path.join(rootDir, 'package.json');
+  const pkgPath = join(rootDir, 'package.json');
   const parsed = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version?: unknown };
   if (typeof parsed.version !== 'string' || parsed.version.length === 0) {
     throw new Error(

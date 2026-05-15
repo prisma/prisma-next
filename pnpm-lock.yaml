@@ -77,6 +77,9 @@ importers:
       lint-staged:
         specifier: ^16.2.6
         version: 16.4.0
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       pkg-pr-new:
         specifier: 0.0.71
         version: 0.0.71

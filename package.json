@@ -54,12 +54,13 @@
     "gray-matter": "catalog:",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
+    "pathe": "^2.0.3",
+    "pkg-pr-new": "0.0.71",
     "tslib": "^2.8.1",
     "tsx": "^4.20.6",
     "turbo": "^2.6.1",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "pkg-pr-new": "0.0.71"
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=24"

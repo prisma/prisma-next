@@ -18,11 +18,11 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'pathe';
 import { assertCanonicalBase, computeNextMinor } from './determine-version-utils.ts';
 
-const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function readRootVersionAtHead(): string {
   const json = execFileSync('git', ['show', 'HEAD:package.json'], {
@@ -49,7 +49,7 @@ console.log(`Current root version (HEAD): ${currentVersion}`);
 console.log(`Next minor version:          ${nextVersion}`);
 console.log('');
 
-const setVersionScript = path.join(rootDir, 'scripts', 'set-version.ts');
+const setVersionScript = join(rootDir, 'scripts', 'set-version.ts');
 execFileSync('node', [setVersionScript, nextVersion], {
   cwd: rootDir,
   stdio: 'inherit',
