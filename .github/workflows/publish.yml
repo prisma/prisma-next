@@ -102,6 +102,14 @@ jobs:
       - name: Check publish dependency specifiers
         run: pnpm check:publish-deps
 
+      # Publish-time gate: ensures every substrate change since the previous
+      # `v[0-9]*` tag is accompanied by a matching upgrade-instructions
+      # directory in the user-skill / extension-upgrade-skill packages, and
+      # that any newly added entries land in the in-flight transition
+      # directory. See `scripts/check-upgrade-coverage.mjs`.
+      - name: Check upgrade-instruction coverage
+        run: pnpm check:upgrade-coverage --mode publish
+
       # Both publish paths fan out across `PUBLISH_CONCURRENCY` workers
       # (default 8) via `scripts/publish-packages.mjs`. `pnpm -r publish` is
       # intentionally serialized (it rejects `--workspace-concurrency`

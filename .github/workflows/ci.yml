@@ -31,6 +31,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # `check:upgrade-coverage` diffs HEAD against `origin/main`; needs
+          # enough history for `git diff origin/main..HEAD` to resolve.
+          fetch-depth: 0
+      - name: Fetch base branch (origin/main)
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
       - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:
           cache: true
@@ -53,8 +59,10 @@ jobs:
         run: pnpm lint:manifests
       - name: Lint workflow triggers (forbid Pwn Request pattern)
         run: pnpm lint:workflows
-      - name: Test workflow-triggers lint
+      - name: Test scripts/
         run: pnpm test:scripts
+      - name: Check upgrade-instruction coverage
+        run: pnpm check:upgrade-coverage --mode pr
 
   fixtures:
     name: Fixtures
