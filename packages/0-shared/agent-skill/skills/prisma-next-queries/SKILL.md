@@ -1,6 +1,6 @@
 ---
 name: prisma-next-queries
-description: Write Prisma Next queries — pick a lane (`db.orm.<Model>` for CRUD and includes, `db.sql.<table>` SQL builder for set-builder shapes the ORM doesn't express), filter / project / sort / paginate, eager-load relations with `.include(...)`, transactions via `db.transaction(...)`, aggregates via `.aggregate(...)`. Use for query, where, select, orderBy, take, skip, include, eager load, first, all, count, aggregate, create, update, delete, upsert, returning, transaction, db.transaction, drizzle-style, kysely-style, prisma client.
+description: Write Prisma Next queries — pick a lane (`db.orm.<Model>` for CRUD and includes, `db.sql.<table>` SQL builder for set-builder shapes the ORM doesn't express), filter / project / sort / paginate, eager-load relations with `.include(...)`, transactions via `db.transaction(...)`, aggregates via `.aggregate(...)`. Use for query, where, select, orderBy, take, skip, include, eager load, first, all, count, aggregate, create, update, delete, upsert, returning, transaction, db.transaction, drizzle-style, kysely-style, prisma client. Also covers result consumption (`.all()` is a Thenable — just `await` it; no `collect()` / `toArray()` helper needed), single-consumption semantics (`RUNTIME.ITERATOR_CONSUMED`), aggregate nullability (`count` returns `number`, `sum/avg/min/max` return `number | null` per SQL semantics), and range conditions (chain `.where()` clauses or use `and(...)` — there is no `.between(...)`).
 ---
 
 # Prisma Next — Queries
@@ -82,6 +82,24 @@ db.orm.User.where({ kind: 'admin' });
 
 Operators on the field proxy include `.eq`, `.neq`, `.lt`, `.lte`, `.gt`, `.gte`, `.like`, `.ilike`, `.in([...])`, `.isNull()`, `.isNotNull()`. Extensions add target-specific operators on extension-typed columns (`pgvector`'s `.cosineDistance(...)`, `postgis`'s `.within(...)` / `.intersectsBbox(...)` / `.distanceSphere(...)`, `cipherstash`'s `.cipherstashEq(...)` / `.cipherstashGt(...)` / …).
 
+**There is no `.between(a, b)` operator.** Express ranges either as two chained `.where(...)` clauses (the idiomatic form — clauses AND-compose) or with the `and(...)` combinator inside one clause:
+
+```typescript
+// Chained .where() — each clause AND-composes with the previous one.
+await db.orm.Sale
+  .where((s) => s.day.gte(start))
+  .where((s) => s.day.lte(end))
+  .all();
+
+// Equivalent with an explicit `and(...)` inside one clause.
+import { and } from '@prisma-next/sql-orm-client'; // façade re-export pending — see *What PN doesn't do yet*
+await db.orm.Sale
+  .where((s) => and(s.day.gte(start), s.day.lte(end)))
+  .all();
+```
+
+The two forms emit the same SQL. Pick chained `.where()` when each clause adds a separate condition that reads as its own thought; pick `and(...)` when one logical predicate happens to have two parts and you want the visual grouping. Don't reach for a `between` helper — there isn't one.
+
 **Combinators** (`and`, `or`, `not`) compose predicates, and **relation predicates** (`.some(...)`, `.none(...)`, `.every(...)`) recurse into a relation. These currently come from the internal `@prisma-next/sql-orm-client` package — see *What Prisma Next doesn't do yet* for the façade-completeness gap:
 
 ```typescript
@@ -116,6 +134,57 @@ await db.orm.Post
 ```
 
 **`.first()` vs `.first({ pk })` vs `.all()`.** Use `.first()` for a single row (issues a `LIMIT 1`); use `.first({ pk })` for primary-key lookups; reserve `.all()` for the genuine many case (no implicit `LIMIT`).
+
+### Consuming the result: `await`, `.toArray()`, or `for await`
+
+Critical to get right early — `.all()` returns an **`AsyncIterableResult<Row>`**, which is *both* a `PromiseLike<Row[]>` and an `AsyncIterable<Row>`. That means three consumption forms all work, and the canonical one is the shortest:
+
+```typescript
+const users = await db.orm.User.select('id', 'email').all();
+//    ^? Row[]   ← the Thenable resolves to a real array. This is the default idiom.
+```
+
+You do **not** need a `collect()` / `toArray()` helper — `await` is enough. Internally `await` invokes the result's `then(...)`, which buffers the rows into an array. Two equivalent alternatives exist for the cases where they read better:
+
+```typescript
+// Explicit buffering — same outcome as `await ... .all()`, useful when you
+// want a named Promise<Row[]> to thread through downstream code.
+const rows: Promise<User[]> = db.orm.User.select('id', 'email').all().toArray();
+
+// Streaming — process rows one at a time without buffering the whole result.
+// Use for genuinely large result sets (anything that wouldn't fit comfortably
+// in memory) or pipelines where you can start work before all rows arrive.
+for await (const user of db.orm.User.select('id', 'email').all()) {
+  process(user);
+}
+```
+
+Two single-row shortcuts also exist on the result, in addition to the collection-level `.first()` (which issues `LIMIT 1`):
+
+```typescript
+const user = await db.orm.User.where({ id }).all().first();
+//    ^? Row | null   ← buffers, returns the first row or null. Issues no LIMIT.
+const required = await db.orm.User.where({ id }).all().firstOrThrow();
+//    ^? Row          ← buffers; throws `RUNTIME.NO_ROWS` if empty.
+```
+
+For genuine single-row reads, prefer the *collection*-level `.first()` (which adds `LIMIT 1` to the SQL) over `.all().first()` (which fetches all rows and discards the rest). The result-level helpers are for cases where you already need the full result and want the first row without an extra round-trip.
+
+**The result is single-consumption.** Each `AsyncIterableResult` instance can be consumed once — by `await`, by `.toArray()`, or by `for await`. Trying to consume it a second time throws **`RUNTIME.ITERATOR_CONSUMED`**. The fix is almost always to store the array in a variable on first consumption and reuse the variable:
+
+```typescript
+// Bad — second await throws RUNTIME.ITERATOR_CONSUMED.
+const result = db.orm.User.select('id', 'email').all();
+const a = await result;
+const b = await result;
+
+// Good — buffer once, reuse the array.
+const users = await db.orm.User.select('id', 'email').all();
+const a = users;
+const b = users;
+```
+
+If you've seen `collect(...)` / `toArray(...)` helpers in a codebase wrapping `.all()`, they're vestigial — `await` does the same thing for free. Remove them when you touch the surrounding code.
 
 ## Workflow — Eager-loading relations (`.include`)
 
@@ -194,6 +263,29 @@ const byKind = await db.orm.User
 ```
 
 `aggregate` exposes `.count()`, `.sum(field)`, `.avg(field)`, `.min(field)`, `.max(field)`. Project the aggregates into named result keys; the result type narrows accordingly.
+
+**Aggregate nullability matches SQL semantics:**
+
+| Aggregate | Type | Empty result |
+|---|---|---|
+| `count()` | `number` | `0` |
+| `sum(field)` | `number \| null` | `null` (SQL `SUM` over zero rows is `NULL`) |
+| `avg(field)` | `number \| null` | `null` |
+| `min(field)` | `number \| null` | `null` |
+| `max(field)` | `number \| null` | `null` |
+
+This isn't a typing bug — it's faithful to what the database returns. Coalesce client-side when you want zero-fill:
+
+```typescript
+const revenue = await db.orm.Sale
+  .where((s) => s.day.gte(start))
+  .aggregate((a) => ({ total: a.sum('amount') }));
+// revenue.total: number | null
+
+const safe = revenue.total ?? 0;   // ← apply at the consumption site, not in the aggregate spec.
+```
+
+If `?? 0` is showing up on every aggregate, that's a signal you're calling `sum` (or peers) over potentially-empty filters — which is exactly when SQL returns NULL. The pattern is correct; the typing is honest.
 
 ## Workflow — SQL builder (`db.sql.<table>`)
 
@@ -287,16 +379,22 @@ The callback's return value passes through `db.transaction(...)`. Capture insert
 
 1. **Reaching for `db.sql` when `db.orm` would have done.** The ORM covers most CRUD shapes; the SQL builder is the seam for the shapes it doesn't. Default to the ORM.
 2. **Using `.all()` when you wanted one row.** `.all()` issues no implicit `LIMIT`. Use `.first()` (issues `LIMIT 1`) or `.first({ pk })`.
-3. **Importing `and` / `or` / `not` from a façade subpath.** The combinators currently live in `@prisma-next/sql-orm-client` — an internal package. See *What Prisma Next doesn't do yet*.
-4. **Trying to `db.sql.from(tables.user)`.** That surface does not exist. The builder is table-shaped: `db.sql.<tableName>.select(...)`. There is no `db.schema.tables` either.
-5. **Trying to `db.execute(plan)` directly.** Plans execute through the runtime: `db.runtime().execute(plan)`. Inside a transaction, use `tx.execute(plan)`.
-6. **Setting `capabilities: { includeMany: true }` in `prisma-next.config.ts`.** `defineConfig` does not take `capabilities`. Capabilities are declared by the active adapter and become part of the emitted contract; the Postgres adapter advertises `lateral`, `jsonAgg`, and `returning` out of the box. Enable extension capabilities through `extensions: [...]` in the config (see `prisma-next-contract`).
-7. **Confabulating a `db.sql.raw\`...\``, TypedSQL, or `.stream()` surface.** None of those exist today. See *What Prisma Next doesn't do yet*.
-8. **Mixing the ORM mutation return with `db.execute(plan)`.** The ORM's terminal verbs (`.create`, `.update`, `.delete`, `.first`, `.all`, `.aggregate`) issue the query themselves and return rows. Don't pass the builder to `db.runtime().execute(...)` — that's for SQL-builder plans.
+3. **Writing a `collect()` / `toArray()` helper to convert `.all()` to an array.** `.all()` returns an `AsyncIterableResult<Row>` which *is* a `PromiseLike<Row[]>` — `await collection.all()` directly yields `Row[]`. The helpers some codebases ship are vestigial. See *Consuming the result*.
+4. **Consuming an `AsyncIterableResult` twice.** Each result is single-use. The second consumer throws `RUNTIME.ITERATOR_CONSUMED`. Buffer once into a variable and reuse the variable.
+5. **Coalescing `count()` with `?? 0` "just in case".** `count()` is `number`, not `number | null` — the runtime already substitutes `0` for the empty case. The `?? 0` belongs on `sum` / `avg` / `min` / `max`, whose `number | null` shape is faithful to SQL semantics over empty result sets.
+6. **Reaching for `.between(a, b)` on a field proxy.** It doesn't exist. Either chain `.where((m) => m.field.gte(a)).where((m) => m.field.lte(b))` or use `and(m.field.gte(a), m.field.lte(b))` inside one `.where()` clause.
+7. **Importing `and` / `or` / `not` from a façade subpath.** The combinators currently live in `@prisma-next/sql-orm-client` — an internal package. See *What Prisma Next doesn't do yet*.
+8. **Trying to `db.sql.from(tables.user)`.** That surface does not exist. The builder is table-shaped: `db.sql.<tableName>.select(...)`. There is no `db.schema.tables` either.
+9. **Trying to `db.execute(plan)` directly.** Plans execute through the runtime: `db.runtime().execute(plan)`. Inside a transaction, use `tx.execute(plan)`.
+10. **Setting `capabilities: { includeMany: true }` in `prisma-next.config.ts`.** `defineConfig` does not take `capabilities`. Capabilities are declared by the active adapter and become part of the emitted contract; the Postgres adapter advertises `lateral`, `jsonAgg`, and `returning` out of the box. Enable extension capabilities through `extensions: [...]` in the config (see `prisma-next-contract`).
+11. **Confabulating a `db.sql.raw\`...\``, TypedSQL, or `.stream()` surface.** None of those exist today. See *What Prisma Next doesn't do yet*.
+12. **Mixing the ORM mutation return with `db.execute(plan)`.** The ORM's terminal verbs (`.create`, `.update`, `.delete`, `.first`, `.all`, `.aggregate`) issue the query themselves and return rows. Don't pass the builder to `db.runtime().execute(...)` — that's for SQL-builder plans.
+13. **Top-N grouped queries written as `groupBy(...).aggregate(...).sort().slice()` in JS.** That's a fallback because the grouped collection doesn't expose `.orderBy(...)` / `.take(...)` (see *What PN doesn't do yet*). Fine at small cardinalities; for genuinely large grouped result sets, drop to `db.sql.<table>` and write `GROUP BY` + `ORDER BY` + `LIMIT` against the table directly.
 
 ## What Prisma Next doesn't do yet
 
 - **`and` / `or` / `not` combinators in the postgres façade.** The combinators currently import from `@prisma-next/sql-orm-client` (an internal package). Tracked alongside other façade-completeness gaps in Linear `TML-2526`. Workaround today: import them from `@prisma-next/sql-orm-client` directly, the way the example apps do. If you want them on `@prisma-next/postgres/runtime`, file a feature request via `prisma-next-feedback`.
+- **`.orderBy(...)` / `.take(...)` on grouped aggregates.** `db.orm.<Model>.groupBy(...).aggregate(...)` materializes a `Promise<Array<Group & Aggregates>>` and exposes neither ordering nor row limits at the DB layer. Result: a "top-N groups by SUM" query falls back to JS-side sort + slice over the full grouped result, which is fine at small cardinalities and bad at scale. Workarounds: (a) drop to `db.sql.<table>` and write the `GROUP BY` + `ORDER BY` + `LIMIT` against the aggregated table directly; (b) live with the JS-side sort/slice if the grouped cardinality is bounded. File a feature request via `prisma-next-feedback` if this is hitting you in production.
 - **A raw-SQL lane.** Prisma Next does not currently expose a user-facing raw-SQL surface (no `db.sql.raw\`SELECT ...\``). Workaround: model the query through the SQL builder or — for shapes the builder can't yet express — file a feature request via `prisma-next-feedback` describing the shape so the team can decide whether to grow the builder or ship a raw lane.
 - **TypedSQL (`.sql` files compiled into typed callables).** Not implemented. Workaround: stick to the SQL builder; for repeated queries, extract a function that returns the built plan and call `db.runtime().execute(plan)` at the call site. If you want a `.sql`-file compile path, file a feature request via `prisma-next-feedback`.
 - **`EXPLAIN` / query-plan inspection.** Prisma Next does not expose an `.explain()` method. Workaround: connect a `pg.Pool` you control via the runtime's `pg:` binding (see `prisma-next-runtime`) and issue `EXPLAIN ANALYZE` through it. If you want a first-class plan-inspection surface, file a feature request via `prisma-next-feedback`.
@@ -316,8 +414,12 @@ This skill is intentionally body-only. The authoritative surfaces are:
 
 - [ ] Chose the right lane (ORM by default; SQL builder for set-builder shapes the ORM doesn't express).
 - [ ] Used `.first()` / `.first({ pk })` for single-row reads — not `.all()`.
-- [ ] For ORM combinators, imported `and` / `or` / `not` from the (currently internal) `@prisma-next/sql-orm-client` and noted the gap to the user.
+- [ ] Consumed `.all()` with plain `await` (not a `collect()` / `toArray()` helper). Used `for await` only when streaming is actually wanted, and never iterated the same result twice.
+- [ ] Coalesced `sum` / `avg` / `min` / `max` results with `?? 0` (or similar) at the consumption site when zero-fill is desired — did NOT coalesce `count()`, which is `number`.
+- [ ] Expressed ranges as chained `.where(...)` clauses or a single `and(...)` clause — did NOT reach for a non-existent `.between(...)` operator.
+- [ ] For ORM combinators, imported `and` / `or` / `not` from the (currently internal) `@prisma-next/sql-orm-client` and noted the façade gap to the user.
 - [ ] Executed SQL-builder plans via `db.runtime().execute(plan)` (or `tx.execute(plan)` inside a transaction).
 - [ ] Wrapped multi-statement work in `db.transaction(async (tx) => { ... })` where atomicity matters.
-- [ ] Did NOT confabulate `db.sql.raw`, TypedSQL, `.stream()`, `db.batch`, a `capabilities` field on `defineConfig`, or a `db.sql.from(tables.user)` API — routed to *What Prisma Next doesn't do yet* / `prisma-next-feedback` instead.
+- [ ] Did NOT confabulate `db.sql.raw`, TypedSQL, `.stream()`, `db.batch`, `.between(...)`, a `capabilities` field on `defineConfig`, or a `db.sql.from(tables.user)` API — routed to *What Prisma Next doesn't do yet* / `prisma-next-feedback` instead.
+- [ ] For top-N grouped aggregates at meaningful scale, dropped to `db.sql.<table>` rather than JS-side sort + slice over `groupBy(...).aggregate(...)`.
 - [ ] Did NOT use the SQL builder for something the ORM cleanly expresses.
