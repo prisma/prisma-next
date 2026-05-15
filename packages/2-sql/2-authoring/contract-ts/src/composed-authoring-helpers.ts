@@ -134,12 +134,11 @@ export type ComposedAuthoringHelpers<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-> = {
-  readonly entities: EntityHelpersFromNamespace<
-    ExtractEntitiesNamespaceFromPack<Family> &
-      ExtractEntitiesNamespaceFromPack<Target> &
-      MergeExtensionEntityNamespaces<ExtensionPacks>
-  >;
+> = EntityHelpersFromNamespace<
+  ExtractEntitiesNamespaceFromPack<Family> &
+    ExtractEntitiesNamespaceFromPack<Target> &
+    MergeExtensionEntityNamespaces<ExtensionPacks>
+> & {
   readonly field: CoreFieldHelpers &
     FieldHelpersFromNamespace<
       ExtractFieldNamespaceFromPack<Family> &
@@ -213,6 +212,26 @@ function composeEntityNamespace(
   return merged as AuthoringEntityTypeNamespace;
 }
 
+/**
+ * Reserved top-level keys on the composed helpers surface — the
+ * built-in `model` / `rel` helpers, the `field` / `type` namespace
+ * objects. Pack-contributed entity types are flattened to the same
+ * top-level shape (e.g. `helpers.enum({...})`), so a pack cannot
+ * contribute an entity type whose name collides with one of these
+ * reserved keys without silently overwriting at runtime. Detect the
+ * collision at compose time and fail loudly with a guidance message.
+ */
+const RESERVED_HELPER_KEYS: readonly string[] = ['field', 'model', 'rel', 'type'];
+
+function assertNoBuiltInEntityCollisions(namespace: AuthoringEntityTypeNamespace): void {
+  const collisions = Object.keys(namespace).filter((name) => RESERVED_HELPER_KEYS.includes(name));
+  if (collisions.length > 0) {
+    throw new Error(
+      `Pack-contributed entity type(s) ${collisions.map((c) => `"${c}"`).join(', ')} collide with the reserved built-in helper key(s) on the composed helpers surface. Reserved keys: ${RESERVED_HELPER_KEYS.map((k) => `"${k}"`).join(', ')}.`,
+    );
+  }
+}
+
 function createComposedFieldHelpers(
   fieldNamespace: AuthoringFieldNamespace,
 ): CoreFieldHelpers & Record<string, unknown> {
@@ -271,9 +290,10 @@ export function createComposedAuthoringHelpers<
   // Mirrors the call in `assembleAuthoringContributions`: PSL composes via
   // `createControlStack`, the TS DSL composes here. Both seams need the guard.
   assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace, entityNamespace);
+  assertNoBuiltInEntityCollisions(entityNamespace);
 
   return {
-    entities: createEntityHelpersFromNamespace(entityNamespace, {
+    ...createEntityHelpersFromNamespace(entityNamespace, {
       ctx: { family: options.family.familyId, target: options.target.targetId },
     }),
     field: createComposedFieldHelpers(fieldNamespace),

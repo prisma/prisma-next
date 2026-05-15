@@ -10,8 +10,13 @@ import { instantiateAuthoringEntityType } from '@prisma-next/framework-component
  * authoring contributions. The per-namespace shape (`field`, `type`,
  * `entityTypes`) is parameterized by the discriminator key so each
  * namespace can reuse the same extractor + cross-pack merger without
- * re-deriving the template per family. Call sites map merged
- * `entityTypes` into the user-facing `helpers.entities` runtime object.
+ * re-deriving the template per family. Call sites flatten merged
+ * `entityTypes` onto the user-facing top-level helpers surface
+ * alongside the built-in `model` / `rel` (e.g. `helpers.enum(...)`).
+ * The contribution data structure stays as
+ * `authoring.entityTypes.<name>` — pack authors keep contributing
+ * through the namespace; the composed-helpers template performs the
+ * rename in the type system.
  *
  * SQL-specific composition (the `field` / `model` / `rel` / `type` core
  * helpers, the SQL index-types merge) lives in the SQL contract-ts

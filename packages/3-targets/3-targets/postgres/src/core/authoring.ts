@@ -10,15 +10,19 @@ import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-ty
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
 
 /**
- * Entity type contributions surface through the runtime `helpers.entities.*`
- * helpers (merged from each pack's `authoring.entityTypes`).
+ * Entity type contributions surface as top-level helpers on the
+ * composed-helpers shape (e.g. `helpers.enum({...})`), flattened
+ * alongside the built-in `model` / `rel` helpers. Pack contributions
+ * still ship via the contribution data structure
+ * `authoring.entityTypes.<name>`; the composed-helpers template
+ * performs the rename in the type system.
  *
  * `enum` is the first real consumer of the entities-namespace mechanism:
  * the factory constructs a `PostgresEnumType` IR-class instance from
  * the user-supplied input. Both authoring runtimes (TS DSL and PSL)
  * dispatch through this single contribution — PSL `enum Status { … }`
  * declarations are lowered by the interpreter into a factory call
- * with the parsed name + value list; TS DSL `helpers.entities.enum({...})`
+ * with the parsed name + value list; TS DSL `helpers.enum({...})`
  * resolves through the same path. Removing this contribution makes
  * both surfaces fail with a "no entity helper named `enum`" type
  * error at the contract-definition site.

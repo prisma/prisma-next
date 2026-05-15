@@ -181,14 +181,15 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
 
   if (!input.enumEntityDescriptor) {
     // The PSL `enum X { … }` syntax only resolves when the active
-    // pack composition contributes an `entities.enum` factory (the
-    // Postgres target pack does so today). Without the contribution
-    // we surface a diagnostic per declaration rather than silently
+    // pack composition contributes an `enum` entity-type factory (the
+    // Postgres target pack does so today via
+    // `authoring.entityTypes.enum`). Without the contribution we
+    // surface a diagnostic per declaration rather than silently
     // swallowing the syntax.
     for (const enumDeclaration of input.enums) {
       input.diagnostics.push({
         code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
-        message: `Enum "${enumDeclaration.name}" requires the active target pack to contribute an entities.enum helper`,
+        message: `Enum "${enumDeclaration.name}" requires the active target pack to contribute an enum entity-type helper`,
         sourceId: input.sourceId,
         span: enumDeclaration.span,
       });
@@ -207,7 +208,7 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
     });
     const values = enumDeclaration.values.map((value) => value.name);
     const constructed = instantiateAuthoringEntityType(
-      'entities.enum',
+      'enum',
       input.enumEntityDescriptor,
       [{ name: enumDeclaration.name, nativeType, values }],
       input.entityContext,
@@ -215,7 +216,7 @@ function processEnumDeclarations(input: ProcessEnumDeclarationsInput): {
     if (!isPostgresEnumStorageEntry(constructed)) {
       input.diagnostics.push({
         code: 'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
-        message: `Enum "${enumDeclaration.name}": entities.enum factory must return a PostgresEnumStorageEntry-shaped value (kind: 'postgres-enum')`,
+        message: `Enum "${enumDeclaration.name}": enum entity-type factory must return a PostgresEnumStorageEntry-shaped value (kind: 'postgres-enum')`,
         sourceId: input.sourceId,
         span: enumDeclaration.span,
       });

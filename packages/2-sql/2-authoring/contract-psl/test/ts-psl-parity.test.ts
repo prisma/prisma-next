@@ -259,9 +259,9 @@ model Post {
 
 const representativeTsAuthoring = `defineContract(
   { family: sqlFamilyPack, target: portablePostgresTargetPack, extensionPacks: { pgvector: pgvectorExtensionPack } },
-  ({ entities, type, field, model, rel }) => {
+  ({ enum: enumEntity, type, field, model, rel }) => {
     const types = {
-      Role: entities.enum({ name: 'Role', values: ['USER', 'ADMIN'] as const }),
+      Role: enumEntity({ name: 'Role', values: ['USER', 'ADMIN'] as const }),
       Embedding1536: type.pgvector.Vector(1536),
     } as const;
     const User = model('User', {
@@ -297,9 +297,9 @@ function buildTsContract() {
       target: portablePostgresTargetPack,
       extensionPacks: { pgvector: pgvectorExtensionPack },
     },
-    ({ entities, type, field, model, rel }) => {
+    ({ enum: enumEntity, type, field, model, rel }) => {
       const types = {
-        Role: entities.enum({ name: 'Role', values: ['USER', 'ADMIN'] as const }),
+        Role: enumEntity({ name: 'Role', values: ['USER', 'ADMIN'] as const }),
         Embedding1536: type.pgvector.Vector(1536),
       } as const;
 

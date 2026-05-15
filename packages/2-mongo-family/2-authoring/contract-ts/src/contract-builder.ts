@@ -554,12 +554,11 @@ export type ContractAuthoringHelpers<
   Family extends FamilyPackRef<string> = FamilyPackRef<string>,
   Target extends TargetPackRef<string, string> = TargetPackRef<string, string>,
   ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
-> = {
-  readonly entities: EntityHelpersFromNamespace<
-    ExtractEntitiesNamespaceFromPack<Family> &
-      ExtractEntitiesNamespaceFromPack<Target> &
-      MergeExtensionEntityNamespaces<ExtensionPacks>
-  >;
+> = EntityHelpersFromNamespace<
+  ExtractEntitiesNamespaceFromPack<Family> &
+    ExtractEntitiesNamespaceFromPack<Target> &
+    MergeExtensionEntityNamespaces<ExtensionPacks>
+> & {
   readonly field: typeof field;
   readonly index: typeof index;
   readonly model: typeof model;
@@ -574,6 +573,14 @@ type AuthoringComponent = {
 function extractEntitiesNamespace(component: AuthoringComponent): AuthoringEntityTypeNamespace {
   return (component.authoring?.entityTypes ?? {}) as AuthoringEntityTypeNamespace;
 }
+
+const MONGO_RESERVED_HELPER_KEYS: readonly string[] = [
+  'field',
+  'index',
+  'model',
+  'rel',
+  'valueObject',
+];
 
 function composeMongoEntityHelpers(
   family: FamilyPackRef<string>,
@@ -597,6 +604,18 @@ function composeMongoEntityHelpers(
   // any future field / type contributions surface a structurally identical
   // collision error.
   assertNoCrossRegistryCollisions({}, {}, merged as AuthoringEntityTypeNamespace);
+  // Pack-contributed entity types flatten onto the same top-level shape
+  // as the built-in helpers (`model`, `rel`, `field`, `index`,
+  // `valueObject`). Detect collisions explicitly so a contributed name
+  // can't silently overwrite a built-in at runtime.
+  const collisions = Object.keys(merged).filter((name) =>
+    MONGO_RESERVED_HELPER_KEYS.includes(name),
+  );
+  if (collisions.length > 0) {
+    throw new Error(
+      `Pack-contributed entity type(s) ${collisions.map((c) => `"${c}"`).join(', ')} collide with the reserved built-in helper key(s) on the Mongo composed helpers surface. Reserved keys: ${MONGO_RESERVED_HELPER_KEYS.map((k) => `"${k}"`).join(', ')}.`,
+    );
+  }
   return createEntityHelpersFromNamespace(merged as AuthoringEntityTypeNamespace, {
     ctx: { family: family.familyId, target: target.targetId },
   });
@@ -1586,7 +1605,7 @@ export function defineContract(
     definition.extensionPacks,
   );
   const helpers = {
-    entities,
+    ...entities,
     field,
     index,
     model,

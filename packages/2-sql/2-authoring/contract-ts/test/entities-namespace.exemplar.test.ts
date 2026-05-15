@@ -13,8 +13,9 @@ import { defineContract } from '../src/contract-builder';
  * Demonstrates end-to-end:
  *
  *   1. type narrowing — a contributed entity surfaces at
- *      `helpers.entities.<name>(input)` with the contributed input type
- *      and the IR-class output type;
+ *      `helpers.<name>(input)` (flattened to top level alongside the
+ *      built-in `model` / `rel` helpers) with the contributed input
+ *      type and the IR-class output type;
  *   2. runtime construction — the helper call dispatches to the
  *      supplied factory, which returns a frozen IR-class instance via
  *      the framework's `freezeNode` affordance;
@@ -89,18 +90,18 @@ const demoEntitiesExtensionPack = {
 } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
 
 describe('entities namespace — synthetic pack exemplar', () => {
-  it('surfaces contributed entity helpers under helpers.entities with type-narrowed input/output', () => {
+  it('surfaces contributed entity helpers at the top level with type-narrowed input/output', () => {
     defineContract(
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
         extensionPacks: { demo: demoEntitiesExtensionPack },
       },
-      ({ entities, field, model }) => {
-        expectTypeOf(entities.demoEntity).parameters.toEqualTypeOf<[DemoEntityInput]>();
-        expectTypeOf(entities.demoEntity).returns.toEqualTypeOf<DemoEntity>();
+      ({ demoEntity, field, model }) => {
+        expectTypeOf(demoEntity).parameters.toEqualTypeOf<[DemoEntityInput]>();
+        expectTypeOf(demoEntity).returns.toEqualTypeOf<DemoEntity>();
 
-        const demo = entities.demoEntity({ name: 'audit', columns: ['id', 'message'] });
+        const demo = demoEntity({ name: 'audit', columns: ['id', 'message'] });
         expect(demo).toBeInstanceOf(DemoEntity);
         expect(Object.isFrozen(demo)).toBe(true);
 
@@ -123,8 +124,8 @@ describe('entities namespace — synthetic pack exemplar', () => {
         target: postgresTargetPack,
         extensionPacks: { demo: demoEntitiesExtensionPack },
       },
-      ({ entities, field, model }) => {
-        constructed = entities.demoEntity({ name: 'orders', columns: ['id', 'total'] });
+      ({ demoEntity, field, model }) => {
+        constructed = demoEntity({ name: 'orders', columns: ['id', 'total'] });
         return {
           models: {
             Marker: model('Marker', { fields: { id: field.text() } }),
@@ -143,17 +144,20 @@ describe('entities namespace — synthetic pack exemplar', () => {
     });
   });
 
-  it('omitting the contributing pack removes the helper from helpers.entities', () => {
+  it('omitting the contributing pack removes the helper from the helpers surface', () => {
     defineContract(
       {
         family: sqlFamilyPack,
         target: postgresTargetPack,
       },
-      ({ entities, field, model }) => {
-        expectTypeOf<keyof typeof entities>().toEqualTypeOf<never>();
+      (helpers) => {
+        // The `demoEntity` helper is contributed by `demoEntitiesExtensionPack`;
+        // omitting the pack removes it from the helpers shape entirely.
+        // @ts-expect-error helper is gone when the contributing pack is absent
+        helpers.demoEntity;
         return {
           models: {
-            Marker: model('Marker', { fields: { id: field.text() } }),
+            Marker: helpers.model('Marker', { fields: { id: helpers.field.text() } }),
           },
         };
       },
