@@ -5,12 +5,13 @@ import type {
   StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
-import type { IndexTypeRegistration } from '@prisma-next/sql-contract/index-types';
 import type { Namespace } from '@prisma-next/framework-components/ir';
+import type { IndexTypeRegistration } from '@prisma-next/sql-contract/index-types';
 import type {
   ContractWithTypeMaps,
   Index,
   ReferentialAction,
+  SqlEnumType,
   StorageTypeInstance,
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
@@ -109,7 +110,7 @@ type DefinitionModels<Definition> = Definition extends {
 type DefinitionTypes<Definition> = Definition extends {
   readonly types?: unknown;
 }
-  ? Present<Definition['types']> extends Record<string, StorageTypeInstance>
+  ? Present<Definition['types']> extends Record<string, StorageTypeInstance | SqlEnumType>
     ? Present<Definition['types']>
     : Record<never, never>
   : Record<never, never>;

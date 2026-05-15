@@ -4,7 +4,7 @@ import type {
   AuthoringFieldNamespace,
   AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
-import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { SqlEnumType } from '@prisma-next/sql-contract/types';
 import { PostgresEnumType, type PostgresEnumTypeInput } from './postgres-enum-type';
 
 export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespace;
@@ -24,25 +24,23 @@ export const postgresAuthoringTypes = {} as const satisfies AuthoringTypeNamespa
  * error at the contract-definition site.
  */
 /**
- * Factory return type erases the concrete `PostgresEnumType<TName,
- * TValues>` to `StorageTypeInstance` for the contract-builder's
- * declarative type inference. The runtime instance is still a
- * `PostgresEnumType` (so `instanceof SqlEnumType` checks in the
- * verifier / planner / serializer dispatch correctly); the type
- * erasure exists so contracts referencing `helpers.entities.enum(...)`
- * results in `storage.types` keep their inferred type expressible
- * without needing to import a target-internal class declaration.
- * Sharpening this to surface enum-specific narrowing in the
- * inferred contract type is a separable refinement to the
- * `EntityHelperFunction` shape without changing the contribution wiring.
+ * The factory constructs a `PostgresEnumType` instance natively — the
+ * `SqlStorage.types` slot accepts polymorphic IR (the framework
+ * `StorageType` alphabet), so no cast is needed at the contribution
+ * surface. The factory's declared return type is the family-level
+ * `SqlEnumType` abstract so the inferred contract type stays portable
+ * (it names a type exported from `@prisma-next/sql-contract/types`,
+ * a public surface every consumer already imports). Sharpening the
+ * inferred contract type to surface enum-specific narrowing through
+ * `EntityHelperFunction` is a separable refinement and lives outside
+ * this PR.
  */
 export const postgresAuthoringEntityTypes = {
   enum: {
     kind: 'entity',
     discriminator: 'sql-enum-type',
     output: {
-      factory: (input: PostgresEnumTypeInput): StorageTypeInstance =>
-        new PostgresEnumType(input) as unknown as StorageTypeInstance,
+      factory: (input: PostgresEnumTypeInput): SqlEnumType => new PostgresEnumType(input),
     },
   },
 } as const satisfies AuthoringEntityTypeNamespace;
