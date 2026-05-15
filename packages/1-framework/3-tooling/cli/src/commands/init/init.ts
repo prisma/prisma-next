@@ -11,6 +11,8 @@ import {
   detectPackageManager,
   formatAddArgs,
   formatAddDevArgs,
+  formatInstallArgs,
+  formatInstallCommand,
   formatRunCommand,
   hasProjectManifest,
   type PackageManager,
@@ -31,12 +33,15 @@ import {
   INIT_EXIT_PRECONDITION,
   INIT_EXIT_USER_ABORTED,
 } from './exit-codes';
+import { DenoManifestParseError, mergeDenoImports } from './hygiene-deno-manifest';
 import { mergeGitattributes, requiredGitattributesLines } from './hygiene-gitattributes';
 import { mergeGitignore } from './hygiene-gitignore';
 import {
   ensureEsmModuleType,
+  mergePackageDependencies,
   mergePackageScripts,
   REQUIRED_SCRIPTS,
+  type RequiredPackageDependency,
 } from './hygiene-package-scripts';
 import { type InitFlagOptions, type ResolvedInitInputs, resolveInitInputs } from './inputs';
 import {
@@ -72,6 +77,11 @@ interface InstallReport {
   readonly deps: readonly string[];
   readonly devDeps: readonly string[];
   readonly warnings: readonly string[];
+}
+
+interface InitDependencySet {
+  readonly deps: readonly string[];
+  readonly devDeps: readonly string[];
 }
 
 /**
@@ -247,12 +257,16 @@ export async function runInit(
   // When neither `package.json` nor a `deno.json[c]` is present, init
   // synthesises a minimal `package.json` (TML-2496) — running
   // `npm init -y` first was friction with no upside, since we always
-  // edit the file anyway. A `deno.json[c]` project is left alone:
+  // edit the file anyway. A `deno.json[c]` project keeps that manifest:
   // creating a `package.json` next to it would fork the project's
-  // dependency graph.
+  // dependency graph, so dependency metadata is merged into `imports`
+  // instead.
   const packageJsonPath = join(baseDir, 'package.json');
   const packageJsonExisted = existsSync(packageJsonPath);
   const synthesisePackageJson = !packageJsonExisted && !hasProjectManifest(baseDir);
+  let dependencySet = buildInitDependencySet(inputs.target, false);
+  let manifestDependenciesWritten = false;
+  let catalogScan: ReturnType<typeof detectPnpmCatalogOverrides> | null = null;
   let parsedPackageJson: Record<string, unknown> | null = null;
   if (packageJsonExisted || synthesisePackageJson) {
     const pkgRaw = packageJsonExisted
@@ -270,14 +284,22 @@ export async function runInit(
       }
       throw err;
     }
+    dependencySet = buildInitDependencySet(
+      inputs.target,
+      hasDirectDep(parsedPackageJson, '@types/node'),
+    );
+    catalogScan =
+      pm === 'pnpm'
+        ? detectPnpmCatalogOverrides(baseDir, [...dependencySet.deps, ...dependencySet.devDeps])
+        : null;
 
     // package.json edits are chained: FR9.2 facade-dep removal first
     // (so the later passes see the cleaned `dependencies` and we round
-    // out a single re-stringification), then FR3.5 / FR9.3 idempotent
-    // scripts merge with collision detection, then `"type": "module"`
-    // alignment so the ESM-only `with { type: 'json' }` import attribute
-    // in the scaffolded `prisma/db.ts` loads cleanly under Node's
-    // loader (TML-2494).
+    // out a single re-stringification), then manifest dependencies, then
+    // FR3.5 / FR9.3 idempotent scripts merge with collision detection,
+    // then `"type": "module"` alignment so the ESM-only `with { type:
+    // 'json' }` import attribute in the scaffolded `prisma/db.ts` loads
+    // cleanly under Node's loader (TML-2494).
     let workingPkg = pkgRaw;
     // A synthesised manifest is always a write — the file does not
     // exist on disk yet.
@@ -289,6 +311,15 @@ export async function runInit(
         pkgChanged = true;
       }
     }
+    const { content: depsPkg } = mergePackageDependencies(
+      workingPkg,
+      buildRequiredPackageDependencies(dependencySet, catalogScan),
+    );
+    if (depsPkg !== null) {
+      workingPkg = depsPkg;
+      pkgChanged = true;
+    }
+    manifestDependenciesWritten = true;
     const { content: nextPkg, warnings: scriptWarnings } = mergePackageScripts(
       workingPkg,
       REQUIRED_SCRIPTS,
@@ -313,6 +344,30 @@ export async function runInit(
       warnings.push(
         'No package.json found in the target directory; created a minimal one. Edit `name` / `version` to taste.',
       );
+    }
+  }
+
+  const denoManifestPath = findDenoManifest(baseDir);
+  if (!packageJsonExisted && !synthesisePackageJson && denoManifestPath !== null) {
+    const denoRaw = readFileSync(join(baseDir, denoManifestPath), 'utf-8');
+    try {
+      const { content: denoManifest } = mergeDenoImports(denoRaw, [
+        ...dependencySet.deps,
+        ...dependencySet.devDeps,
+      ]);
+      if (denoManifest !== null) {
+        filesToWrite.push({ path: denoManifestPath, content: denoManifest });
+      }
+      manifestDependenciesWritten = true;
+    } catch (err) {
+      if (err instanceof DenoManifestParseError) {
+        return emitError(
+          ui,
+          flags,
+          errorInitInvalidManifest({ path: denoManifestPath, cause: err.message }),
+        );
+      }
+      throw err;
     }
   }
 
@@ -363,13 +418,13 @@ export async function runInit(
     install = await runInstall({
       baseDir,
       pm,
-      target: inputs.target,
+      dependencySet,
       install: inputs.install,
       flags,
       ui,
       filesWritten,
-      hasTypesNode:
-        parsedPackageJson !== null ? hasDirectDep(parsedPackageJson, '@types/node') : false,
+      manifestDependenciesWritten,
+      catalogScan,
     });
   } catch (error) {
     if (CliStructuredError.is(error)) {
@@ -573,8 +628,65 @@ export function applyProbeOutcome(
   }
 }
 
+function buildInitDependencySet(
+  target: ResolvedInitInputs['target'],
+  hasTypesNode: boolean,
+): InitDependencySet {
+  const pkg = targetPackageName(target);
+  const deps = [pkg, 'dotenv'];
+  // FR2.1: under `moduleResolution: 'bundler'` (FR2.2) the scaffolded
+  // `db.ts` / `prisma-next.config.ts` reference `process.env`, which
+  // only typechecks with Node's ambient types in the resolution graph.
+  // Pin it as a devDep rather than relying on a transitive resolution
+  // through `dotenv` (whose types bundle is internal and not guaranteed
+  // across versions). Skip when the user already declares `@types/node`
+  // directly so a locked major (e.g. `^18` for a Node 18 runtime) is
+  // preserved.
+  const devDeps = hasTypesNode ? ['prisma-next'] : ['prisma-next', '@types/node'];
+
+  return { deps, devDeps };
+}
+
+function findDenoManifest(baseDir: string): 'deno.json' | 'deno.jsonc' | null {
+  if (existsSync(join(baseDir, 'deno.json'))) {
+    return 'deno.json';
+  }
+  if (existsSync(join(baseDir, 'deno.jsonc'))) {
+    return 'deno.jsonc';
+  }
+  return null;
+}
+
+function dependencyVersionSpecifier(
+  packageName: string,
+  catalogScan: ReturnType<typeof detectPnpmCatalogOverrides> | null,
+): string {
+  if (catalogScan?.entries.some((entry) => entry.name === packageName) === true) {
+    return 'catalog:';
+  }
+  return 'latest';
+}
+
+function buildRequiredPackageDependencies(
+  dependencySet: InitDependencySet,
+  catalogScan: ReturnType<typeof detectPnpmCatalogOverrides> | null,
+): RequiredPackageDependency[] {
+  return [
+    ...dependencySet.deps.map((name) => ({
+      name,
+      section: 'dependencies' as const,
+      version: dependencyVersionSpecifier(name, catalogScan),
+    })),
+    ...dependencySet.devDeps.map((name) => ({
+      name,
+      section: 'devDependencies' as const,
+      version: dependencyVersionSpecifier(name, catalogScan),
+    })),
+  ];
+}
+
 /**
- * Drives the `pnpm add` / `npm install` step. Failures are escalated to
+ * Drives the package-manager install step. Failures are escalated to
  * a structured `errorInitInstallFailed` (exit code 4) — the spec treats
  * an unrecoverable install as a hard outcome rather than a warning so
  * CI/agents can branch on the exit code (FR1.6).
@@ -588,37 +700,30 @@ export function applyProbeOutcome(
 async function runInstall(ctx: {
   readonly baseDir: string;
   readonly pm: Awaited<ReturnType<typeof detectPackageManager>>;
-  readonly target: ResolvedInitInputs['target'];
+  readonly dependencySet: InitDependencySet;
   readonly install: boolean;
   readonly flags: GlobalFlags;
   readonly ui: TerminalUI;
   readonly filesWritten: readonly string[];
-  /**
-   * FR2.1 — set when the user already declares `@types/node` directly in
-   * `dependencies` or `devDependencies`. We then skip adding it so a
-   * locked major (e.g. `^18` for a Node 18 runtime) survives `init`
-   * unchanged. Transitive presence is intentionally ignored: detecting
-   * it requires lockfile introspection and the realistic clobber risk
-   * is the direct-pin case.
-   */
-  readonly hasTypesNode: boolean;
+  readonly manifestDependenciesWritten: boolean;
+  readonly catalogScan: ReturnType<typeof detectPnpmCatalogOverrides> | null;
 }): Promise<InstallReport> {
-  const { baseDir, pm, target, install, flags, ui, filesWritten, hasTypesNode } = ctx;
-  const pkg = targetPackageName(target);
-  const deps = [pkg, 'dotenv'];
-  // FR2.1: under `moduleResolution: 'bundler'` (FR2.2) the scaffolded
-  // `db.ts` / `prisma-next.config.ts` reference `process.env`, which
-  // only typechecks with Node's ambient types in the resolution graph.
-  // Pin it as a devDep rather than relying on a transitive resolution
-  // through `dotenv` (whose types bundle is internal and not guaranteed
-  // across versions). Skip when the user already declares `@types/node`
-  // directly so a locked major (e.g. `^18` for a Node 18 runtime) is
-  // preserved. Listed last so the install log still leads with the
-  // user-relevant `prisma-next` line.
-  const devDeps = hasTypesNode ? ['prisma-next'] : ['prisma-next', '@types/node'];
+  const {
+    baseDir,
+    pm,
+    dependencySet,
+    install,
+    flags,
+    ui,
+    filesWritten,
+    manifestDependenciesWritten,
+    catalogScan,
+  } = ctx;
+  const { deps, devDeps } = dependencySet;
 
   const addCommand = `${pm} ${formatAddArgs(pm, deps).join(' ')}`;
   const addDevCommand = `${pm} ${formatAddDevArgs(pm, devDeps).join(' ')}`;
+  const installCommand = formatInstallCommand(pm);
   const emitCommand = formatRunCommand(pm, 'prisma-next', 'contract emit');
 
   // FR7.3 / Spec Decision 8 — honour-and-warn: if the surrounding pnpm
@@ -628,17 +733,20 @@ async function runInstall(ctx: {
   // warning whether or not we actually run install — the override
   // applies to a manual install too — but only when pnpm is the chosen
   // PM (catalog: specifiers are pnpm-specific).
-  const catalogWarnings = pm === 'pnpm' ? buildCatalogWarnings(baseDir, [...deps, ...devDeps]) : [];
+  const catalogWarnings =
+    pm === 'pnpm' ? buildCatalogWarnings(baseDir, [...deps, ...devDeps], catalogScan) : [];
 
   if (!install) {
     if (!flags.json && !flags.quiet) {
+      const installLines = manifestDependenciesWritten
+        ? [`     ${installCommand}`]
+        : [`     ${addCommand}`, `     ${addDevCommand}`];
       ui.note(
         [
           'Run the following commands to complete setup:',
           '',
           '  1. Install dependencies:',
-          `     ${addCommand}`,
-          `     ${addDevCommand}`,
+          ...installLines,
           '',
           '  2. Emit the contract:',
           `     ${emitCommand}`,
@@ -646,11 +754,18 @@ async function runInstall(ctx: {
         'Manual steps',
       );
     }
-    return { skipped: true, deps: [], devDeps: [], warnings: catalogWarnings };
+    return { skipped: true, deps, devDeps, warnings: catalogWarnings };
   }
 
   const exec = promisify(execFile);
-  const runPair = async (manager: PackageManager): Promise<void> => {
+  const installCommands = manifestDependenciesWritten
+    ? [installCommand]
+    : [addCommand, addDevCommand];
+  const runInstallCommand = async (manager: PackageManager): Promise<void> => {
+    if (manifestDependenciesWritten) {
+      await exec(manager, formatInstallArgs(manager), { cwd: baseDir });
+      return;
+    }
     await exec(manager, formatAddArgs(manager, deps), { cwd: baseDir });
     await exec(manager, formatAddDevArgs(manager, devDeps), { cwd: baseDir });
   };
@@ -659,7 +774,7 @@ async function runInstall(ctx: {
   const spinner = ui.spinner();
   spinner.start(`Installing ${allPackages}...`);
   try {
-    await runPair(pm);
+    await runInstallCommand(pm);
     spinner.stop(`Installed ${allPackages}`);
     return { skipped: false, deps, devDeps, warnings: catalogWarnings };
   } catch (err) {
@@ -673,7 +788,13 @@ async function runInstall(ctx: {
         'pnpm could not resolve a workspace/catalog dependency, retrying with npm...',
       );
       try {
-        await runPair('npm');
+        rewriteCatalogSpecsForNpmFallback({
+          baseDir,
+          dependencySet,
+          enabled: manifestDependenciesWritten,
+          catalogScan,
+        });
+        await runInstallCommand('npm');
         spinner.stop(`Installed ${allPackages} via npm (pnpm fallback)`);
         const fallbackWarning = [
           'pnpm could not install: a published Prisma Next dependency leaked a `workspace:*` or `catalog:` specifier.',
@@ -698,8 +819,7 @@ async function runInstall(ctx: {
         spinner.stop('Installation failed');
         const npmStderr = redactSecrets(readChildStderr(npmErr));
         throw errorInitInstallFailed({
-          addCommand,
-          addDevCommand,
+          installCommands,
           emitCommand,
           filesWritten,
           stderrLines: [stderrText, npmStderr],
@@ -709,12 +829,38 @@ async function runInstall(ctx: {
 
     spinner.stop('Installation failed');
     throw errorInitInstallFailed({
-      addCommand,
-      addDevCommand,
+      installCommands,
       emitCommand,
       filesWritten,
       stderrLines: [stderrText],
     });
+  }
+}
+
+function rewriteCatalogSpecsForNpmFallback(options: {
+  readonly baseDir: string;
+  readonly dependencySet: InitDependencySet;
+  readonly enabled: boolean;
+  readonly catalogScan: ReturnType<typeof detectPnpmCatalogOverrides> | null;
+}): void {
+  if (
+    !options.enabled ||
+    options.catalogScan === null ||
+    options.catalogScan.entries.length === 0
+  ) {
+    return;
+  }
+  const packageJsonPath = join(options.baseDir, 'package.json');
+  if (!existsSync(packageJsonPath)) {
+    return;
+  }
+  const existing = readFileSync(packageJsonPath, 'utf-8');
+  const { content } = mergePackageDependencies(
+    existing,
+    buildRequiredPackageDependencies(options.dependencySet, null),
+  );
+  if (content !== null) {
+    writeFileSync(packageJsonPath, content, 'utf-8');
   }
 }
 
@@ -729,8 +875,9 @@ async function runInstall(ctx: {
 export function buildCatalogWarnings(
   baseDir: string,
   packages: readonly string[],
+  precomputed?: ReturnType<typeof detectPnpmCatalogOverrides> | null,
 ): readonly string[] {
-  const result = detectPnpmCatalogOverrides(baseDir, packages);
+  const result = precomputed ?? detectPnpmCatalogOverrides(baseDir, packages);
   if (result === null || result.entries.length === 0) {
     return [];
   }

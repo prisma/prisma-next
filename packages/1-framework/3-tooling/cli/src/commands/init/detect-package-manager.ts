@@ -31,6 +31,9 @@ export async function detectPackageManager(cwd: string): Promise<PackageManager>
   if (detected && KNOWN.has(detected.name)) {
     return detected.name as PackageManager;
   }
+  if (!existsSync(join(cwd, 'package.json')) && hasDenoManifest(cwd)) {
+    return 'deno';
+  }
   const userAgent = getUserAgent();
   if (userAgent !== null && KNOWN.has(userAgent)) {
     return userAgent as PackageManager;
@@ -39,11 +42,11 @@ export async function detectPackageManager(cwd: string): Promise<PackageManager>
 }
 
 export function hasProjectManifest(cwd: string): boolean {
-  return (
-    existsSync(join(cwd, 'package.json')) ||
-    existsSync(join(cwd, 'deno.json')) ||
-    existsSync(join(cwd, 'deno.jsonc'))
-  );
+  return existsSync(join(cwd, 'package.json')) || hasDenoManifest(cwd);
+}
+
+function hasDenoManifest(cwd: string): boolean {
+  return existsSync(join(cwd, 'deno.json')) || existsSync(join(cwd, 'deno.jsonc'));
 }
 
 export function formatRunCommand(pm: PackageManager, bin: string, args: string): string {
@@ -56,16 +59,24 @@ export function formatRunCommand(pm: PackageManager, bin: string, args: string):
   return `${pm} ${bin} ${args}`;
 }
 
-export function formatAddArgs(pm: PackageManager, packages: string[]): string[] {
+export function formatAddArgs(pm: PackageManager, packages: readonly string[]): string[] {
   if (pm === 'deno') {
     return ['add', ...packages.map((p) => `npm:${p}`)];
   }
   return ['add', ...packages];
 }
 
-export function formatAddDevArgs(pm: PackageManager, packages: string[]): string[] {
+export function formatAddDevArgs(pm: PackageManager, packages: readonly string[]): string[] {
   if (pm === 'deno') {
     return ['add', '--dev', ...packages.map((p) => `npm:${p}`)];
   }
   return ['add', '-D', ...packages];
+}
+
+export function formatInstallArgs(_pm: PackageManager): string[] {
+  return ['install'];
+}
+
+export function formatInstallCommand(pm: PackageManager): string {
+  return `${pm} ${formatInstallArgs(pm).join(' ')}`;
 }

@@ -51,6 +51,12 @@ describe('detectPackageManager', () => {
     expect(await detectPackageManager(tmpDir)).toBe('deno');
   });
 
+  it('detects deno from deno.json when no package.json exists', async () => {
+    writeFileSync(join(tmpDir, 'deno.json'), '{}');
+
+    expect(await detectPackageManager(tmpDir)).toBe('deno');
+  });
+
   it('falls back to packageManager field in package.json', async () => {
     writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ packageManager: 'pnpm@9.0.0' }));
 

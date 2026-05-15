@@ -59,7 +59,7 @@ export function createInitCommand(): Command {
     'prisma-next init --yes --target postgres --authoring psl',
     'prisma-next init --yes --target mongodb --authoring typescript --json',
     'prisma-next init --yes --force --target postgres --authoring psl  # overwrite an existing scaffold',
-    'prisma-next init --no-install                                       # skip pnpm/npm install + emit',
+    'prisma-next init --no-install                                       # write package deps, skip pnpm/npm install + emit',
   ]);
 
   return addGlobalOptions(command)
@@ -82,7 +82,10 @@ export function createInitCommand(): Command {
       '--strict-probe',
       'Treat a failed --probe-db as fatal (no-op without --probe-db; init is offline-by-default)',
     )
-    .option('--no-install', 'Skip dependency installation and contract emission')
+    .option(
+      '--no-install',
+      'Write dependency metadata but skip package-manager install and contract emission',
+    )
     .action(async (options: InitCommandOptions) => {
       const { runInit } = await import('./init');
       const flags = parseGlobalFlags(options);

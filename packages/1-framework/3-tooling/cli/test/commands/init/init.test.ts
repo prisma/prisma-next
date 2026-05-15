@@ -413,10 +413,18 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
     expect(config).not.toContain('.//');
   });
 
-  it('with --no-install skips dependency installation and emit', async () => {
+  it('with --no-install writes dependency metadata but skips install command and emit', async () => {
     await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     expect(execFile).not.toHaveBeenCalled();
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      dependencies: Record<string, string>;
+      devDependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies['@prisma-next/postgres']).toBe('latest');
+    expect(pkg.dependencies['dotenv']).toBe('latest');
+    expect(pkg.devDependencies['prisma-next']).toBe('latest');
+    expect(pkg.devDependencies['@types/node']).toBe('latest');
     expect(existsSync(join(tmpDir, 'prisma/contract.json'))).toBe(false);
     expect(existsSync(join(tmpDir, 'prisma/contract.d.ts'))).toBe(false);
   });
@@ -428,19 +436,13 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
 
     expect(execFile).toHaveBeenCalledWith(
       'pnpm',
-      ['add', '@prisma-next/postgres', 'dotenv'],
-      expect.anything(),
-      expect.any(Function),
-    );
-    expect(execFile).toHaveBeenCalledWith(
-      'pnpm',
-      ['add', '-D', 'prisma-next', '@types/node'],
+      ['install'],
       expect.anything(),
       expect.any(Function),
     );
   });
 
-  it('detects deno and installs with npm: prefix', async () => {
+  it('detects deno, writes imports, and installs declared dependencies', async () => {
     rmSync(join(tmpDir, 'package.json'));
     writeFileSync(join(tmpDir, 'deno.json'), '{}');
     writeFileSync(join(tmpDir, 'deno.lock'), '{}');
@@ -449,16 +451,17 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
 
     expect(execFile).toHaveBeenCalledWith(
       'deno',
-      ['add', 'npm:@prisma-next/postgres', 'npm:dotenv'],
+      ['install'],
       expect.anything(),
       expect.any(Function),
     );
-    expect(execFile).toHaveBeenCalledWith(
-      'deno',
-      ['add', '--dev', 'npm:prisma-next', 'npm:@types/node'],
-      expect.anything(),
-      expect.any(Function),
-    );
+    const deno = JSON.parse(readFileSync(join(tmpDir, 'deno.json'), 'utf-8')) as {
+      imports: Record<string, string>;
+    };
+    expect(deno.imports['@prisma-next/postgres']).toBe('npm:@prisma-next/postgres@latest');
+    expect(deno.imports['dotenv']).toBe('npm:dotenv@latest');
+    expect(deno.imports['prisma-next']).toBe('npm:prisma-next@latest');
+    expect(deno.imports['@types/node']).toBe('npm:@types/node@latest');
   });
 
   it('shows prisma-next.md in outro', async () => {
@@ -485,6 +488,8 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
       private: boolean;
       type: string;
       scripts: Record<string, string>;
+      dependencies: Record<string, string>;
+      devDependencies: Record<string, string>;
     };
     expect(pkg.name).toBeTypeOf('string');
     expect(pkg.name.length).toBeGreaterThan(0);
@@ -493,6 +498,10 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
     // The newly-created package.json still flows through the FR3.5 scripts
     // merge, so the contract:emit script lands in one shot.
     expect(pkg.scripts['contract:emit']).toBe('prisma-next contract emit');
+    expect(pkg.dependencies['@prisma-next/postgres']).toBe('latest');
+    expect(pkg.dependencies['dotenv']).toBe('latest');
+    expect(pkg.devDependencies['prisma-next']).toBe('latest');
+    expect(pkg.devDependencies['@types/node']).toBe('latest');
     expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(true);
   });
 
@@ -508,6 +517,10 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
 
     expect(exit).toBe(INIT_EXIT_OK);
     expect(existsSync(join(tmpDir, 'package.json'))).toBe(false);
+    const deno = JSON.parse(readFileSync(join(tmpDir, 'deno.json'), 'utf-8')) as {
+      imports: Record<string, string>;
+    };
+    expect(deno.imports['@prisma-next/postgres']).toBe('npm:@prisma-next/postgres@latest');
   });
 
   it('accepts deno.json as project manifest', async () => {
@@ -785,14 +798,18 @@ describe('runInit hygiene + tsconfig (FR2 / FR3)', { timeout: timeouts.databaseO
 
     expect(execFile).toHaveBeenCalledWith(
       'pnpm',
-      ['add', '-D', 'prisma-next'],
+      ['install'],
       expect.anything(),
       expect.any(Function),
     );
-    for (const call of vi.mocked(execFile).mock.calls) {
-      const args = call[1];
-      expect(args).not.toContain('@types/node');
-    }
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      dependencies: Record<string, string>;
+      devDependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies['@prisma-next/postgres']).toBe('latest');
+    expect(pkg.dependencies['dotenv']).toBe('latest');
+    expect(pkg.devDependencies['prisma-next']).toBe('latest');
+    expect(pkg.devDependencies['@types/node']).toBe('^18.19.0');
   });
 
   it('skips adding @types/node when already in dependencies (FR2.1)', async () => {
@@ -809,10 +826,19 @@ describe('runInit hygiene + tsconfig (FR2 / FR3)', { timeout: timeouts.databaseO
 
     expect(execFile).toHaveBeenCalledWith(
       'pnpm',
-      ['add', '-D', 'prisma-next'],
+      ['install'],
       expect.anything(),
       expect.any(Function),
     );
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      dependencies: Record<string, string>;
+      devDependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies['@types/node']).toBe('^18.19.0');
+    expect(pkg.dependencies['@prisma-next/postgres']).toBe('latest');
+    expect(pkg.dependencies['dotenv']).toBe('latest');
+    expect(pkg.devDependencies['prisma-next']).toBe('latest');
+    expect(pkg.devDependencies['@types/node']).toBeUndefined();
   });
 
   it('still adds @types/node when only an unrelated dep is declared (FR2.1)', async () => {
@@ -829,10 +855,16 @@ describe('runInit hygiene + tsconfig (FR2 / FR3)', { timeout: timeouts.databaseO
 
     expect(execFile).toHaveBeenCalledWith(
       'pnpm',
-      ['add', '-D', 'prisma-next', '@types/node'],
+      ['install'],
       expect.anything(),
       expect.any(Function),
     );
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      devDependencies: Record<string, string>;
+    };
+    expect(pkg.devDependencies['typescript']).toBe('^5.0.0');
+    expect(pkg.devDependencies['prisma-next']).toBe('latest');
+    expect(pkg.devDependencies['@types/node']).toBe('latest');
   });
 
   it('exits PRECONDITION with structured error on a malformed package.json (F01)', async () => {
@@ -1018,7 +1050,8 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
       dependencies: Record<string, string>;
     };
     expect(pkg.dependencies['@prisma-next/postgres']).toBeUndefined();
-    expect(pkg.dependencies['dotenv']).toBe('^16.0.0');
+    expect(pkg.dependencies['@prisma-next/mongo']).toBe('latest');
+    expect(pkg.dependencies['dotenv']).toBe('latest');
   });
 
   it('keeps the facade dep when re-init does not switch targets (FR9.2)', async () => {
@@ -1043,10 +1076,11 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
     const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
       dependencies: Record<string, string>;
     };
-    expect(pkg.dependencies['@prisma-next/postgres']).toBe('^1.0.0');
+    expect(pkg.dependencies['@prisma-next/postgres']).toBe('latest');
+    expect(pkg.dependencies['dotenv']).toBe('latest');
   });
 
-  it('does not touch deps on a green-field init (FR9.2 boundary)', async () => {
+  it('adds required deps while preserving unrelated deps on a green-field init (FR9.2 boundary)', async () => {
     writeFileSync(
       join(tmpDir, 'package.json'),
       JSON.stringify(
@@ -1068,6 +1102,8 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
       dependencies: Record<string, string>;
     };
     expect(pkg.dependencies['@prisma-next/mongo']).toBe('^1.0.0');
+    expect(pkg.dependencies['@prisma-next/postgres']).toBe('latest');
+    expect(pkg.dependencies['dotenv']).toBe('latest');
     expect(pkg.dependencies['someUnrelated']).toBe('^2.0.0');
   });
 
@@ -1100,6 +1136,7 @@ describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation 
       dependencies: Record<string, string>;
     };
     expect(pkg.dependencies['@prisma-next/postgres']).toBeUndefined();
+    expect(pkg.dependencies['@prisma-next/mongo']).toBe('latest');
     expect(existsSync(join(tmpDir, 'prisma/contract.json'))).toBe(false);
     expect(existsSync(join(tmpDir, 'prisma/contract.d.ts'))).toBe(false);
   });
@@ -1468,7 +1505,11 @@ describe('runInit (--json output, FR1.5 / FR10.2)', { timeout: timeouts.database
     expect(parsed['schemaPath']).toBe('prisma/contract.prisma');
     expect(Array.isArray(parsed['filesWritten'])).toBe(true);
     expect((parsed['filesWritten'] as string[]).length).toBeGreaterThan(0);
-    expect(parsed['packagesInstalled']).toMatchObject({ skipped: true });
+    expect(parsed['packagesInstalled']).toMatchObject({
+      skipped: true,
+      deps: ['@prisma-next/postgres', 'dotenv'],
+      devDeps: ['prisma-next', '@types/node'],
+    });
     // The `nextSteps` array is part of the documented `--json` contract
     // (FR1.5 / FR10.2). Agents and CI are expected to surface these
     // strings to the user verbatim, so we lock the canonical anchor
@@ -1605,8 +1646,9 @@ describe('runInit pnpm → npm install fallback (FR7.2)', {
       });
       expect(exit).toBe(INIT_EXIT_OK);
 
-      const npmAddCalls = vi.mocked(execFile).mock.calls.filter((c) => c[0] === 'npm');
-      expect(npmAddCalls.length).toBe(2);
+      const npmInstallCalls = vi.mocked(execFile).mock.calls.filter((c) => c[0] === 'npm');
+      expect(npmInstallCalls).toHaveLength(1);
+      expect(npmInstallCalls[0]?.[1]).toEqual(['install']);
 
       const parsed = JSON.parse(writes.join('').trim()) as {
         warnings: string[];

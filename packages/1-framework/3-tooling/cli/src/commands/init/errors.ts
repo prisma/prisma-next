@@ -110,8 +110,7 @@ export function errorInitStrictProbeWithoutProbe(): CliStructuredError {
  * agent can resume manually. Maps to exit code `4 = INSTALL_FAILED`.
  */
 export function errorInitInstallFailed(options: {
-  readonly addCommand: string;
-  readonly addDevCommand: string;
+  readonly installCommands: readonly string[];
   readonly emitCommand: string;
   readonly filesWritten: readonly string[];
   readonly stderrLines: readonly string[];
@@ -124,7 +123,7 @@ export function errorInitInstallFailed(options: {
   return new CliStructuredError('5007', 'Failed to install dependencies', {
     domain: 'CLI',
     why,
-    fix: `Install manually:\n  ${options.addCommand}\n  ${options.addDevCommand}\nThen run \`${options.emitCommand}\` to emit the contract.`,
+    fix: `Install manually:\n${options.installCommands.map((command) => `  ${command}`).join('\n')}\nThen run \`${options.emitCommand}\` to emit the contract.`,
     docsUrl: 'https://prisma-next.dev/docs/cli/init',
     meta: {
       filesWritten: options.filesWritten,

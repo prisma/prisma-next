@@ -106,6 +106,53 @@ export interface EsmModuleTypeResult {
   readonly warning: string | null;
 }
 
+export interface RequiredPackageDependency {
+  readonly name: string;
+  readonly section: 'dependencies' | 'devDependencies';
+  readonly version: string;
+}
+
+export interface PackageDependenciesMergeResult {
+  readonly content: string | null;
+}
+
+/**
+ * Idempotently adds the dependencies needed by the generated Prisma Next
+ * project. This is intentionally separate from running the package manager:
+ * `--no-install` should leave a complete manifest behind so the user can run
+ * their preferred install command later.
+ */
+export function mergePackageDependencies(
+  existing: string,
+  required: readonly RequiredPackageDependency[],
+): PackageDependenciesMergeResult {
+  const parsed = JSON.parse(existing) as Record<string, unknown>;
+  let mutated = false;
+
+  for (const dep of required) {
+    const existingSection =
+      typeof parsed[dep.section] === 'object' &&
+      parsed[dep.section] !== null &&
+      !Array.isArray(parsed[dep.section])
+        ? (parsed[dep.section] as Record<string, string>)
+        : null;
+    const currentSection = existingSection === null ? {} : { ...existingSection };
+
+    if (currentSection[dep.name] !== dep.version) {
+      currentSection[dep.name] = dep.version;
+      parsed[dep.section] = currentSection;
+      mutated = true;
+    }
+  }
+
+  if (!mutated) {
+    return { content: null };
+  }
+
+  const trailingNewline = existing.endsWith('\n') ? '\n' : '';
+  return { content: `${JSON.stringify(parsed, null, 2)}${trailingNewline}` };
+}
+
 /**
  * Idempotently sets `"type": "module"` on a `package.json` so the
  * scaffolded `prisma/db.ts` — which uses the ESM-only `with { type: 'json' }`
