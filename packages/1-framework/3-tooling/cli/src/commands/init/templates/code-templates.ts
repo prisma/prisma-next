@@ -253,7 +253,10 @@ export function dbFile(target: TargetId): string {
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-export const db = postgres<Contract>({ contractJson });
+export const db = postgres<Contract>({
+  contractJson,
+  url: process.env['DATABASE_URL']!,
+});
 `;
   }
 
