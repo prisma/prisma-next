@@ -14,6 +14,15 @@ import {
  * the result polymorphically. The unspecified singleton overrides these
  * methods to elide the prefix entirely — call sites stay polymorphic and
  * never branch on `id === UNSPECIFIED_NAMESPACE_ID`.
+ *
+ * **Freeze-trap warning.** The constructor calls `freezeNode(this)` at
+ * the end. Direct subclasses MUST NOT add instance fields — the freeze
+ * runs in this base constructor and any subclass field assignment will
+ * silently fail in non-strict mode or throw in strict mode. The
+ * `MongoTargetUnspecifiedDatabase` singleton below is intentionally
+ * field-free for this reason; if a future subclass needs to carry
+ * additional fields, lift this `freezeNode` to the leaf-class
+ * constructors (or to a `seal()` hook each leaf calls explicitly).
  */
 export class MongoTargetDatabase extends NamespaceBase {
   readonly kind = 'database' as const;

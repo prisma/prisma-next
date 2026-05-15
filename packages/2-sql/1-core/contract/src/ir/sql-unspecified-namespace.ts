@@ -19,6 +19,18 @@ import {
  * so the JSON envelope reads `{ "id": "__unspecified__" }` — symmetric
  * with the family-level non-enumerable `kind` on `SqlNode` and bounded
  * to the minimum data the framework `Namespace` interface promises.
+ *
+ * **Freeze-trap warning.** The leaf constructor calls
+ * `freezeNode(this)` after installing `kind`. The leaf-class shape
+ * works today only because `NamespaceBase` does NOT freeze in its
+ * constructor — the `Object.defineProperty(this, 'kind', …)` call after
+ * `super()` succeeds because the instance is still mutable at that
+ * point. Subclasses that add instance fields will still hit the freeze
+ * trap once leaf-class `freezeNode(this)` runs; and if a future
+ * framework change lifts the freeze to `NamespaceBase`, even the
+ * `defineProperty` here would silently fail. To add subclass instance
+ * fields safely, lift `freezeNode` to a leaf-class `seal()` hook each
+ * leaf calls explicitly at the end of its own constructor.
  */
 export class SqlUnspecifiedNamespace extends NamespaceBase {
   static readonly instance: SqlUnspecifiedNamespace = new SqlUnspecifiedNamespace();
