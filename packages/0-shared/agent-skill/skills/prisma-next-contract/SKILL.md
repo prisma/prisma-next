@@ -1,6 +1,6 @@
 ---
 name: prisma-next-contract
-description: Edit the Prisma Next data contract — add models, fields, relations, indexes, enums, type aliases, value objects, inheritance, install extensions. Use for schema, models, fields, attributes, validations, callbacks, soft delete, paranoid, scopes, prisma schema, PSL, contract.ts, contract emit, prisma-next.config.ts, extensionPacks, pgvector, cipherstash.
+description: Edit the Prisma Next data contract — add models, fields, relations, indexes, enums, type aliases, value objects, polymorphic types (STI / MTI on SQL), install extensions. Use for schema, models, fields, attributes, validations, callbacks, soft delete, paranoid, scopes, polymorphism, discriminator, prisma schema, PSL, contract.ts, contract emit, prisma-next.config.ts, extensionPacks, pgvector, cipherstash.
 ---
 
 # Prisma Next — Contract Authoring
@@ -189,7 +189,14 @@ model User {
 
 For MongoDB, this is a nested document. For Postgres, this is a composite type or JSON column depending on extensions.
 
-## Add an inheritance hierarchy (`@@discriminator` / `@@base`)
+## Add a polymorphic type (`@@discriminator` / `@@base`)
+
+For SQL targets, Prisma Next supports two layouts for a polymorphic type with shared and per-variant fields:
+
+- **Single-table polymorphism (STI)** — all variants share one underlying table, discriminated by a column.
+- **Multi-table polymorphism (MTI)** — the base table holds shared columns, per-variant tables hold variant-specific columns and join 1:1 to the base by primary key.
+
+The contract uses `@@base` + `@@discriminator` for both; the variant chooses the layout.
 
 ```prisma
 model Animal {
@@ -215,7 +222,7 @@ model Cat {
 }
 ```
 
-Single-table inheritance (STI). All three models share one underlying table; `kind` discriminates. Queries through `db.orm.Dog` and `db.orm.Cat` are typed appropriately.
+Queries through `db.orm.Dog` / `db.orm.Cat` return the right variant-typed row; `db.orm.Animal` returns the union. Cross-target note: MongoDB has no schema layer to model polymorphism — variants are just documents whose shape differs by field. On Mongo, model the variants directly (or with a `kind` discriminator field in application code) instead of using `@@base` / `@@discriminator`.
 
 ## Install an extension
 
