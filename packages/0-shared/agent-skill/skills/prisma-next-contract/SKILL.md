@@ -85,23 +85,16 @@ export const contract = defineContract({
 
 Then `pnpm prisma-next contract emit` to regenerate the artifacts.
 
-## Edit a field — rename safely
+## Edit a field — rename
 
-PN can't tell a rename from a drop+add; you must hint it:
+Prisma Next does not yet have a rename hint. When you rename a field in the contract, the planner sees the old column drop and the new column add as two unrelated operations: `migration plan` produces a destructive `DROP COLUMN` + `ADD COLUMN`. There is no in-contract way to tell the planner *"this is a rename, preserve the data"* today.
 
-```prisma
-// Bad: rename without a hint — PN plans a drop+add, you lose data.
-model User {
-  emailAddress String @unique
-}
+Workarounds, in order of preference:
 
-// Good: hint the rename — PN plans an ALTER TABLE ... RENAME COLUMN.
-model User {
-  emailAddress String @unique @hint(was: "email")
-}
-```
+1. **Hand-edit `migration.ts` after `migration plan`** so the destructive op becomes a `RENAME COLUMN` (or `RENAME TABLE`). Then run `node migrations/<dir>/migration.ts` to self-emit and `migration apply`. See `prisma-next-migrations` for the hand-edit workflow.
+2. **Keep the old field, add the new field, backfill in `migration.ts`, then drop the old field in a follow-up migration.** Safer for production, two deploys instead of one.
 
-After emit, plan the migration (`migration plan --name rename-email`). Verify the plan uses a rename, not drop+add.
+If you want a first-class rename hint (e.g. `@@rename(old: "email", new: "emailAddress")` or similar), file a feature request via the `prisma-next-feedback` skill.
 
 ## Add a relation
 
@@ -281,11 +274,10 @@ See [ADR 212 — Contract spaces](https://github.com/prisma/prisma-next/blob/mai
 
 ## Common Pitfalls
 
-1. **Forgetting to emit after an edit.** Types and `contract.json` go stale; the type-checker either misses the new model or flags it as missing. Re-emit.
+1. **Forgetting to emit after an edit.** Types and `contract.json` go stale; the type-checker either misses the new model or flags it as missing. Re-emit (or use the Vite plugin — see `prisma-next-build`).
 2. **Editing `contract.json` or `contract.d.ts` directly.** Both are emitted artifacts. Edit the source (`schema.psl` / `contract.ts`), not the artifacts.
-3. **Renaming without a `@hint(was: "...")`.** Plans a destructive drop+add. Always hint a rename.
+3. **Renaming a field and expecting the planner to detect it.** PN doesn't have a rename hint today; the planner sees a destructive drop+add. Hand-edit `migration.ts` after `migration plan` (see *Edit a field — rename* above and `prisma-next-migrations`).
 4. **Adding an extension namespace before installing the pack.** Emit fails with "unrecognized namespace". Install the pack and add it to `extensionPacks` first.
-5. **Editing the wrong package's contract in a monorepo.** Confirm which `prisma-next.config.ts` you're working against before editing.
 
 ## What Prisma Next doesn't do yet
 
@@ -303,11 +295,11 @@ See [ADR 212 — Contract spaces](https://github.com/prisma/prisma-next/blob/mai
 ## Checklist
 
 - [ ] Read `prisma-next.config.ts` and identified target + authoring mode + extensionPacks.
-- [ ] Edited the right contract source (PSL or TS, monorepo package or root).
-- [ ] Used `@hint(was: "...")` on every field rename.
+- [ ] Edited the contract source (`schema.psl` or `contract.ts`), not an emitted artifact.
+- [ ] For renames: hand-edited `migration.ts` (or used the keep-then-drop two-migration pattern) — PN has no rename hint today.
 - [ ] For new extension namespaces: installed the package, added to `extensionPacks`, then used the namespace.
-- [ ] Ran `prisma-next contract emit` after the edit.
+- [ ] Ran `prisma-next contract emit` after the edit (or let the Vite plugin re-emit on save).
 - [ ] Confirmed `contract.json` and `contract.d.ts` updated.
 - [ ] Type-checked any code that depends on the new/changed models.
 - [ ] Did NOT hand-edit `contract.json` / `contract.d.ts`.
-- [ ] Did NOT silently confabulate a missing feature (validations, callbacks, soft delete, scopes) — referred user to the capability-gap section + feature-request URL.
+- [ ] Did NOT silently confabulate a missing feature (validations, callbacks, soft delete, scopes, in-contract rename hint) — referred user to the capability-gap section + feature-request URL.
