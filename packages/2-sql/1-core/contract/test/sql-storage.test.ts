@@ -10,7 +10,7 @@ import { StorageTable } from '../src/ir/storage-table';
  * match a known discriminator so format drift surfaces loudly at the
  * deserializer boundary instead of corrupting downstream IR walks.
  */
-describe('SqlStorage — polymorphic storage.types normalisation (T1.8)', () => {
+describe('SqlStorage — polymorphic storage.types normalisation', () => {
   const baseTable = new StorageTable({
     columns: {
       id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
