@@ -471,6 +471,105 @@ describe('index and unique sorting', () => {
     expect(indexes[1]?.['name']).toBe('idx_a');
   });
 
+  it('sorts indexes inside a nested-by-namespace envelope (FR15)', () => {
+    // Cross-namespace contracts persist `tables` as
+    // `Record<NamespaceId, Record<TableName, StorageTable>>` when the
+    // same table name exists across namespaces. The canonicalisation
+    // walk must recurse into the namespace bucket before sorting
+    // indexes/uniques arrays, else multi-namespace contracts with
+    // named indexes hash non-deterministically based on insertion
+    // order.
+    const ordered = canonicalizeContractToObject(
+      minimal({
+        storage: {
+          storageHash: 'sha256:stub',
+          tables: {
+            public: {
+              User: {
+                columns: {},
+                indexes: [
+                  { name: 'idx_alpha', columns: ['a'] },
+                  { name: 'idx_zeta', columns: ['z'] },
+                ],
+                uniques: [
+                  { name: 'uq_alpha', columns: ['a'] },
+                  { name: 'uq_zeta', columns: ['z'] },
+                ],
+              },
+            },
+            auth: {
+              User: {
+                columns: {},
+                indexes: [
+                  { name: 'idx_zeta', columns: ['z'] },
+                  { name: 'idx_alpha', columns: ['a'] },
+                ],
+                uniques: [
+                  { name: 'uq_zeta', columns: ['z'] },
+                  { name: 'uq_alpha', columns: ['a'] },
+                ],
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    const reversed = canonicalizeContractToObject(
+      minimal({
+        storage: {
+          storageHash: 'sha256:stub',
+          tables: {
+            // Reverse insertion order: indexes/uniques inverted; namespace
+            // map keys reversed too. After canonicalisation both inputs
+            // must produce identical output.
+            auth: {
+              User: {
+                columns: {},
+                indexes: [
+                  { name: 'idx_alpha', columns: ['a'] },
+                  { name: 'idx_zeta', columns: ['z'] },
+                ],
+                uniques: [
+                  { name: 'uq_alpha', columns: ['a'] },
+                  { name: 'uq_zeta', columns: ['z'] },
+                ],
+              },
+            },
+            public: {
+              User: {
+                columns: {},
+                indexes: [
+                  { name: 'idx_zeta', columns: ['z'] },
+                  { name: 'idx_alpha', columns: ['a'] },
+                ],
+                uniques: [
+                  { name: 'uq_zeta', columns: ['z'] },
+                  { name: 'uq_alpha', columns: ['a'] },
+                ],
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    expect(JSON.stringify(ordered)).toBe(JSON.stringify(reversed));
+
+    const authIndexes = drill(ordered, 'storage', 'tables', 'auth', 'User')['indexes'] as Array<{
+      name?: string;
+    }>;
+    const publicIndexes = drill(ordered, 'storage', 'tables', 'public', 'User')[
+      'indexes'
+    ] as Array<{ name?: string }>;
+    const authUniques = drill(ordered, 'storage', 'tables', 'auth', 'User')['uniques'] as Array<{
+      name?: string;
+    }>;
+    expect(authIndexes.map((i) => i.name)).toEqual(['idx_alpha', 'idx_zeta']);
+    expect(publicIndexes.map((i) => i.name)).toEqual(['idx_alpha', 'idx_zeta']);
+    expect(authUniques.map((u) => u.name)).toEqual(['uq_alpha', 'uq_zeta']);
+  });
+
   it('sorts uniques without name using empty-string fallback', () => {
     const result = canonicalizeContractToObject(
       minimal({

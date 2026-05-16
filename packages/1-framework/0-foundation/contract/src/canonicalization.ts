@@ -186,6 +186,61 @@ type TableObject = {
   [key: string]: unknown;
 };
 
+function sortNamedArray(items: unknown[]): unknown[] {
+  return [...items].sort((a, b) => {
+    const nameA = (a as { name?: string })?.name || '';
+    const nameB = (b as { name?: string })?.name || '';
+    return nameA.localeCompare(nameB);
+  });
+}
+
+function sortTableIndexesAndUniques(table: unknown): unknown {
+  if (!table || typeof table !== 'object') return table;
+  const tableObj = table as TableObject;
+  const sortedTable: TableObject = { ...tableObj };
+  if (Array.isArray(tableObj.indexes)) {
+    sortedTable.indexes = sortNamedArray(tableObj.indexes);
+  }
+  if (Array.isArray(tableObj.uniques)) {
+    sortedTable.uniques = sortNamedArray(tableObj.uniques);
+  }
+  return sortedTable;
+}
+
+/** Known keys on a flat `StorageTable` shape. Used to discriminate
+ * flat-table entries from namespace buckets even after `omitDefaults`
+ * has stripped an empty `columns: {}` field. */
+const FLAT_TABLE_KEYS: ReadonlySet<string> = new Set([
+  'columns',
+  'indexes',
+  'uniques',
+  'foreignKeys',
+  'primaryKey',
+  'namespaceId',
+]);
+
+/**
+ * Distinguish the FR15 nested-by-namespace envelope (`storage.tables`
+ * as `Record<NamespaceId, Record<TableName, StorageTable>>`) from the
+ * legacy flat-by-name envelope (`Record<TableName, StorageTable>`).
+ *
+ * A flat-table entry carries at least one of the known flat-table
+ * fields ({@link FLAT_TABLE_KEYS}); a namespace bucket does not — its
+ * keys are table names. The check survives `omitDefaults` stripping an
+ * empty `columns: {}` field because `uniques` / `indexes` /
+ * `foreignKeys` always survive in the canonicalised flat-table shape
+ * (the omit step keeps them as required empty defaults).
+ */
+function isNestedTablesEnvelope(tables: Record<string, unknown>): boolean {
+  for (const entry of Object.values(tables)) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+    const entryKeys = Object.keys(entry);
+    if (entryKeys.some((k) => FLAT_TABLE_KEYS.has(k))) return false;
+    return true;
+  }
+  return false;
+}
+
 function sortIndexesAndUniques(storage: unknown): unknown {
   if (!storage || typeof storage !== 'object') {
     return storage;
@@ -199,37 +254,33 @@ function sortIndexesAndUniques(storage: unknown): unknown {
   const tables = storageObj.tables;
   const result: StorageObject = { ...storageObj };
 
-  result.tables = {};
-  const sortedTableNames = Object.keys(tables).sort();
-  for (const tableName of sortedTableNames) {
-    const table = tables[tableName];
-    if (!table || typeof table !== 'object') {
-      result.tables[tableName] = table;
-      continue;
+  // The canonicalisation walk runs after the per-target serialiser has
+  // emitted either the flat (single-namespace) or nested
+  // (cross-namespace name collisions) envelope. Sort `indexes` /
+  // `uniques` arrays at whichever depth they live: flat envelope has
+  // them at `storage.tables.<table>.indexes`; nested envelope has them
+  // at `storage.tables.<namespace>.<table>.indexes`.
+  if (isNestedTablesEnvelope(tables)) {
+    const sortedNamespaces: Record<string, Record<string, unknown>> = {};
+    for (const namespaceId of Object.keys(tables).sort()) {
+      const bucket = tables[namespaceId];
+      if (!bucket || typeof bucket !== 'object') continue;
+      const bucketRecord = bucket as Record<string, unknown>;
+      const sortedBucket: Record<string, unknown> = {};
+      for (const tableName of Object.keys(bucketRecord).sort()) {
+        sortedBucket[tableName] = sortTableIndexesAndUniques(bucketRecord[tableName]);
+      }
+      sortedNamespaces[namespaceId] = sortedBucket;
     }
-
-    const tableObj = table as TableObject;
-    const sortedTable: TableObject = { ...tableObj };
-
-    if (Array.isArray(tableObj.indexes)) {
-      sortedTable.indexes = [...tableObj.indexes].sort((a, b) => {
-        const nameA = (a as { name?: string })?.name || '';
-        const nameB = (b as { name?: string })?.name || '';
-        return nameA.localeCompare(nameB);
-      });
-    }
-
-    if (Array.isArray(tableObj.uniques)) {
-      sortedTable.uniques = [...tableObj.uniques].sort((a, b) => {
-        const nameA = (a as { name?: string })?.name || '';
-        const nameB = (b as { name?: string })?.name || '';
-        return nameA.localeCompare(nameB);
-      });
-    }
-
-    result.tables[tableName] = sortedTable;
+    result.tables = sortedNamespaces;
+    return result;
   }
 
+  const flatResult: Record<string, unknown> = {};
+  for (const tableName of Object.keys(tables).sort()) {
+    flatResult[tableName] = sortTableIndexesAndUniques(tables[tableName]);
+  }
+  result.tables = flatResult;
   return result;
 }
 
