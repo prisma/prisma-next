@@ -26,10 +26,25 @@ export function mapLoadAggregateError(error: LoadAggregateError): CliStructuredE
       error.violations.length === 1
         ? 'Contract-space layout violation detected'
         : `Contract-space layout violations detected (${error.violations.length})`;
+    const hasDeclaredButUnmigrated = error.violations.some(
+      (v) => v.kind === 'declaredButUnmigrated',
+    );
+    const hasOrphanSpaceDir = error.violations.some((v) => v.kind === 'orphanSpaceDir');
+    const fixParts: string[] = [];
+    if (hasDeclaredButUnmigrated) {
+      fixParts.push(
+        'For `declaredButUnmigrated` violations, run `prisma-next migration plan` to materialise the pinned per-space artefacts from the extension descriptor.',
+      );
+    }
+    if (hasOrphanSpaceDir) {
+      fixParts.push(
+        'For `orphanSpaceDir` violations, either remove the `migrations/<spaceId>/` directory or re-add the extension to `extensionPacks` in `prisma-next.config.ts`.',
+      );
+    }
     return new CliStructuredError('5001', summary, {
       domain: 'MIG',
       why: `The on-disk \`migrations/\` directory and your \`extensionPacks\` declaration are not in agreement.\n${lines.join('\n')}`,
-      fix: 'Run `prisma-next migrate` to materialise on-disk artefacts for declared extensions, or remove the orphan directory.',
+      fix: fixParts.join(' '),
       docsUrl: 'https://pris.ly/contract-spaces',
       meta: {
         violations: error.violations.map((v) => ({
@@ -68,7 +83,7 @@ export function mapLoadAggregateError(error: LoadAggregateError): CliStructuredE
       {
         domain: 'MIG',
         why: error.detail,
-        fix: 'Run `prisma-next migrate` to refresh on-disk artefacts, or restore the on-disk `migrations/` directory from version control.',
+        fix: 'Run `prisma-next migration plan` to re-emit the pinned per-space artefacts from the extension descriptor, or restore the on-disk `migrations/` directory from version control.',
         docsUrl: 'https://pris.ly/contract-spaces',
         meta: {
           violations: [{ kind: 'integrity', spaceId: error.spaceId, detail: error.detail }],
@@ -83,7 +98,7 @@ export function mapLoadAggregateError(error: LoadAggregateError): CliStructuredE
       {
         domain: 'MIG',
         why: error.detail,
-        fix: 'Run `prisma-next migrate` to refresh on-disk artefacts, or fix the extension descriptor producing the invalid contract.',
+        fix: 'Run `prisma-next migration plan` to re-emit the pinned per-space artefacts from the extension descriptor, or fix the extension descriptor producing the invalid contract.',
         meta: {
           violations: [{ kind: 'validation', spaceId: error.spaceId, detail: error.detail }],
         },

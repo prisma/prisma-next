@@ -250,7 +250,7 @@ When in doubt: every flag defaults to `true`. Enabling unused flags costs migrat
 
 The extension contributes its database scaffolding (the `eql_v2_configuration` table, the `eql_v2_encrypted` / `ore_*` composite types, the `eql_v2.bloom_filter` / `hmac_256` / `blake3` domains, and the EQL bundle SQL) as a **contract space** so the Prisma Next framework can plan, apply, and verify it the same way it manages an application's own schema. See [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md).
 
-After `prisma-next migrate plan`, the user's repo gains:
+After `prisma-next migration plan`, the user's repo gains:
 
 - `migrations/cipherstash/contract.json`,
 - `migrations/cipherstash/contract.d.ts`,

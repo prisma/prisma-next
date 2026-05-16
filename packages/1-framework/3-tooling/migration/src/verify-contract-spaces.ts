@@ -192,7 +192,7 @@ export function verifyContractSpaces(
       violations.push({
         kind: 'declaredButUnmigrated',
         spaceId,
-        remediation: `Extension '${spaceId}' is declared in extensionPacks but has not been emitted; run \`prisma-next migrate\`.`,
+        remediation: `Extension '${spaceId}' is declared in extensionPacks but has not been emitted; run \`prisma-next migration plan\` to materialise the pinned per-space artefacts from the extension descriptor.`,
       });
       continue;
     }
@@ -209,7 +209,7 @@ export function verifyContractSpaces(
         spaceId,
         priorHeadHash: head.hash,
         markerHash: marker.hash,
-        remediation: `Marker row for space '${spaceId}' is keyed at ${marker.hash}, but the on-disk ${join('migrations', spaceId, 'contract.json')} resolves to ${head.hash}. Run \`prisma-next db update\` to advance the database, or \`prisma-next migrate\` if the descriptor was bumped without re-emitting.`,
+        remediation: `Marker row for space '${spaceId}' is keyed at ${marker.hash}, but the on-disk ${join('migrations', spaceId, 'contract.json')} resolves to ${head.hash}. Run \`prisma-next db update\` to advance the database, or \`prisma-next migration plan\` to re-emit the pinned per-space artefacts if the descriptor was bumped without re-emitting.`,
       });
       continue;
     }
