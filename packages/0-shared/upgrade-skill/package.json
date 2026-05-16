@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/upgrade-skill",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "license": "Apache-2.0",
   "type": "module",
   "description": "Agent skill that upgrades a Prisma Next user app from one minor version to the next. Carries the bump-install-instructions-validate-commit flow plus the cumulative set of per-transition upgrade instructions.",
