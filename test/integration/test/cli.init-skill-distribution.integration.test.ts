@@ -7,6 +7,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { delimiter as pathDelimiter } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { join, resolve } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -52,7 +53,7 @@ describe('init skill distribution (offline integration)', () => {
     const previousLog = process.env['TEST_FAKE_PNPM_LOG'];
     const previousInternal = process.env['INSTALL_INTERNAL_SKILLS'];
 
-    process.env['PATH'] = `${fakeBinDir}:${previousPath ?? ''}`;
+    process.env['PATH'] = `${fakeBinDir}${pathDelimiter}${previousPath ?? ''}`;
     process.env['PRISMA_NEXT_SKILLS_REF'] = pathToFileURL(WORKSPACE_ROOT).href;
     process.env['TEST_FAKE_PNPM_LOG'] = logPath;
     delete process.env['INSTALL_INTERNAL_SKILLS'];
@@ -91,7 +92,7 @@ describe('init skill distribution (offline integration)', () => {
     const previousLog = process.env['TEST_FAKE_PNPM_LOG'];
     const previousInternal = process.env['INSTALL_INTERNAL_SKILLS'];
 
-    process.env['PATH'] = `${fakeBinDir}:${previousPath ?? ''}`;
+    process.env['PATH'] = `${fakeBinDir}${pathDelimiter}${previousPath ?? ''}`;
     process.env['PRISMA_NEXT_SKILLS_REF'] = pathToFileURL(WORKSPACE_ROOT).href;
     process.env['TEST_FAKE_PNPM_LOG'] = logPath;
     process.env['INSTALL_INTERNAL_SKILLS'] = '1';
@@ -188,10 +189,11 @@ process.exit(0);
 
 function readFrontmatter(skillPath) {
   const source = fs.readFileSync(skillPath, 'utf8');
-  if (!source.startsWith('---\\n')) return null;
-  const end = source.indexOf('\\n---\\n', 4);
+  const normalized = source.replace(/\\r\\n/g, '\\n');
+  if (!normalized.startsWith('---\\n')) return null;
+  const end = normalized.indexOf('\\n---\\n', 4);
   if (end === -1) return null;
-  const frontmatter = source.slice(4, end);
+  const frontmatter = normalized.slice(4, end);
   const lines = frontmatter.split('\\n');
   let name = '';
   let internal = false;
@@ -280,11 +282,12 @@ function readSkillNamesFrom(root: string, includeInternal = false): readonly str
 
 function parseSkillMetadata(skillFile: string): ParsedSkillMetadata | null {
   const source = readFileSync(skillFile, 'utf8');
-  if (!source.startsWith('---\n')) return null;
-  const end = source.indexOf('\n---\n', 4);
+  const normalized = source.replace(/\r\n/g, '\n');
+  if (!normalized.startsWith('---\n')) return null;
+  const end = normalized.indexOf('\n---\n', 4);
   if (end === -1) return null;
 
-  const lines = source.slice(4, end).split('\n');
+  const lines = normalized.slice(4, end).split('\n');
   let name = '';
   let internal = false;
   let inMetadata = false;
