@@ -758,6 +758,7 @@ const DEMO_BASE_STORAGE: SqlStorageInput = {
   },
   types: {
     user_type: {
+      kind: 'codec-instance',
       codecId: 'pg/enum@1',
       nativeType: 'user_type',
       typeParams: { values: ['admin', 'user'] },
