@@ -519,16 +519,15 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
   return errors;
 }
 
-type SqlValidationContract = Contract<SqlStorage, Record<string, ContractModel<SqlModelStorage>>>;
-
 /**
  * SQL storage logical-consistency checks: every model.storage.table
  * resolves to a real table, every model.storage.fields[*].column
  * resolves to a real column, and value-object fields land on JSON-native
  * columns. Throws `ContractValidationError` on the first mismatch.
  */
-export function validateModelStorageReferences(contract: SqlValidationContract): void {
-  for (const [modelName, model] of Object.entries(contract.models)) {
+export function validateModelStorageReferences(contract: Contract<SqlStorage>): void {
+  const models = contract.models as Record<string, ContractModel<SqlModelStorage>>;
+  for (const [modelName, model] of Object.entries(models)) {
     const storageTable = model.storage.table;
 
     const table = contract.storage.tables[storageTable] as
@@ -692,8 +691,6 @@ export function validateSqlContractFully<T extends Contract<SqlStorage>>(value: 
       'storage',
     );
   }
-  validateModelStorageReferences(
-    validated as unknown as Contract<SqlStorage, Record<string, ContractModel<SqlModelStorage>>>,
-  );
+  validateModelStorageReferences(validated);
   return validated;
 }
