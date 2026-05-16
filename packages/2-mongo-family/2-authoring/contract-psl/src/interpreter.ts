@@ -93,8 +93,9 @@ function collectPolymorphismDeclarations(
 } {
   const discriminatorDeclarations = new Map<string, DiscriminatorDeclaration>();
   const baseDeclarations = new Map<string, BaseDeclaration>();
+  const allPslModels = document.ast.namespaces.flatMap((ns) => ns.models);
 
-  for (const pslModel of document.ast.models) {
+  for (const pslModel of allPslModels) {
     for (const attr of pslModel.attributes) {
       if (attr.name === 'discriminator') {
         const fieldName = getPositionalArgument(attr);
@@ -176,6 +177,7 @@ function resolvePolymorphism(input: {
     indexSpans,
     modelIndexesByName,
   } = input;
+  const allPslModels = document.ast.namespaces.flatMap((ns) => ns.models);
   let patched = input.models;
   let roots = input.roots;
   let collections = input.collections;
@@ -195,7 +197,7 @@ function resolvePolymorphism(input: {
     const model = patched[modelName];
     if (!model) continue;
 
-    const pslModel = document.ast.models.find((m) => m.name === modelName);
+    const pslModel = allPslModels.find((m) => m.name === modelName);
     const mappedDiscriminatorField = pslModel
       ? (resolveFieldMappings(pslModel).pslNameToMapped.get(decl.fieldName) ?? decl.fieldName)
       : decl.fieldName;
@@ -258,7 +260,7 @@ function resolvePolymorphism(input: {
     }
 
     const baseModel = patched[baseDecl.baseName];
-    const variantPslModel = document.ast.models.find((m) => m.name === variantName);
+    const variantPslModel = allPslModels.find((m) => m.name === variantName);
     if (!variantPslModel) continue;
     const hasExplicitMap = getMapName(variantPslModel.attributes) !== undefined;
 
@@ -797,8 +799,13 @@ export function interpretPslDocumentToMongoContract(
   const { document, scalarTypeDescriptors, codecLookup } = input;
   const sourceId = document.ast.sourceId;
   const diagnostics: ContractSourceDiagnostic[] = [];
-  const modelNames = new Set(document.ast.models.map((m) => m.name));
-  const compositeTypeNames = new Set(document.ast.compositeTypes.map((ct) => ct.name));
+  // Mongo does not yet expose multi-database namespacing; until per-target
+  // namespace dispatch lands, every namespace bucket is flattened into the
+  // same declaration set the interpreter has always consumed.
+  const allModels = document.ast.namespaces.flatMap((ns) => ns.models);
+  const allCompositeTypes = document.ast.namespaces.flatMap((ns) => ns.compositeTypes);
+  const modelNames = new Set(allModels.map((m) => m.name));
+  const compositeTypeNames = new Set(allCompositeTypes.map((ct) => ct.name));
 
   const models: Record<string, MongoModelEntry> = {};
   const collections: Record<string, Record<string, unknown>> = {};
@@ -817,7 +824,7 @@ export function interpretPslDocumentToMongoContract(
   }
   const backrelationCandidates: BackrelationCandidate[] = [];
 
-  for (const pslModel of document.ast.models) {
+  for (const pslModel of allModels) {
     const collectionName = resolveCollectionName(pslModel);
     const fieldMappings = resolveFieldMappings(pslModel);
 
@@ -845,7 +852,7 @@ export function interpretPslDocumentToMongoContract(
         if (relation?.fields && relation?.references) {
           const localMapped = relation.fields.map((f) => fieldMappings.pslNameToMapped.get(f) ?? f);
 
-          const targetModel = document.ast.models.find((m) => m.name === field.typeName);
+          const targetModel = allModels.find((m) => m.name === field.typeName);
           const targetFieldMappings = targetModel ? resolveFieldMappings(targetModel) : undefined;
           const targetMapped = relation.references.map(
             (f) => targetFieldMappings?.pslNameToMapped.get(f) ?? f,
@@ -917,7 +924,7 @@ export function interpretPslDocumentToMongoContract(
   }
 
   const valueObjects: Record<string, ContractValueObject> = {};
-  for (const compositeType of document.ast.compositeTypes) {
+  for (const compositeType of allCompositeTypes) {
     const fields: Record<string, ContractField> = {};
     for (const field of compositeType.fields) {
       const resolved = resolveNonRelationField(

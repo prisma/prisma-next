@@ -12,6 +12,7 @@ import type {
   PslSpan,
   PslTypesBlock,
 } from '@prisma-next/framework-components/psl-ast';
+import { UNSPECIFIED_PSL_NAMESPACE_ID } from '@prisma-next/framework-components/psl-ast';
 import type { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import type { DefaultMappingOptions } from './default-mapping';
 import { mapDefault } from './default-mapping';
@@ -153,12 +154,25 @@ function buildPslDocumentAst(schemaIR: SqlSchemaIR, options: PslPrinterOptions):
         }
       : undefined;
 
+  // Inferred PSL nodes will eventually be routed into per-namespace buckets
+  // matching the source storage; for now we synthesise a single
+  // `__unspecified__` bucket so round-tripping the AST through the framework
+  // printer (which emits the synthesised bucket at top level with no
+  // `namespace { … }` wrapper) preserves the existing introspection output
+  // verbatim.
   const ast: PslDocumentAst = {
     kind: 'document',
     sourceId: '<sql-schema-ir>',
-    models: sortedModels,
-    enums,
-    compositeTypes: [],
+    namespaces: [
+      {
+        kind: 'namespace',
+        name: UNSPECIFIED_PSL_NAMESPACE_ID,
+        models: sortedModels,
+        enums,
+        compositeTypes: [],
+        span: SYNTHETIC_SPAN,
+      },
+    ],
     ...(types ? { types } : {}),
     span: SYNTHETIC_SPAN,
   };

@@ -900,7 +900,7 @@ describe('ControlClient progress emission', () => {
 
   describe('inferPslContract()', () => {
     it('delegates to family instance when capability is implemented', () => {
-      const fakeAst = { kind: 'document', models: [] } as unknown;
+      const fakeAst = { kind: 'document', namespaces: [] } as unknown;
       const { mockFamily, mockTarget, mockAdapter, mockFamilyInstance } = createMockComponents();
       (mockFamilyInstance as unknown as { inferPslContract: (ir: unknown) => unknown })[
         'inferPslContract'

@@ -73,9 +73,7 @@ describe('interpretPslDocumentToSqlContract diagnostics', () => {
       ast: {
         kind: 'document',
         sourceId: 'schema.prisma',
-        models: [],
-        enums: [],
-        compositeTypes: [],
+        namespaces: [],
         types: {
           kind: 'types',
           declarations: [

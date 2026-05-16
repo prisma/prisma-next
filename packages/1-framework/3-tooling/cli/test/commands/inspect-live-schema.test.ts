@@ -285,7 +285,7 @@ describe('inspectLiveSchema', () => {
   });
 
   it('exposes the AST returned by client.inferPslContract', async () => {
-    const fakeAst = { kind: 'document', models: [] } as unknown;
+    const fakeAst = { kind: 'document', namespaces: [] } as unknown;
     mocks.inferPslContractMock.mockReturnValue(fakeAst);
 
     const { flags, ui } = createUi();

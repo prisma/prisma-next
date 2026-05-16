@@ -1298,9 +1298,12 @@ export function interpretPslDocumentToSqlContract(
   }
 
   const diagnostics: ContractSourceDiagnostic[] = mapParserDiagnostics(input.document);
-  const models = input.document.ast.models ?? [];
-  const enums = input.document.ast.enums ?? [];
-  const compositeTypes = input.document.ast.compositeTypes ?? [];
+  // Per-target namespace dispatch is not yet wired into the SQL interpreter;
+  // until it lands, every namespace bucket is flattened into the same
+  // declaration set the interpreter has always consumed.
+  const models = input.document.ast.namespaces.flatMap((ns) => ns.models);
+  const enums = input.document.ast.namespaces.flatMap((ns) => ns.enums);
+  const compositeTypes = input.document.ast.namespaces.flatMap((ns) => ns.compositeTypes);
   const modelNames = new Set(models.map((model) => model.name));
   const compositeTypeNames = new Set(compositeTypes.map((ct) => ct.name));
   const composedExtensions = new Set(input.composedExtensionPacks ?? []);
