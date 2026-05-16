@@ -34,7 +34,6 @@ interface InitCommandOptions extends CommonCommandOptions {
   readonly probeDb?: boolean;
   readonly strictProbe?: boolean;
   readonly install?: boolean;
-  readonly installUserSkill?: boolean;
   readonly skill?: boolean;
 }
 
@@ -64,7 +63,6 @@ export function createInitCommand(): Command {
     'prisma-next init --yes --target mongodb --authoring typescript --json',
     'prisma-next init --yes --force --target postgres --authoring psl  # overwrite an existing scaffold',
     'prisma-next init --no-install                                       # skip pnpm/npm install + emit',
-    'prisma-next init --install-user-skill                               # also install @prisma-next/agent-skill at the user level',
     'prisma-next init --no-skill                                         # skip the agent-skill install (air-gapped / restricted env)',
   ]);
 
@@ -89,10 +87,6 @@ export function createInitCommand(): Command {
       'Treat a failed --probe-db as fatal (no-op without --probe-db; init is offline-by-default)',
     )
     .option('--no-install', 'Skip dependency installation and contract emission')
-    .option(
-      '--install-user-skill',
-      'Additionally install @prisma-next/agent-skill at the user level (every project on this host)',
-    )
     .option(
       '--no-skill',
       'Skip the @prisma-next/agent-skill install (air-gapped CI, restricted registries, etc.)',

@@ -2,7 +2,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import * as clack from '@clack/prompts';
 import { extname, join, normalize } from 'pathe';
 import type { GlobalFlags } from '../../utils/global-flags';
-import { readMarker } from './agent-skill-install';
 import {
   errorInitInvalidFlagValue,
   errorInitMissingFlags,
@@ -33,15 +32,9 @@ export interface InitFlagOptions {
   readonly strictProbe?: boolean;
   readonly install?: boolean;
   /**
-   * `--install-user-skill` — additionally install
-   * `@prisma-next/agent-skill` at the user level so the agent picks
-   * the skill up across every project on this host.
-   */
-  readonly installUserSkill?: boolean;
-  /**
-   * `--no-skill` — skip both the project-level and user-level skill
-   * installs entirely. Documented escape hatch for air-gapped CI,
-   * restricted registries, and any environment where `npx skills` is
+   * `--no-skill` — skip the project-level skill install entirely.
+   * Documented escape hatch for air-gapped CI, restricted registries,
+   * and any environment where `npx skills` is
    * not reachable.
    */
   readonly skill?: boolean;
@@ -78,23 +71,11 @@ export interface ResolvedInitInputs {
   /**
    * Whether to run `npx skills add @prisma-next/agent-skill` at the
    * project level after install + emit. True by default; `--no-skill`
-   * sets it to `false`. The user-level install (a separate step) is
-   * governed by `installUserSkill`.
+   * sets it to `false`. The skill is always project-level (never
+   * user-level / global) so its version stays locked to the project's
+   * Prisma Next version — see `agent-skill-install.ts`.
    */
   readonly installProjectSkill: boolean;
-  /**
-   * Whether to additionally install the skill at the user level. True
-   * when `--install-user-skill` was passed, or when the user answered
-   * "yes" to the first-run prompt. Always `false` when the project-
-   * level install is disabled (`--no-skill`).
-   */
-  readonly installUserSkill: boolean;
-  /**
-   * Whether the FR5 first-run prompt should fire and write the marker
-   * file. True only in interactive runs with no marker present and
-   * neither `--install-user-skill` nor `--no-skill` already supplied.
-   */
-  readonly userSkillPromptPending: boolean;
 }
 
 const TARGET_ALIASES: ReadonlyMap<string, TargetId> = new Map([
@@ -197,17 +178,10 @@ export async function resolveInitInputs(ctx: {
 
   // Skill-install gating. `--no-skill` (commander parses
   // `options.skill === false`) is the only escape hatch; otherwise
-  // project-level install is unconditional. User-level install is
-  // gated by the explicit `--install-user-skill` flag, the FR5
-  // first-run prompt (only when interactive + no marker), or the
-  // marker file's recorded "yes" answer.
+  // project-level install is unconditional. The skill is always
+  // installed at the project level so its version tracks the
+  // project's Prisma Next release.
   const installProjectSkill = options.skill !== false;
-  const explicitUserSkill = Boolean(options.installUserSkill);
-  const marker = installProjectSkill ? readMarker() : null;
-  const markerSaidYes = marker !== null && marker.userSkillPromptShown && marker.answeredYes;
-  const userSkillPromptPending =
-    installProjectSkill && !explicitUserSkill && marker === null && canPrompt && !autoAcceptPrompts;
-  const installUserSkill = installProjectSkill && (explicitUserSkill || markerSaidYes);
 
   return {
     target: finalTarget,
@@ -220,8 +194,6 @@ export async function resolveInitInputs(ctx: {
     reinit,
     removePreviousFacade,
     installProjectSkill,
-    installUserSkill,
-    userSkillPromptPending,
   };
 }
 

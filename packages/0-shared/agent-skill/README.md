@@ -34,18 +34,17 @@ mkdir my-app && cd my-app
 pnpm dlx prisma-next init
 ```
 
-To install standalone (existing project, new agent runtime, or user-level):
+To install standalone (existing project or a new agent runtime added after `init`):
 
 ```bash
-# Project-level (recommended). `--all` installs every skill in the
-# cluster (the cluster works as a unit — the router skill routes between
-# the others) for every agent runtime the CLI detects on this machine,
-# without prompting per-skill or per-agent.
+# `--all` installs every skill in the cluster (the cluster works as a
+# unit — the router skill routes between the others) for every agent
+# runtime the CLI detects on this machine, without prompting per-skill
+# or per-agent.
 npx skills add @prisma-next/agent-skill --all
-
-# User-level (every project on this host).
-npx skills add @prisma-next/agent-skill --all -g
 ```
+
+The skill is always installed at the **project level** — there is no host-wide / global install path. The cluster's surface (commands it references, exit codes it expects, capability claims it makes) tracks the project's `@prisma-next/*` version, and a global install would have to pick a single version for every project on the host. Pinning per-project keeps the skill, CLI, runtime, and extension packs coherent on every project the user works in.
 
 If you have multiple agent runtimes installed and want the skill cluster active in only one of them, swap `--all` for `--skill '*' -a <agent>` (e.g. `-a claude-code`, `-a cursor`, `-a codex`). The `skills` CLI's `--help` lists the supported agent ids.
 

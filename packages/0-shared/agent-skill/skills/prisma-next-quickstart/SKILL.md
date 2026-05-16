@@ -190,8 +190,7 @@ The flags `init` accepts (run `prisma-next init --help` for the source of truth)
 - `--probe-db` — connect to `DATABASE_URL` once and check the server version against the target's minimum.
 - `--strict-probe` — fail init if the probe fails (no-op without `--probe-db`).
 - `--no-install` — skip dependency install + initial contract emit.
-- `--no-skill` — skip the `@prisma-next/agent-skill` install (air-gapped / restricted environments).
-- `--install-user-skill` — also install the agent skill at the user level (every project on this host).
+- `--no-skill` — skip the `@prisma-next/agent-skill` install (air-gapped / restricted environments). The skill is always installed at the project level — never globally — so its version stays locked to the project's Prisma Next version.
 
 `init` writes (when it runs cleanly):
 
