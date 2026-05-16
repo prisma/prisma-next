@@ -37,12 +37,17 @@ pnpm dlx prisma-next init
 To install standalone (existing project, new agent runtime, or user-level):
 
 ```bash
-# Project-level
-npx skills add @prisma-next/agent-skill
+# Project-level (recommended). `--all` installs every skill in the
+# cluster (the cluster works as a unit — the router skill routes between
+# the others) for every agent runtime the CLI detects on this machine,
+# without prompting per-skill or per-agent.
+npx skills add @prisma-next/agent-skill --all
 
-# User-level (every project on this host)
-npx skills add @prisma-next/agent-skill --user
+# User-level (every project on this host).
+npx skills add @prisma-next/agent-skill --all -g
 ```
+
+If you have multiple agent runtimes installed and want the skill cluster active in only one of them, swap `--all` for `--skill '*' -a <agent>` (e.g. `-a claude-code`, `-a cursor`, `-a codex`). The `skills` CLI's `--help` lists the supported agent ids.
 
 ## Capability-gap honesty
 

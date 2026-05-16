@@ -21,13 +21,26 @@ export const AGENT_SKILL_PACKAGE = '@prisma-next/agent-skill';
  * user; we pick the variant that matches the rest of the install step
  * so a single project consistently uses one runner.
  *
+ * Flag choices:
+ * - `--all` auto-selects every skill and every detected agent, skipping
+ *   the multi-select prompts the `skills` CLI shows by default. A
+ *   non-interactive scaffold step cannot present prompts, and the user
+ *   invoked `init` to get a working project — picking skills one-by-one
+ *   would defeat the onboarding contract. Users who want a narrower
+ *   install (one specific agent, a subset of skills) run `npx skills
+ *   add @prisma-next/agent-skill` themselves after `init` with the
+ *   flags they want.
+ * - `-g` (the canonical user-level flag in the upstream `skills` CLI,
+ *   formerly `--user` here, which silently no-op'd because that flag
+ *   does not exist upstream).
+ *
  * Exported for unit tests so the per-PM dispatch can be asserted
  * without a live subprocess.
  */
 export function formatSkillInstallCommand(pm: PackageManager, userLevel: boolean): string {
   const args = userLevel
-    ? ['skills', 'add', '--user', AGENT_SKILL_PACKAGE]
-    : ['skills', 'add', AGENT_SKILL_PACKAGE];
+    ? ['skills', 'add', AGENT_SKILL_PACKAGE, '--all', '-g']
+    : ['skills', 'add', AGENT_SKILL_PACKAGE, '--all'];
   switch (pm) {
     case 'pnpm':
       return `pnpm dlx ${args.join(' ')}`;

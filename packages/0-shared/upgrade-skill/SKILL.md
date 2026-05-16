@@ -19,7 +19,7 @@ This skill upgrades a project that **consumes** Prisma Next via the public packa
 
 Before anything else, ensure this skill is installed at `@latest` and reload it. Bug fixes to *old* per-transition upgrade instructions ship in the latest skill release as part of its cumulative set; running against a stale skill can apply a known-broken translation.
 
-If the agent runtime supports an in-session refresh, perform it now. Otherwise, exit and ask the user to re-install (`npx skills add @prisma-next/upgrade-skill@latest`), then re-invoke.
+If the agent runtime supports an in-session refresh, perform it now. Otherwise, exit and ask the user to re-install (`npx skills add @prisma-next/upgrade-skill@latest --all`), then re-invoke.
 
 ## Pre-flight — extension compatibility
 

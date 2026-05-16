@@ -7,17 +7,23 @@ Cross-runtime automation against a moving model surface is its own research proj
 ## How to run a journey test
 
 1. Check out the example app named at the top of the journey file.
-2. Install the skill at the project level. The path below is monorepo-relative, so this command must be run **from the `prisma-next` repo root** (not from the example app):
+2. Install the skill at the project level. The path below is monorepo-relative, so this command must be run **from the `prisma-next` repo root** (not from the example app). `--all` installs every skill in the cluster to every detected agent without prompting (the cluster is meant to be installed as a unit):
 
    ```bash
    # from the prisma-next repo root
-   npx skills add file:packages/0-shared/agent-skill/
+   npx skills add file:packages/0-shared/agent-skill/ --all
    ```
 
    Or, once `@prisma-next/agent-skill` is published to npm, install from anywhere by package name:
 
    ```bash
-   npx skills add @prisma-next/agent-skill
+   npx skills add @prisma-next/agent-skill --all
+   ```
+
+   To test against an in-flight PR branch (publishes via pkg.pr.new on every push):
+
+   ```bash
+   npx skills add https://pkg.pr.new/prisma/prisma-next/@prisma-next/agent-skill@<pr-number> --all
    ```
 
 3. Open the project in your agent's IDE (or attach the agent via its CLI).
