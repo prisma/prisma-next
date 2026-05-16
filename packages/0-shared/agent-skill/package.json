@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/agent-skill",
-  "version": "0.0.1",
+  "version": "0.8.0",
   "description": "Agent skills for Prisma Next — eight workflow-scoped SKILL.md files an agent loads on demand to operate Prisma Next end-to-end.",
   "license": "Apache-2.0",
   "type": "module",
