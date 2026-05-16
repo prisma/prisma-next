@@ -1,4 +1,5 @@
 import type { CodecTrait } from '@prisma-next/framework-components/codec';
+import type { ReferentialAction } from './ir/foreign-key';
 
 export {
   ForeignKey,
@@ -39,8 +40,8 @@ export {
 
 export type ForeignKeyOptions = {
   readonly name?: string;
-  readonly onDelete?: import('./ir/foreign-key').ReferentialAction;
-  readonly onUpdate?: import('./ir/foreign-key').ReferentialAction;
+  readonly onDelete?: ReferentialAction;
+  readonly onUpdate?: ReferentialAction;
 };
 
 export type SqlModelFieldStorage = {
