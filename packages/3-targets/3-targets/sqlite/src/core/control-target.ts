@@ -41,7 +41,7 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
         return createSqliteMigrationRunner(family) as MigrationRunner<'sql', 'sqlite'>;
       },
       contractToSchema(contract, _frameworkComponents) {
-        return contractToSchemaIR(contract as Contract<SqlStorage> | null, {
+        return contractToSchemaIR(contract as unknown as Contract<SqlStorage> | null, {
           annotationNamespace: 'sqlite',
           renderDefault: sqliteRenderDefault,
         });
