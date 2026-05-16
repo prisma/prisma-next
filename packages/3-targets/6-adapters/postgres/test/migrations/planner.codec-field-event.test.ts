@@ -3,7 +3,7 @@ import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID, type OpFactoryCall } from '@prisma-next/framework-components/control';
-import { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';

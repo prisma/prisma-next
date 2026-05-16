@@ -1,11 +1,11 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../../src/core/migrations/planner';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 function createContract(): Contract<SqlStorage> {
   return {

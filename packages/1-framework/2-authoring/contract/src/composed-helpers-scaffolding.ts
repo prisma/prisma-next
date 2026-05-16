@@ -47,19 +47,20 @@ export type MergeExtensionAuthoringNamespaces<
   ExtensionPacks,
   Key extends AuthoringNamespaceKey,
   EmptyNamespace = Record<never, never>,
-> = ExtensionPacks extends Record<string, unknown>
-  ? keyof ExtensionPacks extends never
-    ? EmptyNamespace
-    : UnionToIntersection<
-        {
-          [K in keyof ExtensionPacks]: ExtractAuthoringNamespaceFromPack<
-            ExtensionPacks[K],
-            Key,
-            EmptyNamespace
-          >;
-        }[keyof ExtensionPacks]
-      >
-  : EmptyNamespace;
+> =
+  ExtensionPacks extends Record<string, unknown>
+    ? keyof ExtensionPacks extends never
+      ? EmptyNamespace
+      : UnionToIntersection<
+          {
+            [K in keyof ExtensionPacks]: ExtractAuthoringNamespaceFromPack<
+              ExtensionPacks[K],
+              Key,
+              EmptyNamespace
+            >;
+          }[keyof ExtensionPacks]
+        >
+    : EmptyNamespace;
 
 /**
  * Entity-helper shape derivation. Mirrors `FieldHelpersFromNamespace` /

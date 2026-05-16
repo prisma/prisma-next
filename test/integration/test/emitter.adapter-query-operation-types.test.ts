@@ -3,7 +3,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { generateContractDts } from '@prisma-next/emitter';
 import { extractQueryOperationTypeImports } from '@prisma-next/framework-components/control';
 import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlUnspecifiedNamespace, type SqlStorage } from '@prisma-next/sql-contract/types';
+import { type SqlStorage, SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { describe, expect, it } from 'vitest';
 

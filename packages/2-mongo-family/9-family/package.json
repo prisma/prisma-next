@@ -1,6 +1,6 @@
 {
   "name": "@prisma-next/family-mongo",
-  "version": "0.0.1",
+  "version": "0.7.0",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -23,6 +23,7 @@
     "@prisma-next/mongo-query-ast": "workspace:0.7.0",
     "@prisma-next/mongo-schema-ir": "workspace:0.7.0",
     "@prisma-next/utils": "workspace:0.7.0",
+    "arktype": "catalog:",
     "mongodb": "catalog:",
     "pathe": "^2.0.3"
   },

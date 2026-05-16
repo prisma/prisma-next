@@ -137,49 +137,114 @@ function makeRunner() {
   return runner;
 }
 
-describe(
-  'Mongo contract-space aggregate e2e',
-  { timeout: timeouts.spinUpMongoMemoryServer },
-  () => {
-    let replSet: MongoMemoryReplSet;
-    let client: MongoClient;
-    let db: Db;
-    const dbName = 'mongo_aggregate_e2e_test';
+describe('Mongo contract-space aggregate e2e', {
+  timeout: timeouts.spinUpMongoMemoryServer,
+}, () => {
+  let replSet: MongoMemoryReplSet;
+  let client: MongoClient;
+  let db: Db;
+  const dbName = 'mongo_aggregate_e2e_test';
 
-    beforeAll(async () => {
-      replSet = await MongoMemoryReplSet.create({
-        instanceOpts: [
-          { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
-        ],
-        replSet: { count: 1, storageEngine: 'wiredTiger' },
-      });
-      client = new MongoClient(replSet.getUri());
-      await client.connect();
-      db = client.db(dbName);
-    }, timeouts.spinUpMongoMemoryServer);
-
-    afterAll(async () => {
-      try {
-        await client?.close();
-        await replSet?.stop();
-      } catch {
-        // ignore cleanup errors
-      }
-    }, timeouts.spinUpMongoMemoryServer);
-
-    beforeEach(async () => {
-      await db.dropDatabase();
+  beforeAll(async () => {
+    replSet = await MongoMemoryReplSet.create({
+      instanceOpts: [
+        { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+      ],
+      replSet: { count: 1, storageEngine: 'wiredTiger' },
     });
+    client = new MongoClient(replSet.getUri());
+    await client.connect();
+    db = client.db(dbName);
+  }, timeouts.spinUpMongoMemoryServer);
 
-    it('applies app + extension across spaces, advances both markers, and strict per-space verify passes', async () => {
-      const appContract = buildAppContract();
-      const appOps = planFor(appContract, null);
-      const extOps = planFor(extContract, null);
-      const runner = makeRunner();
+  afterAll(async () => {
+    try {
+      await client?.close();
+      await replSet?.stop();
+    } catch {
+      // ignore cleanup errors
+    }
+  }, timeouts.spinUpMongoMemoryServer);
 
-      const driver = await mongoControlDriver.create(replSet.getUri(dbName));
-      try {
-        const perSpaceOptions: readonly PerSpaceOptions[] = [
+  beforeEach(async () => {
+    await db.dropDatabase();
+  });
+
+  it('applies app + extension across spaces, advances both markers, and strict per-space verify passes', async () => {
+    const appContract = buildAppContract();
+    const appOps = planFor(appContract, null);
+    const extOps = planFor(extContract, null);
+    const runner = makeRunner();
+
+    const driver = await mongoControlDriver.create(replSet.getUri(dbName));
+    try {
+      const perSpaceOptions: readonly PerSpaceOptions[] = [
+        {
+          space: APP_SPACE_ID,
+          plan: {
+            targetId: 'mongo',
+            spaceId: APP_SPACE_ID,
+            destination: { storageHash: appContract.storage.storageHash },
+            operations: appOps,
+          },
+          driver,
+          destinationContract: appContract,
+          policy: ALL_POLICY,
+          frameworkComponents: [],
+        },
+        {
+          space: MONGO_TEST_SPACE_ID,
+          plan: {
+            targetId: 'mongo',
+            spaceId: MONGO_TEST_SPACE_ID,
+            destination: { storageHash: extContract.storage.storageHash },
+            operations: extOps,
+          },
+          driver,
+          destinationContract: extContract,
+          policy: ALL_POLICY,
+          frameworkComponents: [],
+        },
+      ];
+
+      const result = await runner.executeAcrossSpaces({ driver, perSpaceOptions });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('unreachable');
+      expect(result.value.perSpaceResults.map((r) => r.space)).toEqual([
+        APP_SPACE_ID,
+        MONGO_TEST_SPACE_ID,
+      ]);
+
+      // Both markers advanced — per-space marker-level atomicity gated on
+      // post-apply strict verify (option C, recorded in spec § Atomicity).
+      const markers = await readAllMarkers(db);
+      expect(markers.size).toBe(2);
+      expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(appContract.storage.storageHash);
+      expect(markers.get(MONGO_TEST_SPACE_ID)?.storageHash).toBe(extContract.storage.storageHash);
+
+      // Sanity: the fixture's collection landed with its unique index
+      // and validator from the planner-derived ops.
+      const collInfo = await db.listCollections({ name: MONGO_TEST_COLLECTION }).toArray();
+      expect(collInfo).toHaveLength(1);
+      const indexes = await db.collection(MONGO_TEST_COLLECTION).indexes();
+      expect(indexes.some((ix) => ix.unique && ix.key?.['tenantId'] === 1)).toBe(true);
+    } finally {
+      await driver.close();
+    }
+  });
+
+  it('per-space verify isolates extension drift: dropping the fixture index fails ext-space verify but app-space verify still passes', async () => {
+    const appContract = buildAppContract();
+    const appOps = planFor(appContract, null);
+    const extOps = planFor(extContract, null);
+    const runner = makeRunner();
+
+    const driver = await mongoControlDriver.create(replSet.getUri(dbName));
+    try {
+      const result = await runner.executeAcrossSpaces({
+        driver,
+        perSpaceOptions: [
           {
             space: APP_SPACE_ID,
             plan: {
@@ -206,147 +271,80 @@ describe(
             policy: ALL_POLICY,
             frameworkComponents: [],
           },
-        ];
+        ],
+      });
+      expect(result.ok).toBe(true);
 
-        const result = await runner.executeAcrossSpaces({ driver, perSpaceOptions });
+      // Hand-edit: drop the fixture's `tenantId_1` unique index. The
+      // live `test_audit_event` collection still exists, but the
+      // shape no longer matches the pinned ext contract.
+      const indexesBefore = await db.collection(MONGO_TEST_COLLECTION).indexes();
+      const uniqueIndex = indexesBefore.find(
+        (ix) => ix.unique === true && ix.key?.['tenantId'] === 1,
+      );
+      expect(uniqueIndex?.name).toBeDefined();
+      await db.collection(MONGO_TEST_COLLECTION).dropIndex(uniqueIndex!.name!);
 
-        expect(result.ok).toBe(true);
-        if (!result.ok) throw new Error('unreachable');
-        expect(result.value.perSpaceResults.map((r) => r.space)).toEqual([
-          APP_SPACE_ID,
-          MONGO_TEST_SPACE_ID,
-        ]);
+      const instance = createInstance();
 
-        // Both markers advanced — per-space marker-level atomicity gated on
-        // post-apply strict verify (option C, recorded in spec § Atomicity).
-        const markers = await readAllMarkers(db);
-        expect(markers.size).toBe(2);
-        expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(appContract.storage.storageHash);
-        expect(markers.get(MONGO_TEST_SPACE_ID)?.storageHash).toBe(extContract.storage.storageHash);
-
-        // Sanity: the fixture's collection landed with its unique index
-        // and validator from the planner-derived ops.
-        const collInfo = await db.listCollections({ name: MONGO_TEST_COLLECTION }).toArray();
-        expect(collInfo).toHaveLength(1);
-        const indexes = await db.collection(MONGO_TEST_COLLECTION).indexes();
-        expect(indexes.some((ix) => ix.unique && ix.key?.['tenantId'] === 1)).toBe(true);
-      } finally {
-        await driver.close();
+      // Per-space verifier output: verify the ext slice against the
+      // mutated live DB and assert every reported issue is scoped to
+      // the extension's collection. Failure isolation across
+      // contract-space boundaries propagates through to the
+      // human-readable verifier output — every issue's `table` names
+      // the ext-owned collection, never the app-owned `users`.
+      //
+      // Non-strict: `instance.schemaVerify` walks the whole live DB
+      // at this surface (no per-space projection — that is the
+      // multi-space runner's job, exercised in the happy path
+      // above). Sibling app-owned collections would otherwise
+      // surface as strict-mode extras; non-strict elides those
+      // warnings while genuine drift on a contract-declared index
+      // still escalates to a failure.
+      const extDriver = makeDriver(driver);
+      const extSchema = await instance.introspect({
+        driver: extDriver,
+        contract: extContract,
+      });
+      const extVerify = instance.verifySchema({
+        contract: extContract,
+        schema: extSchema,
+        strict: false,
+        frameworkComponents: [],
+      });
+      expect(extVerify.ok).toBe(false);
+      expect(extVerify.schema.counts.fail).toBeGreaterThan(0);
+      const indexIssues = extVerify.schema.issues.filter(
+        (i): i is typeof i & { readonly table: string } =>
+          i.kind === 'index_mismatch' && 'table' in i,
+      );
+      expect(indexIssues.length).toBeGreaterThan(0);
+      for (const issue of indexIssues) {
+        expect(issue.table).toBe(MONGO_TEST_COLLECTION);
       }
-    });
-
-    it('per-space verify isolates extension drift: dropping the fixture index fails ext-space verify but app-space verify still passes', async () => {
-      const appContract = buildAppContract();
-      const appOps = planFor(appContract, null);
-      const extOps = planFor(extContract, null);
-      const runner = makeRunner();
-
-      const driver = await mongoControlDriver.create(replSet.getUri(dbName));
-      try {
-        const result = await runner.executeAcrossSpaces({
-          driver,
-          perSpaceOptions: [
-            {
-              space: APP_SPACE_ID,
-              plan: {
-                targetId: 'mongo',
-                spaceId: APP_SPACE_ID,
-                destination: { storageHash: appContract.storage.storageHash },
-                operations: appOps,
-              },
-              driver,
-              destinationContract: appContract,
-              policy: ALL_POLICY,
-              frameworkComponents: [],
-            },
-            {
-              space: MONGO_TEST_SPACE_ID,
-              plan: {
-                targetId: 'mongo',
-                spaceId: MONGO_TEST_SPACE_ID,
-                destination: { storageHash: extContract.storage.storageHash },
-                operations: extOps,
-              },
-              driver,
-              destinationContract: extContract,
-              policy: ALL_POLICY,
-              frameworkComponents: [],
-            },
-          ],
-        });
-        expect(result.ok).toBe(true);
-
-        // Hand-edit: drop the fixture's `tenantId_1` unique index. The
-        // live `test_audit_event` collection still exists, but the
-        // shape no longer matches the pinned ext contract.
-        const indexesBefore = await db.collection(MONGO_TEST_COLLECTION).indexes();
-        const uniqueIndex = indexesBefore.find(
-          (ix) => ix.unique === true && ix.key?.['tenantId'] === 1,
-        );
-        expect(uniqueIndex?.name).toBeDefined();
-        await db.collection(MONGO_TEST_COLLECTION).dropIndex(uniqueIndex!.name!);
-
-        const instance = createInstance();
-
-        // Per-space verifier output: verify the ext slice against the
-        // mutated live DB and assert every reported issue is scoped to
-        // the extension's collection. Failure isolation across
-        // contract-space boundaries propagates through to the
-        // human-readable verifier output — every issue's `table` names
-        // the ext-owned collection, never the app-owned `users`.
-        //
-        // Non-strict: `instance.schemaVerify` walks the whole live DB
-        // at this surface (no per-space projection — that is the
-        // multi-space runner's job, exercised in the happy path
-        // above). Sibling app-owned collections would otherwise
-        // surface as strict-mode extras; non-strict elides those
-        // warnings while genuine drift on a contract-declared index
-        // still escalates to a failure.
-        const extDriver = makeDriver(driver);
-        const extSchema = await instance.introspect({
-          driver: extDriver,
-          contract: extContract,
-        });
-        const extVerify = instance.verifySchema({
-          contract: extContract,
-          schema: extSchema,
-          strict: false,
-          frameworkComponents: [],
-        });
-        expect(extVerify.ok).toBe(false);
-        expect(extVerify.schema.counts.fail).toBeGreaterThan(0);
-        const indexIssues = extVerify.schema.issues.filter(
-          (i): i is typeof i & { readonly table: string } =>
-            i.kind === 'index_mismatch' && 'table' in i,
-        );
-        expect(indexIssues.length).toBeGreaterThan(0);
-        for (const issue of indexIssues) {
-          expect(issue.table).toBe(MONGO_TEST_COLLECTION);
-        }
-        // The remediation hint a CLI consumer would render therefore
-        // points at the extension's collection, not at the app's.
-        // Issues on app-owned collections without per-space projection
-        // (e.g. `extra_table` for the app's `users` from the ext
-        // contract's POV) are warnings in non-strict mode; only drift
-        // on a contract-declared element escalates to a failure, and
-        // every failure here scopes to the extension's collection.
-        for (const issue of indexIssues) {
-          expect(issue.table).not.toBe('users');
-        }
-      } finally {
-        await driver.close();
+      // The remediation hint a CLI consumer would render therefore
+      // points at the extension's collection, not at the app's.
+      // Issues on app-owned collections without per-space projection
+      // (e.g. `extra_table` for the app's `users` from the ext
+      // contract's POV) are warnings in non-strict mode; only drift
+      // on a contract-declared element escalates to a failure, and
+      // every failure here scopes to the extension's collection.
+      for (const issue of indexIssues) {
+        expect(issue.table).not.toBe('users');
       }
-    });
-
-    function makeDriver(_existingDriver: Awaited<ReturnType<typeof mongoControlDriver.create>>) {
-      // `schemaVerify` accepts the family's control driver type, not
-      // the cross-package `MongoControlDriver` instance returned by
-      // `mongoControlDriver.create`. Build a fresh family-level driver
-      // from the same `Db` / `MongoClient` pair so both lanes see the
-      // live database. (The two driver shapes converge on the same
-      // underlying connection, so there is no schema divergence to
-      // worry about.)
-      return createMongoControlDriver(db, client);
+    } finally {
+      await driver.close();
     }
-  },
-);
+  });
+
+  function makeDriver(_existingDriver: Awaited<ReturnType<typeof mongoControlDriver.create>>) {
+    // `schemaVerify` accepts the family's control driver type, not
+    // the cross-package `MongoControlDriver` instance returned by
+    // `mongoControlDriver.create`. Build a fresh family-level driver
+    // from the same `Db` / `MongoClient` pair so both lanes see the
+    // live database. (The two driver shapes converge on the same
+    // underlying connection, so there is no schema divergence to
+    // worry about.)
+    return createMongoControlDriver(db, client);
+  }
+});

@@ -1269,7 +1269,7 @@ importers:
   packages/1-framework/2-authoring/contract:
     dependencies:
       '@prisma-next/framework-components':
-        specifier: workspace:*
+        specifier: workspace:0.7.0
         version: link:../../1-core/framework-components
     devDependencies:
       '@prisma-next/tsconfig':
@@ -2183,6 +2183,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:0.7.0
         version: link:../../1-framework/0-foundation/utils
+      arktype:
+        specifier: 2.1.29
+        version: 2.1.29
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0
