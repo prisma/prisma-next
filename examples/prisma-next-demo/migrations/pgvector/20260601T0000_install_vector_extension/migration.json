@@ -1,0 +1,15 @@
+{
+  "from": null,
+  "to": "sha256:401e16b37b0c5cc5d312b70de0168b89fabadbaf96619c581b468134d0a9d621",
+  "labels": [],
+  "providedInvariants": [
+    "pgvector:install-vector-v1"
+  ],
+  "createdAt": "2026-06-01T00:00:00.000Z",
+  "hints": {
+    "used": [],
+    "applied": [],
+    "plannerVersion": "2.0.0"
+  },
+  "migrationHash": "sha256:26fa53f19f1854fd4d2163a3a00c3c615c0f7a0f35e429a2aa116fb4ddbf653f"
+}
