@@ -12,6 +12,7 @@ export interface PslSpan {
 export type PslDiagnosticCode =
   | 'PSL_UNTERMINATED_BLOCK'
   | 'PSL_UNSUPPORTED_TOP_LEVEL_BLOCK'
+  | 'PSL_INVALID_NAMESPACE_BLOCK'
   | 'PSL_INVALID_ATTRIBUTE_SYNTAX'
   | 'PSL_INVALID_MODEL_MEMBER'
   | 'PSL_UNSUPPORTED_MODEL_ATTRIBUTE'
@@ -171,14 +172,64 @@ export interface PslTypesBlock {
   readonly span: PslSpan;
 }
 
-export interface PslDocumentAst {
-  readonly kind: 'document';
-  readonly sourceId: string;
+/**
+ * Name of the synthesised namespace bucket the framework parser uses for
+ * top-level declarations that appear outside any `namespace { … }` block.
+ * The double-underscore decoration signals that the identifier is parser-
+ * synthesised and never appears in user-authored PSL source — writing
+ * `namespace __unspecified__ { … }` is a parse error.
+ *
+ * Distinct from the IR sentinel `__unbound__`: the PSL bucket describes
+ * syntactic absence at the parser layer; the IR sentinel describes a late-
+ * bound storage slot at the IR layer. Per-target interpreters decide how
+ * (or whether) to map the PSL bucket to the IR sentinel.
+ */
+export const UNSPECIFIED_PSL_NAMESPACE_ID = '__unspecified__';
+
+/**
+ * A named namespace block from a PSL document, or the parser's synthesised
+ * `__unspecified__` bucket for declarations that appear outside any
+ * `namespace { … }` block. Multiple `namespace foo { … }` blocks for the
+ * same name across one or more files reopen-merge into a single entry;
+ * `span` points at the first opening.
+ */
+export interface PslNamespace {
+  readonly kind: 'namespace';
+  readonly name: string;
   readonly models: readonly PslModel[];
   readonly enums: readonly PslEnum[];
   readonly compositeTypes: readonly PslCompositeType[];
+  readonly span: PslSpan;
+}
+
+export interface PslDocumentAst {
+  readonly kind: 'document';
+  readonly sourceId: string;
+  readonly namespaces: readonly PslNamespace[];
   readonly types?: PslTypesBlock;
   readonly span: PslSpan;
+}
+
+/**
+ * Returns all models from every namespace in document order. Convenience
+ * for consumers that don't (yet) need namespace-awareness.
+ */
+export function flatPslModels(ast: PslDocumentAst): readonly PslModel[] {
+  return ast.namespaces.flatMap((ns) => ns.models);
+}
+
+/**
+ * Returns all enums from every namespace in document order.
+ */
+export function flatPslEnums(ast: PslDocumentAst): readonly PslEnum[] {
+  return ast.namespaces.flatMap((ns) => ns.enums);
+}
+
+/**
+ * Returns all composite types from every namespace in document order.
+ */
+export function flatPslCompositeTypes(ast: PslDocumentAst): readonly PslCompositeType[] {
+  return ast.namespaces.flatMap((ns) => ns.compositeTypes);
 }
 
 export interface ParsePslDocumentInput {
