@@ -234,6 +234,11 @@ function sanitizeName(name) {
     'utf8',
   );
   chmodSync(join(fakeBinDir, 'pnpm'), 0o755);
+  writeFileSync(
+    join(fakeBinDir, 'pnpm.cmd'),
+    '@echo off\r\nnode "%~dp0pnpm" %*\r\nexit /b %ERRORLEVEL%\r\n',
+    'utf8',
+  );
   return { fakeBinDir, logPath };
 }
 
