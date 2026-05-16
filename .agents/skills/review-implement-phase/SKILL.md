@@ -2,6 +2,8 @@
 name: review-implement-phase
 description: Implements triaged review actions, commits focused fixes, and posts Done plus resolves threads. Use when the user wants only the implementation phase of the review-framework workflow.
 argument-hint: "[pr-url] [output-dir]"
+metadata:
+  internal: true
 ---
 
 # Review Implement Phase

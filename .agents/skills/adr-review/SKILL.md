@@ -5,6 +5,8 @@ description: >-
   context), identify narrative and structural issues, then rewrite them. Use
   when the user asks to review, improve, rewrite, or take a fresh-eyes pass on
   an ADR or a set of ADRs (Architecture Decision Records).
+metadata:
+  internal: true
 ---
 
 # Reviewing and Rewriting ADRs

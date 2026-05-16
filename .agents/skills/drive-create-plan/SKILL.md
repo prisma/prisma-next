@@ -6,6 +6,7 @@ description: >
   decomposes tasks from those tests. Optionally creates a Linear project.
 metadata:
   version: "2026.4.29"
+  internal: true
 ---
 
 # Create Plan

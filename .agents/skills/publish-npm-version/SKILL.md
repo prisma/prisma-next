@@ -8,6 +8,8 @@ description: >-
   version to npm under dist-tag `latest`, plus a matching GitHub Release.
   Use when a maintainer asks to "cut the next minor", "bump to the next
   version", "open a release PR", or "prepare a publish PR".
+metadata:
+  internal: true
 ---
 
 # Publish next npm version
