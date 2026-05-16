@@ -89,7 +89,7 @@ export function createInitCommand(): Command {
     .option('--no-install', 'Skip dependency installation and contract emission')
     .option(
       '--no-skill',
-      'Skip the @prisma-next/skills install (air-gapped CI, restricted registries, etc.)',
+      'Skip Prisma Next skills install (air-gapped CI, restricted registries, etc.)',
     )
     .action(async (options: InitCommandOptions) => {
       const { runInit } = await import('./init');
