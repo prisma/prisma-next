@@ -1,22 +1,24 @@
 import {
   freezeNode,
   NamespaceBase,
-  UNSPECIFIED_NAMESPACE_ID,
+  UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 
 /**
- * Family-layer placeholder for the SQL unspecified-namespace singleton.
+ * Family-layer placeholder for the SQL unbound-namespace singleton —
+ * the late-bound slot whose binding the target resolves at connection
+ * time rather than at authoring time.
  *
  * SQL contracts honour the framework `Storage.namespaces` invariant from
  * the moment they appear in the IR. Today `SqlStorage` is family-shared
  * (Postgres + SQLite consume the same class); a per-target namespace
- * concretion (`PostgresSchema.unspecified`, `SqliteUnspecifiedDatabase.instance`)
+ * concretion (`PostgresSchema.unbound`, `SqliteUnboundDatabase.instance`)
  * earns its existence when each target's namespace shape lands. Until
  * then the family ships a single placeholder singleton so the JSON
  * envelope and runtime walk are honest at every layer.
  *
  * The `kind` discriminator is installed as a non-enumerable own property
- * so the JSON envelope reads `{ "id": "__unspecified__" }` — symmetric
+ * so the JSON envelope reads `{ "id": "__unbound__" }` — symmetric
  * with the family-level non-enumerable `kind` on `SqlNode` and bounded
  * to the minimum data the framework `Namespace` interface promises.
  *
@@ -32,10 +34,10 @@ import {
  * fields safely, lift `freezeNode` to a leaf-class `seal()` hook each
  * leaf calls explicitly at the end of its own constructor.
  */
-export class SqlUnspecifiedNamespace extends NamespaceBase {
-  static readonly instance: SqlUnspecifiedNamespace = new SqlUnspecifiedNamespace();
+export class SqlUnboundNamespace extends NamespaceBase {
+  static readonly instance: SqlUnboundNamespace = new SqlUnboundNamespace();
 
-  readonly id = UNSPECIFIED_NAMESPACE_ID;
+  readonly id = UNBOUND_NAMESPACE_ID;
   declare readonly kind?: string;
 
   private constructor() {

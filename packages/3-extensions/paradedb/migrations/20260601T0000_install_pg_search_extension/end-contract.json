@@ -7,11 +7,11 @@
   "models": {},
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
+      "__unbound__": {
+        "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:63dcc51de85b0e7beca2231e8d93483e02ad385069a6418802fe2dcf77677b98",
+    "storageHash": "sha256:c2d358c3ed7d4fee668cd5addfbca4c5cc4d1b8810fbf2f7c653f5795ccfea67",
     "tables": {}
   },
   "capabilities": {

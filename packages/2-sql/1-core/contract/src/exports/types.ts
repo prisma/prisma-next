@@ -48,7 +48,7 @@ export {
   PrimaryKey,
   SqlNode,
   SqlStorage,
-  SqlUnspecifiedNamespace,
+  SqlUnboundNamespace,
   StorageColumn,
   StorageTable,
   toStorageTypeInstance,

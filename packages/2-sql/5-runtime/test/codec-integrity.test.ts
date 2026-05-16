@@ -2,8 +2,8 @@ import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage, SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import type { SqlRuntimeExtensionDescriptor } from '../src/sql-context';
@@ -135,7 +135,7 @@ describe('createExecutionContext — column codec integrity', () => {
           foreignKeys: [],
         },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
     return {
       targetFamily: 'sql',
@@ -288,7 +288,7 @@ describe('createExecutionContext — column codec integrity', () => {
           typeParams: { length: 1536 },
         },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     });
     const contract: Contract<SqlStorage> = {
       targetFamily: 'sql',

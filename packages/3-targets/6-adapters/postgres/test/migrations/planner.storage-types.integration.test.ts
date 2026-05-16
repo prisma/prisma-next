@@ -1,9 +1,9 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
+import { SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import { PostgresEnumType } from '@prisma-next/target-postgres/types';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -45,7 +45,7 @@ const contractWithEnum: Contract<SqlStorage> = {
         values: ['USER', 'ADMIN'],
       }),
     },
-    namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+    namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
   },
   roots: {},
   models: {},

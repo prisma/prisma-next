@@ -23,7 +23,7 @@ export {
   type SqlStorageInput,
   type SqlStorageTypeEntry,
 } from './ir/sql-storage';
-export { SqlUnspecifiedNamespace } from './ir/sql-unspecified-namespace';
+export { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
 export { StorageTable, type StorageTableInput } from './ir/storage-table';
 export {

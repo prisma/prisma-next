@@ -3,14 +3,14 @@ import {
   freezeNode,
   type Namespace,
   type Storage,
-  UNSPECIFIED_NAMESPACE_ID,
+  UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
 } from './postgres-enum-storage-entry';
 import { SqlNode } from './sql-node';
-import { SqlUnspecifiedNamespace } from './sql-unspecified-namespace';
+import { SqlUnboundNamespace } from './sql-unbound-namespace';
 import { StorageTable, type StorageTableInput } from './storage-table';
 import {
   isStorageTypeInstance,
@@ -35,7 +35,7 @@ export type SqlStorageTypeEntry =
   | StorageTypeInstanceInput;
 
 const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
-  [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance,
+  [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance,
 });
 
 export interface SqlStorageInput<THash extends string = string> {
@@ -56,10 +56,10 @@ export interface SqlStorageInput<THash extends string = string> {
  *
  * Honours the framework `Storage` interface: every SQL IR carries a
  * `namespaces` map keyed by namespace id. The default singleton
- * (`{ [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance }`)
+ * (`{ [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance }`)
  * binds every contract authored before per-target namespace concretions
- * land; per-target namespace classes (`PostgresSchema.unspecified`,
- * `SqliteUnspecifiedDatabase.instance`) earn their slots when each
+ * land; per-target namespace classes (`PostgresSchema.unbound`,
+ * `SqliteUnboundDatabase.instance`) earn their slots when each
  * target's namespace shape lands.
  *
  * The constructor normalises nested IR-class fields (`tables`, optional

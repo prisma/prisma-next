@@ -40,7 +40,7 @@ type EmittedContract = Contract<
         readonly foreignKeys: readonly [];
       };
     };
-    readonly namespaces: { readonly __unspecified__: { readonly id: '__unspecified__' } };
+    readonly namespaces: { readonly __unbound__: { readonly id: '__unbound__' } };
   },
   {
     readonly User: {

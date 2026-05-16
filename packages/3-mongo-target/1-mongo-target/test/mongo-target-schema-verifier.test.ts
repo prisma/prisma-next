@@ -50,7 +50,7 @@ describe('MongoTargetSchemaVerifier', () => {
   it('uses the family-shared scaffolding: walks each namespace and aggregates issues', () => {
     const verifier = new MongoTargetSchemaVerifier();
     const contract = deserializedContract();
-    expect(Object.keys(contract.storage.namespaces)).toEqual(['__unspecified__']);
+    expect(Object.keys(contract.storage.namespaces)).toEqual(['__unbound__']);
 
     const result = verifier.verifySchema({ contract, schema: new MongoSchemaIR([]) });
     expect(result).toBeDefined();

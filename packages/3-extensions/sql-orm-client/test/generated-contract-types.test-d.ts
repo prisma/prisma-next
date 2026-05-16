@@ -70,7 +70,7 @@ type GeneratedLikeContractBase = Contract<
         foreignKeys: [];
       };
     };
-    namespaces: { __unspecified__: { id: '__unspecified__' } };
+    namespaces: { __unbound__: { id: '__unbound__' } };
   },
   {
     User: {
@@ -408,7 +408,7 @@ type VOContractBase = Contract<
         foreignKeys: [];
       };
     };
-    namespaces: { __unspecified__: { id: '__unspecified__' } };
+    namespaces: { __unbound__: { id: '__unbound__' } };
   },
   {
     User: {

@@ -28,8 +28,8 @@ export interface MongoStorageInput<THash extends string = string> {
  * `namespaces` is supplied by the caller. The Mongo target wraps a
  * deserialized `MongoContract` envelope at
  * `MongoTargetContractSerializer.constructTargetContract`, providing
- * the default `{ [UNSPECIFIED_NAMESPACE_ID]:
- * MongoTargetUnspecifiedDatabase.instance }` map at that target-layer
+ * the default `{ [UNBOUND_NAMESPACE_ID]:
+ * MongoTargetUnboundDatabase.instance }` map at that target-layer
  * site. The foundation-layer class stays target-agnostic.
  *
  * Constructed instances are frozen via `freezeNode(this)`; instance

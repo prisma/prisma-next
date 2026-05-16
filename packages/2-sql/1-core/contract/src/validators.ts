@@ -183,9 +183,9 @@ const StorageTableSchema = type({
  * Namespace entry under `storage.namespaces[id]`. SQL contracts honour
  * the framework `Storage.namespaces` invariant from PR1; today every
  * contract binds to the singleton placeholder
- * (`SqlUnspecifiedNamespace.instance`) and the persisted shape carries
+ * (`SqlUnboundNamespace.instance`) and the persisted shape carries
  * just the namespace id. Per-target namespace concretions
- * (`PostgresSchema`, `SqliteUnspecifiedDatabase`) can additively grow
+ * (`PostgresSchema`, `SqliteUnboundDatabase`) can additively grow
  * the persisted shape when they earn their slots.
  */
 const NamespaceEntrySchema = type({

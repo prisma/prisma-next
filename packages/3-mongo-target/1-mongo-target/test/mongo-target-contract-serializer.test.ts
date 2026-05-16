@@ -8,7 +8,7 @@ import {
 } from '@prisma-next/mongo-contract';
 import { describe, expect, it } from 'vitest';
 import { MongoTargetContractSerializer } from '../src/core/mongo-target-contract-serializer';
-import { MongoTargetUnspecifiedDatabase } from '../src/core/mongo-target-database';
+import { MongoTargetUnboundDatabase } from '../src/core/mongo-target-database';
 
 function makeValidContractJson() {
   return {
@@ -33,13 +33,11 @@ describe('MongoTargetContractSerializer', () => {
     expect(contract.storage).toBeInstanceOf(MongoStorage);
   });
 
-  it('default storage carries the __unspecified__ singleton namespace', () => {
+  it('default storage carries the __unbound__ singleton namespace', () => {
     const serializer = new MongoTargetContractSerializer();
     const contract = serializer.deserializeContract(makeValidContractJson());
 
-    expect(contract.storage.namespaces['__unspecified__']).toBe(
-      MongoTargetUnspecifiedDatabase.instance,
-    );
+    expect(contract.storage.namespaces['__unbound__']).toBe(MongoTargetUnboundDatabase.instance);
   });
 
   it('hydrates collections into MongoCollection IR-class instances', () => {

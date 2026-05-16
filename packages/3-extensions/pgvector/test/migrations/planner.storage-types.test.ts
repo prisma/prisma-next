@@ -3,9 +3,9 @@ import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
+import { SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
@@ -83,7 +83,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
             typeParams: { values: ['USER'] },
           },
         },
-        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+        namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
       },
       roots: {},
       models: {},
@@ -155,7 +155,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
             typeParams: { values: ['USER'] },
           },
         },
-        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+        namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
       },
       roots: {},
       models: {},
@@ -251,7 +251,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
             typeParams: { values: ['ADMIN', 'USER'] },
           },
         },
-        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+        namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
       },
       roots: {},
       models: {},
@@ -314,7 +314,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
             typeParams: { length: 1536 },
           },
         },
-        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+        namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
       },
       roots: {},
       models: {},
@@ -375,7 +375,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
             typeParams: { length: 1536 },
           },
         },
-        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+        namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
       },
       roots: {},
       models: {},

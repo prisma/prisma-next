@@ -33,8 +33,8 @@
   },
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
+      "__unbound__": {
+        "id": "__unbound__"
       }
     },
     "storageHash": "sha256:254a19b8b88b9f1fa249829666339c6e7bfe44ca3e996ea4f5b84798969e5a8a",

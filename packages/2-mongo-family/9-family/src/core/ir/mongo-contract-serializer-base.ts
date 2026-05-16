@@ -116,7 +116,7 @@ export abstract class MongoContractSerializerBase<TContract>
    * Target-specific class construction from the validated structural
    * data. The target wraps the contract envelope in the family-layer
    * `MongoStorage` class instance, supplying the `namespaces` map
-   * (target concretions like `MongoTargetUnspecifiedDatabase`). The
+   * (target concretions like `MongoTargetUnboundDatabase`). The
    * leaf collection / index shapes are already family-layer IR-class
    * instances after the hydration walk above.
    */

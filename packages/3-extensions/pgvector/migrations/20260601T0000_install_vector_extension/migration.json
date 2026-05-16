@@ -1,6 +1,6 @@
 {
   "from": null,
-  "to": "sha256:401e16b37b0c5cc5d312b70de0168b89fabadbaf96619c581b468134d0a9d621",
+  "to": "sha256:cd54e5c077cb602fadd5bc725effee5d1b0e2a0d970c1cfe65329c458a18b9e3",
   "labels": [],
   "providedInvariants": ["pgvector:install-vector-v1"],
   "createdAt": "2026-06-01T00:00:00.000Z",
@@ -14,11 +14,11 @@
     "models": {},
     "storage": {
       "namespaces": {
-        "__unspecified__": {
-          "id": "__unspecified__"
+        "__unbound__": {
+          "id": "__unbound__"
         }
       },
-      "storageHash": "sha256:401e16b37b0c5cc5d312b70de0168b89fabadbaf96619c581b468134d0a9d621",
+      "storageHash": "sha256:cd54e5c077cb602fadd5bc725effee5d1b0e2a0d970c1cfe65329c458a18b9e3",
       "tables": {},
       "types": {
         "vector": {

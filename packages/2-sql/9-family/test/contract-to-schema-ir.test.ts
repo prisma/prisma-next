@@ -1,8 +1,8 @@
 import type { ColumnDefault, Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { profileHash } from '@prisma-next/contract/types';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
-import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
+import { SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import type { DefaultRenderer } from '../src/core/migrations/contract-to-schema-ir';
@@ -84,7 +84,7 @@ describe('contractToSchemaIR', () => {
           },
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -125,7 +125,7 @@ describe('contractToSchemaIR', () => {
           typeParams: { dimensions: 1536 },
         },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -157,7 +157,7 @@ describe('contractToSchemaIR', () => {
           },
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const expand = (input: {
@@ -210,7 +210,7 @@ describe('contractToSchemaIR', () => {
           typeParams: { length: 1536 },
         },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const expand = (input: {
@@ -246,7 +246,7 @@ describe('contractToSchemaIR', () => {
           },
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -266,7 +266,7 @@ describe('contractToSchemaIR', () => {
           },
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -286,7 +286,7 @@ describe('contractToSchemaIR', () => {
           },
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -306,7 +306,7 @@ describe('contractToSchemaIR', () => {
           },
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -326,7 +326,7 @@ describe('contractToSchemaIR', () => {
           },
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -343,7 +343,7 @@ describe('contractToSchemaIR', () => {
           },
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -362,7 +362,7 @@ describe('contractToSchemaIR', () => {
           primaryKey: { columns: ['id'], name: 'T_pkey' },
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -380,7 +380,7 @@ describe('contractToSchemaIR', () => {
           uniques: [{ columns: ['email'], name: 'T_email_key' }],
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -398,7 +398,7 @@ describe('contractToSchemaIR', () => {
           indexes: [{ columns: ['email'], name: 'T_email_idx' }],
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -426,7 +426,7 @@ describe('contractToSchemaIR', () => {
           ],
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -451,7 +451,7 @@ describe('contractToSchemaIR', () => {
           columns: { id: col({ nativeType: 'text' }) },
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -477,7 +477,7 @@ describe('contractToSchemaIR', () => {
           typeParams: { dimensions: 1536 },
         },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -511,7 +511,7 @@ describe('contractToSchemaIR', () => {
           typeParams: { dimensions: 1536 },
         },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIRImpl(wrap(storage), {
@@ -541,7 +541,7 @@ describe('contractToSchemaIR', () => {
           uniques: [{ columns: ['a', 'b'] }],
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -564,7 +564,7 @@ describe('contractToSchemaIR', () => {
           ],
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
@@ -596,7 +596,7 @@ describe('contractToSchemaIR', () => {
           ],
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage));
@@ -624,7 +624,7 @@ describe('contractToSchemaIR', () => {
           ],
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage));
@@ -657,7 +657,7 @@ describe('contractToSchemaIR', () => {
           ],
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const result = contractToSchemaIR(wrap(storage));
@@ -672,7 +672,7 @@ describe('detectDestructiveChanges', () => {
     const to: SqlStorage = {
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
     expect(detectDestructiveChanges(null, to)).toEqual([]);
   });
@@ -681,7 +681,7 @@ describe('detectDestructiveChanges', () => {
     const storage: SqlStorage = {
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
     expect(detectDestructiveChanges(storage, storage)).toEqual([]);
   });
@@ -690,14 +690,14 @@ describe('detectDestructiveChanges', () => {
     const from: SqlStorage = {
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
     const to: SqlStorage = {
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({ columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) } }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
     expect(detectDestructiveChanges(from, to)).toEqual([]);
   });
@@ -708,12 +708,12 @@ describe('detectDestructiveChanges', () => {
       tables: {
         T: table({ columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) } }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
     const to: SqlStorage = {
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: { T: table({ columns: { a: col({ nativeType: 'text' }) } }) },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const conflicts = detectDestructiveChanges(from, to);
@@ -731,12 +731,12 @@ describe('detectDestructiveChanges', () => {
         A: table({ columns: { id: col({ nativeType: 'text' }) } }),
         B: table({ columns: { id: col({ nativeType: 'text' }) } }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
     const to: SqlStorage = {
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: { A: table({ columns: { id: col({ nativeType: 'text' }) } }) },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const conflicts = detectDestructiveChanges(from, to);
@@ -755,12 +755,12 @@ describe('detectDestructiveChanges', () => {
           columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) },
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
     const to: SqlStorage = {
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {},
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const conflicts = detectDestructiveChanges(from, to);
@@ -777,14 +777,14 @@ describe('detectDestructiveChanges', () => {
         }),
         B: table({ columns: { id: col({ nativeType: 'text' }) } }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
     const to: SqlStorage = {
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         A: table({ columns: { id: col({ nativeType: 'text' }) } }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const conflicts = detectDestructiveChanges(from, to);
@@ -800,12 +800,12 @@ describe('detectDestructiveChanges', () => {
       tables: {
         toString: table({ columns: { id: col({ nativeType: 'text' }) } }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
     const to: SqlStorage = {
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {},
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const conflicts = detectDestructiveChanges(from, to);
@@ -827,14 +827,14 @@ describe('detectDestructiveChanges', () => {
           },
         }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
     const to: SqlStorage = {
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables: {
         T: table({ columns: {} }),
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     };
 
     const conflicts = detectDestructiveChanges(from, to);

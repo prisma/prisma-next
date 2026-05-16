@@ -17,7 +17,7 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
@@ -29,7 +29,7 @@ import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
   SqlStorage,
-  SqlUnspecifiedNamespace,
+  SqlUnboundNamespace,
   type StorageColumn,
   type StorageTable,
   type StorageTypeInstance,
@@ -417,7 +417,7 @@ export function buildSqlContractFromDefinition(
   const storageWithoutHash = {
     tables: storageTables,
     types: storageTypes,
-    namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+    namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
   };
   const storageHash: StorageHashBase<string> = definition.storageHash
     ? coreHash(definition.storageHash)

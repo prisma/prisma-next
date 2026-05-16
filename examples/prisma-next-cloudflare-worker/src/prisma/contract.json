@@ -379,11 +379,11 @@
   },
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
+      "__unbound__": {
+        "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:15823d3626844985b4031c96aa28f09c9a50b00c88b0afa1f13a2543c4de7e4e",
+    "storageHash": "sha256:e19478ead24e5a45a0469bd0b8ca2215140b52508525af8b33a1142146510d3b",
     "tables": {
       "bug": {
         "columns": {

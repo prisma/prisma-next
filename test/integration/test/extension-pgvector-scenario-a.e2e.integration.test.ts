@@ -1,4 +1,4 @@
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 /**
  * Scenario A end-to-end against PGlite — pgvector contract-space
  * (project: extension-contract-spaces, M4 / T4.3).
@@ -68,7 +68,7 @@ import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
+import { SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -152,7 +152,7 @@ function buildAppContract(opts: { readonly withLength: boolean }): Contract<SqlS
           foreignKeys: [],
         },
       },
-      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+      namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     },
     roots: {},
     models: {},

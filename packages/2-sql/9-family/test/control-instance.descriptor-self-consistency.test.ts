@@ -6,9 +6,9 @@ import type {
   ControlStack,
 } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
-import { SqlStorage, SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
+import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
 import type { SqlControlExtensionDescriptor } from '../src/core/migrations/types';
@@ -28,7 +28,7 @@ const fixtureStorageBody = {
       foreignKeys: [],
     },
   },
-  namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+  namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
 };
 
 const FIXTURE_HEAD_HASH = computeStorageHash({

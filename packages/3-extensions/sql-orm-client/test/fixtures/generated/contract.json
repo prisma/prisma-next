@@ -418,11 +418,11 @@
   },
   "storage": {
     "namespaces": {
-      "__unspecified__": {
-        "id": "__unspecified__"
+      "__unbound__": {
+        "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:f11b50f00065a242f5755d2aa750bcbc6904163dd1a88dfb200c42c8aa7b44db",
+    "storageHash": "sha256:e92df339aecf4a798943e8e5109cdb006b7f8737d88f674cf0bab6b0dff47adf",
     "tables": {
       "articles": {
         "columns": {

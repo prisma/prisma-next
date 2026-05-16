@@ -1,9 +1,9 @@
 import { MongoContractSerializerBase } from '@prisma-next/family-mongo/ir';
-import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { type MongoContract, MongoStorage } from '@prisma-next/mongo-contract';
 import type { JsonObject } from '@prisma-next/utils/json';
 import type { MongoTargetContract } from './mongo-target-contract';
-import { MongoTargetUnspecifiedDatabase } from './mongo-target-database';
+import { MongoTargetUnboundDatabase } from './mongo-target-database';
 
 /**
  * Mongo target `ContractSerializer` concretion. Plugs into the
@@ -12,11 +12,11 @@ import { MongoTargetUnspecifiedDatabase } from './mongo-target-database';
  * instance and providing the target's default namespace map.
  *
  * Default namespaces is
- * `{ [UNSPECIFIED_NAMESPACE_ID]: MongoTargetUnspecifiedDatabase.instance }`
+ * `{ [UNBOUND_NAMESPACE_ID]: MongoTargetUnboundDatabase.instance }`
  * — supplied at this target-layer call site because the family-layer
  * `MongoStorage` class is target-agnostic (it cannot import the
  * Mongo-target's namespace concretion). Contracts authored before
- * multi-namespace support bind to the unspecified singleton without the
+ * multi-namespace support bind to the unbound singleton without the
  * call site declaring anything.
  *
  * `validated.storage.collections` already carries `MongoCollection` IR
@@ -32,7 +32,7 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
       storageHash: storage.storageHash,
       collections: storage.collections,
       namespaces: {
-        [UNSPECIFIED_NAMESPACE_ID]: MongoTargetUnspecifiedDatabase.instance,
+        [UNBOUND_NAMESPACE_ID]: MongoTargetUnboundDatabase.instance,
       },
     });
     return { ...rest, storage: targetStorage };
@@ -44,7 +44,7 @@ export class MongoTargetContractSerializer extends MongoContractSerializerBase<M
    * for its live-instance API but that don't belong in the persisted
    * envelope: `MongoStorage.namespaces` is a Namespace-class map the
    * verifier and runtime walk; the persisted shape omits it (today's
-   * contracts have a single implicit unspecified namespace; future
+   * contracts have a single implicit unbound namespace; future
    * explicit per-collection assignment will surface in JSON via a
    * different field).
    *
