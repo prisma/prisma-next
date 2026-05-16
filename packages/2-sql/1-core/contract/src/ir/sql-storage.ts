@@ -156,7 +156,13 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
     const nestedTables = normaliseTablesInput(input.tables);
     Object.defineProperty(this, 'tablesByNamespace', {
       value: freezeNestedTables(nestedTables),
-      enumerable: true,
+      // Non-enumerable: the nested view is an in-memory derived projection
+      // of the flat `tables` view; the JSON envelope on disk mirrors the
+      // flat shape (single-namespace contracts) for byte-identity. The
+      // canonicalisation walk and JSON.stringify therefore skip this
+      // property; consumers reach it via the explicit `iterateTables*` /
+      // `findTableByCoord` helpers.
+      enumerable: false,
       writable: false,
       configurable: false,
     });
@@ -166,7 +172,7 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
       const nestedTypes = normaliseTypesInput(input.types);
       Object.defineProperty(this, 'typesByNamespace', {
         value: freezeNestedTypes(nestedTypes),
-        enumerable: true,
+        enumerable: false,
         writable: false,
         configurable: false,
       });
