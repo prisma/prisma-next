@@ -4,16 +4,27 @@ import type {
   StorageColumn,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { postgresCreateNamespace } from '../postgres-schema';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
+/**
+ * String-keyed entry points the migration ops use to render
+ * schema-qualified DDL and catalog checks. The `schema` argument is
+ * interpreted as a namespace coordinate: the framework `__unbound__`
+ * sentinel resolves to the late-bound `PostgresUnboundSchema` singleton
+ * (which elides the qualifier so `search_path` decides at runtime); any
+ * other id materialises a `PostgresSchema(id)` whose qualifier is the
+ * named schema. Helpers route through these `Namespace` concretions so
+ * the unbound branch lives in the polymorphic override, not the call
+ * site.
+ */
 export function qualifyTableName(schema: string, table: string): string {
-  return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
+  return postgresCreateNamespace(schema).qualifyTable(table);
 }
 
 export function toRegclassLiteral(schema: string, name: string): string {
-  const regclass = `${quoteIdentifier(schema)}.${quoteIdentifier(name)}`;
-  return `'${escapeLiteral(regclass)}'`;
+  return postgresCreateNamespace(schema).regclassLiteral(name);
 }
 
 /**
@@ -32,15 +43,16 @@ export function constraintExistsCheck({
   table?: string;
   exists?: boolean;
 }): string {
+  const namespace = postgresCreateNamespace(schema);
   const existsClause = exists ? 'EXISTS' : 'NOT EXISTS';
   const tableFilter = table
-    ? `AND c.conrelid = to_regclass(${toRegclassLiteral(schema, table)})`
+    ? `AND c.conrelid = to_regclass(${namespace.regclassLiteral(table)})`
     : '';
   return `SELECT ${existsClause} (
   SELECT 1 FROM pg_constraint c
   JOIN pg_namespace n ON c.connamespace = n.oid
   WHERE c.conname = '${escapeLiteral(constraintName)}'
-  AND n.nspname = '${escapeLiteral(schema)}'
+  AND n.nspname = ${namespace.schemaSqlExpression()}
   ${tableFilter}
 )`;
 }
@@ -56,11 +68,12 @@ export function columnExistsCheck({
   column: string;
   exists?: boolean;
 }): string {
+  const namespace = postgresCreateNamespace(schema);
   const existsClause = exists ? '' : 'NOT ';
   return `SELECT ${existsClause}EXISTS (
   SELECT 1
   FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
+  WHERE table_schema = ${namespace.schemaSqlExpression()}
     AND table_name = '${escapeLiteral(table)}'
     AND column_name = '${escapeLiteral(column)}'
 )`;
@@ -77,11 +90,12 @@ export function columnNullabilityCheck({
   column: string;
   nullable: boolean;
 }): string {
+  const namespace = postgresCreateNamespace(schema);
   const expected = nullable ? 'YES' : 'NO';
   return `SELECT EXISTS (
   SELECT 1
   FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
+  WHERE table_schema = ${namespace.schemaSqlExpression()}
     AND table_name = '${escapeLiteral(table)}'
     AND column_name = '${escapeLiteral(column)}'
     AND is_nullable = '${expected}'
@@ -97,10 +111,11 @@ export function columnHasNoDefaultCheck(opts: {
   table: string;
   column: string;
 }): string {
+  const namespace = postgresCreateNamespace(opts.schema);
   return `SELECT NOT EXISTS (
   SELECT 1
   FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(opts.schema)}'
+  WHERE table_schema = ${namespace.schemaSqlExpression()}
     AND table_name = '${escapeLiteral(opts.table)}'
     AND column_name = '${escapeLiteral(opts.column)}'
     AND column_default IS NOT NULL
@@ -267,12 +282,13 @@ export function columnTypeCheck({
   column: string;
   expectedType: string;
 }): string {
+  const namespace = postgresCreateNamespace(schema);
   return `SELECT EXISTS (
   SELECT 1
   FROM pg_attribute a
   JOIN pg_class c ON c.oid = a.attrelid
   JOIN pg_namespace n ON n.oid = c.relnamespace
-  WHERE n.nspname = '${escapeLiteral(schema)}'
+  WHERE n.nspname = ${namespace.schemaSqlExpression()}
     AND c.relname = '${escapeLiteral(table)}'
     AND a.attname = '${escapeLiteral(column)}'
     AND format_type(a.atttypid, a.atttypmod) = '${escapeLiteral(expectedType)}'
@@ -291,11 +307,12 @@ export function columnDefaultExistsCheck({
   column: string;
   exists?: boolean;
 }): string {
+  const namespace = postgresCreateNamespace(schema);
   const nullCheck = exists ? 'IS NOT NULL' : 'IS NULL';
   return `SELECT EXISTS (
   SELECT 1
   FROM information_schema.columns
-  WHERE table_schema = '${escapeLiteral(schema)}'
+  WHERE table_schema = ${namespace.schemaSqlExpression()}
     AND table_name = '${escapeLiteral(table)}'
     AND column_name = '${escapeLiteral(column)}'
     AND column_default ${nullCheck}
@@ -308,6 +325,7 @@ export function tableHasPrimaryKeyCheck(
   exists: boolean,
   constraintName?: string,
 ): string {
+  const namespace = postgresCreateNamespace(schema);
   const comparison = exists ? '' : 'NOT ';
   const constraintFilter = constraintName
     ? `AND c2.relname = '${escapeLiteral(constraintName)}'`
@@ -318,7 +336,7 @@ export function tableHasPrimaryKeyCheck(
   JOIN pg_class c ON c.oid = i.indrelid
   JOIN pg_namespace n ON n.oid = c.relnamespace
   LEFT JOIN pg_class c2 ON c2.oid = i.indexrelid
-  WHERE n.nspname = '${escapeLiteral(schema)}'
+  WHERE n.nspname = ${namespace.schemaSqlExpression()}
     AND c.relname = '${escapeLiteral(table)}'
     AND i.indisprimary
     ${constraintFilter}

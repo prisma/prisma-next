@@ -3,6 +3,7 @@ import {
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
+import { escapeLiteral } from './sql-utils';
 
 /**
  * Postgres target `Namespace` concretion — a Postgres schema (`CREATE
@@ -63,6 +64,28 @@ export class PostgresSchema extends NamespaceBase {
   qualifyTable(tableName: string): string {
     return `"${this.id}"."${tableName}"`;
   }
+
+  /**
+   * Render a SQL string-literal containing the qualified-name form
+   * suitable for `to_regclass(...)` arguments (e.g. `'"public"."user"'`).
+   * The unbound singleton overrides this to elide the schema prefix
+   * (`'"user"'`) so `search_path` resolves the object at runtime.
+   */
+  regclassLiteral(name: string): string {
+    return `'${escapeLiteral(this.qualifyTable(name))}'`;
+  }
+
+  /**
+   * Render a SQL expression that evaluates to this namespace's schema
+   * name at runtime, ready to drop into a `WHERE table_schema = …` /
+   * `WHERE n.nspname = …` clause. Named schemas emit a quoted SQL
+   * literal (`'public'`); the unbound singleton overrides this to emit
+   * `current_schema()` so catalog queries match whichever schema the
+   * connection's `search_path` resolved at runtime.
+   */
+  schemaSqlExpression(): string {
+    return `'${escapeLiteral(this.id)}'`;
+  }
 }
 
 /**
@@ -92,6 +115,10 @@ export class PostgresUnboundSchema extends PostgresSchema {
 
   override qualifyTable(tableName: string): string {
     return `"${tableName}"`;
+  }
+
+  override schemaSqlExpression(): string {
+    return 'current_schema()';
   }
 }
 
