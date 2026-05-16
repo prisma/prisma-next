@@ -171,7 +171,7 @@ function toSpaceMember(
 ): ContractSpaceMember {
   return {
     spaceId: opts.space,
-    contract: opts.destinationContract as Contract,
+    contract: opts.destinationContract as unknown as Contract,
     headRef: { hash: '', invariants: [] },
     migrations: {
       graph: {

@@ -212,7 +212,7 @@ export async function loadContractFromTs(
 
     validatePurity(contract);
 
-    return contract as Contract;
+    return contract as unknown as Contract;
   } catch (error) {
     try {
       if (tempFile) {

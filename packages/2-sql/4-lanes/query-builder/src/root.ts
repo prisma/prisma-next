@@ -62,5 +62,5 @@ export function createRoot<TContract extends Contract<SqlStorage>>(
  * @internal
  */
 export function createRoot(contract: unknown): unknown {
-  return new Root(contract as Contract<SqlStorage>);
+  return new Root(contract as unknown as Contract<SqlStorage>);
 }

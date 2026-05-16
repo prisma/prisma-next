@@ -115,7 +115,7 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
     result: {
       plan,
       displayOps: synthedPlan.operations,
-      destinationContract: input.member.contract as Contract,
+      destinationContract: input.member.contract as unknown as Contract,
       strategy: 'synth',
     },
   };

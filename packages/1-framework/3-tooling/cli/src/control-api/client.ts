@@ -641,7 +641,10 @@ class ControlClientImpl implements ControlClient {
     });
 
     try {
-      const enrichedIR = enrichContract(contractRaw as Contract, this.frameworkComponents ?? []);
+      const enrichedIR = enrichContract(
+        contractRaw as unknown as Contract,
+        this.frameworkComponents ?? [],
+      );
 
       try {
         this.familyInstance.validateContract(enrichedIR);

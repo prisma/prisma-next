@@ -232,7 +232,10 @@ export async function executeContractEmit(
         config.target.targetId,
         rawComponents,
       );
-      const enrichedIR = enrichContract(validatedContract.value as Contract, frameworkComponents);
+      const enrichedIR = enrichContract(
+        validatedContract.value as unknown as Contract,
+        frameworkComponents,
+      );
       familyInstance.validateContract(enrichedIR);
       // Each target's descriptor ships a `contractSerializer` SPI; the
       // framework canonicalizer threads its `serializeContract` so the

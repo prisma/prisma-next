@@ -66,7 +66,7 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
       },
       contractToSchema(contract, frameworkComponents) {
         const expander = buildNativeTypeExpander(frameworkComponents);
-        return contractToSchemaIR(contract as Contract<SqlStorage> | null, {
+        return contractToSchemaIR(contract as unknown as Contract<SqlStorage> | null, {
           annotationNamespace: 'pg',
           ...ifDefined('expandNativeType', expander),
           renderDefault: postgresRenderDefault,
