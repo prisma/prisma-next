@@ -7,7 +7,7 @@
  * Spec: agent-os/specs/2026-02-15-runtime-dx-ir-shaped-contract-mappings-on-executioncontext/spec.md
  */
 
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract, TypeMaps } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
@@ -19,7 +19,7 @@ test('contract.d.ts exports Contract and TypeMaps separately', () => {
 });
 
 test('SPI deserializeContract output is assignable to visualization shape', () => {
-  const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+  const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
 
   expectTypeOf(contract.models).toHaveProperty('User');
   expectTypeOf(contract.models).toHaveProperty('Post');

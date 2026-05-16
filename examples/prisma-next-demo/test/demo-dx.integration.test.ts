@@ -7,14 +7,14 @@
  * Spec: agent-os/specs/2026-02-15-runtime-dx-ir-shaped-contract-mappings-on-executioncontext/spec.md
  */
 
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '../src/prisma/contract.d';
 import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 
 describe('demo contract visualization DX', () => {
   it('validated contract has runtime shape needed for visualization', () => {
-    const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+    const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
 
     expect(contract.target).toBeDefined();
     expect(typeof contract.target).toBe('string');
@@ -30,7 +30,7 @@ describe('demo contract visualization DX', () => {
   });
 
   it('validated contract exposes model storage field mappings', () => {
-    const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+    const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
 
     expect(contract.models.User.storage.table).toBe('user');
     expect(contract.models.User.storage.fields.email.column).toBe('email');
@@ -42,7 +42,7 @@ describe('demo contract visualization DX', () => {
       ...contractJson,
       _generated: { emittedAt: '2026-02-15T12:00:00Z' },
     };
-    const contract = new SqlContractSerializer().deserializeContract(
+    const contract = new PostgresContractSerializer().deserializeContract(
       contractWithGenerated,
     ) as Contract;
 
@@ -51,7 +51,7 @@ describe('demo contract visualization DX', () => {
   });
 
   it('validated contract is traversable for render use-case', () => {
-    const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+    const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
 
     for (const [, model] of Object.entries(contract.models)) {
       const m = model as Record<string, unknown>;
