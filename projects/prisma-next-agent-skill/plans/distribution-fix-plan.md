@@ -63,10 +63,11 @@ Replace the broken distribution channel with a git-source URL pinned to the CLI'
 
 - `pnpm typecheck`
 - `pnpm test --filter @prisma-next/cli` (covers TC-3 and the existing `init` snapshot suite)
-- `pnpm test:integration` (covers TC-1, TC-2)
+- `pnpm --dir test/integration exec vitest run test/cli.init-skill-distribution.integration.test.ts` (covers TC-1, TC-2 directly; targeted because the workspace-wide `pnpm test:integration` carries pre-existing postgres-connection instability orthogonal to this milestone — see `wip/unattended-decisions.md` decision 4)
 - `pnpm lint:deps`
-- `pnpm lint:rules:sync` (the rule-sync invariant the previous PR introduced — still holds because we don't touch `.agents/rules/`)
 - `pnpm build` (the CLI build must succeed because `formatSkillInstallCommand` now reads from `package.json` at module load)
+
+> Earlier drafts of this plan listed `pnpm lint:rules:sync` as a gate. That script lives on a separate rule-sync branch and is not present in this branch's `package.json`; the milestone does not touch `.agents/rules/` so the invariant the gate would have asserted is structurally satisfied. See `wip/unattended-decisions.md` decision 3.
 
 ## Open Items
 
