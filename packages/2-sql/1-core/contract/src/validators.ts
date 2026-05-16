@@ -5,6 +5,8 @@ import { type } from 'arktype';
 import {
   type ForeignKeyInput,
   type ForeignKeyReferencesInput,
+  findTableByName,
+  iterateTablesWithCoords,
   type PrimaryKeyInput,
   type ReferentialAction,
   type SqlModelStorage,
@@ -380,7 +382,7 @@ export function validateSqlContract<T extends Contract<SqlStorage>>(value: unkno
 export function validateStorageSemantics(storage: SqlStorage): string[] {
   const errors: string[] = [];
 
-  for (const [tableName, table] of Object.entries(storage.tables)) {
+  for (const { name: tableName, table } of iterateTablesWithCoords(storage)) {
     const namedObjects = new Map<string, string[]>();
     const registerNamedObject = (kind: string, name: string | undefined) => {
       if (!name) return;
@@ -529,9 +531,7 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
   for (const [modelName, model] of Object.entries(models)) {
     const storageTable = model.storage.table;
 
-    const table = contract.storage.tables[storageTable] as
-      | (typeof contract.storage.tables)[string]
-      | undefined;
+    const table = findTableByName(contract.storage, storageTable);
     if (!table) {
       throw new ContractValidationError(
         `Model "${modelName}" references non-existent table "${storageTable}"`,
@@ -574,9 +574,12 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
  * counts match their referenced columns. Throws on the first mismatch.
  */
 export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): void {
-  const tableNames = new Set(Object.keys(contract.storage.tables));
+  const tableNames = new Set<string>();
+  for (const { name } of iterateTablesWithCoords(contract.storage)) {
+    tableNames.add(name);
+  }
 
-  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
+  for (const { name: tableName, table } of iterateTablesWithCoords(contract.storage)) {
     const columnNames = new Set(Object.keys(table.columns));
 
     if (table.primaryKey) {
@@ -638,7 +641,7 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
         );
       }
 
-      const referencedTable = contract.storage.tables[fk.references.table];
+      const referencedTable = findTableByName(contract.storage, fk.references.table);
       if (!referencedTable) continue;
       const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
       for (const colName of fk.references.columns) {

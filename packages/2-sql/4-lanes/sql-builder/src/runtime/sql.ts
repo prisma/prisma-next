@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { findTableByName, type SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Db } from '../types/db';
 import type { BuilderContext } from './builder-base';
@@ -22,8 +22,7 @@ export function sql<C extends Contract<SqlStorage>>(options: SqlOptions<C>): Db<
 
   return new Proxy({} as Db<C>, {
     get(_target, prop: string) {
-      const tables = context.contract.storage.tables;
-      const table = Object.hasOwn(tables, prop) ? tables[prop] : undefined;
+      const table = findTableByName(context.contract.storage, prop);
       if (table) {
         return new TableProxyImpl(prop, table, prop, ctx);
       }

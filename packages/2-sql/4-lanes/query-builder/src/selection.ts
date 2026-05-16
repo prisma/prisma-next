@@ -51,6 +51,10 @@ export type TableToSelection<
   readonly [ColumnName in keyof TContract['storage']['tables'][TTableName]['columns'] &
     string]: SelectionValue<
     ExtractOutputType<TContract, TTableName, ColumnName>,
-    TContract['storage']['tables'][TTableName]['columns'][ColumnName]['nativeType']
+    TContract['storage']['tables'][TTableName]['columns'][ColumnName] extends {
+      readonly nativeType: infer NT;
+    }
+      ? NT
+      : unknown
   >;
 }>;

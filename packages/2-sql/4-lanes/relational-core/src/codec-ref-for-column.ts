@@ -1,6 +1,8 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecRef } from '@prisma-next/framework-components/codec';
 import {
+  findTableByName,
+  findTypeByName,
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
   type SqlStorage,
@@ -22,12 +24,12 @@ export function codecRefForStorageColumn(
   tableName: string,
   columnName: string,
 ): CodecRef | undefined {
-  const tableDef = storage.tables[tableName];
+  const tableDef = findTableByName(storage, tableName);
   if (!tableDef) return undefined;
   const columnDef = tableDef.columns[columnName];
   if (!columnDef) return undefined;
   if (columnDef.typeRef !== undefined) {
-    const instance = storage.types?.[columnDef.typeRef];
+    const instance = findTypeByName(storage, columnDef.typeRef);
     if (!instance) return undefined;
     if (isPostgresEnumStorageEntry(instance)) {
       // Canonical path: the entry is a live `PostgresEnumType` IR

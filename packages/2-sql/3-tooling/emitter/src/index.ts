@@ -4,8 +4,14 @@ import type {
   GenerateContractTypesOptions,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  findTableByName,
+  findTypeByName,
   isPostgresEnumStorageEntry,
+  iterateTablesWithCoords,
+  iterateTypesWithCoords,
+  type PostgresEnumStorageEntry,
   type SqlModelStorage,
   type SqlStorage,
   type StorageTable,
@@ -37,10 +43,8 @@ export const sqlEmission = {
 
     const typeIdRegex = /^([^/]+)\/([^@]+)@(\d+)$/;
 
-    for (const [tableName, tableUnknown] of Object.entries(storage.tables)) {
-      const table = tableUnknown as StorageTable;
-      for (const [colName, colUnknown] of Object.entries(table.columns)) {
-        const col = colUnknown as { codecId?: string };
+    for (const { name: tableName, table } of iterateTablesWithCoords(storage)) {
+      for (const [colName, col] of Object.entries(table.columns)) {
         const codecId = col.codecId;
         if (!codecId) {
           throw new Error(`Column "${colName}" in table "${tableName}" is missing codecId`);
@@ -67,7 +71,10 @@ export const sqlEmission = {
     }
 
     const models = contract.models as Record<string, ContractModel<SqlModelStorage>>;
-    const tableNames = new Set(Object.keys(storage.tables));
+    const tableNames = new Set<string>();
+    for (const { name } of iterateTablesWithCoords(storage)) {
+      tableNames.add(name);
+    }
 
     if (models) {
       for (const [modelName, model] of Object.entries(models)) {
@@ -80,7 +87,7 @@ export const sqlEmission = {
           throw new Error(`Model "${modelName}" references non-existent table "${tableName}"`);
         }
 
-        const table: StorageTable | undefined = storage.tables[tableName];
+        const table: StorageTable | undefined = findTableByName(storage, tableName);
         assertDefined(table, `Model "${modelName}" references non-existent table "${tableName}"`);
 
         const columnNames = new Set(Object.keys(table.columns));
@@ -109,8 +116,7 @@ export const sqlEmission = {
       }
     }
 
-    for (const [tableName, tableUnknown] of Object.entries(storage.tables)) {
-      const table = tableUnknown as StorageTable;
+    for (const { name: tableName, table } of iterateTablesWithCoords(storage)) {
       const columnNames = new Set(Object.keys(table.columns));
 
       if (!Array.isArray(table.uniques)) {
@@ -174,7 +180,10 @@ export const sqlEmission = {
           );
         }
 
-        const referencedTable: StorageTable | undefined = storage.tables[fk.references.table];
+        const referencedTable: StorageTable | undefined = findTableByName(
+          storage,
+          fk.references.table,
+        );
         assertDefined(
           referencedTable,
           `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
@@ -200,84 +209,11 @@ export const sqlEmission = {
 
   generateStorageType(contract: Contract, storageHashTypeName: string): string {
     const storage = contract.storage as unknown as SqlStorage;
-    const tables: string[] = [];
-    for (const [tableName, table] of Object.entries(storage.tables).sort(([a], [b]) =>
-      a.localeCompare(b),
-    )) {
-      const columns: string[] = [];
-      for (const [colName, col] of Object.entries(table.columns)) {
-        const nullable = col.nullable ? 'true' : 'false';
-        const nativeType = serializeValue(col.nativeType);
-        const codecId = serializeValue(col.codecId);
-        const defaultSpec = col.default
-          ? col.default.kind === 'literal'
-            ? `; readonly default: { readonly kind: 'literal'; readonly value: DefaultLiteralValue<${codecId}, ${serializeValue(
-                col.default.value,
-              )}> }`
-            : `; readonly default: { readonly kind: 'function'; readonly expression: ${serializeValue(
-                col.default.expression,
-              )} }`
-          : '';
-        const typeParamsSpec =
-          col.typeParams && Object.keys(col.typeParams).length > 0
-            ? `; readonly typeParams: ${serializeTypeParamsLiteral(col.typeParams)}`
-            : '';
-        const typeRefSpec = col.typeRef ? `; readonly typeRef: ${serializeValue(col.typeRef)}` : '';
-        columns.push(
-          `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable}${defaultSpec}${typeParamsSpec}${typeRefSpec} }`,
-        );
-      }
-
-      const tableParts: string[] = [`columns: { ${columns.join('; ')} }`];
-
-      if (table.primaryKey) {
-        const pkCols = table.primaryKey.columns.map((c) => serializeValue(c)).join(', ');
-        const pkName = table.primaryKey.name
-          ? `; readonly name: ${serializeValue(table.primaryKey.name)}`
-          : '';
-        tableParts.push(`primaryKey: { readonly columns: readonly [${pkCols}]${pkName} }`);
-      }
-
-      const uniques = table.uniques
-        .map((u) => {
-          const cols = u.columns.map((c: string) => serializeValue(c)).join(', ');
-          const name = u.name ? `; readonly name: ${serializeValue(u.name)}` : '';
-          return `{ readonly columns: readonly [${cols}]${name} }`;
-        })
-        .join(', ');
-      tableParts.push(`uniques: readonly [${uniques}]`);
-
-      const indexes = table.indexes
-        .map((i) => {
-          const cols = i.columns.map((c: string) => serializeValue(c)).join(', ');
-          const name = i.name !== undefined ? `; readonly name: ${serializeValue(i.name)}` : '';
-          const indexType =
-            i.type !== undefined ? `; readonly type: ${serializeValue(i.type)}` : '';
-          const indexOptions =
-            i.options !== undefined ? `; readonly options: ${serializeValue(i.options)}` : '';
-          return `{ readonly columns: readonly [${cols}]${name}${indexType}${indexOptions} }`;
-        })
-        .join(', ');
-      tableParts.push(`indexes: readonly [${indexes}]`);
-
-      const fks = table.foreignKeys
-        .map((fk) => {
-          const cols = fk.columns.map((c: string) => serializeValue(c)).join(', ');
-          const refCols = fk.references.columns.map((c: string) => serializeValue(c)).join(', ');
-          const name = fk.name ? `; readonly name: ${serializeValue(fk.name)}` : '';
-          return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: ${serializeValue(fk.references.table)}; readonly columns: readonly [${refCols}] }${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
-        })
-        .join(', ');
-      tableParts.push(`foreignKeys: readonly [${fks}]`);
-
-      tables.push(`readonly ${tableName}: { ${tableParts.join('; ')} }`);
-    }
-
-    const typesType = generateStorageTypesType(storage.types);
-
+    const tablesType = generateTablesType(storage);
+    const typesType = generateStorageTypesType(storage);
     const namespacesType = generateStorageNamespacesType(storage.namespaces);
 
-    return `{ readonly tables: { ${tables.join('; ')} }; readonly types: ${typesType}; readonly namespaces: ${namespacesType}; readonly storageHash: ${storageHashTypeName} }`;
+    return `{ readonly tables: ${tablesType}; readonly types: ${typesType}; readonly namespaces: ${namespacesType}; readonly storageHash: ${storageHashTypeName} }`;
   },
 
   generateModelStorageType(_modelName: string, model: ContractModel): string {
@@ -313,14 +249,14 @@ export const sqlEmission = {
     if (!storage) return undefined;
 
     const tableName = sqlModel.storage.table;
-    const table: StorageTable | undefined = storage.tables[tableName];
+    const table: StorageTable | undefined = findTableByName(storage, tableName);
     if (!table) return undefined;
 
     const column = table.columns[storageField.column];
     if (!column) return undefined;
 
     if (column.typeRef) {
-      const typeInstance = storage.types?.[column.typeRef];
+      const typeInstance = findTypeByName(storage, column.typeRef);
       if (typeInstance === undefined) return undefined;
       if (isPostgresEnumStorageEntry(typeInstance)) {
         return { values: typeInstance.values };
@@ -378,13 +314,142 @@ export const sqlEmission = {
   },
 } as const;
 
-function generateStorageTypesType(types: SqlStorage['types']): string {
-  if (!types || Object.keys(types).length === 0) {
+function emitTableType(table: StorageTable): string {
+  const columns: string[] = [];
+  for (const [colName, col] of Object.entries(table.columns)) {
+    const nullable = col.nullable ? 'true' : 'false';
+    const nativeType = serializeValue(col.nativeType);
+    const codecId = serializeValue(col.codecId);
+    const defaultSpec = col.default
+      ? col.default.kind === 'literal'
+        ? `; readonly default: { readonly kind: 'literal'; readonly value: DefaultLiteralValue<${codecId}, ${serializeValue(
+            col.default.value,
+          )}> }`
+        : `; readonly default: { readonly kind: 'function'; readonly expression: ${serializeValue(
+            col.default.expression,
+          )} }`
+      : '';
+    const typeParamsSpec =
+      col.typeParams && Object.keys(col.typeParams).length > 0
+        ? `; readonly typeParams: ${serializeTypeParamsLiteral(col.typeParams)}`
+        : '';
+    const typeRefSpec = col.typeRef ? `; readonly typeRef: ${serializeValue(col.typeRef)}` : '';
+    columns.push(
+      `readonly ${colName}: { readonly nativeType: ${nativeType}; readonly codecId: ${codecId}; readonly nullable: ${nullable}${defaultSpec}${typeParamsSpec}${typeRefSpec} }`,
+    );
+  }
+
+  const tableParts: string[] = [`columns: { ${columns.join('; ')} }`];
+
+  if (table.primaryKey) {
+    const pkCols = table.primaryKey.columns.map((c) => serializeValue(c)).join(', ');
+    const pkName = table.primaryKey.name
+      ? `; readonly name: ${serializeValue(table.primaryKey.name)}`
+      : '';
+    tableParts.push(`primaryKey: { readonly columns: readonly [${pkCols}]${pkName} }`);
+  }
+
+  const uniques = table.uniques
+    .map((u) => {
+      const cols = u.columns.map((c: string) => serializeValue(c)).join(', ');
+      const name = u.name ? `; readonly name: ${serializeValue(u.name)}` : '';
+      return `{ readonly columns: readonly [${cols}]${name} }`;
+    })
+    .join(', ');
+  tableParts.push(`uniques: readonly [${uniques}]`);
+
+  const indexes = table.indexes
+    .map((i) => {
+      const cols = i.columns.map((c: string) => serializeValue(c)).join(', ');
+      const name = i.name !== undefined ? `; readonly name: ${serializeValue(i.name)}` : '';
+      const indexType = i.type !== undefined ? `; readonly type: ${serializeValue(i.type)}` : '';
+      const indexOptions =
+        i.options !== undefined ? `; readonly options: ${serializeValue(i.options)}` : '';
+      return `{ readonly columns: readonly [${cols}]${name}${indexType}${indexOptions} }`;
+    })
+    .join(', ');
+  tableParts.push(`indexes: readonly [${indexes}]`);
+
+  const fks = table.foreignKeys
+    .map((fk) => {
+      const cols = fk.columns.map((c: string) => serializeValue(c)).join(', ');
+      const refCols = fk.references.columns.map((c: string) => serializeValue(c)).join(', ');
+      const name = fk.name ? `; readonly name: ${serializeValue(fk.name)}` : '';
+      return `{ readonly columns: readonly [${cols}]; readonly references: { readonly table: ${serializeValue(fk.references.table)}; readonly columns: readonly [${refCols}] }${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
+    })
+    .join(', ');
+  tableParts.push(`foreignKeys: readonly [${fks}]`);
+
+  return `{ ${tableParts.join('; ')} }`;
+}
+
+/**
+ * Single-namespace contracts (only `__unbound__` populated) emit a flat
+ * `tables: { [tableName]: ... }` shape so single-namespace
+ * contract.d.ts envelopes stay byte-identical post-FR15. Multi-namespace
+ * contracts emit the FR15 nested-by-namespace shape required to express
+ * cross-namespace same-named tables without collision.
+ */
+function generateTablesType(storage: SqlStorage): string {
+  // Single-namespace contracts emit a flat `tables: { [tableName]: ... }`
+  // shape so existing single-namespace contract.d.ts envelopes stay
+  // byte-identical post-FR15. Multi-namespace contracts emit the FR15
+  // nested-by-namespace shape required to express cross-namespace
+  // same-named tables without collision.
+  const tablesByNamespace = storage.tablesByNamespace ?? {
+    [UNBOUND_NAMESPACE_ID]: storage.tables,
+  };
+  const namespaceIds = Object.keys(tablesByNamespace);
+  const isSingleNamespace =
+    namespaceIds.length <= 1 &&
+    (namespaceIds.length === 0 || namespaceIds[0] === UNBOUND_NAMESPACE_ID);
+
+  if (isSingleNamespace) {
+    const tableEntries: string[] = [];
+    for (const { name: tableName, table } of iterateTablesWithCoords(storage)) {
+      tableEntries.push(`readonly ${tableName}: ${emitTableType(table)}`);
+    }
+    tableEntries.sort();
+    return `{ ${tableEntries.join('; ')} }`;
+  }
+
+  const namespaceEntries: string[] = [];
+  for (const namespaceId of [...namespaceIds].sort()) {
+    const bucket: Readonly<Record<string, StorageTable>> = tablesByNamespace[namespaceId] ?? {};
+    const tableEntries: string[] = [];
+    for (const tableName of Object.keys(bucket).sort()) {
+      const table = bucket[tableName];
+      if (!table) continue;
+      tableEntries.push(`readonly ${tableName}: ${emitTableType(table)}`);
+    }
+    namespaceEntries.push(
+      `readonly ${serializeObjectKey(namespaceId)}: { ${tableEntries.join('; ')} }`,
+    );
+  }
+  return `{ ${namespaceEntries.join('; ')} }`;
+}
+
+function generateStorageTypesType(storage: SqlStorage): string {
+  const typesByNamespace =
+    storage.typesByNamespace ?? (storage.types ? { [UNBOUND_NAMESPACE_ID]: storage.types } : {});
+  if (Object.keys(typesByNamespace).length === 0) {
     return 'Record<string, never>';
   }
 
-  const typeEntries: string[] = [];
-  for (const [typeName, typeInstance] of Object.entries(types)) {
+  const namespaceIds = Object.keys(typesByNamespace);
+  const isSingleNamespace =
+    namespaceIds.length <= 1 &&
+    (namespaceIds.length === 0 || namespaceIds[0] === UNBOUND_NAMESPACE_ID);
+  let totalTypes = 0;
+  for (const bucket of Object.values(typesByNamespace)) totalTypes += Object.keys(bucket).length;
+  if (totalTypes === 0) {
+    return 'Record<string, never>';
+  }
+
+  function emitTypeEntry(
+    typeName: string,
+    typeInstance: StorageTypeInstance | PostgresEnumStorageEntry,
+  ): string {
     if (isPostgresEnumStorageEntry(typeInstance)) {
       const codecId = serializeValue(
         // `codecBinding.codecId` lives on the live IR-class instance;
@@ -402,10 +467,7 @@ function generateStorageTypesType(types: SqlStorage['types']): string {
       // satisfies the polymorphic slot's structural alphabet. The
       // persisted JSON envelope still carries the IR's narrower kind
       // discriminator; the d.ts is the type-level codec-resolved view.
-      typeEntries.push(
-        `readonly ${typeName}: { readonly kind: 'codec-instance'; readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
-      );
-      continue;
+      return `readonly ${typeName}: { readonly kind: 'codec-instance'; readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`;
     }
     // The slot is polymorphic at the framework level; codec-instance
     // entries are the only non-IR-class kind today. The runtime
@@ -426,12 +488,32 @@ function generateStorageTypesType(types: SqlStorage['types']): string {
     const codecId = serializeValue(codecInstanceShape.codecId);
     const nativeType = serializeValue(codecInstanceShape.nativeType);
     const typeParamsStr = serializeTypeParamsLiteral(codecInstanceShape.typeParams);
-    typeEntries.push(
-      `readonly ${typeName}: { readonly kind: 'codec-instance'; readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
-    );
+    return `readonly ${typeName}: { readonly kind: 'codec-instance'; readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`;
   }
 
-  return `{ ${typeEntries.join('; ')} }`;
+  if (isSingleNamespace) {
+    const typeEntries: string[] = [];
+    for (const { name: typeName, entry: typeInstance } of iterateTypesWithCoords(storage)) {
+      typeEntries.push(emitTypeEntry(typeName, typeInstance));
+    }
+    return `{ ${typeEntries.join('; ')} }`;
+  }
+
+  const namespaceEntries: string[] = [];
+  for (const namespaceId of [...namespaceIds].sort()) {
+    const bucket: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>> =
+      typesByNamespace[namespaceId] ?? {};
+    const typeEntries: string[] = [];
+    for (const typeName of Object.keys(bucket).sort()) {
+      const typeInstance = bucket[typeName];
+      if (typeInstance === undefined) continue;
+      typeEntries.push(emitTypeEntry(typeName, typeInstance));
+    }
+    namespaceEntries.push(
+      `readonly ${serializeObjectKey(namespaceId)}: { ${typeEntries.join('; ')} }`,
+    );
+  }
+  return `{ ${namespaceEntries.join('; ')} }`;
 }
 
 function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): string {

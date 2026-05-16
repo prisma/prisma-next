@@ -15,6 +15,7 @@ import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import {
   SqlStorage,
   type SqlStorageInput,
+  type SqlStorageTablesFlatInput,
   type StorageColumn,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
@@ -696,7 +697,7 @@ function createAdapterHooksComponent(): TargetBoundComponentDescriptor<'sql', st
   };
 }
 
-const DEMO_BASE_STORAGE: SqlStorageInput = {
+const DEMO_BASE_STORAGE: SqlStorageInput & { tables: SqlStorageTablesFlatInput } = {
   storageHash: coreHash('sha256:test'),
   tables: {
     user: table({

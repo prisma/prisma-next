@@ -19,9 +19,22 @@ export { PrimaryKey, type PrimaryKeyInput } from './ir/primary-key';
 export { Index, type IndexInput } from './ir/sql-index';
 export { SqlNode } from './ir/sql-node';
 export {
+  countAllTables,
+  findTableByCoord,
+  findTableByName,
+  findTypeByCoord,
+  findTypeByName,
+  iterateAllTables,
+  iterateTablesWithCoords,
+  iterateTypesWithCoords,
+  listAllTableNames,
   SqlStorage,
   type SqlStorageInput,
+  type SqlStorageTablesFlatInput,
+  type SqlStorageTablesNestedInput,
   type SqlStorageTypeEntry,
+  type SqlStorageTypesFlatInput,
+  type SqlStorageTypesNestedInput,
 } from './ir/sql-storage';
 export { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';

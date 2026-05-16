@@ -26,6 +26,8 @@ import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import {
   isPostgresEnumStorageEntry,
+  iterateTablesWithCoords,
+  iterateTypesWithCoords,
   type SqlStorage,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
@@ -314,7 +316,7 @@ function collectTypeRefSites(
   storage: SqlStorage,
 ): Map<string, Array<{ readonly table: string; readonly column: string }>> {
   const sites = new Map<string, Array<{ readonly table: string; readonly column: string }>>();
-  for (const [tableName, table] of Object.entries(storage.tables)) {
+  for (const { name: tableName, table } of iterateTablesWithCoords(storage)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
       if (typeof column.typeRef !== 'string') continue;
       const list = sites.get(column.typeRef);
@@ -342,7 +344,7 @@ function initializeTypeHelpers(
 
   const typeRefSites = collectTypeRefSites(storage);
 
-  for (const [typeName, typeInstance] of Object.entries(storageTypes)) {
+  for (const { name: typeName, entry: typeInstance } of iterateTypesWithCoords(storage)) {
     const enumView = readEnumViewIfApplicable(typeInstance);
     const codecId = enumView ? enumView.codecId : (typeInstance as StorageTypeInstance).codecId;
     const typeParams = enumView
@@ -372,7 +374,7 @@ function validateColumnTypeParams(
   storage: SqlStorage,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): void {
-  for (const [tableName, table] of Object.entries(storage.tables)) {
+  for (const { name: tableName, table } of iterateTablesWithCoords(storage)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
       if (column.typeParams) {
         const descriptor = codecDescriptors.get(column.codecId);
@@ -399,7 +401,7 @@ function assertColumnCodecIntegrity(
   storage: SqlStorage,
   codecDescriptors: CodecDescriptorRegistry,
 ): void {
-  for (const [tableName, table] of Object.entries(storage.tables)) {
+  for (const { name: tableName, table } of iterateTablesWithCoords(storage)) {
     for (const columnName of Object.keys(table.columns)) {
       const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
       if (!ref) continue;
@@ -489,7 +491,7 @@ function buildContractCodecRegistry(
   const nameByKey = new Map<string, string>();
 
   const typeRefSites = collectTypeRefSites(contract.storage);
-  for (const [typeName, typeInstance] of Object.entries(contract.storage.types ?? {})) {
+  for (const { name: typeName, entry: typeInstance } of iterateTypesWithCoords(contract.storage)) {
     const enumView = readEnumViewIfApplicable(typeInstance);
     const ref: CodecRef = enumView
       ? {
@@ -512,7 +514,7 @@ function buildContractCodecRegistry(
     }
   }
 
-  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
+  for (const { name: tableName, table } of iterateTablesWithCoords(contract.storage)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
       if (column.typeRef !== undefined) continue;
       const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
@@ -542,7 +544,7 @@ function buildContractCodecRegistry(
     };
   });
 
-  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
+  for (const { name: tableName, table } of iterateTablesWithCoords(contract.storage)) {
     for (const columnName of Object.keys(table.columns)) {
       const ref = codecDescriptors.codecRefForColumn(tableName, columnName);
       if (!ref) continue;

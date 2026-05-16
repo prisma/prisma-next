@@ -20,9 +20,9 @@ import {
 } from './storage-type-instance';
 
 /**
- * Polymorphic value type for `SqlStorage.types` entries (Decision 18,
- * Option B). The slot's framework alphabet is `StorageType` — codec
- * triples (`StorageTypeInstance` with `kind: 'codec-instance'`) and
+ * Polymorphic value type for `SqlStorage.types` entries. The slot's
+ * framework alphabet is `StorageType` — codec triples
+ * (`StorageTypeInstance` with `kind: 'codec-instance'`) and
  * target-specific IR class instances structurally satisfying
  * `PostgresEnumStorageEntry` (with `kind: 'postgres-enum'`) are the
  * two variants the SQL family ships today. The construction side also
@@ -38,10 +38,49 @@ const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
   [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance,
 });
 
+/**
+ * Flat (legacy) tables input shape: `{ [tableName]: StorageTable | StorageTableInput }`.
+ * Each entry's `namespaceId` (defaulted to {@link UNBOUND_NAMESPACE_ID})
+ * decides which nested namespace bucket the entry lifts into. Same-named
+ * tables in different namespaces cannot be expressed via this shape; the
+ * second occurrence collides on the `tableName` key — use the nested
+ * input shape ({@link SqlStorageTablesNestedInput}) when authoring
+ * cross-namespace same-named tables.
+ *
+ * Accepted as ergonomic sugar at the constructor boundary so existing
+ * single-namespace authoring stays terse.
+ */
+export type SqlStorageTablesFlatInput = Record<string, StorageTable | StorageTableInput>;
+
+/**
+ * Nested (FR15) tables input shape:
+ * `{ [namespaceId]: { [tableName]: StorageTable | StorageTableInput } }`.
+ * The only shape that can express two same-named tables in distinct
+ * namespaces (`auth.User` + `public.User`) without collision.
+ */
+export type SqlStorageTablesNestedInput = Record<
+  string,
+  Record<string, StorageTable | StorageTableInput>
+>;
+
+export type SqlStorageTypesFlatInput = Record<string, SqlStorageTypeEntry>;
+
+export type SqlStorageTypesNestedInput = Record<string, Record<string, SqlStorageTypeEntry>>;
+
 export interface SqlStorageInput<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
-  readonly tables: Record<string, StorageTable | StorageTableInput>;
-  readonly types?: Record<string, SqlStorageTypeEntry>;
+  /**
+   * Tables map. Accepts the legacy flat shape (`{ [tableName]: ... }`)
+   * or the FR15 nested-by-namespace shape (`{ [namespaceId]: { [tableName]: ... } }`).
+   * Flat input is bucketed by each entry's `StorageTable.namespaceId`
+   * field (default {@link UNBOUND_NAMESPACE_ID}).
+   */
+  readonly tables: SqlStorageTablesFlatInput | SqlStorageTablesNestedInput;
+  /**
+   * Types map. Same dual-shape contract as `tables`. Flat input
+   * buckets under {@link UNBOUND_NAMESPACE_ID}.
+   */
+  readonly types?: SqlStorageTypesFlatInput | SqlStorageTypesNestedInput;
   readonly namespaces?: Readonly<Record<string, Namespace>>;
 }
 
@@ -49,32 +88,55 @@ export interface SqlStorageInput<THash extends string = string> {
  * SQL Contract IR root node for the `storage` field.
  *
  * Single concrete family-shared class — both Postgres and SQLite
- * consume this same class today. Per-target storage subclasses are
- * introduced when each target's namespace shape earns its
- * target-specific concretion (target-specific derived fields,
- * target-specific storage extensions).
+ * consume this same class today.
  *
  * Honours the framework `Storage` interface: every SQL IR carries a
- * `namespaces` map keyed by namespace id. The default singleton
- * (`{ [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance }`)
- * binds every contract authored before per-target namespace concretions
- * land; per-target namespace classes (`PostgresSchema.unbound`,
- * `SqliteUnboundDatabase.instance`) earn their slots when each
- * target's namespace shape lands.
+ * `namespaces` map keyed by namespace id.
  *
- * The constructor normalises nested IR-class fields (`tables`, optional
- * `types`) into class instances so downstream walks see a uniform AST.
- * `types` is polymorphic per Decision 18 Option B: codec-triple inputs
- * are stamped with `kind: 'codec-instance'`; class-instance kinds
- * (e.g. Postgres-enum entries satisfying `PostgresEnumStorageEntry`)
- * pass through; hydration of raw JSON class-instance entries (carrying
- * their narrower `kind` literal) is the per-target serializer's
- * responsibility (so the family base does not import target-specific
- * subclasses).
+ * **Tables shape (FR15 dual view).** The IR exposes two views of the
+ * same data, both populated at construction:
+ *
+ * - `tables: Readonly<Record<TableName, StorageTable>>` — the
+ *   ergonomic flat-by-name view. Single-namespace contracts use this
+ *   exclusively. Same-named tables across namespaces resolve to the
+ *   first entry encountered (iteration order of the nested map);
+ *   consumers needing the collision-free truth must read
+ *   `tablesByNamespace`.
+ * - `tablesByNamespace: Readonly<Record<NamespaceId, Record<TableName,
+ *   StorageTable>>>` — the FR15 nested-by-namespace truth. Same-named
+ *   tables across namespaces (e.g. `auth.User` + `public.User`)
+ *   coexist here without collision.
+ *
+ * The constructor accepts either flat input (legacy authoring;
+ * bucketed by each entry's `StorageTable.namespaceId`, default
+ * {@link UNBOUND_NAMESPACE_ID}) or the FR15 nested shape directly.
+ *
+ * `StorageTable.namespaceId` is retained as a back-pointer for
+ * ergonomic walks; the constructor validates it agrees with the
+ * enclosing nested key when nested input is supplied.
+ *
+ * Use {@link iterateAllTables} / {@link iterateTablesWithCoords} for
+ * "walk every table" consumers, {@link findTableByCoord} for
+ * `(namespaceId, name)` lookups, and {@link findTableByName} as the
+ * legacy name-only lookup (throws when the name is ambiguous across
+ * namespaces).
+ *
+ * The `types` slot follows the same dual-view contract: `types` is
+ * the flat-by-name view, `typesByNamespace` is the FR15 nested truth.
+ *
+ * `tablesByNamespace` and `typesByNamespace` are declared optional in
+ * the type so user-facing emitted contract types — built bottom-up by
+ * the emitter / `defineContract` from the flat `tables` shape — remain
+ * structurally assignable to `Contract<SqlStorage>`. Reads via the
+ * helpers transparently fall back to wrapping the flat view under the
+ * unbound namespace when the nested view is absent.
  */
 export class SqlStorage<THash extends string = string> extends SqlNode implements Storage {
   readonly storageHash: StorageHashBase<THash>;
   readonly tables: Readonly<Record<string, StorageTable>>;
+  declare readonly tablesByNamespace?: Readonly<
+    Record<string, Readonly<Record<string, StorageTable>>>
+  >;
   readonly namespaces: Readonly<Record<string, Namespace>>;
   // SQL-family slot view: the two structural variants the family ships
   // today (codec triples + Postgres-enum structural entries). Each
@@ -84,28 +146,198 @@ export class SqlStorage<THash extends string = string> extends SqlNode implement
   // type guards rather than importing the target's concrete IR class
   // (cross-domain rule: SQL may not import `target-*`).
   declare readonly types?: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
+  declare readonly typesByNamespace?: Readonly<
+    Record<string, Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>>
+  >;
 
   constructor(input: SqlStorageInput<THash>) {
     super();
     this.storageHash = input.storageHash;
-    this.tables = Object.freeze(
-      Object.fromEntries(
-        Object.entries(input.tables).map(([name, t]) => [
-          name,
-          t instanceof StorageTable ? t : new StorageTable(t),
-        ]),
-      ),
-    );
+    const nestedTables = normaliseTablesInput(input.tables);
+    Object.defineProperty(this, 'tablesByNamespace', {
+      value: freezeNestedTables(nestedTables),
+      enumerable: true,
+      writable: false,
+      configurable: false,
+    });
+    this.tables = freezeFlatTablesView(nestedTables);
     this.namespaces = input.namespaces ?? DEFAULT_NAMESPACES;
     if (input.types !== undefined) {
-      this.types = Object.freeze(
-        Object.fromEntries(
-          Object.entries(input.types).map(([name, ti]) => [name, normaliseTypeEntry(ti)]),
-        ),
-      );
+      const nestedTypes = normaliseTypesInput(input.types);
+      Object.defineProperty(this, 'typesByNamespace', {
+        value: freezeNestedTypes(nestedTypes),
+        enumerable: true,
+        writable: false,
+        configurable: false,
+      });
+      Object.defineProperty(this, 'types', {
+        value: freezeFlatTypesView(nestedTypes),
+        enumerable: true,
+        writable: false,
+        configurable: false,
+      });
     }
     freezeNode(this);
   }
+}
+
+/**
+ * Discriminate between the legacy flat `tables` input shape and the
+ * FR15 nested-by-namespace input shape, then normalise to the nested
+ * in-memory shape. A flat input is detected by spotting an immediate
+ * value that "looks like a table" (a `StorageTable` instance, or an
+ * input object carrying the `columns` field). A nested input has
+ * record-of-records values.
+ */
+function normaliseTablesInput(
+  input: SqlStorageTablesFlatInput | SqlStorageTablesNestedInput,
+): Record<string, Record<string, StorageTable>> {
+  if (isFlatTablesInput(input)) {
+    const result: Record<string, Record<string, StorageTable>> = {};
+    for (const [name, entry] of Object.entries(input)) {
+      const table = entry instanceof StorageTable ? entry : new StorageTable(entry);
+      const namespaceId = table.namespaceId ?? UNBOUND_NAMESPACE_ID;
+      if (result[namespaceId] === undefined) {
+        result[namespaceId] = {};
+      }
+      const bucket = result[namespaceId];
+      if (Object.hasOwn(bucket, name)) {
+        throw new Error(
+          `SqlStorage: table "${name}" appears twice in namespace "${namespaceId}". The legacy flat input shape cannot express same-named tables across namespaces; rewrite as the nested \`Record<namespaceId, Record<tableName, StorageTable>>\` shape.`,
+        );
+      }
+      bucket[name] = table;
+    }
+    return result;
+  }
+  const result: Record<string, Record<string, StorageTable>> = {};
+  for (const [namespaceId, bucketInput] of Object.entries(input)) {
+    const bucket: Record<string, StorageTable> = {};
+    for (const [name, entry] of Object.entries(bucketInput)) {
+      const table = entry instanceof StorageTable ? entry : new StorageTable(entry);
+      const explicit = table.namespaceId;
+      if (explicit !== undefined && explicit !== namespaceId) {
+        throw new Error(
+          `SqlStorage: table "${name}" carries namespaceId "${explicit}" but is keyed under namespace "${namespaceId}". The nested map key must agree with the back-pointer (or omit the back-pointer).`,
+        );
+      }
+      bucket[name] = table;
+    }
+    result[namespaceId] = bucket;
+  }
+  return result;
+}
+
+function isFlatTablesInput(
+  input: SqlStorageTablesFlatInput | SqlStorageTablesNestedInput,
+): input is SqlStorageTablesFlatInput {
+  for (const value of Object.values(input)) {
+    if (value instanceof StorageTable) return true;
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'columns' in (value as Record<string, unknown>)
+    ) {
+      return true;
+    }
+    return false;
+  }
+  // Empty input — treat as flat (no tables).
+  return true;
+}
+
+function freezeNestedTables(
+  nested: Record<string, Record<string, StorageTable>>,
+): Readonly<Record<string, Readonly<Record<string, StorageTable>>>> {
+  const out: Record<string, Readonly<Record<string, StorageTable>>> = {};
+  for (const [namespaceId, bucket] of Object.entries(nested)) {
+    out[namespaceId] = Object.freeze({ ...bucket });
+  }
+  return Object.freeze(out);
+}
+
+/**
+ * Build the flat-by-name view from the nested-by-namespace truth.
+ * Single-namespace contracts flatten 1:1. Multi-namespace contracts
+ * that reuse a table name across namespaces pick the **first** entry
+ * encountered (iteration order across the nested map's keys); the
+ * second is hidden from the flat view. Consumers needing the
+ * collision-free truth must read `tablesByNamespace` directly.
+ */
+function freezeFlatTablesView(
+  nested: Record<string, Record<string, StorageTable>>,
+): Readonly<Record<string, StorageTable>> {
+  const flat: Record<string, StorageTable> = {};
+  for (const bucket of Object.values(nested)) {
+    for (const [name, table] of Object.entries(bucket)) {
+      if (!Object.hasOwn(flat, name)) {
+        flat[name] = table;
+      }
+    }
+  }
+  return Object.freeze(flat);
+}
+
+function normaliseTypesInput(
+  input: SqlStorageTypesFlatInput | SqlStorageTypesNestedInput,
+): Record<string, Record<string, StorageTypeInstance | PostgresEnumStorageEntry>> {
+  if (isFlatTypesInput(input)) {
+    const bucket: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+    for (const [name, entry] of Object.entries(input)) {
+      bucket[name] = normaliseTypeEntry(entry);
+    }
+    return { [UNBOUND_NAMESPACE_ID]: bucket };
+  }
+  const out: Record<string, Record<string, StorageTypeInstance | PostgresEnumStorageEntry>> = {};
+  for (const [namespaceId, bucketInput] of Object.entries(input)) {
+    const bucket: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+    for (const [name, entry] of Object.entries(bucketInput)) {
+      bucket[name] = normaliseTypeEntry(entry);
+    }
+    out[namespaceId] = bucket;
+  }
+  return out;
+}
+
+function isFlatTypesInput(
+  input: SqlStorageTypesFlatInput | SqlStorageTypesNestedInput,
+): input is SqlStorageTypesFlatInput {
+  for (const value of Object.values(input)) {
+    if (typeof value !== 'object' || value === null) return true;
+    if ('kind' in (value as Record<string, unknown>)) return true;
+    if ('codecId' in (value as Record<string, unknown>)) return true;
+    return false;
+  }
+  return true;
+}
+
+function freezeNestedTypes(
+  nested: Record<string, Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
+): Readonly<
+  Record<string, Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>>
+> {
+  const out: Record<
+    string,
+    Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>
+  > = {};
+  for (const [namespaceId, bucket] of Object.entries(nested)) {
+    out[namespaceId] = Object.freeze({ ...bucket });
+  }
+  return Object.freeze(out);
+}
+
+function freezeFlatTypesView(
+  nested: Record<string, Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
+): Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>> {
+  const flat: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+  for (const bucket of Object.values(nested)) {
+    for (const [name, entry] of Object.entries(bucket)) {
+      if (!Object.hasOwn(flat, name)) {
+        flat[name] = entry;
+      }
+    }
+  }
+  return Object.freeze(flat);
 }
 
 function normaliseTypeEntry(
@@ -127,4 +359,184 @@ function normaliseTypeEntry(
     return entry;
   }
   return toStorageTypeInstance(entry as StorageTypeInstanceInput);
+}
+
+/**
+ * Read the nested-by-namespace view of a storage's tables. Falls back
+ * to wrapping the flat-by-name view under the unbound namespace when
+ * the storage's nested view is absent — the case for user-facing
+ * contract type structures the emitter / `defineContract` builds
+ * bottom-up from the flat `tables` shape (these structurally satisfy
+ * `SqlStorage` but don't round-trip through the runtime constructor).
+ */
+function nestedTablesView(
+  storage: Pick<SqlStorage, 'tables' | 'tablesByNamespace'>,
+): Readonly<Record<string, Readonly<Record<string, StorageTable>>>> {
+  return storage.tablesByNamespace ?? { [UNBOUND_NAMESPACE_ID]: storage.tables };
+}
+
+function nestedTypesView(
+  storage: Pick<SqlStorage, 'types' | 'typesByNamespace'>,
+): Readonly<
+  Record<string, Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>>
+> {
+  if (storage.typesByNamespace !== undefined) return storage.typesByNamespace;
+  if (storage.types !== undefined) return { [UNBOUND_NAMESPACE_ID]: storage.types };
+  return {};
+}
+
+/**
+ * Iterate every table in the storage's nested map. Yields the
+ * `(namespaceId, name, table)` coordinate tuple — the most general
+ * shape consumers need; sites that only want the table itself can
+ * destructure `{ table }`.
+ */
+export function* iterateTablesWithCoords(
+  storage: Pick<SqlStorage, 'tables' | 'tablesByNamespace'>,
+): IterableIterator<{
+  readonly namespaceId: string;
+  readonly name: string;
+  readonly table: StorageTable;
+}> {
+  for (const [namespaceId, bucket] of Object.entries(nestedTablesView(storage))) {
+    for (const [name, table] of Object.entries(bucket)) {
+      yield { namespaceId, name, table };
+    }
+  }
+}
+
+/**
+ * Iterate every table in the storage, yielding only the `StorageTable`
+ * instances. Use {@link iterateTablesWithCoords} when the namespace id
+ * or table name is needed.
+ */
+export function* iterateAllTables(
+  storage: Pick<SqlStorage, 'tables' | 'tablesByNamespace'>,
+): IterableIterator<StorageTable> {
+  for (const bucket of Object.values(nestedTablesView(storage))) {
+    for (const table of Object.values(bucket)) {
+      yield table;
+    }
+  }
+}
+
+/**
+ * Look up a table by name across every namespace bucket. Returns
+ * `undefined` when no entry matches; throws when the same name appears
+ * in more than one namespace (the caller is reading a multi-namespace
+ * contract through a flat-name lookup that cannot disambiguate; supply
+ * the namespace id via {@link findTableByCoord} or read
+ * `tablesByNamespace` directly).
+ */
+export function findTableByName(
+  storage: Pick<SqlStorage, 'tables' | 'tablesByNamespace'>,
+  name: string,
+): StorageTable | undefined {
+  let found: StorageTable | undefined;
+  let foundIn: string | undefined;
+  for (const [namespaceId, bucket] of Object.entries(nestedTablesView(storage))) {
+    if (Object.hasOwn(bucket, name)) {
+      if (found !== undefined) {
+        throw new Error(
+          `findTableByName: table "${name}" exists in multiple namespaces ("${foundIn}" and "${namespaceId}"); use findTableByCoord(storage, namespaceId, name) to disambiguate.`,
+        );
+      }
+      found = bucket[name];
+      foundIn = namespaceId;
+    }
+  }
+  return found;
+}
+
+/**
+ * Look up a table by `(namespaceId, name)`. Returns `undefined` when
+ * no matching entry exists.
+ */
+export function findTableByCoord(
+  storage: Pick<SqlStorage, 'tables' | 'tablesByNamespace'>,
+  namespaceId: string,
+  name: string,
+): StorageTable | undefined {
+  return nestedTablesView(storage)[namespaceId]?.[name];
+}
+
+/**
+ * Number of tables across every namespace.
+ */
+export function countAllTables(storage: Pick<SqlStorage, 'tables' | 'tablesByNamespace'>): number {
+  let count = 0;
+  for (const bucket of Object.values(nestedTablesView(storage))) {
+    count += Object.keys(bucket).length;
+  }
+  return count;
+}
+
+/**
+ * Return every table-name in the storage, regardless of namespace.
+ * Sites that need namespace-aware iteration should switch to
+ * {@link iterateTablesWithCoords}.
+ */
+export function listAllTableNames(
+  storage: Pick<SqlStorage, 'tables' | 'tablesByNamespace'>,
+): string[] {
+  const names: string[] = [];
+  for (const bucket of Object.values(nestedTablesView(storage))) {
+    for (const name of Object.keys(bucket)) {
+      names.push(name);
+    }
+  }
+  return names;
+}
+
+/**
+ * Iterate every type entry in the storage's nested map.
+ */
+export function* iterateTypesWithCoords(
+  storage: Pick<SqlStorage, 'types' | 'typesByNamespace'>,
+): IterableIterator<{
+  readonly namespaceId: string;
+  readonly name: string;
+  readonly entry: StorageTypeInstance | PostgresEnumStorageEntry;
+}> {
+  for (const [namespaceId, bucket] of Object.entries(nestedTypesView(storage))) {
+    for (const [name, entry] of Object.entries(bucket)) {
+      yield { namespaceId, name, entry };
+    }
+  }
+}
+
+/**
+ * Look up a type entry by name across every namespace bucket. Throws
+ * when the same name appears in more than one namespace.
+ */
+export function findTypeByName(
+  storage: Pick<SqlStorage, 'types' | 'typesByNamespace'>,
+  name: string,
+): StorageTypeInstance | PostgresEnumStorageEntry | undefined {
+  let found: StorageTypeInstance | PostgresEnumStorageEntry | undefined;
+  let foundIn: string | undefined;
+  for (const [namespaceId, bucket] of Object.entries(nestedTypesView(storage))) {
+    if (Object.hasOwn(bucket, name)) {
+      if (found !== undefined) {
+        throw new Error(
+          `findTypeByName: type "${name}" exists in multiple namespaces ("${foundIn}" and "${namespaceId}"); narrow the lookup by namespace.`,
+        );
+      }
+      found = bucket[name];
+      foundIn = namespaceId;
+    }
+  }
+  return found;
+}
+
+/**
+ * Look up a type entry by `(namespaceId, name)`. Returns `undefined`
+ * when no matching entry exists.
+ */
+export function findTypeByCoord(
+  storage: Pick<SqlStorage, 'types' | 'typesByNamespace'>,
+  namespaceId: string,
+  name: string,
+): StorageTypeInstance | PostgresEnumStorageEntry | undefined {
+  return nestedTypesView(storage)[namespaceId]?.[name];
 }
