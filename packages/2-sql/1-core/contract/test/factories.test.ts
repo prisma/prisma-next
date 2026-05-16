@@ -257,17 +257,19 @@ describe('SQL contract factories', () => {
     });
 
     describe('namespaceId coordinate', () => {
-      it('resolves to UNBOUND_NAMESPACE_ID when input.namespaceId is omitted (single-namespace default)', () => {
+      it('leaves the property `undefined` when input.namespaceId is omitted (single-namespace default)', () => {
         const userTable = new StorageTable({
           columns: { id: col('int4', 'pg/int4@1') },
           uniques: [],
           indexes: [],
           foreignKeys: [],
         });
-        expect(userTable.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
+        expect(userTable.namespaceId).toBeUndefined();
+        const resolved = userTable.namespaceId ?? UNBOUND_NAMESPACE_ID;
+        expect(resolved).toBe(UNBOUND_NAMESPACE_ID);
       });
 
-      it('omits namespaceId from the serialized JSON envelope when it resolves to UNBOUND_NAMESPACE_ID', () => {
+      it('omits namespaceId from the serialized JSON envelope when the property is undefined', () => {
         const userTable = new StorageTable({
           columns: { id: col('int4', 'pg/int4@1') },
           uniques: [],
@@ -291,7 +293,7 @@ describe('SQL contract factories', () => {
         expect(json['namespaceId']).toBe('auth');
       });
 
-      it('treats explicit `__unbound__` the same as omitting the field — does not write the field to JSON', () => {
+      it('treats explicit `__unbound__` the same as omitting the field — does not write the field', () => {
         const tenantTable = new StorageTable({
           namespaceId: UNBOUND_NAMESPACE_ID,
           columns: { id: col('int4', 'pg/int4@1') },
@@ -299,7 +301,7 @@ describe('SQL contract factories', () => {
           indexes: [],
           foreignKeys: [],
         });
-        expect(tenantTable.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
+        expect(tenantTable.namespaceId).toBeUndefined();
         const json = JSON.parse(JSON.stringify(tenantTable)) as Record<string, unknown>;
         expect(json).not.toHaveProperty('namespaceId');
       });

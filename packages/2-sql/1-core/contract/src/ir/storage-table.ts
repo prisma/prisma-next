@@ -35,10 +35,11 @@ export interface StorageTableInput {
  * the parent `SqlStorage.tables: Record<string, StorageTable>` map.
  *
  * The `namespaceId` coordinate identifies which entry in the parent
- * `SqlStorage.namespaces` map the table inhabits. The runtime property
- * is always present (`UNBOUND_NAMESPACE_ID` for the late-bound default);
- * the persisted JSON envelope omits the field when it would equal the
- * default so single-namespace contracts stay byte-stable.
+ * `SqlStorage.namespaces` map the table inhabits. The property is
+ * **optional** — single-namespace contracts (every table on the
+ * late-bound default) leave it `undefined`, which keeps existing
+ * contract JSON envelopes byte-stable. Consumers that need the
+ * resolved id read `table.namespaceId ?? UNBOUND_NAMESPACE_ID`.
  */
 export class StorageTable extends SqlNode {
   readonly columns: Readonly<Record<string, StorageColumn>>;
@@ -47,12 +48,12 @@ export class StorageTable extends SqlNode {
   readonly foreignKeys: ReadonlyArray<ForeignKey>;
   declare readonly primaryKey?: PrimaryKey;
   /**
-   * Coordinate into `SqlStorage.namespaces`. The property is enumerable
-   * (and therefore serialised) only when the coordinate is not the
-   * default late-bound sentinel — see `get namespaceId` below for the
-   * always-present runtime view.
+   * Coordinate into `SqlStorage.namespaces`. Optional — `undefined`
+   * means the late-bound default (`UNBOUND_NAMESPACE_ID`); any
+   * explicit non-default value is also written enumerably so it
+   * appears in the persisted JSON envelope.
    */
-  declare readonly namespaceId: string;
+  declare readonly namespaceId?: string;
 
   constructor(input: StorageTableInput) {
     super();
@@ -77,17 +78,9 @@ export class StorageTable extends SqlNode {
     this.foreignKeys = Object.freeze(
       input.foreignKeys.map((fk) => (fk instanceof ForeignKey ? fk : new ForeignKey(fk))),
     );
-    const namespaceId = input.namespaceId ?? UNBOUND_NAMESPACE_ID;
-    if (namespaceId === UNBOUND_NAMESPACE_ID) {
+    if (input.namespaceId !== undefined && input.namespaceId !== UNBOUND_NAMESPACE_ID) {
       Object.defineProperty(this, 'namespaceId', {
-        value: UNBOUND_NAMESPACE_ID,
-        enumerable: false,
-        writable: false,
-        configurable: false,
-      });
-    } else {
-      Object.defineProperty(this, 'namespaceId', {
-        value: namespaceId,
+        value: input.namespaceId,
         enumerable: true,
         writable: false,
         configurable: false,

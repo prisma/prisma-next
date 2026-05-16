@@ -765,11 +765,7 @@ model OrderItem {
       const storage = result.value.storage as SqlStorage;
       const table = storage.tables['user'];
       expect(table).toBeDefined();
-      // Implicit `__unspecified__` bucket leaves the coordinate
-      // unset — the runtime view resolves to the late-bound default
-      // and the JSON envelope omits the field, preserving parity
-      // with TS-authored single-namespace contracts.
-      expect(table?.namespaceId).toBe('__unbound__');
+      expect(table?.namespaceId).toBeUndefined();
       const json = JSON.parse(JSON.stringify(table)) as Record<string, unknown>;
       expect(json).not.toHaveProperty('namespaceId');
     });
@@ -793,7 +789,11 @@ model OrderItem {
       const storage = result.value.storage as SqlStorage;
       const tenant = storage.tables['tenant'];
       expect(tenant).toBeDefined();
-      expect(tenant?.namespaceId).toBe('__unbound__');
+      // `namespace unbound { … }` lowers to `__unbound__` — the
+      // sentinel value is the late-bound default and the storage
+      // layer treats it identically to an unset field (no envelope
+      // entry; runtime resolved via `?? UNBOUND_NAMESPACE_ID`).
+      expect(tenant?.namespaceId).toBeUndefined();
       const json = JSON.parse(JSON.stringify(tenant)) as Record<string, unknown>;
       expect(json).not.toHaveProperty('namespaceId');
     });
@@ -849,11 +849,12 @@ namespace unbound {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = result.value.storage as SqlStorage;
-      // Top-level `Post` stays on the late-bound default (TS/PSL
-      // byte parity for implicit-namespace contracts).
-      expect(storage.tables['post']?.namespaceId).toBe('__unbound__');
+      // Top-level `Post` and `Tenant` both stay on the late-bound
+      // default (unset). Named bucket `auth` records the coordinate
+      // explicitly.
+      expect(storage.tables['post']?.namespaceId).toBeUndefined();
       expect(storage.tables['user']?.namespaceId).toBe('auth');
-      expect(storage.tables['tenant']?.namespaceId).toBe('__unbound__');
+      expect(storage.tables['tenant']?.namespaceId).toBeUndefined();
     });
   });
 });
