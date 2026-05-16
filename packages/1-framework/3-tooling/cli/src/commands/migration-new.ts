@@ -90,24 +90,29 @@ async function executeMigrationNewCommand(
     throw error;
   }
 
+  // Route the on-disk contract read through the family
+  // `ContractSerializer` seam. `validateContract` performs structural
+  // arktype validation and IR-class hydration in one step, so
+  // downstream code (the planner's `emptyMigration` call) always sees
+  // a fully hydrated `Contract`, never a bare JSON envelope whose
+  // polymorphic `storage.types` entries lack their `kind`
+  // discriminator.
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
   let toContractJson: Contract;
   try {
-    toContractJson = JSON.parse(contractJsonContent) as Contract;
+    toContractJson = familyInstance.validateContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorRuntime('Contract JSON is invalid', {
-        why: `Failed to parse ${contractPathAbsolute}: ${error instanceof Error ? error.message : String(error)}`,
+        why: `Failed to parse or validate ${contractPathAbsolute}: ${error instanceof Error ? error.message : String(error)}`,
         fix: 'Run `prisma-next contract emit` to regenerate the contract',
       }),
     );
   }
 
-  const toStorageHash = (
-    (toContractJson as unknown as Record<string, unknown>)['storage'] as
-      | Record<string, unknown>
-      | undefined
-  )?.['storageHash'] as string | undefined;
-  if (!toStorageHash) {
+  const toStorageHash = toContractJson.storage?.storageHash;
+  if (typeof toStorageHash !== 'string') {
     return notOk(
       errorRuntime('Contract is missing storageHash', {
         why: `Contract at ${contractPathAbsolute} has no storageHash`,
@@ -236,8 +241,6 @@ async function executeMigrationNewCommand(
       }
     }
 
-    const stack = createControlStack(config);
-    const familyInstance = config.family.create(stack);
     const planner = migrations.createPlanner(familyInstance);
     const emptyPlan = planner.emptyMigration(
       {

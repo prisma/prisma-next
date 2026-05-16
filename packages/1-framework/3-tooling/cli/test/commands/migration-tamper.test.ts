@@ -82,8 +82,21 @@ async function writeTestPackage(
 }
 
 function setupConfigMock(): void {
+  // The CLI now routes every on-disk contract read through
+  // `familyInstance.validateContract` (TML-2536). The stub family
+  // instance returned here exposes a pass-through `validateContract`
+  // so the loader-boundary integrity check inside
+  // `readMigrationPackage` is what fires first (the contract.json
+  // fixture is structurally minimal but `Contract`-shaped; what we
+  // want to exercise is the migration-package hash mismatch, not
+  // contract validation).
   mocks.loadConfig.mockResolvedValue({
-    family: { familyId: TARGET_FAMILY, create: vi.fn().mockReturnValue({}) },
+    family: {
+      familyId: TARGET_FAMILY,
+      create: vi.fn().mockReturnValue({
+        validateContract: vi.fn((json: unknown) => json),
+      }),
+    },
     target: {
       id: TARGET,
       familyId: TARGET_FAMILY,

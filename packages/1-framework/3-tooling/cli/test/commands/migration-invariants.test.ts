@@ -76,6 +76,11 @@ function setupConfigMock(
     readAllMarkers: vi
       .fn()
       .mockResolvedValue(markerRecord ? new Map([['app', markerRecord]]) : new Map()),
+    // `migration apply` now hydrates the on-disk contract through the
+    // family `ContractSerializer` seam (TML-2536) — provide a
+    // pass-through so the structurally-minimal test fixture passes
+    // without exercising real validation.
+    validateContract: vi.fn((json: unknown) => json),
   };
   mocks.loadConfig.mockResolvedValue({
     family: { familyId: TARGET_FAMILY, create: vi.fn().mockReturnValue(familyInstance) },

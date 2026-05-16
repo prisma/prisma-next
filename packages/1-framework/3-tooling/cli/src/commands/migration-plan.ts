@@ -60,16 +60,27 @@ interface MigrationPlanOptions extends CommonCommandOptions {
 
 /**
  * Load a predecessor migration's destination contract from its sibling
- * `end-contract.json` on disk. The manifest no longer inlines the
+ * `end-contract.json` on disk and hydrate it through the family
+ * `ContractSerializer` seam. The manifest no longer inlines the
  * contract; the planner reads it from the canonical on-disk artefact
  * authored by a previous `migration plan` run.
+ *
+ * Routing through `familyInstance.validateContract` (rather than a
+ * `JSON.parse(...) as Contract` cast) means structural arktype
+ * validation and IR-class hydration happen at the seam — downstream
+ * code (the planner, `contractToSchema`) always sees a fully hydrated
+ * `Contract`, never a bare JSON envelope whose polymorphic
+ * `storage.types` entries lack their `kind` discriminator.
  *
  * Throws `CliStructuredError` with `errorFileNotFound` when the
  * sibling file is missing — the user has likely deleted or never
  * authored the snapshot, and the message names the file and points
  * them at re-emitting from the source.
  */
-async function readPredecessorEndContract(migrationDir: string): Promise<Contract> {
+async function readPredecessorEndContract(
+  migrationDir: string,
+  validateContract: (json: unknown) => Contract,
+): Promise<Contract> {
   const path = join(migrationDir, 'end-contract.json');
   let raw: string;
   try {
@@ -83,7 +94,7 @@ async function readPredecessorEndContract(migrationDir: string): Promise<Contrac
     }
     throw error;
   }
-  return JSON.parse(raw) as Contract;
+  return validateContract(JSON.parse(raw) as unknown);
 }
 
 export interface MigrationPlanResult {
@@ -183,13 +194,20 @@ async function executeMigrationPlanCommand(
     );
   }
 
+  // Construct the family instance up front so the contract serializer
+  // is the single seam every on-disk read crosses: both the
+  // "to"-contract validation below and the predecessor-snapshot read
+  // (`readPredecessorEndContract`) share this validator.
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
+
   let toContractJson: Contract;
   try {
-    toContractJson = JSON.parse(contractJsonContent) as Contract;
+    toContractJson = familyInstance.validateContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorContractValidationFailed(
-        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        `Contract validation failed: ${error instanceof Error ? error.message : String(error)}`,
         { where: { path: contractPathAbsolute } },
       ),
     );
@@ -231,7 +249,9 @@ async function executeMigrationPlanCommand(
       }
       fromHash = resolved.value.metadata.to;
       fromContractSourceDir = resolved.value.dirPath;
-      fromContract = await readPredecessorEndContract(fromContractSourceDir);
+      fromContract = await readPredecessorEndContract(fromContractSourceDir, (json) =>
+        familyInstance.validateContract(json),
+      );
     } else {
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
@@ -241,7 +261,9 @@ async function executeMigrationPlanCommand(
         );
         if (leafPkg) {
           fromContractSourceDir = leafPkg.dirPath;
-          fromContract = await readPredecessorEndContract(fromContractSourceDir);
+          fromContract = await readPredecessorEndContract(fromContractSourceDir, (json) =>
+            familyInstance.validateContract(json),
+          );
         }
       }
     }
@@ -320,24 +342,13 @@ async function executeMigrationPlanCommand(
   // Phase 2 — load: build the aggregate against the now-consistent disk
   // state that phase 1 just seeded. The seed phase guarantees every
   // declared extension has its head ref pinned, so the loader's
-  // declaredButUnmigrated precheck always passes here.
-  const stack = createControlStack(config);
-  const familyInstance = config.family.create(stack);
-  let validatedAppContract: Contract;
-  try {
-    validatedAppContract = familyInstance.validateContract(toContractJson);
-  } catch (error) {
-    return notOk(
-      errorContractValidationFailed(
-        `Contract validation failed: ${error instanceof Error ? error.message : String(error)}`,
-        { where: { path: contractPathAbsolute } },
-      ),
-    );
-  }
+  // declaredButUnmigrated precheck always passes here. `toContractJson`
+  // is already a hydrated `Contract` because it crossed
+  // `familyInstance.validateContract` at the top of this function.
   const aggregateResult = await buildContractSpaceAggregate({
     targetId: config.target.targetId,
     migrationsDir,
-    appContract: validatedAppContract,
+    appContract: toContractJson,
     extensionPacks: config.extensionPacks ?? [],
     validateContract: (json: unknown) => familyInstance.validateContract(json),
   });

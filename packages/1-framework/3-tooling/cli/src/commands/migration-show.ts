@@ -281,21 +281,27 @@ async function executeMigrationShowCommand(
     );
   }
 
+  // Route the on-disk contract read through the family
+  // `ContractSerializer` seam: structural validation + IR-class
+  // hydration happen at the boundary, not at each downstream consumer.
+  // The aggregate loader's `validateContract` callback below shares
+  // the same family instance, so every space's contract crosses the
+  // same seam.
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
   let appContract: Contract;
   try {
-    appContract = JSON.parse(contractJsonContent) as Contract;
+    appContract = familyInstance.validateContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorContractValidationFailed(
-        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        `Contract validation failed: ${error instanceof Error ? error.message : String(error)}`,
         { where: { path: contractPathAbsolute } },
       ),
     );
   }
 
   // Build the aggregate against current disk state to enumerate all spaces.
-  const stack = createControlStack(config);
-  const familyInstance = config.family.create(stack);
   const aggregateResult = await buildContractSpaceAggregate({
     targetId: config.target.targetId,
     migrationsDir,

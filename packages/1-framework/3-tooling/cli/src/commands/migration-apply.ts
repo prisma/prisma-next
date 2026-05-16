@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
+import { createControlStack } from '@prisma-next/framework-components/control';
 import { errorUnknownInvariant, MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
@@ -155,11 +156,20 @@ async function executeMigrationApplyCommand(
 
   // Resolve and parse the contract envelope. The aggregate-walking
   // operation needs the validated app contract to load the aggregate.
+  // Route the read through the family `ContractSerializer` seam so
+  // structural validation and IR-class hydration happen at the
+  // boundary — `client.migrationApply` below revalidates internally
+  // (every family operation does), but routing through the seam here
+  // guarantees the polymorphic-slot discriminator dispatch fires at
+  // every on-disk boundary, not just the ones a downstream call
+  // happens to revalidate.
   const contractPathAbsolute = resolveContractPath(config);
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
   let contractRaw: Contract;
+  let contractContent: string;
   try {
-    const contractContent = await readFile(contractPathAbsolute, 'utf-8');
-    contractRaw = JSON.parse(contractContent) as Contract;
+    contractContent = await readFile(contractPathAbsolute, 'utf-8');
   } catch (error) {
     if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
       return notOk(
@@ -171,7 +181,17 @@ async function executeMigrationApplyCommand(
     }
     return notOk(
       errorContractValidationFailed(
-        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        `Contract file read failed: ${error instanceof Error ? error.message : String(error)}`,
+        { where: { path: contractPathAbsolute } },
+      ),
+    );
+  }
+  try {
+    contractRaw = familyInstance.validateContract(JSON.parse(contractContent) as unknown);
+  } catch (error) {
+    return notOk(
+      errorContractValidationFailed(
+        `Contract validation failed: ${error instanceof Error ? error.message : String(error)}`,
         { where: { path: contractPathAbsolute } },
       ),
     );

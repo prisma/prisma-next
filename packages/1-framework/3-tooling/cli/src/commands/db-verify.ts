@@ -1,9 +1,11 @@
 import { readFile } from 'node:fs/promises';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
+  createControlStack,
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
   VERIFY_CODE_TARGET_MISMATCH,
@@ -236,7 +238,7 @@ async function resolveVerifyPaths(options: DbVerifyOptions) {
 type VerifyPaths = Awaited<ReturnType<typeof resolveVerifyPaths>>;
 
 interface VerifySetup extends VerifyPaths {
-  readonly contractJson: Record<string, unknown>;
+  readonly contractJson: Contract;
   readonly dbConnection: string;
 }
 
@@ -266,13 +268,21 @@ async function resolveVerifySetup(
     );
   }
 
-  let contractJson: Record<string, unknown>;
+  // Route the on-disk read through the family `ContractSerializer`
+  // seam. `client.verify` / `client.dbVerify` below revalidate the
+  // contract internally (every family operation does), but routing
+  // through the seam here guarantees the polymorphic-slot
+  // discriminator dispatch fires at every on-disk boundary, not just
+  // the ones a downstream call happens to revalidate.
+  const stack = createControlStack(config);
+  const familyInstance = config.family.create(stack);
+  let contractJson: Contract;
   try {
-    contractJson = JSON.parse(contractJsonContent) as Record<string, unknown>;
+    contractJson = familyInstance.validateContract(JSON.parse(contractJsonContent) as unknown);
   } catch (error) {
     return notOk(
       errorContractValidationFailed(
-        `Contract JSON is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        `Contract validation failed: ${error instanceof Error ? error.message : String(error)}`,
         { where: { path: contractPathAbsolute } },
       ),
     );
