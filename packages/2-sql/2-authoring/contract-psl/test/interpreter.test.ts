@@ -746,4 +746,114 @@ model OrderItem {
       });
     });
   });
+
+  describe('per-target namespace resolution (FR15 slice 2 / FR16c)', () => {
+    it('Postgres leaves implicit top-level declarations on the late-bound default slot (TS/PSL byte parity for single-namespace contracts)', () => {
+      const document = parsePslDocument({
+        schema: `model User {
+  id Int @id
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = result.value.storage as SqlStorage;
+      const table = storage.tables['user'];
+      expect(table).toBeDefined();
+      // Implicit `__unspecified__` bucket leaves the coordinate
+      // unset — the runtime view resolves to the late-bound default
+      // and the JSON envelope omits the field, preserving parity
+      // with TS-authored single-namespace contracts.
+      expect(table?.namespaceId).toBe('__unbound__');
+      const json = JSON.parse(JSON.stringify(table)) as Record<string, unknown>;
+      expect(json).not.toHaveProperty('namespaceId');
+    });
+
+    it('Postgres lowers `namespace unbound { … }` to the late-binding sentinel slot', () => {
+      const document = parsePslDocument({
+        schema: `namespace unbound {
+  model Tenant {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = result.value.storage as SqlStorage;
+      const tenant = storage.tables['tenant'];
+      expect(tenant).toBeDefined();
+      expect(tenant?.namespaceId).toBe('__unbound__');
+      const json = JSON.parse(JSON.stringify(tenant)) as Record<string, unknown>;
+      expect(json).not.toHaveProperty('namespaceId');
+    });
+
+    it('Postgres lowers named `namespace auth { … }` to its eponymous schema slot', () => {
+      const document = parsePslDocument({
+        schema: `namespace auth {
+  model User {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = result.value.storage as SqlStorage;
+      const user = storage.tables['user'];
+      expect(user).toBeDefined();
+      expect(user?.namespaceId).toBe('auth');
+      const json = JSON.parse(JSON.stringify(user)) as Record<string, unknown>;
+      expect(json['namespaceId']).toBe('auth');
+    });
+
+    it('Postgres routes a mixed top-level + namespaced document into the right slots', () => {
+      const document = parsePslDocument({
+        schema: `model Post {
+  id Int @id
+}
+
+namespace auth {
+  model User {
+    id Int @id
+  }
+}
+
+namespace unbound {
+  model Tenant {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = result.value.storage as SqlStorage;
+      // Top-level `Post` stays on the late-bound default (TS/PSL
+      // byte parity for implicit-namespace contracts).
+      expect(storage.tables['post']?.namespaceId).toBe('__unbound__');
+      expect(storage.tables['user']?.namespaceId).toBe('auth');
+      expect(storage.tables['tenant']?.namespaceId).toBe('__unbound__');
+    });
+  });
 });

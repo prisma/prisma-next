@@ -87,6 +87,17 @@ export interface ValueObjectNode {
 export interface ModelNode {
   readonly modelName: string;
   readonly tableName: string;
+  /**
+   * Resolved namespace coordinate for this model — the key into the
+   * parent contract's `SqlStorage.namespaces` map. Omitting the field
+   * (or setting it to the framework's `UNBOUND_NAMESPACE_ID` sentinel)
+   * selects the late-bound slot, which renders as unqualified DDL.
+   *
+   * Populated by per-target PSL interpreters from the resolved
+   * `namespace { … }` AST bucket; the TS builder also sets it from the
+   * per-model `namespace` field once that authoring surface lands.
+   */
+  readonly namespaceId?: string;
   readonly fields: readonly (FieldNode | ValueObjectFieldNode)[];
   readonly id?: PrimaryKeyNode;
   readonly uniques?: readonly UniqueConstraintNode[];

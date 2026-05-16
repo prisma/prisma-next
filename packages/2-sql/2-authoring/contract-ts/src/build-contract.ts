@@ -306,6 +306,7 @@ export function buildSqlContractFromDefinition(
     });
 
     storageTables[tableName] = {
+      ...ifDefined('namespaceId', semanticModel.namespaceId),
       columns,
       uniques: (semanticModel.uniques ?? []).map((u) => ({
         columns: u.columns,

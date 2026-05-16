@@ -188,6 +188,49 @@ const UNSPECIFIED_PSL_NAMESPACE_NAME = '__unspecified__';
  * Storage-side lowering of these buckets to IR namespace slots is not
  * yet wired; this helper closes only the diagnostic surface.
  */
+/**
+ * Per-target FR15 lowering: map a PSL AST namespace bucket name to the
+ * resolved IR namespace id (the key downstream consumers use against
+ * `SqlStorage.namespaces`).
+ *
+ * - **Postgres**: an explicit `namespace unbound { … }` block lowers
+ *   to the framework sentinel `__unbound__` — the slot whose binding
+ *   the connection's `search_path` resolves at runtime. Every other
+ *   explicit bucket name (e.g. `auth`, `public`) passes through as a
+ *   named schema id. The implicit `__unspecified__` bucket — top-level
+ *   declarations outside any `namespace { … }` block — leaves the
+ *   coordinate unset; downstream consumers treat unset as the
+ *   late-bound default, and TS / PSL authoring stay byte-identical
+ *   on single-namespace contracts. (A future round will add a
+ *   target-default-namespace surface so `__unspecified__` lowers to
+ *   `public` consistently on both authoring paths.)
+ * - **SQLite**: SQLite has no schema concept; every namespace
+ *   collapses to the late-bound default. The FR16c validation step
+ *   has already rejected any explicit `namespace { … }` block on
+ *   SQLite, so the only bucket the lowering ever sees there is
+ *   `__unspecified__`.
+ *
+ * Returns `undefined` for targets / bucket names with no explicit
+ * namespaceId to assign — callers leave the model's `namespaceId`
+ * slot empty (which means the late-bound default at the `StorageTable`
+ * layer; emitted JSON omits the field).
+ */
+function resolveNamespaceIdForSqlTarget(input: {
+  readonly bucketName: string;
+  readonly targetId: string;
+}): string | undefined {
+  if (input.targetId !== 'postgres') {
+    return undefined;
+  }
+  if (input.bucketName === UNSPECIFIED_PSL_NAMESPACE_NAME) {
+    return undefined;
+  }
+  if (input.bucketName === 'unbound') {
+    return '__unbound__';
+  }
+  return input.bucketName;
+}
+
 function validateNamespaceBlocksForSqlTarget(input: {
   readonly namespaces: readonly PslNamespace[];
   readonly targetId: string;
@@ -1354,13 +1397,26 @@ export function interpretPslDocumentToSqlContract(
     sourceId,
     diagnostics,
   });
-  // Storage-side per-target namespace lowering (assigning each table to the
-  // resolved IR namespace slot and populating `storage.namespaces`) is not
-  // yet wired into the SQL contract build pipeline; until it lands, every
-  // namespace bucket is flattened into the same declaration set the
-  // interpreter has always consumed, so single-namespace contracts behave
-  // identically to today.
-  const models = input.document.ast.namespaces.flatMap((ns) => ns.models);
+  // Per-target namespace resolution: walk each AST bucket once,
+  // recording every model's resolved `namespaceId` for later threading
+  // into the `ModelNode` build. The resolution rules are target-local
+  // (see `resolveNamespaceIdForSqlTarget`); the flattened model list
+  // remains the input to the rest of the interpreter so non-namespace
+  // concerns stay structurally identical to before.
+  const models: PslModel[] = [];
+  const modelNamespaceIds = new Map<string, string>();
+  for (const namespace of input.document.ast.namespaces) {
+    const resolvedNamespaceId = resolveNamespaceIdForSqlTarget({
+      bucketName: namespace.name,
+      targetId: input.target.targetId,
+    });
+    for (const model of namespace.models) {
+      models.push(model);
+      if (resolvedNamespaceId !== undefined) {
+        modelNamespaceIds.set(model.name, resolvedNamespaceId);
+      }
+    }
+  }
   const enums = input.document.ast.namespaces.flatMap((ns) => ns.enums);
   const compositeTypes = input.document.ast.namespaces.flatMap((ns) => ns.compositeTypes);
   const modelNames = new Set(models.map((model) => model.name));
@@ -1428,7 +1484,12 @@ export function interpretPslDocumentToSqlContract(
       sourceId,
       diagnostics,
     });
-    modelNodes.push(result.modelNode);
+    const resolvedNamespaceId = modelNamespaceIds.get(model.name);
+    modelNodes.push(
+      resolvedNamespaceId !== undefined
+        ? { ...result.modelNode, namespaceId: resolvedNamespaceId }
+        : result.modelNode,
+    );
     fkRelationMetadata.push(...result.fkRelationMetadata);
     backrelationCandidates.push(...result.backrelationCandidates);
     modelResolvedFields.set(model.name, result.resolvedFields);
