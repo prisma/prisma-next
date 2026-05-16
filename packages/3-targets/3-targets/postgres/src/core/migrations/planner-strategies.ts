@@ -26,6 +26,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
@@ -34,6 +35,7 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PostgresEnumType } from '../postgres-enum-type';
+import { PostgresSchema } from '../postgres-schema';
 import { determineEnumDiff, readExistingEnumValues } from './enum-planning';
 import {
   AddColumnCall,
@@ -96,23 +98,42 @@ export interface StrategyContext {
 /**
  * Resolve the schema-coordinate string for a per-table migration op.
  *
- * Reads the table's `namespaceId` from the destination contract (the
- * FR15 nested-by-namespace storage shape). When set, that coordinate
- * flows through the migration ops verbatim — it can be a named schema
- * (`"auth"`) or the framework-reserved `__unbound__` sentinel. The
- * downstream planner-sql-checks helpers route `__unbound__` through
- * the `PostgresUnboundSchema` singleton to elide the qualifier so
- * `search_path` resolves the table at runtime.
+ * Resolution order:
  *
- * When the table has no explicit `namespaceId` (single-namespace
- * contracts, including every contract authored before this slice
- * landed), falls back to the planner's global `ctx.schemaName`. This
- * keeps existing single-namespace migration plans byte-identical
- * across the rewire.
+ * 1. Explicit `StorageTable.namespaceId` (named schema or
+ *    `__unbound__` sentinel) wins — that coordinate flows verbatim
+ *    through the migration ops and downstream `qualifyTableName` /
+ *    `regclassLiteral` calls dispatch via `postgresCreateNamespace` to
+ *    `PostgresSchema(id)` (named) or `PostgresSchema.unbound` (elides
+ *    so `search_path` resolves at runtime).
+ * 2. When `namespaceId` is absent, inspect the contract's
+ *    `SqlStorage.namespaces` map:
+ *    - If the unbound slot carries a `PostgresSchema` concretion, the
+ *      contract was authored with the Postgres-aware `createNamespace`
+ *      factory (FR16a). FR16c then maps the implicit "no coordinate"
+ *      bucket to `'public'` if the contract declared one, else to
+ *      the framework `__unbound__` sentinel (the only other slot the
+ *      author chose to populate).
+ *    - Otherwise the namespaces map is the framework family default
+ *      (`{ __unbound__: SqlUnboundNamespace.instance }`), which is the
+ *      shape every legacy single-namespace contract carries — fall back
+ *      to the planner's global `ctx.schemaName` to keep existing
+ *      migration fixtures byte-identical.
  */
 export function effectiveSchemaForTable(ctx: StrategyContext, tableName: string): string {
   const table = ctx.toContract.storage.tables[tableName];
-  return table?.namespaceId ?? ctx.schemaName;
+  if (table?.namespaceId !== undefined) {
+    return table.namespaceId;
+  }
+  const namespaces = ctx.toContract.storage.namespaces;
+  const unbound = namespaces[UNBOUND_NAMESPACE_ID];
+  if (!(unbound instanceof PostgresSchema)) {
+    return ctx.schemaName;
+  }
+  if (namespaces['public'] !== undefined) {
+    return 'public';
+  }
+  return UNBOUND_NAMESPACE_ID;
 }
 
 // ============================================================================
