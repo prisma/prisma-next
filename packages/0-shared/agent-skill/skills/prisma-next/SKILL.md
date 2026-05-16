@@ -46,7 +46,7 @@ If you still can't tell which skill applies, ask the user what they want to do. 
 
 ## The canonical model (one paragraph)
 
-Prisma Next is a contract-first data layer. You author a **data contract** (a `schema.psl` file, or a TypeScript builder). The framework emits machine-readable artifacts (`contract.json`, `contract.d.ts`) and gives you three runtime surfaces: a typed SQL query builder (`db.sql.from(...)`), a typed ORM client (`db.orm.User.select(...)`), and a raw SQL escape hatch (`db.sql.raw\`SELECT ...\``). Migrations are planned from the contract diff; you review them, optionally edit the `migration.ts` for data transforms, and apply.
+Prisma Next is a contract-first data layer. You author a **data contract** (a `schema.psl` file, or a TypeScript builder). The framework emits machine-readable artifacts (`contract.json`, `contract.d.ts`) and gives you three runtime surfaces: a typed SQL query builder (`db.sql.from(...)`), a typed ORM client (`db.orm.User.select(...)`), and a raw SQL escape hatch (`db.sql.raw(...)`). Migrations are planned from the contract diff; you review them, optionally edit the `migration.ts` for data transforms, and apply.
 
 Three steps the user does:
 

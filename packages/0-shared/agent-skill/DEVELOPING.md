@@ -128,10 +128,6 @@ These are well-trodden but worth listing in one place:
 
 When you add or rewrite a skill workflow, add or update a journey test that exercises it end-to-end.
 
-## Project specs
-
-While the cluster is in active development, the canonical spec and plan live under [`projects/prisma-next-agent-skill/`](../../../projects/prisma-next-agent-skill) in this monorepo. After the project closes, those artifacts migrate into `docs/` and the `projects/` directory is deleted. After that point, this `DEVELOPING.md` is the durable contributor home.
-
 ## Where to surface defects
 
 - **Skill content drift / staleness** — fix in-PR or open a follow-up under this project / Linear ticket. Don't merge a framework-surface change without the skill update.

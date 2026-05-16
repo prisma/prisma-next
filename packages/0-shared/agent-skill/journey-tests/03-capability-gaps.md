@@ -2,7 +2,7 @@
 
 **Skills under test:** `prisma-next-contract`, `prisma-next-migrations`, `prisma-next-queries`, `prisma-next-build`, `prisma-next-debug`, `prisma-next-feedback`.
 
-**Acceptance criterion:** AC6 from `specs/usage-skill.spec.md`.
+**Acceptance criterion:** The agent names the gap, names the workaround, and routes to `prisma-next-feedback`; it does not fabricate an API call.
 
 The point: when the user asks about a feature Prisma Next doesn't have yet, the agent must NOT confabulate an API. It must name the gap, suggest the workaround, and route to `prisma-next-feedback` so the request becomes a tracked issue.
 
