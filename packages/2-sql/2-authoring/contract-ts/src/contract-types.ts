@@ -144,15 +144,16 @@ type ShouldInsertSnakeUnderscore<
   PrevKind extends 'start' | 'lower' | 'upper' | 'other' | 'end',
   Current extends string,
   Next extends string,
-> = CharKind<Current> extends 'upper'
-  ? PrevKind extends 'start'
-    ? false
-    : PrevKind extends 'lower' | 'other'
-      ? true
-      : CharKind<Next> extends 'lower'
+> =
+  CharKind<Current> extends 'upper'
+    ? PrevKind extends 'start'
+      ? false
+      : PrevKind extends 'lower' | 'other'
         ? true
-        : false
-  : false;
+        : CharKind<Next> extends 'lower'
+          ? true
+          : false
+    : false;
 
 type SnakeCaseInternal<
   S extends string,
@@ -428,19 +429,20 @@ type ModelStorageColumn<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends string,
-> = FieldName extends ModelFieldNames<Definition, ModelName>
-  ? StorageColumn<
-      DescriptorCodecId<
-        ResolveFieldDescriptor<Definition, ModelFieldState<Definition, ModelName, FieldName>>
-      >,
-      FieldNullableOf<ModelFieldState<Definition, ModelName, FieldName>>,
-      DescriptorNativeType<
-        ResolveFieldDescriptor<Definition, ModelFieldState<Definition, ModelName, FieldName>>
-      >,
-      ResolveFieldColumnTypeRef<Definition, ModelFieldState<Definition, ModelName, FieldName>>,
-      ResolveFieldColumnTypeParams<Definition, ModelFieldState<Definition, ModelName, FieldName>>
-    >
-  : never;
+> =
+  FieldName extends ModelFieldNames<Definition, ModelName>
+    ? StorageColumn<
+        DescriptorCodecId<
+          ResolveFieldDescriptor<Definition, ModelFieldState<Definition, ModelName, FieldName>>
+        >,
+        FieldNullableOf<ModelFieldState<Definition, ModelName, FieldName>>,
+        DescriptorNativeType<
+          ResolveFieldDescriptor<Definition, ModelFieldState<Definition, ModelName, FieldName>>
+        >,
+        ResolveFieldColumnTypeRef<Definition, ModelFieldState<Definition, ModelName, FieldName>>,
+        ResolveFieldColumnTypeParams<Definition, ModelFieldState<Definition, ModelName, FieldName>>
+      >
+    : never;
 
 type BuiltModels<Definition> = {
   readonly [ModelName in ModelNames<Definition>]: {
@@ -527,17 +529,18 @@ type FieldOutputType<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends ModelFieldNames<Definition, ModelName>,
-> = ModelStorageColumn<Definition, ModelName, FieldName> extends infer Col
-  ? Col extends { readonly codecId: infer Id extends string }
-    ? Id extends keyof CodecTypesFromDefinition<Definition>
-      ? CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
-        ? Col extends { readonly nullable: true }
-          ? O | null
-          : O
+> =
+  ModelStorageColumn<Definition, ModelName, FieldName> extends infer Col
+    ? Col extends { readonly codecId: infer Id extends string }
+      ? Id extends keyof CodecTypesFromDefinition<Definition>
+        ? CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
+          ? Col extends { readonly nullable: true }
+            ? O | null
+            : O
+          : unknown
         : unknown
       : unknown
-    : unknown
-  : unknown;
+    : unknown;
 
 type FieldOutputTypes<Definition> = {
   readonly [ModelName in ModelNames<Definition>]: {

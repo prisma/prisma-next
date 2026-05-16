@@ -66,6 +66,30 @@ This creates the unique index on `users.email` and records the migration in the 
 | `pnpm test`           | Run integration tests against an in-memory MongoDB replica set              |
 | `pnpm dev`            | Start the Vite dev server (React UI)                                        |
 | `pnpm dev:api`        | Start the API server (`src/server.ts`)                                      |
+| `pnpm cache-demo`     | Demonstrate cross-family caching against the in-memory MongoDB              |
+
+## Cross-family caching
+
+`src/db.ts` wires `@prisma-next/middleware-cache` into the Mongo runtime — the same middleware used by `examples/prisma-next-demo` against Postgres. The package depends only on `@prisma-next/framework-components/runtime`; cache keys come from `RuntimeMiddlewareContext.contentHash(exec)`, which `MongoRuntimeImpl` populates the same way `SqlRuntimeImpl` does, so the middleware works against Mongo out of the box.
+
+The cache is **opt-in per query**: it acts only on plans whose `meta.annotations` carry a `cacheAnnotation` payload with a `ttl`. `scripts/cache-demo.ts` builds an aggregation plan with `mongoQuery`, attaches `cacheAnnotation({ ttl })` to `plan.meta.annotations.cache`, runs the same plan twice, and prints the per-call latency so the cache hit is visible:
+
+```bash
+pnpm cache-demo
+```
+
+A representative run looks like:
+
+```text
+Demonstrating opt-in caching with cacheAnnotation on a Mongo aggregation plan...
+Running the same plan twice — second call should hit cache.
+
+First call (cache miss):  18.42ms
+Second call (cache hit):  0.21ms
+Speedup: 87.7x faster
+```
+
+The Mongo query builder doesn't yet expose a chainable `.annotate(...)` surface (the SQL DSL does), so the demo threads the annotation through `plan.meta.annotations.cache` directly via a small `withCacheAnnotation` helper. `test/cache-middleware.test.ts` pins the same end-to-end short-circuit behaviour against `mongodb-memory-server` so the cross-family claim is exercised by CI.
 
 ## How emission works
 

@@ -10,6 +10,7 @@ import {
   type StorageColumn,
   type StorageTable,
   type StorageTypeInstance,
+  toStorageTypeInstance,
   type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
@@ -317,11 +318,11 @@ function deriveAnnotations(
   const byNativeType: Record<string, StorageTypeInstance> = {};
   for (const typeInstance of Object.values(types)) {
     if (isPostgresEnumStorageEntry(typeInstance)) {
-      byNativeType[typeInstance.nativeType] = {
+      byNativeType[typeInstance.nativeType] = toStorageTypeInstance({
         codecId: typeInstance.codecId,
         nativeType: typeInstance.nativeType,
         typeParams: { values: typeInstance.values },
-      };
+      });
       continue;
     }
     if (isStorageTypeInstance(typeInstance)) {

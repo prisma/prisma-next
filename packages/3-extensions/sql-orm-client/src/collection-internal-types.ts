@@ -109,13 +109,14 @@ export type IncludeRefinementValue<
   RelName extends string,
   DefaultIncludedRow,
   RefinedResult,
-> = RefinedResult extends RowSelection<infer V>
-  ? // IncludeScalar / IncludeCombine carry a final value that must not be
-    // cardinality-wrapped; Collection carries a raw row that still needs it.
-    RefinedResult extends { readonly kind: 'includeScalar' | 'includeCombine' }
-    ? V
-    : IncludeRelationValue<TContract, ParentModelName, RelName, V>
-  : IncludeRelationValue<TContract, ParentModelName, RelName, DefaultIncludedRow>;
+> =
+  RefinedResult extends RowSelection<infer V>
+    ? // IncludeScalar / IncludeCombine carry a final value that must not be
+      // cardinality-wrapped; Collection carries a raw row that still needs it.
+      RefinedResult extends { readonly kind: 'includeScalar' | 'includeCombine' }
+      ? V
+      : IncludeRelationValue<TContract, ParentModelName, RelName, V>
+    : IncludeRelationValue<TContract, ParentModelName, RelName, DefaultIncludedRow>;
 
 export type WhereInput<TContract extends Contract<SqlStorage>, ModelName extends string> =
   | ((model: ModelAccessor<TContract, ModelName>) => AnyExpression)

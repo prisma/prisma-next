@@ -1,5 +1,5 @@
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
+import { createCacheMiddleware } from '@prisma-next/middleware-cache';
 import postgres from '@prisma-next/postgres/runtime';
 import { budgets, lints } from '@prisma-next/sql-runtime';
 import type { Contract } from './contract.d';
@@ -9,7 +9,11 @@ export const db = postgres<Contract>({
   contractJson,
   extensions: [pgvector],
   middleware: [
-    createTelemetryMiddleware(),
+    // Cache first so its `intercept` short-circuits before any downstream
+    // middleware (`lints`, `budgets`) fires on a hit. The cache stores
+    // raw rows; the runtime still runs `decodeRow` on the hit path, so
+    // consumers see decoded values in both cases.
+    createCacheMiddleware({ maxEntries: 1_000 }),
     lints(),
     budgets({
       maxRows: 10_000,

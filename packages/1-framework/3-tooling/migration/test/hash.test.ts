@@ -32,15 +32,6 @@ describe('computeMigrationHash', () => {
     expect(computeMigrationHash(metadata, ops)).toBe(computeMigrationHash(withMigrationHash, ops));
   });
 
-  it('ignores signature on metadata', () => {
-    const metadata = createTestMetadata();
-    const withSig = createTestMetadata({
-      signature: { keyId: 'key1', value: 'sig_value' },
-    });
-    const ops = createTestOps();
-    expect(computeMigrationHash(metadata, ops)).toBe(computeMigrationHash(withSig, ops));
-  });
-
   it('changes when a metadata field changes', () => {
     const ops = createTestOps();
     const id1 = computeMigrationHash(createTestMetadata({ labels: [] }), ops);
@@ -125,7 +116,6 @@ describe('computeMigrationHash', () => {
 
     const {
       migrationHash: _migrationHash,
-      signature: _signature,
       fromContract: _fromContract,
       toContract: _toContract,
       hints: _hints,

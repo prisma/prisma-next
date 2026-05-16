@@ -121,142 +121,140 @@ function buildAppPlan() {
   });
 }
 
-describe(
-  'SqliteMigrationRunner.executeAcrossSpaces',
-  { timeout: timeouts.databaseOperation },
-  () => {
-    let testDb: TestDatabase;
+describe('SqliteMigrationRunner.executeAcrossSpaces', {
+  timeout: timeouts.databaseOperation,
+}, () => {
+  let testDb: TestDatabase;
 
-    afterEach(() => {
-      testDb?.cleanup();
+  afterEach(() => {
+    testDb?.cleanup();
+  });
+
+  it('applies plans for multiple spaces inside one transaction and writes per-space markers', async () => {
+    testDb = createTestDatabase();
+    const { driver } = testDb;
+    const runner = sqliteTargetDescriptor.createRunner(familyInstance);
+
+    const result = await runner.executeAcrossSpaces({
+      driver,
+      perSpaceOptions: [
+        {
+          space: 'ext',
+          plan: buildSuccessfulExtensionPlan(),
+          driver,
+          destinationContract: extensionContract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+        {
+          space: 'app',
+          plan: buildAppPlan(),
+          driver,
+          destinationContract: appContract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+      ],
     });
 
-    it('applies plans for multiple spaces inside one transaction and writes per-space markers', async () => {
-      testDb = createTestDatabase();
-      const { driver } = testDb;
-      const runner = sqliteTargetDescriptor.createRunner(familyInstance);
+    if (!result.ok) {
+      throw new Error(formatRunnerFailure(result.failure));
+    }
 
-      const result = await runner.executeAcrossSpaces({
-        driver,
-        perSpaceOptions: [
-          {
-            space: 'ext',
-            plan: buildSuccessfulExtensionPlan(),
-            driver,
-            destinationContract: extensionContract,
-            policy: INIT_ADDITIVE_POLICY,
-            frameworkComponents,
-            strictVerification: false,
-          },
-          {
-            space: 'app',
-            plan: buildAppPlan(),
-            driver,
-            destinationContract: appContract,
-            policy: INIT_ADDITIVE_POLICY,
-            frameworkComponents,
-            strictVerification: false,
-          },
-        ],
-      });
+    const markers = await driver.query<{ space: string; core_hash: string }>(
+      'SELECT space, core_hash FROM _prisma_marker ORDER BY space',
+    );
+    expect(markers.rows.map((r) => r.space)).toEqual(['app', 'ext']);
+    expect(markers.rows.find((r) => r.space === 'app')!.core_hash).toBe(
+      appContract.storage.storageHash,
+    );
+    expect(markers.rows.find((r) => r.space === 'ext')!.core_hash).toBe(
+      extensionContract.storage.storageHash,
+    );
 
-      if (!result.ok) {
-        throw new Error(formatRunnerFailure(result.failure));
-      }
+    const userTable = await driver.query<{ cnt: number }>(
+      "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type = 'table' AND name = 'user'",
+    );
+    expect(userTable.rows[0]!.cnt).toBe(1);
 
-      const markers = await driver.query<{ space: string; core_hash: string }>(
-        'SELECT space, core_hash FROM _prisma_marker ORDER BY space',
-      );
-      expect(markers.rows.map((r) => r.space)).toEqual(['app', 'ext']);
-      expect(markers.rows.find((r) => r.space === 'app')!.core_hash).toBe(
-        appContract.storage.storageHash,
-      );
-      expect(markers.rows.find((r) => r.space === 'ext')!.core_hash).toBe(
-        extensionContract.storage.storageHash,
-      );
+    const helperTable = await driver.query<{ cnt: number }>(
+      "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type = 'table' AND name = '_ext_helper'",
+    );
+    expect(helperTable.rows[0]!.cnt).toBe(1);
+  });
 
-      const userTable = await driver.query<{ cnt: number }>(
-        "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type = 'table' AND name = 'user'",
-      );
-      expect(userTable.rows[0]!.cnt).toBe(1);
+  it('rolls back ALL spaces when any one fails (locks AM4-rollback)', async () => {
+    testDb = createTestDatabase();
+    const { driver } = testDb;
+    const runner = sqliteTargetDescriptor.createRunner(familyInstance);
 
-      const helperTable = await driver.query<{ cnt: number }>(
-        "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type = 'table' AND name = '_ext_helper'",
-      );
-      expect(helperTable.rows[0]!.cnt).toBe(1);
+    const result = await runner.executeAcrossSpaces({
+      driver,
+      perSpaceOptions: [
+        {
+          // Extension space succeeds first.
+          space: 'ext',
+          plan: buildSuccessfulExtensionPlan(),
+          driver,
+          destinationContract: extensionContract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+        {
+          // App space fails — its raise(ABORT) aborts the outer tx.
+          space: 'app',
+          plan: buildFailingExtensionPlan(),
+          driver,
+          destinationContract: extensionContract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+      ],
     });
 
-    it('rolls back ALL spaces when any one fails (locks AM4-rollback)', async () => {
-      testDb = createTestDatabase();
-      const { driver } = testDb;
-      const runner = sqliteTargetDescriptor.createRunner(familyInstance);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected failure');
+    expect(result.failure.failingSpace).toBe('app');
 
-      const result = await runner.executeAcrossSpaces({
-        driver,
-        perSpaceOptions: [
-          {
-            // Extension space succeeds first.
-            space: 'ext',
-            plan: buildSuccessfulExtensionPlan(),
-            driver,
-            destinationContract: extensionContract,
-            policy: INIT_ADDITIVE_POLICY,
-            frameworkComponents,
-            strictVerification: false,
-          },
-          {
-            // App space fails — its raise(ABORT) aborts the outer tx.
-            space: 'app',
-            plan: buildFailingExtensionPlan(),
-            driver,
-            destinationContract: extensionContract,
-            policy: INIT_ADDITIVE_POLICY,
-            frameworkComponents,
-            strictVerification: false,
-          },
-        ],
-      });
+    // The first space's helper table must NOT exist (transaction
+    // rolled back).
+    const helperTable = await driver.query<{ cnt: number }>(
+      "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type = 'table' AND name = '_ext_helper'",
+    );
+    expect(helperTable.rows[0]!.cnt).toBe(0);
 
-      expect(result.ok).toBe(false);
-      if (result.ok) throw new Error('expected failure');
-      expect(result.failure.failingSpace).toBe('app');
-
-      // The first space's helper table must NOT exist (transaction
-      // rolled back).
-      const helperTable = await driver.query<{ cnt: number }>(
-        "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type = 'table' AND name = '_ext_helper'",
+    // No marker rows should exist (the marker table itself may have
+    // been created if it survived the rollback through SQLite's
+    // BEGIN EXCLUSIVE — but typically also rolls back; either way no
+    // rows are expected).
+    const markerExists = await driver.query<{ cnt: number }>(
+      "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type = 'table' AND name = '_prisma_marker'",
+    );
+    if (markerExists.rows[0]!.cnt > 0) {
+      const markerCount = await driver.query<{ cnt: number }>(
+        'SELECT COUNT(*) as cnt FROM _prisma_marker',
       );
-      expect(helperTable.rows[0]!.cnt).toBe(0);
+      expect(markerCount.rows[0]!.cnt).toBe(0);
+    }
+  });
 
-      // No marker rows should exist (the marker table itself may have
-      // been created if it survived the rollback through SQLite's
-      // BEGIN EXCLUSIVE — but typically also rolls back; either way no
-      // rows are expected).
-      const markerExists = await driver.query<{ cnt: number }>(
-        "SELECT COUNT(*) as cnt FROM sqlite_master WHERE type = 'table' AND name = '_prisma_marker'",
-      );
-      if (markerExists.rows[0]!.cnt > 0) {
-        const markerCount = await driver.query<{ cnt: number }>(
-          'SELECT COUNT(*) as cnt FROM _prisma_marker',
-        );
-        expect(markerCount.rows[0]!.cnt).toBe(0);
-      }
+  it('returns ok with empty results for an empty perSpaceOptions list', async () => {
+    testDb = createTestDatabase();
+    const { driver } = testDb;
+    const runner = sqliteTargetDescriptor.createRunner(familyInstance);
+
+    const result = await runner.executeAcrossSpaces({
+      driver,
+      perSpaceOptions: [],
     });
 
-    it('returns ok with empty results for an empty perSpaceOptions list', async () => {
-      testDb = createTestDatabase();
-      const { driver } = testDb;
-      const runner = sqliteTargetDescriptor.createRunner(familyInstance);
-
-      const result = await runner.executeAcrossSpaces({
-        driver,
-        perSpaceOptions: [],
-      });
-
-      if (!result.ok) {
-        throw new Error(formatRunnerFailure(result.failure));
-      }
-      expect(result.value.perSpaceResults).toEqual([]);
-    });
-  },
-);
+    if (!result.ok) {
+      throw new Error(formatRunnerFailure(result.failure));
+    }
+    expect(result.value.perSpaceResults).toEqual([]);
+  });
+});

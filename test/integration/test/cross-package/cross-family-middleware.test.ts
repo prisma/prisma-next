@@ -1,12 +1,13 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type {
+  AfterExecuteResult,
+  CrossFamilyMiddleware,
   ExecutionPlan,
   QueryPlan,
   RuntimeMiddleware,
   RuntimeMiddlewareContext,
 } from '@prisma-next/framework-components/runtime';
 import { RuntimeCore } from '@prisma-next/framework-components/runtime';
-import { createTelemetryMiddleware, type TelemetryEvent } from '@prisma-next/middleware-telemetry';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import {
@@ -19,9 +20,58 @@ import {
 import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
 import { describe, expect, it, vi } from 'vitest';
 
-function collectingTelemetry() {
-  const events: TelemetryEvent[] = [];
-  const middleware = createTelemetryMiddleware({ onEvent: (e) => events.push(e) });
+/**
+ * Minimal cross-family observer for tests. Records `beforeExecute` and
+ * `afterExecute` events into an array; declares no `familyId`/`targetId`
+ * so it composes against any runtime that satisfies the framework SPI.
+ *
+ * This is the structural shape that the (now-retired)
+ * `@prisma-next/middleware-telemetry` package shipped as a
+ * proof-of-concept; the cross-family contract is now exercised by the
+ * real `@prisma-next/middleware-cache` package (see
+ * `middleware-cache.test.ts` and `examples/mongo-demo`). The tests in
+ * this file remain useful for asserting composition order and the
+ * `source: 'driver' | 'middleware'` round-trip without coupling to a
+ * specific middleware package.
+ */
+interface ObservedEvent {
+  readonly phase: 'beforeExecute' | 'afterExecute';
+  readonly lane: string;
+  readonly target: string;
+  readonly storageHash: string;
+  readonly rowCount?: number;
+  readonly completed?: boolean;
+  readonly source?: 'driver' | 'middleware';
+}
+
+function collectingObserver() {
+  const events: ObservedEvent[] = [];
+  const middleware: CrossFamilyMiddleware = {
+    name: 'observer',
+    async beforeExecute(plan: { readonly meta: PlanMeta }, _ctx: RuntimeMiddlewareContext) {
+      events.push({
+        phase: 'beforeExecute',
+        lane: plan.meta.lane,
+        target: plan.meta.target,
+        storageHash: plan.meta.storageHash,
+      });
+    },
+    async afterExecute(
+      plan: { readonly meta: PlanMeta },
+      result: AfterExecuteResult,
+      _ctx: RuntimeMiddlewareContext,
+    ) {
+      events.push({
+        phase: 'afterExecute',
+        lane: plan.meta.lane,
+        target: plan.meta.target,
+        storageHash: plan.meta.storageHash,
+        rowCount: result.rowCount,
+        completed: result.completed,
+        source: result.source,
+      });
+    },
+  };
   return { middleware, events };
 }
 
@@ -138,11 +188,12 @@ const sqlCtx: RuntimeMiddlewareContext = {
   now: () => Date.now(),
   log: { info: () => {}, warn: () => {}, error: () => {} },
   contentHash: async () => 'mock-hash',
+  scope: 'runtime',
 };
 
 describe('cross-family middleware proof', () => {
   it('same middleware observes queries from an SQL runtime', async () => {
-    const { middleware, events } = collectingTelemetry();
+    const { middleware, events } = collectingObserver();
 
     const sqlRuntime = new MockSqlRuntime([middleware], sqlCtx, [{ id: 1, name: 'Alice' }]);
 
@@ -177,7 +228,7 @@ describe('cross-family middleware proof', () => {
   });
 
   it('same middleware observes queries from a Mongo runtime', async () => {
-    const { middleware, events } = collectingTelemetry();
+    const { middleware, events } = collectingObserver();
 
     const mongoAdapter = createMockMongoAdapter();
     const mongoRuntime = createMongoRuntime({
@@ -210,7 +261,7 @@ describe('cross-family middleware proof', () => {
   });
 
   it('same middleware instance works across SQL and Mongo runtimes', async () => {
-    const { middleware, events } = collectingTelemetry();
+    const { middleware, events } = collectingObserver();
 
     const sqlRuntime = new MockSqlRuntime([middleware], sqlCtx, [{ id: 1 }]);
 
@@ -259,13 +310,10 @@ describe('cross-family middleware proof', () => {
     // that the intercept hook is family-agnostic by construction: both
     // SqlRuntimeImpl and MongoRuntimeImpl inherit it from runWithMiddleware
     // via RuntimeCore, so no per-family wiring is needed.
-    const { middleware: telemetry, events } = collectingTelemetry();
+    const { middleware: observer, events } = collectingObserver();
 
     const interceptCalls: string[] = [];
-    const intercepted: RuntimeMiddleware & {
-      readonly familyId?: undefined;
-      readonly targetId?: undefined;
-    } = {
+    const intercepted: CrossFamilyMiddleware = {
       name: 'mock-interceptor',
       async intercept(plan) {
         interceptCalls.push(plan.meta.target);
@@ -274,14 +322,14 @@ describe('cross-family middleware proof', () => {
     };
 
     const sqlDriverRows: Record<string, unknown>[] = [{ id: 'should-not-appear' }];
-    const sqlRuntime = new MockSqlRuntime([intercepted, telemetry], sqlCtx, sqlDriverRows);
+    const sqlRuntime = new MockSqlRuntime([intercepted, observer], sqlCtx, sqlDriverRows);
 
     const mongoAdapter = createMockMongoAdapter();
     const mongoDriver = createMockMongoDriver([{ _id: 'should-not-appear' }]);
     const mongoRuntime = createMongoRuntime({
       context: makeMongoContext(mongoAdapter),
       driver: mongoDriver,
-      middleware: [intercepted, telemetry],
+      middleware: [intercepted, observer],
     });
 
     const sqlPlan: MockSqlPlan = {
@@ -323,7 +371,7 @@ describe('cross-family middleware proof', () => {
     expect(sqlRuntime.driverSpy).not.toHaveBeenCalled();
     expect(mongoDriver.execute).not.toHaveBeenCalled();
 
-    // Telemetry observed both beforeExecute and afterExecute for each run
+    // The observer saw both beforeExecute and afterExecute for each run
     // (beforeExecute fires pre-encode regardless of whether intercept
     // short-circuits the driver path) and saw source: 'middleware' on the
     // afterExecute events.

@@ -1,0 +1,411 @@
+import { strict as assert } from 'node:assert';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { execPath } from 'node:process';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+import {
+  coverageTransitionLabel,
+  inFlightTransitionLabel,
+  parseTransitionFromPath,
+  parseVersion,
+} from './check-upgrade-coverage.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const SCRIPT_PATH = join(HERE, 'check-upgrade-coverage.mjs');
+
+let repo;
+
+function git(...args) {
+  return execFileSync('git', args, {
+    cwd: repo,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+
+function writeRepoFile(relPath, content) {
+  const full = join(repo, relPath);
+  mkdirSync(dirname(full), { recursive: true });
+  writeFileSync(full, content);
+}
+
+function writePackageJson(version) {
+  writeRepoFile('package.json', JSON.stringify({ name: 'fixture', version }, null, 2));
+}
+
+function commitAll(message) {
+  git('add', '-A');
+  git('commit', '-m', message);
+}
+
+function runScript(args) {
+  return spawnSync(execPath, [SCRIPT_PATH, ...args], { cwd: repo, encoding: 'utf8' });
+}
+
+beforeEach(() => {
+  repo = mkdtempSync(join(tmpdir(), 'pn-upgrade-coverage-'));
+  git('init', '--quiet', '--initial-branch=main');
+  git('config', 'user.email', 'test@example.com');
+  git('config', 'user.name', 'Test');
+  git('config', 'commit.gpgsign', 'false');
+});
+
+afterEach(() => {
+  rmSync(repo, { recursive: true, force: true });
+});
+
+describe('parseTransitionFromPath', () => {
+  it('extracts the transition segment for the user skill', () => {
+    assert.equal(
+      parseTransitionFromPath('packages/0-shared/upgrade-skill/upgrades/0.7-to-0.8/foo.ts'),
+      '0.7-to-0.8',
+    );
+  });
+  it('extracts the transition segment for the extension skill', () => {
+    assert.equal(
+      parseTransitionFromPath(
+        'packages/0-shared/extension-upgrade-skill/upgrades/0.7-to-0.8/instructions.md',
+      ),
+      '0.7-to-0.8',
+    );
+  });
+  it('returns null for paths outside an upgrades/<transition>/ subdirectory', () => {
+    assert.equal(parseTransitionFromPath('packages/0-shared/upgrade-skill/SKILL.md'), null);
+    assert.equal(parseTransitionFromPath('packages/0-shared/upgrade-skill/upgrades/'), null);
+    assert.equal(parseTransitionFromPath('examples/foo/bar.ts'), null);
+  });
+});
+
+describe('inFlightTransitionLabel', () => {
+  it('returns head.minor → head.minor + 1 (function of head only)', () => {
+    assert.equal(inFlightTransitionLabel(parseVersion('0.7.0')), '0.7-to-0.8');
+    assert.equal(inFlightTransitionLabel(parseVersion('0.7.1')), '0.7-to-0.8');
+    assert.equal(inFlightTransitionLabel(parseVersion('1.0.0')), '1.0-to-1.1');
+  });
+});
+
+describe('coverageTransitionLabel', () => {
+  it('PR-mode steady-state (prev.minor === head.minor): returns the in-flight directory', () => {
+    assert.equal(
+      coverageTransitionLabel(parseVersion('0.7.0'), parseVersion('0.7.0')),
+      '0.7-to-0.8',
+    );
+    assert.equal(
+      coverageTransitionLabel(parseVersion('0.7.1'), parseVersion('0.7.0')),
+      '0.7-to-0.8',
+    );
+  });
+  it('publish mode (head.minor > prev.minor): returns prev → head', () => {
+    assert.equal(
+      coverageTransitionLabel(parseVersion('0.7.0'), parseVersion('0.6.0')),
+      '0.6-to-0.7',
+    );
+    assert.equal(
+      coverageTransitionLabel(parseVersion('0.8.0'), parseVersion('0.6.0')),
+      '0.6-to-0.8',
+    );
+  });
+});
+
+describe('check-upgrade-coverage — coverage rule (publish style: prev.minor < head.minor)', () => {
+  it('fails when the diff touches examples/ but the user-skill directory is absent', () => {
+    writePackageJson('0.6.0');
+    writeRepoFile('examples/demo/src/main.ts', 'export const a = 1;\n');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.7.0');
+    writeRepoFile('examples/demo/src/main.ts', 'export const a = 2;\n');
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /coverage/);
+    assert.match(result.stderr, /packages\/0-shared\/upgrade-skill\/upgrades\/0\.6-to-0\.7/);
+    assert.match(result.stderr, /examples\/demo\/src\/main\.ts/);
+  });
+
+  it('fails when the diff touches packages/3-extensions/ but the extension-skill directory is absent', () => {
+    writePackageJson('0.6.0');
+    writeRepoFile('packages/3-extensions/cipherstash/src/main.ts', 'export const a = 1;\n');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.7.0');
+    writeRepoFile('packages/3-extensions/cipherstash/src/main.ts', 'export const a = 2;\n');
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(result.status, 0);
+    assert.match(
+      result.stderr,
+      /packages\/0-shared\/extension-upgrade-skill\/upgrades\/0\.6-to-0\.7/,
+    );
+  });
+
+  it('requires both directories when both substrates change; passes once both are present', () => {
+    writePackageJson('0.6.0');
+    writeRepoFile('examples/demo/src/main.ts', 'a\n');
+    writeRepoFile('packages/3-extensions/cipherstash/src/main.ts', 'a\n');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.7.0');
+    writeRepoFile('examples/demo/src/main.ts', 'b\n');
+    writeRepoFile('packages/3-extensions/cipherstash/src/main.ts', 'b\n');
+    commitAll('head-broken');
+
+    // Neither directory present → both missing.
+    const missingBoth = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(missingBoth.status, 0);
+    assert.match(missingBoth.stderr, /packages\/0-shared\/upgrade-skill\/upgrades\/0\.6-to-0\.7/);
+    assert.match(
+      missingBoth.stderr,
+      /packages\/0-shared\/extension-upgrade-skill\/upgrades\/0\.6-to-0\.7/,
+    );
+
+    // Add only the user-skill directory; extension-skill still missing.
+    writeRepoFile(
+      'packages/0-shared/upgrade-skill/upgrades/0.6-to-0.7/instructions.md',
+      '---\nfrom: "0.6"\nto: "0.7"\nchanges: []\n---\n',
+    );
+    commitAll('add user-skill dir');
+    const missingExt = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(missingExt.status, 0);
+    assert.match(
+      missingExt.stderr,
+      /packages\/0-shared\/extension-upgrade-skill\/upgrades\/0\.6-to-0\.7/,
+    );
+    assert.doesNotMatch(
+      missingExt.stderr,
+      /packages\/0-shared\/upgrade-skill\/upgrades\/0\.6-to-0\.7/,
+    );
+
+    // Add the extension-skill directory; both present → pass.
+    writeRepoFile(
+      'packages/0-shared/extension-upgrade-skill/upgrades/0.6-to-0.7/instructions.md',
+      '---\nfrom: "0.6"\nto: "0.7"\nchanges: []\n---\n',
+    );
+    commitAll('add ext-skill dir');
+    const both = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(both.status, 0, `expected exit 0; stderr=${both.stderr}`);
+  });
+
+  it('publish mode: compares against the most recent v[0-9]* tag', () => {
+    writePackageJson('0.6.0');
+    writeRepoFile('examples/demo/src/main.ts', 'a\n');
+    commitAll('prev');
+    git('tag', '-a', 'v0.6.0', '-m', 'v0.6.0');
+    writePackageJson('0.7.0');
+    writeRepoFile('examples/demo/src/main.ts', 'b\n');
+    commitAll('head');
+    const result = runScript(['--mode', 'publish', '--head', 'HEAD']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /packages\/0-shared\/upgrade-skill\/upgrades\/0\.6-to-0\.7/);
+  });
+});
+
+describe('check-upgrade-coverage — coverage rule (PR style: prev.minor === head.minor)', () => {
+  it('PR with no version bump: coverage requires the in-flight directory (head → head+1)', () => {
+    // Models the typical feature branch: package.json reads the
+    // currently-published version (0.7.0) on both prev and head; the
+    // breaking change is in-flight for the next release (0.7 → 0.8).
+    writePackageJson('0.7.0');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writeRepoFile('examples/demo/src/main.ts', 'export const a = 2;\n');
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /packages\/0-shared\/upgrade-skill\/upgrades\/0\.7-to-0\.8/);
+    assert.doesNotMatch(result.stderr, /upgrades\/0\.6-to-0\.7/);
+  });
+
+  it('PR with a substrate diff and the matching in-flight directory present: passes', () => {
+    writePackageJson('0.7.0');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writeRepoFile('examples/demo/src/main.ts', 'export const a = 2;\n');
+    writeRepoFile(
+      'packages/0-shared/upgrade-skill/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n',
+    );
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
+  });
+
+  it('patch range with a substrate diff still requires an in-flight entry (no carve-out)', () => {
+    // Under the corrected semantic, patch ranges aren't a special
+    // case — a substrate diff is a substrate diff. If the patch is
+    // genuinely consumer-invisible, the entry can ship `changes: []`.
+    writePackageJson('0.7.0');
+    writeRepoFile('examples/demo/src/main.ts', 'export const a = 1;\n');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.7.1');
+    writeRepoFile('examples/demo/src/main.ts', 'export const a = 2;\n');
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(
+      result.status,
+      0,
+      `expected non-zero; stderr=${result.stderr}; stdout=${result.stdout}`,
+    );
+    assert.match(result.stderr, /upgrades\/0\.7-to-0\.8/);
+  });
+
+  it('no substrate diff: coverage rule is vacuously satisfied regardless of version', () => {
+    writePackageJson('0.7.0');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.7.1');
+    writeRepoFile('docs/notes.md', 'unrelated\n');
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
+  });
+});
+
+describe('check-upgrade-coverage — generated artefacts are NOT exempt from the substrate diff', () => {
+  it('a contract.json change in examples/ requires an in-flight entry (format-change is an upgrade instruction)', () => {
+    writePackageJson('0.7.0');
+    writeRepoFile('examples/demo/src/prisma/contract.json', '{"v":1}\n');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writeRepoFile('examples/demo/src/prisma/contract.json', '{"v":2}\n');
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /upgrades\/0\.7-to-0\.8/);
+    assert.match(result.stderr, /examples\/demo\/src\/prisma\/contract\.json/);
+  });
+});
+
+describe('check-upgrade-coverage — new-entries rule', () => {
+  it('rejects an added file under a stale transition directory (publish mode)', () => {
+    // Simulates a publish-time check: prev tag at 0.7, head main tip
+    // bumped to 0.8. A file added at upgrades/0.6-to-0.7/ is stale
+    // (allowed transitions are 0.7-to-0.8 and 0.8-to-0.9).
+    writePackageJson('0.7.0');
+    writeRepoFile(
+      'packages/0-shared/upgrade-skill/upgrades/0.6-to-0.7/instructions.md',
+      '---\nfrom: "0.6"\nto: "0.7"\nchanges: []\n---\n',
+    );
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.8.0');
+    writeRepoFile(
+      'packages/0-shared/upgrade-skill/upgrades/0.6-to-0.7/new-script.ts',
+      'export const x = 1;\n',
+    );
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /new-entries-stale-transition/);
+    assert.match(result.stderr, /0\.6-to-0\.7\/new-script\.ts/);
+    // Either of the allowed transitions should be mentioned.
+    assert.match(result.stderr, /0\.7-to-0\.8|0\.8-to-0\.9/);
+  });
+
+  it('publish mode: accepts an added file under either prev→head or head→head+1', () => {
+    // Both `0.7-to-0.8` (the release being shipped) and `0.8-to-0.9`
+    // (the next in-flight) are valid landing spots in publish mode.
+    writePackageJson('0.7.0');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.8.0');
+    writeRepoFile(
+      'packages/0-shared/upgrade-skill/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n',
+    );
+    writeRepoFile(
+      'packages/0-shared/extension-upgrade-skill/upgrades/0.8-to-0.9/instructions.md',
+      '---\nfrom: "0.8"\nto: "0.9"\nchanges: []\n---\n',
+    );
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
+  });
+
+  it('PR mode (skill-bootstrap): accepts an added placeholder under the in-flight directory', () => {
+    // Mirrors the real-world tml-2519 case: a feature PR whose
+    // package.json hasn't bumped (prev.minor = head.minor = 0.7)
+    // adds the placeholder for the in-flight 0.7→0.8 transition.
+    writePackageJson('0.7.0');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.7.0');
+    writeRepoFile(
+      'packages/0-shared/upgrade-skill/upgrades/0.7-to-0.8/instructions.md',
+      '---\nfrom: "0.7"\nto: "0.8"\nchanges: []\n---\n',
+    );
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
+  });
+
+  it('PR mode: rejects an added placeholder under a stale transition directory', () => {
+    // Same fixture as above but the placeholder lands in 0.6-to-0.7
+    // (already-shipped transition); that's stale relative to head=0.7.
+    writePackageJson('0.7.0');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.7.0');
+    writeRepoFile(
+      'packages/0-shared/upgrade-skill/upgrades/0.6-to-0.7/instructions.md',
+      '---\nfrom: "0.6"\nto: "0.7"\nchanges: []\n---\n',
+    );
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /new-entries-stale-transition/);
+    assert.match(result.stderr, /0\.7-to-0\.8/);
+  });
+
+  it('accepts a modification to an existing file in a stale transition directory', () => {
+    writePackageJson('0.7.0');
+    writeRepoFile(
+      'packages/0-shared/upgrade-skill/upgrades/0.6-to-0.7/instructions.md',
+      '---\nfrom: "0.6"\nto: "0.7"\nchanges: []\n---\n# v1\n',
+    );
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+    writePackageJson('0.8.0');
+    // Same path — modification, not add.
+    writeRepoFile(
+      'packages/0-shared/upgrade-skill/upgrades/0.6-to-0.7/instructions.md',
+      '---\nfrom: "0.6"\nto: "0.7"\nchanges: []\n---\n# v2 — bug fix\n',
+    );
+    commitAll('head');
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
+  });
+});
+
+describe('check-upgrade-coverage — in-flight minor source-of-truth', () => {
+  it('reads the in-flight minor from package.json on the --head ref (not from npm or from main)', () => {
+    writePackageJson('0.6.0');
+    writeRepoFile('examples/demo/src/main.ts', 'a\n');
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+
+    // Head A: version 0.7.0 → publish-style coverage (prev.minor 6 <
+    // head.minor 7) requires upgrades/0.6-to-0.7/.
+    writePackageJson('0.7.0');
+    writeRepoFile('examples/demo/src/main.ts', 'b\n');
+    commitAll('head-0.7.0');
+    const a = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(a.status, 0);
+    assert.match(a.stderr, /upgrades\/0\.6-to-0\.7/);
+    assert.doesNotMatch(a.stderr, /upgrades\/0\.5-to-0\.6/);
+
+    // Head B: version 0.8.0 on a new commit → publish-style coverage
+    // requires upgrades/0.6-to-0.8/ because prev is still at 0.6.0.
+    writePackageJson('0.8.0');
+    writeRepoFile('examples/demo/src/main.ts', 'c\n');
+    commitAll('head-0.8.0');
+    const b = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.notEqual(b.status, 0);
+    assert.match(b.stderr, /upgrades\/0\.6-to-0\.8/);
+  });
+});

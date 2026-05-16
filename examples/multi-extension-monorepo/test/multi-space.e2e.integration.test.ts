@@ -180,236 +180,234 @@ async function setupTestProject(): Promise<TestProject> {
   return { projectRoot, migrationsDir };
 }
 
-describe.sequential(
-  'multi-extension-monorepo end-to-end (PGlite)',
-  { timeout: timeouts.spinUpPpgDev },
-  () => {
-    let database: Awaited<ReturnType<typeof createDevDatabase>>;
-    let driver: Awaited<ReturnType<typeof postgresDriverDescriptor.create>> | undefined;
-    let project: TestProject | undefined;
+describe.sequential('multi-extension-monorepo end-to-end (PGlite)', {
+  timeout: timeouts.spinUpPpgDev,
+}, () => {
+  let database: Awaited<ReturnType<typeof createDevDatabase>>;
+  let driver: Awaited<ReturnType<typeof postgresDriverDescriptor.create>> | undefined;
+  let project: TestProject | undefined;
 
-    beforeAll(async () => {
-      database = await createDevDatabase();
-    }, timeouts.spinUpPpgDev);
+  beforeAll(async () => {
+    database = await createDevDatabase();
+  }, timeouts.spinUpPpgDev);
 
-    afterAll(async () => {
-      if (database) await database.close();
-    }, timeouts.spinUpPpgDev);
+  afterAll(async () => {
+    if (database) await database.close();
+  }, timeouts.spinUpPpgDev);
 
-    beforeEach(async () => {
-      driver = await postgresDriverDescriptor.create(database.connectionString);
-      await driver.query('drop schema if exists public cascade');
-      await driver.query('drop schema if exists prisma_contract cascade');
-      await driver.query('create schema public');
-    }, timeouts.spinUpPpgDev);
+  beforeEach(async () => {
+    driver = await postgresDriverDescriptor.create(database.connectionString);
+    await driver.query('drop schema if exists public cascade');
+    await driver.query('drop schema if exists prisma_contract cascade');
+    await driver.query('create schema public');
+  }, timeouts.spinUpPpgDev);
 
-    afterEach(async () => {
-      if (driver) {
-        await driver.close();
-        driver = undefined;
-      }
-      if (project) {
-        await rm(project.projectRoot, { recursive: true, force: true });
-        project = undefined;
-      }
-    });
+  afterEach(async () => {
+    if (driver) {
+      await driver.close();
+      driver = undefined;
+    }
+    if (project) {
+      await rm(project.projectRoot, { recursive: true, force: true });
+      project = undefined;
+    }
+  });
 
-    it('pinned per-space artefacts land for both extension spaces', async () => {
-      project = await setupTestProject();
+  it('pinned per-space artefacts land for both extension spaces', async () => {
+    project = await setupTestProject();
 
-      const auditHeadJson = JSON.parse(
-        await readFile(join(project.migrationsDir, AUDIT_SPACE_ID, 'refs', 'head.json'), 'utf-8'),
-      );
-      expect(auditHeadJson.hash).toBe(AUDIT_STORAGE_HASH);
-      expect(auditHeadJson.invariants).toEqual([AUDIT_BASELINE_INVARIANT_ID]);
+    const auditHeadJson = JSON.parse(
+      await readFile(join(project.migrationsDir, AUDIT_SPACE_ID, 'refs', 'head.json'), 'utf-8'),
+    );
+    expect(auditHeadJson.hash).toBe(AUDIT_STORAGE_HASH);
+    expect(auditHeadJson.invariants).toEqual([AUDIT_BASELINE_INVARIANT_ID]);
 
-      const featureFlagsHeadJson = JSON.parse(
-        await readFile(
-          join(project.migrationsDir, FEATURE_FLAGS_SPACE_ID, 'refs', 'head.json'),
-          'utf-8',
+    const featureFlagsHeadJson = JSON.parse(
+      await readFile(
+        join(project.migrationsDir, FEATURE_FLAGS_SPACE_ID, 'refs', 'head.json'),
+        'utf-8',
+      ),
+    );
+    expect(featureFlagsHeadJson.hash).toBe(FEATURE_FLAGS_STORAGE_HASH);
+    expect(featureFlagsHeadJson.invariants).toEqual([FEATURE_FLAGS_BASELINE_INVARIANT_ID]);
+
+    const auditOps = JSON.parse(
+      await readFile(
+        join(project.migrationsDir, AUDIT_SPACE_ID, auditBaselineMigration.dirName, 'ops.json'),
+        'utf-8',
+      ),
+    ) as ReadonlyArray<{ readonly invariantId?: string }>;
+    expect(auditOps.find((op) => op.invariantId === AUDIT_BASELINE_INVARIANT_ID)).toBeDefined();
+
+    const featureFlagsOps = JSON.parse(
+      await readFile(
+        join(
+          project.migrationsDir,
+          FEATURE_FLAGS_SPACE_ID,
+          featureFlagsBaselineMigration.dirName,
+          'ops.json',
         ),
-      );
-      expect(featureFlagsHeadJson.hash).toBe(FEATURE_FLAGS_STORAGE_HASH);
-      expect(featureFlagsHeadJson.invariants).toEqual([FEATURE_FLAGS_BASELINE_INVARIANT_ID]);
+        'utf-8',
+      ),
+    ) as ReadonlyArray<{ readonly invariantId?: string }>;
+    expect(
+      featureFlagsOps.find((op) => op.invariantId === FEATURE_FLAGS_BASELINE_INVARIANT_ID),
+    ).toBeDefined();
+  });
 
-      const auditOps = JSON.parse(
-        await readFile(
-          join(project.migrationsDir, AUDIT_SPACE_ID, auditBaselineMigration.dirName, 'ops.json'),
-          'utf-8',
-        ),
-      ) as ReadonlyArray<{ readonly invariantId?: string }>;
-      expect(auditOps.find((op) => op.invariantId === AUDIT_BASELINE_INVARIANT_ID)).toBeDefined();
+  it('mode=plan produces a multi-space plan ordered alphabetically (extensions first, app last)', async () => {
+    project = await setupTestProject();
 
-      const featureFlagsOps = JSON.parse(
-        await readFile(
-          join(
-            project.migrationsDir,
-            FEATURE_FLAGS_SPACE_ID,
-            featureFlagsBaselineMigration.dirName,
-            'ops.json',
-          ),
-          'utf-8',
-        ),
-      ) as ReadonlyArray<{ readonly invariantId?: string }>;
-      expect(
-        featureFlagsOps.find((op) => op.invariantId === FEATURE_FLAGS_BASELINE_INVARIANT_ID),
-      ).toBeDefined();
+    const result = await executeDbInit({
+      driver: driver!,
+      familyInstance: buildFamilyInstance('natural'),
+      contract: appContract,
+      mode: 'plan',
+      migrations: postgresTargetDescriptor.migrations,
+      frameworkComponents: [...frameworkComponents],
+      migrationsDir: project.migrationsDir,
+      targetId: 'postgres',
+      extensionPacks: [auditExtensionDescriptor, featureFlagsExtensionDescriptor],
     });
 
-    it('mode=plan produces a multi-space plan ordered alphabetically (extensions first, app last)', async () => {
-      project = await setupTestProject();
-
-      const result = await executeDbInit({
-        driver: driver!,
-        familyInstance: buildFamilyInstance('natural'),
-        contract: appContract,
-        mode: 'plan',
-        migrations: postgresTargetDescriptor.migrations,
-        frameworkComponents: [...frameworkComponents],
-        migrationsDir: project.migrationsDir,
-        targetId: 'postgres',
-        extensionPacks: [auditExtensionDescriptor, featureFlagsExtensionDescriptor],
-      });
-
-      if (!result.ok) {
-        throw new Error(
-          `Expected plan ok but got failure: ${JSON.stringify(result.failure, null, 2)}`,
-        );
-      }
-      const opIdsInOrder = result.value.plan.operations.map((op: { readonly id: string }) => op.id);
-
-      const auditIdx = opIdsInOrder.findIndex((id: string) =>
-        id.includes(`audit.create-${AUDIT_EVENT_TABLE}`),
+    if (!result.ok) {
+      throw new Error(
+        `Expected plan ok but got failure: ${JSON.stringify(result.failure, null, 2)}`,
       );
-      const featureFlagsIdx = opIdsInOrder.findIndex((id: string) =>
-        id.includes(`feature-flags.create-${FEATURE_FLAG_TABLE}`),
-      );
-      const appIdx = opIdsInOrder.findIndex((id: string) => id.includes(APP_USER_TABLE));
+    }
+    const opIdsInOrder = result.value.plan.operations.map((op: { readonly id: string }) => op.id);
 
-      expect(auditIdx).toBeGreaterThanOrEqual(0);
-      expect(featureFlagsIdx).toBeGreaterThan(auditIdx);
-      expect(appIdx).toBeGreaterThan(featureFlagsIdx);
+    const auditIdx = opIdsInOrder.findIndex((id: string) =>
+      id.includes(`audit.create-${AUDIT_EVENT_TABLE}`),
+    );
+    const featureFlagsIdx = opIdsInOrder.findIndex((id: string) =>
+      id.includes(`feature-flags.create-${FEATURE_FLAG_TABLE}`),
+    );
+    const appIdx = opIdsInOrder.findIndex((id: string) => id.includes(APP_USER_TABLE));
+
+    expect(auditIdx).toBeGreaterThanOrEqual(0);
+    expect(featureFlagsIdx).toBeGreaterThan(auditIdx);
+    expect(appIdx).toBeGreaterThan(featureFlagsIdx);
+  });
+
+  it('mode=apply: three spaces apply atomically; markers + round-trips OK', async () => {
+    project = await setupTestProject();
+
+    const result = await executeDbInit({
+      driver: driver!,
+      familyInstance: buildFamilyInstance('natural'),
+      contract: appContract,
+      mode: 'apply',
+      migrations: postgresTargetDescriptor.migrations,
+      frameworkComponents: [...frameworkComponents],
+      migrationsDir: project.migrationsDir,
+      targetId: 'postgres',
+      extensionPacks: [auditExtensionDescriptor, featureFlagsExtensionDescriptor],
     });
 
-    it('mode=apply: three spaces apply atomically; markers + round-trips OK', async () => {
-      project = await setupTestProject();
-
-      const result = await executeDbInit({
-        driver: driver!,
-        familyInstance: buildFamilyInstance('natural'),
-        contract: appContract,
-        mode: 'apply',
-        migrations: postgresTargetDescriptor.migrations,
-        frameworkComponents: [...frameworkComponents],
-        migrationsDir: project.migrationsDir,
-        targetId: 'postgres',
-        extensionPacks: [auditExtensionDescriptor, featureFlagsExtensionDescriptor],
-      });
-
-      if (!result.ok) {
-        throw new Error(
-          `Expected db apply success but got failure: ${JSON.stringify(result.failure, null, 2)}`,
-        );
-      }
-
-      const markers = await driver!.query<{
-        space: string;
-        core_hash: string;
-        invariants: readonly string[];
-      }>('select space, core_hash, invariants from prisma_contract.marker order by space');
-      const markerBySpace = new Map(markers.rows.map((row) => [row.space, row]));
-
-      expect([...markerBySpace.keys()].sort()).toEqual(
-        ['app', AUDIT_SPACE_ID, FEATURE_FLAGS_SPACE_ID].sort(),
+    if (!result.ok) {
+      throw new Error(
+        `Expected db apply success but got failure: ${JSON.stringify(result.failure, null, 2)}`,
       );
+    }
 
-      expect(markerBySpace.get('app')?.core_hash).toBe(APP_CONTRACT_HASH_VALUE);
-      expect(markerBySpace.get(AUDIT_SPACE_ID)?.core_hash).toBe(AUDIT_STORAGE_HASH);
-      expect(markerBySpace.get(FEATURE_FLAGS_SPACE_ID)?.core_hash).toBe(FEATURE_FLAGS_STORAGE_HASH);
+    const markers = await driver!.query<{
+      space: string;
+      core_hash: string;
+      invariants: readonly string[];
+    }>('select space, core_hash, invariants from prisma_contract.marker order by space');
+    const markerBySpace = new Map(markers.rows.map((row) => [row.space, row]));
 
-      expect([...(markerBySpace.get(AUDIT_SPACE_ID)?.invariants ?? [])].sort()).toEqual(
-        [...auditHeadRef.invariants].sort(),
-      );
-      expect([...(markerBySpace.get(FEATURE_FLAGS_SPACE_ID)?.invariants ?? [])].sort()).toEqual(
-        [...featureFlagsHeadRef.invariants].sort(),
-      );
+    expect([...markerBySpace.keys()].sort()).toEqual(
+      ['app', AUDIT_SPACE_ID, FEATURE_FLAGS_SPACE_ID].sort(),
+    );
 
-      const auditTable = await driver!.query<{ exists: boolean }>(
-        `select to_regclass('public."${AUDIT_EVENT_TABLE}"') is not null as exists`,
-      );
-      expect(auditTable.rows[0]?.exists).toBe(true);
+    expect(markerBySpace.get('app')?.core_hash).toBe(APP_CONTRACT_HASH_VALUE);
+    expect(markerBySpace.get(AUDIT_SPACE_ID)?.core_hash).toBe(AUDIT_STORAGE_HASH);
+    expect(markerBySpace.get(FEATURE_FLAGS_SPACE_ID)?.core_hash).toBe(FEATURE_FLAGS_STORAGE_HASH);
 
-      const featureFlagsTable = await driver!.query<{ exists: boolean }>(
-        `select to_regclass('public."${FEATURE_FLAG_TABLE}"') is not null as exists`,
-      );
-      expect(featureFlagsTable.rows[0]?.exists).toBe(true);
+    expect([...(markerBySpace.get(AUDIT_SPACE_ID)?.invariants ?? [])].sort()).toEqual(
+      [...auditHeadRef.invariants].sort(),
+    );
+    expect([...(markerBySpace.get(FEATURE_FLAGS_SPACE_ID)?.invariants ?? [])].sort()).toEqual(
+      [...featureFlagsHeadRef.invariants].sort(),
+    );
 
-      const appTable = await driver!.query<{ exists: boolean }>(
-        `select to_regclass('public."${APP_USER_TABLE}"') is not null as exists`,
-      );
-      expect(appTable.rows[0]?.exists).toBe(true);
+    const auditTable = await driver!.query<{ exists: boolean }>(
+      `select to_regclass('public."${AUDIT_EVENT_TABLE}"') is not null as exists`,
+    );
+    expect(auditTable.rows[0]?.exists).toBe(true);
 
-      await driver!.query(
-        `insert into public."${AUDIT_EVENT_TABLE}" ("id", "actor", "action") values ($1, $2, $3)`,
-        ['evt-1', 'alice', 'login'],
-      );
-      const auditRows = await driver!.query<{ id: string; actor: string; action: string }>(
-        `select "id", "actor", "action" from public."${AUDIT_EVENT_TABLE}"`,
-      );
-      expect(auditRows.rows.length).toBe(1);
-      expect(auditRows.rows[0]?.actor).toBe('alice');
+    const featureFlagsTable = await driver!.query<{ exists: boolean }>(
+      `select to_regclass('public."${FEATURE_FLAG_TABLE}"') is not null as exists`,
+    );
+    expect(featureFlagsTable.rows[0]?.exists).toBe(true);
 
-      await driver!.query(
-        `insert into public."${FEATURE_FLAG_TABLE}" ("key", "enabled") values ($1, $2)`,
-        ['dark-mode', true],
-      );
-      const featureFlagsRows = await driver!.query<{ key: string; enabled: boolean }>(
-        `select "key", "enabled" from public."${FEATURE_FLAG_TABLE}"`,
-      );
-      expect(featureFlagsRows.rows.length).toBe(1);
-      expect(featureFlagsRows.rows[0]?.enabled).toBe(true);
+    const appTable = await driver!.query<{ exists: boolean }>(
+      `select to_regclass('public."${APP_USER_TABLE}"') is not null as exists`,
+    );
+    expect(appTable.rows[0]?.exists).toBe(true);
 
-      await driver!.query(
-        `insert into public."${APP_USER_TABLE}" ("id", "email") values ($1, $2)`,
-        ['user-1', 'alice@example.com'],
-      );
-      const appRows = await driver!.query<{ id: string; email: string }>(
-        `select "id", "email" from public."${APP_USER_TABLE}"`,
-      );
-      expect(appRows.rows.length).toBe(1);
-      expect(appRows.rows[0]?.email).toBe('alice@example.com');
+    await driver!.query(
+      `insert into public."${AUDIT_EVENT_TABLE}" ("id", "actor", "action") values ($1, $2, $3)`,
+      ['evt-1', 'alice', 'login'],
+    );
+    const auditRows = await driver!.query<{ id: string; actor: string; action: string }>(
+      `select "id", "actor", "action" from public."${AUDIT_EVENT_TABLE}"`,
+    );
+    expect(auditRows.rows.length).toBe(1);
+    expect(auditRows.rows[0]?.actor).toBe('alice');
+
+    await driver!.query(
+      `insert into public."${FEATURE_FLAG_TABLE}" ("key", "enabled") values ($1, $2)`,
+      ['dark-mode', true],
+    );
+    const featureFlagsRows = await driver!.query<{ key: string; enabled: boolean }>(
+      `select "key", "enabled" from public."${FEATURE_FLAG_TABLE}"`,
+    );
+    expect(featureFlagsRows.rows.length).toBe(1);
+    expect(featureFlagsRows.rows[0]?.enabled).toBe(true);
+
+    await driver!.query(`insert into public."${APP_USER_TABLE}" ("id", "email") values ($1, $2)`, [
+      'user-1',
+      'alice@example.com',
+    ]);
+    const appRows = await driver!.query<{ id: string; email: string }>(
+      `select "id", "email" from public."${APP_USER_TABLE}"`,
+    );
+    expect(appRows.rows.length).toBe(1);
+    expect(appRows.rows[0]?.email).toBe('alice@example.com');
+  });
+
+  it('marker hashes are independent of `extensionPacks` declaration order', async () => {
+    project = await setupTestProject();
+
+    const result = await executeDbInit({
+      driver: driver!,
+      familyInstance: buildFamilyInstance('reverse'),
+      contract: appContract,
+      mode: 'apply',
+      migrations: postgresTargetDescriptor.migrations,
+      frameworkComponents: [...frameworkComponents],
+      migrationsDir: project.migrationsDir,
+      targetId: 'postgres',
+      extensionPacks: [featureFlagsExtensionDescriptor, auditExtensionDescriptor],
     });
 
-    it('marker hashes are independent of `extensionPacks` declaration order', async () => {
-      project = await setupTestProject();
+    if (!result.ok) {
+      throw new Error(
+        `Expected db apply success but got failure: ${JSON.stringify(result.failure, null, 2)}`,
+      );
+    }
 
-      const result = await executeDbInit({
-        driver: driver!,
-        familyInstance: buildFamilyInstance('reverse'),
-        contract: appContract,
-        mode: 'apply',
-        migrations: postgresTargetDescriptor.migrations,
-        frameworkComponents: [...frameworkComponents],
-        migrationsDir: project.migrationsDir,
-        targetId: 'postgres',
-        extensionPacks: [featureFlagsExtensionDescriptor, auditExtensionDescriptor],
-      });
+    const markers = await driver!.query<{
+      space: string;
+      core_hash: string;
+    }>('select space, core_hash from prisma_contract.marker order by space');
+    const markerBySpace = new Map(markers.rows.map((row) => [row.space, row]));
 
-      if (!result.ok) {
-        throw new Error(
-          `Expected db apply success but got failure: ${JSON.stringify(result.failure, null, 2)}`,
-        );
-      }
-
-      const markers = await driver!.query<{
-        space: string;
-        core_hash: string;
-      }>('select space, core_hash from prisma_contract.marker order by space');
-      const markerBySpace = new Map(markers.rows.map((row) => [row.space, row]));
-
-      expect(markerBySpace.get(AUDIT_SPACE_ID)?.core_hash).toBe(AUDIT_STORAGE_HASH);
-      expect(markerBySpace.get(FEATURE_FLAGS_SPACE_ID)?.core_hash).toBe(FEATURE_FLAGS_STORAGE_HASH);
-      expect(markerBySpace.get('app')?.core_hash).toBe(APP_CONTRACT_HASH_VALUE);
-    });
-  },
-);
+    expect(markerBySpace.get(AUDIT_SPACE_ID)?.core_hash).toBe(AUDIT_STORAGE_HASH);
+    expect(markerBySpace.get(FEATURE_FLAGS_SPACE_ID)?.core_hash).toBe(FEATURE_FLAGS_STORAGE_HASH);
+    expect(markerBySpace.get('app')?.core_hash).toBe(APP_CONTRACT_HASH_VALUE);
+  });
+});

@@ -196,4 +196,4 @@ export async function expectNoMarkerOrLedgerWrites(driver: SqliteControlDriver):
   }
 }
 
-export { sqliteTargetDescriptor, createMigrationPlan, sqliteDriverDescriptor };
+export { createMigrationPlan, sqliteDriverDescriptor, sqliteTargetDescriptor };

@@ -16,27 +16,28 @@
   },
   "dependencies": {
     "@cipherstash/stack": "^0.15.3",
-    "@prisma-next/adapter-postgres": "workspace:*",
-    "@prisma-next/contract": "workspace:*",
-    "@prisma-next/driver-postgres": "workspace:*",
-    "@prisma-next/extension-cipherstash": "workspace:*",
-    "@prisma-next/family-sql": "workspace:*",
-    "@prisma-next/framework-components": "workspace:*",
-    "@prisma-next/postgres": "workspace:*",
-    "@prisma-next/sql-contract": "workspace:*",
-    "@prisma-next/sql-contract-psl": "workspace:*",
-    "@prisma-next/sql-orm-client": "workspace:*",
-    "@prisma-next/sql-runtime": "workspace:*",
-    "@prisma-next/target-postgres": "workspace:*",
+    "@prisma-next/adapter-postgres": "workspace:0.7.0",
+    "@prisma-next/contract": "workspace:0.7.0",
+    "@prisma-next/driver-postgres": "workspace:0.7.0",
+    "@prisma-next/extension-cipherstash": "workspace:0.7.0",
+    "@prisma-next/family-sql": "workspace:0.7.0",
+    "@prisma-next/framework-components": "workspace:0.7.0",
+    "@prisma-next/postgres": "workspace:0.7.0",
+    "@prisma-next/sql-contract": "workspace:0.7.0",
+    "@prisma-next/sql-contract-psl": "workspace:0.7.0",
+    "@prisma-next/sql-orm-client": "workspace:0.7.0",
+    "@prisma-next/sql-runtime": "workspace:0.7.0",
+    "@prisma-next/target-postgres": "workspace:0.7.0",
     "dotenv": "^16.4.5"
   },
   "devDependencies": {
-    "@prisma-next/cli": "workspace:*",
-    "@prisma-next/tsconfig": "workspace:*",
+    "@prisma-next/cli": "workspace:0.7.0",
+    "@prisma-next/tsconfig": "workspace:0.7.0",
     "@types/node": "catalog:",
     "pathe": "^2.0.3",
     "tsx": "^4.19.2",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  }
+  },
+  "version": "0.7.0"
 }

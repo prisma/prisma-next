@@ -17,10 +17,7 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 - [Conventions](docs/onboarding/Conventions.md) — TypeScript, tooling, and code style
 - [Testing](docs/onboarding/Testing.md) — Test commands, patterns, and organization
 - [Common Tasks Playbook](docs/onboarding/Common-Tasks-Playbook.md) — Add operation, split monolith, fix import
-
-## Cursor Cloud Agents
-
-`.cursor/environment.json` clones Prisma Ignite to `$HOME/ignite` on cloud-agent boot. Skills should resolve Ignite as: `$IGNITE_REPO`, then `$HOME/ignite`, then `$HOME/Projects/prisma/ignite`. Do not assume Ignite is a workspace sibling.
+- [Cursor Cloud Agents](docs/onboarding/Cursor-Cloud-Agents.md) — Setup, secrets, lockfile discipline, snapshot management
 
 ## Project Overview
 
@@ -33,48 +30,40 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 
 ## Golden Rules
 
-- **Node.js version**: Use the shell's Node. Do not run nvm/fnm or any version switcher. Source of truth is root `package.json` `engines.node`. If the shell's version is wrong or commands fail, report that the shell is misconfigured and the user should configure their environment to satisfy `engines.node`.
-- Use `pnpm` not `npm`!
-- The source of truth for the required Node version is the root `package.json` `engines.node` field.
-- Never use `npx`
-- If the shell's `node -v` does not satisfy that, or Node/pnpm commands fail due to version, report:
-  "Your shell is misconfigured for this repo. Configure your environment so that `node`
-  resolves to a version that satisfies the root package.json engines.node (e.g. set your
-  default Node in your version manager, or use Volta)."
-- We use turborepo to build, generally. `pnpm build` scripts are available in each package which delegate to turborepo
-- If you change exported types in a workspace package consumed by other packages/examples, run that package's `pnpm build` to refresh `dist/*.d.mts` declarations before validating downstream TypeScript usage.
-- When you want to typecheck, use the local `pnpm typecheck` scripts instead of writing `tsc` commands from scratch
-- When you want to test, use the local `pnpm test` scripts. For coverage, use `pnpm test:coverage` (all packages) or `pnpm coverage:packages` (packages only, excludes examples)
-- Use arktype instead of zod
-- Never add file extensions to imports in TypeScript
-- Don't add comments if avoidable, prefer code which expresses its intent
-- Don't add exports for backwards compatibility unless requested to do so
-- Always write tests before creating or modifying implementation
-- Do not reexport things from one file in another, except in the `exports/` folders
-- Don't branch on target; use adapters: `.cursor/rules/no-target-branches.mdc`
-- Keep tests concise; omit "should": `.cursor/rules/omit-should-in-tests.mdc`
-- Keep docs current (READMEs, rules, links): `.cursor/rules/doc-maintenance.mdc`
-- Prefer links to canonical docs over long comments
+- **Node.js version**: Use the shell's Node — do not run `nvm`/`fnm` or any version switcher. Source of truth is the root `package.json` `engines.node`. If the shell's `node -v` doesn't satisfy that, report that the shell is misconfigured (e.g. user should set their default Node in their version manager, or use Volta) — don't try to switch it yourself.
+- Use `pnpm`, not `npm`. Never use `npx`.
+- Build with `pnpm build` (delegates to Turbo). After changing exported types in a workspace package consumed elsewhere, run that package's `pnpm build` to refresh `dist/*.d.mts` before validating downstream TypeScript.
+- For typecheck/test, use the local `pnpm typecheck` / `pnpm test` scripts rather than writing `tsc`/`vitest` invocations from scratch.
+- Use arktype, not zod.
+- Never add file extensions to imports in TypeScript.
+- Don't add comments if avoidable, prefer code that expresses its intent.
+- Don't add backwards-compat exports unless asked.
+- Always write tests before creating or modifying implementation.
+- Don't reexport from one file in another, except in `exports/` folders.
+- Don't branch on target; use adapters: `.cursor/rules/no-target-branches.mdc`.
+- Keep tests concise; omit "should": `.cursor/rules/omit-should-in-tests.mdc`.
+- Keep docs current (READMEs, rules, links): `.cursor/rules/doc-maintenance.mdc`.
+- Prefer links to canonical docs over long comments.
 
 ## Typesafety rules
-- Never use `any` type
-- Never use `@ts-expect-error` outside of negative type tests
-- Never use `@ts-nocheck`
-- Never suppress biome lints
-- Try to minimize type casts. Instead, prefer explicit types that would make type casts unnecessary. If type cast is unavoidable, try to minimize its scope — never cast
-  entire object/class when casting one property would suffice.
-- `as unknown as SomeOtherType` type cast should be used only as a last resort and should always be accompanied by a comment explaining why it is necessary.
+
+- Never use `any`.
+- Never use `@ts-expect-error` outside of negative type tests; never use `@ts-nocheck`.
+- Never suppress biome lints.
+- Minimize type casts: prefer explicit types that make casts unnecessary. If unavoidable, narrow the cast as far as possible — never cast a whole object/class when casting one property would suffice.
+- `as unknown as SomeOtherType` is a last resort and must be accompanied by a comment explaining why.
 
 ## Common Commands
 
 ```bash
 pnpm build                 # Build via Turbo
-pnpm test:packages         # Run package tests
-pnpm test:e2e              # Run e2e tests
-pnpm test:integration      # Run integration tests
-pnpm test:all              # Run all tests
+pnpm test:packages         # Run package tests (cheapest healthy-workspace signal)
+pnpm test:integration      # Integration tests (PGlite + mongodb-memory-server, no external DB)
+pnpm test:e2e              # E2E tests (also self-contained)
+pnpm test:all              # Everything
 pnpm coverage:packages     # Coverage (packages only)
-pnpm lint:deps             # Validate layering/imports
+pnpm lint:deps             # Validate layering/imports — fix violations, never bypass
+pnpm fixtures:check        # Use this rather than ad-hoc emit-and-diff
 ```
 
 ## Core Concepts
@@ -84,15 +73,17 @@ pnpm lint:deps             # Validate layering/imports
 1. **Authoring**: Write `schema.psl` or use TypeScript builders → canonicalized Contract IR
 2. **Emission**: Emitter validates and generates `contract.json` + `contract.d.ts`
 3. **Validation**: `validateContract<Contract>(json)` validates structure and returns typed contract
-4. **Usage**: DSL functions (`sql()`, `schema()`) accept contract and propagate types
+4. **Usage**: DSL functions (`sql()`, `schema()`) accept the contract and propagate types
 
 ### Key Patterns
 
-- **Type Parameter Pattern**: JSON imports lose literal types. Use `.d.ts` for precise types, `validateContract()` for runtime validation
-- **ExecutionContext**: Encapsulates contract, codecs, operations, and types. Pass to `schema()`, `sql()`, `orm()`
+- **Type Parameter Pattern**: JSON imports lose literal types. Import the precise types from `contract.d.ts` and validate the JSON at runtime: `validateContract<Contract>(contractJson)`. The type parameter must be the fully-typed `Contract`, not a generic like `SqlContract<SqlStorage>`.
+- **ExecutionContext**: Encapsulates contract, codecs, operations, and types. Pass to `schema()`, `sql()`, `orm()`.
 - **Interface + factory pattern for stateful services**: Stateful services (registries, runtimes, adapters, drivers) are exposed through an interface plus a `createX()` factory; the implementing class stays package-private. Consumers depend on the interface, never the implementation. Pattern reference: [`docs/architecture docs/patterns/interface-plus-factory.md`](docs/architecture%20docs/patterns/interface-plus-factory.md).
 - **Three-layer polymorphic IR for AST/IR class hierarchies**: AST/IR nodes (Contract IR, Schema IR, migration ops) are organised as framework interface → family abstract base → target concrete classes. Concrete classes are publicly exported as the target's IR alphabet; `freezeNode(this)` is called in the constructor. Target packs contribute new entity kinds via `AuthoringContributions.entities` (see [`docs/reference/typescript-patterns.md`](docs/reference/typescript-patterns.md) § "AST/IR class hierarchies"). Pattern references: [`three-layer-polymorphic-ir.md`](docs/architecture%20docs/patterns/three-layer-polymorphic-ir.md), [`frozen-class-ast.md`](docs/architecture%20docs/patterns/frozen-class-ast.md), [`json-canonical-class-in-memory.md`](docs/architecture%20docs/patterns/json-canonical-class-in-memory.md).
-- **Capability Gating**: Features like `includeMany` and `returning()` require capabilities in contract
+- **Capability Gating**: Features like `includeMany` and `returning()` require capabilities in the contract; gating is enforced at authoring time.
+- **Builder chaining**: Methods return new instances — always chain calls.
+- **Column access**: Use `table.columns.fieldName` to avoid conflicts with table properties.
 
 ### Package Organization
 
@@ -104,85 +95,20 @@ Organized by **Domains → Layers → Planes**:
 
 See `architecture.config.json` for the complete mapping and `pnpm lint:deps` to validate.
 
-## Quick Reference
-
-### Query Pattern
-
-```typescript
-import postgres from '@prisma-next/postgres/runtime';
-import type { Contract, TypeMaps } from './contract.d';
-import contractJson from './contract.json' with { type: 'json' };
-
-const db = postgres<Contract, TypeMaps>({
-  contractJson,
-  url: process.env['DATABASE_URL']!,
-});
-
-const tables = db.schema.tables;
-const plan = db.sql
-  .from(tables.user)
-  .select({ id: tables.user.columns.id, email: tables.user.columns.email })
-  .limit(10)
-  .build();
-```
-
-### Contract Validation
-
-```typescript
-// CRITICAL: Type parameter must be the fully-typed Contract from contract.d.ts
-const contract = validateContract<Contract>(contractJson);
-```
-
-## Common Pitfalls
-
-1. **Don't infer types from JSON** — Use type parameter pattern with `.d.ts`
-2. **validateContract requires fully-typed Contract** — NOT generic `SqlContract<SqlStorage>`
-3. **Type canonicalization happens at authoring time** — Not during validation
-4. **No target-specific branches in core** — Use adapters instead
-5. **Builder chaining** — Methods return new instances, always chain calls
-6. **Column access** — Use `table.columns.fieldName` to avoid conflicts with table properties
-
-## Boundaries & Safety Rails
-
-- No backward‑compat shims; update call sites instead: `.cursor/rules/no-backward-compatibility.md`
-- Package layering is enforced; fix violations rather than bypassing: `scripts/check-imports.mjs` and `.cursor/rules/import-validation.mdc`
-- Capability‑gated features must be enabled in contract capabilities
-
 ## Frequent Tasks
 
-- Add SQL operation: `docs/briefs/complete` and `.cursor/plans/add-sql-operation.md`
-- Split monolith into modules: `.cursor/plans/split-into-modules.md`
-- Fix import violation: `.cursor/plans/fix-import-violation.md`
+- Day-to-day playbook (add SQL operation, split monolith, fix import violation, etc.): [Common Tasks Playbook](docs/onboarding/Common-Tasks-Playbook.md)
 - Shape and deliver a project (spec → plan → implement): `.agents/rules/drive-project-workflow.mdc` (artifacts live under `projects/`, see `projects/README.md`)
+- Cut the next npm minor release: `.agents/skills/publish-npm-version/SKILL.md` (policy in [`docs/oss/versioning.md`](docs/oss/versioning.md))
 
 ## Subsystem Deep Dives
 
-See `docs/architecture docs/subsystems/`:
-
-1. **Data Contract** — Contract structure and semantics
-2. **Contract Emitter & Types** — How contracts are generated
-3. **Query Lanes** — SQL DSL, ORM, Raw SQL surfaces
-4. **Runtime & Middleware Framework** — Execution pipeline and middleware
-5. **Adapters & Targets** — Postgres adapter, capability gating
-6. **Error Handling** — Error envelope and stable codes
-7. **Migration System** — Schema migrations
+See [`docs/architecture docs/subsystems/`](docs/architecture%20docs/subsystems/) — Data Contract, Contract Emitter & Types, Query Lanes, Runtime & Middleware Framework, Adapters & Targets, Error Handling, Migration System.
 
 ## Ask First
 
-- Significant refactors to rule scope (`alwaysApply`) or architecture docs
-- Changes that affect demo, examples, or CI
-
-## Cursor Cloud specific instructions
-
-Setup, config, and snapshot management live in [Cursor Cloud Agents](docs/onboarding/Cursor-Cloud-Agents.md). When running as a cloud agent, follow these operational reminders in addition to the rest of this file:
-
-- **Sanity check first**: run `pnpm test:packages` before broader suites. It's the cheapest end-to-end signal that the workspace is healthy.
-- **Heavier suites are self-contained**: `pnpm test:integration` and `pnpm test:e2e` use PGlite (embedded Postgres via `@prisma/dev`) and `mongodb-memory-server` — no external database required. They run out of the box after `pnpm install && pnpm build`.
-- **Corepack interactive prompt**: Corepack may prompt for confirmation when downloading pnpm for the first time. Set `COREPACK_ENABLE_AUTO_PIN=0` to avoid interactive prompts in non-interactive environments.
-- **Don't put secrets in the repo**: configure them in the Cursor dashboard (Cloud Agents → Secrets) and mark sensitive ones Redacted.
-- **Lockfile discipline**: if you run `pnpm add`/`pnpm update`, commit `pnpm-lock.yaml` alongside the `package.json` change or the next boot fails with `ERR_PNPM_OUTDATED_LOCKFILE`.
-- **Layering**: treat `pnpm lint:deps` failures as errors to fix, never to bypass.
-- **Fixtures**: use `pnpm fixtures:check` rather than ad-hoc emit-and-diff.
+- Significant refactors to rule scope (`alwaysApply`) or architecture docs.
+- Changes that affect demo, examples, or CI.
 
 ---
 

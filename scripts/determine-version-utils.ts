@@ -1,34 +1,50 @@
-const NUMERIC_PATTERN = /^\d+$/;
-const PR_VERSION_PATTERN = /^\d+\.\d+\.\d+-pr\.(\d+)\.(\d+)$/;
+// This module is intentionally pure. All npm/dist-tag I/O and filesystem
+// reads live in the callers (`scripts/determine-version.ts`,
+// `scripts/bump-minor.ts`); this file is reserved for deterministic
+// helpers exercised under `node --test` from `pnpm test:scripts`.
 
-function assertNumericPrNumber(prNumber: string): void {
-  if (!NUMERIC_PATTERN.test(prNumber)) {
-    throw new Error('PR number must be numeric');
-  }
+const CANONICAL_BASE_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+
+export interface ParsedVersion {
+  major: number;
+  minor: number;
+  patch: number;
 }
 
-export function parsePrBuildNumber(version: string, prNumber: string): number | undefined {
-  assertNumericPrNumber(prNumber);
-  const match = version.match(PR_VERSION_PATTERN);
-  if (!match) {
-    return undefined;
-  }
-
-  const versionPrNumber = match[1];
-  if (versionPrNumber !== prNumber) {
-    return undefined;
-  }
-
-  return Number.parseInt(match[2], 10);
+/**
+ * Parses a semver-shaped version string into its numeric components.
+ * Tolerant of pre-release suffixes (`0.7.0-foo` parses the same as
+ * `0.7.0`); strict on the leading `major.minor.patch` shape — anything
+ * else returns NaN-bearing components.
+ */
+export function parseVersion(version: string): ParsedVersion {
+  const [major, minor, patch] = version.split('-')[0].split('.').map(Number);
+  return { major, minor, patch };
 }
 
-export function findNextPrBuildNumber(versions: readonly string[], prNumber: string): number {
-  assertNumericPrNumber(prNumber);
+/**
+ * Given the current version, computes the next minor's zero-patch
+ * form: `0.7.0` -> `0.8.0`, `1.2.5` -> `1.3.0`. Pure / deterministic.
+ * Pre-release suffixes on the input are ignored (`0.7.0-foo` -> `0.8.0`).
+ */
+export function computeNextMinor(current: string): string {
+  const { major, minor } = parseVersion(current);
+  return `${major}.${minor + 1}.0`;
+}
 
-  const matchingBuildNumbers = versions
-    .map((version) => parsePrBuildNumber(version, prNumber))
-    .filter((buildNumber) => buildNumber !== undefined);
-
-  const lastBuild = matchingBuildNumbers.length > 0 ? Math.max(...matchingBuildNumbers) : 0;
-  return lastBuild + 1;
+/**
+ * Asserts that a base version is canonical (`major.minor.patch`, no
+ * suffix). Used to fail-fast in the publish workflow if root
+ * `package.json` was edited to something other than a clean release
+ * shape — without this guard, a malformed root would compose nonsense
+ * publish versions like `0.7.0-foo-dev.1`.
+ */
+export function assertCanonicalBase(base: string): void {
+  if (!CANONICAL_BASE_PATTERN.test(base)) {
+    throw new Error(
+      `Base version "${base}" is not canonical major.minor.patch. ` +
+        'The root package.json `version` must be a clean release shape (e.g. "0.7.0"); ' +
+        'no pre-release suffixes are permitted on `main`.',
+    );
+  }
 }

@@ -320,353 +320,343 @@ function parseJsonOutput<T>(result: RunResult): T {
   }
 }
 
-describe(
-  'Journey: Mongo invariant-aware ref routing (live database)',
-  { timeout: timeouts.spinUpMongoMemoryServer },
-  () => {
-    let replSet: MongoMemoryReplSet;
-    let client: MongoClient;
-    const created = new Set<string>();
+describe('Journey: Mongo invariant-aware ref routing (live database)', {
+  timeout: timeouts.spinUpMongoMemoryServer,
+}, () => {
+  let replSet: MongoMemoryReplSet;
+  let client: MongoClient;
+  const created = new Set<string>();
 
-    beforeAll(async () => {
-      replSet = await MongoMemoryReplSet.create({
-        instanceOpts: [
-          { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
-        ],
-        replSet: { count: 1, storageEngine: 'wiredTiger' },
-      });
-      client = new MongoClient(replSet.getUri());
-      await client.connect();
-    }, timeouts.spinUpMongoMemoryServer);
-
-    let dbName: string;
-    beforeEach(async () => {
-      dbName = `mongo_inv_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  beforeAll(async () => {
+    replSet = await MongoMemoryReplSet.create({
+      instanceOpts: [
+        { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+      ],
+      replSet: { count: 1, storageEngine: 'wiredTiger' },
     });
+    client = new MongoClient(replSet.getUri());
+    await client.connect();
+  }, timeouts.spinUpMongoMemoryServer);
 
-    afterEach(async () => {
-      await client
-        ?.db(dbName)
-        .dropDatabase()
-        .catch(() => {});
-      for (const dir of created) {
-        await rm(dir, { recursive: true, force: true }).catch(() => {});
-      }
-      created.clear();
-    });
+  let dbName: string;
+  beforeEach(async () => {
+    dbName = `mongo_inv_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  });
 
-    afterAll(async () => {
-      await client?.close().catch(() => {});
-      await replSet?.stop().catch(() => {});
-    }, timeouts.spinUpMongoMemoryServer);
+  afterEach(async () => {
+    await client
+      ?.db(dbName)
+      .dropDatabase()
+      .catch(() => {});
+    for (const dir of created) {
+      await rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+    created.clear();
+  });
 
-    it('Mongo O: invariantId on dataTransform → ref requires it → apply lowercases names + accumulates marker → re-apply is noop', async () => {
-      const ctx = setupMongoJourney(buildMongoUri(replSet.getUri(), dbName));
-      created.add(ctx.testDir);
+  afterAll(async () => {
+    await client?.close().catch(() => {});
+    await replSet?.stop().catch(() => {});
+  }, timeouts.spinUpMongoMemoryServer);
 
-      // Mongo-O.01: emit base + plan + apply init (creates `users` collection + email index).
-      expect((await emitContract(ctx)).exitCode, 'Mongo-O.01: emit base').toBe(0);
-      expect((await migrationPlan(ctx, ['--name', 'initial'])).exitCode, 'Mongo-O.01: plan').toBe(
-        0,
-      );
-      expect(
-        (
-          await migrationEmit(ctx, [
-            '--dir',
-            `migrations/app/${basename(getLatestMigrationDir(ctx))}`,
-          ])
-        ).exitCode,
-        'Mongo-O.01: emit init',
-      ).toBe(0);
-      expect((await migrationApply(ctx)).exitCode, 'Mongo-O.01: apply init').toBe(0);
+  it('Mongo O: invariantId on dataTransform → ref requires it → apply lowercases names + accumulates marker → re-apply is noop', async () => {
+    const ctx = setupMongoJourney(buildMongoUri(replSet.getUri(), dbName));
+    created.add(ctx.testDir);
 
-      // Mongo-O.02: seed a row whose `name` needs lower-casing.
-      await client
-        .db(dbName)
-        .collection('users')
-        .insertMany([
-          { email: 'alice@example.com', name: 'Alice' },
-          { email: 'bob@example.com', name: 'BOB' },
-        ]);
+    // Mongo-O.01: emit base + plan + apply init (creates `users` collection + email index).
+    expect((await emitContract(ctx)).exitCode, 'Mongo-O.01: emit base').toBe(0);
+    expect((await migrationPlan(ctx, ['--name', 'initial'])).exitCode, 'Mongo-O.01: plan').toBe(0);
+    expect(
+      (
+        await migrationEmit(ctx, [
+          '--dir',
+          `migrations/app/${basename(getLatestMigrationDir(ctx))}`,
+        ])
+      ).exitCode,
+      'Mongo-O.01: emit init',
+    ).toBe(0);
+    expect((await migrationApply(ctx)).exitCode, 'Mongo-O.01: apply init').toBe(0);
 
-      // Mongo-O.03: swap to additive (adds `name` index), emit, scaffold a hand-authored migration.
-      swapToAdditive(ctx);
-      expect((await emitContract(ctx)).exitCode, 'Mongo-O.03: emit additive').toBe(0);
-      expect(
-        (await migrationNew(ctx, ['--name', 'normalize-names'])).exitCode,
-        'Mongo-O.03: migration new',
-      ).toBe(0);
-
-      const migrationDir = findMigrationDirBySlug(ctx, 'normalize_names');
-      const migrationTsPath = join(migrationDir, 'migration.ts');
-      const draftManifest = JSON.parse(
-        readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
-      ) as { from: string; to: string };
-
-      // Mongo-O.04: write the migration with invariantId baked in.
-      writeFileSync(
-        migrationTsPath,
-        renderInvariantMigrationTs(draftManifest.from, draftManifest.to, {
-          invariantId: INVARIANT_ID,
-        }),
-      );
-      expect((await migrationEmit(ctx, ['--dir', migrationDir])).exitCode, 'Mongo-O.04: emit').toBe(
-        0,
-      );
-
-      // Mongo-O.05: confirm migration.json carries providedInvariants.
-      const manifestAfter = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8'));
-      expect(
-        manifestAfter.providedInvariants,
-        'Mongo-O.05: manifest carries providedInvariants',
-      ).toEqual([INVARIANT_ID]);
-      const c2Hash = manifestAfter.to as string;
-
-      // Mongo-O.06: declare a ref that requires the invariant.
-      writeRefFile(ctx, 'prod', c2Hash, [INVARIANT_ID]);
-
-      // Mongo-O.07: apply --ref prod — routes through the invariant edge.
-      const applyRef = await migrationApply(ctx, ['--ref', 'prod', '--json']);
-      expect(
-        applyRef.exitCode,
-        `Mongo-O.07: apply --ref prod: ${applyRef.stdout}\n${applyRef.stderr}`,
-      ).toBe(0);
-      const applyResult = parseJsonOutput<{
-        ok: boolean;
-        markerHash: string;
-        pathDecision?: {
-          requiredInvariants: readonly string[];
-          satisfiedInvariants: readonly string[];
-          selectedPath: readonly { dirName: string; invariants: readonly string[] }[];
-        };
-      }>(applyRef);
-      expect(applyResult.ok, 'Mongo-O.07: ok').toBe(true);
-      expect(applyResult.markerHash, 'Mongo-O.07: marker advanced').toBe(c2Hash);
-      expect(
-        applyResult.pathDecision?.requiredInvariants,
-        'Mongo-O.07: required reflects ref',
-      ).toEqual([INVARIANT_ID]);
-      expect(
-        applyResult.pathDecision?.satisfiedInvariants,
-        'Mongo-O.07: satisfied = required',
-      ).toEqual([INVARIANT_ID]);
-      expect(
-        applyResult.pathDecision?.selectedPath.at(-1)?.invariants,
-        'Mongo-O.07: selectedPath edge carries the invariant',
-      ).toEqual([INVARIANT_ID]);
-
-      // Mongo-O.08: data was actually lowercased.
-      const users = await client
-        .db(dbName)
-        .collection('users')
-        .aggregate([{ $project: { _id: 0, email: 1, name: 1 } }, { $sort: { email: 1 } }])
-        .toArray();
-      expect(users, 'Mongo-O.08: names lowercased').toEqual([
-        { email: 'alice@example.com', name: 'alice' },
-        { email: 'bob@example.com', name: 'bob' },
+    // Mongo-O.02: seed a row whose `name` needs lower-casing.
+    await client
+      .db(dbName)
+      .collection('users')
+      .insertMany([
+        { email: 'alice@example.com', name: 'Alice' },
+        { email: 'bob@example.com', name: 'BOB' },
       ]);
 
-      // Mongo-O.09: status --ref prod surfaces the three invariant sets and
-      // proves the marker doc accumulated the invariant via $setUnion.
-      const statusRef = await migrationStatus(ctx, ['--ref', 'prod', '--json']);
-      expect(statusRef.exitCode, 'Mongo-O.09: status --ref prod').toBe(0);
-      const statusResult = parseJsonOutput<{
-        requiredInvariants?: readonly string[];
-        appliedInvariants?: readonly string[];
-        missingInvariants?: readonly string[];
-      }>(statusRef);
-      expect(statusResult.requiredInvariants, 'Mongo-O.09: required').toEqual([INVARIANT_ID]);
-      expect(
-        statusResult.appliedInvariants,
-        'Mongo-O.09: applied (marker accumulated server-side)',
-      ).toEqual([INVARIANT_ID]);
-      expect(statusResult.missingInvariants, 'Mongo-O.09: missing empty').toEqual([]);
+    // Mongo-O.03: swap to additive (adds `name` index), emit, scaffold a hand-authored migration.
+    swapToAdditive(ctx);
+    expect((await emitContract(ctx)).exitCode, 'Mongo-O.03: emit additive').toBe(0);
+    expect(
+      (await migrationNew(ctx, ['--name', 'normalize-names'])).exitCode,
+      'Mongo-O.03: migration new',
+    ).toBe(0);
 
-      // Mongo-O.10: re-apply is a noop. The CLI's marker subtraction empties
-      // the required set; the Mongo runner additionally short-circuits via
-      // its own `incomingIsSubsetOfExisting` guard.
-      const reapply = await migrationApply(ctx, ['--ref', 'prod', '--json']);
-      expect(reapply.exitCode, 'Mongo-O.10: re-apply').toBe(0);
-      const reapplyResult = parseJsonOutput<{
-        ok: boolean;
-        markerHash: string;
-        summary: string;
-      }>(reapply);
-      expect(reapplyResult.ok, 'Mongo-O.10: ok').toBe(true);
-      expect(reapplyResult.markerHash, 'Mongo-O.10: marker unchanged').toBe(c2Hash);
-      expect(reapplyResult.summary, 'Mongo-O.10: noop summary').toMatch(/up to date/i);
-    });
+    const migrationDir = findMigrationDirBySlug(ctx, 'normalize_names');
+    const migrationTsPath = join(migrationDir, 'migration.ts');
+    const draftManifest = JSON.parse(
+      readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
+    ) as { from: string; to: string };
 
-    it('Mongo P: apply and status both exit 1 with MIGRATION.UNKNOWN_INVARIANT before any DB activity', async () => {
-      const ctx = setupMongoJourney(buildMongoUri(replSet.getUri(), dbName));
-      created.add(ctx.testDir);
+    // Mongo-O.04: write the migration with invariantId baked in.
+    writeFileSync(
+      migrationTsPath,
+      renderInvariantMigrationTs(draftManifest.from, draftManifest.to, {
+        invariantId: INVARIANT_ID,
+      }),
+    );
+    expect((await migrationEmit(ctx, ['--dir', migrationDir])).exitCode, 'Mongo-O.04: emit').toBe(
+      0,
+    );
 
-      // Mongo-P.01: stand up an init migration on disk; no invariant declared.
-      expect((await emitContract(ctx)).exitCode, 'Mongo-P.01: emit base').toBe(0);
-      expect((await migrationPlan(ctx, ['--name', 'initial'])).exitCode, 'Mongo-P.01: plan').toBe(
-        0,
-      );
-      const initDir = getLatestMigrationDir(ctx);
-      expect(
-        (await migrationEmit(ctx, ['--dir', `migrations/app/${basename(initDir)}`])).exitCode,
-        'Mongo-P.01: emit init',
-      ).toBe(0);
-      expect((await migrationApply(ctx)).exitCode, 'Mongo-P.01: apply init').toBe(0);
+    // Mongo-O.05: confirm migration.json carries providedInvariants.
+    const manifestAfter = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8'));
+    expect(
+      manifestAfter.providedInvariants,
+      'Mongo-O.05: manifest carries providedInvariants',
+    ).toEqual([INVARIANT_ID]);
+    const c2Hash = manifestAfter.to as string;
 
-      // Mongo-P.02: hand-author an additive migration with INVARIANT_ID.
-      swapToAdditive(ctx);
-      expect((await emitContract(ctx)).exitCode, 'Mongo-P.02: emit additive').toBe(0);
-      expect(
-        (await migrationNew(ctx, ['--name', 'normalize-names'])).exitCode,
-        'Mongo-P.02: new',
-      ).toBe(0);
-      const dir2 = findMigrationDirBySlug(ctx, 'normalize_names');
-      const draft = JSON.parse(readFileSync(join(dir2, 'migration.json'), 'utf-8')) as {
-        from: string;
-        to: string;
+    // Mongo-O.06: declare a ref that requires the invariant.
+    writeRefFile(ctx, 'prod', c2Hash, [INVARIANT_ID]);
+
+    // Mongo-O.07: apply --ref prod — routes through the invariant edge.
+    const applyRef = await migrationApply(ctx, ['--ref', 'prod', '--json']);
+    expect(
+      applyRef.exitCode,
+      `Mongo-O.07: apply --ref prod: ${applyRef.stdout}\n${applyRef.stderr}`,
+    ).toBe(0);
+    const applyResult = parseJsonOutput<{
+      ok: boolean;
+      markerHash: string;
+      pathDecision?: {
+        requiredInvariants: readonly string[];
+        satisfiedInvariants: readonly string[];
+        selectedPath: readonly { dirName: string; invariants: readonly string[] }[];
       };
-      writeFileSync(
-        join(dir2, 'migration.ts'),
-        renderInvariantMigrationTs(draft.from, draft.to, { invariantId: INVARIANT_ID }),
-      );
-      expect((await migrationEmit(ctx, ['--dir', dir2])).exitCode, 'Mongo-P.02: emit').toBe(0);
+    }>(applyRef);
+    expect(applyResult.ok, 'Mongo-O.07: ok').toBe(true);
+    expect(applyResult.markerHash, 'Mongo-O.07: marker advanced').toBe(c2Hash);
+    expect(
+      applyResult.pathDecision?.requiredInvariants,
+      'Mongo-O.07: required reflects ref',
+    ).toEqual([INVARIANT_ID]);
+    expect(
+      applyResult.pathDecision?.satisfiedInvariants,
+      'Mongo-O.07: satisfied = required',
+    ).toEqual([INVARIANT_ID]);
+    expect(
+      applyResult.pathDecision?.selectedPath.at(-1)?.invariants,
+      'Mongo-O.07: selectedPath edge carries the invariant',
+    ).toEqual([INVARIANT_ID]);
 
-      const manifest = JSON.parse(readFileSync(join(dir2, 'migration.json'), 'utf-8'));
-      const c2Hash = manifest.to as string;
+    // Mongo-O.08: data was actually lowercased.
+    const users = await client
+      .db(dbName)
+      .collection('users')
+      .aggregate([{ $project: { _id: 0, email: 1, name: 1 } }, { $sort: { email: 1 } }])
+      .toArray();
+    expect(users, 'Mongo-O.08: names lowercased').toEqual([
+      { email: 'alice@example.com', name: 'alice' },
+      { email: 'bob@example.com', name: 'bob' },
+    ]);
 
-      // Mongo-P.03: ref names an id no migration declares.
-      writeRefFile(ctx, 'prod', c2Hash, ['typo-no-migration-declares-this']);
+    // Mongo-O.09: status --ref prod surfaces the three invariant sets and
+    // proves the marker doc accumulated the invariant via $setUnion.
+    const statusRef = await migrationStatus(ctx, ['--ref', 'prod', '--json']);
+    expect(statusRef.exitCode, 'Mongo-O.09: status --ref prod').toBe(0);
+    const statusResult = parseJsonOutput<{
+      requiredInvariants?: readonly string[];
+      appliedInvariants?: readonly string[];
+      missingInvariants?: readonly string[];
+    }>(statusRef);
+    expect(statusResult.requiredInvariants, 'Mongo-O.09: required').toEqual([INVARIANT_ID]);
+    expect(
+      statusResult.appliedInvariants,
+      'Mongo-O.09: applied (marker accumulated server-side)',
+    ).toEqual([INVARIANT_ID]);
+    expect(statusResult.missingInvariants, 'Mongo-O.09: missing empty').toEqual([]);
 
-      // Mongo-P.04: apply fails with UNKNOWN_INVARIANT.
-      const applyFail = await migrationApply(ctx, ['--ref', 'prod', '--json']);
-      expect(applyFail.exitCode, 'Mongo-P.04: apply exits 1').toBe(1);
-      const applyEnvelope = parseJsonOutput<{
-        meta?: { code?: string; unknown?: readonly string[]; declared?: readonly string[] };
-      }>(applyFail);
-      expect(applyEnvelope.meta?.code, 'Mongo-P.04: error code').toBe(
-        'MIGRATION.UNKNOWN_INVARIANT',
-      );
-      expect(applyEnvelope.meta?.unknown, 'Mongo-P.04: unknown listed').toEqual([
-        'typo-no-migration-declares-this',
-      ]);
-      expect(applyEnvelope.meta?.declared, 'Mongo-P.04: declared listed').toEqual([INVARIANT_ID]);
+    // Mongo-O.10: re-apply is a noop. The CLI's marker subtraction empties
+    // the required set; the Mongo runner additionally short-circuits via
+    // its own `incomingIsSubsetOfExisting` guard.
+    const reapply = await migrationApply(ctx, ['--ref', 'prod', '--json']);
+    expect(reapply.exitCode, 'Mongo-O.10: re-apply').toBe(0);
+    const reapplyResult = parseJsonOutput<{
+      ok: boolean;
+      markerHash: string;
+      summary: string;
+    }>(reapply);
+    expect(reapplyResult.ok, 'Mongo-O.10: ok').toBe(true);
+    expect(reapplyResult.markerHash, 'Mongo-O.10: marker unchanged').toBe(c2Hash);
+    expect(reapplyResult.summary, 'Mongo-O.10: noop summary').toMatch(/up to date/i);
+  });
 
-      // Mongo-P.05: marker untouched (still at C1, not C2). Read via status
-      // without --ref so the pre-check doesn't fire.
-      const statusOffline = await migrationStatus(ctx, ['--json']);
-      expect(statusOffline.exitCode, 'Mongo-P.05: status').toBe(0);
-      const offlineState = parseJsonOutput<{ markerHash?: string }>(statusOffline);
-      expect(offlineState.markerHash, 'Mongo-P.05: marker did not advance to C2').not.toBe(c2Hash);
+  it('Mongo P: apply and status both exit 1 with MIGRATION.UNKNOWN_INVARIANT before any DB activity', async () => {
+    const ctx = setupMongoJourney(buildMongoUri(replSet.getUri(), dbName));
+    created.add(ctx.testDir);
 
-      // Mongo-P.06: status --ref also fatal (parity with apply).
-      const statusFail = await migrationStatus(ctx, ['--ref', 'prod', '--json']);
-      expect(statusFail.exitCode, 'Mongo-P.06: status exits 1').toBe(1);
-      const statusEnvelope = parseJsonOutput<{ meta?: { code?: string } }>(statusFail);
-      expect(statusEnvelope.meta?.code, 'Mongo-P.06: status error code').toBe(
-        'MIGRATION.UNKNOWN_INVARIANT',
-      );
-    });
+    // Mongo-P.01: stand up an init migration on disk; no invariant declared.
+    expect((await emitContract(ctx)).exitCode, 'Mongo-P.01: emit base').toBe(0);
+    expect((await migrationPlan(ctx, ['--name', 'initial'])).exitCode, 'Mongo-P.01: plan').toBe(0);
+    const initDir = getLatestMigrationDir(ctx);
+    expect(
+      (await migrationEmit(ctx, ['--dir', `migrations/app/${basename(initDir)}`])).exitCode,
+      'Mongo-P.01: emit init',
+    ).toBe(0);
+    expect((await migrationApply(ctx)).exitCode, 'Mongo-P.01: apply init').toBe(0);
 
-    it('Mongo Q: divergent graph — ref points at the no-invariant branch, apply fails with NO_INVARIANT_PATH', async () => {
-      const ctx = setupMongoJourney(buildMongoUri(replSet.getUri(), dbName));
-      created.add(ctx.testDir);
+    // Mongo-P.02: hand-author an additive migration with INVARIANT_ID.
+    swapToAdditive(ctx);
+    expect((await emitContract(ctx)).exitCode, 'Mongo-P.02: emit additive').toBe(0);
+    expect(
+      (await migrationNew(ctx, ['--name', 'normalize-names'])).exitCode,
+      'Mongo-P.02: new',
+    ).toBe(0);
+    const dir2 = findMigrationDirBySlug(ctx, 'normalize_names');
+    const draft = JSON.parse(readFileSync(join(dir2, 'migration.json'), 'utf-8')) as {
+      from: string;
+      to: string;
+    };
+    writeFileSync(
+      join(dir2, 'migration.ts'),
+      renderInvariantMigrationTs(draft.from, draft.to, { invariantId: INVARIANT_ID }),
+    );
+    expect((await migrationEmit(ctx, ['--dir', dir2])).exitCode, 'Mongo-P.02: emit').toBe(0);
 
-      // Mongo-Q.01: emit base, plan + apply init.
-      expect((await emitContract(ctx)).exitCode, 'Mongo-Q.01: emit base').toBe(0);
-      expect((await migrationPlan(ctx, ['--name', 'initial'])).exitCode, 'Mongo-Q.01: plan').toBe(
-        0,
-      );
-      const initDir = getLatestMigrationDir(ctx);
-      expect(
-        (await migrationEmit(ctx, ['--dir', `migrations/app/${basename(initDir)}`])).exitCode,
-        'Mongo-Q.01: emit init',
-      ).toBe(0);
-      expect((await migrationApply(ctx)).exitCode, 'Mongo-Q.01: apply init').toBe(0);
-      const initManifest = JSON.parse(readFileSync(join(initDir, 'migration.json'), 'utf-8')) as {
-        to: string;
+    const manifest = JSON.parse(readFileSync(join(dir2, 'migration.json'), 'utf-8'));
+    const c2Hash = manifest.to as string;
+
+    // Mongo-P.03: ref names an id no migration declares.
+    writeRefFile(ctx, 'prod', c2Hash, ['typo-no-migration-declares-this']);
+
+    // Mongo-P.04: apply fails with UNKNOWN_INVARIANT.
+    const applyFail = await migrationApply(ctx, ['--ref', 'prod', '--json']);
+    expect(applyFail.exitCode, 'Mongo-P.04: apply exits 1').toBe(1);
+    const applyEnvelope = parseJsonOutput<{
+      meta?: { code?: string; unknown?: readonly string[]; declared?: readonly string[] };
+    }>(applyFail);
+    expect(applyEnvelope.meta?.code, 'Mongo-P.04: error code').toBe('MIGRATION.UNKNOWN_INVARIANT');
+    expect(applyEnvelope.meta?.unknown, 'Mongo-P.04: unknown listed').toEqual([
+      'typo-no-migration-declares-this',
+    ]);
+    expect(applyEnvelope.meta?.declared, 'Mongo-P.04: declared listed').toEqual([INVARIANT_ID]);
+
+    // Mongo-P.05: marker untouched (still at C1, not C2). Read via status
+    // without --ref so the pre-check doesn't fire.
+    const statusOffline = await migrationStatus(ctx, ['--json']);
+    expect(statusOffline.exitCode, 'Mongo-P.05: status').toBe(0);
+    const offlineState = parseJsonOutput<{ markerHash?: string }>(statusOffline);
+    expect(offlineState.markerHash, 'Mongo-P.05: marker did not advance to C2').not.toBe(c2Hash);
+
+    // Mongo-P.06: status --ref also fatal (parity with apply).
+    const statusFail = await migrationStatus(ctx, ['--ref', 'prod', '--json']);
+    expect(statusFail.exitCode, 'Mongo-P.06: status exits 1').toBe(1);
+    const statusEnvelope = parseJsonOutput<{ meta?: { code?: string } }>(statusFail);
+    expect(statusEnvelope.meta?.code, 'Mongo-P.06: status error code').toBe(
+      'MIGRATION.UNKNOWN_INVARIANT',
+    );
+  });
+
+  it('Mongo Q: divergent graph — ref points at the no-invariant branch, apply fails with NO_INVARIANT_PATH', async () => {
+    const ctx = setupMongoJourney(buildMongoUri(replSet.getUri(), dbName));
+    created.add(ctx.testDir);
+
+    // Mongo-Q.01: emit base, plan + apply init.
+    expect((await emitContract(ctx)).exitCode, 'Mongo-Q.01: emit base').toBe(0);
+    expect((await migrationPlan(ctx, ['--name', 'initial'])).exitCode, 'Mongo-Q.01: plan').toBe(0);
+    const initDir = getLatestMigrationDir(ctx);
+    expect(
+      (await migrationEmit(ctx, ['--dir', `migrations/app/${basename(initDir)}`])).exitCode,
+      'Mongo-Q.01: emit init',
+    ).toBe(0);
+    expect((await migrationApply(ctx)).exitCode, 'Mongo-Q.01: apply init').toBe(0);
+    const initManifest = JSON.parse(readFileSync(join(initDir, 'migration.json'), 'utf-8')) as {
+      to: string;
+    };
+    const c1Hash = initManifest.to;
+
+    // Mongo-Q.02: branch A — additive contract, hand-authored migration WITH invariantId.
+    swapToAdditive(ctx);
+    expect((await emitContract(ctx)).exitCode, 'Mongo-Q.02: emit CA').toBe(0);
+    expect(
+      (await migrationNew(ctx, ['--name', 'branch-a-with-invariant'])).exitCode,
+      'Mongo-Q.02: new branch A',
+    ).toBe(0);
+    const branchADir = findMigrationDirBySlug(ctx, 'branch_a_with_invariant');
+    const draftA = JSON.parse(readFileSync(join(branchADir, 'migration.json'), 'utf-8')) as {
+      from: string;
+      to: string;
+    };
+    writeFileSync(
+      join(branchADir, 'migration.ts'),
+      renderInvariantMigrationTs(draftA.from, draftA.to, { invariantId: INVARIANT_ID }),
+    );
+    expect(
+      (await migrationEmit(ctx, ['--dir', branchADir])).exitCode,
+      'Mongo-Q.02: emit branch A',
+    ).toBe(0);
+
+    // Mongo-Q.03: branch B — index-only migration, no invariantId, planned --from C1.
+    // We use `migration new --from <hash>` to fork off C1. Replace the contract
+    // file with a different additive shape so the destination hash differs.
+    // Easiest: keep the same additive contract but write a different migration
+    // body that produces a distinct destination hash via a different index spec.
+    expect(
+      (await migrationNew(ctx, ['--name', 'branch-b-no-invariant', '--from', c1Hash])).exitCode,
+      'Mongo-Q.03: new branch B',
+    ).toBe(0);
+    const branchBDir = findMigrationDirBySlug(ctx, 'branch_b_no_invariant');
+    const branchBManifestPath = join(branchBDir, 'migration.json');
+    const branchBManifest = JSON.parse(readFileSync(branchBManifestPath, 'utf-8')) as {
+      from: string;
+      to: string;
+      toContract?: unknown;
+      fromContract?: unknown;
+    };
+    // Synthesize a CB hash so branch B lands at a destination distinct from
+    // branch A. The contract files share the same hash, so we cannot get a
+    // real second hash without a second contract fixture; clearing the
+    // toContract bookend lets emit accept the synthetic destination.
+    const cbHash = `sha256:${'b'.repeat(64)}`;
+    writeFileSync(
+      branchBManifestPath,
+      `${JSON.stringify({ ...branchBManifest, toContract: null }, null, 2)}\n`,
+      'utf-8',
+    );
+    writeFileSync(
+      join(branchBDir, 'migration.ts'),
+      renderIndexOnlyMigrationTs(branchBManifest.from, cbHash),
+    );
+    expect(
+      (await migrationEmit(ctx, ['--dir', branchBDir])).exitCode,
+      'Mongo-Q.03: emit branch B',
+    ).toBe(0);
+
+    // Mongo-Q.04: ref points at CB but requires INVARIANT_ID — declared on
+    // branch A, not on the path C1 → CB.
+    writeRefFile(ctx, 'prod', cbHash, [INVARIANT_ID]);
+
+    // Mongo-Q.05: apply --ref prod fails with NO_INVARIANT_PATH.
+    const applyFail = await migrationApply(ctx, ['--ref', 'prod', '--json']);
+    expect(applyFail.exitCode, 'Mongo-Q.05: apply exits 1').toBe(1);
+    const envelope = parseJsonOutput<{
+      meta?: {
+        code?: string;
+        required?: readonly string[];
+        missing?: readonly string[];
+        structuralPath?: readonly { dirName: string; invariants: readonly string[] }[];
       };
-      const c1Hash = initManifest.to;
-
-      // Mongo-Q.02: branch A — additive contract, hand-authored migration WITH invariantId.
-      swapToAdditive(ctx);
-      expect((await emitContract(ctx)).exitCode, 'Mongo-Q.02: emit CA').toBe(0);
-      expect(
-        (await migrationNew(ctx, ['--name', 'branch-a-with-invariant'])).exitCode,
-        'Mongo-Q.02: new branch A',
-      ).toBe(0);
-      const branchADir = findMigrationDirBySlug(ctx, 'branch_a_with_invariant');
-      const draftA = JSON.parse(readFileSync(join(branchADir, 'migration.json'), 'utf-8')) as {
-        from: string;
-        to: string;
-      };
-      writeFileSync(
-        join(branchADir, 'migration.ts'),
-        renderInvariantMigrationTs(draftA.from, draftA.to, { invariantId: INVARIANT_ID }),
-      );
-      expect(
-        (await migrationEmit(ctx, ['--dir', branchADir])).exitCode,
-        'Mongo-Q.02: emit branch A',
-      ).toBe(0);
-
-      // Mongo-Q.03: branch B — index-only migration, no invariantId, planned --from C1.
-      // We use `migration new --from <hash>` to fork off C1. Replace the contract
-      // file with a different additive shape so the destination hash differs.
-      // Easiest: keep the same additive contract but write a different migration
-      // body that produces a distinct destination hash via a different index spec.
-      expect(
-        (await migrationNew(ctx, ['--name', 'branch-b-no-invariant', '--from', c1Hash])).exitCode,
-        'Mongo-Q.03: new branch B',
-      ).toBe(0);
-      const branchBDir = findMigrationDirBySlug(ctx, 'branch_b_no_invariant');
-      const branchBManifestPath = join(branchBDir, 'migration.json');
-      const branchBManifest = JSON.parse(readFileSync(branchBManifestPath, 'utf-8')) as {
-        from: string;
-        to: string;
-        toContract?: unknown;
-        fromContract?: unknown;
-      };
-      // Synthesize a CB hash so branch B lands at a destination distinct from
-      // branch A. The contract files share the same hash, so we cannot get a
-      // real second hash without a second contract fixture; clearing the
-      // toContract bookend lets emit accept the synthetic destination.
-      const cbHash = `sha256:${'b'.repeat(64)}`;
-      writeFileSync(
-        branchBManifestPath,
-        `${JSON.stringify({ ...branchBManifest, toContract: null }, null, 2)}\n`,
-        'utf-8',
-      );
-      writeFileSync(
-        join(branchBDir, 'migration.ts'),
-        renderIndexOnlyMigrationTs(branchBManifest.from, cbHash),
-      );
-      expect(
-        (await migrationEmit(ctx, ['--dir', branchBDir])).exitCode,
-        'Mongo-Q.03: emit branch B',
-      ).toBe(0);
-
-      // Mongo-Q.04: ref points at CB but requires INVARIANT_ID — declared on
-      // branch A, not on the path C1 → CB.
-      writeRefFile(ctx, 'prod', cbHash, [INVARIANT_ID]);
-
-      // Mongo-Q.05: apply --ref prod fails with NO_INVARIANT_PATH.
-      const applyFail = await migrationApply(ctx, ['--ref', 'prod', '--json']);
-      expect(applyFail.exitCode, 'Mongo-Q.05: apply exits 1').toBe(1);
-      const envelope = parseJsonOutput<{
-        meta?: {
-          code?: string;
-          required?: readonly string[];
-          missing?: readonly string[];
-          structuralPath?: readonly { dirName: string; invariants: readonly string[] }[];
-        };
-      }>(applyFail);
-      expect(envelope.meta?.code, 'Mongo-Q.05: error code').toBe('MIGRATION.NO_INVARIANT_PATH');
-      expect(envelope.meta?.required, 'Mongo-Q.05: required').toEqual([INVARIANT_ID]);
-      expect(envelope.meta?.missing, 'Mongo-Q.05: missing').toEqual([INVARIANT_ID]);
-      expect(envelope.meta?.structuralPath, 'Mongo-Q.05: structuralPath populated').toBeDefined();
-      expect(
-        envelope.meta?.structuralPath?.at(-1)?.invariants,
-        'Mongo-Q.05: CB-branch edge has no invariants',
-      ).toEqual([]);
-    });
-  },
-);
+    }>(applyFail);
+    expect(envelope.meta?.code, 'Mongo-Q.05: error code').toBe('MIGRATION.NO_INVARIANT_PATH');
+    expect(envelope.meta?.required, 'Mongo-Q.05: required').toEqual([INVARIANT_ID]);
+    expect(envelope.meta?.missing, 'Mongo-Q.05: missing').toEqual([INVARIANT_ID]);
+    expect(envelope.meta?.structuralPath, 'Mongo-Q.05: structuralPath populated').toBeDefined();
+    expect(
+      envelope.meta?.structuralPath?.at(-1)?.invariants,
+      'Mongo-Q.05: CB-branch edge has no invariants',
+    ).toEqual([]);
+  });
+});

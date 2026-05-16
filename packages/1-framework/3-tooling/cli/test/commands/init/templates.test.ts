@@ -166,10 +166,14 @@ describe('templates', () => {
   });
 
   describe('dbFile', () => {
-    it('generates postgres db.ts with single @prisma-next import', () => {
+    it('generates postgres db.ts with lazy facade and DATABASE_URL binding', () => {
       const db = dbFile('postgres');
 
       expect(db).toContain("from '@prisma-next/postgres/runtime'");
+      expect(db).toContain('postgres<Contract>({');
+      expect(db).toContain('contractJson,');
+      expect(db).toContain("url: process.env['DATABASE_URL']!,");
+      expect(db).not.toContain('await db.connect');
       const prismaNextImports = db.split('\n').filter((l) => l.includes("from '@prisma-next/"));
       expect(prismaNextImports).toHaveLength(1);
     });

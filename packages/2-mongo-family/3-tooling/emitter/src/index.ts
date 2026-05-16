@@ -35,7 +35,7 @@ export const mongoEmission = {
             throw new Error(`Field "${fieldName}" on model "${modelName}" is missing codecId`);
           }
           const match = codecId.match(typeIdRegex);
-          if (!match || !match[1]) {
+          if (!match?.[1]) {
             throw new Error(
               `Field "${fieldName}" on model "${modelName}" has invalid codec ID format "${codecId}". Expected format: ns/name@version`,
             );
@@ -51,7 +51,7 @@ export const mongoEmission = {
     }
 
     const storage = contract.storage as MongoStorage | undefined;
-    if (!storage || !storage.collections || typeof storage.collections !== 'object') {
+    if (!storage?.collections || typeof storage.collections !== 'object') {
       throw new Error('Mongo contract must have storage.collections');
     }
 

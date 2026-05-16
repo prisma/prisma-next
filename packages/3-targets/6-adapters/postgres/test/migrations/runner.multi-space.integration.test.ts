@@ -115,100 +115,96 @@ describe.sequential('PostgresMigrationRunner.executeAcrossSpaces', () => {
     }
   });
 
-  it(
-    'rolls back ALL spaces when one fails (locks AM4-rollback)',
-    { timeout: testTimeout },
-    async () => {
-      const runner = postgresTargetDescriptor.createRunner(familyInstance);
+  it('rolls back ALL spaces when one fails (locks AM4-rollback)', {
+    timeout: testTimeout,
+  }, async () => {
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
 
-      const result = await runner.executeAcrossSpaces({
-        driver: driver!,
-        perSpaceOptions: [
-          {
-            space: 'ext',
-            plan: buildSuccessfulExtensionPlan(),
-            driver: driver!,
-            destinationContract: extensionContract,
-            policy: INIT_ADDITIVE_POLICY,
-            frameworkComponents,
-            strictVerification: false,
-          },
-          {
-            space: 'app',
-            plan: buildFailingAppPlan(),
-            driver: driver!,
-            destinationContract: extensionContract,
-            policy: INIT_ADDITIVE_POLICY,
-            frameworkComponents,
-            strictVerification: false,
-          },
-        ],
-      });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) throw new Error('expected failure');
-      expect(result.failure.failingSpace).toBe('app');
-      expect(result.failure.code).toBe('PRECHECK_FAILED');
-
-      // The first (succeeding) space's writes must have rolled back —
-      // the helper table should not exist.
-      const helperExists = await driver!.query<{ exists: boolean }>(
-        `select to_regclass('public._ext_helper') is not null as exists`,
-      );
-      expect(helperExists.rows[0]?.exists).toBe(false);
-
-      // No marker rows should exist for either space (the marker
-      // table itself may not have been created since the whole
-      // transaction rolled back).
-      const markerSchemaExists = await driver!.query<{ exists: boolean }>(
-        `select exists(select 1 from information_schema.schemata where schema_name = 'prisma_contract') as exists`,
-      );
-      if (markerSchemaExists.rows[0]?.exists) {
-        const markers = await driver!.query<{ space: string }>(
-          'select space from prisma_contract.marker',
-        );
-        expect(markers.rows).toEqual([]);
-      }
-    },
-  );
-
-  it(
-    'commits per-space marker rows when all spaces succeed',
-    { timeout: testTimeout },
-    async () => {
-      const runner = postgresTargetDescriptor.createRunner(familyInstance);
-
-      const result = await runner.executeAcrossSpaces({
-        driver: driver!,
-        perSpaceOptions: [
-          {
-            space: 'ext',
-            plan: buildSuccessfulExtensionPlan(),
-            driver: driver!,
-            destinationContract: extensionContract,
-            policy: INIT_ADDITIVE_POLICY,
-            frameworkComponents,
-            strictVerification: false,
-          },
-        ],
-      });
-
-      expect(result.ok).toBe(true);
-
-      const markerRow = await driver!.query<{ space: string; core_hash: string }>(
-        'select space, core_hash from prisma_contract.marker order by space',
-      );
-      expect(markerRow.rows).toEqual([
+    const result = await runner.executeAcrossSpaces({
+      driver: driver!,
+      perSpaceOptions: [
         {
           space: 'ext',
-          core_hash: extensionContract.storage.storageHash,
+          plan: buildSuccessfulExtensionPlan(),
+          driver: driver!,
+          destinationContract: extensionContract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
         },
-      ]);
+        {
+          space: 'app',
+          plan: buildFailingAppPlan(),
+          driver: driver!,
+          destinationContract: extensionContract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+      ],
+    });
 
-      const helperExists = await driver!.query<{ exists: boolean }>(
-        `select to_regclass('public._ext_helper') is not null as exists`,
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected failure');
+    expect(result.failure.failingSpace).toBe('app');
+    expect(result.failure.code).toBe('PRECHECK_FAILED');
+
+    // The first (succeeding) space's writes must have rolled back —
+    // the helper table should not exist.
+    const helperExists = await driver!.query<{ exists: boolean }>(
+      `select to_regclass('public._ext_helper') is not null as exists`,
+    );
+    expect(helperExists.rows[0]?.exists).toBe(false);
+
+    // No marker rows should exist for either space (the marker
+    // table itself may not have been created since the whole
+    // transaction rolled back).
+    const markerSchemaExists = await driver!.query<{ exists: boolean }>(
+      `select exists(select 1 from information_schema.schemata where schema_name = 'prisma_contract') as exists`,
+    );
+    if (markerSchemaExists.rows[0]?.exists) {
+      const markers = await driver!.query<{ space: string }>(
+        'select space from prisma_contract.marker',
       );
-      expect(helperExists.rows[0]?.exists).toBe(true);
-    },
-  );
+      expect(markers.rows).toEqual([]);
+    }
+  });
+
+  it('commits per-space marker rows when all spaces succeed', {
+    timeout: testTimeout,
+  }, async () => {
+    const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+    const result = await runner.executeAcrossSpaces({
+      driver: driver!,
+      perSpaceOptions: [
+        {
+          space: 'ext',
+          plan: buildSuccessfulExtensionPlan(),
+          driver: driver!,
+          destinationContract: extensionContract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          strictVerification: false,
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+
+    const markerRow = await driver!.query<{ space: string; core_hash: string }>(
+      'select space, core_hash from prisma_contract.marker order by space',
+    );
+    expect(markerRow.rows).toEqual([
+      {
+        space: 'ext',
+        core_hash: extensionContract.storage.storageHash,
+      },
+    ]);
+
+    const helperExists = await driver!.query<{ exists: boolean }>(
+      `select to_regclass('public._ext_helper') is not null as exists`,
+    );
+    expect(helperExists.rows[0]?.exists).toBe(true);
+  });
 });

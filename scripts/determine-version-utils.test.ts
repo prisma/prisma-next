@@ -1,30 +1,57 @@
-import { describe, expect, it } from 'vitest';
-import { findNextPrBuildNumber, parsePrBuildNumber } from './determine-version-utils';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { assertCanonicalBase, computeNextMinor, parseVersion } from './determine-version-utils.ts';
 
-describe('parsePrBuildNumber', () => {
-  it('extracts build number for matching PR number', () => {
-    expect(parsePrBuildNumber('1.2.3-pr.42.7', '42')).toBe(7);
+describe('parseVersion', () => {
+  it('parses a clean release', () => {
+    assert.deepEqual(parseVersion('0.7.0'), { major: 0, minor: 7, patch: 0 });
   });
 
-  it('returns undefined for non-matching PR number', () => {
-    expect(parsePrBuildNumber('1.2.3-pr.42.7', '43')).toBeUndefined();
+  it('parses a multi-digit version', () => {
+    assert.deepEqual(parseVersion('12.34.567'), { major: 12, minor: 34, patch: 567 });
+  });
+
+  it('tolerates a pre-release suffix', () => {
+    assert.deepEqual(parseVersion('0.7.0-dev.5'), { major: 0, minor: 7, patch: 0 });
+    assert.deepEqual(parseVersion('1.2.3-foo'), { major: 1, minor: 2, patch: 3 });
   });
 });
 
-describe('findNextPrBuildNumber', () => {
-  it('increments from latest matching build', () => {
-    const versions = ['1.2.3-pr.42.1', '1.2.3-pr.42.2', '1.2.3-pr.11.9'];
-    expect(findNextPrBuildNumber(versions, '42')).toBe(3);
+describe('computeNextMinor', () => {
+  it('advances 0.7.0 to 0.8.0', () => {
+    assert.equal(computeNextMinor('0.7.0'), '0.8.0');
   });
 
-  it('returns 1 when no matching PR versions exist', () => {
-    const versions = ['1.2.3-pr.10.2', '1.2.3-dev.4'];
-    expect(findNextPrBuildNumber(versions, '42')).toBe(1);
+  it('zeros the patch component', () => {
+    assert.equal(computeNextMinor('1.2.5'), '1.3.0');
   });
 
-  it('throws when PR number is not numeric', () => {
-    expect(() => findNextPrBuildNumber(['1.2.3-pr.42.1'], '42x')).toThrow(
-      'PR number must be numeric',
-    );
+  it('ignores pre-release suffixes on the input', () => {
+    assert.equal(computeNextMinor('0.7.0-dev.5'), '0.8.0');
+  });
+});
+
+describe('assertCanonicalBase', () => {
+  it('accepts a clean release', () => {
+    assert.doesNotThrow(() => assertCanonicalBase('0.7.0'));
+    assert.doesNotThrow(() => assertCanonicalBase('1.2.3'));
+  });
+
+  it('rejects a pre-release suffix', () => {
+    assert.throws(() => assertCanonicalBase('0.7.0-dev.1'), /not canonical/);
+  });
+
+  it('rejects a missing component', () => {
+    assert.throws(() => assertCanonicalBase('0.7'), /not canonical/);
+  });
+
+  it('rejects an empty string', () => {
+    assert.throws(() => assertCanonicalBase(''), /not canonical/);
+  });
+
+  it('rejects components with leading zeros', () => {
+    assert.throws(() => assertCanonicalBase('01.2.3'), /not canonical/);
+    assert.throws(() => assertCanonicalBase('1.02.3'), /not canonical/);
+    assert.throws(() => assertCanonicalBase('1.2.03'), /not canonical/);
   });
 });

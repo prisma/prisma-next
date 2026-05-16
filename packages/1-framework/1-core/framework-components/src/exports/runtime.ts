@@ -1,3 +1,11 @@
+export type {
+  AnnotationHandle,
+  AnnotationValue,
+  DefineAnnotationOptions,
+  OperationKind,
+  ValidAnnotations,
+} from '../annotations';
+export { assertAnnotationsApplicable, defineAnnotation } from '../annotations';
 export { AsyncIterableResult } from '../execution/async-iterable-result';
 export { runBeforeExecuteChain } from '../execution/before-execute-chain';
 export type { ExecutionPlan, QueryPlan, ResultType } from '../execution/query-plan';
@@ -14,6 +22,7 @@ export {
 } from '../execution/runtime-error';
 export type {
   AfterExecuteResult,
+  CrossFamilyMiddleware,
   InterceptResult,
   ParamRefMutator,
   RuntimeExecuteOptions,
@@ -23,3 +32,5 @@ export type {
   RuntimeMiddlewareContext,
 } from '../execution/runtime-middleware';
 export { checkMiddlewareCompatibility } from '../execution/runtime-middleware';
+export type { LaneMetaBuilder, MetaBuilder } from '../meta-builder';
+export { createMetaBuilder } from '../meta-builder';

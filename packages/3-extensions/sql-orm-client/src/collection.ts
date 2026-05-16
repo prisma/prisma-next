@@ -1,5 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
+import type {
+  AnnotationValue,
+  MetaBuilder,
+  OperationKind,
+} from '@prisma-next/framework-components/runtime';
+import { AsyncIterableResult, createMetaBuilder } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression,
@@ -85,6 +90,7 @@ import {
   compileUpdateCount,
   compileUpdateReturning,
   compileUpsertReturning,
+  mergeAnnotations,
 } from './query-plan';
 import {
   type AggregateBuilder,
@@ -642,19 +648,51 @@ export class Collection<
     return this.#clone({ offset: n });
   }
 
-  all(): AsyncIterableResult<Row> {
-    return this.#dispatch();
+  /**
+   * Read terminal: stream all rows matching the current state.
+   *
+   * Accepts an optional `configure` callback that receives a
+   * `MetaBuilder<'read'>` so the caller can attach typed user
+   * annotations to the executed plan. `meta.annotate(...)` enforces
+   * applicability at the type level and at runtime; annotations are
+   * merged into `plan.meta.annotations` at compile time.
+   */
+  all(configure?: (meta: MetaBuilder<'read'>) => void): AsyncIterableResult<Row> {
+    return this.#withAnnotationsFromMeta(configure, 'all').#dispatch();
   }
 
   async first(): Promise<Row | null>;
   async first(
-    filter: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
+    filter: undefined,
+    configure: (meta: MetaBuilder<'read'>) => void,
   ): Promise<Row | null>;
-  async first(filter: ShorthandWhereFilter<TContract, ModelName>): Promise<Row | null>;
+  async first(
+    filter: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
+    configure?: (meta: MetaBuilder<'read'>) => void,
+  ): Promise<Row | null>;
+  async first(
+    filter: ShorthandWhereFilter<TContract, ModelName>,
+    configure?: (meta: MetaBuilder<'read'>) => void,
+  ): Promise<Row | null>;
+  /**
+   * Read terminal: return the first matching row, or `null`.
+   *
+   * Accepts an optional `filter` (function or shorthand) followed by an
+   * optional `configure` callback that receives a `MetaBuilder<'read'>`
+   * for attaching typed annotations. To attach annotations without
+   * narrowing further, pass `undefined` as the filter (or chain
+   * `.where(...)` first):
+   *
+   * ```typescript
+   * await db.User.first({ id }, (meta) => meta.annotate(cacheAnnotation({ ttl: 60 })));
+   * await db.User.first(undefined, (meta) => meta.annotate(cacheAnnotation({ ttl: 60 })));
+   * ```
+   */
   async first(
     filter?:
       | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
       | ShorthandWhereFilter<TContract, ModelName>,
+    configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<Row | null> {
     const scoped =
       filter === undefined
@@ -662,13 +700,22 @@ export class Collection<
         : typeof filter === 'function'
           ? this.where(filter)
           : this.where(filter);
-    const limited = scoped.take(1);
+    const limited = scoped.take(1).#withAnnotationsFromMeta(configure, 'first');
     const rows = await limited.#dispatch().toArray();
     return rows[0] ?? null;
   }
 
+  /**
+   * Read terminal: run an aggregate query (count, sum, avg, min, max)
+   * built via the `AggregateBuilder` callback.
+   *
+   * Accepts an optional `configure` callback that receives a
+   * `MetaBuilder<'read'>` for attaching typed annotations.
+   * Annotations are merged into the compiled plan's `meta.annotations`.
+   */
   async aggregate<Spec extends AggregateSpec>(
     fn: (aggregate: AggregateBuilder<TContract, ModelName>) => Spec,
+    configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<AggregateResult<Spec>> {
     const aggregateSpec = fn(createAggregateBuilder(this.contract, this.modelName));
     const entries = Object.entries(aggregateSpec);
@@ -682,11 +729,11 @@ export class Collection<
       }
     }
 
-    const compiled = compileAggregate(
-      this.contract,
-      this.tableName,
-      this.state.filters,
-      aggregateSpec,
+    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'read', 'aggregate');
+
+    const compiled = mergeAnnotations(
+      compileAggregate(this.contract, this.tableName, this.state.filters, aggregateSpec),
+      annotationsMap,
     );
     const rows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
@@ -695,14 +742,36 @@ export class Collection<
     return normalizeAggregateResult(aggregateSpec, rows[0] ?? {});
   }
 
-  async create(data: ResolvedCreateInput<TContract, ModelName, State['variantName']>): Promise<Row>;
-  async create(data: MutationCreateInputWithRelations<TContract, ModelName>): Promise<Row>;
+  async create(
+    data: ResolvedCreateInput<TContract, ModelName, State['variantName']>,
+    configure?: (meta: MetaBuilder<'write'>) => void,
+  ): Promise<Row>;
+  async create(
+    data: MutationCreateInputWithRelations<TContract, ModelName>,
+    configure?: (meta: MetaBuilder<'write'>) => void,
+  ): Promise<Row>;
+  /**
+   * Write terminal: insert one row and return it.
+   *
+   * Accepts an optional `configure` callback that receives a
+   * `MetaBuilder<'write'>` for attaching typed annotations.
+   * Annotations are merged into the compiled mutation plan's
+   * `meta.annotations`.
+   *
+   * Note: when the input contains nested-mutation callbacks, the
+   * operation is executed as a graph of internal queries via
+   * `withMutationScope`. In that path, annotations apply to the
+   * logical `create()` call but do not currently flow into each
+   * constituent SQL statement issued for the related rows.
+   */
   async create(
     data:
       | ResolvedCreateInput<TContract, ModelName, State['variantName']>
       | MutationCreateInputWithRelations<TContract, ModelName>,
+    configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<Row> {
     assertReturningCapability(this.contract, 'create()');
+    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'create');
 
     if (
       hasNestedMutationCallbacks(this.contract, this.modelName, data as Record<string, unknown>)
@@ -722,9 +791,10 @@ export class Collection<
       return reloaded;
     }
 
-    const rows = await this.createAll([
-      data as ResolvedCreateInput<TContract, ModelName, State['variantName']>,
-    ]);
+    const rows = await this.#createAllWithAnnotations(
+      [data as ResolvedCreateInput<TContract, ModelName, State['variantName']>],
+      annotationsMap,
+    );
     const created = rows[0];
     if (created) {
       return created;
@@ -735,6 +805,17 @@ export class Collection<
 
   createAll(
     data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
+    configure?: (meta: MetaBuilder<'write'>) => void,
+  ): AsyncIterableResult<Row> {
+    return this.#createAllWithAnnotations(
+      data,
+      this.#collectAnnotationsFromMeta(configure, 'write', 'createAll'),
+    );
+  }
+
+  #createAllWithAnnotations(
+    data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
+    annotationsMap: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined,
   ): AsyncIterableResult<Row> {
     if (data.length === 0) {
       const generator = async function* (): AsyncGenerator<Row, void, unknown> {};
@@ -762,7 +843,7 @@ export class Collection<
         this.tableName,
         mappedRows,
         selectedForInsert,
-      );
+      ).map((plan) => mergeAnnotations(plan, annotationsMap));
       return dispatchSplitMutationRows<Row>({
         contract: this.contract,
         runtime: this.ctx.runtime,
@@ -774,11 +855,9 @@ export class Collection<
       });
     }
 
-    const compiled = compileInsertReturning(
-      this.contract,
-      this.tableName,
-      mappedRows,
-      selectedForInsert,
+    const compiled = mergeAnnotations(
+      compileInsertReturning(this.contract, this.tableName, mappedRows, selectedForInsert),
+      annotationsMap,
     );
     return dispatchMutationRows<Row>({
       contract: this.contract,
@@ -947,26 +1026,33 @@ export class Collection<
 
   async createCount(
     data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
+    configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<number> {
     if (data.length === 0) {
       return 0;
     }
 
     this.#assertNotMtiVariant('createCount()');
+    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'createCount');
 
     const rows = data as readonly Record<string, unknown>[];
     const mappedRows = this.#mapCreateRows(rows);
     applyCreateDefaults(this.ctx, this.tableName, mappedRows);
 
     if (this.contract.capabilities?.['sql']?.['defaultInInsert'] !== true) {
-      const plans = compileInsertCountSplit(this.contract, this.tableName, mappedRows);
+      const plans = compileInsertCountSplit(this.contract, this.tableName, mappedRows).map((plan) =>
+        mergeAnnotations(plan, annotationsMap),
+      );
       for (const plan of plans) {
         await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, plan).toArray();
       }
       return data.length;
     }
 
-    const compiled = compileInsertCount(this.contract, this.tableName, mappedRows);
+    const compiled = mergeAnnotations(
+      compileInsertCount(this.contract, this.tableName, mappedRows),
+      annotationsMap,
+    );
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
     return data.length;
   }
@@ -976,13 +1062,17 @@ export class Collection<
    * On conflict, `ON CONFLICT DO NOTHING RETURNING ...` may return zero rows,
    * so this method may issue a follow-up reload query to return the existing row.
    */
-  async upsert(input: {
-    create: ResolvedCreateInput<TContract, ModelName, State['variantName']>;
-    update: Partial<DefaultModelRow<TContract, ModelName>>;
-    conflictOn?: UniqueConstraintCriterion<TContract, ModelName>;
-  }): Promise<Row> {
+  async upsert(
+    input: {
+      create: ResolvedCreateInput<TContract, ModelName, State['variantName']>;
+      update: Partial<DefaultModelRow<TContract, ModelName>>;
+      conflictOn?: UniqueConstraintCriterion<TContract, ModelName>;
+    },
+    configure?: (meta: MetaBuilder<'write'>) => void,
+  ): Promise<Row> {
     assertReturningCapability(this.contract, 'upsert()');
     this.#assertNotMtiVariant('upsert()');
+    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'upsert');
 
     const mappedCreateRows = this.#mapCreateRows([input.create as Record<string, unknown>]);
     const createValues = mappedCreateRows[0] ?? {};
@@ -1006,13 +1096,16 @@ export class Collection<
       this.state.selectedFields,
       parentJoinColumns,
     );
-    const compiled = compileUpsertReturning(
-      this.contract,
-      this.tableName,
-      createValues,
-      updateValues,
-      conflictColumns,
-      selectedForUpsert,
+    const compiled = mergeAnnotations(
+      compileUpsertReturning(
+        this.contract,
+        this.tableName,
+        createValues,
+        updateValues,
+        conflictColumns,
+        selectedForUpsert,
+      ),
+      annotationsMap,
     );
     const row = await executeMutationReturningSingleRow<Row>({
       contract: this.contract,
@@ -1042,10 +1135,25 @@ export class Collection<
     throw new Error(`upsert() for model "${this.modelName}" did not return a row`);
   }
 
+  /**
+   * Write terminal: update matching rows and return the first one (or
+   * null when no row matched).
+   *
+   * Accepts an optional `configure` callback that receives a
+   * `MetaBuilder<'write'>` for attaching typed annotations.
+   *
+   * Note: when the input contains nested-mutation callbacks, the
+   * operation is executed as a graph of internal queries via
+   * `withMutationScope`. In that path, annotations apply to the logical
+   * `update()` call but do not currently flow into each constituent SQL
+   * statement issued for the related rows.
+   */
   async update(
     data: State['hasWhere'] extends true ? MutationUpdateInput<TContract, ModelName> : never,
+    configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<Row | null> {
     assertReturningCapability(this.contract, 'update()');
+    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'update');
 
     if (
       hasNestedMutationCallbacks(this.contract, this.modelName, data as Record<string, unknown>)
@@ -1072,10 +1180,11 @@ export class Collection<
         return null;
       }
       const narrowed = scoped.#clone({ filters: [identityWhere] });
-      const rows = await narrowed.updateAll(
+      const rows = await narrowed.#updateAllWithAnnotations(
         data as State['hasWhere'] extends true
           ? Partial<DefaultModelRow<TContract, ModelName>>
           : never,
+        annotationsMap,
       );
       return rows[0] ?? null;
     });
@@ -1083,6 +1192,17 @@ export class Collection<
 
   updateAll(
     data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
+    configure?: (meta: MetaBuilder<'write'>) => void,
+  ): AsyncIterableResult<Row> {
+    return this.#updateAllWithAnnotations(
+      data,
+      this.#collectAnnotationsFromMeta(configure, 'write', 'updateAll'),
+    );
+  }
+
+  #updateAllWithAnnotations(
+    data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
+    annotationsMap: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined,
   ): AsyncIterableResult<Row> {
     assertReturningCapability(this.contract, 'updateAll()');
 
@@ -1099,12 +1219,15 @@ export class Collection<
       this.state.selectedFields,
       parentJoinColumns,
     );
-    const compiled = compileUpdateReturning(
-      this.contract,
-      this.tableName,
-      mappedData,
-      this.state.filters,
-      selectedForUpdate,
+    const compiled = mergeAnnotations(
+      compileUpdateReturning(
+        this.contract,
+        this.tableName,
+        mappedData,
+        this.state.filters,
+        selectedForUpdate,
+      ),
+      annotationsMap,
     );
     return dispatchMutationRows<Row>({
       contract: this.contract,
@@ -1119,6 +1242,7 @@ export class Collection<
 
   async updateCount(
     data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
+    configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<number> {
     const mappedData = mapModelDataToStorageRow(this.contract, this.modelName, data);
     if (Object.keys(mappedData).length === 0) {
@@ -1126,6 +1250,9 @@ export class Collection<
     }
 
     applyUpdateDefaults(this.ctx, this.tableName, mappedData);
+
+    // Annotations attach to the write, not the matching read.
+    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'updateCount');
 
     const primaryKeyColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
     const countState: CollectionState = {
@@ -1139,21 +1266,28 @@ export class Collection<
       countCompiled,
     ).toArray();
 
-    const compiled = compileUpdateCount(
-      this.contract,
-      this.tableName,
-      mappedData,
-      this.state.filters,
+    const compiled = mergeAnnotations(
+      compileUpdateCount(this.contract, this.tableName, mappedData, this.state.filters),
+      annotationsMap,
     );
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
 
     return matchingRows.length;
   }
 
+  /**
+   * Write terminal: delete matching rows and return the first one (or
+   * null when no row matched).
+   *
+   * Accepts an optional `configure` callback that receives a
+   * `MetaBuilder<'write'>` for attaching typed annotations.
+   */
   async delete(
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
+    configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<Row | null> {
     assertReturningCapability(this.contract, 'delete()');
+    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'delete');
     return withMutationScope(this.ctx.runtime, async (scope) => {
       const scoped = this.#withRuntime(scope);
       const identityWhere = await scoped.#findFirstMatchingRowIdentityWhere();
@@ -1161,29 +1295,38 @@ export class Collection<
         return null;
       }
       const narrowed = scoped.#clone({ filters: [identityWhere] });
-      const rows = await narrowed.#executeDeleteReturning().toArray();
+      const rows = await narrowed.#executeDeleteReturning(annotationsMap).toArray();
       return rows[0] ?? null;
     });
   }
 
   deleteAll(
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
+    configure?: (meta: MetaBuilder<'write'>) => void,
   ): AsyncIterableResult<Row> {
-    assertReturningCapability(this.contract, 'deleteAll()');
-    return this.#executeDeleteReturning();
+    return (this as Collection<TContract, ModelName, Row, State>).#deleteAllWithAnnotations(
+      this.#collectAnnotationsFromMeta(configure, 'write', 'deleteAll'),
+    );
   }
 
-  #executeDeleteReturning(): AsyncIterableResult<Row> {
+  #deleteAllWithAnnotations(
+    annotationsMap: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined,
+  ): AsyncIterableResult<Row> {
+    assertReturningCapability(this.contract, 'deleteAll()');
+    return this.#executeDeleteReturning(annotationsMap);
+  }
+
+  #executeDeleteReturning(
+    annotationsMap: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined,
+  ): AsyncIterableResult<Row> {
     const parentJoinColumns = this.state.includes.map((include) => include.localColumn);
     const { selectedForQuery: selectedForDelete, hiddenColumns } = augmentSelectionForJoinColumns(
       this.state.selectedFields,
       parentJoinColumns,
     );
-    const compiled = compileDeleteReturning(
-      this.contract,
-      this.tableName,
-      this.state.filters,
-      selectedForDelete,
+    const compiled = mergeAnnotations(
+      compileDeleteReturning(this.contract, this.tableName, this.state.filters, selectedForDelete),
+      annotationsMap,
     );
     return dispatchMutationRows<Row>({
       contract: this.contract,
@@ -1198,7 +1341,11 @@ export class Collection<
 
   async deleteCount(
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
+    configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<number> {
+    // Annotations attach to the write, not the matching read.
+    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'deleteCount');
+
     const primaryKeyColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
     const countState: CollectionState = {
       ...emptyState(),
@@ -1211,7 +1358,10 @@ export class Collection<
       countCompiled,
     ).toArray();
 
-    const compiled = compileDeleteCount(this.contract, this.tableName, this.state.filters);
+    const compiled = mergeAnnotations(
+      compileDeleteCount(this.contract, this.tableName, this.state.filters),
+      annotationsMap,
+    );
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
 
     return matchingRows.length;
@@ -1387,5 +1537,61 @@ export class Collection<
       tableName: this.tableName,
       modelName: this.modelName,
     });
+  }
+
+  /**
+   * Invokes the user-supplied configurator (if any) against a freshly
+   * constructed read meta builder, and returns a clone whose
+   * `state.annotations` carries the recorded map. Used by read
+   * terminals that flow annotations through state (`all`, `first`).
+   *
+   * Returns the receiver unchanged when no configurator was supplied
+   * or when the configurator did not call `meta.annotate(...)`. The
+   * meta builder's `annotate` method enforces applicability at the
+   * type level and at runtime, so terminal code does not need to
+   * re-validate.
+   */
+  #withAnnotationsFromMeta(
+    configure: ((meta: MetaBuilder<'read'>) => void) | undefined,
+    terminalName: string,
+  ): this {
+    if (configure === undefined) {
+      return this;
+    }
+    const meta = createMetaBuilder('read', terminalName);
+    configure(meta);
+    if (meta.annotations.size === 0) {
+      return this;
+    }
+    const next = new Map(this.state.annotations);
+    for (const [namespace, value] of meta.annotations) {
+      next.set(namespace, value);
+    }
+    return this.#clone({ annotations: next }) as this;
+  }
+
+  /**
+   * Invokes the user-supplied configurator (if any) against a freshly
+   * constructed meta builder of the given operation kind, and returns
+   * the recorded annotation map (or `undefined` when empty). Used by
+   * terminals where annotations don't flow through `state` — the
+   * compiled plan is post-wrapped via `mergeAnnotations` instead.
+   * Read terminals `all` and `first` populate `state.annotations`
+   * via `#withAnnotationsFromMeta` instead; `aggregate` uses this
+   * post-wrap path because its compile function doesn't take `state`.
+   * The meta builder's `annotate` method enforces applicability at the
+   * type level and at runtime.
+   */
+  #collectAnnotationsFromMeta<K extends OperationKind>(
+    configure: ((meta: MetaBuilder<K>) => void) | undefined,
+    kind: K,
+    terminalName: string,
+  ): ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined {
+    if (configure === undefined) {
+      return undefined;
+    }
+    const meta = createMetaBuilder(kind, terminalName);
+    configure(meta);
+    return meta.annotations.size === 0 ? undefined : meta.annotations;
   }
 }

@@ -792,7 +792,10 @@ exports[`templates > per-cell snapshots (FR5.4) > postgres + psl > dbFile is sta
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-export const db = postgres<Contract>({ contractJson });
+export const db = postgres<Contract>({
+  contractJson,
+  url: process.env['DATABASE_URL']!,
+});
 "
 `;
 
@@ -1054,7 +1057,10 @@ exports[`templates > per-cell snapshots (FR5.4) > postgres + typescript > dbFile
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-export const db = postgres<Contract>({ contractJson });
+export const db = postgres<Contract>({
+  contractJson,
+  url: process.env['DATABASE_URL']!,
+});
 "
 `;
 

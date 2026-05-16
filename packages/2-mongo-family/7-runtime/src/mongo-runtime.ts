@@ -89,6 +89,10 @@ class MongoRuntimeImpl
       // ctx is only invoked by runWithMiddleware with execs this runtime lowered;
       // the framework parameter type is the cross-family base.
       contentHash: (exec) => computeMongoContentHash(exec as MongoExecutionPlan),
+      // When MongoRuntimeImpl grows connection()/transaction() surfaces,
+      // derive a scope-narrowed ctx per call (mirror
+      // SqlRuntimeImpl#executeAgainstQueryable in `sql-runtime.ts`).
+      scope: 'runtime',
     };
 
     super({ middleware, ctx });

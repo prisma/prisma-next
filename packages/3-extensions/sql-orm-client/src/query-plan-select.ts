@@ -23,6 +23,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type PolymorphismInfo,
   resolvePolymorphismInfo,
@@ -451,7 +452,7 @@ export function compileSelect(
   );
 
   const { params } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params);
+  return buildOrmQueryPlan(contract, ast, params, state.annotations);
 }
 
 export function compileRelationSelect(
@@ -522,10 +523,10 @@ export function compileSelectWithIncludeStrategy(
     {
       joins: includeJoins,
       includeProjection,
-      ...(topLevelWhere ? { where: topLevelWhere } : {}),
+      ...ifDefined('where', topLevelWhere),
     },
   );
 
   const { params } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params);
+  return buildOrmQueryPlan(contract, ast, params, state.annotations);
 }

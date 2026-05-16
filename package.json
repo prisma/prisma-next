@@ -1,5 +1,6 @@
 {
   "name": "@prisma-next/monorepo",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a",
@@ -31,8 +32,10 @@
     "lint:docs": "node scripts/validate-package-readmes.mjs",
     "lint:manifests": "node scripts/validate-package-manifests.mjs",
     "lint:workflows": "node scripts/lint-workflow-triggers.mjs",
-    "test:scripts": "node --test scripts/lint-workflow-triggers.test.mjs",
+    "test:scripts": "node --test scripts/lint-workflow-triggers.test.mjs scripts/determine-version-utils.test.ts scripts/check-upgrade-coverage.test.mjs scripts/set-version-utils.test.ts scripts/check-publish-deps-pn-pins.test.mjs",
+    "bump-minor": "node scripts/bump-minor.ts",
     "check:publish-deps": "node scripts/check-publish-deps.mjs",
+    "check:upgrade-coverage": "node scripts/check-upgrade-coverage.mjs",
     "fixtures:emit": "pnpm --filter @prisma-next/sql-builder --filter @prisma-next/sql-orm-client --filter @prisma-next/e2e-tests --filter @prisma-next/e2e-sqlite-tests --filter @prisma-next/integration-tests --filter prisma-next-demo --filter prisma-next-cloudflare-worker -r emit",
     "fixtures:check": "pnpm fixtures:emit && git diff --exit-code -- packages/2-sql/4-lanes/sql-builder/test/fixtures/generated/ packages/3-extensions/sql-orm-client/test/fixtures/generated/ test/e2e/framework/test/fixtures/generated/ test/e2e/sqlite/test/fixtures/generated/ test/integration/test/fixtures/ examples/prisma-next-demo/src/prisma/contract.json examples/prisma-next-demo/src/prisma/contract.d.ts examples/prisma-next-cloudflare-worker/src/prisma/contract.json examples/prisma-next-cloudflare-worker/src/prisma/contract.d.ts",
     "typecheck": "turbo run typecheck",
@@ -44,20 +47,21 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.3.11",
-    "@prisma-next/tsconfig": "workspace:*",
+    "@biomejs/biome": "2.4.14",
+    "@prisma-next/tsconfig": "workspace:0.7.0",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "^4.0.17",
     "dependency-cruiser": "^16.3.3",
     "gray-matter": "catalog:",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
+    "pathe": "^2.0.3",
+    "pkg-pr-new": "0.0.71",
     "tslib": "^2.8.1",
     "tsx": "^4.20.6",
     "turbo": "^2.6.1",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "pkg-pr-new": "0.0.71"
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=24"

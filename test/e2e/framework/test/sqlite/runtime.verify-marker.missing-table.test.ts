@@ -84,48 +84,46 @@ async function buildHarness(verify: RuntimeVerifyOptions): Promise<Harness> {
   };
 }
 
-describe(
-  'sqlite runtime verify-marker: missing marker table',
-  { timeout: timeouts.databaseOperation },
-  () => {
-    let harness: Harness | undefined;
+describe('sqlite runtime verify-marker: missing marker table', {
+  timeout: timeouts.databaseOperation,
+}, () => {
+  let harness: Harness | undefined;
 
-    beforeEach(() => {
-      harness = undefined;
+  beforeEach(() => {
+    harness = undefined;
+  });
+
+  afterEach(async () => {
+    if (harness) {
+      await harness.cleanup();
+    }
+  });
+
+  it('verify.mode: "onFirstUse" + requireMarker: false tolerates a missing _prisma_marker table', async () => {
+    harness = await buildHarness({ mode: 'onFirstUse', requireMarker: false });
+
+    const rows = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
+
+    expect(rows.map((r) => r.id)).toEqual([1]);
+  });
+
+  it('verify.mode: "always" + requireMarker: false tolerates a missing _prisma_marker table across calls', async () => {
+    harness = await buildHarness({ mode: 'always', requireMarker: false });
+
+    const first = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
+    const second = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
+
+    expect(first.map((r) => r.id)).toEqual([1]);
+    expect(second.map((r) => r.id)).toEqual([1]);
+  });
+
+  it('requireMarker: true surfaces CONTRACT.MARKER_MISSING (not raw driver error) when the marker table is absent', async () => {
+    harness = await buildHarness({ mode: 'onFirstUse', requireMarker: true });
+
+    await expect(
+      harness.runtime.execute(harness.db.users.select('id').build()).toArray(),
+    ).rejects.toMatchObject({
+      code: 'CONTRACT.MARKER_MISSING',
     });
-
-    afterEach(async () => {
-      if (harness) {
-        await harness.cleanup();
-      }
-    });
-
-    it('verify.mode: "onFirstUse" + requireMarker: false tolerates a missing _prisma_marker table', async () => {
-      harness = await buildHarness({ mode: 'onFirstUse', requireMarker: false });
-
-      const rows = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
-
-      expect(rows.map((r) => r.id)).toEqual([1]);
-    });
-
-    it('verify.mode: "always" + requireMarker: false tolerates a missing _prisma_marker table across calls', async () => {
-      harness = await buildHarness({ mode: 'always', requireMarker: false });
-
-      const first = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
-      const second = await harness.runtime.execute(harness.db.users.select('id').build()).toArray();
-
-      expect(first.map((r) => r.id)).toEqual([1]);
-      expect(second.map((r) => r.id)).toEqual([1]);
-    });
-
-    it('requireMarker: true surfaces CONTRACT.MARKER_MISSING (not raw driver error) when the marker table is absent', async () => {
-      harness = await buildHarness({ mode: 'onFirstUse', requireMarker: true });
-
-      await expect(
-        harness.runtime.execute(harness.db.users.select('id').build()).toArray(),
-      ).rejects.toMatchObject({
-        code: 'CONTRACT.MARKER_MISSING',
-      });
-    });
-  },
-);
+  });
+});

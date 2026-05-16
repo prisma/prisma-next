@@ -17,7 +17,7 @@ On-disk migration persistence, hash verification, and history reconstruction for
 
 `computeMigrationHash` in `hash.ts` uses explicit framing:
 
-1. Strip identity-affecting fields (`migrationHash`, `signature`, `fromContract`,
+1. Strip identity-affecting fields (`migrationHash`, `fromContract`,
    `toContract`, `hints`) from the metadata envelope, then canonicalize the
    stripped envelope and the ops array.
 2. SHA-256 each canonical part independently.

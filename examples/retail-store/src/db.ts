@@ -1,4 +1,4 @@
-import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
+import { createCacheMiddleware } from '@prisma-next/middleware-cache';
 import mongo from '@prisma-next/mongo/runtime';
 import { mongoRaw } from '@prisma-next/mongo-orm';
 import type { MongoRuntime } from '@prisma-next/mongo-runtime';
@@ -10,7 +10,7 @@ export async function createClient(connectionUri: string, dbName: string) {
     contractJson,
     url: connectionUri,
     dbName,
-    middleware: [createTelemetryMiddleware()],
+    middleware: [createCacheMiddleware()],
   });
   const runtime = await db.runtime();
   const raw = mongoRaw({ contract: db.contract });

@@ -27,24 +27,6 @@ import { errorRuntime } from '@prisma-next/errors/execution';
 import type { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 
 export {
-  CliStructuredError,
-  errorConfigFileNotFound,
-  errorConfigValidation,
-  errorContractConfigMissing,
-  errorContractMissingExtensionPacks,
-  errorContractValidationFailed,
-  errorDatabaseConnectionRequired,
-  errorDriverRequired,
-  errorFamilyReadMarkerSqlRequired,
-  errorFileNotFound,
-  errorMigrationCliInvalidConfigArg,
-  errorMigrationCliUnknownFlag,
-  errorMigrationPlanningFailed,
-  errorQueryRunnerFactoryRequired,
-  errorTargetMigrationNotSupported,
-  errorUnexpected,
-};
-export {
   ERROR_CODE_DESTRUCTIVE_CHANGES,
   errorDestructiveChanges,
   errorHashMismatch,
@@ -62,6 +44,24 @@ export {
   errorUnfilledPlaceholder,
   placeholder,
 } from '@prisma-next/errors/migration';
+export {
+  CliStructuredError,
+  errorConfigFileNotFound,
+  errorConfigValidation,
+  errorContractConfigMissing,
+  errorContractMissingExtensionPacks,
+  errorContractValidationFailed,
+  errorDatabaseConnectionRequired,
+  errorDriverRequired,
+  errorFamilyReadMarkerSqlRequired,
+  errorFileNotFound,
+  errorMigrationCliInvalidConfigArg,
+  errorMigrationCliUnknownFlag,
+  errorMigrationPlanningFailed,
+  errorQueryRunnerFactoryRequired,
+  errorTargetMigrationNotSupported,
+  errorUnexpected,
+};
 
 /**
  * Maps a `MigrationToolsError` raised by the migration-tools loader/graph

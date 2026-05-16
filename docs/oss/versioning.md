@@ -1,0 +1,91 @@
+# Versioning
+
+This page covers the **version contract** Prisma Next offers to its users and ecosystem, and the **mechanism** that delivers it. The first half is the policy you can rely on; the second half is the procedure maintainers follow to honour it.
+
+## Pre-1.0: deliberately unstable
+
+Prisma Next is in early access and is deliberately pre-`1.0`. Per [SemVer §4](https://semver.org/#spec-item-4), the `0.x` range carries no backwards-compatibility promise, and we use that latitude. Concretely:
+
+- **Breaking changes ship in regular minor bumps.** A `0.7.0` to `0.8.0` upgrade may include API removals, semantic changes to existing APIs, or contract-format changes.
+- **Releases are frequent.** The cadence is "ship a minor whenever the next batch of work is cohesive enough to warrant one", not a fixed weekly/monthly schedule. Expect minors more often than you would expect them from a 1.x project.
+- **There are no patch releases of older minors.** Once `0.8.0` ships, `0.7.x` receives no further updates — no security patches, no regression fixes, no cherry-picks. If you hit a regression in the latest `latest` we may cut a `0.8.1`, but you are expected to keep up rather than pin and wait.
+- **The agent-driven upgrade skill is the long-run answer to keeping consumers current with minimal churn.** Each minor will ship with a machine-readable upgrade recipe that the skill applies; the upgrade contract — what the recipes are allowed to assume, what they're allowed to change — will be documented separately in `docs/oss/upgrade-policy.md` once that work lands. Until then, breaking changes are surfaced through release notes only.
+
+If your project cannot tolerate this cadence today, Prisma Next is not the right choice yet. The promise we make instead is that you can always read a single number — the root `package.json` `version` of any commit — and know exactly what you have.
+
+## Lockstep across the workspace
+
+Every workspace package — publishable, private, the workspace root, and example apps — carries the same `version`. One read of root `package.json` answers "what version is this code?" for the entire repository.
+
+This invariant has consequences that ecosystem participants need to plan for:
+
+- **Agent skills, the upgrade skill, and any other tooling we ship alongside the framework version in lockstep with it.** A skill installed at the same time as `@prisma-next/postgres@0.8.0` is a `0.8.0` skill and reasons about a `0.8.0` contract. There is no separate skill-version axis to track.
+- **Extension authors that depend on internal framework packages must pin those dependencies to the framework version their consumers will use.** If your extension depends on `@prisma-next/sql-core` (an internal framework package), publish each version of your extension targeting one specific Prisma Next minor and pin to it exactly (`"@prisma-next/sql-core": "0.8.0"`, not `"^0.8.0"`). Internal packages do not promise inter-minor compatibility — `0.8.x` and `0.9.x` may have incompatible internals even when the user-visible surface looks similar. The extension's published version range communicates which framework minor it targets.
+- **Internal packages are never published, but they still version in lockstep** so a contributor cloning the repo at any commit sees one consistent answer to "what version is this code?" The `private: true` flag means `pnpm publish` skips them.
+
+If lockstep ever broke — if a private package or example carried a different version — the "one read of root tells you everything" invariant would be silently violated. Every CI gate that checks the root version on publish (today: pre-publish dependency-specifier validation; tomorrow: the upgrade-skill recipe-presence check that fires on root version changes) is built on this assumption.
+
+## Dist-tag convention
+
+The npm registry exposes Prisma Next under three dist-tags:
+
+- **`latest`** — the most recent stable release. Default for any `npm install @prisma-next/...`. New `latest` releases happen automatically when a release PR merges (see procedure below).
+- **`dev`** — every push to `main` that doesn't change the root `version` produces a `<base>-dev.N` tarball under this tag. Use these to pin reproductions, install internal CI runs, or hand someone a "try `npm install @prisma-next/postgres@dev` to get the bleeding edge" link. **No stability promise** — they may be yanked freely.
+- **`beta`** — reserved for hand-cut release candidates ahead of significant changes. Routine releases do not use this tag.
+
+The `pr` dist-tag was used historically to publish per-PR previews; PR previews now go through [`pkg.pr.new`](https://pkg.pr.new) ([`.github/workflows/preview-publish.yml`](../../.github/workflows/preview-publish.yml)) instead. The legacy `pr` tag is left as-is on the registry.
+
+## Who can publish
+
+Publishing requires:
+
+- **Membership in the maintainer team** (see [Governance](./governance.md)) — pushing to `main` or merging a release PR is restricted to maintainers.
+- **A green run of the [`Publish to npm`](../../.github/workflows/publish.yml) workflow.** The workflow uses [npm OIDC trusted publishing](https://docs.npmjs.com/generating-provenance-statements) — no long-lived `NPM_TOKEN` exists in repository secrets, so a leaked secret cannot be used to publish out-of-band. Each published tarball carries an [npm provenance attestation](https://docs.npmjs.com/generating-provenance-statements) tying it to this repository and the workflow run that produced it.
+- The workflow only publishes from `main`. Dry-runs are permitted from any branch (see "validating publish changes" below); every step that would mutate external state is independently guarded.
+
+## Mechanism: how we deliver the contract
+
+The version Prisma Next ships is the **`version` field of the root [`package.json`](../../package.json)**. The publish workflow ([`.github/workflows/publish.yml`](../../.github/workflows/publish.yml)) reads this value at the workflow's git ref and refuses to publish anything else. There is no `workflow_dispatch` input to override the version, no per-package `version` drift, and no separate "release manifest" file. Anyone — human or agent — can answer "what version are we on?" by reading a single file under git.
+
+This is by design. Two of the three other places a version *could* live cause silent problems:
+
+- **Querying the npm registry for the latest tag** (the previous behaviour) makes the next minor implicit. A yanked release, a manually-rewritten dist-tag, or registry latency all silently shift what the next CI build calls itself.
+- **A separate `versions.json` or `release.toml`** would diverge from the per-package `version` in tooling that only inspects `package.json` (npm, dependency analyzers, supply-chain scanners, downstream consumers). Keeping the source in `package.json` means there is nothing to keep in sync.
+
+[`scripts/set-version.ts`](../../scripts/set-version.ts) is what enforces lockstep: a single invocation walks every workspace `package.json` and writes the requested version. The publish workflow uses the same script, so per-package and root values cannot diverge through the publish path.
+
+The publish workflow is **triggered by a change to the root `version`**: a push to `main` whose root `package.json` carries a different `version` than the previous tip is recognised as a release bump and ships the new version under dist-tag `latest`. Pushes that don't change the root `version` produce `<base>-dev.N` tarballs under dist-tag `dev` instead. This is what makes "merge the release PR" the publish trigger — there is no separate dispatch step.
+
+A growing set of pre-publish gates run as part of the workflow:
+
+- **Dependency-specifier check** ([`pnpm check:publish-deps`](../../scripts/check-publish-deps.mjs)) — fails the publish if any resolved `package.json` would carry an unrewritten `workspace:*` or `catalog:` specifier into the registry.
+- More gates will accumulate here as the upgrade-skill machinery lands (recipe-presence check fired on root version changes, etc.). The root-version-as-trigger model is the hook these checks plug into.
+
+## Procedure: cut the next minor
+
+The release cadence is one PR per minor. A maintainer:
+
+1. **Runs the `publish-npm-version` skill** (see [`.agents/skills/publish-npm-version/SKILL.md`](../../.agents/skills/publish-npm-version/SKILL.md)). The skill creates a fresh worktree off `origin/main`, drives `pnpm bump-minor`, and opens a PR in the maintainer's name. Using a skill rather than a GitHub workflow ensures the PR carries real maintainer credentials so CI runs on it normally.
+2. **Reviews and merges the PR.** This is the gate where humans verify there are no in-flight breaking changes that need release-notes attention. The merge itself is the publish trigger: the resulting push to `main` carries the bumped root `version`, the publish workflow detects the change, and publishes `<version>` under dist-tag `latest` plus a matching GitHub Release. No separate dispatch step is required.
+
+If the publish needs to be re-run (transient registry failure, etc.), a maintainer can dispatch the [`Publish to npm`](../../.github/workflows/publish.yml) workflow from `main` with `dist-tag=latest` and `dry-run=false`; the workflow re-publishes the version currently committed at HEAD. This is the same path used to cut a hand-rolled `beta` (`dist-tag=beta`).
+
+## Procedure: patch the current minor
+
+Patches are not part of the routine cadence and only apply to the **current** minor (per the pre-1.0 policy above — older minors are not maintained). If a freshly-published `latest` ships a regression that must be addressed before the next minor:
+
+1. Land the fix as a small PR.
+2. On a follow-up PR, run `node scripts/set-version.ts <major>.<minor>.<patch+1>` to advance every workspace package to the patch version.
+3. Merge to `main`. The merge changes the root `version` and auto-publishes `latest` via the same path as a minor bump.
+
+The skill is not used for patches because the bump shape is different (`patch+1`, not `minor+1`); the explicit `set-version.ts` invocation is the procedure.
+
+## Procedure: validate publish changes
+
+The publish workflow's `dry-run` mode (the input default) can be invoked from any branch to validate that the publish pipeline still works after touching `publish.yml`, `set-version.ts`, `determine-version.ts`, the publish script, or any of the build scripts. A dry-run exercises `pnpm publish --dry-run` against every publishable workspace package, runs the pre-publish gates, and skips the registry publish + GitHub Release.
+
+## Non-goals
+
+- **Maintenance of older minors.** Stated above as policy: in the `0.x` range, you upgrade. There is no tooling for cutting a `0.7.x` patch after `0.8.0` ships, and that is intentional.
+- **Pre-release / release-candidate cadence.** The `beta` dist-tag exists but cutting beta releases is hand-edited rather than scripted. If a beta cadence becomes routine, that is a follow-up.
+- **Independent per-package versioning.** Lockstep is the invariant the rest of the contract is built on; per-package versions would require redesigning `set-version.ts`, the publish flow, and the upgrade-skill recipe model.

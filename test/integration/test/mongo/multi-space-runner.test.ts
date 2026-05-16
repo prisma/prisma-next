@@ -190,67 +190,106 @@ function planFor(contract: MongoContract, fromContract: MongoContract | null) {
   return JSON.parse(serializeMongoOps(ops)) as readonly MongoMigrationPlanOperation[];
 }
 
-describe(
-  'mongoTargetDescriptor.executeAcrossSpaces (multi-space)',
-  { timeout: timeouts.spinUpMongoMemoryServer },
-  () => {
-    let replSet: MongoMemoryReplSet;
-    let client: MongoClient;
-    let db: Db;
-    const dbName = 'mongo_multi_space_runner_test';
+describe('mongoTargetDescriptor.executeAcrossSpaces (multi-space)', {
+  timeout: timeouts.spinUpMongoMemoryServer,
+}, () => {
+  let replSet: MongoMemoryReplSet;
+  let client: MongoClient;
+  let db: Db;
+  const dbName = 'mongo_multi_space_runner_test';
 
-    beforeAll(async () => {
-      replSet = await MongoMemoryReplSet.create({
-        instanceOpts: [
-          { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
-        ],
-        replSet: { count: 1, storageEngine: 'wiredTiger' },
-      });
-      client = new MongoClient(replSet.getUri());
-      await client.connect();
-      db = client.db(dbName);
-    }, timeouts.spinUpMongoMemoryServer);
-
-    afterAll(async () => {
-      try {
-        await client?.close();
-        await replSet?.stop();
-      } catch {
-        // ignore cleanup errors
-      }
-    }, timeouts.spinUpMongoMemoryServer);
-
-    beforeEach(async () => {
-      await db.dropDatabase();
+  beforeAll(async () => {
+    replSet = await MongoMemoryReplSet.create({
+      instanceOpts: [
+        { launchTimeout: timeouts.spinUpMongoMemoryServer, storageEngine: 'wiredTiger' },
+      ],
+      replSet: { count: 1, storageEngine: 'wiredTiger' },
     });
+    client = new MongoClient(replSet.getUri());
+    await client.connect();
+    db = client.db(dbName);
+  }, timeouts.spinUpMongoMemoryServer);
 
-    it('runs both spaces in caller order under strict per-space verify', async () => {
-      // With per-space verify projection in place, strict-mode
-      // verify (the default) succeeds across the aggregate even though
-      // the live database holds collections owned by sibling spaces:
-      // each space's verify only sees the slice its contract claims.
-      const runner = makeRunner();
-      const appContract = buildAppContract();
-      const extContract = buildExtContract();
-      const appOps = planFor(appContract, null);
-      const extOps = planFor(extContract, null);
+  afterAll(async () => {
+    try {
+      await client?.close();
+      await replSet?.stop();
+    } catch {
+      // ignore cleanup errors
+    }
+  }, timeouts.spinUpMongoMemoryServer);
 
-      const driver = await mongoControlDriver.create(replSet.getUri(dbName));
-      try {
-        const perSpaceOptions: readonly PerSpaceOptions[] = [
-          {
-            space: EXT_SPACE,
-            plan: {
-              targetId: 'mongo',
-              spaceId: EXT_SPACE,
-              destination: { storageHash: extContract.storage.storageHash },
-              operations: extOps,
-            },
-            driver,
-            destinationContract: extContract,
-            policy: ALL_POLICY,
-            frameworkComponents: [],
+  beforeEach(async () => {
+    await db.dropDatabase();
+  });
+
+  it('runs both spaces in caller order under strict per-space verify', async () => {
+    // With per-space verify projection in place, strict-mode
+    // verify (the default) succeeds across the aggregate even though
+    // the live database holds collections owned by sibling spaces:
+    // each space's verify only sees the slice its contract claims.
+    const runner = makeRunner();
+    const appContract = buildAppContract();
+    const extContract = buildExtContract();
+    const appOps = planFor(appContract, null);
+    const extOps = planFor(extContract, null);
+
+    const driver = await mongoControlDriver.create(replSet.getUri(dbName));
+    try {
+      const perSpaceOptions: readonly PerSpaceOptions[] = [
+        {
+          space: EXT_SPACE,
+          plan: {
+            targetId: 'mongo',
+            spaceId: EXT_SPACE,
+            destination: { storageHash: extContract.storage.storageHash },
+            operations: extOps,
           },
+          driver,
+          destinationContract: extContract,
+          policy: ALL_POLICY,
+          frameworkComponents: [],
+        },
+        {
+          space: APP_SPACE_ID,
+          plan: {
+            targetId: 'mongo',
+            spaceId: APP_SPACE_ID,
+            destination: { storageHash: appContract.storage.storageHash },
+            operations: appOps,
+          },
+          driver,
+          destinationContract: appContract,
+          policy: ALL_POLICY,
+          frameworkComponents: [],
+        },
+      ];
+
+      const result = await runner.executeAcrossSpaces({ driver, perSpaceOptions });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('unreachable');
+      expect(result.value.perSpaceResults.map((r) => r.space)).toEqual([EXT_SPACE, APP_SPACE_ID]);
+
+      const markers = await readAllMarkers(db);
+      expect(markers.size).toBe(2);
+      expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(appContract.storage.storageHash);
+      expect(markers.get(EXT_SPACE)?.storageHash).toBe(extContract.storage.storageHash);
+    } finally {
+      await driver.close();
+    }
+  });
+
+  it('degenerate single-space invocation succeeds', async () => {
+    const runner = makeRunner();
+    const appContract = buildAppContract();
+    const appOps = planFor(appContract, null);
+
+    const driver = await mongoControlDriver.create(replSet.getUri(dbName));
+    try {
+      const result = await runner.executeAcrossSpaces({
+        driver,
+        perSpaceOptions: [
           {
             space: APP_SPACE_ID,
             plan: {
@@ -264,186 +303,145 @@ describe(
             policy: ALL_POLICY,
             frameworkComponents: [],
           },
-        ];
+        ],
+      });
 
-        const result = await runner.executeAcrossSpaces({ driver, perSpaceOptions });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('unreachable');
+      expect(result.value.perSpaceResults).toHaveLength(1);
+      expect(result.value.perSpaceResults[0]?.space).toBe(APP_SPACE_ID);
+    } finally {
+      await driver.close();
+    }
+  });
 
-        expect(result.ok).toBe(true);
-        if (!result.ok) throw new Error('unreachable');
-        expect(result.value.perSpaceResults.map((r) => r.space)).toEqual([EXT_SPACE, APP_SPACE_ID]);
+  it('empty perSpaceOptions returns ok with no results', async () => {
+    const runner = makeRunner();
+    const driver = await mongoControlDriver.create(replSet.getUri(dbName));
+    try {
+      const result = await runner.executeAcrossSpaces({ driver, perSpaceOptions: [] });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error('unreachable');
+      expect(result.value.perSpaceResults).toEqual([]);
+    } finally {
+      await driver.close();
+    }
+  });
 
-        const markers = await readAllMarkers(db);
-        expect(markers.size).toBe(2);
-        expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(appContract.storage.storageHash);
-        expect(markers.get(EXT_SPACE)?.storageHash).toBe(extContract.storage.storageHash);
-      } finally {
-        await driver.close();
-      }
-    });
+  it('mid-run failure surfaces failingSpace and leaves earlier markers advanced; resume re-applies the failed space and skips already-at-head spaces', async () => {
+    // The contract under test: per-space verify projects the live
+    // schema to the slice the destination contract claims, then verifies.
+    // We manufacture a per-space contract violation by applying a plan
+    // generated from a *trimmed* app contract (claims only `users`) but
+    // verifying against the *full* app contract (claims `users` + `posts`).
+    // The trimmed plan creates `users`; per-space verify against the full
+    // contract finds `posts` missing → SCHEMA_VERIFY_FAILED.
+    const runner = makeRunner();
+    const appContractFull = buildAppContract();
+    const appContractTrimmed = buildAppContractMissingPosts();
+    const extContract = buildExtContract();
+    const extOps = planFor(extContract, null);
+    const appOpsTrimmed = planFor(appContractTrimmed, null);
 
-    it('degenerate single-space invocation succeeds', async () => {
-      const runner = makeRunner();
-      const appContract = buildAppContract();
-      const appOps = planFor(appContract, null);
-
-      const driver = await mongoControlDriver.create(replSet.getUri(dbName));
-      try {
-        const result = await runner.executeAcrossSpaces({
+    const driver = await mongoControlDriver.create(replSet.getUri(dbName));
+    try {
+      const failingPerSpaceOptions: readonly PerSpaceOptions[] = [
+        {
+          space: EXT_SPACE,
+          plan: {
+            targetId: 'mongo',
+            spaceId: EXT_SPACE,
+            destination: { storageHash: extContract.storage.storageHash },
+            operations: extOps,
+          },
           driver,
-          perSpaceOptions: [
-            {
-              space: APP_SPACE_ID,
-              plan: {
-                targetId: 'mongo',
-                spaceId: APP_SPACE_ID,
-                destination: { storageHash: appContract.storage.storageHash },
-                operations: appOps,
-              },
-              driver,
-              destinationContract: appContract,
-              policy: ALL_POLICY,
-              frameworkComponents: [],
-            },
-          ],
-        });
-
-        expect(result.ok).toBe(true);
-        if (!result.ok) throw new Error('unreachable');
-        expect(result.value.perSpaceResults).toHaveLength(1);
-        expect(result.value.perSpaceResults[0]?.space).toBe(APP_SPACE_ID);
-      } finally {
-        await driver.close();
-      }
-    });
-
-    it('empty perSpaceOptions returns ok with no results', async () => {
-      const runner = makeRunner();
-      const driver = await mongoControlDriver.create(replSet.getUri(dbName));
-      try {
-        const result = await runner.executeAcrossSpaces({ driver, perSpaceOptions: [] });
-        expect(result.ok).toBe(true);
-        if (!result.ok) throw new Error('unreachable');
-        expect(result.value.perSpaceResults).toEqual([]);
-      } finally {
-        await driver.close();
-      }
-    });
-
-    it('mid-run failure surfaces failingSpace and leaves earlier markers advanced; resume re-applies the failed space and skips already-at-head spaces', async () => {
-      // The contract under test: per-space verify projects the live
-      // schema to the slice the destination contract claims, then verifies.
-      // We manufacture a per-space contract violation by applying a plan
-      // generated from a *trimmed* app contract (claims only `users`) but
-      // verifying against the *full* app contract (claims `users` + `posts`).
-      // The trimmed plan creates `users`; per-space verify against the full
-      // contract finds `posts` missing → SCHEMA_VERIFY_FAILED.
-      const runner = makeRunner();
-      const appContractFull = buildAppContract();
-      const appContractTrimmed = buildAppContractMissingPosts();
-      const extContract = buildExtContract();
-      const extOps = planFor(extContract, null);
-      const appOpsTrimmed = planFor(appContractTrimmed, null);
-
-      const driver = await mongoControlDriver.create(replSet.getUri(dbName));
-      try {
-        const failingPerSpaceOptions: readonly PerSpaceOptions[] = [
-          {
-            space: EXT_SPACE,
-            plan: {
-              targetId: 'mongo',
-              spaceId: EXT_SPACE,
-              destination: { storageHash: extContract.storage.storageHash },
-              operations: extOps,
-            },
-            driver,
-            destinationContract: extContract,
-            policy: ALL_POLICY,
-            frameworkComponents: [],
+          destinationContract: extContract,
+          policy: ALL_POLICY,
+          frameworkComponents: [],
+        },
+        {
+          space: APP_SPACE_ID,
+          plan: {
+            targetId: 'mongo',
+            spaceId: APP_SPACE_ID,
+            destination: { storageHash: appContractFull.storage.storageHash },
+            operations: appOpsTrimmed,
           },
-          {
-            space: APP_SPACE_ID,
-            plan: {
-              targetId: 'mongo',
-              spaceId: APP_SPACE_ID,
-              destination: { storageHash: appContractFull.storage.storageHash },
-              operations: appOpsTrimmed,
-            },
-            driver,
-            destinationContract: appContractFull,
-            policy: ALL_POLICY,
-            frameworkComponents: [],
-          },
-        ];
-
-        const failingResult = await runner.executeAcrossSpaces({
           driver,
-          perSpaceOptions: failingPerSpaceOptions,
-        });
+          destinationContract: appContractFull,
+          policy: ALL_POLICY,
+          frameworkComponents: [],
+        },
+      ];
 
-        expect(failingResult.ok).toBe(false);
-        if (failingResult.ok) throw new Error('unreachable');
-        expect(failingResult.failure.failingSpace).toBe(APP_SPACE_ID);
-        expect(failingResult.failure.code).toBe('SCHEMA_VERIFY_FAILED');
+      const failingResult = await runner.executeAcrossSpaces({
+        driver,
+        perSpaceOptions: failingPerSpaceOptions,
+      });
 
-        const extMarkerAfterFail = await readMarker(db, EXT_SPACE);
-        expect(extMarkerAfterFail?.storageHash).toBe(extContract.storage.storageHash);
-        const appMarkerAfterFail = await readMarker(db, APP_SPACE_ID);
-        expect(appMarkerAfterFail).toBeNull();
+      expect(failingResult.ok).toBe(false);
+      if (failingResult.ok) throw new Error('unreachable');
+      expect(failingResult.failure.failingSpace).toBe(APP_SPACE_ID);
+      expect(failingResult.failure.code).toBe('SCHEMA_VERIFY_FAILED');
 
-        // Re-run with the corrected app plan (covers both
-        // collections). ext is already at head — the runner's no-op
-        // path skips it. App applies its full plan: `users` is
-        // postcheck-idempotent-skipped, `posts` is created. Per-space
-        // verify against the full contract passes; app marker advances.
-        const appOpsFull = planFor(appContractFull, null);
-        const resumePerSpaceOptions: readonly PerSpaceOptions[] = [
-          {
-            space: EXT_SPACE,
-            plan: {
-              targetId: 'mongo',
-              spaceId: EXT_SPACE,
-              destination: { storageHash: extContract.storage.storageHash },
-              operations: extOps,
-            },
-            driver,
-            destinationContract: extContract,
-            policy: ALL_POLICY,
-            frameworkComponents: [],
+      const extMarkerAfterFail = await readMarker(db, EXT_SPACE);
+      expect(extMarkerAfterFail?.storageHash).toBe(extContract.storage.storageHash);
+      const appMarkerAfterFail = await readMarker(db, APP_SPACE_ID);
+      expect(appMarkerAfterFail).toBeNull();
+
+      // Re-run with the corrected app plan (covers both
+      // collections). ext is already at head — the runner's no-op
+      // path skips it. App applies its full plan: `users` is
+      // postcheck-idempotent-skipped, `posts` is created. Per-space
+      // verify against the full contract passes; app marker advances.
+      const appOpsFull = planFor(appContractFull, null);
+      const resumePerSpaceOptions: readonly PerSpaceOptions[] = [
+        {
+          space: EXT_SPACE,
+          plan: {
+            targetId: 'mongo',
+            spaceId: EXT_SPACE,
+            destination: { storageHash: extContract.storage.storageHash },
+            operations: extOps,
           },
-          {
-            space: APP_SPACE_ID,
-            plan: {
-              targetId: 'mongo',
-              spaceId: APP_SPACE_ID,
-              destination: { storageHash: appContractFull.storage.storageHash },
-              operations: appOpsFull,
-            },
-            driver,
-            destinationContract: appContractFull,
-            policy: ALL_POLICY,
-            frameworkComponents: [],
-          },
-        ];
-
-        const resumeResult = await runner.executeAcrossSpaces({
           driver,
-          perSpaceOptions: resumePerSpaceOptions,
-        });
+          destinationContract: extContract,
+          policy: ALL_POLICY,
+          frameworkComponents: [],
+        },
+        {
+          space: APP_SPACE_ID,
+          plan: {
+            targetId: 'mongo',
+            spaceId: APP_SPACE_ID,
+            destination: { storageHash: appContractFull.storage.storageHash },
+            operations: appOpsFull,
+          },
+          driver,
+          destinationContract: appContractFull,
+          policy: ALL_POLICY,
+          frameworkComponents: [],
+        },
+      ];
 
-        expect(resumeResult.ok).toBe(true);
-        if (!resumeResult.ok) throw new Error('unreachable');
-        expect(resumeResult.value.perSpaceResults.map((r) => r.space)).toEqual([
-          EXT_SPACE,
-          APP_SPACE_ID,
-        ]);
+      const resumeResult = await runner.executeAcrossSpaces({
+        driver,
+        perSpaceOptions: resumePerSpaceOptions,
+      });
 
-        const markers = await readAllMarkers(db);
-        expect(markers.size).toBe(2);
-        expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(appContractFull.storage.storageHash);
-        expect(markers.get(EXT_SPACE)?.storageHash).toBe(extContract.storage.storageHash);
-      } finally {
-        await driver.close();
-      }
-    });
-  },
-);
+      expect(resumeResult.ok).toBe(true);
+      if (!resumeResult.ok) throw new Error('unreachable');
+      expect(resumeResult.value.perSpaceResults.map((r) => r.space)).toEqual([
+        EXT_SPACE,
+        APP_SPACE_ID,
+      ]);
+
+      const markers = await readAllMarkers(db);
+      expect(markers.size).toBe(2);
+      expect(markers.get(APP_SPACE_ID)?.storageHash).toBe(appContractFull.storage.storageHash);
+      expect(markers.get(EXT_SPACE)?.storageHash).toBe(extContract.storage.storageHash);
+    } finally {
+      await driver.close();
+    }
+  });
+});

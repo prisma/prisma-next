@@ -106,31 +106,32 @@ type FieldSqlSpecForState<State extends AnyScalarFieldState> = {
 type ApplyFieldSqlSpec<
   State extends AnyScalarFieldState,
   Spec extends FieldSqlSpecForState<State>,
-> = State extends ScalarFieldState<
-  infer CodecId,
-  infer TypeRef,
-  infer Nullable,
-  infer ColumnName,
-  infer IdSpec,
-  infer UniqueSpec
->
-  ? ScalarFieldState<
-      CodecId,
-      TypeRef,
-      Nullable,
-      Spec extends { readonly column: infer NextColumn extends string } ? NextColumn : ColumnName,
-      Spec extends { readonly id: { readonly name: infer IdName extends string } }
-        ? IdSpec extends NamedConstraintSpec
-          ? NamedConstraintSpec<IdName>
-          : IdSpec
-        : IdSpec,
-      Spec extends { readonly unique: { readonly name: infer UniqueName extends string } }
-        ? UniqueSpec extends NamedConstraintSpec
-          ? NamedConstraintSpec<UniqueName>
+> =
+  State extends ScalarFieldState<
+    infer CodecId,
+    infer TypeRef,
+    infer Nullable,
+    infer ColumnName,
+    infer IdSpec,
+    infer UniqueSpec
+  >
+    ? ScalarFieldState<
+        CodecId,
+        TypeRef,
+        Nullable,
+        Spec extends { readonly column: infer NextColumn extends string } ? NextColumn : ColumnName,
+        Spec extends { readonly id: { readonly name: infer IdName extends string } }
+          ? IdSpec extends NamedConstraintSpec
+            ? NamedConstraintSpec<IdName>
+            : IdSpec
+          : IdSpec,
+        Spec extends { readonly unique: { readonly name: infer UniqueName extends string } }
+          ? UniqueSpec extends NamedConstraintSpec
+            ? NamedConstraintSpec<UniqueName>
+            : UniqueSpec
           : UniqueSpec
-        : UniqueSpec
-    >
-  : never;
+      >
+    : never;
 
 export type GeneratedFieldSpec = {
   readonly type: ColumnTypeDescriptor;
@@ -476,14 +477,15 @@ export type AnyRelationBuilder = RelationBuilder<AnyRelationState>;
 type ApplyBelongsToRelationSqlSpec<
   State extends RelationState,
   SqlSpec extends BelongsToRelationSqlSpec,
-> = State extends BelongsToRelation<
-  infer ToModel,
-  infer FromField,
-  infer ToField,
-  BelongsToRelationSqlSpec | undefined
->
-  ? BelongsToRelation<ToModel, FromField, ToField, SqlSpec>
-  : never;
+> =
+  State extends BelongsToRelation<
+    infer ToModel,
+    infer FromField,
+    infer ToField,
+    BelongsToRelationSqlSpec | undefined
+  >
+    ? BelongsToRelation<ToModel, FromField, ToField, SqlSpec>
+    : never;
 
 export class RelationBuilder<State extends RelationState = AnyRelationState> {
   declare readonly __state: State;

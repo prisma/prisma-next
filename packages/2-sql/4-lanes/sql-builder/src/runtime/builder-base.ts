@@ -1,5 +1,6 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type { CodecRef } from '@prisma-next/framework-components/codec';
+import type { AnnotationValue, OperationKind } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlOperationEntry } from '@prisma-next/sql-operations';
 import {
@@ -18,6 +19,7 @@ import type {
   AppliedMutationDefault,
   MutationDefaultsOptions,
 } from '@prisma-next/sql-relational-core/query-lane-context';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   AggregateFunctions,
   Expression,
@@ -72,6 +74,12 @@ export interface BuilderState {
   readonly distinctOn: readonly AstExpression[] | undefined;
   readonly scope: Scope;
   readonly rowFields: Record<string, ScopeField>;
+  /**
+   * Annotations accumulated through `.annotate(...)` calls. Stored as
+   * a `Map<namespace, AnnotationValue>` so duplicate namespaces
+   * last-write-win. Empty on a fresh state.
+   */
+  readonly annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
 }
 
 export interface BuilderContext {
@@ -115,6 +123,7 @@ export function emptyState(from: TableSource, scope: Scope): BuilderState {
     distinctOn: undefined,
     scope,
     rowFields: {},
+    annotations: new Map(),
   };
 }
 
@@ -149,13 +158,24 @@ export function buildSelectAst(state: BuilderState): SelectAst {
 export function buildQueryPlan<Row = unknown>(
   ast: import('@prisma-next/sql-relational-core/ast').AnyQueryAst,
   ctx: BuilderContext,
+  annotations?: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>,
 ): SqlQueryPlan<Row> {
   const paramValues = collectOrderedParamRefs(ast).map((r) => r.value);
 
+  // SQL DSL has no framework-reserved namespace keys (e.g. `codecs`) in
+  // scope at `.build()` time, so user annotations land verbatim here. The
+  // ORM dispatch path — which compiles to plans that may already carry
+  // reserved keys — enforces the precedence rule in `mergeAnnotations`
+  // (`sql-orm-client/src/query-plan-meta.ts`).
+  const annotationsRecord =
+    annotations !== undefined && annotations.size > 0
+      ? Object.freeze(Object.fromEntries(annotations))
+      : undefined;
   const meta: PlanMeta = Object.freeze({
     target: ctx.target,
     storageHash: ctx.storageHash,
     lane: 'dsl',
+    ...ifDefined('annotations', annotationsRecord),
   });
 
   return Object.freeze({ ast, params: paramValues, meta });
@@ -165,7 +185,7 @@ export function buildPlan<Row = unknown>(
   state: BuilderState,
   ctx: BuilderContext,
 ): SqlQueryPlan<Row> {
-  return buildQueryPlan<Row>(buildSelectAst(state), ctx);
+  return buildQueryPlan<Row>(buildSelectAst(state), ctx, state.annotations);
 }
 
 export function tableToScope(
