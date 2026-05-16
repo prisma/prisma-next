@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { col, pk } from '../src/factories';
 import { findTableByCoord, iterateTablesWithCoords, SqlStorage } from '../src/ir/sql-storage';
 import { StorageTable } from '../src/ir/storage-table';
+import { validateStorage } from '../src/validators';
 
 /**
  * Multi-namespace SqlStorage JSON round-trip coverage.
@@ -116,5 +117,63 @@ describe('SqlStorage multi-namespace JSON round-trip', () => {
     };
     expect(envelope.tables['Post']?.namespaceId).toBe('public');
     expect(envelope.tables['Account']?.namespaceId).toBe('auth');
+  });
+
+  it('escalates to the nested envelope when the same name lives in two namespaces (FR15)', () => {
+    const storage = new SqlStorage({
+      storageHash: sha as SqlStorage['storageHash'],
+      tables: {
+        auth: { User: makeTable('User', 'auth') },
+        public: { User: makeTable('User', 'public') },
+      },
+    });
+
+    const envelope = JSON.parse(JSON.stringify(storage)) as {
+      tables: Record<string, unknown>;
+    };
+    expect(Object.keys(envelope.tables).sort()).toEqual(['auth', 'public']);
+    const authBucket = envelope.tables['auth'] as Record<string, unknown>;
+    const publicBucket = envelope.tables['public'] as Record<string, unknown>;
+    expect(authBucket).toHaveProperty('User');
+    expect(publicBucket).toHaveProperty('User');
+  });
+
+  it('rehydrates the nested envelope back through validateStorage to a dual-view IR', () => {
+    const original = new SqlStorage({
+      storageHash: sha as SqlStorage['storageHash'],
+      tables: {
+        auth: { User: makeTable('User', 'auth') },
+        public: { User: makeTable('User', 'public') },
+      },
+    });
+
+    const envelope = JSON.parse(JSON.stringify(original));
+    const rehydrated = validateStorage(envelope);
+
+    const coords = [...iterateTablesWithCoords(rehydrated)]
+      .map(({ namespaceId, name }) => `${namespaceId}.${name}`)
+      .sort();
+    expect(coords).toEqual(['auth.User', 'public.User']);
+    expect(findTableByCoord(rehydrated, 'auth', 'User')?.namespaceId).toBe('auth');
+    expect(findTableByCoord(rehydrated, 'public', 'User')?.namespaceId).toBe('public');
+  });
+
+  it('rehydrates the flat envelope back through validateStorage to a dual-view IR', () => {
+    const original = new SqlStorage({
+      storageHash: sha as SqlStorage['storageHash'],
+      tables: {
+        auth: { Account: makeTable('Account', 'auth') },
+        public: { Post: makeTable('Post', 'public') },
+      },
+    });
+
+    const envelope = JSON.parse(JSON.stringify(original)) as {
+      tables: Record<string, unknown>;
+    };
+    expect(Object.keys(envelope.tables).sort()).toEqual(['Account', 'Post']);
+
+    const rehydrated = validateStorage(envelope);
+    expect(findTableByCoord(rehydrated, 'auth', 'Account')?.namespaceId).toBe('auth');
+    expect(findTableByCoord(rehydrated, 'public', 'Post')?.namespaceId).toBe('public');
   });
 });

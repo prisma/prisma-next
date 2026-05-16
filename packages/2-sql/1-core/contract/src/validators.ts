@@ -179,6 +179,11 @@ const StorageTableSchema = type({
   uniques: UniqueConstraintSchema.array().readonly(),
   indexes: IndexSchema.array().readonly(),
   foreignKeys: ForeignKeySchema.array().readonly(),
+  // Optional namespace back-pointer. Single-namespace contracts omit
+  // it (byte-identity preserved on the legacy envelope); multi-namespace
+  // contracts persist it enumerably so the JSON envelope round-trips
+  // through `validateStorage` back into the nested-by-namespace IR.
+  'namespaceId?': 'string',
 });
 
 /**
@@ -194,11 +199,26 @@ const NamespaceEntrySchema = type({
   id: 'string',
 });
 
-const StorageSchema = type({
+const FlatStorageSchema = type({
   '+': 'reject',
   storageHash: 'string',
   tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeEntrySchema }),
+  'namespaces?': type({ '[string]': NamespaceEntrySchema }),
+});
+
+/**
+ * FR15 nested-by-namespace envelope. Multi-namespace contracts persist
+ * `tables` as `{ [namespaceId]: { [tableName]: StorageTable } }` (and
+ * the same dual shape for `types`). `validateStorage` discriminates
+ * between the two shapes at the runtime entry point and routes through
+ * the matching arktype schema.
+ */
+const NestedStorageSchema = type({
+  '+': 'reject',
+  storageHash: 'string',
+  tables: type({ '[string]': type({ '[string]': StorageTableSchema }) }),
+  'types?': type({ '[string]': type({ '[string]': StorageTypeEntrySchema }) }),
   'namespaces?': type({ '[string]': NamespaceEntrySchema }),
 });
 
@@ -274,7 +294,7 @@ const ContractMetaSchema = type({
   '[string]': 'unknown',
 });
 
-const SqlContractSchema = type({
+const sqlContractBaseShape = {
   '+': 'reject',
   target: 'string',
   targetFamily: "'sql'",
@@ -286,8 +306,17 @@ const SqlContractSchema = type({
   'roots?': 'Record<string, string>',
   models: type({ '[string]': ModelSchema }),
   'valueObjects?': 'Record<string, unknown>',
-  storage: StorageSchema,
   'execution?': ExecutionSchema,
+} as const;
+
+const FlatSqlContractSchema = type({
+  ...sqlContractBaseShape,
+  storage: FlatStorageSchema,
+});
+
+const NestedSqlContractSchema = type({
+  ...sqlContractBaseShape,
+  storage: NestedStorageSchema,
 });
 
 // NOTE: StorageColumnSchema, StorageTableSchema, and StorageSchema use bare type()
@@ -304,7 +333,8 @@ const SqlContractSchema = type({
  * @throws Error if the storage structure is invalid
  */
 export function validateStorage(value: unknown): SqlStorage {
-  const result = StorageSchema(value);
+  const schema = isNestedTablesEnvelope(value) ? NestedStorageSchema : FlatStorageSchema;
+  const result = schema(value);
   if (result instanceof type.errors) {
     const messages = result.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Storage validation failed: ${messages}`);
@@ -314,6 +344,25 @@ export function validateStorage(value: unknown): SqlStorage {
   // (`tables`, `types`) are normalised into class instances and the
   // branded `storageHash` is preserved on the returned `SqlStorage`.
   return new SqlStorage(result as SqlStorageInput);
+}
+
+/**
+ * Peek at the envelope's `tables` shape. A flat envelope has values
+ * carrying `columns` directly (the StorageTable shape). A nested
+ * envelope has values that are namespace buckets — i.e. records whose
+ * own values carry `columns`. An empty `tables` map is treated as flat
+ * (the legacy default).
+ */
+function isNestedTablesEnvelope(value: unknown): boolean {
+  if (!isPlainRecord(value)) return false;
+  const tables = value['tables'];
+  if (!isPlainRecord(tables)) return false;
+  for (const tableEntry of Object.values(tables)) {
+    if (!isPlainRecord(tableEntry)) return false;
+    if ('columns' in tableEntry) return false;
+    return true;
+  }
+  return false;
 }
 
 export function validateModel(value: unknown): unknown {
@@ -351,7 +400,11 @@ export function validateSqlContract<T extends Contract<SqlStorage>>(value: unkno
     );
   }
 
-  const contractResult = SqlContractSchema(value);
+  const storageEnvelope = isPlainRecord(value) ? value['storage'] : undefined;
+  const contractSchema = isNestedTablesEnvelope(storageEnvelope)
+    ? NestedSqlContractSchema
+    : FlatSqlContractSchema;
+  const contractResult = contractSchema(value);
 
   if (contractResult instanceof type.errors) {
     const messages = contractResult.map((p: { message: string }) => p.message).join('; ');
