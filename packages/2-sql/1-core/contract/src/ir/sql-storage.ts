@@ -97,11 +97,15 @@ export interface SqlStorageInput<THash extends string = string> {
  * same data, both populated at construction:
  *
  * - `tables: Readonly<Record<TableName, StorageTable>>` — the
- *   ergonomic flat-by-name view. Single-namespace contracts use this
- *   exclusively. Same-named tables across namespaces resolve to the
- *   first entry encountered (iteration order of the nested map);
- *   consumers needing the collision-free truth must read
- *   `tablesByNamespace`.
+ *   ergonomic flat-by-name view. **Deprecated for cross-namespace
+ *   contracts.** Single-namespace contracts use this exclusively and
+ *   it remains the back-compat surface for legacy consumers. Names
+ *   that appear in two or more namespace buckets are installed as
+ *   **non-enumerable throwing getters** on the flat view — direct
+ *   subscript access (`storage.tables['User']`) raises an explicit
+ *   error naming the ambiguity, and `Object.keys` / `Object.entries`
+ *   skip the ambiguous name. Consumers walking storage in a
+ *   namespace-aware codebase should switch to the helpers below.
  * - `tablesByNamespace: Readonly<Record<NamespaceId, Record<TableName,
  *   StorageTable>>>` — the FR15 nested-by-namespace truth. Same-named
  *   tables across namespaces (e.g. `auth.User` + `public.User`)
@@ -119,10 +123,11 @@ export interface SqlStorageInput<THash extends string = string> {
  * "walk every table" consumers, {@link findTableByCoord} for
  * `(namespaceId, name)` lookups, and {@link findTableByName} as the
  * legacy name-only lookup (throws when the name is ambiguous across
- * namespaces).
+ * namespaces — same diagnostic as the deprecated flat-view subscript).
  *
  * The `types` slot follows the same dual-view contract: `types` is
- * the flat-by-name view, `typesByNamespace` is the FR15 nested truth.
+ * the flat-by-name view (with the same throwing-getter ambiguity
+ * gate), `typesByNamespace` is the FR15 nested truth.
  *
  * `tablesByNamespace` and `typesByNamespace` are declared optional in
  * the type so user-facing emitted contract types — built bottom-up by
@@ -333,24 +338,79 @@ function freezeNestedTables(
 
 /**
  * Build the flat-by-name view from the nested-by-namespace truth.
- * Single-namespace contracts flatten 1:1. Multi-namespace contracts
- * that reuse a table name across namespaces pick the **first** entry
- * encountered (iteration order across the nested map's keys); the
- * second is hidden from the flat view. Consumers needing the
- * collision-free truth must read `tablesByNamespace` directly.
+ *
+ * - Names that appear in exactly one namespace bucket are installed as
+ *   ordinary enumerable readonly own properties (single-namespace
+ *   contracts hit only this branch, so the flat view is byte-identical
+ *   to the legacy shape).
+ * - Names that appear in two or more namespace buckets are installed as
+ *   **non-enumerable throwing getters**. Direct subscript access raises
+ *   an explicit error naming the ambiguity; `Object.keys` /
+ *   `Object.entries` skip the ambiguous name. The throw documents the
+ *   helper to migrate to ({@link findTableByCoord}).
+ *
+ * The "throw on ambiguous subscript" behaviour is what makes the flat
+ * view safe as a deprecation-gated back-compat alias: legacy direct
+ * subscribers either work unchanged (no ambiguity) or fail loudly with
+ * the upgrade path in the diagnostic. Iteration via `Object.entries`
+ * sees only the unambiguous entries, never silently dropping a
+ * colliding name.
  */
 function freezeFlatTablesView(
   nested: Record<string, Record<string, StorageTable>>,
 ): Readonly<Record<string, StorageTable>> {
-  const flat: Record<string, StorageTable> = {};
-  for (const bucket of Object.values(nested)) {
-    for (const [name, table] of Object.entries(bucket)) {
-      if (!Object.hasOwn(flat, name)) {
-        flat[name] = table;
+  const namespacesByName = new Map<string, string[]>();
+  for (const [namespaceId, bucket] of Object.entries(nested)) {
+    for (const name of Object.keys(bucket)) {
+      let nses = namespacesByName.get(name);
+      if (nses === undefined) {
+        nses = [];
+        namespacesByName.set(name, nses);
       }
+      nses.push(namespaceId);
     }
   }
+
+  const flat: Record<string, StorageTable> = {};
+  for (const [name, namespaceIds] of namespacesByName) {
+    if (namespaceIds.length === 1) {
+      const nsId = namespaceIds[0];
+      const table = nsId !== undefined ? nested[nsId]?.[name] : undefined;
+      if (table !== undefined) {
+        flat[name] = table;
+      }
+      continue;
+    }
+    installAmbiguousFlatGetter(flat, name, namespaceIds, 'table', 'tables');
+  }
   return Object.freeze(flat);
+}
+
+/**
+ * Install a non-enumerable getter on the flat view that throws an
+ * explicit diagnostic when subscript-accessed. Shared by the flat
+ * `tables` and `types` builders so the diagnostic phrasing stays
+ * single-sourced.
+ */
+function installAmbiguousFlatGetter(
+  flat: Record<string, unknown>,
+  name: string,
+  namespaceIds: readonly string[],
+  entryNoun: 'table' | 'type',
+  slotNoun: 'tables' | 'types',
+): void {
+  const helperByCoord = entryNoun === 'table' ? 'findTableByCoord' : 'findTypeByCoord';
+  const nestedView = entryNoun === 'table' ? 'tablesByNamespace' : 'typesByNamespace';
+  const nsList = namespaceIds.map((id) => `"${id}"`).join(', ');
+  Object.defineProperty(flat, name, {
+    enumerable: false,
+    configurable: false,
+    get(): never {
+      throw new Error(
+        `SqlStorage.${slotNoun}["${name}"] is ambiguous across namespaces (${nsList}); the flat-by-name view cannot disambiguate. Use ${helperByCoord}(storage, namespaceId, "${name}") or read storage.${nestedView}[namespaceId]["${name}"] directly.`,
+      );
+    },
+  });
 }
 
 function normaliseTypesInput(
@@ -404,13 +464,29 @@ function freezeNestedTypes(
 function freezeFlatTypesView(
   nested: Record<string, Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
 ): Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>> {
+  const namespacesByName = new Map<string, string[]>();
+  for (const [namespaceId, bucket] of Object.entries(nested)) {
+    for (const name of Object.keys(bucket)) {
+      let nses = namespacesByName.get(name);
+      if (nses === undefined) {
+        nses = [];
+        namespacesByName.set(name, nses);
+      }
+      nses.push(namespaceId);
+    }
+  }
+
   const flat: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
-  for (const bucket of Object.values(nested)) {
-    for (const [name, entry] of Object.entries(bucket)) {
-      if (!Object.hasOwn(flat, name)) {
+  for (const [name, namespaceIds] of namespacesByName) {
+    if (namespaceIds.length === 1) {
+      const nsId = namespaceIds[0];
+      const entry = nsId !== undefined ? nested[nsId]?.[name] : undefined;
+      if (entry !== undefined) {
         flat[name] = entry;
       }
+      continue;
     }
+    installAmbiguousFlatGetter(flat, name, namespaceIds, 'type', 'types');
   }
   return Object.freeze(flat);
 }

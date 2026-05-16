@@ -134,4 +134,34 @@ describe('SqlStorage — same-named tables across namespaces', () => {
     expect(storage.tablesByNamespace).toBeDefined();
     expect(Object.keys(storage.tablesByNamespace ?? {})).toEqual([UNBOUND_NAMESPACE_ID]);
   });
+
+  it('storage.tables[<ambiguous>] throws an explicit diagnostic naming the colliding namespaces', () => {
+    const storage = new SqlStorage({
+      storageHash: sha as SqlStorage['storageHash'],
+      tables: {
+        auth: { User: makeUserTable('auth') },
+        public: { User: makeUserTable('public') },
+      },
+    });
+
+    // Direct subscript hits the throwing getter installed by
+    // freezeFlatTablesView when the name is ambiguous across namespaces.
+    expect(() => storage.tables['User']).toThrow(/ambiguous across namespaces/);
+    expect(() => storage.tables['User']).toThrow(/findTableByCoord/);
+  });
+
+  it('Object.keys / Object.entries skip ambiguous flat-view entries (non-enumerable)', () => {
+    const storage = new SqlStorage({
+      storageHash: sha as SqlStorage['storageHash'],
+      tables: {
+        auth: { User: makeUserTable('auth') },
+        public: { User: makeUserTable('public'), Account: makeUserTable('public') },
+      },
+    });
+
+    // `User` is ambiguous → non-enumerable on the flat view.
+    // `Account` is unique → still present.
+    expect(Object.keys(storage.tables)).toEqual(['Account']);
+    expect(Object.entries(storage.tables).map(([name]) => name)).toEqual(['Account']);
+  });
 });
