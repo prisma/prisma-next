@@ -3,7 +3,7 @@
 Agent skills for [Prisma Next](https://github.com/prisma/prisma-next) — a small set of `SKILL.md` files that teach an LLM agent how to operate Prisma Next end-to-end without re-deriving the API from documentation each time.
 
 > **Edit your data contract. Prisma handles the rest.**
-
+>
 > **Install the version that matches your Prisma Next version.** This package ships in lockstep with the rest of Prisma Next. If `package.json` says `"@prisma-next/postgres": "0.7.0"`, install `@prisma-next/agent-skill@0.7.0`. A mismatched skill version will describe API surfaces from the wrong era and produce wrong instructions.
 
 ## What's in the box

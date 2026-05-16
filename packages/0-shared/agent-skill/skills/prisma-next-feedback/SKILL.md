@@ -187,20 +187,20 @@ Preferred. Two steps:
 1. **Write the rendered body to a temporary file.** Use your file-write tool (the same tool you'd use to create any other file on disk) to write the body to e.g. `wip/pn-issue-body.md` or `/tmp/pn-issue-body.md`. The body content is just the markdown produced in step 4 of this workflow — no surrounding shell quoting, no heredoc.
 2. **Reference that file from `gh`.** Run:
 
-   ```bash
+   ~~~bash
    gh issue create \
      --repo prisma/prisma-next \
      --title "<title>" \
      --body-file <path-from-step-1>
-   ```
+   ~~~
 
 **Anti-pattern (do not do this):** inlining the body via `--body "$(cat <<EOF …)"` or `--body-file <(cat <<EOF …)`. Those one-liners reliably leak literal `cat <<'EOF'` / `EOF` markers into the issue body when the agent reuses the template verbatim with the body interpolated. Always write the body to a real file first and pass the path.
 
 If `gh` is not installed: open the prefilled new-issue URL in the browser:
 
-```text
+~~~text
 https://github.com/prisma/prisma-next/issues/new/choose
-```
+~~~
 
 …and instruct the user to paste the rendered body. The agent can copy the body to the clipboard via `pbcopy` (macOS), `xclip` (Linux), or by simply printing it in the chat for the user to copy.
 
