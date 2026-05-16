@@ -2,7 +2,7 @@
 
 **Skill under test:** `prisma-next-build`.
 
-**Acceptance criterion:** AC8b from `specs/usage-skill.spec.md`.
+**Acceptance criterion:** The build workflow routes to the Vite plugin path and avoids unsupported package names.
 
 ## Setup
 
@@ -14,7 +14,7 @@ pnpm dlx prisma-next init
 pnpm add vite @vitejs/plugin-react react react-dom
 ```
 
-The agent runtime has `@prisma-next/skills` registered (project level, as `init` installs it).
+The agent runtime has Prisma Next skills registered (project level, as `init` installs them).
 
 ## Prompt
 

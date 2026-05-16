@@ -190,7 +190,7 @@ The flags `init` accepts (run `prisma-next init --help` for the source of truth)
 - `--probe-db` — connect to `DATABASE_URL` once and check the server version against the target's minimum.
 - `--strict-probe` — fail init if the probe fails (no-op without `--probe-db`).
 - `--no-install` — skip dependency install + initial contract emit.
-- `--no-skill` — skip the `@prisma-next/skills` install (air-gapped / restricted environments). The skill is always installed at the project level — never globally — so its version stays locked to the project's Prisma Next version.
+- `--no-skill` — skip Prisma Next skills installation (air-gapped / restricted environments). The skill cluster is always installed at the project level — never globally — so its version stays locked to the project's Prisma Next version.
 
 `init` writes (when it runs cleanly):
 
@@ -201,7 +201,7 @@ The flags `init` accepts (run `prisma-next init --help` for the source of truth)
 - `.env.example` (and `.env` if `--write-env`).
 - Updates `package.json` (deps + scripts) and `tsconfig.json` (required compiler options).
 - Installs deps and runs `prisma-next contract emit` once.
-- Registers `@prisma-next/skills` with the local agent runtime.
+- Registers Prisma Next skills with the local agent runtime.
 
 **If you took `init`'s default and ended up with a top-level `prisma/` directory** (TML-2532), the cleanup is one move + one config edit:
 

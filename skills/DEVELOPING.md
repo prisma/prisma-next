@@ -1,6 +1,6 @@
-# Developing `@prisma-next/skills`
+# Developing Prisma Next skills
 
-Contributor guide for the agent-skill cluster. If you are *using* the skills, read [`README.md`](./README.md) and stop here. If you are *authoring or maintaining* a skill in this package, read this file first.
+Contributor guide for the agent-skill cluster. If you are *using* the skills, read [`README.md`](./README.md) and stop here. If you are *authoring or maintaining* a skill in this cluster, read this file first.
 
 ## What this cluster is
 
@@ -52,7 +52,7 @@ Procedural workflow sections — *"step 1: run X; step 2: read Y; step 3: if Z, 
 
 #### Worked example — `prisma-next-migration-review`
 
-The pilot rewrite of [`skills/prisma-next-migration-review/SKILL.md`](./skills/prisma-next-migration-review/SKILL.md) is the canonical worked example for this principle in this cluster. Before that rewrite, the skill contained:
+The pilot rewrite of [`skills/prisma-next-migration-review/SKILL.md`](./prisma-next-migration-review/SKILL.md) is the canonical worked example for this principle in this cluster. Before that rewrite, the skill contained:
 
 - A five-step *"diamond convergence procedure"* for resolving concurrent migrations.
 - A four-step *"detect that main advanced"* workflow.
@@ -74,7 +74,7 @@ A skill that teaches the verbose form has handed the agent a worse mental model 
 **Verify each user-authored import:**
 
 ```bash
-rg "from '@prisma-next/" packages/0-shared/skills/skills/<skill>/SKILL.md \
+rg "from '@prisma-next/" skills/<skill>/SKILL.md \
   | rg -v '@prisma-next/(postgres|mongo|sqlite|extension-|[a-z]+-plugin-)' \
   | rg -v 'framework-rendered'
 ```
@@ -109,7 +109,7 @@ These are well-trodden but worth listing in one place:
 
 1. Read [`README.md`](./README.md) for the user-facing scope of the cluster.
 2. Read the [`skill-specialist` persona](https://github.com/prisma/ignite/blob/main/skills/.curated/drive-agent-personas/personas/skill-specialist.md) in the Ignite persona library — it's the canonical lens for skill-cluster work.
-3. Read [`skills/prisma-next-migration-review/SKILL.md`](./skills/prisma-next-migration-review/SKILL.md) for the cluster's worked example of concepts-over-procedures.
+3. Read [`skills/prisma-next-migration-review/SKILL.md`](./prisma-next-migration-review/SKILL.md) for the cluster's worked example of concepts-over-procedures.
 4. Draft `SKILL.md`, **verifying each tool-surface claim against the framework source as you write it** (see *Verify the tool surface as you author* above for the ripgrep commands). The shape:
    - `description:` frontmatter as a matcher (CLI flags, error codes, feature names — all verified).
    - Preamble + canonical mental-model headline.
