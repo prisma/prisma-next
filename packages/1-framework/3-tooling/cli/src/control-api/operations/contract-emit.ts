@@ -232,6 +232,14 @@ export async function executeContractEmit(
         config.target.targetId,
         rawComponents,
       );
+      // Blind cast: `validateProviderResult` upstream has already
+      // pinned `validatedContract.value` to the provider's loose
+      // `Contract` envelope, but the local `Contract` type at this
+      // call site is the precise structural interface. Re-narrowing
+      // the envelope into the precise type is exactly what the
+      // `familyInstance.validateContract(enrichedIR)` call on the
+      // next line does — the cast just defers the structural check
+      // by one statement so `enrichContract` can decorate first.
       const enrichedIR = enrichContract(
         validatedContract.value as unknown as Contract,
         frameworkComponents,

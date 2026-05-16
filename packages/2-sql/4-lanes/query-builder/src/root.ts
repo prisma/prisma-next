@@ -62,5 +62,11 @@ export function createRoot<TContract extends Contract<SqlStorage>>(
  * @internal
  */
 export function createRoot(contract: unknown): unknown {
+  // Blind cast: the public overloads above (`createRoot(TContract)`)
+  // statically constrain `contract` to `Contract<SqlStorage>` —
+  // this internal `unknown` overload exists only to give the
+  // implementation a single body. Any caller that reaches the
+  // `unknown` form has already been narrowed by the matching
+  // overload at compile time.
   return new Root(contract as unknown as Contract<SqlStorage>);
 }

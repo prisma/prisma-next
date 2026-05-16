@@ -1,4 +1,3 @@
-import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlFamilyInstance,
@@ -115,7 +114,7 @@ export async function synthStrategy<TFamilyId extends string, TTargetId extends 
     result: {
       plan,
       displayOps: synthedPlan.operations,
-      destinationContract: input.member.contract as unknown as Contract,
+      destinationContract: input.member.contract,
       strategy: 'synth',
     },
   };

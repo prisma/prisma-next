@@ -66,6 +66,14 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
       },
       contractToSchema(contract, frameworkComponents) {
         const expander = buildNativeTypeExpander(frameworkComponents);
+        // Blind cast: the framework SPI signature
+        // (`control-migration-types.ts § contractToSchema`) types
+        // `contract` as the generic `Contract | null`. Inside the
+        // postgres target descriptor we know any contract reaching
+        // this method is SQL-family — the family contract resolver
+        // would have refused to construct a postgres target binding
+        // otherwise — so we narrow the generic to
+        // `Contract<SqlStorage>` for the lowering call.
         return contractToSchemaIR(contract as unknown as Contract<SqlStorage> | null, {
           annotationNamespace: 'pg',
           ...ifDefined('expandNativeType', expander),
