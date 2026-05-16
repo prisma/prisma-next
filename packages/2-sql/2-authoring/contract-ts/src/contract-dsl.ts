@@ -1215,6 +1215,26 @@ export type ContractInput<
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
   readonly capabilities?: Capabilities;
+  /**
+   * Declared namespace coordinates the contract recognises. Per-model
+   * `namespace` references must reference an entry in this list (or the
+   * Postgres-specific late-binding keyword `unbound`). Reserved values:
+   *
+   * - `__unbound__` — IR sentinel for the late-binding slot.
+   * - `__unspecified__` — parser-synthesised AST bucket for top-level
+   *   declarations (not a real namespace).
+   * - `unbound` — Postgres-specific reserved keyword (the PSL surface
+   *   uses `namespace unbound { … }` to opt into late binding).
+   *
+   * SQLite contracts must declare an empty list (or omit the field) —
+   * SQLite has no schema concept and emits unqualified DDL.
+   *
+   * Storage-side population of `SqlStorage.namespaces` from this list
+   * lands in a follow-on milestone; today the field is recorded on
+   * `ContractInput` for defensive validation and to give consumers a
+   * stable type-level surface to write against.
+   */
+  readonly namespaces?: readonly string[];
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;

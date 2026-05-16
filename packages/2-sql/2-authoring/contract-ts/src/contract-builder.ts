@@ -114,6 +114,62 @@ function validateTargetPackRef(
   }
 }
 
+/**
+ * Per-target reserved namespace names enforced by `defineContract` for
+ * SQL family contracts. Two categories:
+ *
+ * 1. **IR sentinels** (`__unbound__`, `__unspecified__`) — reserved on
+ *    every SQL target. The double-underscore decoration marks them as
+ *    framework-reserved coordinates; user code must not declare them
+ *    explicitly.
+ * 2. **Target-specific PSL keywords** — Postgres reserves the bare
+ *    `unbound` identifier for the late-binding opt-in
+ *    (`namespace unbound { … }`) so the TS surface must reject it from
+ *    `defineContract({ namespaces })` lists. SQLite has no schema
+ *    concept and rejects every non-empty namespaces list outright;
+ *    callers should declare `namespaces: []` or omit the field.
+ */
+function validateNamespaceDeclarations(
+  target: TargetPackRef<'sql', string>,
+  namespaces: readonly string[] | undefined,
+): void {
+  if (!namespaces) {
+    return;
+  }
+
+  if (target.targetId === 'sqlite' && namespaces.length > 0) {
+    throw new Error(
+      `defineContract: SQLite contracts cannot declare namespaces (SQLite has no schema concept; emitted DDL is always unqualified). Received namespaces: [${namespaces
+        .map((name) => `"${name}"`)
+        .join(', ')}].`,
+    );
+  }
+
+  const seen = new Set<string>();
+  for (const namespace of namespaces) {
+    if (namespace.length === 0) {
+      throw new Error('defineContract: namespace names cannot be empty.');
+    }
+    if (namespace.trim().length === 0) {
+      throw new Error(`defineContract: namespace name "${namespace}" cannot be whitespace-only.`);
+    }
+    if (namespace === '__unbound__' || namespace === '__unspecified__') {
+      throw new Error(
+        `defineContract: namespace name "${namespace}" is a reserved IR sentinel and cannot appear in the declared namespaces list.`,
+      );
+    }
+    if (target.targetId === 'postgres' && namespace === 'unbound') {
+      throw new Error(
+        `defineContract: namespace name "unbound" is reserved by Postgres for the late-binding opt-in (use \`namespace unbound { … }\` in PSL instead of declaring it as a regular schema).`,
+      );
+    }
+    if (seen.has(namespace)) {
+      throw new Error(`defineContract: namespaces list contains duplicate entry "${namespace}".`);
+    }
+    seen.add(namespace);
+  }
+}
+
 function validateExtensionPackRefs(
   target: TargetPackRef<'sql', string>,
   extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
@@ -152,6 +208,7 @@ function buildContractFromDsl(
 ): ReturnType<typeof buildSqlContractFromDefinition> {
   validateTargetPackRef(definition.family, definition.target);
   validateExtensionPackRefs(definition.target, definition.extensionPacks);
+  validateNamespaceDeclarations(definition.target, definition.namespaces);
 
   return buildSqlContractFromDefinition(
     buildContractDefinition(definition),
