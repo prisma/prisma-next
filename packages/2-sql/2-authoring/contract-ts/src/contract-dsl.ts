@@ -999,6 +999,7 @@ export class ContractModelBuilder<
   constructor(
     readonly stageOne: {
       readonly modelName?: ModelName;
+      readonly namespace?: string;
       readonly fields: Fields;
       readonly relations: Relations;
     },
@@ -1275,6 +1276,7 @@ export function model<
   input: {
     readonly fields: Fields;
     readonly relations?: Relations;
+    readonly namespace?: string;
   },
 ): ContractModelBuilder<ModelName, Fields, Relations>;
 
@@ -1284,6 +1286,7 @@ export function model<
 >(input: {
   readonly fields: Fields;
   readonly relations?: Relations;
+  readonly namespace?: string;
 }): ContractModelBuilder<undefined, Fields, Relations>;
 
 export function model<
@@ -1296,10 +1299,12 @@ export function model<
     | {
         readonly fields: Fields;
         readonly relations?: Relations;
+        readonly namespace?: string;
       },
   maybeInput?: {
     readonly fields: Fields;
     readonly relations?: Relations;
+    readonly namespace?: string;
   },
 ): ContractModelBuilder<ModelName | undefined, Fields, Relations> {
   const input = typeof modelNameOrInput === 'string' ? maybeInput : modelNameOrInput;
@@ -1310,6 +1315,7 @@ export function model<
 
   return new ContractModelBuilder({
     ...(typeof modelNameOrInput === 'string' ? { modelName: modelNameOrInput } : {}),
+    ...(input.namespace !== undefined ? { namespace: input.namespace } : {}),
     fields: input.fields,
     relations: (input.relations ?? {}) as Relations,
   });

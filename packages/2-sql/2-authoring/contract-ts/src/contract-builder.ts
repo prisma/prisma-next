@@ -36,6 +36,7 @@ export { buildSqlContractFromDefinition } from './build-contract';
 type ModelLike = {
   readonly stageOne: {
     readonly modelName?: string;
+    readonly namespace?: string;
     readonly fields: Record<string, ScalarFieldBuilder>;
     readonly relations: Record<string, RelationBuilder<RelationState>>;
   };
@@ -175,6 +176,70 @@ function validateNamespaceDeclarations(
   }
 }
 
+/**
+ * Per-model `namespace` validation paired with
+ * {@link validateNamespaceDeclarations}. Mirrors the reserved-name
+ * rules so the per-model surface stays consistent with the contract-
+ * level surface:
+ *
+ * - `__unbound__` / `__unspecified__` — reserved IR sentinels on
+ *   every SQL target.
+ * - `unbound` on Postgres — reserved for the PSL
+ *   `namespace unbound { … }` opt-in.
+ *
+ * Additionally enforces that each per-model `namespace` either
+ * references an entry in the contract's declared `namespaces` list or
+ * names the Postgres late-binding keyword (`unbound`) — the latter is
+ * not a "declared namespace" but is a legal opt-in only via PSL today,
+ * so the TS surface also rejects it on the per-model side and points
+ * authors at the PSL `namespace unbound { … }` block.
+ *
+ * The SQLite per-model `namespace` field is rejected outright (SQLite
+ * has no schema concept).
+ */
+function validatePerModelNamespaces(
+  target: TargetPackRef<'sql', string>,
+  namespaces: readonly string[] | undefined,
+  models: Record<string, ModelLike>,
+): void {
+  const declaredNamespaces = new Set<string>(namespaces ?? []);
+
+  for (const [modelKey, modelBuilder] of Object.entries(models)) {
+    const perModelNamespace = modelBuilder.stageOne.namespace;
+    if (perModelNamespace === undefined) {
+      continue;
+    }
+
+    if (target.targetId === 'sqlite') {
+      throw new Error(
+        `defineContract: model "${modelKey}" sets \`namespace: "${perModelNamespace}"\` but the target is SQLite (SQLite has no schema concept; remove the per-model \`namespace\` field).`,
+      );
+    }
+
+    if (perModelNamespace === '__unbound__' || perModelNamespace === '__unspecified__') {
+      throw new Error(
+        `defineContract: model "${modelKey}" sets \`namespace: "${perModelNamespace}"\` but that name is a reserved IR sentinel and cannot appear in user code.`,
+      );
+    }
+
+    if (target.targetId === 'postgres' && perModelNamespace === 'unbound') {
+      throw new Error(
+        `defineContract: model "${modelKey}" sets \`namespace: "unbound"\` but that name is reserved by Postgres for the late-binding opt-in (use \`namespace unbound { … }\` in PSL instead — there is no equivalent surface in the TS builder today).`,
+      );
+    }
+
+    if (!declaredNamespaces.has(perModelNamespace)) {
+      const hint =
+        declaredNamespaces.size > 0
+          ? ` Declared namespaces: [${[...declaredNamespaces].map((name) => `"${name}"`).join(', ')}].`
+          : ' The contract does not declare any namespaces; add `namespaces: ["…"]` to `defineContract` first.';
+      throw new Error(
+        `defineContract: model "${modelKey}" references namespace "${perModelNamespace}" but that name does not appear in the contract's declared \`namespaces\` list.${hint}`,
+      );
+    }
+  }
+}
+
 function validateExtensionPackRefs(
   target: TargetPackRef<'sql', string>,
   extensionPacks?: Record<string, ExtensionPackRef<'sql', string>>,
@@ -214,6 +279,11 @@ function buildContractFromDsl(
   validateTargetPackRef(definition.family, definition.target);
   validateExtensionPackRefs(definition.target, definition.extensionPacks);
   validateNamespaceDeclarations(definition.target, definition.namespaces);
+  validatePerModelNamespaces(
+    definition.target,
+    definition.namespaces,
+    (definition.models ?? {}) as Record<string, ModelLike>,
+  );
 
   return buildSqlContractFromDefinition(
     buildContractDefinition(definition),

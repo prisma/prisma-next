@@ -47,6 +47,7 @@ type RuntimeModel = ContractModelBuilder<
 type RuntimeModelSpec = {
   readonly modelName: string;
   readonly tableName: string;
+  readonly namespace: string | undefined;
   readonly fieldBuilders: Record<string, ScalarFieldBuilder>;
   readonly fieldToColumn: Record<string, string>;
   readonly relations: Record<string, RelationBuilder<RelationState>>;
@@ -595,6 +596,7 @@ function resolveModelNode(
   return {
     modelName: spec.modelName,
     tableName: spec.tableName,
+    ...(spec.namespace !== undefined ? { namespaceId: spec.namespace } : {}),
     fields,
     ...(idConstraint
       ? {
@@ -668,6 +670,7 @@ function collectRuntimeModelSpecs(definition: ContractInput): RuntimeCollection 
     modelSpecs.set(modelName, {
       modelName,
       tableName,
+      namespace: modelDefinition.stageOne.namespace,
       fieldBuilders,
       fieldToColumn,
       relations: modelDefinition.stageOne.relations,
