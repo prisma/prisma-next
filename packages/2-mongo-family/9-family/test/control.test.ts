@@ -1,8 +1,4 @@
-import {
-  createControlStack,
-  hasMigrations,
-  hasSchemaView,
-} from '@prisma-next/framework-components/control';
+import { createControlStack, hasSchemaView } from '@prisma-next/framework-components/control';
 import {
   MongoSchemaCollection,
   MongoSchemaCollectionOptions,
@@ -13,18 +9,21 @@ import {
 import { describe, expect, it } from 'vitest';
 import { mongoFamilyDescriptor } from '../src/core/control-descriptor';
 import { createMongoFamilyInstance } from '../src/core/control-instance';
-import { mongoTargetDescriptor } from '../src/core/mongo-target-descriptor';
 import mongoFamilyPack from '../src/exports/pack';
+import { stubMongoTargetDescriptor } from './test-target-descriptor';
 
 function createMinimalControlStack() {
-  return createControlStack({ family: mongoFamilyDescriptor, target: mongoTargetDescriptor });
+  return createControlStack({
+    family: mongoFamilyDescriptor,
+    target: stubMongoTargetDescriptor,
+  });
 }
 
 describe('mongoFamilyDescriptor', () => {
   it('returns a valid instance from ControlStack', () => {
     const stack = createControlStack({
       family: mongoFamilyDescriptor,
-      target: mongoTargetDescriptor,
+      target: stubMongoTargetDescriptor,
     });
 
     const instance = mongoFamilyDescriptor.create(stack);
@@ -39,39 +38,6 @@ describe('mongoFamilyDescriptor', () => {
     expect(mongoFamilyDescriptor.familyId).toBe('mongo');
     expect(mongoFamilyDescriptor.version).toBe('0.0.1');
     expect(mongoFamilyDescriptor.emission).toBeDefined();
-  });
-});
-
-describe('mongoTargetDescriptor', () => {
-  it('has expected shape', () => {
-    expect(mongoTargetDescriptor.kind).toBe('target');
-    expect(mongoTargetDescriptor.id).toBe('mongo');
-    expect(mongoTargetDescriptor.familyId).toBe('mongo');
-    expect(mongoTargetDescriptor.targetId).toBe('mongo');
-  });
-
-  it('exposes migrations capability', () => {
-    expect(hasMigrations(mongoTargetDescriptor)).toBe(true);
-  });
-
-  it('migrations.createPlanner() returns a functional planner', () => {
-    if (!hasMigrations(mongoTargetDescriptor)) throw new Error('expected migrations');
-    const family = createMongoFamilyInstance(createMinimalControlStack());
-    const planner = mongoTargetDescriptor.migrations.createPlanner(family);
-    expect(typeof planner.plan).toBe('function');
-  });
-
-  it('migrations.createRunner() returns a functional runner', () => {
-    if (!hasMigrations(mongoTargetDescriptor)) throw new Error('expected migrations');
-    const family = createMongoFamilyInstance(createMinimalControlStack());
-    const runner = mongoTargetDescriptor.migrations.createRunner(family);
-    expect(typeof runner.execute).toBe('function');
-  });
-
-  it('migrations.contractToSchema(null) returns empty IR', () => {
-    if (!hasMigrations(mongoTargetDescriptor)) throw new Error('expected migrations');
-    const ir = mongoTargetDescriptor.migrations.contractToSchema(null) as MongoSchemaIR;
-    expect(ir.collections).toEqual([]);
   });
 });
 
@@ -105,18 +71,16 @@ describe('createMongoFamilyInstance', () => {
     ).rejects.toThrow();
   });
 
-  it('schemaVerify() requires a valid contract', async () => {
+  it('verifySchema() requires a valid contract', () => {
     const instance = createMongoFamilyInstance(createMinimalControlStack());
-    const fakeDriver = {} as Parameters<typeof instance.schemaVerify>[0]['driver'];
-    await expect(
-      instance.schemaVerify({
-        driver: fakeDriver,
+    expect(() =>
+      instance.verifySchema({
         contract: {},
+        schema: { collections: [] } as MongoSchemaIR,
         strict: false,
-        contractPath: '/test',
         frameworkComponents: [],
       }),
-    ).rejects.toThrow();
+    ).toThrow();
   });
 
   it('sign() requires a valid contract', async () => {
@@ -127,11 +91,11 @@ describe('createMongoFamilyInstance', () => {
     ).rejects.toThrow();
   });
 
-  it('introspect() delegates to introspectSchema', async () => {
+  it('introspect() requires an adapter on the control stack', async () => {
     const instance = createMongoFamilyInstance(createMinimalControlStack());
     const fakeDriver = {} as Parameters<typeof instance.introspect>[0]['driver'];
     await expect(instance.introspect({ driver: fakeDriver })).rejects.toThrow(
-      'does not expose a db property',
+      'Mongo family requires an adapter',
     );
   });
 

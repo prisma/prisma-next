@@ -10,7 +10,7 @@ import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
 import { countSemanticLines } from '@prisma-next/test-utils/semantic-lines';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
-import { createBuiltinLikeControlMutationDefaults } from './fixtures';
+import { createBuiltinLikeControlMutationDefaults, testEnumEntityContributions } from './fixtures';
 
 const sqlFamilyPack = {
   kind: 'family',
@@ -50,19 +50,8 @@ const portablePostgresTargetPack = {
   targetId: 'postgres',
   version: '0.0.1',
   authoring: {
-    type: {
-      enum: {
-        kind: 'typeConstructor',
-        args: [{ kind: 'string' }, { kind: 'stringArray' }],
-        output: {
-          codecId: 'pg/enum@1',
-          nativeType: { kind: 'arg', index: 0 },
-          typeParams: {
-            values: { kind: 'arg', index: 1 },
-          },
-        },
-      },
-    },
+    entityTypes: testEnumEntityContributions,
+    type: {},
   },
 } as const satisfies TargetPackRef<'sql', 'postgres'>;
 
@@ -93,6 +82,7 @@ const pgvectorExtensionPack = {
 
 const authoringContributions = {
   field: sqlFamilyPack.authoring.field,
+  entityTypes: portablePostgresTargetPack.authoring.entityTypes,
   type: {
     ...portablePostgresTargetPack.authoring.type,
     ...pgvectorExtensionPack.authoring.type,
@@ -269,9 +259,9 @@ model Post {
 
 const representativeTsAuthoring = `defineContract(
   { family: sqlFamilyPack, target: portablePostgresTargetPack, extensionPacks: { pgvector: pgvectorExtensionPack } },
-  ({ type, field, model, rel }) => {
+  ({ enum: enumEntity, type, field, model, rel }) => {
     const types = {
-      Role: type.enum('Role', ['USER', 'ADMIN'] as const),
+      Role: enumEntity({ name: 'Role', values: ['USER', 'ADMIN'] as const }),
       Embedding1536: type.pgvector.Vector(1536),
     } as const;
     const User = model('User', {
@@ -307,9 +297,9 @@ function buildTsContract() {
       target: portablePostgresTargetPack,
       extensionPacks: { pgvector: pgvectorExtensionPack },
     },
-    ({ type, field, model, rel }) => {
+    ({ enum: enumEntity, type, field, model, rel }) => {
       const types = {
-        Role: type.enum('Role', ['USER', 'ADMIN'] as const),
+        Role: enumEntity({ name: 'Role', values: ['USER', 'ADMIN'] as const }),
         Embedding1536: type.pgvector.Vector(1536),
       } as const;
 

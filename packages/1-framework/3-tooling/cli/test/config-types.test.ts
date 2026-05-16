@@ -39,29 +39,7 @@ describe('defineConfig', () => {
           target: { expected: 'postgres' },
           timings: { total: 0 },
         }),
-        schemaVerify: async () => ({
-          ok: true,
-          summary: 'test',
-          contract: { storageHash: 'test' },
-          target: { expected: 'postgres' },
-          schema: {
-            issues: [],
-            root: {
-              status: 'pass' as const,
-              kind: 'root',
-              name: 'root',
-              contractPath: '',
-              code: '',
-              message: '',
-              expected: null,
-              actual: null,
-              children: [],
-            },
-            counts: { pass: 0, warn: 0, fail: 0, totalNodes: 0 },
-          },
-          timings: { total: 0 },
-        }),
-        schemaVerifyAgainstSchema: () => ({
+        verifySchema: () => ({
           ok: true,
           summary: 'test',
           contract: { storageHash: 'test' },
@@ -102,6 +80,10 @@ describe('defineConfig', () => {
       targetId: 'postgres',
       id: 'postgres',
       version: '0.0.1',
+      contractSerializer: {
+        deserializeContract: (json) => json as never,
+        serializeContract: (contract) => contract as never,
+      },
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     adapter: {
@@ -223,7 +205,7 @@ describe('defineConfig', () => {
     const result = await config.source.load({
       composedExtensionPacks: [],
       scalarTypeDescriptors: new Map(),
-      authoringContributions: { field: {}, type: {} },
+      authoringContributions: { field: {}, type: {}, entityTypes: {} },
       codecLookup: {
         get: () => undefined,
         targetTypesFor: () => undefined,

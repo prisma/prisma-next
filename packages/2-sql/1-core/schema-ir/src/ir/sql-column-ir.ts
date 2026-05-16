@@ -1,0 +1,44 @@
+import { freezeNode } from '@prisma-next/framework-components/ir';
+import { SqlSchemaIRNode } from './sql-schema-ir-node';
+
+/**
+ * Namespaced annotations for extensibility. Each namespace
+ * (e.g. `pg`, `pgvector`) owns its annotations subtree.
+ */
+export type SqlAnnotations = {
+  readonly [namespace: string]: unknown;
+};
+
+export interface SqlColumnIRInput {
+  readonly name: string;
+  readonly nativeType: string;
+  readonly nullable: boolean;
+  /** Raw database default expression (e.g. `'hello'::text`, `nextval('seq')`). */
+  readonly default?: string;
+  readonly annotations?: SqlAnnotations;
+}
+
+/**
+ * Schema IR node for a single column on a table, as observed by
+ * introspection. Unlike the Contract IR `StorageColumn`, this carries
+ * the column's `name` (Schema IR columns are returned as arrays from
+ * introspection queries; the parent table re-keys them into a record
+ * for downstream consumers).
+ */
+export class SqlColumnIR extends SqlSchemaIRNode {
+  readonly name: string;
+  readonly nativeType: string;
+  readonly nullable: boolean;
+  declare readonly default?: string;
+  declare readonly annotations?: SqlAnnotations;
+
+  constructor(input: SqlColumnIRInput) {
+    super();
+    this.name = input.name;
+    this.nativeType = input.nativeType;
+    this.nullable = input.nullable;
+    if (input.default !== undefined) this.default = input.default;
+    if (input.annotations !== undefined) this.annotations = input.annotations;
+    freezeNode(this);
+  }
+}

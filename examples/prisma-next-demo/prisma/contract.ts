@@ -19,10 +19,10 @@ export const contract = defineContract(
       },
     },
   },
-  ({ field, model, type }) => {
+  ({ enum: enumEntity, field, model, type }) => {
     const types = {
       Embedding1536: type.pgvector.Vector(1536),
-      user_type: type.enum('user_type', ['admin', 'user'] as const),
+      user_type: enumEntity({ name: 'user_type', values: ['admin', 'user'] as const }),
     } as const;
 
     const User = model('User', {

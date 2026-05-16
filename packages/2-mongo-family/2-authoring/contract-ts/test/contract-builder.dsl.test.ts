@@ -57,8 +57,8 @@ describe('mongo contract builder', () => {
       posts: 'Post',
     });
     expect(contract.storage.collections).toEqual({
-      users: {},
-      posts: {},
+      users: { kind: 'mongo-collection' },
+      posts: { kind: 'mongo-collection' },
     });
     expect(contract.models.Post).toEqual({
       storage: {
@@ -141,7 +141,7 @@ describe('mongo contract builder', () => {
       tasks: 'Task',
     });
     expect(contract.storage.collections).toEqual({
-      tasks: {},
+      tasks: { kind: 'mongo-collection' },
     });
     expect(contract.valueObjects).toEqual({
       Address: {
@@ -189,10 +189,15 @@ describe('mongo contract builder', () => {
 
     expect(contract.storage.collections).toEqual({
       users: {
+        kind: 'mongo-collection',
         indexes: [
-          { keys: [{ field: 'email', direction: 1 }], unique: true },
-          { keys: [{ field: 'createdAt', direction: 1 }], expireAfterSeconds: 3600 },
-          { keys: [{ field: 'location', direction: '2dsphere' }] },
+          { kind: 'mongo-index', keys: [{ field: 'email', direction: 1 }], unique: true },
+          {
+            kind: 'mongo-index',
+            keys: [{ field: 'createdAt', direction: 1 }],
+            expireAfterSeconds: 3600,
+          },
+          { kind: 'mongo-index', keys: [{ field: 'location', direction: '2dsphere' }] },
         ],
       },
     });
@@ -253,9 +258,11 @@ describe('mongo contract builder', () => {
 
     expect(contract.storage.collections).toEqual({
       tasks: {
+        kind: 'mongo-collection',
         indexes: [
-          { keys: [{ field: 'title', direction: 1 }], unique: true },
+          { kind: 'mongo-index', keys: [{ field: 'title', direction: 1 }], unique: true },
           {
+            kind: 'mongo-index',
             keys: [{ field: 'expiresAt', direction: 1 }],
             expireAfterSeconds: 3600,
             partialFilterExpression: { type: 'derived' },
@@ -388,9 +395,14 @@ describe('mongo contract builder', () => {
 
     expect(contract.storage.collections).toEqual({
       users: {
+        kind: 'mongo-collection',
         options: {
-          collation: { locale: 'en', strength: 2 },
-          changeStreamPreAndPostImages: { enabled: true },
+          kind: 'mongo-collection-options',
+          collation: { kind: 'mongo-collation-options', locale: 'en', strength: 2 },
+          changeStreamPreAndPostImages: {
+            kind: 'mongo-change-stream-pre-and-post-images-options',
+            enabled: true,
+          },
         },
       },
     });

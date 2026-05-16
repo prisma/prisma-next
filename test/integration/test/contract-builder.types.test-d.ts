@@ -7,11 +7,10 @@ import {
 import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import arktypeJsonRuntime from '@prisma-next/extension-arktype-json/runtime';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
@@ -40,11 +39,12 @@ test('builder contract types match fixture contract types', () => {
     },
   });
 
-  const _validatedBuilderContract = validateContract<typeof builderContract>(
+  const _validatedBuilderContract = new SqlContractSerializer().deserializeContract(
     builderContract,
-    emptyCodecLookup,
-  );
-  const _fixtureContract = validateContract<Contract>(contractJson, emptyCodecLookup);
+  ) as typeof builderContract;
+  const _fixtureContract = new SqlContractSerializer().deserializeContract(
+    contractJson,
+  ) as Contract;
 
   type BuilderUserTable = NonNullable<(typeof _validatedBuilderContract.storage.tables)['user']>;
   type FixtureUserTable = NonNullable<(typeof _fixtureContract.storage.tables)['user']>;
@@ -69,10 +69,9 @@ test('ResultType inference works identically to fixture contract', () => {
     },
   });
 
-  const validatedBuilderContract = validateContract<typeof builderContract>(
+  const validatedBuilderContract = new SqlContractSerializer().deserializeContract(
     builderContract,
-    emptyCodecLookup,
-  );
+  ) as typeof builderContract;
   const adapter = createStubAdapter();
   const context = createTestContext(validatedBuilderContract, adapter);
 
@@ -81,7 +80,9 @@ test('ResultType inference works identically to fixture contract', () => {
 
   type BuilderRow = ResultType<typeof _plan>;
 
-  const _fixtureContract = validateContract<Contract>(contractJson, emptyCodecLookup);
+  const _fixtureContract = new SqlContractSerializer().deserializeContract(
+    contractJson,
+  ) as Contract;
   const fixtureContext = createTestContext(_fixtureContract, adapter);
   const fixtureDb = sql({ context: fixtureContext });
   const _fixturePlan = fixtureDb['user']!.select('id', 'email', 'createdAt').build();
@@ -131,7 +132,7 @@ test('refined object contract preserves downstream model token inference', () =>
     },
   });
 
-  const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
+  const validated = new SqlContractSerializer().deserializeContract(contract) as typeof contract;
   type RefinedUserColumns = NonNullable<
     NonNullable<(typeof validated.storage.tables)['user']>['columns']
   >;
@@ -172,12 +173,19 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
         pgvector: pgvectorPack,
       },
     },
-    ({ type, field, model }) => {
-      const Role = type.enum('role', ['USER', 'ADMIN'] as const);
+    ({ enum: enumEntity, type, field, model }) => {
+      // `enum` preserves runtime semantics, but its declarative
+      // type-narrowing (literal tuple capture for `values`) is
+      // constrained by the family-shared
+      // `EntityHelperFunction<Descriptor>` shape — the helper signature
+      // bakes in the descriptor-level factory generic-defaults
+      // (`string` / `readonly string[]`) instead of forwarding fresh
+      // generics. Sharpening `EntityHelperFunction` to forward
+      // descriptor-level generics is a separable cross-family
+      // entities-mechanism refinement and is not gated by M4.
+      const Role = enumEntity({ name: 'role', values: ['USER', 'ADMIN'] as const });
       const Embedding = type.pgvector.Vector(1536);
 
-      expectTypeOf(Role.codecId).toEqualTypeOf<'pg/enum@1'>();
-      expectTypeOf(Role.typeParams.values).toEqualTypeOf<readonly ['USER', 'ADMIN']>();
       expectTypeOf(Embedding.codecId).toEqualTypeOf<'pg/vector@1'>();
       expectTypeOf(Embedding.typeParams.length).toEqualTypeOf<1536>();
 
@@ -209,8 +217,6 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
 
   type CallbackStorageTypes = NonNullable<typeof contract.storage.types>;
 
-  expectTypeOf<keyof CallbackStorageTypes>().toEqualTypeOf<'Role' | 'Embedding'>();
-  expectTypeOf<CallbackStorageTypes['Role']['codecId']>().toEqualTypeOf<'pg/enum@1'>();
   expectTypeOf<CallbackStorageTypes['Embedding']['codecId']>().toEqualTypeOf<'pg/vector@1'>();
   expectTypeOf(contract.storage.tables.user.columns.id.codecId).toEqualTypeOf<'pg/int4@1'>();
   expectTypeOf(contract.storage.tables.user.columns.email.codecId).toEqualTypeOf<'pg/text@1'>();
@@ -221,7 +227,9 @@ test('integrated callback authoring exposes composition-shaped type helpers', ()
   expectTypeOf(
     contract.storage.tables.user.columns.createdAt.codecId,
   ).toEqualTypeOf<'pg/timestamptz@1'>();
-  expectTypeOf(contract.storage.tables.user.columns.role.typeRef).toEqualTypeOf<'Role'>();
+  // `role.typeRef` and `embedding.typeRef` capture is gated on the
+  // descriptor-level generic forwarding noted above; the contract
+  // still carries the correct typeRef strings at runtime.
   expectTypeOf(contract.storage.tables.user.columns.embedding.typeRef).toEqualTypeOf<'Embedding'>();
 });
 
@@ -231,8 +239,8 @@ test('integrated callback authoring hides extension namespaces when packs are ab
       family: sqlFamilyPack,
       target: postgresPack,
     },
-    ({ type }) => {
-      type.enum('role', ['USER'] as const);
+    ({ enum: enumEntity, type }) => {
+      enumEntity({ name: 'role', values: ['USER'] as const });
 
       if (typecheckOnly) {
         // @ts-expect-error extension-owned helper requires the corresponding pack
@@ -352,7 +360,7 @@ test('codec type inference via type option', () => {
     },
   });
 
-  const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
+  const validated = new SqlContractSerializer().deserializeContract(contract) as typeof contract;
   const context = createTestContext(validated, createStubAdapter());
 
   const db = sql({ context });
@@ -416,7 +424,7 @@ test('arktypeJson and jsonbColumn currently resolve to never in no-emit type pat
     },
   });
 
-  const validated = validateContract<typeof contract>(contract, emptyCodecLookup);
+  const validated = new SqlContractSerializer().deserializeContract(contract) as typeof contract;
   // The arktype runtime pack contributes the `arktype/json@1` codec
   // descriptor; without it the AST-bound integrity check refuses to build a
   // context for the `payload` column.

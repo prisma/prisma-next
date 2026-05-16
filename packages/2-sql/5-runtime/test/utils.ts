@@ -14,7 +14,7 @@ import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage, type SqlStorageInput } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
   Codec,
@@ -389,7 +389,7 @@ export function createTestContract(
   contract: Partial<Omit<Contract<SqlStorage>, 'profileHash' | 'storage'>> & {
     storageHash?: string;
     profileHash?: string;
-    storage?: Omit<SqlStorage, 'storageHash'>;
+    storage?: Omit<SqlStorageInput, 'storageHash'>;
   },
 ): Contract<SqlStorage> {
   const { execution, ...rest } = contract;
@@ -399,8 +399,8 @@ export function createTestContract(
     target: rest['target'] ?? 'postgres',
     targetFamily: rest['targetFamily'] ?? 'sql',
     storage: rest['storage']
-      ? { ...rest['storage'], storageHash: storageHashValue }
-      : { storageHash: storageHashValue, tables: {} },
+      ? new SqlStorage({ ...rest['storage'], storageHash: storageHashValue })
+      : new SqlStorage({ storageHash: storageHashValue, tables: {} }),
     models: rest['models'] ?? {},
     roots: rest['roots'] ?? {},
     capabilities: rest['capabilities'] ?? {},

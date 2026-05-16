@@ -9,7 +9,7 @@ import sqlFamilyDescriptor, {
   type SqlMigrationRunnerFailure,
 } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
@@ -20,7 +20,7 @@ export const contract: Contract<SqlStorage> = {
   target: 'sqlite',
   targetFamily: 'sql',
   profileHash: profileHash('sha256:test'),
-  storage: {
+  storage: new SqlStorage({
     storageHash: coreHash('sha256:contract'),
     tables: {
       user: {
@@ -34,7 +34,7 @@ export const contract: Contract<SqlStorage> = {
         foreignKeys: [],
       },
     },
-  },
+  }),
   roots: {},
   models: {},
   capabilities: {},

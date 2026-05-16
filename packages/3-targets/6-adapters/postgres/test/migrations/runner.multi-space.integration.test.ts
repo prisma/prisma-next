@@ -1,6 +1,6 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -20,10 +20,10 @@ const extensionContract: Contract<SqlStorage> = {
   target: 'postgres',
   targetFamily: 'sql',
   profileHash: profileHash('sha256:ext-test'),
-  storage: {
+  storage: new SqlStorage({
     storageHash: coreHash('sha256:ext-contract'),
     tables: {},
-  },
+  }),
   roots: {},
   models: {},
   capabilities: {},

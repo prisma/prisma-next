@@ -22,6 +22,7 @@ import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
+import { readExistingEnumValues } from './enum-planning';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 import {
   buildLedgerInsertStatement,
@@ -187,6 +188,8 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         frameworkComponents: options.frameworkComponents,
         normalizeDefault: parsePostgresDefault,
         normalizeNativeType: normalizeSchemaNativeType,
+        resolveExistingEnumValues: (schema, enumType) =>
+          readExistingEnumValues(schema, enumType.nativeType),
       });
       if (!schemaVerifyResult.ok) {
         return runnerFailure('SCHEMA_VERIFY_FAILED', schemaVerifyResult.summary, {

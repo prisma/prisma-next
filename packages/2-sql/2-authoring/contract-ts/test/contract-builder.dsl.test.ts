@@ -90,6 +90,7 @@ describe('contract DSL authoring surface', () => {
   it('lowers inline ids and uniques while keeping sql focused on table/index/fk concerns', () => {
     const types = {
       Role: {
+        kind: 'codec-instance',
         codecId: 'pg/enum@1',
         nativeType: 'role',
         typeParams: { values: ['USER', 'ADMIN'] },

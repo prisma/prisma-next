@@ -49,6 +49,7 @@ export const contract = defineContract(
   () => ({
     types: {
       [POSTGIS_NATIVE_TYPE]: {
+        kind: 'codec-instance',
         codecId: POSTGIS_GEOMETRY_CODEC_ID,
         nativeType: POSTGIS_NATIVE_TYPE,
         typeParams: {},

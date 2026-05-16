@@ -100,9 +100,54 @@ export type AuthoringFieldNamespace = {
   readonly [name: string]: AuthoringFieldPresetDescriptor | AuthoringFieldNamespace;
 };
 
+/**
+ * Context surfaced to entity-type factories at call time. Currently a
+ * placeholder — sharpened as concrete consumers (enum, namespace, …)
+ * discover what the factory actually needs to read (codec lookup,
+ * namespace registry, …).
+ */
+export interface AuthoringEntityContext {
+  readonly family: string;
+  readonly target: string;
+}
+
+export interface AuthoringEntityTypeTemplateOutput {
+  readonly template: AuthoringTemplateValue;
+}
+
+/**
+ * Default `Input = never` is load-bearing for pack-bag-driven type
+ * narrowing. Factory parameter positions are contravariant, so a pack
+ * literal declaring `factory: (input: DemoEntityInput) => DemoEntity`
+ * is only assignable to the base descriptor's factory shape if the
+ * base's input is `never` (the bottom of the contravariant position).
+ * The concrete input/output types are recovered at the helper-derivation
+ * site via `EntityHelperFunction<Descriptor>`'s conditional inference,
+ * which reads them from the pack's `as const` literal factory signature
+ * — the base widening does not erase the literal because `satisfies`
+ * does not widen the declared type.
+ */
+export interface AuthoringEntityTypeFactoryOutput<Input = never, Output = unknown> {
+  readonly factory: (input: Input, ctx: AuthoringEntityContext) => Output;
+}
+
+export interface AuthoringEntityTypeDescriptor<Input = never, Output = unknown> {
+  readonly kind: 'entity';
+  readonly discriminator: string;
+  readonly args?: readonly AuthoringArgumentDescriptor[];
+  readonly output:
+    | AuthoringEntityTypeTemplateOutput
+    | AuthoringEntityTypeFactoryOutput<Input, Output>;
+}
+
+export type AuthoringEntityTypeNamespace = {
+  readonly [name: string]: AuthoringEntityTypeDescriptor | AuthoringEntityTypeNamespace;
+};
+
 export interface AuthoringContributions {
   readonly type?: AuthoringTypeNamespace;
   readonly field?: AuthoringFieldNamespace;
+  readonly entityTypes?: AuthoringEntityTypeNamespace;
 }
 
 export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
@@ -145,6 +190,29 @@ export function isAuthoringFieldPresetDescriptor(
     typeof (value as { output?: unknown }).output === 'object' &&
     (value as { output?: unknown }).output !== null
   );
+}
+
+export function isAuthoringEntityTypeDescriptor(
+  value: unknown,
+): value is AuthoringEntityTypeDescriptor {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    (value as { kind?: unknown }).kind !== 'entity'
+  ) {
+    return false;
+  }
+  const discriminator = (value as { discriminator?: unknown }).discriminator;
+  if (typeof discriminator !== 'string' || discriminator.length === 0) {
+    return false;
+  }
+  const output = (value as { output?: unknown }).output;
+  if (typeof output !== 'object' || output === null) {
+    return false;
+  }
+  const factory = (output as { factory?: unknown }).factory;
+  const template = (output as { template?: unknown }).template;
+  return typeof factory === 'function' || template !== undefined;
 }
 
 /**
@@ -263,27 +331,33 @@ function collectAuthoringLeafPaths(
 export function assertNoCrossRegistryCollisions(
   typeNamespace: AuthoringTypeNamespace,
   fieldNamespace: AuthoringFieldNamespace,
+  entityTypeNamespace: AuthoringEntityTypeNamespace = {},
 ): void {
   const typePaths = new Set(
     collectAuthoringLeafPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
   );
+  const fieldPaths = new Set(
+    collectAuthoringLeafPaths(fieldNamespace, isAuthoringFieldPresetDescriptor),
+  );
+  const entityPaths = new Set(
+    collectAuthoringLeafPaths(entityTypeNamespace, isAuthoringEntityTypeDescriptor),
+  );
   // Within-registry duplicate detection is handled upstream by the merge
   // walker (`mergeAuthoringNamespaces` in control-stack.ts and
   // `mergeHelperNamespaces` in composed-authoring-helpers.ts), which throws
-  // on same-path registrations within either registry before this check
-  // runs. This function only handles the cross-registry case — and an
-  // empty type namespace makes a cross-registry collision structurally
-  // impossible, so the early-out is sound.
-  if (typePaths.size === 0) {
-    return;
-  }
-  for (const fieldPath of collectAuthoringLeafPaths(
-    fieldNamespace,
-    isAuthoringFieldPresetDescriptor,
-  )) {
+  // on same-path registrations within any single registry before this check
+  // runs. This function only handles the cross-registry case.
+  for (const fieldPath of fieldPaths) {
     if (typePaths.has(fieldPath)) {
       throw new Error(
-        `Ambiguous authoring registry path "${fieldPath}". The same path is registered as both a type constructor and a field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type.`,
+        `Ambiguous authoring registry path "${fieldPath}". The same path is registered as both a type constructor and a field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.`,
+      );
+    }
+  }
+  for (const entityPath of entityPaths) {
+    if (typePaths.has(entityPath) || fieldPaths.has(entityPath)) {
+      throw new Error(
+        `Ambiguous authoring registry path "${entityPath}". The same path is registered as an entity contribution AND as a type constructor or field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type / authoringContributions.entityTypes.`,
       );
     }
   }
@@ -531,6 +605,36 @@ export function instantiateAuthoringTypeConstructor(
   readonly typeParams?: Record<string, unknown>;
 } {
   return resolveAuthoringStorageTypeTemplate(descriptor.output, args);
+}
+
+export function instantiateAuthoringEntityType(
+  helperPath: string,
+  descriptor: AuthoringEntityTypeDescriptor,
+  args: readonly unknown[],
+  ctx: AuthoringEntityContext,
+): unknown {
+  // Factory-output entities carry their input contract on the factory
+  // signature itself — TypeScript narrows callers via
+  // `EntityHelperFunction`'s extracted `input` parameter, and the factory
+  // is free to do its own runtime validation (e.g. arktype Type). The
+  // descriptor-level `args` validator is reserved for template-output
+  // entities (which mirror field/type's declarative argument shape).
+  if ('factory' in descriptor.output) {
+    const input = args[0];
+    // The base `AuthoringEntityTypeDescriptor`'s factory is typed
+    // `(input: never, ctx) => unknown` so concrete pack-literal factories
+    // with narrower input types remain assignable through the
+    // contravariant position (see the type's docstring). The runtime
+    // delegates input validation to the pack's factory itself, so we
+    // forward the supplied input here without a static input contract.
+    const factory = descriptor.output.factory as (
+      input: unknown,
+      ctx: AuthoringEntityContext,
+    ) => unknown;
+    return factory(input, ctx);
+  }
+  validateAuthoringHelperArguments(helperPath, descriptor.args, args);
+  return resolveAuthoringTemplateValue(descriptor.output.template, args);
 }
 
 export function instantiateAuthoringFieldPreset(

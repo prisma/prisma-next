@@ -81,6 +81,45 @@ This architectural pattern is now documented in the architecture pattern catalog
 
 This reference doc retains only the TypeScript-mechanical guidance below — the language-level caveat about classes with private properties in exported types — because that is a TypeScript trap rather than a structural pattern.
 
+## AST/IR class hierarchies
+
+The previous section's interface-plus-factory pattern is for **stateful services** (registries, runtimes, adapters, drivers) that consumers hold as opaque handles. AST/IR nodes are a different shape — they round-trip through JSON, support polymorphic dispatch on `kind`, and target authors extend them with new kinds the framework cannot anticipate. They are codified as the **three-layer polymorphic IR** pattern; consult the catalogue entries for intent, structure, and reference implementations:
+
+- [`three-layer-polymorphic-ir.md`](../architecture%20docs/patterns/three-layer-polymorphic-ir.md) — framework interface → family abstract base → target concrete classes; the layering rule when an IR crosses the framework/target boundary.
+- [`frozen-class-ast.md`](../architecture%20docs/patterns/frozen-class-ast.md) — the in-class shape: abstract base + concrete kind classes + visitor for exhaustive dispatch; `freeze()` in the constructor.
+- [`json-canonical-class-in-memory.md`](../architecture%20docs/patterns/json-canonical-class-in-memory.md) — the persistence rule that pairs with the AST shape: on-disk JSON is canonical; in-memory classes are JSON-clean by construction.
+
+### When to use which pattern
+
+| Situation | Pattern |
+|-----------|---------|
+| Stateful service with a lifecycle (registry, runtime, adapter, driver) | [Interface + factory](../architecture%20docs/patterns/interface-plus-factory.md) |
+| Tree of kinds with multiple polymorphic-dispatch consumers, no target-specific extension | [Frozen-class AST + visitor](../architecture%20docs/patterns/frozen-class-ast.md) |
+| AST/IR that crosses the framework/target boundary and admits target-only kinds | [Three-layer polymorphic IR](../architecture%20docs/patterns/three-layer-polymorphic-ir.md) (which builds on the frozen-class AST shape) |
+
+The heuristic: ask whether the type *is* a polymorphic data tree (AST/IR) or whether it *holds* one (a service). AST/IR uses the class hierarchy and exports its concrete classes; services hide their classes and export interface + factory.
+
+### `kind` discriminator strategy
+
+The framework's `IRNodeBase` declares `kind` as `abstract readonly kind?: string` — **optional at the framework level**. Family bases and concrete classes commit per-leaf as needed:
+
+- **Polymorphic dispatch today** (verifiers / walkers dispatch on `kind`): each leaf class declares an enumerable literal `kind = '<family>-<leaf>' as const`. The leaf literal dominates union narrowing; framework consumers and target consumers both narrow through it. Reference: `PostgresEnumType.kind = 'sql-enum-type' as const`.
+- **No polymorphic dispatch today** (consumers walk by structural position, not by `kind`): the family base installs a single non-enumerable own `kind` property in its constructor via `Object.defineProperty(this, 'kind', { enumerable: false, … })`. This keeps `JSON.stringify(node)` envelope-compatible with the pre-class shape (no `kind` field on disk), keeps `toEqual({…})` assertions against pre-lift flat shapes passing, and still allows direct access and runtime narrowing. Reference: `SqlNode.kind = 'sql'` non-enumerable on the family base.
+
+The optional framework-level contract is intentional — a required-`kind` contract forced hundreds of edits to literal storage shapes that never carried one, and no framework consumer dispatches on the base type's `kind` anyway. Per-leaf literals are added where polymorphic dispatch earns them.
+
+### `freezeNode(this)` convention
+
+Concrete IR classes call `freezeNode(this)` in their constructors after assigning their fields. This is exposed as a free function (or as a `protected freeze()` helper on the abstract base) so subclasses don't reach for `Object.freeze` directly; the convention name carries the intent that *every* IR class instance is immutable once constructed.
+
+### Hydration via the per-target `ContractSerializer` SPI
+
+JSON envelopes hydrate into class instances through the target's `ContractSerializer` implementation (`descriptor.contractSerializer.deserializeContract(json)`). Family-shared validation lives on `SqlContractSerializerBase` / `MongoContractSerializerBase`; per-target subclasses override protected hooks (`hydrateEnumType`, `constructTargetContract`, etc.) to construct the concrete subclass. The inverse direction — `serializeContract(contract)` — owns the on-disk JSON envelope shape; runtime-only class fields stay enumerable on instances and the serializer elides them on the way out. The pattern is the architectural home for "what's on disk" decisions; do not reach for non-enumerable property tricks on the class layer.
+
+### Pack-contributed entity authoring
+
+Target packs contribute new entity kinds (Postgres enums, Postgres schemas, future RLS policies) via the `entities` namespace on `AuthoringContributions`. Each entity descriptor carries a factory `(input, ctx) => IRNode` that constructs the IR-class instance; pack-bag-driven type narrowing surfaces the contributed kind at `helpers.entities.<entityName>(input)` in the TS DSL with full type narrowing on `input`. PSL syntax for the same kind lowers through the same descriptor. The mechanism is the authoring counterpart of the IR's target-extensibility — once the IR admits target-specific kinds, the authoring surface admits them too without hand-edited family-layer construction sites.
+
 ### Exception: Classes with Private Properties in Exported Types
 
 **CRITICAL**: When a class with private properties is part of an exported type (e.g., returned from an exported function), the class must be explicitly exported from the exports file, not just from the source file. Otherwise, TypeScript treats it as an anonymous class type, which cannot have private or protected properties.

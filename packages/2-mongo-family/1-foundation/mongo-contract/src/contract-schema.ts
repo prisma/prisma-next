@@ -121,6 +121,7 @@ const IndexFieldsSchema = type({
 
 const CollationSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-collation-options'",
   locale: 'string',
   'caseLevel?': 'boolean',
   'caseFirst?': '"off" | "upper" | "lower"',
@@ -134,11 +135,13 @@ const CollationSchema = type({
 
 const IndexOptionDefaultsSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-index-option-defaults'",
   'storageEngine?': MongoJsonObjectSchema,
 });
 
 const TimeSeriesCollectionOptionsSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-time-series-collection-options'",
   timeField: 'string',
   'metaField?': 'string',
   'granularity?': '"seconds" | "minutes" | "hours"',
@@ -157,6 +160,7 @@ const ClusteredCollectionKeySchema = type({
 
 const ClusteredCollectionOptionsSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-clustered-collection-options'",
   'name?': 'string',
   key: ClusteredCollectionKeySchema,
   unique: 'boolean',
@@ -164,6 +168,7 @@ const ClusteredCollectionOptionsSchema = type({
 
 const ChangeStreamPreAndPostImagesSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-change-stream-pre-and-post-images-options'",
   enabled: 'boolean',
 });
 
@@ -215,6 +220,7 @@ const WildcardProjectionSchema = type({
 
 const IndexOptionsSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-index-options'",
   'unique?': 'boolean',
   'name?': 'string',
   'partialFilterExpression?': MongoJsonObjectSchema,
@@ -248,6 +254,7 @@ const MongoIndexKeySchema = type({
 
 const MongoStorageIndexSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-index'",
   keys: MongoIndexKeySchema.array().atLeastLength(1),
   'unique?': 'boolean',
   'sparse?': 'boolean',
@@ -262,6 +269,7 @@ const MongoStorageIndexSchema = type({
 
 const MongoStorageValidatorSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-validator'",
   jsonSchema: 'Record<string, unknown>',
   validationLevel: "'strict' | 'moderate'",
   validationAction: "'error' | 'warn'",
@@ -275,9 +283,12 @@ const CappedOptionsSchema = type({
 
 const TimeseriesOptionsSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-time-series-collection-options'",
   timeField: 'string',
   'metaField?': 'string',
   'granularity?': "'seconds' | 'minutes' | 'hours'",
+  'bucketMaxSpanSeconds?': 'number',
+  'bucketRoundingSeconds?': 'number',
 });
 
 const ClusteredIndexSchema = type({
@@ -287,15 +298,20 @@ const ClusteredIndexSchema = type({
 
 const MongoCollectionOptionsSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-collection-options'",
   'capped?': CappedOptionsSchema,
+  'storageEngine?': MongoJsonObjectSchema,
+  'indexOptionDefaults?': IndexOptionDefaultsSchema,
   'timeseries?': TimeseriesOptionsSchema,
   'collation?': 'Record<string, unknown>',
+  'expireAfterSeconds?': 'number',
   'changeStreamPreAndPostImages?': ChangeStreamPreAndPostImagesSchema,
   'clusteredIndex?': ClusteredIndexSchema,
 });
 
 const StorageCollectionSchema = type({
   '+': 'reject',
+  'kind?': "'mongo-collection'",
   'indexes?': MongoStorageIndexSchema.array(),
   'validator?': MongoStorageValidatorSchema,
   'options?': MongoCollectionOptionsSchema,

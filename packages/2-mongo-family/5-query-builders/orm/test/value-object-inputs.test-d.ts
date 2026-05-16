@@ -1,5 +1,9 @@
 import type { ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
-import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mongo-contract';
+import type {
+  MongoCollection,
+  MongoContractWithTypeMaps,
+  MongoTypeMaps,
+} from '@prisma-next/mongo-contract';
 import { expectTypeOf, test } from 'vitest';
 import type {
   CreateInput,
@@ -65,7 +69,7 @@ type VOContract = MongoContractWithTypeMaps<
       };
     };
     readonly storage: {
-      readonly collections: { readonly users: Record<string, never> };
+      readonly collections: { readonly users: MongoCollection };
       readonly storageHash: StorageHashBase<'sha256:test-storage'>;
     };
   },
@@ -198,7 +202,7 @@ type VOContractWithFieldTypes = MongoContractWithTypeMaps<
       };
     };
     readonly storage: {
-      readonly collections: { readonly users: Record<string, never> };
+      readonly collections: { readonly users: MongoCollection };
       readonly storageHash: StorageHashBase<'sha256:test-storage'>;
     };
   },
@@ -364,8 +368,8 @@ type ExtContract = MongoContractWithTypeMaps<
     };
     readonly storage: {
       readonly collections: {
-        readonly tasks: Record<string, never>;
-        readonly users: Record<string, never>;
+        readonly tasks: MongoCollection;
+        readonly users: MongoCollection;
       };
       readonly storageHash: StorageHashBase<'sha256:ext-storage'>;
     };

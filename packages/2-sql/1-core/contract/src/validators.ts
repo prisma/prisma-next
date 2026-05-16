@@ -1,14 +1,17 @@
-import type { Contract } from '@prisma-next/contract/types';
+import type { Contract, ContractField, ContractModel } from '@prisma-next/contract/types';
 import { ContractValidationError } from '@prisma-next/contract/validate-contract';
+import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { type } from 'arktype';
-import type {
-  ForeignKey,
-  ForeignKeyReferences,
-  PrimaryKey,
-  ReferentialAction,
+import {
+  type ForeignKeyInput,
+  type ForeignKeyReferencesInput,
+  type PrimaryKeyInput,
+  type ReferentialAction,
+  type SqlModelStorage,
   SqlStorage,
-  StorageTypeInstance,
-  UniqueConstraint,
+  type SqlStorageInput,
+  type StorageTypeInstanceInput,
+  type UniqueConstraintInput,
 } from './types';
 
 type ColumnDefaultLiteral = {
@@ -77,18 +80,66 @@ const StorageColumnSchema = type({
   return true;
 });
 
-const StorageTypeInstanceSchema = type.declare<StorageTypeInstance>().type({
-  codecId: 'string',
+/**
+ * Codec-triple entry persisted under `storage.types[name]`. Carries an
+ * enumerable literal `kind: 'codec-instance'` discriminator so the
+ * polymorphic slot dispatch can distinguish codec triples from
+ * class-instance kinds (e.g. `'postgres-enum'`) sharing the slot.
+ */
+const StorageTypeInstanceSchema = type
+  .declare<StorageTypeInstanceInput & { kind: 'codec-instance' }>()
+  .type({
+    kind: "'codec-instance'",
+    codecId: 'string',
+    nativeType: 'string',
+    typeParams: 'Record<string, unknown>',
+  });
+
+/**
+ * Polymorphic enum-type entry under `storage.types[name]`. Carries an
+ * enumerable literal `kind: 'postgres-enum'` discriminator so the
+ * per-target hydration walker can dispatch cleanly back to a typed
+ * IR-class instance during `deserializeContract`. The discriminator
+ * reflects target-level behaviour (Postgres-native enums versus
+ * family-layer codec triples) — not the family abstract altitude alone.
+ *
+ * The schema literal lives at the family layer today because
+ * registry-driven validation for arbitrary slot shapes is not wired
+ * yet; once a second polymorphic kind ships through the slot, this
+ * structural enumeration can move to the registry-dispatch site and
+ * per-target schemas can live in their target packages.
+ */
+const PostgresEnumTypeSchema = type({
+  kind: "'postgres-enum'",
+  name: 'string',
   nativeType: 'string',
-  typeParams: 'Record<string, unknown>',
+  values: type.string.array().readonly(),
 });
 
-const PrimaryKeySchema = type.declare<PrimaryKey>().type({
+/**
+ * Family-layer arktype validation enumerates the polymorphic shapes the
+ * SQL family ships today (codec-instance + Postgres-enum). Pack-contributed
+ * entity types ship a parallel arktype schema entry here when they
+ * introduce a new persisted shape; the registry-driven hydration seam at
+ * `SqlContractSerializerBase.hydrateStorageTypeEntry` is open, but the
+ * family-layer structural validator is closed by design — extension
+ * packs cannot inject arbitrary persisted shapes through the slot
+ * without their structural shape being known at the family layer.
+ *
+ * A future refinement is to lift `StorageTypeEntrySchema` toward an
+ * `unknown` fallback and move structural diagnostics to the
+ * registry-dispatch site at hydration time, earned once a non-enum
+ * storage shape needs to flow through the slot without growing another
+ * closed union arm here first.
+ */
+const StorageTypeEntrySchema = PostgresEnumTypeSchema.or(StorageTypeInstanceSchema);
+
+const PrimaryKeySchema = type.declare<PrimaryKeyInput>().type({
   columns: type.string.array().readonly(),
   'name?': 'string',
 });
 
-const UniqueConstraintSchema = type.declare<UniqueConstraint>().type({
+const UniqueConstraintSchema = type.declare<UniqueConstraintInput>().type({
   columns: type.string.array().readonly(),
   'name?': 'string',
 });
@@ -100,7 +151,7 @@ export const IndexSchema = type({
   'options?': 'Record<string, unknown>',
 });
 
-export const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferences>().type({
+export const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferencesInput>().type({
   table: 'string',
   columns: type.string.array().readonly(),
 });
@@ -109,7 +160,7 @@ export const ReferentialActionSchema = type
   .declare<ReferentialAction>()
   .type("'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'");
 
-export const ForeignKeySchema = type.declare<ForeignKey>().type({
+export const ForeignKeySchema = type.declare<ForeignKeyInput>().type({
   columns: type.string.array().readonly(),
   references: ForeignKeyReferencesSchema,
   'name?': 'string',
@@ -128,11 +179,25 @@ const StorageTableSchema = type({
   foreignKeys: ForeignKeySchema.array().readonly(),
 });
 
+/**
+ * Namespace entry under `storage.namespaces[id]`. SQL contracts honour
+ * the framework `Storage.namespaces` invariant from PR1; today every
+ * contract binds to the singleton placeholder
+ * (`SqlUnspecifiedNamespace.instance`) and the persisted shape carries
+ * just the namespace id. Per-target namespace concretions
+ * (`PostgresSchema`, `SqliteUnspecifiedDatabase`) can additively grow
+ * the persisted shape when they earn their slots.
+ */
+const NamespaceEntrySchema = type({
+  id: 'string',
+});
+
 const StorageSchema = type({
   '+': 'reject',
   storageHash: 'string',
   tables: type({ '[string]': StorageTableSchema }),
-  'types?': type({ '[string]': StorageTypeInstanceSchema }),
+  'types?': type({ '[string]': StorageTypeEntrySchema }),
+  'namespaces?': type({ '[string]': NamespaceEntrySchema }),
 });
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -228,7 +293,6 @@ const SqlContractSchema = type({
 // includes bigint | Date (runtime-only types after decoding) which cannot be expressed
 // in Arktype's JSON validation DSL. The `as SqlStorage` cast in validateStorage() bridges
 // the gap between the JSON-safe Arktype output and the runtime TypeScript type.
-// See decodeContractDefaults() in validate.ts for the decoding step.
 
 /**
  * Validates the structural shape of SqlStorage using Arktype.
@@ -243,7 +307,11 @@ export function validateStorage(value: unknown): SqlStorage {
     const messages = result.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Storage validation failed: ${messages}`);
   }
-  return result as SqlStorage;
+  // The arktype-validated shape matches `SqlStorageInput`
+  // structurally. Funnel through the constructor so nested IR fields
+  // (`tables`, `types`) are normalised into class instances and the
+  // branded `storageHash` is preserved on the returned `SqlStorage`.
+  return new SqlStorage(result as SqlStorageInput);
 }
 
 export function validateModel(value: unknown): unknown {
@@ -448,4 +516,180 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
   }
 
   return errors;
+}
+
+/**
+ * SQL storage logical-consistency checks: every model.storage.table
+ * resolves to a real table, every model.storage.fields[*].column
+ * resolves to a real column, and value-object fields land on JSON-native
+ * columns. Throws `ContractValidationError` on the first mismatch.
+ */
+export function validateModelStorageReferences(contract: Contract<SqlStorage>): void {
+  const models = contract.models as Record<string, ContractModel<SqlModelStorage>>;
+  for (const [modelName, model] of Object.entries(models)) {
+    const storageTable = model.storage.table;
+
+    const table = contract.storage.tables[storageTable] as
+      | (typeof contract.storage.tables)[string]
+      | undefined;
+    if (!table) {
+      throw new ContractValidationError(
+        `Model "${modelName}" references non-existent table "${storageTable}"`,
+        'storage',
+      );
+    }
+
+    const columnNames = new Set(Object.keys(table.columns));
+    for (const [fieldName, field] of Object.entries(model.storage.fields)) {
+      if (!columnNames.has(field.column)) {
+        throw new ContractValidationError(
+          `Model "${modelName}" field "${fieldName}" references non-existent column "${field.column}" in table "${storageTable}"`,
+          'storage',
+        );
+      }
+    }
+
+    const JSON_NATIVE_TYPES = new Set(['json', 'jsonb']);
+    for (const [fieldName, domainField] of Object.entries(model.fields ?? {})) {
+      const f = domainField as ContractField;
+      if (f.type?.kind !== 'valueObject') continue;
+      const storageField = model.storage.fields[fieldName];
+      if (!storageField) continue;
+      const column = table.columns[storageField.column];
+      if (!column) continue;
+      if (!JSON_NATIVE_TYPES.has(column.nativeType)) {
+        throw new ContractValidationError(
+          `Model "${modelName}" field "${fieldName}" is a value object but storage column "${storageField.column}" has nativeType "${column.nativeType}" (expected json or jsonb)`,
+          'storage',
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Cross-table consistency checks for SQL storage: primary key, unique,
+ * index, and foreign key column references resolve to real columns;
+ * NOT NULL columns don't carry a literal `null` default; FK column
+ * counts match their referenced columns. Throws on the first mismatch.
+ */
+export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): void {
+  const tableNames = new Set(Object.keys(contract.storage.tables));
+
+  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
+    const columnNames = new Set(Object.keys(table.columns));
+
+    if (table.primaryKey) {
+      for (const colName of table.primaryKey.columns) {
+        if (!columnNames.has(colName)) {
+          throw new ContractValidationError(
+            `Table "${tableName}" primaryKey references non-existent column "${colName}"`,
+            'storage',
+          );
+        }
+      }
+    }
+
+    for (const unique of table.uniques) {
+      for (const colName of unique.columns) {
+        if (!columnNames.has(colName)) {
+          throw new ContractValidationError(
+            `Table "${tableName}" unique constraint references non-existent column "${colName}"`,
+            'storage',
+          );
+        }
+      }
+    }
+
+    for (const index of table.indexes) {
+      for (const colName of index.columns) {
+        if (!columnNames.has(colName)) {
+          throw new ContractValidationError(
+            `Table "${tableName}" index references non-existent column "${colName}"`,
+            'storage',
+          );
+        }
+      }
+    }
+
+    for (const [colName, column] of Object.entries(table.columns)) {
+      if (!column.nullable && column.default?.kind === 'literal' && column.default.value === null) {
+        throw new ContractValidationError(
+          `Table "${tableName}" column "${colName}" is NOT NULL but has a literal null default`,
+          'storage',
+        );
+      }
+    }
+
+    for (const fk of table.foreignKeys) {
+      for (const colName of fk.columns) {
+        if (!columnNames.has(colName)) {
+          throw new ContractValidationError(
+            `Table "${tableName}" foreignKey references non-existent column "${colName}"`,
+            'storage',
+          );
+        }
+      }
+
+      if (!tableNames.has(fk.references.table)) {
+        throw new ContractValidationError(
+          `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+          'storage',
+        );
+      }
+
+      const referencedTable = contract.storage.tables[fk.references.table];
+      if (!referencedTable) continue;
+      const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
+      for (const colName of fk.references.columns) {
+        if (!referencedColumnNames.has(colName)) {
+          throw new ContractValidationError(
+            `Table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.references.table}"`,
+            'storage',
+          );
+        }
+      }
+
+      if (fk.columns.length !== fk.references.columns.length) {
+        throw new ContractValidationError(
+          `Table "${tableName}" foreignKey column count (${fk.columns.length}) does not match referenced column count (${fk.references.columns.length})`,
+          'storage',
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Full SQL contract validation: structural (arktype) +
+ * framework-shared domain + SQL storage logical-consistency + SQL
+ * storage semantic + model ↔ storage reference checks. Throws
+ * `ContractValidationError` on the first failure. Returns the
+ * validated flat-data shape; IR class hydration happens in the SPI
+ * base on top of this helper.
+ */
+export function validateSqlContractFully<T extends Contract<SqlStorage>>(value: unknown): T {
+  const stripped =
+    typeof value === 'object' && value !== null
+      ? (() => {
+          const { schemaVersion: _, _generated: _g, ...rest } = value as Record<string, unknown>;
+          return rest;
+        })()
+      : value;
+  const validated = validateSqlContract<T>(stripped);
+  validateContractDomain({
+    roots: validated.roots,
+    models: validated.models,
+    ...(validated.valueObjects ? { valueObjects: validated.valueObjects } : {}),
+  });
+  validateSqlStorageConsistency(validated);
+  const semanticErrors = validateStorageSemantics(validated.storage);
+  if (semanticErrors.length > 0) {
+    throw new ContractValidationError(
+      `Contract semantic validation failed: ${semanticErrors.join('; ')}`,
+      'storage',
+    );
+  }
+  validateModelStorageReferences(validated);
+  return validated;
 }

@@ -4,8 +4,9 @@ import {
   APP_SPACE_ID,
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
-import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { PostgresEnumType } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createDriver,
@@ -32,7 +33,10 @@ function makeContract(
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: { storageHash: coreHash(`sha256:reconciliation-integ-${hashSuffix}`), tables },
+    storage: new SqlStorage({
+      storageHash: coreHash(`sha256:reconciliation-integ-${hashSuffix}`),
+      tables,
+    }),
     roots: {},
     models: {},
     capabilities: {},
@@ -969,7 +973,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:reconciliation-integ-text-to-enum-updated'),
         tables: {
           item: {
@@ -989,13 +993,13 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           },
         },
         types: {
-          status_type: {
-            codecId: 'pg/enum@1',
+          status_type: new PostgresEnumType({
+            name: 'status_type',
             nativeType: 'status_type',
-            typeParams: { values: ['active', 'inactive'] },
-          },
+            values: ['active', 'inactive'],
+          }),
         },
-      },
+      }),
       roots: {},
       models: {},
       capabilities: {},
@@ -1240,7 +1244,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
       target: 'postgres',
       targetFamily: 'sql',
       profileHash: profileHash('sha256:test'),
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
         tables: {
           item: {
@@ -1260,13 +1264,13 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           },
         },
         types: {
-          StatusType: {
-            codecId: 'pg/enum@1',
+          StatusType: new PostgresEnumType({
+            name: 'StatusType',
             nativeType: 'StatusType',
-            typeParams: { values: ['active', 'inactive'] },
-          },
+            values: ['active', 'inactive'],
+          }),
         },
-      },
+      }),
       roots: {},
       models: {},
       capabilities: {},

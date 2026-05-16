@@ -8,7 +8,7 @@ import type { MigrationPlanOperation } from '@prisma-next/framework-components/c
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   contract as appContract,
@@ -47,7 +47,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash(`sha256:pg-ext-test-v${version}`),
-    storage: {
+    storage: new SqlStorage({
       storageHash: coreHash(`sha256:pg-ext-contract-v${version}`),
       tables: {
         _ext_helper: {
@@ -65,7 +65,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
           foreignKeys: [],
         },
       },
-    },
+    }),
     roots: {},
     models: {},
     capabilities: {},

@@ -1,13 +1,13 @@
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { defineAnnotation } from '@prisma-next/framework-components/runtime';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
 import { sql } from '../../src/runtime/sql';
 import { contract as contractJson } from '../fixtures/contract';
 import type { Contract } from '../fixtures/generated/contract';
 
-const sqlContract = validateContract<Contract>(contractJson, emptyCodecLookup);
+// Builder annotate tests exercise plan-meta wiring; they don't need
+// real contract validation, so we cast the fixture's typed contract JSON.
+const sqlContract = contractJson as unknown as Contract;
 
 const stubBase = {
   operations: {},

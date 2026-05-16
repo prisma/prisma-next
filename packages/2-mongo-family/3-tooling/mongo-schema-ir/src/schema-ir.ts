@@ -1,8 +1,9 @@
+import { freezeNode } from '@prisma-next/framework-components/ir';
 import type { MongoSchemaCollection } from './schema-collection';
-import { MongoSchemaNode } from './schema-node';
+import { MongoSchemaIRNode } from './schema-node';
 import type { MongoSchemaVisitor } from './visitor';
 
-export class MongoSchemaIR extends MongoSchemaNode {
+export class MongoSchemaIR extends MongoSchemaIRNode {
   readonly kind = 'schema' as const;
   readonly collections: ReadonlyArray<MongoSchemaCollection>;
   readonly collectionNames: ReadonlyArray<string>;
@@ -15,7 +16,7 @@ export class MongoSchemaIR extends MongoSchemaNode {
     this.collections = sorted;
     this._byName = new Map(sorted.map((c) => [c.name, c]));
     this.collectionNames = sorted.map((c) => c.name);
-    this.freeze();
+    freezeNode(this);
   }
 
   accept<R>(visitor: MongoSchemaVisitor<R>): R {

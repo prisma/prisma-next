@@ -13,7 +13,7 @@ export type {
 } from '@prisma-next/framework-components/control';
 export { assembleAuthoringContributions } from '@prisma-next/framework-components/control';
 export { extractCodecControlHooks } from '../core/assembly';
-export type { SchemaVerifyOptions, SqlControlFamilyInstance } from '../core/control-instance';
+export type { SqlControlFamilyInstance } from '../core/control-instance';
 export type {
   ContractToSchemaIROptions,
   DefaultRenderer,

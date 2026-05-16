@@ -16,7 +16,7 @@ This package is part of the SQL family namespace (`packages/2-sql/2-authoring/co
 
 - the SQL contract DSL centered on `defineContract(...)`
 - the base structural helpers exported from `./contract-builder`: `field.column(...)`, `field.generated(...)`, `field.namedType(...)`, plus `model(...)` and `rel.*`
-- an optional callback overload that exposes pack-composed helper namespaces such as `field.id.uuidv7()`, `field.text()`, `field.temporal.createdAt()`, `field.temporal.updatedAt()`, and `type.enum(...)`
+- an optional callback overload that exposes pack-composed helpers — namespaced helpers like `field.id.uuidv7()`, `field.text()`, `field.temporal.createdAt()`, `field.temporal.updatedAt()`, plus pack-contributed entity-type helpers at top level alongside the built-in `model` / `rel` (e.g. `enum({ name, values })`)
 - lowering from authored model definitions into the canonical SQL `Contract`
 
 ## Responsibilities
@@ -25,11 +25,11 @@ This package is part of the SQL family namespace (`packages/2-sql/2-authoring/co
 - **Pack-composed helper vocabulary**: Merge family, target, and extension authoring contributions into the callback helper namespaces
 - **Lowering pipeline**: Turn authored model definitions into the canonical SQL contract artifacts consumed by the rest of the stack
 - **Config helper**: Provide `typescriptContract(...)` for `prisma-next.config.ts`
-- **Schema validation**: Contract JSON validation integration via `@prisma-next/sql-contract/validate`
+- **Schema validation**: Contract JSON validation flows through the per-target descriptor SPI (`descriptor.contractSerializer.deserializeContract(json)`)
 
 ## Package Status
 
-This is the current SQL TypeScript authoring implementation. Shared descriptor types live in `@prisma-next/contract-authoring`. Contract validation lives in `@prisma-next/sql-contract/validate`.
+This is the current SQL TypeScript authoring implementation. Shared descriptor types live in `@prisma-next/contract-authoring`. Contract validation flows through the per-target descriptor's `contractSerializer` SPI (e.g. `postgresTarget.contractSerializer.deserializeContract`), or via the canonical façade (`postgres<Contract>(...)`).
 
 ## Architecture
 
@@ -123,10 +123,10 @@ export const contract = defineContract(
     target: postgresPack,
     extensionPacks: { pgvector },
   },
-  ({ type, field, model, rel }) => {
+  ({ type, enum: enumEntity, field, model, rel }) => {
     const types = {
       ShortName: type.sql.String(35),
-      Role: type.enum('role', ['USER', 'ADMIN'] as const),
+      Role: enumEntity({ name: 'role', values: ['USER', 'ADMIN'] as const }),
       Embedding1536: type.pgvector.Vector(1536),
     } as const;
 
@@ -219,13 +219,31 @@ Per-FK overrides still live next to the FK authoring site, either via `constrain
 
 ### Validating Contracts
 
-Contract JSON validation lives in `@prisma-next/sql-contract/validate`, while this package focuses on authoring and lowering.
+Contract JSON validation flows through the per-target descriptor's
+`contractSerializer` SPI; this package focuses on authoring and lowering.
+End-user app code typically goes through the canonical façade
+(`postgres<Contract>(...)`), which threads the descriptor SPI internally.
 
 ```typescript
-import { validateContract } from '@prisma-next/sql-contract/validate';
+import postgres from '@prisma-next/postgres/runtime';
+import contractJson from './contract.json' with { type: 'json' };
+import type { Contract, TypeMaps } from './contract.d';
+
+const db = postgres<Contract, TypeMaps>({
+  contractJson,
+  url: process.env['DATABASE_URL']!,
+});
+```
+
+For advanced consumers that need direct access to the SPI:
+
+```typescript
+import postgresTarget from '@prisma-next/target-postgres/control';
 import type { Contract } from './contract.d';
 
-const contract = validateContract<Contract>(contractJson);
+const contract = postgresTarget.contractSerializer.deserializeContract(
+  contractJson,
+) as Contract;
 ```
 
 ### Config Helper
@@ -258,7 +276,7 @@ Unit tests for the authoring DSL live in this package. Broader integration tests
 - Direct imports give you the structural DSL
 - The callback overload gives you pack-composed helper vocabularies
 - Import authoring helpers directly from `@prisma-next/sql-contract-ts`
-- Import validation from `@prisma-next/sql-contract/validate`
+- Reach contract validation through the per-target descriptor's `contractSerializer.deserializeContract(...)` (or via the canonical façade)
 
 ## See Also
 

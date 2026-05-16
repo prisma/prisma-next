@@ -589,24 +589,33 @@ export class CreateEnumTypeCall extends PostgresOpFactoryCallNode {
   readonly operationClass = 'additive' as const;
   readonly schemaName: string;
   readonly typeName: string;
+  readonly nativeType: string;
   readonly values: readonly string[];
   readonly label: string;
 
-  constructor(schemaName: string, typeName: string, values: readonly string[]) {
+  constructor(
+    schemaName: string,
+    typeName: string,
+    values: readonly string[],
+    nativeType: string = typeName,
+  ) {
     super();
     this.schemaName = schemaName;
     this.typeName = typeName;
+    this.nativeType = nativeType;
     this.values = values;
     this.label = `Create enum type "${typeName}"`;
     this.freeze();
   }
 
   toOp(): Op {
-    return createEnumType(this.schemaName, this.typeName, this.values);
+    return createEnumType(this.schemaName, this.typeName, this.values, this.nativeType);
   }
 
   renderTypeScript(): string {
-    return `createEnumType(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.typeName)}, ${jsonToTsSource(this.values)})`;
+    const nativeArg =
+      this.nativeType === this.typeName ? '' : `, ${jsonToTsSource(this.nativeType)}`;
+    return `createEnumType(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.typeName)}, ${jsonToTsSource(this.values)}${nativeArg})`;
   }
 }
 

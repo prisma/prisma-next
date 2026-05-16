@@ -5,12 +5,11 @@ import { DatabaseSync } from 'node:sqlite';
 import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import { orm } from '@prisma-next/sql-orm-client';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
@@ -33,7 +32,7 @@ export async function withSqliteTestRuntime<TContract extends Contract<SqlStorag
   callback: (ctx: SqliteTestContext<TContract>) => Promise<void>,
 ): Promise<void> {
   const contractJson = JSON.parse(readFileSync(contractJsonPath, 'utf-8')) as unknown;
-  const contract = validateContract<TContract>(contractJson, emptyCodecLookup);
+  const contract = new SqlContractSerializer().deserializeContract(contractJson) as TContract;
 
   const testDir = mkdtempSync(join(tmpdir(), 'prisma-sqlite-e2e-'));
   const dbPath = join(testDir, 'test.db');

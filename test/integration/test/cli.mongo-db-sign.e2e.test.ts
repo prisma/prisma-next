@@ -1,9 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { readMarker } from '@prisma-next/adapter-mongo/control';
 import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { MongoContract } from '@prisma-next/mongo-contract';
-import { readMarker } from '@prisma-next/target-mongo/control';
+import { MongoCollection, type MongoContract, MongoIndex } from '@prisma-next/mongo-contract';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -33,9 +33,11 @@ const testContract: MongoContract = {
   },
   storage: {
     collections: {
-      users: {
-        indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
-      },
+      users: new MongoCollection({
+        indexes: [
+          new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
+        ],
+      }),
     },
     storageHash: coreHash('sha256:mongo-sign-test'),
   },

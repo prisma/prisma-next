@@ -7,12 +7,18 @@
 
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
-import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
 export function createTestContract(storage: Partial<SqlStorage> = {}): Contract<SqlStorage> {
+  const { storageHash, ...rest } = storage;
   return createContract<SqlStorage>({
-    storage: { tables: {}, types: {}, ...storage },
+    storage: new SqlStorage({
+      tables: {},
+      types: {},
+      storageHash: storageHash ?? ('sha256:test' as never),
+      ...rest,
+    }),
   });
 }
 
@@ -49,6 +55,7 @@ export function createTestEnumType(
   values: readonly string[],
 ): StorageTypeInstance {
   return {
+    kind: 'codec-instance',
     codecId: 'pg/enum@1',
     nativeType,
     typeParams: { values },

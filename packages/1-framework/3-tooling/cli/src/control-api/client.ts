@@ -269,12 +269,15 @@ class ControlClientImpl implements ControlClient {
     });
 
     try {
-      // Delegate to family instance schemaVerify method
-      const result = await familyInstance.schemaVerify({
-        driver,
+      // Introspect the live schema, then verify the contract against
+      // it. Composing the two primitives here keeps the family
+      // interface a single synchronous verifier and gives callers
+      // (and tests) explicit control over the introspected schema.
+      const schema = await familyInstance.introspect({ driver, contract });
+      const result = familyInstance.verifySchema({
         contract,
+        schema,
         strict: options.strict ?? false,
-        contractPath: '',
         frameworkComponents,
       });
 
@@ -662,6 +665,10 @@ class ControlClientImpl implements ControlClient {
         enrichedIR,
         this.stack!,
         this.options.family.emission,
+        {
+          serializeContract: (contract) =>
+            this.options.target.contractSerializer.serializeContract(contract),
+        },
       );
 
       onProgress?.({

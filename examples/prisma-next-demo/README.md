@@ -198,7 +198,7 @@ Relevant points:
 
 ## Browser Visualization
 
-Run `pnpm dev` for the Vite app that visualizes the contract. It renders directly from the constructed Contract (`validateContract` output) using React, with HMR when contract.json is re-emitted. See `src/app/`.
+Run `pnpm dev` for the Vite app that visualizes the contract. It renders directly from the constructed Contract (the descriptor's `contractSerializer.deserializeContract` output) using React, with HMR when contract.json is re-emitted. See `src/app/`.
 
 ## Key Files
 

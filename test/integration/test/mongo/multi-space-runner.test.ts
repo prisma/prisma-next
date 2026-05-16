@@ -1,8 +1,9 @@
+import { readAllMarkers, readMarker } from '@prisma-next/adapter-mongo/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
+  contractToMongoSchemaIR,
   createMongoFamilyInstance,
-  mongoTargetDescriptor,
 } from '@prisma-next/family-mongo/control';
 import {
   APP_SPACE_ID,
@@ -13,10 +14,8 @@ import {
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import {
-  contractToMongoSchemaIR,
   MongoMigrationPlanner,
-  readAllMarkers,
-  readMarker,
+  mongoTargetDescriptor,
   serializeMongoOps,
 } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
@@ -73,10 +72,24 @@ function buildAppContract(): MongoContract {
     storage: {
       collections: {
         users: {
-          indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'email', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
         posts: {
-          indexes: [{ keys: [{ field: 'slug', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'slug', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
       },
       storageHash: coreHash('sha256:app-contract-multi-space'),
@@ -114,7 +127,14 @@ function buildAppContractMissingPosts(): MongoContract {
     storage: {
       collections: {
         users: {
-          indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'email', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
       },
       storageHash: coreHash('sha256:app-contract-trimmed'),
@@ -135,7 +155,14 @@ function buildExtContract(): MongoContract {
     storage: {
       collections: {
         cipherstash_state: {
-          indexes: [{ keys: [{ field: 'tenantId', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'tenantId', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
       },
       storageHash: coreHash('sha256:ext-contract-multi-space'),

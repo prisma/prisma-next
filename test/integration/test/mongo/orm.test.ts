@@ -1,4 +1,4 @@
-import { validateMongoContract } from '@prisma-next/mongo-contract';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { MongoFieldFilter } from '@prisma-next/mongo-query-ast/execution';
 import { ObjectId } from 'mongodb';
@@ -7,14 +7,16 @@ import type { Contract } from './fixtures/generated/contract';
 import ormContractJson from './fixtures/generated/contract.json';
 import { describeWithMongoDB } from './setup';
 
-const { contract } = validateMongoContract<Contract>(ormContractJson);
+const contract = new MongoContractSerializer().deserializeContract(ormContractJson) as Contract;
 
 describeWithMongoDB('mongoOrm integration', (ctx) => {
   it('loads generated collection indexes and options', () => {
     expect(contract.storage.collections.users).toEqual({
-      indexes: [{ keys: [{ field: 'email', direction: 1 }], unique: true }],
+      kind: 'mongo-collection',
+      indexes: [{ kind: 'mongo-index', keys: [{ field: 'email', direction: 1 }], unique: true }],
       options: {
-        collation: { locale: 'en', strength: 2 },
+        kind: 'mongo-collection-options',
+        collation: { kind: 'mongo-collation-options', locale: 'en', strength: 2 },
       },
     });
   });

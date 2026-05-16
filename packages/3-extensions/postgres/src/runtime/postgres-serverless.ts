@@ -3,12 +3,10 @@ import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver, {
   type PostgresDriverCreateOptions,
 } from '@prisma-next/driver-postgres/runtime';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import type {
   ExecutionContext,
   Runtime,
@@ -22,7 +20,7 @@ import {
   createRuntime,
   createSqlExecutionStack,
 } from '@prisma-next/sql-runtime';
-import postgresTarget from '@prisma-next/target-postgres/runtime';
+import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { Client } from 'pg';
 
@@ -68,11 +66,13 @@ function hasContractJson<TContract extends Contract<SqlStorage>>(
   return 'contractJson' in options;
 }
 
+const contractSerializer = new PostgresContractSerializer();
+
 function resolveContract<TContract extends Contract<SqlStorage>>(
   options: PostgresServerlessOptions<TContract>,
 ): TContract {
   const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
-  return validateContract<TContract>(contractInput, emptyCodecLookup);
+  return contractSerializer.deserializeContract(contractInput) as TContract;
 }
 
 function validateConnectionString(url: string): string {

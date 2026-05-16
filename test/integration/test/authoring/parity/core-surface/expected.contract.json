@@ -139,7 +139,12 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:a6df4595908c566f5eff18d0eb1025fd026a6dce4beae2f9b86e6073899a7e71",
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
+    "storageHash": "sha256:ce0ecf615e38da1ccbfd231c360dbc36371b55fa9ceba69a9401a42b5b257fcf",
     "tables": {
       "post": {
         "columns": {
@@ -257,15 +262,16 @@
     "types": {
       "Email": {
         "codecId": "pg/text@1",
+        "kind": "codec-instance",
         "nativeType": "text",
         "typeParams": {}
       },
       "Role": {
         "codecId": "pg/enum@1",
+        "kind": "postgres-enum",
+        "name": "Role",
         "nativeType": "Role",
-        "typeParams": {
-          "values": ["USER", "ADMIN"]
-        }
+        "values": ["USER", "ADMIN"]
       }
     }
   },

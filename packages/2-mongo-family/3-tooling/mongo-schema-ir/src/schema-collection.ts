@@ -1,6 +1,7 @@
+import { freezeNode } from '@prisma-next/framework-components/ir';
 import type { MongoSchemaCollectionOptions } from './schema-collection-options';
 import type { MongoSchemaIndex } from './schema-index';
-import { MongoSchemaNode } from './schema-node';
+import { MongoSchemaIRNode } from './schema-node';
 import type { MongoSchemaValidator } from './schema-validator';
 import type { MongoSchemaVisitor } from './visitor';
 
@@ -11,7 +12,7 @@ export interface MongoSchemaCollectionCtorOptions {
   readonly options?: MongoSchemaCollectionOptions;
 }
 
-export class MongoSchemaCollection extends MongoSchemaNode {
+export class MongoSchemaCollection extends MongoSchemaIRNode {
   readonly kind = 'collection' as const;
   readonly name: string;
   readonly indexes: ReadonlyArray<MongoSchemaIndex>;
@@ -24,7 +25,7 @@ export class MongoSchemaCollection extends MongoSchemaNode {
     this.indexes = options.indexes ?? [];
     this.validator = options.validator;
     this.options = options.options;
-    this.freeze();
+    freezeNode(this);
   }
 
   accept<R>(visitor: MongoSchemaVisitor<R>): R {

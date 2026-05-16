@@ -5,8 +5,7 @@
  * instead of manual SQL and the stampMarker script.
  */
 
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import { validateContract } from '@prisma-next/sql-contract/validate';
+import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
 import { describe, expect, it } from 'vitest';
@@ -15,7 +14,7 @@ import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 import { createPrismaNextControlClient, initTestDatabase } from './utils/control-client';
 
 // Use the emitted JSON contract which has the real computed hashes
-const contract = validateContract<Contract>(contractJson, emptyCodecLookup);
+const contract = new PostgresContractSerializer().deserializeContract(contractJson) as Contract;
 
 describe('control client integration', () => {
   it(

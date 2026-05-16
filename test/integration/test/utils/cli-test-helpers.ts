@@ -10,9 +10,8 @@ import {
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Contract } from '@prisma-next/contract/types';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import { afterEach, beforeEach } from 'vitest';
 // Note: executeCommand and other test helpers are re-exported at the bottom of this file
 // They come from the CLI package's test utilities but are not exported from the package
@@ -230,7 +229,7 @@ export function loadContractFromDisk<TContract extends Contract<SqlStorage> = Co
     throw new Error(`Failed to parse contract JSON from ${contractJsonPath}: ${message}`);
   }
 
-  return validateContract<TContract>(contractJson, emptyCodecLookup);
+  return new SqlContractSerializer().deserializeContract(contractJson) as TContract;
 }
 
 /**

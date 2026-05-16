@@ -24,7 +24,11 @@ import {
 } from '@prisma-next/framework-components/execution';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  isPostgresEnumStorageEntry,
+  type SqlStorage,
+  type StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import {
   createSqlOperationRegistry,
   type SqlOperationDescriptors,
@@ -217,6 +221,30 @@ export function assertExecutionStackContractRequirements(
   }
 }
 
+/**
+ * Resolves codec id + typeParams for a `SqlStorage.types` entry that
+ * represents an enum. The canonical contract path always pipes raw JSON
+ * through the `SqlStorage` constructor, which rejects raw
+ * `kind: 'postgres-enum'` envelopes that bypass the per-target
+ * `ContractSerializer.deserializeContract` hydration. By the time this
+ * function runs, the entry is a live IR-class instance that
+ * structurally satisfies `PostgresEnumStorageEntry` — `codecId` and
+ * `values` are enumerable own properties on the instance. Returns
+ * `undefined` when the entry is not enum-shaped, so callers fall
+ * through to the codec-typed path.
+ */
+function readEnumViewIfApplicable(
+  typeInstance: unknown,
+): { readonly codecId: string; readonly typeParams: Record<string, unknown> } | undefined {
+  if (!isPostgresEnumStorageEntry(typeInstance)) {
+    return undefined;
+  }
+  return {
+    codecId: typeInstance.codecId,
+    typeParams: { values: typeInstance.values },
+  };
+}
+
 function validateTypeParams(
   typeParams: Record<string, unknown>,
   descriptor: RuntimeParameterizedCodecDescriptor,
@@ -315,7 +343,12 @@ function initializeTypeHelpers(
   const typeRefSites = collectTypeRefSites(storage);
 
   for (const [typeName, typeInstance] of Object.entries(storageTypes)) {
-    const descriptor = codecDescriptors.get(typeInstance.codecId);
+    const enumView = readEnumViewIfApplicable(typeInstance);
+    const codecId = enumView ? enumView.codecId : (typeInstance as StorageTypeInstance).codecId;
+    const typeParams = enumView
+      ? enumView.typeParams
+      : (typeInstance as StorageTypeInstance).typeParams;
+    const descriptor = codecDescriptors.get(codecId);
 
     if (!descriptor) {
       // No parameterized descriptor for this codec id — store the raw type instance for callers that need typeParams metadata.
@@ -323,7 +356,7 @@ function initializeTypeHelpers(
       continue;
     }
 
-    const validatedParams = validateTypeParams(typeInstance.typeParams, descriptor, {
+    const validatedParams = validateTypeParams(typeParams, descriptor, {
       typeName,
     });
 
@@ -457,10 +490,16 @@ function buildContractCodecRegistry(
 
   const typeRefSites = collectTypeRefSites(contract.storage);
   for (const [typeName, typeInstance] of Object.entries(contract.storage.types ?? {})) {
-    const ref: CodecRef = {
-      codecId: typeInstance.codecId,
-      typeParams: typeInstance.typeParams as JsonValue,
-    };
+    const enumView = readEnumViewIfApplicable(typeInstance);
+    const ref: CodecRef = enumView
+      ? {
+          codecId: enumView.codecId,
+          typeParams: enumView.typeParams as unknown as JsonValue,
+        }
+      : {
+          codecId: (typeInstance as StorageTypeInstance).codecId,
+          typeParams: (typeInstance as StorageTypeInstance).typeParams as JsonValue,
+        };
     const key = refKeyOf(ref);
     const sites = typeRefSites.get(typeName) ?? [];
     const existing = usedAtByKey.get(key);

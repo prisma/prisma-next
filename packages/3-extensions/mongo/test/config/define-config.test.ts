@@ -1,8 +1,9 @@
 import mongoAdapter from '@prisma-next/adapter-mongo/control';
 import { defineConfig as coreDefineConfig } from '@prisma-next/config/config-types';
 import mongoDriver from '@prisma-next/driver-mongo/control';
-import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
+import { mongoFamilyDescriptor } from '@prisma-next/family-mongo/control';
 import { mongoContract } from '@prisma-next/mongo-contract-psl/provider';
+import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 import { describe, expect, it } from 'vitest';
 import { defineConfig } from '../../src/config/define-config';
 

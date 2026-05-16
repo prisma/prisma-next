@@ -12,7 +12,7 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import {
   applyFkDefaults,
   type ReferentialAction,
-  type SqlStorage,
+  SqlStorage,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type {
@@ -34,18 +34,18 @@ export const emptyTypeMetadataRegistry = new Map<string, { nativeType?: string }
 export function createTestContract(
   tables: Record<string, StorageTable>,
   extensionPacks: Record<string, unknown> = {},
-  storageTypes?: SqlStorage['types'],
+  storageTypes?: Record<string, import('@prisma-next/sql-contract/types').SqlStorageTypeEntry>,
 ): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
     roots: {},
     profileHash: profileHash('sha256:test'),
-    storage: {
+    storage: new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
       tables,
       ...ifDefined('types', storageTypes),
-    },
+    }),
     models: {},
     capabilities: {},
     meta: {},

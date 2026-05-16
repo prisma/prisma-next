@@ -1,6 +1,6 @@
 {
   "from": null,
-  "to": "sha256:efa685171bebbb8f078f08d12be3578bb5d96b71669dccc6cc9e4be96af8cdb4",
+  "to": "sha256:850e136dcb5371712f81b3296a31e4e502fd8ebb9e9ff8a7cdec72f93fc50fe5",
   "labels": [],
   "providedInvariants": ["cipherstash:install-eql-bundle-v1"],
   "createdAt": "2026-05-09T03:42:56.902Z",
@@ -56,7 +56,12 @@
       }
     },
     "storage": {
-      "storageHash": "sha256:efa685171bebbb8f078f08d12be3578bb5d96b71669dccc6cc9e4be96af8cdb4",
+      "namespaces": {
+        "__unspecified__": {
+          "id": "__unspecified__"
+        }
+      },
+      "storageHash": "sha256:850e136dcb5371712f81b3296a31e4e502fd8ebb9e9ff8a7cdec72f93fc50fe5",
       "tables": {
         "eql_v2_configuration": {
           "columns": {
@@ -112,5 +117,5 @@
     "applied": [],
     "plannerVersion": "2.0.0"
   },
-  "migrationHash": "sha256:c9ac07fca95d6159ecb21841514b87fbc51c2cf7ba55f2f28ae4c07f25781ab2"
+  "migrationHash": "sha256:3ee020eef3e21f811870afe2bedef03e73329194c3a934be56f72b79c5107ede"
 }

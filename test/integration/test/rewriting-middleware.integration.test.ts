@@ -1,14 +1,13 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   type ExecutionStackInstance,
   instantiateExecutionStack,
   type RuntimeDriverInstance,
 } from '@prisma-next/framework-components/execution';
 import { sql } from '@prisma-next/sql-builder/runtime';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   AndExpr,
   BinaryExpr,
@@ -36,7 +35,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { contract } from './sql-builder/fixtures/contract';
 import type { Contract } from './sql-builder/fixtures/generated/contract';
 
-const sqlContract = validateContract<Contract>(contract, emptyCodecLookup);
+const sqlContract = new SqlContractSerializer().deserializeContract(contract) as Contract;
 
 function rewriteUserSelects(name: string, rewrite: (ast: SelectAst) => SelectAst): SqlMiddleware {
   return {

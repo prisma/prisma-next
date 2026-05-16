@@ -1,11 +1,19 @@
+import {
+  createEntityHelpersFromNamespace,
+  type EntityHelpersFromNamespace,
+  type ExtractAuthoringNamespaceFromPack,
+  type MergeExtensionAuthoringNamespaces,
+} from '@prisma-next/contract-authoring';
 import type {
   AuthoringArgumentDescriptor,
+  AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
 import {
   assertNoCrossRegistryCollisions,
+  isAuthoringEntityTypeDescriptor,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
@@ -24,7 +32,6 @@ import type {
   FieldHelpersFromNamespace,
   ResolveTemplateValue,
   TupleFromArgumentDescriptors,
-  UnionToIntersection,
 } from './authoring-type-utils';
 import type {
   AnyRelationBuilder,
@@ -35,44 +42,40 @@ import type {
 import { buildFieldPreset, field, model, rel } from './contract-dsl';
 import type { MergeExtensionIndexTypes } from './contract-types';
 
-type ExtractTypeNamespaceFromPack<Pack> = Pack extends {
-  readonly authoring?: { readonly type?: infer Namespace extends AuthoringTypeNamespace };
-}
-  ? Namespace
-  : Record<never, never>;
+type ExtractTypeNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
+  Pack,
+  'type',
+  Record<never, never>
+>;
+type ExtractFieldNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
+  Pack,
+  'field',
+  Record<never, never>
+>;
+type ExtractEntitiesNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
+  Pack,
+  'entityTypes',
+  Record<never, never>
+>;
 
-type ExtractFieldNamespaceFromPack<Pack> = Pack extends {
-  readonly authoring?: { readonly field?: infer Namespace extends AuthoringFieldNamespace };
-}
-  ? Namespace
-  : Record<never, never>;
-
-type MergeExtensionTypeNamespaces<ExtensionPacks> =
-  ExtensionPacks extends Record<string, unknown>
-    ? keyof ExtensionPacks extends never
-      ? Record<never, never>
-      : UnionToIntersection<
-          {
-            [K in keyof ExtensionPacks]: ExtractTypeNamespaceFromPack<ExtensionPacks[K]>;
-          }[keyof ExtensionPacks]
-        >
-    : Record<never, never>;
-
-type MergeExtensionFieldNamespaces<ExtensionPacks> =
-  ExtensionPacks extends Record<string, unknown>
-    ? keyof ExtensionPacks extends never
-      ? Record<never, never>
-      : UnionToIntersection<
-          {
-            [K in keyof ExtensionPacks]: ExtractFieldNamespaceFromPack<ExtensionPacks[K]>;
-          }[keyof ExtensionPacks]
-        >
-    : Record<never, never>;
+type MergeExtensionTypeNamespaces<ExtensionPacks> = MergeExtensionAuthoringNamespaces<
+  ExtensionPacks,
+  'type'
+>;
+type MergeExtensionFieldNamespaces<ExtensionPacks> = MergeExtensionAuthoringNamespaces<
+  ExtensionPacks,
+  'field'
+>;
+type MergeExtensionEntityNamespaces<ExtensionPacks> = MergeExtensionAuthoringNamespaces<
+  ExtensionPacks,
+  'entityTypes'
+>;
 
 type StorageTypeFromDescriptor<
   Descriptor extends AuthoringTypeConstructorDescriptor,
   Args extends readonly unknown[],
 > = {
+  readonly kind: 'codec-instance';
   readonly codecId: ResolveTemplateValue<Descriptor['output']['codecId'], Args>;
   readonly nativeType: ResolveTemplateValue<Descriptor['output']['nativeType'], Args>;
 } & (Descriptor['output'] extends {
@@ -81,7 +84,7 @@ type StorageTypeFromDescriptor<
   ? {
       readonly typeParams: ResolveTemplateValue<TypeParams, Args>;
     }
-  : Record<never, never>);
+  : { readonly typeParams: Record<never, never> });
 
 type TypeHelperFunction<Descriptor extends AuthoringTypeConstructorDescriptor> =
   Descriptor extends { readonly args: infer Args extends readonly AuthoringArgumentDescriptor[] }
@@ -131,7 +134,11 @@ export type ComposedAuthoringHelpers<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
   ExtensionPacks extends Record<string, ExtensionPackRef<'sql', string>> | undefined,
-> = {
+> = EntityHelpersFromNamespace<
+  ExtractEntitiesNamespaceFromPack<Family> &
+    ExtractEntitiesNamespaceFromPack<Target> &
+    MergeExtensionEntityNamespaces<ExtensionPacks>
+> & {
   readonly field: CoreFieldHelpers &
     FieldHelpersFromNamespace<
       ExtractFieldNamespaceFromPack<Family> &
@@ -157,8 +164,17 @@ function extractFieldNamespace<Pack>(pack: Pack): ExtractFieldNamespaceFromPack<
     {}) as ExtractFieldNamespaceFromPack<Pack>;
 }
 
+function extractEntitiesNamespace<Pack>(pack: Pack): ExtractEntitiesNamespaceFromPack<Pack> {
+  return ((pack as { readonly authoring?: { readonly entityTypes?: unknown } }).authoring
+    ?.entityTypes ?? {}) as ExtractEntitiesNamespaceFromPack<Pack>;
+}
+
 type AuthoringComponent = {
-  readonly authoring?: { readonly type?: unknown; readonly field?: unknown };
+  readonly authoring?: {
+    readonly type?: unknown;
+    readonly field?: unknown;
+    readonly entityTypes?: unknown;
+  };
 };
 
 function composeTypeNamespace(components: readonly AuthoringComponent[]): AuthoringTypeNamespace {
@@ -181,6 +197,39 @@ function composeFieldNamespace(components: readonly AuthoringComponent[]): Autho
     }
   }
   return merged as AuthoringFieldNamespace;
+}
+
+function composeEntityNamespace(
+  components: readonly AuthoringComponent[],
+): AuthoringEntityTypeNamespace {
+  const merged: Record<string, unknown> = {};
+  for (const component of components) {
+    const ns = extractEntitiesNamespace(component);
+    if (Object.keys(ns).length > 0) {
+      mergeAuthoringNamespaces(merged, ns, [], isAuthoringEntityTypeDescriptor, 'entity');
+    }
+  }
+  return merged as AuthoringEntityTypeNamespace;
+}
+
+/**
+ * Reserved top-level keys on the composed helpers surface — the
+ * built-in `model` / `rel` helpers, the `field` / `type` namespace
+ * objects. Pack-contributed entity types are flattened to the same
+ * top-level shape (e.g. `helpers.enum({...})`), so a pack cannot
+ * contribute an entity type whose name collides with one of these
+ * reserved keys without silently overwriting at runtime. Detect the
+ * collision at compose time and fail loudly with a guidance message.
+ */
+const RESERVED_HELPER_KEYS: readonly string[] = ['field', 'model', 'rel', 'type'];
+
+function assertNoBuiltInEntityCollisions(namespace: AuthoringEntityTypeNamespace): void {
+  const collisions = Object.keys(namespace).filter((name) => RESERVED_HELPER_KEYS.includes(name));
+  if (collisions.length > 0) {
+    throw new Error(
+      `Pack-contributed entity type(s) ${collisions.map((c) => `"${c}"`).join(', ')} collide with the reserved built-in helper key(s) on the composed helpers surface. Reserved keys: ${RESERVED_HELPER_KEYS.map((k) => `"${k}"`).join(', ')}.`,
+    );
+  }
 }
 
 function createComposedFieldHelpers(
@@ -237,11 +286,16 @@ export function createComposedAuthoringHelpers<
 
   const typeNamespace = composeTypeNamespace(components);
   const fieldNamespace = composeFieldNamespace(components);
+  const entityNamespace = composeEntityNamespace(components);
   // Mirrors the call in `assembleAuthoringContributions`: PSL composes via
   // `createControlStack`, the TS DSL composes here. Both seams need the guard.
-  assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace);
+  assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace, entityNamespace);
+  assertNoBuiltInEntityCollisions(entityNamespace);
 
   return {
+    ...createEntityHelpersFromNamespace(entityNamespace, {
+      ctx: { family: options.family.familyId, target: options.target.targetId },
+    }),
     field: createComposedFieldHelpers(fieldNamespace),
     model,
     rel,

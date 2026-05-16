@@ -1,7 +1,8 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { PostgresEnumType } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   contract,
@@ -97,9 +98,13 @@ describe.sequential('Schema verification after runner - integration', () => {
     it('returns ok: true', { timeout: testTimeout }, async () => {
       await runSuccessfulMigration(driver!);
 
-      const result = await familyInstance.schemaVerify({
+      const schema = await familyInstance.introspect({
         driver: driver!,
-        contract: contract,
+        contract,
+      });
+      const result = familyInstance.verifySchema({
+        contract,
+        schema,
         strict: false,
         frameworkComponents,
       });
@@ -113,7 +118,7 @@ describe.sequential('Schema verification after runner - integration', () => {
         target: 'postgres',
         targetFamily: 'sql',
         profileHash: profileHash('sha256:test'),
-        storage: {
+        storage: new SqlStorage({
           storageHash: coreHash('sha256:contract-with-defaults'),
           tables: {
             user: {
@@ -138,7 +143,7 @@ describe.sequential('Schema verification after runner - integration', () => {
               foreignKeys: [],
             },
           },
-        },
+        }),
         roots: {},
         models: {},
         capabilities: {},
@@ -148,9 +153,13 @@ describe.sequential('Schema verification after runner - integration', () => {
 
       await runSuccessfulMigrationForContract(driver!, contractWithDefaults);
 
-      const result = await familyInstance.schemaVerify({
+      const schema = await familyInstance.introspect({
         driver: driver!,
         contract: contractWithDefaults,
+      });
+      const result = familyInstance.verifySchema({
+        contract: contractWithDefaults,
+        schema,
         strict: false,
         frameworkComponents,
       });
@@ -164,13 +173,11 @@ describe.sequential('Schema verification after runner - integration', () => {
     it('runner post-apply verification passes for mixed-case enum column', {
       timeout: testTimeout,
     }, async () => {
-      // Contract with mixed-case enum type name (e.g., "BillingState")
-      // PostgreSQL's format_type() quotes these: "BillingState" vs BillingState
       const enumContract: Contract<SqlStorage> = {
         target: 'postgres',
         targetFamily: 'sql',
         profileHash: profileHash('sha256:test'),
-        storage: {
+        storage: new SqlStorage({
           storageHash: coreHash('sha256:contract-enum-mixed-case'),
           tables: {
             Organization: {
@@ -190,13 +197,13 @@ describe.sequential('Schema verification after runner - integration', () => {
             },
           },
           types: {
-            BillingState: {
-              codecId: 'pg/enum@1',
+            BillingState: new PostgresEnumType({
+              name: 'BillingState',
               nativeType: 'BillingState',
-              typeParams: { values: ['ok', 'atRisk', 'blocked'] },
-            },
+              values: ['ok', 'atRisk', 'blocked'],
+            }),
           },
-        },
+        }),
         roots: {},
         models: {},
         capabilities: {},
@@ -204,14 +211,15 @@ describe.sequential('Schema verification after runner - integration', () => {
         meta: {},
       };
 
-      // This should NOT throw - the runner's post-apply verification must handle
-      // the quoted enum type name returned by format_type()
       await runSuccessfulMigrationForContract(driver!, enumContract);
 
-      // Also verify via familyInstance.schemaVerify for completeness
-      const result = await familyInstance.schemaVerify({
+      const schema = await familyInstance.introspect({
         driver: driver!,
         contract: enumContract,
+      });
+      const result = familyInstance.verifySchema({
+        contract: enumContract,
+        schema,
         strict: false,
         frameworkComponents,
       });
@@ -228,9 +236,13 @@ describe.sequential('Schema verification after runner - integration', () => {
       // Mutate the database: make email nullable (was NOT NULL)
       await driver!.query('ALTER TABLE "user" ALTER COLUMN email DROP NOT NULL');
 
-      const result = await familyInstance.schemaVerify({
+      const schema = await familyInstance.introspect({
         driver: driver!,
-        contract: contract,
+        contract,
+      });
+      const result = familyInstance.verifySchema({
+        contract,
+        schema,
         strict: false,
         frameworkComponents,
       });
@@ -251,9 +263,13 @@ describe.sequential('Schema verification after runner - integration', () => {
       // Mutate the database: drop the email column
       await driver!.query('ALTER TABLE "user" DROP COLUMN email');
 
-      const result = await familyInstance.schemaVerify({
+      const schema = await familyInstance.introspect({
         driver: driver!,
-        contract: contract,
+        contract,
+      });
+      const result = familyInstance.verifySchema({
+        contract,
+        schema,
         strict: false,
         frameworkComponents,
       });
@@ -275,9 +291,13 @@ describe.sequential('Schema verification after runner - integration', () => {
       // PostgreSQL allows this type change
       await driver!.query('ALTER TABLE "user" ALTER COLUMN email TYPE varchar(255)');
 
-      const result = await familyInstance.schemaVerify({
+      const schema = await familyInstance.introspect({
         driver: driver!,
-        contract: contract,
+        contract,
+      });
+      const result = familyInstance.verifySchema({
+        contract,
+        schema,
         strict: false,
         frameworkComponents,
       });

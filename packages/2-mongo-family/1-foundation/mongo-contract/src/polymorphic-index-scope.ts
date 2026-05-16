@@ -1,4 +1,4 @@
-import type { MongoStorageIndex } from './contract-types';
+import { MongoIndex, type MongoIndexInput } from './ir/mongo-index';
 
 export type PolymorphicIndexScope = {
   readonly discriminatorField: string;
@@ -6,7 +6,7 @@ export type PolymorphicIndexScope = {
 };
 
 export type ApplyScopeResult =
-  | { readonly kind: 'ok'; readonly index: MongoStorageIndex }
+  | { readonly kind: 'ok'; readonly index: MongoIndex }
   | { readonly kind: 'conflict'; readonly reason: string };
 
 function isScalarDiscriminatorValue(value: unknown): value is string | number | boolean {
@@ -23,7 +23,7 @@ function formatValue(value: unknown): string {
 }
 
 export function applyPolymorphicScopeToMongoIndex(
-  index: MongoStorageIndex,
+  index: MongoIndex,
   scope: PolymorphicIndexScope,
 ): ApplyScopeResult {
   if (!isScalarDiscriminatorValue(scope.discriminatorValue)) {
@@ -50,8 +50,18 @@ export function applyPolymorphicScopeToMongoIndex(
     [scope.discriminatorField]: scope.discriminatorValue,
   };
 
-  return {
-    kind: 'ok',
-    index: { ...index, partialFilterExpression: merged },
+  const cloned: MongoIndexInput = {
+    keys: index.keys,
+    ...(index.unique !== undefined && { unique: index.unique }),
+    ...(index.sparse !== undefined && { sparse: index.sparse }),
+    ...(index.expireAfterSeconds !== undefined && { expireAfterSeconds: index.expireAfterSeconds }),
+    partialFilterExpression: merged,
+    ...(index.wildcardProjection !== undefined && { wildcardProjection: index.wildcardProjection }),
+    ...(index.collation !== undefined && { collation: index.collation }),
+    ...(index.weights !== undefined && { weights: index.weights }),
+    ...(index.default_language !== undefined && { default_language: index.default_language }),
+    ...(index.language_override !== undefined && { language_override: index.language_override }),
   };
+
+  return { kind: 'ok', index: new MongoIndex(cloned) };
 }

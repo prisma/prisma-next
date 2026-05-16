@@ -54,7 +54,7 @@ import {
   createSqlExecutionStack,
 } from '@prisma-next/sql-runtime';
 
-const contract = validateContract<Contract>(contractJson);
+const contract = postgresTarget.contractSerializer.deserializeContract(contractJson);
 const stack = createSqlExecutionStack({
   target: postgresTarget,
   adapter: postgresAdapter,

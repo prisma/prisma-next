@@ -3,7 +3,9 @@ import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
@@ -75,11 +77,13 @@ describe('PostgresMigrationPlanner - storage types', () => {
         },
         types: {
           Role: {
+            kind: 'codec-instance',
             codecId: 'pg/enum@1',
             nativeType: 'role',
             typeParams: { values: ['USER'] },
           },
         },
+        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
       },
       roots: {},
       models: {},
@@ -145,11 +149,13 @@ describe('PostgresMigrationPlanner - storage types', () => {
         tables: {},
         types: {
           Role: {
+            kind: 'codec-instance',
             codecId: 'pg/enum@1',
             nativeType: 'role',
             typeParams: { values: ['USER'] },
           },
         },
+        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
       },
       roots: {},
       models: {},
@@ -239,11 +245,13 @@ describe('PostgresMigrationPlanner - storage types', () => {
         },
         types: {
           UserKind: {
+            kind: 'codec-instance',
             codecId: 'pg/enum@1',
             nativeType: 'UserKind',
             typeParams: { values: ['ADMIN', 'USER'] },
           },
         },
+        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
       },
       roots: {},
       models: {},
@@ -300,11 +308,13 @@ describe('PostgresMigrationPlanner - storage types', () => {
         },
         types: {
           Embedding1536: {
+            kind: 'codec-instance',
             codecId: 'pg/vector@1',
             nativeType: 'vector',
             typeParams: { length: 1536 },
           },
         },
+        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
       },
       roots: {},
       models: {},
@@ -359,11 +369,13 @@ describe('PostgresMigrationPlanner - storage types', () => {
         },
         types: {
           Embedding1536: {
+            kind: 'codec-instance',
             codecId: 'pg/vector@1',
             nativeType: 'vector',
             typeParams: { length: 1536 },
           },
         },
+        namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
       },
       roots: {},
       models: {},

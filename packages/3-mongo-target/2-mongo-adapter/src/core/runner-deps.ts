@@ -1,19 +1,19 @@
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { MongoControlAdapter } from '@prisma-next/family-mongo/control-adapter';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
 } from '@prisma-next/framework-components/control';
-import type { MongoDriver } from '@prisma-next/mongo-lowering';
+import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
+import type {
+  MongoDdlCommandVisitor,
+  MongoInspectionCommandVisitor,
+} from '@prisma-next/mongo-query-ast/control';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import {
-  initMarker,
-  type MongoRunnerDependencies,
-  readMarker,
-  updateMarker,
-  writeLedgerEntry,
-} from '@prisma-next/target-mongo/control';
 import type { Db } from 'mongodb';
 import { createMongoAdapter } from '../mongo-adapter';
 import { MongoCommandExecutor, MongoInspectionExecutor } from './command-executor';
+import { MongoControlAdapterImpl } from './mongo-control-adapter';
 
 export function extractDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
   const mongoDriver = driver as ControlDriverInstance<'mongo', 'mongo'> & { db?: Db };
@@ -26,23 +26,83 @@ export function extractDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
   return mongoDriver.db;
 }
 
+/**
+ * Marker / ledger operations the Mongo runner depends on. Every method
+ * takes a `space` parameter so each loaded contract space addresses its
+ * own marker row independently — see ADR 212 for the per-space
+ * mechanism.
+ */
+export interface MarkerOperations {
+  readMarker(space: string): Promise<ContractMarkerRecord | null>;
+  initMarker(
+    space: string,
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
+  ): Promise<void>;
+  updateMarker(
+    space: string,
+    expectedFrom: string,
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
+  ): Promise<boolean>;
+  writeLedgerEntry(
+    space: string,
+    entry: {
+      readonly edgeId: string;
+      readonly from: string;
+      readonly to: string;
+    },
+  ): Promise<void>;
+}
+
+export interface MongoRunnerDependencies {
+  readonly commandExecutor: MongoDdlCommandVisitor<Promise<void>>;
+  readonly inspectionExecutor: MongoInspectionCommandVisitor<Promise<Record<string, unknown>[]>>;
+  readonly adapter: MongoAdapter;
+  readonly driver: MongoDriver;
+  readonly markerOps: MarkerOperations;
+  readonly introspectSchema: () => Promise<MongoSchemaIR>;
+}
+
+/**
+ * Build the runner-dependencies envelope. `controlAdapter` is the
+ * dispatch surface for wire-level Mongo CAS operations (marker reads,
+ * marker advances, ledger appends, introspection); the envelope's
+ * `markerOps` shim simply forwards each call through it. When the
+ * caller already has a `MongoControlAdapter` on the control stack it
+ * can pass it in; otherwise a default `MongoControlAdapterImpl` is
+ * constructed locally.
+ */
 export function createMongoRunnerDeps(
   controlDriver: ControlDriverInstance<'mongo', 'mongo'>,
   driver: MongoDriver,
-  family: ControlFamilyInstance<'mongo', MongoSchemaIR>,
+  // Vestigial after the M2.5 family→adapter SPI dispatch refactor: the runner
+  // dependencies now route every wire-level call through `controlAdapter`, so
+  // the `family` instance is no longer consulted. Kept on the signature to
+  // avoid rippling through ~14 call sites mid-orchestration; a follow-up that
+  // already touches this factory should drop the parameter outright.
+  _family: ControlFamilyInstance<'mongo', MongoSchemaIR>,
+  controlAdapter: MongoControlAdapter<'mongo'> = new MongoControlAdapterImpl(),
 ): MongoRunnerDependencies {
-  const db = extractDb(controlDriver);
   return {
-    commandExecutor: new MongoCommandExecutor(db),
-    inspectionExecutor: new MongoInspectionExecutor(db),
+    commandExecutor: new MongoCommandExecutor(extractDb(controlDriver)),
+    inspectionExecutor: new MongoInspectionExecutor(extractDb(controlDriver)),
     adapter: createMongoAdapter(),
     driver,
     markerOps: {
-      readMarker: (space) => readMarker(db, space),
-      initMarker: (space, dest) => initMarker(db, space, dest),
-      updateMarker: (space, expectedFrom, dest) => updateMarker(db, space, expectedFrom, dest),
-      writeLedgerEntry: (space, entry) => writeLedgerEntry(db, space, entry),
+      readMarker: (space) => controlAdapter.readMarker(controlDriver, space),
+      initMarker: (space, dest) => controlAdapter.initMarker(controlDriver, space, dest),
+      updateMarker: (space, expectedFrom, dest) =>
+        controlAdapter.updateMarker(controlDriver, space, expectedFrom, dest),
+      writeLedgerEntry: (space, entry) =>
+        controlAdapter.writeLedgerEntry(controlDriver, space, entry),
     },
-    introspectSchema: () => family.introspect({ driver: controlDriver }),
+    introspectSchema: () => controlAdapter.introspectSchema(controlDriver),
   };
 }

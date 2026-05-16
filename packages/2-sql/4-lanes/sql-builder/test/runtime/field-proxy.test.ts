@@ -1,5 +1,7 @@
 import { coreHash } from '@prisma-next/contract/types';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import { SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
 import { ColumnRef, IdentifierRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { tableToScope } from '../../src/runtime/builder-base';
@@ -76,12 +78,14 @@ describe('createFieldProxy', () => {
       tables: { Post: table },
       types: {
         Embedding1536: {
+          kind: 'codec-instance',
           codecId: 'pgvector/vector@1',
           nativeType: 'vector',
           typeParams: { length: 1536 },
         },
       },
       storageHash: coreHash('sha256:h'),
+      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
     };
     const scope = tableToScope('post_alias', table, { storage, tableName: 'Post' });
     expect(scope.namespaces['post_alias']?.['embedding']?.codec).toEqual({

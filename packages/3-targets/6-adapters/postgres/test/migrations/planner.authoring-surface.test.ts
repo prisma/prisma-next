@@ -9,7 +9,7 @@ import {
   type MigrationPlanner,
   type MigrationPlannerSuccessResult,
 } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor, {
   postgresRenderDefault,
 } from '@prisma-next/target-postgres/control';
@@ -28,10 +28,10 @@ function createEmptyContract(): Contract<SqlStorage> {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: {
+    storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
       tables: {},
-    },
+    }),
     roots: {},
     models: {},
     capabilities: {},
@@ -60,7 +60,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
 
       const fromContract: Contract<SqlStorage> = {
         ...createEmptyContract(),
-        storage: { storageHash: coreHash('sha256:from'), tables: {} },
+        storage: new SqlStorage({ storageHash: coreHash('sha256:from'), tables: {} }),
       };
       const result = planner.plan({
         contract,

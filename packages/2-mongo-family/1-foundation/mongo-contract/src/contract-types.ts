@@ -5,6 +5,8 @@ import type {
   ContractValueObject,
   StorageBase,
 } from '@prisma-next/contract/types';
+import type { MongoCollection } from './ir/mongo-collection';
+import type { MongoIndexOptionsInput } from './ir/mongo-index-options';
 
 export type MongoIndexFieldValue = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
 
@@ -18,90 +20,17 @@ export type MongoJsonObject = {
   readonly [key: string]: MongoJsonValue;
 };
 
-export type MongoCollationCaseFirst = 'off' | 'upper' | 'lower';
-
-export type MongoCollationStrength = 1 | 2 | 3 | 4 | 5;
-
-export type MongoCollationAlternate = 'non-ignorable' | 'shifted';
-
-export type MongoCollationMaxVariable = 'punct' | 'space';
-
-export type MongoCollationOptions = {
-  readonly locale: string;
-  readonly caseLevel?: boolean;
-  readonly caseFirst?: MongoCollationCaseFirst;
-  readonly strength?: MongoCollationStrength;
-  readonly numericOrdering?: boolean;
-  readonly alternate?: MongoCollationAlternate;
-  readonly maxVariable?: MongoCollationMaxVariable;
-  readonly backwards?: boolean;
-  readonly normalization?: boolean;
-};
-
 export type MongoWildcardProjection = Readonly<Record<string, 0 | 1>>;
 
-export type MongoIndexOptions = {
-  readonly unique?: boolean;
-  readonly name?: string;
-  readonly partialFilterExpression?: MongoJsonObject;
-  readonly sparse?: boolean;
-  readonly expireAfterSeconds?: number;
-  readonly weights?: Readonly<Record<string, number>>;
-  readonly default_language?: string;
-  readonly language_override?: string;
-  readonly textIndexVersion?: number;
-  readonly '2dsphereIndexVersion'?: number;
-  readonly bits?: number;
-  readonly min?: number;
-  readonly max?: number;
-  readonly bucketSize?: number;
-  readonly hidden?: boolean;
-  readonly collation?: MongoCollationOptions;
-  readonly wildcardProjection?: MongoWildcardProjection;
-};
-
-export type MongoIndex = {
+/**
+ * Authoring-DSL shape for a single index entry on a model — the
+ * `indexes` array element accepted by the contract-ts builder. The
+ * builder translates these (with model context) into {@link MongoIndex}
+ * IR-class instances on `MongoCollection.indexes`.
+ */
+export type MongoIndexAuthoringInput = {
   readonly fields: MongoIndexFields;
-  readonly options?: MongoIndexOptions;
-};
-
-export type MongoIndexOptionDefaults = {
-  readonly storageEngine?: MongoJsonObject;
-};
-
-export type MongoTimeSeriesGranularity = 'seconds' | 'minutes' | 'hours';
-
-export type MongoTimeSeriesCollectionOptions = {
-  readonly timeField: string;
-  readonly metaField?: string;
-  readonly granularity?: MongoTimeSeriesGranularity;
-  readonly bucketMaxSpanSeconds?: number;
-  readonly bucketRoundingSeconds?: number;
-};
-
-export type MongoClusteredCollectionKey = Readonly<Record<string, 1>>;
-
-export type MongoClusteredCollectionOptions = {
-  readonly name?: string;
-  readonly key: MongoClusteredCollectionKey;
-  readonly unique: boolean;
-};
-
-export type MongoChangeStreamPreAndPostImagesOptions = {
-  readonly enabled: boolean;
-};
-
-export type MongoCollectionOptions = {
-  readonly capped?: boolean;
-  readonly size?: number;
-  readonly max?: number;
-  readonly storageEngine?: MongoJsonObject;
-  readonly indexOptionDefaults?: MongoIndexOptionDefaults;
-  readonly collation?: MongoCollationOptions;
-  readonly timeseries?: MongoTimeSeriesCollectionOptions;
-  readonly clusteredIndex?: MongoClusteredCollectionOptions;
-  readonly expireAfterSeconds?: number;
-  readonly changeStreamPreAndPostImages?: MongoChangeStreamPreAndPostImagesOptions;
+  readonly options?: MongoIndexOptionsInput;
 };
 
 export type MongoIndexKeyDirection = 1 | -1 | 'text' | '2dsphere' | '2d' | 'hashed';
@@ -111,47 +40,6 @@ export interface MongoIndexKey {
   readonly direction: MongoIndexKeyDirection;
 }
 
-export interface MongoStorageIndex {
-  readonly keys: ReadonlyArray<MongoIndexKey>;
-  readonly unique?: boolean;
-  readonly sparse?: boolean;
-  readonly expireAfterSeconds?: number;
-  readonly partialFilterExpression?: Record<string, unknown>;
-  readonly wildcardProjection?: Record<string, 0 | 1>;
-  readonly collation?: Record<string, unknown>;
-  readonly weights?: Record<string, number>;
-  readonly default_language?: string;
-  readonly language_override?: string;
-}
-
-export interface MongoStorageValidator {
-  readonly jsonSchema: Record<string, unknown>;
-  readonly validationLevel: 'strict' | 'moderate';
-  readonly validationAction: 'error' | 'warn';
-}
-
-export interface MongoStorageCollectionOptions {
-  readonly capped?: { size: number; max?: number };
-  readonly timeseries?: {
-    timeField: string;
-    metaField?: string;
-    granularity?: 'seconds' | 'minutes' | 'hours';
-  };
-  readonly collation?: Record<string, unknown>;
-  readonly changeStreamPreAndPostImages?: { enabled: boolean };
-  readonly clusteredIndex?: { name?: string };
-}
-
-export interface MongoStorageCollection {
-  readonly indexes?: ReadonlyArray<MongoStorageIndex>;
-  readonly validator?: MongoStorageValidator;
-  readonly options?: MongoStorageCollectionOptions;
-}
-
-export type MongoStorage<THash extends string = string> = StorageBase<THash> & {
-  readonly collections: Record<string, MongoStorageCollection>;
-};
-
 export type MongoModelStorage = {
   readonly collection?: string;
   readonly relations?: Record<string, { readonly field: string }>;
@@ -159,8 +47,21 @@ export type MongoModelStorage = {
 
 export type MongoModelDefinition = ContractModel<MongoModelStorage>;
 
+/**
+ * Data-shape constraint for the Mongo family's storage block. The
+ * runtime in-memory representation is the concrete {@link MongoStorage}
+ * class from `./ir/mongo-storage`; this type is the structural superset
+ * used as the generic-parameter constraint so consumers can name
+ * `MongoContract<...>` over either the raw JSON envelope (no
+ * `namespaces` field) or a fully-constructed class instance (with
+ * `namespaces`). The class structurally satisfies this shape.
+ */
+export type MongoStorageShape<THash extends string = string> = StorageBase<THash> & {
+  readonly collections: Record<string, MongoCollection>;
+};
+
 export type MongoContract<
-  S extends MongoStorage = MongoStorage,
+  S extends MongoStorageShape = MongoStorageShape,
   M extends Record<string, MongoModelDefinition> = Record<string, MongoModelDefinition>,
 > = Contract<S, M>;
 

@@ -1,1 +1,0 @@
-export { validateContract } from '../validate';

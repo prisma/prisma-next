@@ -1,7 +1,7 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import {
   type ExecutionStackInstance,
   instantiateExecutionStack,
@@ -14,7 +14,6 @@ import type {
 } from '@prisma-next/framework-components/runtime';
 import { cacheAnnotation, createCacheMiddleware } from '@prisma-next/middleware-cache';
 import { sql } from '@prisma-next/sql-builder/runtime';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   AndExpr,
   BinaryExpr,
@@ -56,7 +55,7 @@ import type { Contract } from '../sql-builder/fixtures/generated/contract';
  *   through the per-exec WeakMap buffer.
  */
 
-const sqlContract = validateContract<Contract>(contract, emptyCodecLookup);
+const sqlContract = new SqlContractSerializer().deserializeContract(contract) as Contract;
 
 type TestStackInstance = ExecutionStackInstance<
   'sql',

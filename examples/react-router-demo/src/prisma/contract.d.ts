@@ -27,14 +27,13 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:95d1e4f76e8e6f94d9a37229ee0a62dfd4c3afe603cf09d39e5c37766dd66b92'>;
+  StorageHashBase<'sha256:83b74ecd053a5905fd5af2f034fc0367679338de2ca91aa85e3ad6fc77c70525'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:8c5eef43d2153fd832b8288ed2d8ffc9f5afb62908f8b4b7e6a4b7018444c41f'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
 
 export type CodecTypes = PgTypes;
-export type OperationTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
@@ -69,7 +68,6 @@ export type FieldInputTypes = {
 };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
-  OperationTypes,
   QueryOperationTypes,
   FieldOutputTypes,
   FieldInputTypes
@@ -142,6 +140,7 @@ type ContractBase = ContractType<
       };
     };
     readonly types: Record<string, never>;
+    readonly namespaces: { readonly __unspecified__: { readonly id: '__unspecified__' } };
     readonly storageHash: StorageHash;
   },
   {

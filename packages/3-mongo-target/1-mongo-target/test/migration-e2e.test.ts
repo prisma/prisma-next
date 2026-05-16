@@ -24,6 +24,9 @@ const cliConfigTypesExport = pathToFileURL(
 const familyMongoControlExport = pathToFileURL(
   resolve(familyMongoRoot, 'src/exports/control.ts'),
 ).href;
+const targetMongoControlExport = pathToFileURL(
+  resolve(repoRoot, 'packages/3-mongo-target/1-mongo-target/src/exports/control.ts'),
+).href;
 const adapterMongoControlExport = pathToFileURL(
   resolve(repoRoot, 'packages/3-mongo-target/2-mongo-adapter/src/exports/control.ts'),
 ).href;
@@ -39,7 +42,8 @@ const adapterMongoControlExport = pathToFileURL(
 const fixtureConfigSource = [
   `import mongoAdapter from '${adapterMongoControlExport}';`,
   `import { defineConfig } from '${cliConfigTypesExport}';`,
-  `import { mongoFamilyDescriptor, mongoTargetDescriptor } from '${familyMongoControlExport}';`,
+  `import { mongoFamilyDescriptor } from '${familyMongoControlExport}';`,
+  `import { mongoTargetDescriptor } from '${targetMongoControlExport}';`,
   '',
   'export default defineConfig({',
   '  family: mongoFamilyDescriptor,',

@@ -10,7 +10,7 @@ import type { TContract } from './fixtures/test-contract';
 import { testContractJson } from './fixtures/test-contract';
 
 describe('contractModelToMongoResultShape', () => {
-  const { contract } = validateMongoContract<TContract>(testContractJson);
+  const contract = validateMongoContract<TContract>(testContractJson).contract;
 
   it('maps full Order model scalars to leaf shapes', () => {
     const model = contract.models['Order'];

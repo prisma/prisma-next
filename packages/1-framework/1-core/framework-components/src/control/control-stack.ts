@@ -2,11 +2,13 @@ import type { Codec } from '../shared/codec';
 import type { CodecLookup, CodecMeta } from '../shared/codec-types';
 import type {
   AuthoringContributions,
+  AuthoringEntityTypeNamespace,
   AuthoringFieldNamespace,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
+  isAuthoringEntityTypeDescriptor,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
   mergeAuthoringNamespaces,
@@ -29,6 +31,7 @@ import type {
 export interface AssembledAuthoringContributions {
   readonly field: AuthoringFieldNamespace;
   readonly type: AuthoringTypeNamespace;
+  readonly entityTypes: AuthoringEntityTypeNamespace;
 }
 
 export interface ControlStack<
@@ -147,6 +150,7 @@ export function assembleAuthoringContributions(
 ): AssembledAuthoringContributions {
   const field = {} as Record<string, unknown>;
   const type = {} as Record<string, unknown>;
+  const entityTypes = {} as Record<string, unknown>;
 
   for (const descriptor of descriptors) {
     if (descriptor.authoring?.field) {
@@ -158,25 +162,35 @@ export function assembleAuthoringContributions(
         'field',
       );
     }
-    if (!descriptor.authoring?.type) {
-      continue;
+    if (descriptor.authoring?.type) {
+      mergeAuthoringNamespaces(
+        type,
+        descriptor.authoring.type,
+        [],
+        isAuthoringTypeConstructorDescriptor,
+        'type',
+      );
     }
-    mergeAuthoringNamespaces(
-      type,
-      descriptor.authoring.type,
-      [],
-      isAuthoringTypeConstructorDescriptor,
-      'type',
-    );
+    if (descriptor.authoring?.entityTypes) {
+      mergeAuthoringNamespaces(
+        entityTypes,
+        descriptor.authoring.entityTypes,
+        [],
+        isAuthoringEntityTypeDescriptor,
+        'entity',
+      );
+    }
   }
 
   const fieldNamespace = field as AuthoringFieldNamespace;
   const typeNamespace = type as AuthoringTypeNamespace;
-  assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace);
+  const entityTypeNamespace = entityTypes as AuthoringEntityTypeNamespace;
+  assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace, entityTypeNamespace);
 
   return {
     field: fieldNamespace,
     type: typeNamespace,
+    entityTypes: entityTypeNamespace,
   };
 }
 

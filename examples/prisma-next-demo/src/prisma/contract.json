@@ -388,7 +388,12 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:6cee6146eaf257ce236bf1144efb238a1087e45a62e04a8104a55d490d9029f4",
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
+    "storageHash": "sha256:f7a8eb5124c7d031e4c57f489cf2aa10c921333cd6caf7676993d9105d96e7f3",
     "tables": {
       "bug": {
         "columns": {
@@ -609,6 +614,7 @@
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",
+        "kind": "codec-instance",
         "nativeType": "vector",
         "typeParams": {
           "length": 1536
@@ -616,13 +622,13 @@
       },
       "user_type": {
         "codecId": "pg/enum@1",
+        "kind": "postgres-enum",
+        "name": "user_type",
         "nativeType": "user_type",
-        "typeParams": {
-          "values": [
-            "admin",
-            "user"
-          ]
-        }
+        "values": [
+          "admin",
+          "user"
+        ]
       }
     }
   },

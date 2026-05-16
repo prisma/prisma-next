@@ -1,7 +1,11 @@
+import mongoAdapterDescriptor, { initMarker } from '@prisma-next/adapter-mongo/control';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
-import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import { initMarker } from '@prisma-next/target-mongo/control';
+import {
+  createMongoFamilyInstance,
+  mongoFamilyDescriptor,
+} from '@prisma-next/family-mongo/control';
+import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
+import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -44,7 +48,11 @@ describe('MongoFamilyInstance per-space readMarker', {
 
   function makeFamily() {
     return createMongoFamilyInstance(
-      {} as unknown as Parameters<typeof createMongoFamilyInstance>[0],
+      createControlStack({
+        family: mongoFamilyDescriptor,
+        target: mongoTargetDescriptor,
+        adapter: mongoAdapterDescriptor,
+      }),
     );
   }
 

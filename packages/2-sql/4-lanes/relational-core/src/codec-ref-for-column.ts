@@ -1,6 +1,10 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { CodecRef } from '@prisma-next/framework-components/codec';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import {
+  isPostgresEnumStorageEntry,
+  isStorageTypeInstance,
+  type SqlStorage,
+} from '@prisma-next/sql-contract/types';
 
 /**
  * Derive the canonical {@link CodecRef} for a `(table, column)` pair against a {@link SqlStorage}. This is the build-time path every column-bound `ParamRef` / `ProjectionItem` uses to stamp its `codec` slot before the AST is handed to the runtime — the runtime resolver then materialises a memoised {@link import('@prisma-next/sql-relational-core/ast').Codec} for the same `CodecRef` via `forCodecRef`.
@@ -25,7 +29,24 @@ export function codecRefForStorageColumn(
   if (columnDef.typeRef !== undefined) {
     const instance = storage.types?.[columnDef.typeRef];
     if (!instance) return undefined;
-    return { codecId: instance.codecId, typeParams: instance.typeParams as JsonValue };
+    if (isPostgresEnumStorageEntry(instance)) {
+      // Canonical path: the entry is a live `PostgresEnumType` IR
+      // instance reached through the per-target serializer's
+      // hydration. Raw JSON envelopes carrying `kind: 'postgres-enum'`
+      // never reach this site — `SqlStorage.normaliseTypeEntry`
+      // rejects them upstream (F09). Read `codecId` and `values` off
+      // the structural shape (enumerable own properties on the live
+      // instance) so the dispatch stays layered against the family
+      // alphabet rather than a target-specific class import.
+      return {
+        codecId: instance.codecId,
+        typeParams: { values: instance.values } as unknown as JsonValue,
+      };
+    }
+    if (isStorageTypeInstance(instance)) {
+      return { codecId: instance.codecId, typeParams: instance.typeParams as JsonValue };
+    }
+    return undefined;
   }
   if (columnDef.typeParams !== undefined) {
     return { codecId: columnDef.codecId, typeParams: columnDef.typeParams as JsonValue };

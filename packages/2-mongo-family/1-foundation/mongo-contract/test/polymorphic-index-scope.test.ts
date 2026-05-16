@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import type { MongoStorageIndex } from '../src/contract-types';
+import { MongoIndex, type MongoIndexInput } from '../src/ir/mongo-index';
 import {
   applyPolymorphicScopeToMongoIndex,
   type PolymorphicIndexScope,
 } from '../src/polymorphic-index-scope';
 
-const baseIndex: MongoStorageIndex = {
+const baseIndexFields: MongoIndexInput = {
   keys: [{ field: 'severity', direction: 1 }],
   unique: true,
 };
+
+const baseIndex = new MongoIndex(baseIndexFields);
+
+function indexWith(overrides: Partial<MongoIndexInput>): MongoIndex {
+  return new MongoIndex({ ...baseIndexFields, ...overrides });
+}
 
 describe('applyPolymorphicScopeToMongoIndex', () => {
   describe('happy path', () => {
@@ -30,10 +36,7 @@ describe('applyPolymorphicScopeToMongoIndex', () => {
     });
 
     it('AND-merges with existing filter on other fields', () => {
-      const index: MongoStorageIndex = {
-        ...baseIndex,
-        partialFilterExpression: { active: true, archived: false },
-      };
+      const index = indexWith({ partialFilterExpression: { active: true, archived: false } });
       const scope: PolymorphicIndexScope = {
         discriminatorField: 'type',
         discriminatorValue: 'bug',
@@ -52,10 +55,7 @@ describe('applyPolymorphicScopeToMongoIndex', () => {
     });
 
     it('returns input unchanged when discriminator field already matches (idempotent)', () => {
-      const index: MongoStorageIndex = {
-        ...baseIndex,
-        partialFilterExpression: { type: 'bug' },
-      };
+      const index = indexWith({ partialFilterExpression: { type: 'bug' } });
       const scope: PolymorphicIndexScope = {
         discriminatorField: 'type',
         discriminatorValue: 'bug',
@@ -70,10 +70,7 @@ describe('applyPolymorphicScopeToMongoIndex', () => {
     });
 
     it('returns input unchanged when matching alongside other filter keys', () => {
-      const index: MongoStorageIndex = {
-        ...baseIndex,
-        partialFilterExpression: { type: 'bug', active: true },
-      };
+      const index = indexWith({ partialFilterExpression: { type: 'bug', active: true } });
       const scope: PolymorphicIndexScope = {
         discriminatorField: 'type',
         discriminatorValue: 'bug',
@@ -141,10 +138,7 @@ describe('applyPolymorphicScopeToMongoIndex', () => {
 
   describe('conflict path', () => {
     it('reports conflict when existing filter sets discriminator to a different string', () => {
-      const index: MongoStorageIndex = {
-        ...baseIndex,
-        partialFilterExpression: { type: 'feature' },
-      };
+      const index = indexWith({ partialFilterExpression: { type: 'feature' } });
       const scope: PolymorphicIndexScope = {
         discriminatorField: 'type',
         discriminatorValue: 'bug',
@@ -161,10 +155,7 @@ describe('applyPolymorphicScopeToMongoIndex', () => {
     });
 
     it('reports conflict when existing filter sets discriminator to a different number', () => {
-      const index: MongoStorageIndex = {
-        ...baseIndex,
-        partialFilterExpression: { kind: 1 },
-      };
+      const index = indexWith({ partialFilterExpression: { kind: 1 } });
       const result = applyPolymorphicScopeToMongoIndex(index, {
         discriminatorField: 'kind',
         discriminatorValue: 2,
@@ -179,11 +170,8 @@ describe('applyPolymorphicScopeToMongoIndex', () => {
     });
 
     it('uses strict === equality (does not treat 1 and "1" as matching)', () => {
-      const index: MongoStorageIndex = {
-        ...baseIndex,
-        // value stored as string but scope expects number
-        partialFilterExpression: { kind: '1' },
-      };
+      // value stored as string but scope expects number
+      const index = indexWith({ partialFilterExpression: { kind: '1' } });
       const result = applyPolymorphicScopeToMongoIndex(index, {
         discriminatorField: 'kind',
         discriminatorValue: 1,

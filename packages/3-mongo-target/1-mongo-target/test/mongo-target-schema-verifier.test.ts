@@ -1,0 +1,59 @@
+import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
+import { describe, expect, it } from 'vitest';
+import { MongoTargetContractSerializer } from '../src/core/mongo-target-contract-serializer';
+import { MongoTargetSchemaVerifier } from '../src/core/mongo-target-schema-verifier';
+
+function deserializedContract() {
+  const json = {
+    targetFamily: 'mongo' as const,
+    roots: { items: 'Item' },
+    storage: { collections: { items: {} } },
+    models: {
+      Item: {
+        fields: { _id: { type: { kind: 'scalar', codecId: 'mongo/objectId@1' }, nullable: false } },
+        storage: { collection: 'items' },
+      },
+    },
+  };
+  return new MongoTargetContractSerializer().deserializeContract(json);
+}
+
+describe('MongoTargetSchemaVerifier', () => {
+  it('returns ok=true with no issues for an empty contract against an empty schema', () => {
+    const verifier = new MongoTargetSchemaVerifier();
+    const json = {
+      targetFamily: 'mongo' as const,
+      roots: {},
+      storage: { collections: {} },
+      models: {},
+    };
+    const contract = new MongoTargetContractSerializer().deserializeContract(json);
+    const schema = new MongoSchemaIR([]);
+
+    const result = verifier.verifySchema({ contract, schema });
+
+    expect(result.ok).toBe(true);
+    expect(result.issues).toEqual([]);
+  });
+
+  it('flags a missing collection against a contract that declares one', () => {
+    const verifier = new MongoTargetSchemaVerifier();
+    const contract = deserializedContract();
+    const schema = new MongoSchemaIR([]);
+
+    const result = verifier.verifySchema({ contract, schema });
+
+    expect(result.ok).toBe(false);
+    expect(result.issues.some((i) => i.kind === 'missing_table')).toBe(true);
+  });
+
+  it('uses the family-shared scaffolding: walks each namespace and aggregates issues', () => {
+    const verifier = new MongoTargetSchemaVerifier();
+    const contract = deserializedContract();
+    expect(Object.keys(contract.storage.namespaces)).toEqual(['__unspecified__']);
+
+    const result = verifier.verifySchema({ contract, schema: new MongoSchemaIR([]) });
+    expect(result).toBeDefined();
+    expect(Array.isArray(result.issues)).toBe(true);
+  });
+});

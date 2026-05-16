@@ -9,7 +9,7 @@ import {
   isAuthoringTypeConstructorDescriptor,
   validateAuthoringHelperArguments,
 } from '@prisma-next/framework-components/authoring';
-import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { type StorageTypeInstance, toStorageTypeInstance } from '@prisma-next/sql-contract/types';
 
 export type RuntimeNamedConstraintSpec = {
   readonly name?: string;
@@ -51,9 +51,14 @@ export function createTypeHelpersFromNamespace(
 
     if (isAuthoringTypeConstructorDescriptor(value)) {
       const helperPath = currentPath.join('.');
-      helpers[key] = (...args: readonly unknown[]) => {
+      helpers[key] = (...args: readonly unknown[]): StorageTypeInstance => {
         validateAuthoringHelperArguments(helperPath, value.args, args);
-        return instantiateAuthoringTypeConstructor(value, args) as StorageTypeInstance;
+        const triple = instantiateAuthoringTypeConstructor(value, args);
+        return toStorageTypeInstance({
+          codecId: triple.codecId,
+          nativeType: triple.nativeType,
+          typeParams: triple.typeParams ?? {},
+        });
       };
       continue;
     }

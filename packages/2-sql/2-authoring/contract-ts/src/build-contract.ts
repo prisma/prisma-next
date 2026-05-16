@@ -17,6 +17,7 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
@@ -25,10 +26,14 @@ import {
 } from '@prisma-next/sql-contract/index-types';
 import {
   applyFkDefaults,
-  type SqlStorage,
+  isPostgresEnumStorageEntry,
+  type PostgresEnumStorageEntry,
+  SqlStorage,
+  SqlUnspecifiedNamespace,
   type StorageColumn,
   type StorageTable,
   type StorageTypeInstance,
+  toStorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -387,15 +392,37 @@ export function buildSqlContractFromDefinition(
 
   // --- Assemble contract ---
 
-  const storageTypes = (definition.storageTypes ?? {}) as Record<string, StorageTypeInstance>;
+  // Normalise raw codec-triple inputs to the `kind: 'codec-instance'`
+  // discriminator shape before hashing so the storageHash matches the
+  // persisted JSON envelope produced from the SqlStorage class instance
+  // (which always carries the discriminator).
+  const rawStorageTypes = (definition.storageTypes ?? {}) as Record<
+    string,
+    StorageTypeInstance | PostgresEnumStorageEntry
+  >;
+  const storageTypes = Object.fromEntries(
+    Object.entries(rawStorageTypes).map(([name, entry]) => {
+      if (isPostgresEnumStorageEntry(entry)) return [name, entry];
+      if ((entry as { kind?: unknown }).kind === 'codec-instance') return [name, entry];
+      return [
+        name,
+        toStorageTypeInstance({
+          codecId: entry.codecId,
+          nativeType: entry.nativeType,
+          typeParams: (entry as { typeParams?: Record<string, unknown> }).typeParams ?? {},
+        }),
+      ];
+    }),
+  );
   const storageWithoutHash = {
     tables: storageTables,
     types: storageTypes,
+    namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
   };
   const storageHash: StorageHashBase<string> = definition.storageHash
     ? coreHash(definition.storageHash)
     : computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
-  const storage: SqlStorage = { ...storageWithoutHash, storageHash };
+  const storage = new SqlStorage({ ...storageWithoutHash, storageHash });
 
   const executionSection =
     executionDefaults.length > 0

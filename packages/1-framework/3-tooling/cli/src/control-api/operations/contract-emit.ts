@@ -4,6 +4,7 @@ import { emit, getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { JsonObject } from '@prisma-next/utils/json';
 import { dirname } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
@@ -233,8 +234,19 @@ export async function executeContractEmit(
       );
       const enrichedIR = enrichContract(validatedContract.value as Contract, frameworkComponents);
       familyInstance.validateContract(enrichedIR);
+      // Each target's descriptor ships a `contractSerializer` SPI; the
+      // framework canonicalizer threads its `serializeContract` so the
+      // on-disk JSON envelope is constructed by target-owned code
+      // rather than by walking the in-memory contract with
+      // `Object.entries` (which would leak runtime-only class API
+      // fields into the persisted shape).
+      const serializeContract = (c: Contract): JsonObject =>
+        config.target.contractSerializer.serializeContract(c);
       emitResult = await unlessAborted(
-        emit(enrichedIR, stack, config.family.emission, { outputJsonPath }),
+        emit(enrichedIR, stack, config.family.emission, {
+          outputJsonPath,
+          serializeContract,
+        }),
       );
     } catch (error) {
       endSpan(onProgress, 'emit', 'error');

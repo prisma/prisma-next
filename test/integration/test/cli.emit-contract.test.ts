@@ -2,12 +2,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractSourceContext } from '@prisma-next/cli/config-types';
-import { emit } from '@prisma-next/emitter';
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { emit } from '../utils/emit';
 import { setupIntegrationTestDirectoryFromFixtures } from './utils/cli-test-helpers';
 
 const fixtureSubdir = 'emit-contract';
@@ -79,7 +79,9 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      const result = await emit(contractRaw, stack, sqlEmission);
+      const result = await emit(contractRaw, stack, sqlEmission, {
+        serializeContract: (c) => config.target.contractSerializer.serializeContract(c),
+      });
 
       expect(result).toBeDefined();
       expect(result.storageHash).toBeDefined();
@@ -125,7 +127,9 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      const result = await emit(contractRaw, stack, sqlEmission);
+      const result = await emit(contractRaw, stack, sqlEmission, {
+        serializeContract: (c) => config.target.contractSerializer.serializeContract(c),
+      });
 
       const contractJsonPath = resolve(testDir, contractConfig.output);
       const contractDtsPath = contractJsonPath.replace(/\.json$/, '.d.ts');
@@ -165,7 +169,9 @@ describe('emitContract API', () => {
           throw new Error('Contract config must have output path');
         }
 
-        const result = await emit(contractRaw, stack, sqlEmission);
+        const result = await emit(contractRaw, stack, sqlEmission, {
+          serializeContract: (c) => config.target.contractSerializer.serializeContract(c),
+        });
 
         const contractJsonPath = resolve(customTestDir, contractConfig.output);
         const contractDtsPath = contractJsonPath.replace(/\.json$/, '.d.ts');
@@ -198,7 +204,9 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      const result = await emit(contractRaw, stack, sqlEmission);
+      const result = await emit(contractRaw, stack, sqlEmission, {
+        serializeContract: (c) => config.target.contractSerializer.serializeContract(c),
+      });
 
       expect(typeof result.profileHash).toBe('string');
       expect(result.profileHash.length).toBeGreaterThan(0);
@@ -222,7 +230,9 @@ describe('emitContract API', () => {
         throw new Error('Contract config must have output path');
       }
 
-      const result = await emit(contractRaw, stack, sqlEmission);
+      const result = await emit(contractRaw, stack, sqlEmission, {
+        serializeContract: (c) => config.target.contractSerializer.serializeContract(c),
+      });
 
       expect(result.storageHash).toBeDefined();
       expect(result.contractJson).toBeDefined();

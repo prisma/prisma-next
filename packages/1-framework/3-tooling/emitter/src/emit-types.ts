@@ -1,3 +1,4 @@
+import type { SerializeContract } from '@prisma-next/contract/hashing';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 
@@ -15,6 +16,16 @@ export interface EmitStackInput {
 
 export interface EmitOptions {
   readonly outputJsonPath?: string;
+  /**
+   * Per-target serializer that converts the in-memory contract into its
+   * canonical on-disk JsonObject shape before the framework's
+   * key-ordering / default-omission walk runs. Threaded from the
+   * descriptor (`descriptor.contractSerializer.serializeContract`) at
+   * the CLI / control-API call site so target classes decide what
+   * appears in the JSON envelope rather than the framework guessing
+   * via property enumerability.
+   */
+  readonly serializeContract: SerializeContract;
 }
 
 export interface EmitResult {

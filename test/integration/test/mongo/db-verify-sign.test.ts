@@ -1,13 +1,15 @@
-import { createMongoControlDriver } from '@prisma-next/adapter-mongo/control';
+import mongoAdapterDescriptor, {
+  createMongoControlDriver,
+  initMarker,
+} from '@prisma-next/adapter-mongo/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import {
   createMongoFamilyInstance,
   mongoFamilyDescriptor,
-  mongoTargetDescriptor,
 } from '@prisma-next/family-mongo/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import type { MongoContract } from '@prisma-next/mongo-contract';
-import { initMarker } from '@prisma-next/target-mongo/control';
+import { MongoCollection, type MongoContract, MongoIndex } from '@prisma-next/mongo-contract';
+import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -29,9 +31,11 @@ const baseContract: MongoContract = {
   },
   storage: {
     collections: {
-      users: {
-        indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
-      },
+      users: new MongoCollection({
+        indexes: [
+          new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
+        ],
+      }),
     },
     storageHash: coreHash('sha256:verify-test'),
   },
@@ -45,6 +49,7 @@ function createInstance() {
   const stack = createControlStack({
     family: mongoFamilyDescriptor,
     target: mongoTargetDescriptor,
+    adapter: mongoAdapterDescriptor,
   });
   return createMongoFamilyInstance(stack);
 }
@@ -158,11 +163,15 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       await db.collection('users').createIndex({ email: 1 }, { unique: true });
 
       const instance = createInstance();
-      const result = await instance.schemaVerify({
-        driver: makeDriver(),
+      const driver = makeDriver();
+      const schema = await instance.introspect({
+        driver,
         contract: baseContract,
+      });
+      const result = instance.verifySchema({
+        contract: baseContract,
+        schema,
         strict: false,
-        contractPath: '/test/contract.json',
         frameworkComponents: [],
       });
 
@@ -174,11 +183,15 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       await db.createCollection('users');
 
       const instance = createInstance();
-      const result = await instance.schemaVerify({
-        driver: makeDriver(),
+      const driver = makeDriver();
+      const schema = await instance.introspect({
+        driver,
         contract: baseContract,
+      });
+      const result = instance.verifySchema({
+        contract: baseContract,
+        schema,
         strict: false,
-        contractPath: '/test/contract.json',
         frameworkComponents: [],
       });
 
@@ -193,11 +206,15 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       await db.collection('users').createIndex({ createdAt: -1 });
 
       const instance = createInstance();
-      const result = await instance.schemaVerify({
-        driver: makeDriver(),
+      const driver = makeDriver();
+      const schema = await instance.introspect({
+        driver,
         contract: baseContract,
+      });
+      const result = instance.verifySchema({
+        contract: baseContract,
+        schema,
         strict: false,
-        contractPath: '/test/contract.json',
         frameworkComponents: [],
       });
 
@@ -211,11 +228,15 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       await db.collection('users').createIndex({ createdAt: -1 });
 
       const instance = createInstance();
-      const result = await instance.schemaVerify({
-        driver: makeDriver(),
+      const driver = makeDriver();
+      const schema = await instance.introspect({
+        driver,
         contract: baseContract,
+      });
+      const result = instance.verifySchema({
+        contract: baseContract,
+        schema,
         strict: true,
-        contractPath: '/test/contract.json',
         frameworkComponents: [],
       });
 
@@ -225,11 +246,15 @@ describe('db verify + db sign for Mongo (end-to-end)', {
 
     it('fails when expected collection is missing', async () => {
       const instance = createInstance();
-      const result = await instance.schemaVerify({
-        driver: makeDriver(),
+      const driver = makeDriver();
+      const schema = await instance.introspect({
+        driver,
         contract: baseContract,
+      });
+      const result = instance.verifySchema({
+        contract: baseContract,
+        schema,
         strict: false,
-        contractPath: '/test/contract.json',
         frameworkComponents: [],
       });
 

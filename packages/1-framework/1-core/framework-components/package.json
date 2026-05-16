@@ -37,6 +37,7 @@
     "./control": "./dist/control.mjs",
     "./emission": "./dist/emission.mjs",
     "./execution": "./dist/execution.mjs",
+    "./ir": "./dist/ir.mjs",
     "./psl-ast": "./dist/psl-ast.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./utils": "./dist/utils.mjs",

@@ -40,7 +40,7 @@ Connection binding can be provided up front (`path`) or deferred via `db.connect
 - **`@prisma-next/sql-builder`** for `sql(...)` query builder
 - **`@prisma-next/sql-relational-core`** for `schema(...)`
 - **`@prisma-next/sql-orm-client`** for `orm(...)`
-- **`@prisma-next/sql-contract`** for `validateContract(...)` and contract types
+- **`@prisma-next/sql-contract`** for contract types (contract validation flows through the `ContractSerializer` SPI on the SQL family target descriptor; the `sqlite<Contract>(...)` facade wraps it)
 
 ## Architecture
 

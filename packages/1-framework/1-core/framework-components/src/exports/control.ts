@@ -1,4 +1,5 @@
 export type { ImportRequirement } from '@prisma-next/ts-render';
+export type { ContractSerializer } from '../control/contract-serializer';
 export type {
   MigratableTargetDescriptor,
   OperationPreviewCapable,
@@ -78,9 +79,9 @@ export {
 } from '../control/control-result-types';
 export type {
   CoreSchemaView,
-  SchemaNodeKind,
   SchemaTreeNodeOptions,
   SchemaTreeVisitor,
+  SchemaViewNodeKind,
 } from '../control/control-schema-view';
 export { SchemaTreeNode } from '../control/control-schema-view';
 export type {
@@ -105,6 +106,11 @@ export {
   extractComponentIds,
   extractQueryOperationTypeImports,
 } from '../control/control-stack';
+export type {
+  SchemaVerifier,
+  SchemaVerifyOptions,
+  SchemaVerifyResult,
+} from '../control/schema-verifier';
 export type {
   ControlMutationDefaultEntry,
   ControlMutationDefaultRegistry,

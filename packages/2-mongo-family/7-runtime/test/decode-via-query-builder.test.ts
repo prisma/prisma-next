@@ -11,7 +11,7 @@
  * `expectTypeOf`) and runtime values.
  */
 
-import { validateMongoContract } from '@prisma-next/mongo-contract';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { acc, mongoQuery } from '@prisma-next/mongo-query-builder';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { ObjectId } from 'mongodb';
@@ -27,7 +27,9 @@ const q = mongoQuery<TDecodeFixtureContract>({ contractJson: decodeFixtureContra
 describe('Mongo runtime decode integration via query-builder', () => {
   it('typed read: contract → query-builder → runtime decode end-to-end', async () => {
     await withMongod(async (ctx) => {
-      const { contract } = validateMongoContract<TDecodeFixtureContract>(decodeFixtureContractJson);
+      const contract = new MongoContractSerializer().deserializeContract(
+        decodeFixtureContractJson,
+      ) as TDecodeFixtureContract;
       const createdAt = new Date('2024-04-15T12:00:00.000Z');
       const vec = [0.1, 0.2, 0.3];
       const insert = await ctx.client.db(ctx.dbName).collection('users').insertOne({

@@ -4,7 +4,13 @@ import type {
   GenerateContractTypesOptions,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
-import type { SqlModelStorage, SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  isPostgresEnumStorageEntry,
+  type SqlModelStorage,
+  type SqlStorage,
+  type StorageTable,
+  type StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import { assertDefined } from '@prisma-next/utils/assertions';
 
 function serializeTypeParamsLiteral(params: Record<string, unknown> | undefined): string {
@@ -269,7 +275,9 @@ export const sqlEmission = {
 
     const typesType = generateStorageTypesType(storage.types);
 
-    return `{ readonly tables: { ${tables.join('; ')} }; readonly types: ${typesType}; readonly storageHash: ${storageHashTypeName} }`;
+    const namespacesType = generateStorageNamespacesType(storage.namespaces);
+
+    return `{ readonly tables: { ${tables.join('; ')} }; readonly types: ${typesType}; readonly namespaces: ${namespacesType}; readonly storageHash: ${storageHashTypeName} }`;
   },
 
   generateModelStorageType(_modelName: string, model: ContractModel): string {
@@ -313,7 +321,16 @@ export const sqlEmission = {
 
     if (column.typeRef) {
       const typeInstance = storage.types?.[column.typeRef];
-      return typeInstance?.typeParams;
+      if (typeInstance === undefined) return undefined;
+      if (isPostgresEnumStorageEntry(typeInstance)) {
+        return { values: typeInstance.values };
+      }
+      // Fall back to structural codec-triple access when the literal
+      // bypasses the runtime normaliser (e.g. test fixtures or
+      // hand-written descriptor inputs that omit the
+      // `kind: 'codec-instance'` discriminator).
+      const codecShape = typeInstance as Partial<StorageTypeInstance>;
+      return codecShape.typeParams;
     }
     return column.typeParams;
   },
@@ -368,13 +385,63 @@ function generateStorageTypesType(types: SqlStorage['types']): string {
 
   const typeEntries: string[] = [];
   for (const [typeName, typeInstance] of Object.entries(types)) {
-    const codecId = serializeValue(typeInstance.codecId);
-    const nativeType = serializeValue(typeInstance.nativeType);
-    const typeParamsStr = serializeTypeParamsLiteral(typeInstance.typeParams);
+    if (isPostgresEnumStorageEntry(typeInstance)) {
+      const codecId = serializeValue(
+        // `codecBinding.codecId` lives on the live IR-class instance;
+        // raw JSON envelopes carry `codecId` as an enumerable own
+        // property. Read the structural-shape field so the emitter
+        // works against both runtime forms.
+        typeInstance.codecId,
+      );
+      const nativeType = serializeValue(typeInstance.nativeType);
+      const typeParamsStr = serializeTypeParamsLiteral({
+        values: typeInstance.values as unknown as readonly unknown[],
+      });
+      // Emit the resolved codec view (kind: 'codec-instance') so the
+      // emitted .d.ts shape stays uniform across slot variants and
+      // satisfies the polymorphic slot's structural alphabet. The
+      // persisted JSON envelope still carries the IR's narrower kind
+      // discriminator; the d.ts is the type-level codec-resolved view.
+      typeEntries.push(
+        `readonly ${typeName}: { readonly kind: 'codec-instance'; readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
+      );
+      continue;
+    }
+    // The slot is polymorphic at the framework level; codec-instance
+    // entries are the only non-IR-class kind today. The runtime
+    // `SqlStorage` constructor stamps `kind: 'codec-instance'` on
+    // plain codec triples; the emitter is forgiving about literal
+    // inputs that bypass the constructor (test fixtures, hand-written
+    // descriptors) and treats anything with the codec-triple shape as
+    // a codec-instance.
+    const codecInstanceShape = typeInstance as Partial<StorageTypeInstance>;
+    if (
+      typeof codecInstanceShape.codecId !== 'string' ||
+      typeof codecInstanceShape.nativeType !== 'string'
+    ) {
+      throw new Error(
+        `Unknown storage type kind for "${typeName}"; expected a codec-instance triple or a known IR-class kind.`,
+      );
+    }
+    const codecId = serializeValue(codecInstanceShape.codecId);
+    const nativeType = serializeValue(codecInstanceShape.nativeType);
+    const typeParamsStr = serializeTypeParamsLiteral(codecInstanceShape.typeParams);
     typeEntries.push(
-      `readonly ${typeName}: { readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
+      `readonly ${typeName}: { readonly kind: 'codec-instance'; readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`,
     );
   }
 
   return `{ ${typeEntries.join('; ')} }`;
+}
+
+function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): string {
+  const entries = Object.entries(namespaces ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  if (entries.length === 0) {
+    return 'Record<string, never>';
+  }
+  const parts: string[] = [];
+  for (const [name, ns] of entries) {
+    parts.push(`readonly ${serializeObjectKey(name)}: { readonly id: ${serializeValue(ns.id)} }`);
+  }
+  return `{ ${parts.join('; ')} }`;
 }

@@ -222,7 +222,8 @@
                 "direction": 1,
                 "field": "authorId"
               }
-            ]
+            ],
+            "kind": "mongo-index"
           },
           {
             "keys": [
@@ -230,9 +231,11 @@
                 "direction": -1,
                 "field": "createdAt"
               }
-            ]
+            ],
+            "kind": "mongo-index"
           }
         ],
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -303,11 +306,13 @@
               "title"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
       },
       "users": {
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -366,12 +371,13 @@
               "name"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
       }
     },
-    "storageHash": "sha256:cca946d0df0e9e671b53c8ce52aa12192538ae44776c4c5e3f76fefa08f4fc08"
+    "storageHash": "sha256:3a71ce514d0a786db06aa4b7d616dc1a0fbb682e2c637c59700a997054deeccb"
   },
   "capabilities": {},
   "extensionPacks": {},

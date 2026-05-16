@@ -28,6 +28,7 @@ export type Contract = ContractWithTypeMaps<BaseContract<
         readonly foreignKeys: ReadonlyArray<never>;
       };
     };
+    readonly namespaces: { readonly __unspecified__: { readonly id: '__unspecified__' } };
   },
   {
     readonly User: {

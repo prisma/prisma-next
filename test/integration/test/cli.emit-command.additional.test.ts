@@ -404,13 +404,15 @@ model Post {
       expect(contractDts).toContain("readonly discriminator: { readonly field: 'type' }");
       expect(contractDts).toContain('readonly users: {');
       expect(contractDts).toContain('readonly indexes:');
+      expect(contractDts).toContain("readonly kind: 'mongo-index'");
       expect(contractDts).toContain("readonly field: 'email'");
       expect(contractDts).toContain('readonly direction: 1');
       expect(contractDts).toContain('readonly unique: true');
       expect(contractDts).toContain('readonly options:');
-      expect(contractDts).toContain(
-        "readonly collation: { readonly locale: 'en'; readonly strength: 2 }",
-      );
+      expect(contractDts).toContain("readonly kind: 'mongo-collection-options'");
+      expect(contractDts).toContain("readonly kind: 'mongo-collation-options'");
+      expect(contractDts).toContain("readonly locale: 'en'");
+      expect(contractDts).toContain('readonly strength: 2');
 
       const jsonOutput = consoleOutput.join('\n');
       const parsed = JSON.parse(jsonOutput);

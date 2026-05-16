@@ -1,8 +1,9 @@
+import { readAllMarkers } from '@prisma-next/adapter-mongo/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
+  contractToMongoSchemaIR,
   createMongoFamilyInstance,
-  mongoTargetDescriptor,
 } from '@prisma-next/family-mongo/control';
 import {
   APP_SPACE_ID,
@@ -13,9 +14,8 @@ import {
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import {
-  contractToMongoSchemaIR,
   MongoMigrationPlanner,
-  readAllMarkers,
+  mongoTargetDescriptor,
   serializeMongoOps,
 } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
@@ -74,7 +74,14 @@ function appContract(): MongoContract {
     storage: {
       collections: {
         users: {
-          indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'email', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
       },
       storageHash: coreHash('sha256:tc18-app-contract'),
@@ -95,7 +102,14 @@ function extContract(): MongoContract {
     storage: {
       collections: {
         cipherstash_state: {
-          indexes: [{ keys: [{ field: 'tenantId', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'tenantId', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
       },
       storageHash: coreHash('sha256:tc18-ext-contract'),

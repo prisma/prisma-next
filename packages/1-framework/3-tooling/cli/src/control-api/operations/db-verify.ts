@@ -172,7 +172,7 @@ function createPerMemberVerifier<TFamilyId extends string, TTargetId extends str
   const { skipSchema, familyInstance, frameworkComponents } = options;
   return (projectedSchema, member, verifyMode) => {
     if (skipSchema) return buildSkippedSchemaResult(member);
-    return familyInstance.schemaVerifyAgainstSchema({
+    return familyInstance.verifySchema({
       contract: member.contract,
       // The family's `TSchemaIR` is opaque to migration-tools; the
       // aggregate verifier passes through whatever we hand it. The

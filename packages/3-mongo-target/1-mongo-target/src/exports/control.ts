@@ -1,13 +1,5 @@
-export { contractToMongoSchemaIR } from '../core/contract-to-schema';
-export { formatMongoOperations } from '../core/ddl-formatter';
+export { mongoTargetDescriptor } from '../core/control-target';
 export { FilterEvaluator } from '../core/filter-evaluator';
-export {
-  initMarker,
-  readAllMarkers,
-  readMarker,
-  updateMarker,
-  writeLedgerEntry,
-} from '../core/marker-ledger';
 export {
   deserializeMongoOp,
   deserializeMongoOps,
@@ -20,6 +12,13 @@ export {
   MongoMigrationRunner,
   type MongoMigrationRunnerExecuteOptions,
 } from '../core/mongo-runner';
+export type { MongoTargetContract } from '../core/mongo-target-contract';
+export { MongoTargetContractSerializer } from '../core/mongo-target-contract-serializer';
+export {
+  MongoTargetDatabase,
+  MongoTargetUnspecifiedDatabase,
+} from '../core/mongo-target-database';
+export { MongoTargetSchemaVerifier } from '../core/mongo-target-schema-verifier';
 export type { CollModMeta, OpFactoryCall } from '../core/op-factory-call';
 export {
   CollModCall,

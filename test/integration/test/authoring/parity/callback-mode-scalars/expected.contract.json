@@ -159,7 +159,12 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:615d7f6e37b15d66c64b8e500ee79877eecae9bb484d48b429f3b3c1d1e21051",
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
+    "storageHash": "sha256:e151326d1cfdbe3ee67aad3c07746c9c70e809c8b7ba8d25424623bcafe8667d",
     "tables": {
       "post": {
         "columns": {
@@ -278,6 +283,7 @@
     "types": {
       "Embedding": {
         "codecId": "pg/vector@1",
+        "kind": "codec-instance",
         "nativeType": "vector",
         "typeParams": {
           "length": 1536

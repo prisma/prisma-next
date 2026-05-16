@@ -45,6 +45,10 @@ function createValidConfig(overrides: Record<string, unknown> = {}): PrismaNextC
       id: 'postgres',
       version: '0.0.1',
       manifest: {},
+      contractSerializer: {
+        deserializeContract: (json) => json as never,
+        serializeContract: (contract) => contract as never,
+      },
       create: () => ({ familyId: 'sql', targetId: 'postgres' }),
     },
     adapter: {

@@ -1,5 +1,8 @@
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
-import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import type {
+  AuthoringContributions,
+  AuthoringEntityTypeNamespace,
+} from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
@@ -7,6 +10,50 @@ import type {
   DefaultFunctionLoweringContext,
   ParsedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
+import { freezeNode } from '@prisma-next/framework-components/ir';
+import { SqlNode } from '@prisma-next/sql-contract/types';
+
+/**
+ * Layer-isolated enum-shaped IR class for `sql-contract-psl` unit tests.
+ * Stays in the test fixture so the interpreter package never depends on
+ * a real target pack; production targets (e.g. Postgres) ship their own
+ * enum IR class and contribute it through `authoring.entityTypes.enum`.
+ * Structurally satisfies `PostgresEnumStorageEntry` (carries
+ * `kind: 'postgres-enum'`, `name`, `nativeType`, `values`, `codecId`).
+ */
+export class TestPostgresEnumType extends SqlNode {
+  override readonly kind = 'postgres-enum' as const;
+  readonly name: string;
+  readonly nativeType: string;
+  readonly values: readonly string[];
+  readonly codecId = 'test/enum@1' as const;
+
+  constructor(input: { name: string; nativeType?: string; values: readonly string[] }) {
+    super();
+    this.name = input.name;
+    this.nativeType = input.nativeType ?? input.name;
+    this.values = Object.freeze([...input.values]);
+    freezeNode(this);
+  }
+
+  get codecBinding() {
+    return {
+      codecId: this.codecId,
+      typeParams: { values: this.values },
+    } as const;
+  }
+}
+
+export const testEnumEntityContributions = {
+  enum: {
+    kind: 'entity' as const,
+    discriminator: 'postgres-enum',
+    output: {
+      factory: (input: { name: string; values: readonly string[] }) =>
+        new TestPostgresEnumType(input),
+    },
+  },
+} as const satisfies AuthoringEntityTypeNamespace;
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;
@@ -100,6 +147,7 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
  * Controlled test-only descriptor — intentionally uses pg/vector@1 with maximum: 2000 rather than importing the real pgvector pack, so interpreter unit tests stay layer-isolated. Real-pack parity is covered by `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`.
  */
 export const pgvectorAuthoringContributions = {
+  entityTypes: {},
   field: {},
   type: {
     pgvector: {
@@ -191,7 +239,7 @@ export function createPostgresTestContext(
   return {
     composedExtensionPacks: [],
     scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
-    authoringContributions: { field: {}, type: {} },
+    authoringContributions: { field: {}, type: {}, entityTypes: {} },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
     resolvedInputs: [],

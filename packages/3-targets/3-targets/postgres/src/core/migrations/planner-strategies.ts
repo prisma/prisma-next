@@ -26,8 +26,15 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import {
+  isPostgresEnumStorageEntry,
+  type PostgresEnumStorageEntry,
+  type SqlStorage,
+  type StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { PostgresEnumType } from '../postgres-enum-type';
+import { determineEnumDiff, readExistingEnumValues } from './enum-planning';
 import {
   AddColumnCall,
   AddEnumValuesCall,
@@ -80,7 +87,7 @@ export interface StrategyContext {
   readonly fromContract: Contract<SqlStorage> | null;
   readonly schemaName: string;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   readonly schema: SqlSchemaIR;
   readonly policy: MigrationOperationPolicy;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
@@ -101,10 +108,12 @@ export type CallMigrationStrategy = (
       /**
        * `true` for strategies that emit cohesive sequential recipes whose
        * calls must stay contiguous and in the returned order — e.g.
-       * `enumChangeCallStrategy` (dataTransform → createEnumType →
-       * dropEnumType), `notNullBackfillCallStrategy` (addColumn →
-       * dataTransform → setNotNull). Defaults to `false`, which lets
-       * `planIssues` hoist individual calls into their DDL sequencing bucket.
+       * `nativeEnumPlanCallStrategy` (createEnumType → alterColumnType →
+       * dropEnumType → renameType, optionally prefixed by a
+       * `DataTransformCall` placeholder), `notNullBackfillCallStrategy`
+       * (addColumn → dataTransform → setNotNull). Defaults to `false`,
+       * which lets `planIssues` hoist individual calls into their DDL
+       * sequencing bucket.
        */
       recipe?: boolean;
     }
@@ -119,7 +128,10 @@ function buildColumnSpec(
   const col = ctx.toContract.storage.tables[table]?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-  const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
+  const mutableTypes = ctx.storageTypes as Record<
+    string,
+    StorageTypeInstance | PostgresEnumStorageEntry
+  >;
   return {
     name: column,
     typeSql: buildColumnTypeSql(col, mutableHooks, mutableTypes),
@@ -137,7 +149,10 @@ function buildAlterTypeOptions(
   const col = ctx.toContract.storage.tables[table]?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-  const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
+  const mutableTypes = ctx.storageTypes as Record<
+    string,
+    StorageTypeInstance | PostgresEnumStorageEntry
+  >;
   const qualifiedTargetType = buildColumnTypeSql(col, mutableHooks, mutableTypes, false);
   const formatTypeExpected = buildExpectedFormatType(col, mutableHooks, mutableTypes);
   return {
@@ -276,8 +291,11 @@ function enumRebuildCallRecipe(
 ): readonly PostgresOpFactoryCall[] {
   const toType = ctx.toContract.storage.types?.[typeName];
   if (!toType) return [];
+  const isEnum = isPostgresEnumStorageEntry(toType);
   const nativeType = toType.nativeType;
-  const desiredValues = (toType.typeParams['values'] ?? []) as readonly string[];
+  const desiredValues: readonly string[] = isEnum
+    ? toType.values
+    : (((toType as StorageTypeInstance).typeParams['values'] ?? []) as readonly string[]);
   const tempName = `${nativeType}${REBUILD_SUFFIX}`;
 
   const columnRefs: { table: string; column: string }[] = [];
@@ -305,70 +323,149 @@ function enumRebuildCallRecipe(
   ];
 }
 
-export const enumChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
-  // The shrink/rebuild branches emit a `DataTransformCall` placeholder or a
-  // destructive rebuild that should be authored explicitly. When the policy
-  // excludes `'data'` (`db update` / `db init`), skip the entire strategy so
-  // `storageTypePlanCallStrategy` (codec-hook driven) takes over with the
-  // dev-push enum behavior.
-  if (!ctx.policy.allowedOperationClasses.includes('data')) return { kind: 'no_match' };
-
-  const matched: SchemaIssue[] = [];
-  const calls: PostgresOpFactoryCall[] = [];
-
-  for (const issue of issues) {
-    if (issue.kind !== 'enum_values_changed') continue;
-    matched.push(issue);
-
-    if (issue.removedValues.length > 0) {
-      calls.push(
-        new DataTransformCall(
-          `migrate-${issue.typeName}-values`,
-          `migrate-${issue.typeName}-values:check`,
-          `migrate-${issue.typeName}-values:run`,
-        ),
-        ...enumRebuildCallRecipe(issue.typeName, ctx),
-      );
-    } else if (issue.addedValues.length === 0) {
-      calls.push(...enumRebuildCallRecipe(issue.typeName, ctx));
-    } else {
-      const toType = ctx.toContract.storage.types?.[issue.typeName];
-      if (toType) {
-        calls.push(
-          new AddEnumValuesCall(
-            ctx.schemaName,
-            issue.typeName,
-            toType.nativeType,
-            issue.addedValues,
-          ),
-        );
-      }
-    }
-  }
-
-  if (matched.length === 0) return { kind: 'no_match' };
-  return {
-    kind: 'match',
-    issues: issues.filter((i) => !matched.includes(i)),
-    calls,
-    recipe: true,
-  };
-};
-
 // ============================================================================
-// Walk-schema strategies (absorbed from the legacy planner)
+// Native enum planner strategy
 // ============================================================================
 
 /**
- * Dispatches storage types through their codec's `planTypeOperations` hook.
- * Replaces the walk-schema `buildStorageTypeOperations` path: the hook is
- * the authoritative source for codec-driven DDL (enum create/rebuild/add-
- * value, custom type creation, etc.).
+ * Single planner strategy for `PostgresEnumType` instances. Walks
+ * `toContract.storage.types` directly (no codec-hook dispatch) and
+ * resolves existing values via `readExistingEnumValues`, the same
+ * Postgres bridging adapter the verifier uses.
  *
- * Runs after `enumChangeCallStrategy` so the structured enum path (value
- * add, rebuild recipe) gets first pick at `enum_values_changed` issues;
- * this strategy then handles remaining `type_missing` / `enum_values_changed`
- * issues for types whose hook produced at least one op.
+ * Per-enum dispatch:
+ *
+ * - No existing type → `CreateEnumTypeCall` with the contract's desired
+ *   values.
+ * - Diff is `unchanged` → no calls emitted (consumes the matching
+ *   `enum_values_changed` issue if present).
+ * - Diff is `add_values` → `AddEnumValuesCall` with the new labels.
+ * - Diff is `rebuild` → the create-temp / migrate-columns /
+ *   drop-original / rename rebuild recipe. When
+ *   `policy.allowedOperationClasses` includes `'data'` and the rebuild
+ *   removes labels (`removedValues.length > 0`), prepend a
+ *   `DataTransformCall` placeholder so the user can author the value
+ *   remap before the destructive recipe runs. Without `'data'` in the
+ *   policy (`db update` / `db init`), the rebuild's PG `USING ::text`
+ *   cast surfaces any value-removal data loss as a runtime error rather
+ *   than silent loss.
+ *
+ * Returns `recipe: true` only when a rebuild recipe was emitted (its
+ * `createEnumType(temp) → alterColumnType → dropEnumType(orig) →
+ * renameType` sequence mixes `dep`-class and `alter`-class calls that
+ * would mis-order if the planner hoisted them into its DDL sequencing
+ * buckets). For the create-only and add-values paths the strategy
+ * returns `recipe: false` so the planner hoists `CreateEnumTypeCall`
+ * into the `dep` bucket — i.e. `CREATE TYPE` runs before any
+ * `CreateTableCall` that references the new enum.
+ */
+export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
+  const enumTypes = collectPostgresEnumTypes(ctx.toContract.storage.types);
+  if (enumTypes.size === 0) return { kind: 'no_match' };
+
+  const dataAllowed = ctx.policy.allowedOperationClasses.includes('data');
+
+  const calls: PostgresOpFactoryCall[] = [];
+  const handledTypeNames = new Set<string>();
+  const introducedTypeNames = new Set<string>();
+  const rebuiltTypeNames = new Set<string>();
+  let emittedRebuildRecipe = false;
+
+  for (const [typeName, enumType] of enumTypes) {
+    const desired = enumType.values;
+    const existing = readExistingEnumValues(ctx.schema, enumType.nativeType);
+    if (!existing) {
+      calls.push(new CreateEnumTypeCall(ctx.schemaName, typeName, desired, enumType.nativeType));
+      handledTypeNames.add(typeName);
+      introducedTypeNames.add(typeName);
+      continue;
+    }
+    const diff = determineEnumDiff(existing, desired);
+    if (diff.kind === 'unchanged') {
+      handledTypeNames.add(typeName);
+      continue;
+    }
+    if (diff.kind === 'add_values') {
+      calls.push(new AddEnumValuesCall(ctx.schemaName, typeName, enumType.nativeType, diff.values));
+      handledTypeNames.add(typeName);
+      continue;
+    }
+    if (dataAllowed && diff.removedValues.length > 0) {
+      calls.push(
+        new DataTransformCall(
+          `migrate-${typeName}-values`,
+          `migrate-${typeName}-values:check`,
+          `migrate-${typeName}-values:run`,
+        ),
+      );
+    }
+    calls.push(...enumRebuildCallRecipe(typeName, ctx));
+    emittedRebuildRecipe = true;
+    handledTypeNames.add(typeName);
+    rebuiltTypeNames.add(typeName);
+  }
+
+  // The strategy emits a single `recipe` flag for the entire pass,
+  // which routes every emitted call to either the contiguous recipe
+  // slot (rebuild path) or the `dep` bucket (introduce / add-values
+  // path). A plan that needs both shapes simultaneously cannot be
+  // expressed today — the introduced `CreateEnumTypeCall` would land
+  // in the recipe slot and any `CreateTableCall` referencing the new
+  // enum would fail at runtime with a confusing `type "X" does not
+  // exist` error. Surface the unrepresentable case here as a
+  // planner-time error so the failure mode is loud, not silent.
+  if (introducedTypeNames.size > 0 && rebuiltTypeNames.size > 0) {
+    throw new Error(
+      `nativeEnumPlanCallStrategy: cannot emit both a brand-new enum and a rebuild on a different enum in the same plan; the single recipe flag cannot route them to different buckets. Introduced: [${[...introducedTypeNames].sort().join(', ')}]; rebuilt: [${[...rebuiltTypeNames].sort().join(', ')}]. Split the strategy or grow the \`match\` return type before this case lands.`,
+    );
+  }
+
+  const remaining = issues.filter(
+    (issue) =>
+      !(
+        (issue.kind === 'type_missing' || issue.kind === 'enum_values_changed') &&
+        issue.typeName &&
+        handledTypeNames.has(issue.typeName)
+      ),
+  );
+
+  if (calls.length === 0 && remaining.length === issues.length) {
+    return { kind: 'no_match' };
+  }
+  // `recipe: true` is required for the rebuild path — its
+  // `createEnumType(temp) → alterColumnType → dropEnumType(orig) →
+  // renameType` mixes `dep`-class and `alter`-class calls that would
+  // mis-order if the planner hoisted them into its DDL sequencing
+  // buckets. For the type_missing / add_values paths we want the
+  // opposite: hoisted into the `dep` bucket so a brand-new
+  // `CreateEnumTypeCall` runs *before* the `CreateTableCall` that
+  // references it. The two cases never co-occur in the same plan
+  // (introducing a new enum type and rebuilding an existing one in
+  // one shot would require both buckets — a shape today's interface
+  // does not surface; if that combination ever needs to land we'd
+  // split this strategy or grow the `match` return type).
+  return { kind: 'match', issues: remaining, calls, recipe: emittedRebuildRecipe };
+};
+
+function collectPostgresEnumTypes(
+  storageTypes: SqlStorage['types'],
+): ReadonlyMap<string, PostgresEnumType> {
+  const result = new Map<string, PostgresEnumType>();
+  for (const [name, instance] of Object.entries(storageTypes ?? {}).sort(([a], [b]) =>
+    a.localeCompare(b),
+  )) {
+    if (instance instanceof PostgresEnumType) {
+      result.set(name, instance);
+    }
+  }
+  return result;
+}
+
+/**
+ * Dispatches non-enum codec-typed storage types through their codec's
+ * `planTypeOperations` hook (the authoritative source for codec-driven DDL
+ * such as custom type creation). Enum dispatch lives in
+ * `nativeEnumPlanCallStrategy` and no longer relies on codec hooks.
  */
 export const storageTypePlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   const storageTypes = ctx.toContract.storage.types ?? {};
@@ -380,11 +477,16 @@ export const storageTypePlanCallStrategy: CallMigrationStrategy = (issues, ctx) 
   for (const [typeName, typeInstance] of Object.entries(storageTypes).sort(([a], [b]) =>
     a.localeCompare(b),
   )) {
-    const hook = ctx.codecHooks.get(typeInstance.codecId);
+    // Enums walk natively in `nativeEnumPlanCallStrategy`; codec-hook
+    // dispatch here is reserved for genuinely codec-typed entries
+    // (decimal, varchar, pgvector, …).
+    if (isPostgresEnumStorageEntry(typeInstance)) continue;
+    const codecInstance = typeInstance as StorageTypeInstance;
+    const hook = ctx.codecHooks.get(codecInstance.codecId);
     if (!hook?.planTypeOperations) continue;
     const planResult = hook.planTypeOperations({
       typeName,
-      typeInstance,
+      typeInstance: codecInstance,
       contract: ctx.toContract,
       schema: ctx.schema,
       schemaName: ctx.schemaName,
@@ -446,7 +548,10 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
   const schemaLookups = buildSchemaLookupMap(ctx.schema);
 
   const mutableCodecHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-  const mutableStorageTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
+  const mutableStorageTypes = ctx.storageTypes as Record<
+    string,
+    StorageTypeInstance | PostgresEnumType
+  >;
 
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
@@ -597,25 +702,33 @@ function canUseSharedTemporaryDefaultStrategy(options: {
  * `policy.allowedOperationClasses`:
  *
  * - When `'data'` is allowed (`migration plan`), the data-safe strategies
- *   (`enumChangeCallStrategy`, `notNullBackfillCallStrategy`,
- *   `typeChangeCallStrategy`, `nullableTighteningCallStrategy`) consume their
- *   matching issues and emit `DataTransformCall` placeholders or recipe ops.
+ *   (`notNullBackfillCallStrategy`, `typeChangeCallStrategy`,
+ *   `nullableTighteningCallStrategy`) and the enum walk
+ *   (`nativeEnumPlanCallStrategy`) consume their matching issues and emit
+ *   `DataTransformCall` placeholders or recipe ops.
  *
- * - When `'data'` is not allowed (`db update` / `db init`), each data-safe
- *   strategy short-circuits to `no_match`, leaving the issue for the
- *   downstream walk-schema strategies (`storageTypePlanCallStrategy`,
- *   `notNullAddColumnCallStrategy`) or the `mapIssueToCall` default to handle
- *   with direct DDL.
+ * - When `'data'` is not allowed (`db update` / `db init`), the
+ *   placeholder-emitting strategies short-circuit to `no_match`, leaving
+ *   the issue for the downstream walk-schema strategies
+ *   (`storageTypePlanCallStrategy`, `notNullAddColumnCallStrategy`) or the
+ *   `mapIssueToCall` default to handle with direct DDL.
+ *   `nativeEnumPlanCallStrategy` runs in both modes; under `db update` /
+ *   `db init` it emits the rebuild recipe without the data-transform
+ *   placeholder so value-removal data loss surfaces as a runtime cast
+ *   error rather than silent loss.
  *
- * Order matters: data-safe strategies must run before the walk-schema
- * strategies on overlapping issue kinds (e.g. `enum_values_changed`,
- * `missing_column` for NOT NULL) so they take priority when active.
+ * Enum dispatch is unified into a single strategy: the
+ * `nativeEnumPlanCallStrategy` decides per-emission whether to emit a
+ * rebuild recipe (`recipe: true`, contiguous slot) or hoist the call
+ * into the `dep` bucket (`recipe: false`, so a brand-new
+ * `CreateEnumTypeCall` runs before any `CreateTableCall` referencing
+ * it). Codec-typed entries continue through `storageTypePlanCallStrategy`.
  */
 export const postgresPlannerStrategies: readonly CallMigrationStrategy[] = [
-  enumChangeCallStrategy,
   notNullBackfillCallStrategy,
   typeChangeCallStrategy,
   nullableTighteningCallStrategy,
+  nativeEnumPlanCallStrategy,
   storageTypePlanCallStrategy,
   notNullAddColumnCallStrategy,
 ];

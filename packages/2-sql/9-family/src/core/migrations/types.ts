@@ -1,6 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
+  ContractSerializer,
   ContractSpace,
   ControlAdapterDescriptor,
   ControlDriverInstance,
@@ -18,6 +19,7 @@ import type {
   OperationContext,
   OpFactoryCall,
   SchemaIssue,
+  SchemaVerifier,
 } from '@prisma-next/framework-components/control';
 import type {
   SqlStorage,
@@ -463,9 +465,26 @@ export interface MultiSpaceRunnerFailure extends SqlMigrationRunnerFailure {
 
 export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiSpaceRunnerFailure>;
 
-export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDetails>
-  extends MigratableTargetDescriptor<'sql', TTargetId, SqlControlFamilyInstance> {
+export interface SqlControlTargetDescriptor<
+  TTargetId extends string,
+  TTargetDetails,
+  TContract extends Contract<SqlStorage> = Contract<SqlStorage>,
+> extends MigratableTargetDescriptor<'sql', TTargetId, SqlControlFamilyInstance> {
   readonly queryOperations?: () => SqlOperationDescriptors;
+  /**
+   * JSON ⇄ class boundary for the SQL target's contract. The descriptor
+   * composes a concrete `SqlContractSerializerBase` subclass; the rest
+   * of the control stack reaches `descriptor.contractSerializer` rather
+   * than importing a per-target `validateContract` function.
+   */
+  readonly contractSerializer: ContractSerializer<TContract>;
+  /**
+   * Per-target schema verifier walking the contract against
+   * `SqlSchemaIR`. The descriptor composes a concrete
+   * `SqlSchemaVerifierBase` subclass; the family-shared walk lives on
+   * the base, the target-specific dispatch on the subclass.
+   */
+  readonly schemaVerifier: SchemaVerifier<TContract, SqlSchemaIR>;
   createPlanner(family: SqlControlFamilyInstance): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }

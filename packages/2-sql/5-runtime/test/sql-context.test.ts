@@ -1,5 +1,5 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
@@ -23,7 +23,7 @@ const testContract: Contract<SqlStorage> = {
   profileHash: profileHash('sha256:test'),
   models: {},
   roots: {},
-  storage: { storageHash: coreHash('sha256:test'), tables: {} },
+  storage: new SqlStorage({ storageHash: coreHash('sha256:test'), tables: {} }),
   extensionPacks: {},
   capabilities: {},
   meta: {},
@@ -291,7 +291,7 @@ describe('contract/stack validation errors', () => {
   it('throws RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR when contract references a generator the stack does not provide', () => {
     const contractWithUnknownGenerator: Contract<SqlStorage> = {
       ...testContract,
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         tables: {
           user: {
@@ -303,7 +303,7 @@ describe('contract/stack validation errors', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       execution: {
         executionHash: executionHash('sha256:test'),
         mutations: {
@@ -334,7 +334,7 @@ describe('contract/stack validation errors', () => {
   it('lists all missing mutation default generator ids in a single error', () => {
     const contractWithMissingGenerators: Contract<SqlStorage> = {
       ...testContract,
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         tables: {
           user: {
@@ -347,7 +347,7 @@ describe('contract/stack validation errors', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       execution: {
         executionHash: executionHash('sha256:test'),
         mutations: {
@@ -380,7 +380,7 @@ describe('contract/stack validation errors', () => {
   it('passes when all referenced mutation default generator ids are registered', () => {
     const contractWithRegisteredGenerator: Contract<SqlStorage> = {
       ...testContract,
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         tables: {
           user: {
@@ -392,7 +392,7 @@ describe('contract/stack validation errors', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       execution: {
         executionHash: executionHash('sha256:test'),
         mutations: {
@@ -415,7 +415,7 @@ describe('contract/stack validation errors', () => {
 describe('applyMutationDefaults', () => {
   const contractWithDefaults: Contract<SqlStorage> = {
     ...testContract,
-    storage: {
+    storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
       tables: {
         user: {
@@ -429,7 +429,7 @@ describe('applyMutationDefaults', () => {
           foreignKeys: [],
         },
       },
-    },
+    }),
     execution: {
       executionHash: executionHash('sha256:test'),
       mutations: {
@@ -527,7 +527,7 @@ describe('applyMutationDefaults', () => {
 
     const contractWithCounter: Contract<SqlStorage> = {
       ...testContract,
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         tables: {
           user: {
@@ -540,7 +540,7 @@ describe('applyMutationDefaults', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       execution: {
         executionHash: executionHash('sha256:test'),
         mutations: {
@@ -617,7 +617,7 @@ describe('applyMutationDefaults', () => {
 
     const contractWithCorrelationId: Contract<SqlStorage> = {
       ...testContract,
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         tables: {
           event: {
@@ -631,7 +631,7 @@ describe('applyMutationDefaults', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       execution: {
         executionHash: executionHash('sha256:test'),
         mutations: {
@@ -699,7 +699,7 @@ describe('applyMutationDefaults', () => {
 
     const contractWithCounter: Contract<SqlStorage> = {
       ...testContract,
-      storage: {
+      storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         tables: {
           user: {
@@ -711,7 +711,7 @@ describe('applyMutationDefaults', () => {
             foreignKeys: [],
           },
         },
-      },
+      }),
       execution: {
         executionHash: executionHash('sha256:test'),
         mutations: {

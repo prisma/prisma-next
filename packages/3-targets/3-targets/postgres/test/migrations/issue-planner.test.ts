@@ -1,9 +1,11 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
+import { PostgresEnumType } from '../../src/exports/types';
 
 function makeContract(
   overrides: Partial<Contract<SqlStorage>['storage']> = {},
@@ -12,11 +14,11 @@ function makeContract(
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: {
+    storage: new SqlStorage({
       storageHash: coreHash('sha256:contract'),
       tables: {},
       ...overrides,
-    },
+    }),
     roots: {},
     models: {},
     capabilities: {},
@@ -30,6 +32,25 @@ const defaultCtx = {
   codecHooks: new Map(),
   storageTypes: {},
 };
+
+function makeSchemaWithEnum(nativeType: string, values: readonly string[]): SqlSchemaIR {
+  return {
+    tables: {},
+    annotations: {
+      pg: {
+        storageTypes: {
+          [nativeType]: {
+            kind: 'postgres-enum',
+            codecId: 'pg/enum@1',
+            nativeType,
+            values,
+            typeParams: { values },
+          },
+        },
+      },
+    },
+  };
+}
 
 describe('planIssues', () => {
   describe('missing_table', () => {
@@ -329,21 +350,19 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {},
         types: {
-          status: {
-            nativeType: 'status',
-            codecId: 'pg/enum@1',
-            typeParams: { values: ['active', 'inactive', 'archived'] },
-          },
+          status: new PostgresEnumType({
+            name: 'status',
+            values: ['active', 'inactive', 'archived'],
+          }),
         },
       });
       const fromContract = makeContract({
         tables: {},
         types: {
-          status: {
-            nativeType: 'status',
-            codecId: 'pg/enum@1',
-            typeParams: { values: ['active', 'inactive'] },
-          },
+          status: new PostgresEnumType({
+            name: 'status',
+            values: ['active', 'inactive'],
+          }),
         },
       });
       const issues: SchemaIssue[] = [
@@ -362,6 +381,7 @@ describe('planIssues', () => {
         toContract,
         fromContract,
         storageTypes: toContract.storage.types ?? {},
+        schema: makeSchemaWithEnum('status', ['active', 'inactive']),
       });
 
       expect(result.ok).toBe(true);
@@ -391,11 +411,10 @@ describe('planIssues', () => {
           },
         },
         types: {
-          status: {
-            nativeType: 'status',
-            codecId: 'pg/enum@1',
-            typeParams: { values: ['active'] },
-          },
+          status: new PostgresEnumType({
+            name: 'status',
+            values: ['active'],
+          }),
         },
       });
       const fromContract = makeContract({
@@ -417,11 +436,10 @@ describe('planIssues', () => {
           },
         },
         types: {
-          status: {
-            nativeType: 'status',
-            codecId: 'pg/enum@1',
-            typeParams: { values: ['active', 'inactive'] },
-          },
+          status: new PostgresEnumType({
+            name: 'status',
+            values: ['active', 'inactive'],
+          }),
         },
       });
       const issues: SchemaIssue[] = [
@@ -440,6 +458,8 @@ describe('planIssues', () => {
         toContract,
         fromContract,
         storageTypes: toContract.storage.types ?? {},
+        schema: makeSchemaWithEnum('status', ['active', 'inactive']),
+        policy: { allowedOperationClasses: ['additive', 'destructive', 'widening', 'data'] },
       });
 
       expect(result.ok).toBe(true);

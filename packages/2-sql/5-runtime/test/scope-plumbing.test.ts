@@ -45,7 +45,7 @@ const testContract: Contract<SqlStorage> = {
   profileHash: profileHash('sha256:test'),
   models: {},
   roots: {},
-  storage: { storageHash: coreHash('sha256:test'), tables: {} },
+  storage: { storageHash: coreHash('sha256:test'), tables: {}, namespaces: {} },
   extensionPacks: {},
   capabilities: {},
   meta: {},

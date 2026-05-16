@@ -11,6 +11,7 @@ import {
   createBuiltinLikeControlMutationDefaults,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  testEnumEntityContributions,
 } from './fixtures';
 
 const testIndexPack = {
@@ -30,6 +31,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
       scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
       ...input,
     });
 
@@ -354,7 +356,12 @@ model Post {
     expect(result.value.storage).toMatchObject({
       types: {
         Email: { codecId: 'pg/text@1', nativeType: 'text' },
-        Role: { codecId: 'pg/enum@1', nativeType: 'Role' },
+        Role: {
+          kind: 'postgres-enum',
+          name: 'Role',
+          nativeType: 'Role',
+          values: ['USER', 'ADMIN'],
+        },
       },
       tables: {
         user: {

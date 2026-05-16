@@ -2,7 +2,8 @@ import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { UNSPECIFIED_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { SqlStorage, SqlUnspecifiedNamespace } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import type { SqlRuntimeExtensionDescriptor } from '../src/sql-context';
@@ -134,6 +135,7 @@ describe('createExecutionContext — column codec integrity', () => {
           foreignKeys: [],
         },
       },
+      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
     };
     return {
       targetFamily: 'sql',
@@ -260,7 +262,7 @@ describe('createExecutionContext — column codec integrity', () => {
   });
 
   it('accepts a typeRef column whose typed instance carries typeParams', () => {
-    const storage: SqlStorage = {
+    const storage: SqlStorage = new SqlStorage({
       storageHash: coreHash('sha256:test'),
       tables: {
         Doc: {
@@ -280,12 +282,14 @@ describe('createExecutionContext — column codec integrity', () => {
       },
       types: {
         V1536: {
+          kind: 'codec-instance',
           codecId: 'pgvector/vector@1',
           nativeType: 'vector',
           typeParams: { length: 1536 },
         },
       },
-    };
+      namespaces: { [UNSPECIFIED_NAMESPACE_ID]: SqlUnspecifiedNamespace.instance },
+    });
     const contract: Contract<SqlStorage> = {
       targetFamily: 'sql',
       target: 'postgres',

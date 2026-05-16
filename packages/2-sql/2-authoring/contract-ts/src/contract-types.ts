@@ -5,10 +5,12 @@ import type {
   StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import type { IndexTypeRegistration } from '@prisma-next/sql-contract/index-types';
 import type {
   ContractWithTypeMaps,
   Index,
+  PostgresEnumStorageEntry,
   ReferentialAction,
   StorageTypeInstance,
   TypeMaps,
@@ -108,7 +110,10 @@ type DefinitionModels<Definition> = Definition extends {
 type DefinitionTypes<Definition> = Definition extends {
   readonly types?: unknown;
 }
-  ? Present<Definition['types']> extends Record<string, StorageTypeInstance>
+  ? Present<Definition['types']> extends Record<
+      string,
+      StorageTypeInstance | PostgresEnumStorageEntry
+    >
     ? Present<Definition['types']>
     : Record<never, never>
   : Record<never, never>;
@@ -272,7 +277,10 @@ type DescriptorTypeRef<Descriptor> = Descriptor extends {
   ? TypeRef
   : undefined;
 
-type LookupNamedStorageTypeKeyByValue<Definition, TypeRef extends StorageTypeInstance> = {
+type LookupNamedStorageTypeKeyByValue<
+  Definition,
+  TypeRef extends StorageTypeInstance | PostgresEnumStorageEntry,
+> = {
   [TypeName in keyof DefinitionTypes<Definition> & string]: [TypeRef] extends [
     DefinitionTypes<Definition>[TypeName],
   ]
@@ -284,7 +292,7 @@ type LookupNamedStorageTypeKeyByValue<Definition, TypeRef extends StorageTypeIns
 
 type ResolveNamedStorageTypeKey<Definition, TypeRef> = TypeRef extends string
   ? TypeRef
-  : TypeRef extends StorageTypeInstance
+  : TypeRef extends StorageTypeInstance | PostgresEnumStorageEntry
     ? [LookupNamedStorageTypeKeyByValue<Definition, TypeRef>] extends [never]
       ? string
       : LookupNamedStorageTypeKeyByValue<Definition, TypeRef>
@@ -517,6 +525,7 @@ type BuiltStorage<Definition> = {
   readonly storageHash: StorageHashBase<string>;
   readonly tables: BuiltStorageTables<Definition>;
   readonly types: DefinitionTypes<Definition>;
+  readonly namespaces: Readonly<Record<string, Namespace>>;
 };
 
 type FieldOutputType<

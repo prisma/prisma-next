@@ -8,6 +8,18 @@ import type {
   ProfileHashBase,
   StorageHashBase,
 } from '@prisma-next/contract/types';
+import {
+  createEntityHelpersFromNamespace,
+  type EntityHelpersFromNamespace,
+  type ExtractAuthoringNamespaceFromPack,
+  type MergeExtensionAuthoringNamespaces,
+} from '@prisma-next/contract-authoring';
+import type { AuthoringEntityTypeNamespace } from '@prisma-next/framework-components/authoring';
+import {
+  assertNoCrossRegistryCollisions,
+  isAuthoringEntityTypeDescriptor,
+  mergeAuthoringNamespaces,
+} from '@prisma-next/framework-components/authoring';
 import type {
   ExtensionPackRef,
   FamilyPackRef,
@@ -15,20 +27,47 @@ import type {
 } from '@prisma-next/framework-components/components';
 import {
   applyPolymorphicScopeToMongoIndex,
-  type MongoCollectionOptions,
+  MongoCollection,
+  type MongoCollectionInput,
+  MongoCollectionOptions,
+  type MongoCollectionOptionsAuthoringInput,
+  type MongoCollectionOptionsInput,
   type MongoContract,
   type MongoContractWithTypeMaps,
-  type MongoIndex,
+  MongoIndex,
+  type MongoIndexAuthoringInput,
   type MongoIndexFields,
-  type MongoIndexOptions,
-  type MongoStorage,
-  type MongoStorageCollection,
-  type MongoStorageCollectionOptions,
-  type MongoStorageIndex,
+  type MongoIndexInput,
+  type MongoIndexOptionsInput,
+  type MongoStorageShape,
   type MongoTypeMaps,
-  validateMongoContract,
 } from '@prisma-next/mongo-contract';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
+
+// `canonicalStringify` rejects non-plain objects so a `Map` or class
+// instance cannot silently collapse to `{}`. The storage-shape values
+// produced by `toStorageIndex` post-M2-R2 are `MongoIndex` class
+// instances (see ADR for the storage-map class flip / FR18), which
+// trips that guard. This local helper produces the same key-sorted,
+// JSON-like representation `canonicalStringify` produces for plain
+// objects, but accepts class instances by reading their enumerable
+// properties via `Object.entries`. The output is only used as an
+// in-memory dedup signature for collection indexes; it never leaves
+// the builder.
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(',')}]`;
+  }
+
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
+      .join(',')}}`;
+  }
+
+  return JSON.stringify(value);
+}
 
 type VariantSpec = {
   readonly value: string;
@@ -158,8 +197,8 @@ export interface ModelBuilder<
   readonly __name: Name;
   readonly __fields: Fields;
   readonly __relations: Relations;
-  readonly __indexes: readonly MongoIndex[] | undefined;
-  readonly __collectionOptions: MongoCollectionOptions | undefined;
+  readonly __indexes: readonly MongoIndexAuthoringInput[] | undefined;
+  readonly __collectionOptions: MongoCollectionOptionsAuthoringInput | undefined;
   readonly __collection: Collection;
   readonly __owner: Owner;
   readonly __base: Base;
@@ -412,7 +451,7 @@ type DerivedRootModels<Models extends Record<string, AnyModelBuilder>> = Simplif
 }>;
 
 type StorageCollectionsFromModels<Models extends Record<string, AnyModelBuilder>> = Simplify<{
-  readonly [K in keyof Models as CollectionName<Models[K]>]: MongoStorageCollection;
+  readonly [K in keyof Models as CollectionName<Models[K]>]: MongoCollection;
 }>;
 
 type NormalizeRoots<Roots extends Record<string, ModelNameInput>> = Simplify<{
@@ -465,7 +504,7 @@ type DefinitionTargetId<Definition> = Definition extends {
   : string;
 
 type DefinitionStorage<Definition> = Simplify<
-  MongoStorage & {
+  MongoStorageShape & {
     readonly collections: StorageCollectionsFromModels<DefinitionModels<Definition>>;
     readonly storageHash: StorageHashBase<string>;
   }
@@ -500,13 +539,87 @@ export type MongoContractResult<Definition> = MongoContractWithTypeMaps<
   MongoTypeMaps<CodecTypesFromDefinition<Definition>>
 >;
 
-type ContractAuthoringHelpers = {
+type ExtractEntitiesNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
+  Pack,
+  'entityTypes',
+  Record<never, never>
+>;
+
+type MergeExtensionEntityNamespaces<ExtensionPacks> = MergeExtensionAuthoringNamespaces<
+  ExtensionPacks,
+  'entityTypes'
+>;
+
+export type ContractAuthoringHelpers<
+  Family extends FamilyPackRef<string> = FamilyPackRef<string>,
+  Target extends TargetPackRef<string, string> = TargetPackRef<string, string>,
+  ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
+> = EntityHelpersFromNamespace<
+  ExtractEntitiesNamespaceFromPack<Family> &
+    ExtractEntitiesNamespaceFromPack<Target> &
+    MergeExtensionEntityNamespaces<ExtensionPacks>
+> & {
   readonly field: typeof field;
   readonly index: typeof index;
   readonly model: typeof model;
   readonly rel: typeof rel;
   readonly valueObject: typeof valueObject;
 };
+
+type AuthoringComponent = {
+  readonly authoring?: { readonly entityTypes?: unknown };
+};
+
+function extractEntitiesNamespace(component: AuthoringComponent): AuthoringEntityTypeNamespace {
+  return (component.authoring?.entityTypes ?? {}) as AuthoringEntityTypeNamespace;
+}
+
+const MONGO_RESERVED_HELPER_KEYS: readonly string[] = [
+  'field',
+  'index',
+  'model',
+  'rel',
+  'valueObject',
+];
+
+function composeMongoEntityHelpers(
+  family: FamilyPackRef<string>,
+  target: TargetPackRef<string, string>,
+  extensionPacks: Record<string, ExtensionPackRef<string, string>> | undefined,
+): Record<string, unknown> {
+  const components: readonly AuthoringComponent[] = [
+    family,
+    target,
+    ...Object.values(extensionPacks ?? {}),
+  ];
+  const merged: Record<string, unknown> = {};
+  for (const component of components) {
+    const ns = extractEntitiesNamespace(component);
+    if (Object.keys(ns).length > 0) {
+      mergeAuthoringNamespaces(merged, ns, [], isAuthoringEntityTypeDescriptor, 'entity');
+    }
+  }
+  // Mongo authoring does not yet ship contributed field / type namespaces in
+  // the TS DSL surface, but the cross-registry guard mirrors SQL's call so
+  // any future field / type contributions surface a structurally identical
+  // collision error.
+  assertNoCrossRegistryCollisions({}, {}, merged as AuthoringEntityTypeNamespace);
+  // Pack-contributed entity types flatten onto the same top-level shape
+  // as the built-in helpers (`model`, `rel`, `field`, `index`,
+  // `valueObject`). Detect collisions explicitly so a contributed name
+  // can't silently overwrite a built-in at runtime.
+  const collisions = Object.keys(merged).filter((name) =>
+    MONGO_RESERVED_HELPER_KEYS.includes(name),
+  );
+  if (collisions.length > 0) {
+    throw new Error(
+      `Pack-contributed entity type(s) ${collisions.map((c) => `"${c}"`).join(', ')} collide with the reserved built-in helper key(s) on the Mongo composed helpers surface. Reserved keys: ${MONGO_RESERVED_HELPER_KEYS.map((k) => `"${k}"`).join(', ')}.`,
+    );
+  }
+  return createEntityHelpersFromNamespace(merged as AuthoringEntityTypeNamespace, {
+    ctx: { family: family.familyId, target: target.targetId },
+  });
+}
 
 export type ContractScaffold<
   Family extends FamilyPackRef<string>,
@@ -539,7 +652,10 @@ export type ContractFactory<
   Models extends Record<string, AnyModelBuilder> = Record<never, never>,
   ValueObjects extends Record<string, AnyValueObjectBuilder> = Record<never, never>,
   Roots extends Record<string, ModelNameInput> | undefined = undefined,
-> = (helpers: ContractAuthoringHelpers) => {
+  Family extends FamilyPackRef<string> = FamilyPackRef<string>,
+  Target extends TargetPackRef<string, string> = TargetPackRef<string, string>,
+  ExtensionPacks extends Record<string, ExtensionPackRef<string, string>> | undefined = undefined,
+> = (helpers: ContractAuthoringHelpers<Family, Target, ExtensionPacks>) => {
   readonly models?: Models;
   readonly valueObjects?: ValueObjects;
   readonly roots?: Roots;
@@ -667,17 +783,17 @@ export function index<const Fields extends MongoIndexFields>(
 };
 export function index<const Fields extends MongoIndexFields, const Options>(
   fields: Fields,
-  options: StrictShape<Options, MongoIndexOptions>,
+  options: StrictShape<Options, MongoIndexOptionsInput>,
 ): {
   readonly fields: Fields;
-  readonly options: Options & MongoIndexOptions;
+  readonly options: Options & MongoIndexOptionsInput;
 };
 export function index(
   fields: MongoIndexFields,
-  options?: MongoIndexOptions,
+  options?: MongoIndexOptionsInput,
 ): {
   readonly fields: MongoIndexFields;
-  readonly options?: MongoIndexOptions;
+  readonly options?: MongoIndexOptionsInput;
 } {
   return {
     fields,
@@ -904,7 +1020,7 @@ type ModelInput<
   Fields extends Record<string, AnyFieldBuilder>,
   Relations extends Record<string, AnyRelationBuilder> | undefined,
   Collection extends string | undefined,
-  Indexes extends readonly MongoIndex[] | undefined,
+  Indexes extends readonly MongoIndexAuthoringInput[] | undefined,
   CollectionOptions,
   Owner extends ModelNameInput | undefined,
   Base extends ModelNameInput | undefined,
@@ -913,7 +1029,7 @@ type ModelInput<
 > = {
   readonly collection?: Collection;
   readonly indexes?: Indexes;
-  readonly collectionOptions?: StrictShape<CollectionOptions, MongoCollectionOptions>;
+  readonly collectionOptions?: StrictShape<CollectionOptions, MongoCollectionOptionsAuthoringInput>;
   readonly storageRelations?: StorageRelations;
   readonly fields: Fields;
   readonly relations?: Relations;
@@ -927,7 +1043,7 @@ export function model<
   const Fields extends Record<string, AnyFieldBuilder>,
   const Relations extends Record<string, AnyRelationBuilder> | undefined = undefined,
   const Collection extends string | undefined = undefined,
-  const Indexes extends readonly MongoIndex[] | undefined = undefined,
+  const Indexes extends readonly MongoIndexAuthoringInput[] | undefined = undefined,
   const CollectionOptions = undefined,
   const Owner extends ModelNameInput | undefined = undefined,
   const Base extends ModelNameInput | undefined = undefined,
@@ -1181,37 +1297,49 @@ function normalizeRoots(roots: Record<string, ModelNameInput> | undefined): Reco
   return normalizedRoots;
 }
 
-function toStorageIndex(index: MongoIndex): MongoStorageIndex {
+function toStorageIndex(index: MongoIndexAuthoringInput): MongoIndex {
   const keys = Object.entries(index.fields).map(([field, direction]) => ({
     field,
     direction,
   }));
-  const result: Record<string, unknown> = { keys };
+  const input: Record<string, unknown> = { keys };
   if (index.options) {
     for (const [key, value] of Object.entries(index.options)) {
       if (value !== undefined) {
-        result[key] = value;
+        input[key] = value;
       }
     }
   }
-  return result as unknown as MongoStorageIndex;
+  return new MongoIndex(input as unknown as MongoIndexInput);
 }
 
-function toStorageCollectionOptions(opts: MongoCollectionOptions): MongoStorageCollectionOptions {
-  const result: Record<string, unknown> = {};
-  if (opts.capped) {
-    result['capped'] = { size: opts.size ?? 0, ...(opts.max != null ? { max: opts.max } : {}) };
-  }
-  if (opts.timeseries) result['timeseries'] = opts.timeseries;
-  if (opts.collation) result['collation'] = opts.collation;
-  if (opts.changeStreamPreAndPostImages)
-    result['changeStreamPreAndPostImages'] = opts.changeStreamPreAndPostImages;
-  if (opts.clusteredIndex) result['clusteredIndex'] = { name: opts.clusteredIndex.name };
-  return result as unknown as MongoStorageCollectionOptions;
+function toStorageCollectionOptions(
+  opts: MongoCollectionOptionsAuthoringInput,
+): MongoCollectionOptions {
+  const input: MongoCollectionOptionsInput = {
+    ...(opts.capped
+      ? { capped: { size: opts.size ?? 0, ...(opts.max != null && { max: opts.max }) } }
+      : {}),
+    ...(opts.storageEngine !== undefined && { storageEngine: opts.storageEngine }),
+    ...(opts.indexOptionDefaults !== undefined && {
+      indexOptionDefaults: opts.indexOptionDefaults,
+    }),
+    ...(opts.collation !== undefined && { collation: opts.collation }),
+    ...(opts.timeseries !== undefined && { timeseries: opts.timeseries }),
+    ...(opts.clusteredIndex !== undefined && {
+      clusteredIndex:
+        opts.clusteredIndex.name !== undefined ? { name: opts.clusteredIndex.name } : {},
+    }),
+    ...(opts.expireAfterSeconds !== undefined && { expireAfterSeconds: opts.expireAfterSeconds }),
+    ...(opts.changeStreamPreAndPostImages !== undefined && {
+      changeStreamPreAndPostImages: opts.changeStreamPreAndPostImages,
+    }),
+  };
+  return new MongoCollectionOptions(input);
 }
 
 function findMissingIndexField(
-  index: MongoIndex,
+  index: MongoIndexAuthoringInput,
   modelFields: Record<string, unknown>,
 ): string | undefined {
   for (const fieldName of Object.keys(index.fields)) {
@@ -1240,11 +1368,11 @@ function resolveVariantScope(
 }
 
 function scopeVariantIndex(
-  storageIndex: MongoStorageIndex,
+  storageIndex: MongoIndex,
   scope: { discriminatorField: string; discriminatorValue: string },
   variantName: string,
-  authoredIndex: MongoIndex | undefined,
-): MongoStorageIndex {
+  authoredIndex: MongoIndexAuthoringInput | undefined,
+): MongoIndex {
   const result = applyPolymorphicScopeToMongoIndex(storageIndex, scope);
   if (result.kind === 'conflict') {
     const indexLabel = authoredIndex ? canonicalStringify(authoredIndex) : '<unknown>';
@@ -1257,8 +1385,8 @@ function scopeVariantIndex(
 
 function buildCollections(
   models: Record<string, AnyModelBuilder> | undefined,
-): Record<string, MongoStorageCollection> {
-  const collections: Record<string, MongoStorageCollection> = {};
+): Record<string, MongoCollection> {
+  const intermediate: Record<string, MongoCollectionInput> = {};
   const declaredIndexOwners = new Map<string, string>();
   const modelMap = models ?? {};
   const modelsByName: Record<string, AnyModelBuilder> = {};
@@ -1283,7 +1411,7 @@ function buildCollections(
       continue;
     }
 
-    const existingCollection = collections[modelBuilder.__collection] ?? {};
+    const existingCollection: MongoCollectionInput = intermediate[modelBuilder.__collection] ?? {};
     const existingIndexes = existingCollection.indexes ?? [];
 
     if (existingCollection.options && modelBuilder.__collectionOptions) {
@@ -1322,7 +1450,7 @@ function buildCollections(
     for (let i = 0; i < storageIndexes.length; i++) {
       const storageIndex = storageIndexes[i];
       if (storageIndex === undefined) continue;
-      const indexSignature = canonicalStringify(storageIndex);
+      const indexSignature = stableStringify(storageIndex);
       const collectionIndexKey = `${modelBuilder.__collection}:${indexSignature}`;
       const firstOwner = declaredIndexOwners.get(collectionIndexKey);
       if (firstOwner) {
@@ -1340,7 +1468,7 @@ function buildCollections(
       ? toStorageCollectionOptions(modelBuilder.__collectionOptions)
       : undefined;
 
-    collections[modelBuilder.__collection] =
+    intermediate[modelBuilder.__collection] =
       storageIndexes.length > 0
         ? {
             ...existingCollection,
@@ -1355,6 +1483,10 @@ function buildCollections(
           : existingCollection;
   }
 
+  const collections: Record<string, MongoCollection> = {};
+  for (const [name, data] of Object.entries(intermediate)) {
+    collections[name] = new MongoCollection(data);
+  }
   return collections;
 }
 
@@ -1407,8 +1539,6 @@ function buildContractFromDefinition<
     meta: {},
   } satisfies MongoContract;
 
-  validateMongoContract(builtContract);
-
   return builtContract as MongoContractResult<Definition>;
 }
 
@@ -1425,9 +1555,9 @@ export function defineContract<
 >(definition: Definition): MongoContractResult<Definition>;
 export function defineContract<
   const Definition extends ContractScaffold<
-    FamilyPackRef<string>,
-    TargetPackRef<string, string>,
-    Record<string, ExtensionPackRef<string, string>> | undefined,
+    Family,
+    Target,
+    ExtensionPacks,
     ContractCapabilities | undefined,
     Record<string, ModelNameInput> | undefined
   >,
@@ -1436,9 +1566,14 @@ export function defineContract<
     readonly valueObjects?: Record<string, AnyValueObjectBuilder>;
     readonly roots?: Record<string, ModelNameInput>;
   },
+  const Family extends FamilyPackRef<string> = FamilyPackRef<string>,
+  const Target extends TargetPackRef<string, string> = TargetPackRef<string, string>,
+  const ExtensionPacks extends
+    | Record<string, ExtensionPackRef<string, string>>
+    | undefined = undefined,
 >(
   definition: Definition,
-  factory: (_helpers: ContractAuthoringHelpers) => Built,
+  factory: (helpers: ContractAuthoringHelpers<Family, Target, ExtensionPacks>) => Built,
 ): MongoContractResult<Definition & Built>;
 export function defineContract(
   definition: ContractScaffold<
@@ -1464,8 +1599,22 @@ export function defineContract(
     return buildContractFromDefinition(definition);
   }
 
+  const entities = composeMongoEntityHelpers(
+    definition.family,
+    definition.target,
+    definition.extensionPacks,
+  );
+  const helpers = {
+    ...entities,
+    field,
+    index,
+    model,
+    rel,
+    valueObject,
+  } as unknown as ContractAuthoringHelpers;
+
   return buildContractFromDefinition({
     ...definition,
-    ...factory({ field, index, model, rel, valueObject }),
+    ...factory(helpers),
   });
 }

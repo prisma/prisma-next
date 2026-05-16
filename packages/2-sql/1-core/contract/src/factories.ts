@@ -1,42 +1,32 @@
 import type { ScalarFieldType } from '@prisma-next/contract/types';
-import type {
+import {
+  applyFkDefaults,
   ForeignKey,
-  ForeignKeyOptions,
-  ForeignKeyReferences,
+  type ForeignKeyOptions,
   Index,
   PrimaryKey,
-  SqlModelFieldStorage,
-  SqlModelStorage,
+  type SqlModelFieldStorage,
+  type SqlModelStorage,
   StorageColumn,
+  type StorageColumnInput,
   StorageTable,
   UniqueConstraint,
 } from './types';
-import { applyFkDefaults } from './types';
 
 export function col(nativeType: string, codecId: string, nullable = false): StorageColumn {
-  return {
-    nativeType,
-    codecId,
-    nullable,
-  };
+  return new StorageColumn({ nativeType, codecId, nullable });
 }
 
 export function pk(...columns: readonly string[]): PrimaryKey {
-  return {
-    columns,
-  };
+  return new PrimaryKey({ columns });
 }
 
 export function unique(...columns: readonly string[]): UniqueConstraint {
-  return {
-    columns,
-  };
+  return new UniqueConstraint({ columns });
 }
 
 export function index(...columns: readonly string[]): Index {
-  return {
-    columns,
-  };
+  return new Index({ columns });
 }
 
 export function fk(
@@ -45,23 +35,20 @@ export function fk(
   refColumns: readonly string[],
   opts?: ForeignKeyOptions & { constraint?: boolean; index?: boolean },
 ): ForeignKey {
-  const references: ForeignKeyReferences = {
-    table: refTable,
-    columns: refColumns,
-  };
-
-  return {
+  const defaults = applyFkDefaults({ constraint: opts?.constraint, index: opts?.index });
+  return new ForeignKey({
     columns,
-    references,
+    references: { table: refTable, columns: refColumns },
     ...(opts?.name !== undefined && { name: opts.name }),
     ...(opts?.onDelete !== undefined && { onDelete: opts.onDelete }),
     ...(opts?.onUpdate !== undefined && { onUpdate: opts.onUpdate }),
-    ...applyFkDefaults({ constraint: opts?.constraint, index: opts?.index }),
-  };
+    constraint: defaults.constraint,
+    index: defaults.index,
+  });
 }
 
 export function table(
-  columns: Record<string, StorageColumn>,
+  columns: Record<string, StorageColumn | StorageColumnInput>,
   opts?: {
     pk?: PrimaryKey;
     uniques?: readonly UniqueConstraint[];
@@ -69,13 +56,13 @@ export function table(
     fks?: readonly ForeignKey[];
   },
 ): StorageTable {
-  return {
+  return new StorageTable({
     columns,
     ...(opts?.pk !== undefined && { primaryKey: opts.pk }),
     uniques: opts?.uniques ?? [],
     indexes: opts?.indexes ?? [],
     foreignKeys: opts?.fks ?? [],
-  };
+  });
 }
 
 export function model(

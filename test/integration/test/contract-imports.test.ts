@@ -5,8 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 import type { EmitStackInput } from '@prisma-next/emitter';
-import { emit } from '@prisma-next/emitter';
-import { createTestContract } from '@prisma-next/emitter/test/utils';
+import { createTestContract, emit } from '@prisma-next/emitter/test/utils';
 import { extractCodecTypeImports, extractComponentIds } from '@prisma-next/family-sql/test-utils';
 import { sqlEmission } from '@prisma-next/sql-contract-emitter';
 import { timeouts } from '@prisma-next/test-utils';
@@ -299,12 +298,11 @@ type UserIdColumn = UserColumns['id'];
 
       // Create a comprehensive test file that uses all exported types
       const testFileContent = `import type { Contract, CodecTypes, Tables, Models } from './contract';
-import { validateContract } from '@prisma-next/sql-contract/validate';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import contractJson from './contract.json' with { type: 'json' };
 
 // Verify we can validate the contract
-const contract = validateContract<Contract>(contractJson, emptyCodecLookup);
+const contract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
 
 // Verify we can access all exported types
 const _tables: Tables = contract.storage.tables;
@@ -350,12 +348,10 @@ type CodecIntType = CodecTypes['pg/int4@1'];
             '@prisma-next/sql-contract/types/*': [
               `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/*`,
             ],
-            '@prisma-next/sql-contract/validate': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/validate.d.mts`,
+            '@prisma-next/family-sql/ir': [
+              `${relativeToWorkspace}/packages/2-sql/9-family/dist/ir.d.mts`,
             ],
-            '@prisma-next/sql-contract/validate/*': [
-              `${relativeToWorkspace}/packages/2-sql/1-core/contract/dist/*`,
-            ],
+            '@prisma-next/family-sql/*': [`${relativeToWorkspace}/packages/2-sql/9-family/dist/*`],
             '@prisma-next/adapter-postgres/*': [
               `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/*`,
             ],

@@ -7,7 +7,11 @@ import {
 import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
-import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  SqlStorage,
+  type SqlStorageInput,
+  type StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
@@ -281,6 +285,7 @@ describe('NOT NULL column without default uses temporary default', () => {
         frameworkComponents: [pgvectorDescriptor],
         extraStorageTypes: {
           Embedding3: {
+            kind: 'codec-instance',
             codecId: 'pg/vector@1',
             nativeType: 'vector',
             typeParams: { length: 3 },
@@ -516,7 +521,7 @@ describe('buildBuiltinIdentityValue (built-in fallback)', () => {
 
 function createTestContract(
   overrides?: Partial<Omit<Contract<SqlStorage>, 'storage'>> & {
-    storage?: Omit<SqlStorage, 'storageHash'>;
+    storage?: Omit<SqlStorageInput, 'storageHash'>;
   },
 ): Contract<SqlStorage> {
   const storageHashValue = coreHash('sha256:contract');
@@ -557,7 +562,7 @@ function createTestContract(
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: { ...storage, storageHash: storageHashValue },
+    storage: new SqlStorage({ ...storage, storageHash: storageHashValue }),
     roots: {},
     models: {},
     capabilities: {},

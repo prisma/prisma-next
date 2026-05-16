@@ -1,10 +1,10 @@
-import { introspectSchema } from '@prisma-next/adapter-mongo/control';
+import mongoAdapterDescriptor, { introspectSchema } from '@prisma-next/adapter-mongo/control';
 import {
   createMongoFamilyInstance,
   mongoFamilyDescriptor,
-  mongoTargetDescriptor,
 } from '@prisma-next/family-mongo/control';
 import { createControlStack, hasSchemaView } from '@prisma-next/framework-components/control';
+import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -14,6 +14,7 @@ function createInstance() {
   const stack = createControlStack({
     family: mongoFamilyDescriptor,
     target: mongoTargetDescriptor,
+    adapter: mongoAdapterDescriptor,
   });
   return createMongoFamilyInstance(stack);
 }

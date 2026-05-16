@@ -417,7 +417,12 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:a47c56555b1a7f1440fc1450b6dc155aa12ed482043fdb031ec4a3917fc8b20d",
+    "namespaces": {
+      "__unspecified__": {
+        "id": "__unspecified__"
+      }
+    },
+    "storageHash": "sha256:f11b50f00065a242f5755d2aa750bcbc6904163dd1a88dfb200c42c8aa7b44db",
     "tables": {
       "articles": {
         "columns": {

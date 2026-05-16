@@ -24,11 +24,13 @@ type TestContract = Contract<
     };
     readonly types: {
       readonly Vector1536: {
+        readonly kind: 'codec-instance';
         readonly codecId: 'pg/vector@1';
         readonly nativeType: 'vector';
         readonly typeParams: { readonly length: 1536 };
       };
     };
+    readonly namespaces: { readonly __unspecified__: { readonly id: '__unspecified__' } };
   },
   Record<string, never>
 >;
@@ -51,6 +53,7 @@ test('ExecutionContext preserves contract type parameter', () => {
   expectTypeOf<ContractStorageTypes>().toExtend<
     | {
         readonly Vector1536: {
+          readonly kind: 'codec-instance';
           readonly codecId: 'pg/vector@1';
           readonly nativeType: 'vector';
           readonly typeParams: { readonly length: 1536 };

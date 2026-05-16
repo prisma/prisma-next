@@ -15,7 +15,7 @@
 
 import type { MongoControlExtensionDescriptor } from '@prisma-next/family-mongo/control';
 import type { ContractSpace } from '@prisma-next/framework-components/control';
-import type { MongoContract, MongoStorage } from '@prisma-next/mongo-contract';
+import type { MongoContract, MongoStorageShape } from '@prisma-next/mongo-contract';
 import { MONGO_TEST_SPACE_ID } from './constants';
 import { mongoTestContractSpaceContract } from './contract';
 import {
@@ -23,7 +23,7 @@ import {
   mongoTestContractSpaceHeadRef,
 } from './migrations';
 
-const mongoTestContractSpace: ContractSpace<MongoContract<MongoStorage>> = {
+const mongoTestContractSpace: ContractSpace<MongoContract<MongoStorageShape>> = {
   contractJson: mongoTestContractSpaceContract,
   migrations: [mongoTestContractSpaceBaselineMigration],
   headRef: mongoTestContractSpaceHeadRef,

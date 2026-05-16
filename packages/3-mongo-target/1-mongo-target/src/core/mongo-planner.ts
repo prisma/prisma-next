@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { contractToMongoSchemaIR } from '@prisma-next/family-mongo/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   MigrationOperationClass,
@@ -18,7 +19,6 @@ import type {
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 import { canonicalize, deepEqual } from '@prisma-next/mongo-schema-ir';
-import { contractToMongoSchemaIR } from './contract-to-schema';
 import type { OpFactoryCall } from './op-factory-call';
 import {
   CollModCall,

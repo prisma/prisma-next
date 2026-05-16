@@ -1,0 +1,60 @@
+import type { StorageType } from '@prisma-next/framework-components/ir';
+
+/**
+ * Sentinel kind for the legacy codec-triple shape persisted under
+ * `SqlStorage.types`. Plain JSON-clean object literals carry this
+ * discriminator so the polymorphic slot dispatch can route them down
+ * the codec path while target-specific IR class instances (e.g. the
+ * Postgres enum class) keep their own narrower `kind` literal.
+ */
+export const CODEC_INSTANCE_KIND = 'codec-instance' as const;
+
+/**
+ * Structural sub-interface of {@link StorageType} for codec-typed entries
+ * in `SqlStorage.types`. These are plain object literals — there is no
+ * runtime IR class, the JSON envelope round-trips through the slot
+ * unchanged. The `kind: 'codec-instance'` discriminator is the dispatch
+ * key that distinguishes codec-typed entries from class-instance entries
+ * (e.g. `PostgresEnumType`) sharing the polymorphic slot.
+ */
+export interface StorageTypeInstance extends StorageType {
+  readonly kind: typeof CODEC_INSTANCE_KIND;
+  readonly codecId: string;
+  readonly nativeType: string;
+  readonly typeParams: Record<string, unknown>;
+}
+
+/**
+ * Construction-time input for a codec-triple entry. Symmetric with the
+ * structural runtime shape minus the `kind` discriminator — callers may
+ * omit `kind`; the helper {@link toStorageTypeInstance} stamps it on.
+ */
+export interface StorageTypeInstanceInput {
+  readonly codecId: string;
+  readonly nativeType: string;
+  readonly typeParams: Record<string, unknown>;
+}
+
+/**
+ * Stamp the codec-instance `kind` discriminator on a caller-supplied
+ * codec triple. Idempotent: input that already carries the discriminator
+ * passes through unchanged.
+ */
+export function toStorageTypeInstance(input: StorageTypeInstanceInput): StorageTypeInstance {
+  return {
+    kind: CODEC_INSTANCE_KIND,
+    codecId: input.codecId,
+    nativeType: input.nativeType,
+    typeParams: input.typeParams,
+  };
+}
+
+/**
+ * Type-guard for codec-typed entries on the polymorphic
+ * `SqlStorage.types` slot. Distinguishes `StorageTypeInstance` from
+ * class-instance kinds (e.g. `PostgresEnumType`).
+ */
+export function isStorageTypeInstance(value: unknown): value is StorageTypeInstance {
+  if (typeof value !== 'object' || value === null) return false;
+  return (value as { kind?: unknown }).kind === CODEC_INSTANCE_KIND;
+}

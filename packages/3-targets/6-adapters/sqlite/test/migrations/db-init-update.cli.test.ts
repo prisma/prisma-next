@@ -58,6 +58,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
     profileHash: profileHash(`sha256:ext-test-v${version}`),
     storage: {
       storageHash: coreHash(`sha256:ext-contract-v${version}`),
+      namespaces: {},
       tables: {
         _ext_helper: {
           columns: {

@@ -140,6 +140,7 @@ describe('authoring helper runtime', () => {
     };
 
     expect(helpers.pgvector.Vector(1536)).toEqual({
+      kind: 'codec-instance',
       codecId: 'pg/vector@1',
       nativeType: 'vector',
       typeParams: { length: 1536 },

@@ -17,6 +17,7 @@ describe('shared contract definition lowering', () => {
       target: postgresTargetPack,
       storageTypes: {
         Role: {
+          kind: 'codec-instance',
           codecId: 'pg/enum@1',
           nativeType: 'role',
           typeParams: { values: ['USER', 'ADMIN'] },
@@ -143,6 +144,7 @@ describe('shared contract definition lowering', () => {
     >;
 
     expect(storage['types']?.['Role']).toEqual({
+      kind: 'codec-instance',
       codecId: 'pg/enum@1',
       nativeType: 'role',
       typeParams: { values: ['USER', 'ADMIN'] },

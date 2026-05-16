@@ -15,14 +15,13 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:e24794a683382da0d74efb644461a150560e3fbde9cea38126586bab96bbdaad'>;
+  StorageHashBase<'sha256:d8e55baf0ffe02a3c7ce7cba6bd7580a9e75774d47d41559f2f9781220643d1a'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:0903547be862dca3fa2dbc62a85cd52e9ca595f00cf43b6b26a3da3d4b9740ae'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:213031a5ce861b455f22bc065769080ea0357fabcb999de0190524ecd32531f7'>;
 
 export type CodecTypes = SqliteTypes;
-export type OperationTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = Record<string, never>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
@@ -59,7 +58,6 @@ export type FieldInputTypes = {
 };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
-  OperationTypes,
   QueryOperationTypes,
   FieldOutputTypes,
   FieldInputTypes
@@ -139,6 +137,7 @@ type ContractBase = ContractType<
       };
     };
     readonly types: Record<string, never>;
+    readonly namespaces: { readonly __unspecified__: { readonly id: '__unspecified__' } };
     readonly storageHash: StorageHash;
   },
   {

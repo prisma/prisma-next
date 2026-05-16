@@ -1,10 +1,9 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm } from '@prisma-next/mongo-orm';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import { orm as sqlOrm } from '@prisma-next/sql-orm-client';
 import {
   createExecutionContext,
@@ -22,7 +21,9 @@ import type { Contract as SqlVOContract } from './fixtures/generated/sql-contrac
 import sqlContractJson from './fixtures/generated/sql-contract.json';
 
 describeWithMongoDB('value objects e2e: Mongo → real DB → typed ORM', (ctx) => {
-  const { contract } = validateMongoContract<MongoVOContract>(mongoContractJson);
+  const contract = new MongoContractSerializer().deserializeContract(
+    mongoContractJson,
+  ) as MongoVOContract;
 
   it('create and read value objects with correct types', async () => {
     const ormClient = mongoOrm({ contract, executor: ctx.runtime });
@@ -102,10 +103,9 @@ describeWithMongoDB('value objects e2e: Mongo → real DB → typed ORM', (ctx) 
 });
 
 describe('value objects e2e: SQL → real Postgres → typed round-trip', () => {
-  const sqlContract = validateContract<SqlVOContract>(
+  const sqlContract = new SqlContractSerializer().deserializeContract(
     sqlContractJson as Record<string, unknown>,
-    emptyCodecLookup,
-  );
+  ) as SqlVOContract;
 
   it(
     'JSONB value object round-trips through Postgres with correct types',

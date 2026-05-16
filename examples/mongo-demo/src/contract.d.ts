@@ -13,13 +13,12 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:cea978351276ff06d725c817bb9b6405efa78c6b2d108f72d43628bee6f74821'>;
+  StorageHashBase<'sha256:0d192ffb03dfdd08ebb65ca08f11df81b67258fb422de3019a66f27c80efc64b'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
 
 export type CodecTypes = MongoCodecTypes;
-export type OperationTypes = Record<string, never>;
 
 export type AddressOutput = {
   readonly street: CodecTypes['mongo/string@1']['output'];
@@ -77,13 +76,15 @@ export type FieldInputTypes = {
     readonly address: AddressInput | null;
   };
 };
-export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes, FieldInputTypes>;
+export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>;
 
 type ContractBase = ContractType<
   {
     readonly collections: {
       readonly users: {
+        readonly kind: 'mongo-collection';
         readonly validator: {
+          readonly kind: 'mongo-validator';
           readonly jsonSchema: {
             readonly bsonType: 'object';
             readonly properties: {
@@ -114,14 +115,17 @@ type ContractBase = ContractType<
         };
       };
       readonly posts: {
+        readonly kind: 'mongo-collection';
         readonly indexes: readonly [
           {
+            readonly kind: 'mongo-index';
             readonly keys: readonly [{ readonly field: 'summary'; readonly direction: 1 }];
             readonly unique: true;
             readonly partialFilterExpression: { readonly kind: 'article' };
           },
         ];
         readonly validator: {
+          readonly kind: 'mongo-validator';
           readonly jsonSchema: {
             readonly bsonType: 'object';
             readonly properties: {

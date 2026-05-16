@@ -1,15 +1,16 @@
-import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
+import { createMongoRunnerDeps, extractDb, readMarker } from '@prisma-next/adapter-mongo/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
-import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
-import type { MongoContract } from '@prisma-next/mongo-contract';
-import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import {
   contractToMongoSchemaIR,
+  createMongoFamilyInstance,
+} from '@prisma-next/family-mongo/control';
+import { MongoCollection, type MongoContract, MongoIndex } from '@prisma-next/mongo-contract';
+import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
+import {
   MongoMigrationPlanner,
   MongoMigrationRunner,
-  readMarker,
   serializeMongoOps,
 } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
@@ -35,7 +36,7 @@ const emptyContract: MongoContract = {
   },
   storage: {
     collections: {
-      users: {},
+      users: new MongoCollection(),
     },
     storageHash: coreHash('sha256:empty-contract'),
   },
@@ -61,9 +62,11 @@ const indexedContract: MongoContract = {
   },
   storage: {
     collections: {
-      users: {
-        indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
-      },
+      users: new MongoCollection({
+        indexes: [
+          new MongoIndex({ keys: [{ field: 'email', direction: 1 as const }], unique: true }),
+        ],
+      }),
     },
     storageHash: coreHash('sha256:indexed-contract'),
   },

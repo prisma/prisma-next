@@ -5,6 +5,8 @@ import type {
 } from '@prisma-next/framework-components/execution';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 
+export { PostgresContractSerializer } from '../core/postgres-contract-serializer';
+
 export interface PostgresRuntimeTargetInstance extends RuntimeTargetInstance<'sql', 'postgres'> {}
 
 /**

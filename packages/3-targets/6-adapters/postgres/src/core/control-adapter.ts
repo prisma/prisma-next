@@ -3,6 +3,7 @@ import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter'
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
   LoweredStatement,
@@ -19,10 +20,11 @@ import type {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
+import { readExistingEnumValues } from '@prisma-next/target-postgres/enum-planning';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
-import { pgEnumControlHooks } from './enum-control-hooks';
+import { introspectPostgresEnumTypes } from './enum-control-hooks';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
 
@@ -59,6 +61,17 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * before comparison with contract native types.
    */
   readonly normalizeNativeType = normalizeSchemaNativeType;
+
+  /**
+   * Bridges native `PostgresEnumStorageEntry` IR walks against the Postgres
+   * introspection shape (`schema.annotations.pg.storageTypes`). Lets
+   * the family-level schema verifier walk enum types without reaching
+   * into target-specific annotation layouts itself.
+   */
+  readonly resolveExistingEnumValues = (
+    schema: SqlSchemaIR,
+    enumType: PostgresEnumStorageEntry,
+  ): readonly string[] | null => readExistingEnumValues(schema, enumType.nativeType);
 
   /**
    * Lower a SQL query AST into a Postgres-flavored `{ sql, params }` payload.
@@ -573,8 +586,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const storageTypes =
-      (await pgEnumControlHooks.introspectTypes?.({ driver, schemaName: schema })) ?? {};
+    const storageTypes = await introspectPostgresEnumTypes({ driver, schemaName: schema });
 
     const annotations = {
       pg: {

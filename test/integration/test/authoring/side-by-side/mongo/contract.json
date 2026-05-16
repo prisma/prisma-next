@@ -110,6 +110,7 @@
   "storage": {
     "collections": {
       "posts": {
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -136,11 +137,13 @@
               "title"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
       },
       "users": {
+        "kind": "mongo-collection",
         "validator": {
           "jsonSchema": {
             "bsonType": "object",
@@ -167,12 +170,13 @@
               "name"
             ]
           },
+          "kind": "mongo-validator",
           "validationAction": "error",
           "validationLevel": "strict"
         }
       }
     },
-    "storageHash": "sha256:cb09278a4bee1b0db899b70cf67fe96bc858f63b4faa1e5c41c69785abae4c4b"
+    "storageHash": "sha256:6075c1c0b05f3ff223ee951ef74ae67bc57a814d6df82a80147a1d4b97aa32e4"
   },
   "capabilities": {},
   "extensionPacks": {},

@@ -4,22 +4,23 @@ import mongoAdapter from '@prisma-next/adapter-mongo/control';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import type { ContractSourceContext } from '@prisma-next/cli/config-types';
 import { enrichContract } from '@prisma-next/cli/control-api';
+import type { SerializeContract } from '@prisma-next/contract/hashing';
 import type { Contract } from '@prisma-next/contract/types';
-import { emit } from '@prisma-next/emitter';
-import { mongoFamilyDescriptor, mongoTargetDescriptor } from '@prisma-next/family-mongo/control';
+import { mongoFamilyDescriptor } from '@prisma-next/family-mongo/control';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import sql from '@prisma-next/family-sql/control';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
-import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoContract } from '@prisma-next/mongo-contract-psl/provider';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract as validateSqlContract } from '@prisma-next/sql-contract/validate';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
+import { type MongoTargetContract, mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 import postgres from '@prisma-next/target-postgres/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { dirname, join } from 'pathe';
 import { describe, expect, it } from 'vitest';
+import { emit } from '../../utils/emit';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtureRootDir = join(__dirname, 'side-by-side');
@@ -115,11 +116,12 @@ function writeExpectedContractJson(fixtureCase: FixtureCase, contractJson: strin
 }
 
 function validateEmittedSqlContract(contractJson: Record<string, unknown>) {
-  return validateSqlContract<Contract<SqlStorage>>(contractJson, emptyCodecLookup);
+  return new SqlContractSerializer().deserializeContract(contractJson) as Contract<SqlStorage>;
 }
 
 function validateEmittedMongoContract(contractJson: Record<string, unknown>) {
-  return validateMongoContract<MongoContract>(contractJson);
+  const contract = new MongoContractSerializer().deserializeContract(contractJson) as MongoContract;
+  return { contract };
 }
 
 describe('side-by-side contract examples', () => {
@@ -168,8 +170,16 @@ describe('side-by-side contract examples', () => {
 
       expect(normalizedTs).toEqual(normalizedPsl);
 
-      const emittedTs = await emit(normalizedTs, sqlStack, sql.emission);
-      const emittedPsl = await emit(normalizedPsl, sqlStack, sql.emission);
+      const sqlSerializeContract: SerializeContract = (contract) =>
+        postgres.contractSerializer.serializeContract(
+          contract as Parameters<typeof postgres.contractSerializer.serializeContract>[0],
+        );
+      const emittedTs = await emit(normalizedTs, sqlStack, sql.emission, {
+        serializeContract: sqlSerializeContract,
+      });
+      const emittedPsl = await emit(normalizedPsl, sqlStack, sql.emission, {
+        serializeContract: sqlSerializeContract,
+      });
 
       expect(emittedTs.contractJson).toBe(emittedPsl.contractJson);
 
@@ -244,8 +254,14 @@ describe('side-by-side contract examples', () => {
       };
       expect(stripValidatorFields(normalizedTs)).toEqual(stripValidatorFields(normalizedPsl));
 
-      const emittedTs = await emit(normalizedTs, mongoStack, mongoFamilyDescriptor.emission);
-      const emittedPsl = await emit(normalizedPsl, mongoStack, mongoFamilyDescriptor.emission);
+      const mongoSerializeContract: SerializeContract = (contract) =>
+        mongoTargetDescriptor.contractSerializer.serializeContract(contract as MongoTargetContract);
+      const emittedTs = await emit(normalizedTs, mongoStack, mongoFamilyDescriptor.emission, {
+        serializeContract: mongoSerializeContract,
+      });
+      const emittedPsl = await emit(normalizedPsl, mongoStack, mongoFamilyDescriptor.emission, {
+        serializeContract: mongoSerializeContract,
+      });
 
       const stripForComparison = (json: string) => {
         const parsed = JSON.parse(json) as Record<string, unknown>;

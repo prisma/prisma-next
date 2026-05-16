@@ -1,5 +1,9 @@
 import type { CodecTypes } from '../exports/codec-types';
-import { postgresAuthoringFieldPresets, postgresAuthoringTypes } from './authoring';
+import {
+  postgresAuthoringEntityTypes,
+  postgresAuthoringFieldPresets,
+  postgresAuthoringTypes,
+} from './authoring';
 
 const postgresTargetDescriptorMetaBase = {
   kind: 'target',
@@ -11,6 +15,7 @@ const postgresTargetDescriptorMetaBase = {
   authoring: {
     type: postgresAuthoringTypes,
     field: postgresAuthoringFieldPresets,
+    entityTypes: postgresAuthoringEntityTypes,
   },
 } as const;
 

@@ -8,7 +8,7 @@
  * core view via the `toSchemaView` method on `FamilyInstance`.
  */
 
-export type SchemaNodeKind =
+export type SchemaViewNodeKind =
   | 'root'
   | 'namespace'
   | 'collection'
@@ -22,7 +22,7 @@ export interface SchemaTreeVisitor<R> {
 }
 
 export interface SchemaTreeNodeOptions {
-  readonly kind: SchemaNodeKind;
+  readonly kind: SchemaViewNodeKind;
   readonly id: string;
   readonly label: string;
   readonly meta?: Record<string, unknown>;
@@ -30,7 +30,7 @@ export interface SchemaTreeNodeOptions {
 }
 
 export class SchemaTreeNode {
-  readonly kind: SchemaNodeKind;
+  readonly kind: SchemaViewNodeKind;
   readonly id: string;
   readonly label: string;
   readonly meta?: Record<string, unknown>;

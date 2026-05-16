@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   AdapterDescriptor,
   DriverDescriptor,
@@ -5,6 +6,7 @@ import type {
   FamilyDescriptor,
   TargetDescriptor,
 } from '../shared/framework-components';
+import type { ContractSerializer } from './contract-serializer';
 import type {
   ControlAdapterInstance,
   ControlDriverInstance,
@@ -33,7 +35,15 @@ export interface ControlTargetDescriptor<
     TFamilyId,
     TTargetId
   >,
+  TContract extends Contract = Contract,
 > extends TargetDescriptor<TFamilyId, TTargetId> {
+  /**
+   * JSON ⇄ class boundary for this target's contract. Every target
+   * ships the SPI: framework consumers reach the serializer through
+   * `descriptor.contractSerializer` rather than importing a per-target
+   * `validateContract` helper. The descriptor IS the aggregator.
+   */
+  readonly contractSerializer: ContractSerializer<TContract>;
   create(): TTargetInstance;
 }
 

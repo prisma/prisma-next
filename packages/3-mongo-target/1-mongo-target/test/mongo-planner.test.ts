@@ -1,5 +1,14 @@
 import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
-import type { MongoContract, MongoStorageCollection } from '@prisma-next/mongo-contract';
+import {
+  MongoCollection,
+  type MongoCollectionOptions,
+  type MongoCollectionOptionsInput,
+  type MongoContract,
+  type MongoIndex,
+  type MongoIndexInput,
+  type MongoValidator,
+  type MongoValidatorInput,
+} from '@prisma-next/mongo-contract';
 import type {
   CollModCommand,
   CreateCollectionCommand,
@@ -27,10 +36,24 @@ const ADDITIVE_ONLY_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive'],
 };
 
+type MongoCollectionData = {
+  readonly indexes?: readonly (MongoIndex | MongoIndexInput)[];
+  readonly validator?: MongoValidator | MongoValidatorInput;
+  readonly options?: MongoCollectionOptions | MongoCollectionOptionsInput;
+};
+
+function makeStorageCollection(data: MongoCollectionData): MongoCollection {
+  return new MongoCollection(data);
+}
+
 function makeContract(
-  collections: Record<string, MongoStorageCollection>,
+  collections: Record<string, MongoCollectionData>,
   storageHash = 'sha256:test-storage',
 ): MongoContract {
+  const builtCollections: Record<string, MongoCollection> = {};
+  for (const [name, data] of Object.entries(collections)) {
+    builtCollections[name] = makeStorageCollection(data);
+  }
   return {
     target: 'mongo',
     targetFamily: 'mongo',
@@ -42,7 +65,7 @@ function makeContract(
     models: {},
     storage: {
       storageHash,
-      collections,
+      collections: builtCollections,
     },
   } as unknown as MongoContract;
 }

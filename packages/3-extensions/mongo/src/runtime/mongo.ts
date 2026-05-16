@@ -1,22 +1,23 @@
 import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
   MongoContract,
   MongoContractWithTypeMaps,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
-import { validateMongoContract } from '@prisma-next/mongo-contract';
 import type { MongoOrmClient, MongoQueryPlan } from '@prisma-next/mongo-orm';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
-import type { MongoRuntime } from '@prisma-next/mongo-runtime';
+import type { MongoMiddleware, MongoRuntime } from '@prisma-next/mongo-runtime';
 import {
   createMongoExecutionContext,
   createMongoExecutionStack,
   createMongoRuntime,
 } from '@prisma-next/mongo-runtime';
 import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
+import { ifDefined } from '@prisma-next/utils/defined';
 import {
   type MongoBinding,
   type MongoBindingInput,
@@ -39,6 +40,10 @@ export interface MongoClient<
 
 export interface MongoOptionsBase {
   readonly mode?: 'strict' | 'permissive';
+  /**
+   * Optional middleware chain applied to every Mongo execution.
+   */
+  readonly middleware?: readonly MongoMiddleware[];
 }
 
 export interface MongoBindingOptions {
@@ -89,7 +94,7 @@ function resolveContract<TContract extends MongoContractWithTypeMaps<MongoContra
   options: MongoOptions<TContract>,
 ): TContract {
   const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
-  return validateMongoContract<TContract>(contractInput).contract;
+  return new MongoContractSerializer().deserializeContract(contractInput) as TContract;
 }
 
 /**
@@ -136,6 +141,7 @@ export default function mongo<
       context,
       driver,
       ...(options.mode !== undefined ? { mode: options.mode } : {}),
+      ...ifDefined('middleware', options.middleware),
     });
   };
 

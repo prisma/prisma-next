@@ -13,7 +13,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65'>;
+  StorageHashBase<'sha256:2ac66455b4ca8c2c4b9b9fac053e4740de89d871f3e773e0353dcef71536b63f'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
@@ -240,8 +240,10 @@ type ContractBase = ContractType<
   {
     readonly collections: {
       readonly products: {
+        readonly kind: 'mongo-collection';
         readonly indexes: readonly [
           {
+            readonly kind: 'mongo-index';
             readonly keys: readonly [
               { readonly field: 'name'; readonly direction: 'text' },
               { readonly field: 'description'; readonly direction: 'text' },
@@ -249,20 +251,26 @@ type ContractBase = ContractType<
             readonly weights: { readonly name: 10; readonly description: 1 };
           },
           {
+            readonly kind: 'mongo-index';
             readonly keys: readonly [
               { readonly field: 'brand'; readonly direction: 1 },
               { readonly field: 'subCategory'; readonly direction: 1 },
             ];
           },
           {
+            readonly kind: 'mongo-index';
             readonly keys: readonly [
               { readonly field: 'primaryCategory'; readonly direction: 1 },
               { readonly field: 'articleType'; readonly direction: 1 },
             ];
           },
-          { readonly keys: readonly [{ readonly field: 'code'; readonly direction: 'hashed' }] },
+          {
+            readonly kind: 'mongo-index';
+            readonly keys: readonly [{ readonly field: 'code'; readonly direction: 'hashed' }];
+          },
         ];
         readonly validator: {
+          readonly kind: 'mongo-validator';
           readonly jsonSchema: {
             readonly bsonType: 'object';
             readonly properties: {
@@ -300,9 +308,9 @@ type ContractBase = ContractType<
               'code',
               'description',
               'image',
-              'primaryCategory',
               'name',
               'price',
+              'primaryCategory',
               'status',
               'subCategory',
             ];
@@ -312,13 +320,16 @@ type ContractBase = ContractType<
         };
       };
       readonly users: {
+        readonly kind: 'mongo-collection';
         readonly indexes: readonly [
           {
+            readonly kind: 'mongo-index';
             readonly keys: readonly [{ readonly field: 'email'; readonly direction: 1 }];
             readonly unique: true;
           },
         ];
         readonly validator: {
+          readonly kind: 'mongo-validator';
           readonly jsonSchema: {
             readonly bsonType: 'object';
             readonly properties: {
@@ -353,13 +364,16 @@ type ContractBase = ContractType<
         };
       };
       readonly carts: {
+        readonly kind: 'mongo-collection';
         readonly indexes: readonly [
           {
+            readonly kind: 'mongo-index';
             readonly keys: readonly [{ readonly field: 'userId'; readonly direction: 1 }];
             readonly unique: true;
           },
         ];
         readonly validator: {
+          readonly kind: 'mongo-validator';
           readonly jsonSchema: {
             readonly bsonType: 'object';
             readonly properties: {
@@ -406,10 +420,15 @@ type ContractBase = ContractType<
         };
       };
       readonly orders: {
+        readonly kind: 'mongo-collection';
         readonly indexes: readonly [
-          { readonly keys: readonly [{ readonly field: 'userId'; readonly direction: 1 }] },
+          {
+            readonly kind: 'mongo-index';
+            readonly keys: readonly [{ readonly field: 'userId'; readonly direction: 1 }];
+          },
         ];
         readonly validator: {
+          readonly kind: 'mongo-validator';
           readonly jsonSchema: {
             readonly bsonType: 'object';
             readonly properties: {
@@ -476,8 +495,10 @@ type ContractBase = ContractType<
         };
       };
       readonly locations: {
+        readonly kind: 'mongo-collection';
         readonly indexes: readonly [
           {
+            readonly kind: 'mongo-index';
             readonly keys: readonly [
               { readonly field: 'city'; readonly direction: 1 },
               { readonly field: 'country'; readonly direction: 1 },
@@ -486,6 +507,7 @@ type ContractBase = ContractType<
           },
         ];
         readonly validator: {
+          readonly kind: 'mongo-validator';
           readonly jsonSchema: {
             readonly bsonType: 'object';
             readonly properties: {
@@ -510,14 +532,20 @@ type ContractBase = ContractType<
         };
       };
       readonly invoices: {
+        readonly kind: 'mongo-collection';
         readonly indexes: readonly [
-          { readonly keys: readonly [{ readonly field: 'orderId'; readonly direction: 1 }] },
           {
+            readonly kind: 'mongo-index';
+            readonly keys: readonly [{ readonly field: 'orderId'; readonly direction: 1 }];
+          },
+          {
+            readonly kind: 'mongo-index';
             readonly keys: readonly [{ readonly field: 'issuedAt'; readonly direction: -1 }];
             readonly sparse: true;
           },
         ];
         readonly validator: {
+          readonly kind: 'mongo-validator';
           readonly jsonSchema: {
             readonly bsonType: 'object';
             readonly properties: {
@@ -556,19 +584,23 @@ type ContractBase = ContractType<
         };
       };
       readonly events: {
+        readonly kind: 'mongo-collection';
         readonly indexes: readonly [
           {
+            readonly kind: 'mongo-index';
             readonly keys: readonly [
               { readonly field: 'userId'; readonly direction: 1 },
               { readonly field: 'timestamp'; readonly direction: -1 },
             ];
           },
           {
+            readonly kind: 'mongo-index';
             readonly keys: readonly [{ readonly field: 'timestamp'; readonly direction: 1 }];
             readonly expireAfterSeconds: 7776000;
           },
         ];
         readonly validator: {
+          readonly kind: 'mongo-validator';
           readonly jsonSchema: {
             readonly bsonType: 'object';
             readonly properties: {

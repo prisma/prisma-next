@@ -2,12 +2,11 @@ import sqliteAdapter from '@prisma-next/adapter-sqlite/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqliteBinding } from '@prisma-next/driver-sqlite/runtime';
 import sqliteDriver from '@prisma-next/driver-sqlite/runtime';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { validateContract } from '@prisma-next/sql-contract/validate';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type {
   ExecutionContext,
@@ -69,7 +68,7 @@ function resolveContract<TContract extends Contract<SqlStorage>>(
     'contractJson' in options && options.contractJson !== undefined
       ? options.contractJson
       : (options as SqliteOptionsWithContract<TContract>).contract;
-  return validateContract<TContract>(contractInput, emptyCodecLookup);
+  return new SqlContractSerializer().deserializeContract(contractInput) as TContract;
 }
 
 export default function sqlite<TContract extends Contract<SqlStorage>>(

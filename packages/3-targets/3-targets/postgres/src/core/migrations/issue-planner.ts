@@ -19,6 +19,7 @@ import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type {
+  PostgresEnumStorageEntry,
   SqlStorage,
   StorageColumn,
   StorageTypeInstance,
@@ -26,6 +27,7 @@ import type {
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
+import { PostgresEnumType } from '../postgres-enum-type';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -131,7 +133,7 @@ export interface IssuePlannerOptions {
   readonly fromContract: Contract<SqlStorage> | null;
   readonly schemaName: string;
   readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
-  readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>;
   /**
    * Current database schema IR. Strategies read this to detect whether a
    * structure already exists (e.g. `buildSchemaLookupMap` for shared-temp-
@@ -162,14 +164,14 @@ function toColumnSpec(
   name: string,
   column: StorageColumn,
   codecHooks: ReadonlyMap<string, CodecControlHooks>,
-  storageTypes: Readonly<Record<string, StorageTypeInstance>>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
 ): ColumnSpec {
   return {
     name,
     typeSql: buildColumnTypeSql(
       column,
       codecHooks as Map<string, CodecControlHooks>,
-      storageTypes as Record<string, StorageTypeInstance>,
+      storageTypes as Record<string, StorageTypeInstance | PostgresEnumStorageEntry>,
     ),
     defaultSql: buildColumnDefaultSql(column.default, column),
     nullable: column.nullable,
@@ -378,7 +380,10 @@ function mapIssueToCall(
             ),
           );
         const hooksMap = codecHooks as Map<string, CodecControlHooks>;
-        const typesMap = storageTypes as Record<string, StorageTypeInstance>;
+        const typesMap = storageTypes as Record<
+          string,
+          StorageTypeInstance | PostgresEnumStorageEntry
+        >;
         const qualifiedTargetType = buildColumnTypeSql(column, hooksMap, typesMap, false);
         const formatTypeExpected = buildExpectedFormatType(column, hooksMap, typesMap);
         return ok([
@@ -515,9 +520,15 @@ function mapIssueToCall(
           ),
         );
       }
-      if (typeInstance.codecId.startsWith('pg/enum')) {
-        const values = (typeInstance.typeParams['values'] ?? []) as readonly string[];
-        return ok([new CreateEnumTypeCall(schemaName, typeInstance.nativeType, values)]);
+      if (typeInstance instanceof PostgresEnumType) {
+        return ok([
+          new CreateEnumTypeCall(
+            schemaName,
+            issue.typeName,
+            typeInstance.values,
+            typeInstance.nativeType,
+          ),
+        ]);
       }
       return notOk(
         issueConflict(
@@ -793,12 +804,13 @@ export function planIssues(
     return notOk(conflicts);
   }
 
-  // Recipe strategies (`enumChangeCallStrategy`, `notNullBackfillCallStrategy`,
-  // etc.) emit a cohesive sequence that must stay contiguous. They are
-  // inserted at a single pattern slot. Non-recipe pattern strategies
-  // (`dependencyInstallCallStrategy`, `storageTypePlanCallStrategy`,
-  // `notNullAddColumnCallStrategy`) produce individually classifiable calls
-  // that slot into DDL buckets alongside default-mapped calls.
+  // Recipe strategies (`nativeEnumPlanCallStrategy`,
+  // `notNullBackfillCallStrategy`, etc.) emit a cohesive sequence that must
+  // stay contiguous. They are inserted at a single pattern slot. Non-recipe
+  // pattern strategies (`dependencyInstallCallStrategy`,
+  // `storageTypePlanCallStrategy`, `notNullAddColumnCallStrategy`) produce
+  // individually classifiable calls that slot into DDL buckets alongside
+  // default-mapped calls.
   const combinedBucketable = [...gatedDefault, ...gatedBucketable];
   const byCategory = (cat: CallCategory) =>
     combinedBucketable.filter((c) => classifyCall(c) === cat);

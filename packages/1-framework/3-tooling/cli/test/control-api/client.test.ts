@@ -76,7 +76,7 @@ function createMockComponents() {
       target: { expected: 'postgres' },
       timings: { total: 10 },
     }),
-    schemaVerify: async (): Promise<VerifyDatabaseSchemaResult> => ({
+    verifySchema: (): VerifyDatabaseSchemaResult => ({
       ok: true,
       summary: 'Schema verification passed',
       contract: { storageHash: 'test-hash' },
@@ -276,8 +276,12 @@ describe('ControlClient progress emission', () => {
       const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor, mockFamilyInstance } =
         createMockComponents();
 
-      // Override schemaVerify to return a failure
-      mockFamilyInstance.schemaVerify = async (): Promise<VerifyDatabaseSchemaResult> => ({
+      // Override verifySchema to return a failure
+      (
+        mockFamilyInstance as unknown as {
+          verifySchema: () => VerifyDatabaseSchemaResult;
+        }
+      ).verifySchema = (): VerifyDatabaseSchemaResult => ({
         ok: false,
         summary: 'Schema mismatch',
         contract: { storageHash: 'test-hash' },

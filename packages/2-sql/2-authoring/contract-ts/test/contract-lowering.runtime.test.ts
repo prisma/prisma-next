@@ -44,6 +44,7 @@ function buildDefinition(
 describe('contract definition lowering runtime checks', () => {
   it('rejects missing and unknown named storage type references', () => {
     const localVector = {
+      kind: 'codec-instance',
       codecId: 'pg/vector@1',
       nativeType: 'vector',
       typeParams: { length: 1536 },

@@ -1,13 +1,17 @@
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
-import type {
-  ForeignKey,
-  Index,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-  StorageTypeInstance,
-  UniqueConstraint,
+import {
+  type ForeignKey,
+  type Index,
+  isPostgresEnumStorageEntry,
+  isStorageTypeInstance,
+  type PostgresEnumStorageEntry,
+  type SqlStorage,
+  type StorageColumn,
+  type StorageTable,
+  type StorageTypeInstance,
+  toStorageTypeInstance,
+  type UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type {
@@ -51,7 +55,7 @@ export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => str
 function convertColumn(
   name: string,
   column: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance>,
+  storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
 ): SqlColumnIR {
@@ -82,9 +86,21 @@ function convertColumn(
   };
 }
 
+/**
+ * `storageTypes` is polymorphic per Decision 18 (Option B) — codec-typed
+ * entries match `StorageTypeInstance`; enum entries match the structural
+ * `PostgresEnumStorageEntry` shape (Postgres-only; cross-domain layering
+ * keeps target IR classes out of the family layer). Both shapes resolve
+ * into the same `(codecId, nativeType, typeParams)` triplet at the
+ * column-resolution boundary so downstream walks stay uniform.
+ */
+type ResolvedStorageTypes = Readonly<
+  Record<string, StorageTypeInstance | PostgresEnumStorageEntry>
+>;
+
 function resolveColumnTypeMetadata(
   column: StorageColumn,
-  storageTypes: Record<string, StorageTypeInstance>,
+  storageTypes: ResolvedStorageTypes,
 ): Pick<StorageColumn, 'codecId' | 'nativeType' | 'typeParams'> {
   if (!column.typeRef) {
     return column;
@@ -95,11 +111,23 @@ function resolveColumnTypeMetadata(
       `Column references storage type "${column.typeRef}" but it is not defined in storage.types.`,
     );
   }
-  return {
-    codecId: referenced.codecId,
-    nativeType: referenced.nativeType,
-    typeParams: referenced.typeParams,
-  };
+  if (isPostgresEnumStorageEntry(referenced)) {
+    return {
+      codecId: referenced.codecId,
+      nativeType: referenced.nativeType,
+      typeParams: { values: referenced.values } as Record<string, unknown>,
+    };
+  }
+  if (isStorageTypeInstance(referenced)) {
+    return {
+      codecId: referenced.codecId,
+      nativeType: referenced.nativeType,
+      typeParams: referenced.typeParams,
+    };
+  }
+  throw new Error(
+    `Storage type "${column.typeRef}" has an unknown polymorphic kind; expected codec-instance or postgres-enum.`,
+  );
 }
 
 function convertUnique(unique: UniqueConstraint): SqlUniqueIR {
@@ -129,7 +157,7 @@ function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
 function convertTable(
   name: string,
   table: StorageTable,
-  storageTypes: Record<string, StorageTypeInstance>,
+  storageTypes: ResolvedStorageTypes,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
 ): SqlTableIR {
@@ -250,7 +278,7 @@ export function contractToSchemaIR(
   }
 
   const storage = contract.storage;
-  const storageTypes = storage.types ?? {};
+  const storageTypes = (storage.types ?? {}) as ResolvedStorageTypes;
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {
     tables[tableName] = convertTable(
@@ -274,11 +302,32 @@ function deriveAnnotations(
   storage: SqlStorage,
   annotationNamespace: string,
 ): SqlAnnotations | undefined {
-  if (!storage.types || Object.keys(storage.types).length === 0) return undefined;
-  // Re-key by nativeType to match the structure produced by introspection
-  const byNativeType: Record<string, (typeof storage.types)[string]> = {};
-  for (const typeInstance of Object.values(storage.types)) {
-    byNativeType[typeInstance.nativeType] = typeInstance;
+  const types = storage.types as ResolvedStorageTypes | undefined;
+  if (!types || Object.keys(types).length === 0) return undefined;
+  // Re-key by nativeType, normalising every variant to the codec-typed
+  // annotation shape `{codecId, nativeType, typeParams}` produced by the
+  // adapter introspector (`introspectPostgresEnumTypes` writes that shape;
+  // see also `enum-planning.ts § readExistingEnumValues`, which reads
+  // `existing.codecId` + `existing.typeParams.values`). Without this
+  // normalisation, the projector would emit the raw
+  // `PostgresEnumStorageEntry` shape (top-level `values`, no `typeParams`)
+  // and downstream Schema IR consumers that walk the codec-typed shape
+  // would see enum entries as new (e.g. the planner emits a fresh
+  // `CreateEnumTypeCall` instead of the rebuild recipe). Unknown future
+  // kinds without `nativeType` are skipped rather than crashing.
+  const byNativeType: Record<string, StorageTypeInstance> = {};
+  for (const typeInstance of Object.values(types)) {
+    if (isPostgresEnumStorageEntry(typeInstance)) {
+      byNativeType[typeInstance.nativeType] = toStorageTypeInstance({
+        codecId: typeInstance.codecId,
+        nativeType: typeInstance.nativeType,
+        typeParams: { values: typeInstance.values },
+      });
+      continue;
+    }
+    if (isStorageTypeInstance(typeInstance)) {
+      byNativeType[typeInstance.nativeType] = typeInstance;
+    }
   }
   return { [annotationNamespace]: { storageTypes: byNativeType } };
 }

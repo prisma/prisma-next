@@ -289,10 +289,21 @@ async function executeMigrationPlanCommand(
   // declaredButUnmigrated precheck always passes here.
   const stack = createControlStack(config);
   const familyInstance = config.family.create(stack);
+  let validatedAppContract: Contract;
+  try {
+    validatedAppContract = familyInstance.validateContract(toContractJson);
+  } catch (error) {
+    return notOk(
+      errorContractValidationFailed(
+        `Contract validation failed: ${error instanceof Error ? error.message : String(error)}`,
+        { where: { path: contractPathAbsolute } },
+      ),
+    );
+  }
   const aggregateResult = await buildContractSpaceAggregate({
     targetId: config.target.targetId,
     migrationsDir,
-    appContract: toContractJson,
+    appContract: validatedAppContract,
     extensionPacks: config.extensionPacks ?? [],
     validateContract: (json: unknown) => familyInstance.validateContract(json),
   });

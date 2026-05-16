@@ -1,6 +1,6 @@
 import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import type { MongoStorageValidator } from '@prisma-next/mongo-contract';
+import { MongoValidator } from '@prisma-next/mongo-contract';
 
 function resolveBsonType(
   codecId: string,
@@ -77,12 +77,12 @@ export function deriveJsonSchema(
   fields: Record<string, ContractField>,
   valueObjects?: Record<string, ContractValueObject>,
   codecLookup?: CodecLookup,
-): MongoStorageValidator {
-  return {
+): MongoValidator {
+  return new MongoValidator({
     jsonSchema: deriveObjectSchema(fields, valueObjects, codecLookup),
     validationLevel: 'strict',
     validationAction: 'error',
-  };
+  });
 }
 
 export interface PolymorphicVariant {
@@ -96,7 +96,7 @@ export function derivePolymorphicJsonSchema(
   variants: readonly PolymorphicVariant[],
   valueObjects?: Record<string, ContractValueObject>,
   codecLookup?: CodecLookup,
-): MongoStorageValidator {
+): MongoValidator {
   const baseSchema = deriveObjectSchema(baseFields, valueObjects, codecLookup);
 
   const oneOf: Record<string, unknown>[] = [];
@@ -142,9 +142,9 @@ export function derivePolymorphicJsonSchema(
     jsonSchema['oneOf'] = oneOf;
   }
 
-  return {
+  return new MongoValidator({
     jsonSchema,
     validationLevel: 'strict',
     validationAction: 'error',
-  };
+  });
 }

@@ -3,7 +3,7 @@ import {
   APP_SPACE_ID,
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { describe, expect, it } from 'vitest';
@@ -176,7 +176,7 @@ function createContract(tables: Contract<SqlStorage>['storage']['tables']): Cont
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: { storageHash: coreHash('sha256:reconciliation-contract'), tables },
+    storage: new SqlStorage({ storageHash: coreHash('sha256:reconciliation-contract'), tables }),
     roots: {},
     models: {},
     capabilities: {},

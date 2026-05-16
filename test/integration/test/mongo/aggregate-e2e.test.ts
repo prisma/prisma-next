@@ -1,10 +1,13 @@
-import { createMongoControlDriver } from '@prisma-next/adapter-mongo/control';
+import mongoAdapterDescriptor, {
+  createMongoControlDriver,
+  readAllMarkers,
+} from '@prisma-next/adapter-mongo/control';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
 import {
+  contractToMongoSchemaIR,
   createMongoFamilyInstance,
   mongoFamilyDescriptor,
-  mongoTargetDescriptor,
 } from '@prisma-next/family-mongo/control';
 import {
   APP_SPACE_ID,
@@ -16,9 +19,8 @@ import {
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import {
-  contractToMongoSchemaIR,
   MongoMigrationPlanner,
-  readAllMarkers,
+  mongoTargetDescriptor,
   serializeMongoOps,
 } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
@@ -79,7 +81,14 @@ function buildAppContract(): MongoContract {
     storage: {
       collections: {
         users: {
-          indexes: [{ keys: [{ field: 'email', direction: 1 as const }], unique: true }],
+          kind: 'mongo-collection' as const,
+          indexes: [
+            {
+              kind: 'mongo-index' as const,
+              keys: [{ field: 'email', direction: 1 as const }],
+              unique: true,
+            },
+          ],
         },
       },
       storageHash: coreHash('sha256:p5-app-contract'),
@@ -114,6 +123,7 @@ function createInstance() {
   const stack = createControlStack({
     family: mongoFamilyDescriptor,
     target: mongoTargetDescriptor,
+    adapter: mongoAdapterDescriptor,
   });
   return createMongoFamilyInstance(stack);
 }
@@ -291,11 +301,15 @@ describe('Mongo contract-space aggregate e2e', {
       // surface as strict-mode extras; non-strict elides those
       // warnings while genuine drift on a contract-declared index
       // still escalates to a failure.
-      const extVerify = await instance.schemaVerify({
-        driver: makeDriver(driver),
+      const extDriver = makeDriver(driver);
+      const extSchema = await instance.introspect({
+        driver: extDriver,
         contract: extContract,
+      });
+      const extVerify = instance.verifySchema({
+        contract: extContract,
+        schema: extSchema,
         strict: false,
-        contractPath: '/test/ext/contract.json',
         frameworkComponents: [],
       });
       expect(extVerify.ok).toBe(false);

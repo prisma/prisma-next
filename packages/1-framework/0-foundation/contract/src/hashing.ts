@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { JsonObject } from '@prisma-next/utils/json';
 import { canonicalizeContract } from './canonicalization';
 import type { Contract } from './contract-types';
 import type { ExecutionHashBase, ProfileHashBase, StorageHashBase } from './types';
@@ -25,7 +26,10 @@ function hashContract(section: Record<string, unknown>): string {
     profileHash: '',
     ...section,
   } as Contract;
-  return canonicalizeContract(contract, { schemaVersion: SCHEMA_VERSION });
+  return canonicalizeContract(contract, {
+    schemaVersion: SCHEMA_VERSION,
+    serializeContract: (c) => JSON.parse(JSON.stringify(c)) as JsonObject,
+  });
 }
 
 export function computeStorageHash(args: {

@@ -22,6 +22,14 @@ export function validateMongoContract<TContract extends MongoContract>(
     throw new Error(`Contract structural validation failed: ${parsed.summary}`);
   }
 
+  // arktype's `infer`d type for `MongoContractSchema` is structurally
+  // equivalent to `MongoContract` but not nominally so (arktype DSL output
+  // types differ on optional/readonly modifiers, narrowed-literal positions,
+  // and utility-type wrappings from the hand-authored generic
+  // `MongoContract<S, M>` surface). The double cast is the documented
+  // escape hatch from arktype's nominal-output representation to the
+  // project's nominal-contract representation; the schema and the type are
+  // kept in lockstep by the round-trip fixtures under `test/validate.test.ts`.
   const contract = parsed as unknown as TContract;
 
   validateContractDomain(contract);

@@ -38,7 +38,6 @@
     "./index-types": "./dist/index-types.mjs",
     "./pack-types": "./dist/pack-types.mjs",
     "./types": "./dist/types.mjs",
-    "./validate": "./dist/validate.mjs",
     "./validators": "./dist/validators.mjs",
     "./package.json": "./package.json"
   },

@@ -95,7 +95,12 @@ function setupBaseConfig(): void {
     }),
   };
   mocks.loadConfig.mockResolvedValue({
-    family: { familyId: 'mongo', create: vi.fn().mockReturnValue({}) },
+    family: {
+      familyId: 'mongo',
+      create: vi.fn().mockReturnValue({
+        validateContract: (c: unknown) => c,
+      }),
+    },
     target: {
       id: 'mongo',
       familyId: 'mongo',
@@ -110,6 +115,7 @@ function setupBaseConfig(): void {
     contract: { output: '/tmp/test/contract.json' },
     migrations: { dir: '/tmp/test/migrations' },
   });
+  mocks.createControlStack.mockReturnValue({});
 }
 
 describe('migration plan command', () => {
@@ -246,7 +252,9 @@ describe('migration plan command', () => {
       mocks.loadConfig.mockResolvedValue({
         family: {
           familyId: 'sql',
-          create: vi.fn().mockReturnValue({}),
+          create: vi.fn().mockReturnValue({
+            validateContract: (c: unknown) => c,
+          }),
         },
         target: {
           id: 'postgres',

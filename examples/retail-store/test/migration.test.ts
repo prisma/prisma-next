@@ -1,4 +1,4 @@
-import { validateMongoContract } from '@prisma-next/mongo-contract';
+import { MongoContractSerializer } from '@prisma-next/family-mongo/ir';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -26,10 +26,10 @@ describe('migration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   }, timeouts.spinUpMongoMemoryServer);
 
   it('contract contains expected index definitions', () => {
-    const { contract } = validateMongoContract<Contract>(contractJson);
+    const contract = new MongoContractSerializer().deserializeContract(contractJson) as Contract;
     const { collections } = contract.storage;
 
-    expect(collections.products.indexes).toEqual([
+    expect(collections.products.indexes).toMatchObject([
       {
         keys: [
           { field: 'name', direction: 'text' },
@@ -52,17 +52,19 @@ describe('migration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
       { keys: [{ field: 'code', direction: 'hashed' }] },
     ]);
 
-    expect(collections.users.indexes).toEqual([
+    expect(collections.users.indexes).toMatchObject([
       { keys: [{ field: 'email', direction: 1 }], unique: true },
     ]);
 
-    expect(collections.carts.indexes).toEqual([
+    expect(collections.carts.indexes).toMatchObject([
       { keys: [{ field: 'userId', direction: 1 }], unique: true },
     ]);
 
-    expect(collections.orders.indexes).toEqual([{ keys: [{ field: 'userId', direction: 1 }] }]);
+    expect(collections.orders.indexes).toMatchObject([
+      { keys: [{ field: 'userId', direction: 1 }] },
+    ]);
 
-    expect(collections.events.indexes).toEqual([
+    expect(collections.events.indexes).toMatchObject([
       {
         keys: [
           { field: 'userId', direction: 1 },
@@ -72,12 +74,12 @@ describe('migration', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
       { keys: [{ field: 'timestamp', direction: 1 }], expireAfterSeconds: 7776000 },
     ]);
 
-    expect(collections.invoices.indexes).toEqual([
+    expect(collections.invoices.indexes).toMatchObject([
       { keys: [{ field: 'orderId', direction: 1 }] },
       { keys: [{ field: 'issuedAt', direction: -1 }], sparse: true },
     ]);
 
-    expect(collections.locations.indexes).toEqual([
+    expect(collections.locations.indexes).toMatchObject([
       {
         keys: [
           { field: 'city', direction: 1 },

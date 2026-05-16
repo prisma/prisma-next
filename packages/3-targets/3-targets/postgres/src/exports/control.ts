@@ -16,6 +16,8 @@ import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
+import { PostgresContractSerializer } from '../core/postgres-contract-serializer';
+import { PostgresSchemaVerifier } from '../core/postgres-schema-verifier';
 
 function buildNativeTypeExpander(
   frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>,
@@ -53,6 +55,8 @@ export function postgresRenderDefault(def: ColumnDefault, column: StorageColumn)
 const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresPlanTargetDetails> =
   {
     ...postgresTargetDescriptorMeta,
+    contractSerializer: new PostgresContractSerializer(),
+    schemaVerifier: new PostgresSchemaVerifier(),
     migrations: {
       createPlanner(_family: SqlControlFamilyInstance) {
         return createPostgresMigrationPlanner();
