@@ -4,15 +4,15 @@ import type { StorageType } from '@prisma-next/framework-components/ir';
  * Discriminator literal for the Postgres-enum variant on the polymorphic
  * `SqlStorage.types` slot.
  *
- * Per Decision 18, enum is a target-only concept (Postgres alone ships
- * native `CREATE TYPE … AS ENUM` today; SQLite emulates via CHECK
- * constraints). The literal lives at the SQL family layer because every
+ * Enums are a target-level concept: Postgres ships native
+ * `CREATE TYPE … AS ENUM` while other SQL targets approximate enums via
+ * constraints. The literal lives at the SQL family layer because every
  * SQL-family consumer (verifier, planner, lowering, …) needs to
  * discriminate enum-typed slot entries from codec-typed ones. The
- * concrete IR class (`PostgresEnumType`) lives at the target-postgres
- * package and `implements` this structural contract; cross-domain
+ * concrete IR class (`PostgresEnumType`) lives in the target-postgres
+ * package and implements this structural contract; cross-domain
  * layering rules forbid the SQL family from importing the concrete
- * target class directly, so the discriminator + structural interface
+ * target class directly, so the discriminator and structural interface
  * carry the dispatch.
  */
 export const POSTGRES_ENUM_KIND = 'postgres-enum' as const;
