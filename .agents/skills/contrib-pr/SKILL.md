@@ -1,6 +1,8 @@
 ---
 name: contrib-pr
 description: Open a high-quality external contributor PR against prisma-next. Use when the user is an outside contributor (not a Prisma maintainer) and wants to submit a change as a pull request from a fork. Encodes the contribution flow from CONTRIBUTING.md so the resulting PR passes review on the first round.
+metadata:
+  internal: true
 ---
 
 # Contributor PR skill (external)

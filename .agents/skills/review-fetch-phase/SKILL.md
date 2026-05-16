@@ -2,6 +2,8 @@
 name: review-fetch-phase
 description: Fetches canonical PR review state and renders derived state artifacts. Use when the user wants the state acquisition phase only (fetch, render, summarize) for a review-framework PR.
 argument-hint: "[pr-url] [output-dir]"
+metadata:
+  internal: true
 ---
 
 # Review Fetch Phase

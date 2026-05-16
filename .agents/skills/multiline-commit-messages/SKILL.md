@@ -3,6 +3,8 @@ name: multiline-commit-messages
 description: >-
   Use single-quoted strings for multiline git commit messages in the Shell tool.
   Prevents heredoc escaping failures that produce garbled commit messages.
+metadata:
+  internal: true
 ---
 
 # Multiline commit messages

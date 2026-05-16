@@ -1,6 +1,8 @@
 ---
 name: drive-pr-walkthrough
 description: Write an intent-first walkthrough (semantic narrative) of a PR/branch or commit range - the overall purpose, the sequence of conceptual steps, the concrete behavior changes, and links to both implementation touchpoints and tests as evidence. Use during branch/PR review when the user asks for a walkthrough, narrative of changes, semantic diff, intent of commits, or “what changed and why” (not a file-by-file diff recap).
+metadata:
+  internal: true
 ---
 
 # Walkthrough

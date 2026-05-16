@@ -1,6 +1,8 @@
 ---
 name: bumping-biome
 description: Bumps `biome` package versions (e.g. `@biomejs/biome`) using `pnpm`, aligns `biome.jsonc` files with the new version/s across the repository and runs biome-related checks. Use when required to update `biome` to a newer version - explicitly or implicitly (e.g. after running `pnpm up`, `pnpm update`, `pnpm upgrade` without specific package names).
+metadata:
+  internal: true
 ---
 
 # Bumping Biome Skill

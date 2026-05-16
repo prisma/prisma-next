@@ -11,6 +11,8 @@ description: >-
   upgrade instructions for this PR", or when you made a breaking
   change to Prisma Next that downstream consumers will need help
   migrating across.
+metadata:
+  internal: true
 ---
 
 # Record upgrade instructions
