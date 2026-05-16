@@ -2,15 +2,16 @@ import type { Contract, ContractField, ContractModel } from '@prisma-next/contra
 import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { type } from 'arktype';
-import type {
-  ForeignKeyInput,
-  ForeignKeyReferencesInput,
-  PrimaryKeyInput,
-  ReferentialAction,
-  SqlModelStorage,
+import {
+  type ForeignKeyInput,
+  type ForeignKeyReferencesInput,
+  type PrimaryKeyInput,
+  type ReferentialAction,
+  type SqlModelStorage,
   SqlStorage,
-  StorageTypeInstanceInput,
-  UniqueConstraintInput,
+  type SqlStorageInput,
+  type StorageTypeInstanceInput,
+  type UniqueConstraintInput,
 } from './types';
 
 type ColumnDefaultLiteral = {
@@ -306,12 +307,11 @@ export function validateStorage(value: unknown): SqlStorage {
     const messages = result.map((p: { message: string }) => p.message).join('; ');
     throw new Error(`Storage validation failed: ${messages}`);
   }
-  // Arktype's inferred output type can't express the polymorphic
-  // `StorageType` slot (each variant carries a narrower `kind` literal
-  // and SqlStorage's branded `storageHash` is not visible to the
-  // schema). The runtime-validated shape matches `SqlStorage`
-  // structurally; the double cast bridges the gap.
-  return result as unknown as SqlStorage;
+  // The arktype-validated shape matches `SqlStorageInput`
+  // structurally. Funnel through the constructor so nested IR fields
+  // (`tables`, `types`) are normalised into class instances and the
+  // branded `storageHash` is preserved on the returned `SqlStorage`.
+  return new SqlStorage(result as SqlStorageInput);
 }
 
 export function validateModel(value: unknown): unknown {
@@ -550,7 +550,7 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
     }
 
     const JSON_NATIVE_TYPES = new Set(['json', 'jsonb']);
-    for (const [fieldName, domainField] of Object.entries(model.fields)) {
+    for (const [fieldName, domainField] of Object.entries(model.fields ?? {})) {
       const f = domainField as ContractField;
       if (f.type?.kind !== 'valueObject') continue;
       const storageField = model.storage.fields[fieldName];
