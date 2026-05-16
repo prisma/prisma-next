@@ -96,7 +96,7 @@ export type LoadAggregateError =
  *
  * - `declaredButUnmigrated`: extension declared in `extensionPacks` with
  *   a `contractSpace` but no contract-space dir on disk. Remediation:
- *   `prisma-next migrate`.
+ *   `prisma-next migration plan`.
  * - `orphanSpaceDir`: contract-space dir under `migrations/` for an extension
  *   not in `extensionPacks`. Remediation: remove the directory, or
  *   re-add the extension to `extensionPacks`.

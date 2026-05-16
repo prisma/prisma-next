@@ -31,7 +31,9 @@ PN-MIG-5001 — Contract-space layout violation
 
 There is no `prisma-next migrate` subcommand. The README has no `migration plan` step either.
 
-**Cause.** The per-space verifier in [`packages/1-framework/3-tooling/migration/src/verify-contract-spaces.ts`](../../packages/1-framework/3-tooling/migration/src/verify-contract-spaces.ts) requires every space in `extensionPacks` to have a matching `<projectRoot>/migrations/<space-id>/` directory before `db init` will run. That directory is materialized by `prisma-next migration plan`, which copies the extension's baseline migration out of its descriptor. The verifier's remediation string names the wrong command (`prisma-next migrate`), and the demo README jumps `emit → db:init` with no plan step.
+**Cause.** The per-space verifier in [`packages/1-framework/3-tooling/migration/src/verify-contract-spaces.ts`](../../packages/1-framework/3-tooling/migration/src/verify-contract-spaces.ts) requires every space in `extensionPacks` to have a matching `<projectRoot>/migrations/<space-id>/` directory before `db init` will run. That directory is materialized by `prisma-next migration plan`, which copies the extension's baseline migration out of its descriptor. The demo README jumps `emit → db:init` with no plan step.
+
+**Status (TML-2495).** The verifier and the CLI aggregate loader now both name the real command (`prisma-next migration plan`) in their remediation hints, so a fresh user hitting `PN-MIG-5001` will be told the correct next step in-line. The workaround below still applies until the demo's README adds the plan step (or a `db:plan` script is wired into `package.json`); only then is the gotcha fully resolved.
 
 **Workaround.** Insert the plan step between `emit` and `db:init`:
 

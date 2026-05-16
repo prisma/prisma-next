@@ -253,6 +253,41 @@ describe('verifyContractSpaces', () => {
     ]);
   });
 
+  it('declaredButUnmigrated remediation names `prisma-next migration plan`, not the non-existent `prisma-next migrate`', () => {
+    const result = verifyContractSpaces({
+      loadedSpaces: new Set(['app', 'cipherstash']),
+      spaceDirsOnDisk: [],
+      headRefsBySpace: new Map(),
+      markerRowsBySpace: new Map(),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const v = result.violations.find((x) => x.kind === 'declaredButUnmigrated');
+    expect(v).toBeDefined();
+    expect(v?.remediation).toContain('prisma-next migration plan');
+    expect(v?.remediation).not.toMatch(/`prisma-next migrate`/);
+  });
+
+  it('hashMismatch remediation names `prisma-next db update` and `prisma-next migration plan`, never `prisma-next migrate`', () => {
+    const driftedMarker: SpaceMarkerRecord = {
+      hash: 'sha256:00000000000000000000000000000000000000000000000000000000000000ff',
+      invariants: cipherstashHead.invariants,
+    };
+    const result = verifyContractSpaces({
+      loadedSpaces: new Set(['app', 'cipherstash']),
+      spaceDirsOnDisk: ['cipherstash'],
+      headRefsBySpace: new Map([['cipherstash', cipherstashHead]]),
+      markerRowsBySpace: new Map([['cipherstash', driftedMarker]]),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const v = result.violations.find((x) => x.kind === 'hashMismatch');
+    expect(v).toBeDefined();
+    expect(v?.remediation).toContain('prisma-next db update');
+    expect(v?.remediation).toContain('prisma-next migration plan');
+    expect(v?.remediation).not.toMatch(/`prisma-next migrate`/);
+  });
+
   it('every violation includes a remediation hint', () => {
     const driftedMarker: SpaceMarkerRecord = {
       hash: 'sha256:00000000000000000000000000000000000000000000000000000000000000ff',
