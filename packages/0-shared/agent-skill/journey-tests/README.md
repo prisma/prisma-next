@@ -43,3 +43,4 @@ Cross-runtime automation against a moving model surface is its own research proj
 | [`05b-build-nextjs-gap.md`](05b-build-nextjs-gap.md) | build, feedback | AC8b (Next.js path) |
 | [`06-feedback-bug.md`](06-feedback-bug.md) | feedback | AC8c (bug path) |
 | [`06b-feedback-feature.md`](06b-feedback-feature.md) | contract, feedback | AC8c (feature path) |
+| [`07-first-touch-orientation.md`](07-first-touch-orientation.md) | quickstart (first-touch path), queries, contract | AC4 (orientation entry point) |
