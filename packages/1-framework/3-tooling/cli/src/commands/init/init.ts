@@ -450,6 +450,7 @@ export async function runInit(
   // `--no-install` for the same reason — no `node_modules` means the
   // workspace isn't ready to consume the skill yet anyway.
   const manualProjectSkillCommand = formatSkillInstallCommand(install.effectivePm);
+  let skillRegistered = false;
   if (!inputs.installProjectSkill) {
     warnings.push(
       `Skipped @prisma-next/skills install (--no-skill). To install later, run \`${manualProjectSkillCommand}\` in this project.`,
@@ -468,6 +469,7 @@ export async function runInit(
         filesWritten,
       });
       spinner.stop(`Registered @prisma-next/skills (project level) — ran \`${project.command}\``);
+      skillRegistered = true;
     } catch (error) {
       spinner.stop('Agent-skill install failed');
       if (CliStructuredError.is(error)) {
@@ -495,6 +497,7 @@ export async function runInit(
       contractEmitted,
       emitCommand,
       schemaPath: inputs.schemaPath,
+      skillRegistered,
     }),
     warnings,
   };
