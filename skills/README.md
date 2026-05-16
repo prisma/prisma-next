@@ -40,7 +40,7 @@ To install standalone (existing project or a new agent runtime added after `init
 # `--all` installs every skill in the cluster (the cluster works as a unit —
 # the router skill routes between the others) for every agent runtime the CLI
 # detects on this machine, without prompting per-skill or per-agent.
-npx skills add prisma/prisma-next#v<your-prisma-next-version> --all
+pnpm dlx skills add prisma/prisma-next#v<your-prisma-next-version> --all
 ```
 
 The skill is always installed at the **project level** — there is no host-wide / global install path. The cluster's surface (commands it references, exit codes it expects, capability claims it makes) tracks the project's `@prisma-next/*` version, and a global install would have to pick a single version for every project on the host. Pinning per-project keeps the skill, CLI, runtime, and extension packs coherent on every project the user works in.

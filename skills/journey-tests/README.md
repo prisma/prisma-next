@@ -11,19 +11,19 @@ Cross-runtime automation against a moving model surface is its own research proj
 
    ```bash
    # from the prisma-next repo root
-   npx skills add file:. --all
+   pnpm dlx skills add file:. --all
    ```
 
    To test the same distribution channel as `prisma-next init`, install from a tagged git ref:
 
    ```bash
-   npx skills add prisma/prisma-next#v<prisma-next-version> --all
+   pnpm dlx skills add prisma/prisma-next#v<prisma-next-version> --all
    ```
 
    To test an in-flight branch or commit:
 
    ```bash
-   npx skills add prisma/prisma-next#<branch-or-sha> --all
+   pnpm dlx skills add prisma/prisma-next#<branch-or-sha> --all
    ```
 
 3. Open the project in your agent's IDE (or attach the agent via its CLI).
