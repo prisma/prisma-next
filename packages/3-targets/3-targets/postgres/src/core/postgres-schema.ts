@@ -96,3 +96,21 @@ export class PostgresUnboundSchema extends PostgresSchema {
 }
 
 PostgresSchema.unbound = PostgresUnboundSchema.instance;
+
+/**
+ * Target-supplied `Namespace` factory the Postgres target plumbs
+ * through `defineContract({ createNamespace })` and the SQL PSL
+ * interpreter. Returns the unbound singleton for the framework
+ * sentinel and a fresh `PostgresSchema(id)` for any other coordinate.
+ *
+ * The factory has no per-call state — every named id deterministically
+ * maps to a distinct schema instance — so callers can pass it through
+ * by reference and trust the resulting `SqlStorage.namespaces` map to
+ * be value-stable for a given input set.
+ */
+export function postgresCreateNamespace(id: string): PostgresSchema {
+  if (id === UNBOUND_NAMESPACE_ID) {
+    return PostgresSchema.unbound;
+  }
+  return new PostgresSchema(id);
+}

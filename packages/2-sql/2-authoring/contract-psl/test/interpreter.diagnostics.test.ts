@@ -1,3 +1,4 @@
+import { freezeNode, type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
 import type { ParsePslDocumentResult, PslSpan } from '@prisma-next/psl-parser';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
@@ -5,6 +6,30 @@ import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract,
 } from '../src/interpreter';
+
+class StubNamespace extends NamespaceBase {
+  readonly kind = 'schema' as const;
+  readonly id: string;
+
+  constructor(id: string) {
+    super();
+    this.id = id;
+    freezeNode(this);
+  }
+
+  qualifier(): string {
+    return `"${this.id}"`;
+  }
+
+  qualifyTable(name: string): string {
+    return `"${this.id}"."${name}"`;
+  }
+}
+
+function createStubNamespace(id: string): Namespace {
+  return new StubNamespace(id);
+}
+
 import {
   createBuiltinLikeControlMutationDefaults,
   postgresScalarTypeDescriptors,
@@ -1169,10 +1194,9 @@ namespace auth {
         ...baseInput,
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
+        createNamespace: createStubNamespace,
       });
 
-      // Storage-side namespace lowering is not yet wired (deferred); the
-      // round closes only the FR16c diagnostic surface here.
       // Postgres must not surface any PSL_UNSUPPORTED_NAMESPACE_BLOCK
       // diagnostic for either explicit block.
       const namespaceDiagnostics = result.ok

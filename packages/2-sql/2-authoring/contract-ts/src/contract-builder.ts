@@ -5,6 +5,7 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
   PostgresEnumStorageEntry,
   StorageTypeInstance,
@@ -62,6 +63,8 @@ type ContractDefinition<
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly capabilities?: Capabilities;
+  readonly namespaces?: readonly string[];
+  readonly createNamespace?: (id: string) => Namespace;
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;
@@ -83,6 +86,8 @@ type ContractScaffold<
   readonly storageHash?: StorageHash;
   readonly foreignKeyDefaults?: ForeignKeyDefaults;
   readonly capabilities?: Capabilities;
+  readonly namespaces?: readonly string[];
+  readonly createNamespace?: (id: string) => Namespace;
   readonly codecLookup?: CodecLookup;
 };
 

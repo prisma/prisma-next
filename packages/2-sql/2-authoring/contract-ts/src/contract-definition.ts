@@ -2,6 +2,7 @@ import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next
 import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
   PostgresEnumStorageEntry,
   ReferentialAction,
@@ -113,6 +114,17 @@ export interface ContractDefinition {
   readonly storageHash?: string;
   readonly foreignKeyDefaults?: ForeignKeyDefaultsState;
   readonly storageTypes?: Record<string, StorageTypeInstance | PostgresEnumStorageEntry>;
+  /**
+   * Declared namespace coordinates for this contract — populates
+   * `SqlStorage.namespaces` together with `createNamespace`.
+   */
+  readonly namespaces?: readonly string[];
+  /**
+   * Target-supplied factory that materialises a `Namespace` concretion
+   * for a declared namespace coordinate. Mirrors
+   * `ContractInput.createNamespace`.
+   */
+  readonly createNamespace?: (id: string) => Namespace;
   readonly models: readonly ModelNode[];
   readonly valueObjects?: readonly ValueObjectNode[];
 }

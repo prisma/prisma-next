@@ -14,6 +14,7 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
   PostgresEnumStorageEntry,
   StorageTypeInstance,
@@ -1229,12 +1230,37 @@ export type ContractInput<
    * SQLite contracts must declare an empty list (or omit the field) —
    * SQLite has no schema concept and emits unqualified DDL.
    *
-   * Storage-side population of `SqlStorage.namespaces` from this list
-   * lands in a follow-on milestone; today the field is recorded on
-   * `ContractInput` for defensive validation and to give consumers a
-   * stable type-level surface to write against.
+   * Populates `SqlStorage.namespaces` together with the
+   * {@link ContractInput.createNamespace} factory: each declared name
+   * (plus the framework-reserved `UNBOUND_NAMESPACE_ID` sentinel) is
+   * resolved through `createNamespace` and stored as the matching slot
+   * value. Models reference declared namespaces via their per-model
+   * `namespace` coordinate; entries that go unreferenced still occupy a
+   * slot so contracts that pre-declare schemas surface them on the live
+   * storage walk.
    */
   readonly namespaces?: readonly string[];
+  /**
+   * Target-supplied factory that materialises a `Namespace` concretion
+   * for a declared namespace coordinate. The SQL family layer is
+   * target-agnostic and cannot import concretions like
+   * `PostgresSchema` or `SqliteUnboundDatabase`; the factory is the
+   * seam by which target packs hand the family the right runtime
+   * representation.
+   *
+   * Called once per distinct namespace id discovered in the contract:
+   * each entry of {@link ContractInput.namespaces}, every
+   * `StorageTable.namespaceId` referenced by a model, and the
+   * framework `UNBOUND_NAMESPACE_ID` sentinel (always present so the
+   * late-bound slot stays available regardless of authoring choices).
+   *
+   * When omitted, the family layer falls back to its placeholder
+   * `SqlUnboundNamespace` singleton for the unbound slot and rejects
+   * any non-unbound coordinate — single-namespace contracts authored
+   * before targets ship their factory stay byte-stable; multi-namespace
+   * contracts must pass the factory through.
+   */
+  readonly createNamespace?: (id: string) => Namespace;
   readonly types?: Types;
   readonly models?: Models;
   readonly codecLookup?: CodecLookup;

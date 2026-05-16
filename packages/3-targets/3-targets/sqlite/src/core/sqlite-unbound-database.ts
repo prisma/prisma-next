@@ -40,3 +40,22 @@ export class SqliteUnboundDatabase extends NamespaceBase {
     return `"${tableName}"`;
   }
 }
+
+/**
+ * Target-supplied `Namespace` factory the SQLite target plumbs through
+ * `defineContract({ createNamespace })`. SQLite has only one
+ * effective namespace slot — the framework `UNBOUND_NAMESPACE_ID`
+ * sentinel — so the factory always returns the singleton and rejects
+ * any other coordinate. The SQL family's defensive validation in
+ * `defineContract` already rejects user-declared SQLite namespaces, so
+ * this throw is a structural safety net rather than a user-facing
+ * surface.
+ */
+export function sqliteCreateNamespace(id: string): SqliteUnboundDatabase {
+  if (id === UNBOUND_NAMESPACE_ID) {
+    return SqliteUnboundDatabase.instance;
+  }
+  throw new Error(
+    `sqliteCreateNamespace: SQLite has no schema concept; the only valid namespace id is "${UNBOUND_NAMESPACE_ID}" (received "${id}").`,
+  );
+}

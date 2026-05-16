@@ -1,6 +1,10 @@
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
-import { PostgresSchema, PostgresUnboundSchema } from '../src/core/postgres-schema';
+import {
+  PostgresSchema,
+  PostgresUnboundSchema,
+  postgresCreateNamespace,
+} from '../src/core/postgres-schema';
 
 describe('PostgresSchema', () => {
   it('exposes its id and renders a quoted-identifier qualifier', () => {
@@ -34,5 +38,29 @@ describe('PostgresUnboundSchema', () => {
 
   it('is a stable singleton — repeated access returns the same instance', () => {
     expect(PostgresSchema.unbound).toBe(PostgresSchema.unbound);
+  });
+});
+
+describe('postgresCreateNamespace factory', () => {
+  it('returns the unbound singleton for the framework-reserved sentinel', () => {
+    const namespace = postgresCreateNamespace(UNBOUND_NAMESPACE_ID);
+    expect(namespace).toBe(PostgresSchema.unbound);
+    expect(namespace).toBeInstanceOf(PostgresUnboundSchema);
+    expect(namespace.qualifyTable('users')).toBe('"users"');
+  });
+
+  it('materialises a fresh PostgresSchema instance for any named coordinate', () => {
+    const auth = postgresCreateNamespace('auth');
+    expect(auth).toBeInstanceOf(PostgresSchema);
+    expect(auth.id).toBe('auth');
+    expect(auth.qualifyTable('users')).toBe('"auth"."users"');
+  });
+
+  it('returns distinct PostgresSchema instances for distinct named coordinates', () => {
+    const auth = postgresCreateNamespace('auth');
+    const billing = postgresCreateNamespace('billing');
+    expect(auth).not.toBe(billing);
+    expect(auth.id).toBe('auth');
+    expect(billing.id).toBe('billing');
   });
 });

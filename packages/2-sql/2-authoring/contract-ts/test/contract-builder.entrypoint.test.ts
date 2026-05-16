@@ -3,8 +3,32 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import { freezeNode, type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { defineContract } from '../src/contract-builder';
+
+class StubNamespace extends NamespaceBase {
+  readonly kind = 'schema' as const;
+  readonly id: string;
+
+  constructor(id: string) {
+    super();
+    this.id = id;
+    freezeNode(this);
+  }
+
+  qualifier(): string {
+    return `"${this.id}"`;
+  }
+
+  qualifyTable(name: string): string {
+    return `"${this.id}"."${name}"`;
+  }
+}
+
+function createStubNamespace(id: string): Namespace {
+  return new StubNamespace(id);
+}
 
 const sqlFamilyPack = {
   kind: 'family',
@@ -130,7 +154,25 @@ describe('defineContract namespace declaration runtime guards (FR16a)', () => {
     ).not.toThrow();
   });
 
-  it('accepts user-declared Postgres schema names', () => {
+  it('accepts user-declared Postgres schema names when paired with a `createNamespace` factory', () => {
+    // Multi-namespace contracts require the target to supply a
+    // namespace factory — the SQL family layer is target-agnostic and
+    // cannot materialise non-unbound `Namespace` concretions on its
+    // own. The test uses a trivial pass-through namespace stub so the
+    // entrypoint validates as a unit; the Postgres target's own test
+    // suite exercises the real `postgresCreateNamespace`.
+    expect(() =>
+      defineContract({
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        namespaces: ['public', 'auth'],
+        createNamespace: createStubNamespace,
+        models: {},
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects a multi-namespace Postgres contract that omits the `createNamespace` factory', () => {
     expect(() =>
       defineContract({
         family: sqlFamilyPack,
@@ -138,7 +180,7 @@ describe('defineContract namespace declaration runtime guards (FR16a)', () => {
         namespaces: ['public', 'auth'],
         models: {},
       }),
-    ).not.toThrow();
+    ).toThrow(/createNamespace/);
   });
 
   it('rejects the reserved IR sentinel `__unbound__` in the declared namespaces list', () => {

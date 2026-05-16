@@ -1,3 +1,4 @@
+import { freezeNode, type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -7,6 +8,30 @@ import {
   type InterpretPslDocumentToSqlContractInput,
   interpretPslDocumentToSqlContract as interpretPslDocumentToSqlContractInternal,
 } from '../src/interpreter';
+
+class StubNamespace extends NamespaceBase {
+  readonly kind = 'schema' as const;
+  readonly id: string;
+
+  constructor(id: string) {
+    super();
+    this.id = id;
+    freezeNode(this);
+  }
+
+  qualifier(): string {
+    return `"${this.id}"`;
+  }
+
+  qualifyTable(name: string): string {
+    return `"${this.id}"."${name}"`;
+  }
+}
+
+function createStubNamespace(id: string): Namespace {
+  return new StubNamespace(id);
+}
+
 import {
   createBuiltinLikeControlMutationDefaults,
   postgresScalarTypeDescriptors,
@@ -811,6 +836,7 @@ model OrderItem {
       const result = interpretPslDocumentToSqlContract({
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
+        createNamespace: createStubNamespace,
       });
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -845,6 +871,7 @@ namespace unbound {
       const result = interpretPslDocumentToSqlContract({
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
+        createNamespace: createStubNamespace,
       });
       expect(result.ok).toBe(true);
       if (!result.ok) return;

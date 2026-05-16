@@ -21,6 +21,7 @@ import type {
   ControlMutationDefaults,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import type {
   ParsePslDocumentResult,
   PslAttribute,
@@ -93,6 +94,16 @@ export interface InterpretPslDocumentToSqlContractInput {
   readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
   readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly authoringContributions?: AuthoringContributions;
+  /**
+   * Target-supplied `Namespace` factory threaded into
+   * `buildSqlContractFromDefinition` for the contract's
+   * `SqlStorage.namespaces` population. Required when the document
+   * contains any explicit `namespace { … }` block on Postgres; the
+   * single-namespace path (top-level declarations only) stays valid
+   * without the factory and falls back to the family
+   * `SqlUnboundNamespace` singleton.
+   */
+  readonly createNamespace?: (id: string) => Namespace;
 }
 
 function buildComposedExtensionPackRefs(
@@ -1541,6 +1552,7 @@ export function interpretPslDocumentToSqlContract(
       ),
     ),
     ...(Object.keys(storageTypes).length > 0 ? { storageTypes } : {}),
+    ...ifDefined('createNamespace', input.createNamespace),
     models: modelNodes.map((model) => ({
       ...model,
       ...(modelRelations.has(model.modelName)

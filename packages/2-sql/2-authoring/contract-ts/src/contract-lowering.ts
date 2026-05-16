@@ -711,6 +711,8 @@ export function buildContractDefinition(definition: ContractInput): ContractDefi
     ...(Object.keys(collection.storageTypes).length > 0
       ? { storageTypes: collection.storageTypes }
       : {}),
+    ...(definition.namespaces ? { namespaces: definition.namespaces } : {}),
+    ...(definition.createNamespace ? { createNamespace: definition.createNamespace } : {}),
     models,
   };
 }
