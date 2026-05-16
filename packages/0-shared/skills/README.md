@@ -1,10 +1,10 @@
-# `@prisma-next/agent-skill`
+# `@prisma-next/skills`
 
 Agent skills for [Prisma Next](https://github.com/prisma/prisma-next) — a small set of `SKILL.md` files that teach an LLM agent how to operate Prisma Next end-to-end without re-deriving the API from documentation each time.
 
 > **Edit your data contract. Prisma handles the rest.**
 >
-> **Install the version that matches your Prisma Next version.** This package ships in lockstep with the rest of Prisma Next. If `package.json` says `"@prisma-next/postgres": "0.7.0"`, install `@prisma-next/agent-skill@0.7.0`. A mismatched skill version will describe API surfaces from the wrong era and produce wrong instructions.
+> **Install the version that matches your Prisma Next version.** This package ships in lockstep with the rest of Prisma Next. If `package.json` says `"@prisma-next/postgres": "0.7.0"`, install `@prisma-next/skills@0.7.0`. A mismatched skill version will describe API surfaces from the wrong era and produce wrong instructions.
 
 ## What's in the box
 
@@ -41,7 +41,7 @@ To install standalone (existing project or a new agent runtime added after `init
 # unit — the router skill routes between the others) for every agent
 # runtime the CLI detects on this machine, without prompting per-skill
 # or per-agent.
-npx skills add @prisma-next/agent-skill --all
+npx skills add @prisma-next/skills --all
 ```
 
 The skill is always installed at the **project level** — there is no host-wide / global install path. The cluster's surface (commands it references, exit codes it expects, capability claims it makes) tracks the project's `@prisma-next/*` version, and a global install would have to pick a single version for every project on the host. Pinning per-project keeps the skill, CLI, runtime, and extension packs coherent on every project the user works in.
@@ -60,7 +60,7 @@ The package ships at the same version as the rest of Prisma Next — keep them l
 
 ## Contributing / authoring a skill
 
-Authoring rules, cluster conventions, and the worked example for *concepts-over-procedures* live in [`DEVELOPING.md`](./DEVELOPING.md). Read that before adding or rewriting a `SKILL.md`. Skill sources live at `packages/0-shared/agent-skill/skills/` in the `prisma-next` monorepo.
+Authoring rules, cluster conventions, and the worked example for *concepts-over-procedures* live in [`DEVELOPING.md`](./DEVELOPING.md). Read that before adding or rewriting a `SKILL.md`. Skill sources live at `packages/0-shared/skills/skills/` in the `prisma-next` monorepo.
 
 ## License
 

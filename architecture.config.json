@@ -1,7 +1,7 @@
 {
   "packages": [
     {
-      "glob": "packages/0-shared/agent-skill/**",
+      "glob": "packages/0-shared/skills/**",
       "domain": "framework",
       "layer": "core",
       "plane": "shared"

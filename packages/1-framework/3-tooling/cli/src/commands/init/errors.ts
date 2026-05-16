@@ -239,7 +239,7 @@ export function errorInitEmitFailed(options: {
 
 /**
  * The project-level agent-skill install (`npx skills add
- * @prisma-next/agent-skill`) failed after a successful dependency
+ * @prisma-next/skills`) failed after a successful dependency
  * install + emit. The project's scaffold remains on disk; the user
  * can either fix the underlying issue (network, registry, PATH) and
  * run the install command manually, or re-run `init --no-skill` to
@@ -253,7 +253,7 @@ export function errorInitSkillInstallFailed(options: {
   readonly filesWritten: readonly string[];
   readonly cause: string;
 }): CliStructuredError {
-  return new CliStructuredError('5013', 'Failed to install @prisma-next/agent-skill', {
+  return new CliStructuredError('5013', 'Failed to install @prisma-next/skills', {
     domain: 'CLI',
     why: `\`${options.skillInstallCommand}\` exited with an error: ${options.cause}`,
     fix:

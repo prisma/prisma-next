@@ -14,7 +14,7 @@ pnpm dlx prisma-next init
 pnpm add vite @vitejs/plugin-react react react-dom
 ```
 
-The agent runtime has `@prisma-next/agent-skill` registered (project level, as `init` installs it).
+The agent runtime has `@prisma-next/skills` registered (project level, as `init` installs it).
 
 ## Prompt
 

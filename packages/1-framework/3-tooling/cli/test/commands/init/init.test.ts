@@ -141,7 +141,7 @@ describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () =>
     rmSync(tmpDir, { recursive: true, force: true });
   }, timeouts.databaseOperation);
 
-  it('scaffolds the per-target files (no agent-skill template — install handled by @prisma-next/agent-skill)', async () => {
+  it('scaffolds the per-target files (no agent-skill template — install handled by @prisma-next/skills)', async () => {
     const exit = await runInitTest(tmpDir, {
       options: { install: false },
       flags: interactiveFlags(),
@@ -1481,7 +1481,7 @@ describe('runInit (--json output, FR1.5 / FR10.2)', { timeout: timeouts.database
     const nextStepsText = nextSteps.join('\n');
     expect(nextStepsText).toContain('DATABASE_URL');
     expect(nextStepsText).toMatch(/(prisma-next|npx prisma-next) contract emit/);
-    expect(nextStepsText).toContain('@prisma-next/agent-skill');
+    expect(nextStepsText).toContain('@prisma-next/skills');
   });
 
   it('writes a structured error to stdout in JSON mode when preconditions fail', async () => {

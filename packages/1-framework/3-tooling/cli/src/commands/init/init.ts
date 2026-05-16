@@ -182,7 +182,7 @@ export async function runInit(
   // and missing-on-disk-at-write-time is tolerated.
   const filesToDelete: string[] = inputs.reinit ? [...findStaleArtefacts(baseDir, schemaDir)] : [];
 
-  // `init` delegates the skill to `npx skills add @prisma-next/agent-skill`,
+  // `init` delegates the skill to `npx skills add @prisma-next/skills`,
   // so a hand-rolled `.agents/skills/prisma-next/SKILL.md` in the project
   // would shadow the published package. Queue it for deletion on every
   // run (not gated on `--reinit`).
@@ -452,24 +452,22 @@ export async function runInit(
   const manualProjectSkillCommand = formatSkillInstallCommand(install.effectivePm);
   if (!inputs.installProjectSkill) {
     warnings.push(
-      `Skipped @prisma-next/agent-skill install (--no-skill). To install later, run \`${manualProjectSkillCommand}\` in this project.`,
+      `Skipped @prisma-next/skills install (--no-skill). To install later, run \`${manualProjectSkillCommand}\` in this project.`,
     );
   } else if (install.skipped) {
     warnings.push(
-      `Skipped @prisma-next/agent-skill install because --no-install was passed. Once you run install manually, register the skill with \`${manualProjectSkillCommand}\`.`,
+      `Skipped @prisma-next/skills install because --no-install was passed. Once you run install manually, register the skill with \`${manualProjectSkillCommand}\`.`,
     );
   } else {
     const spinner = ui.spinner();
-    spinner.start('Registering @prisma-next/agent-skill with the agent runtime...');
+    spinner.start('Registering @prisma-next/skills with the agent runtime...');
     try {
       const project = await runProjectLevelSkillInstall({
         baseDir,
         pm: install.effectivePm,
         filesWritten,
       });
-      spinner.stop(
-        `Registered @prisma-next/agent-skill (project level) — ran \`${project.command}\``,
-      );
+      spinner.stop(`Registered @prisma-next/skills (project level) — ran \`${project.command}\``);
     } catch (error) {
       spinner.stop('Agent-skill install failed');
       if (CliStructuredError.is(error)) {
