@@ -76,12 +76,7 @@ describe('computeMigrationHash', () => {
     const metadata = createTestMetadata();
     const ops = createTestOps();
 
-    const {
-      migrationHash: _migrationHash,
-      signature: _signature,
-      hints: _hints,
-      ...strippedMeta
-    } = metadata;
+    const { migrationHash: _migrationHash, hints: _hints, ...strippedMeta } = metadata;
 
     const canonicalParts = [canonicalizeJson(strippedMeta), canonicalizeJson(ops)];
     const partHashes = canonicalParts.map((part) =>

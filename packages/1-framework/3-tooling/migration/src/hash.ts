@@ -15,9 +15,9 @@ function sha256Hex(input: string): string {
 }
 
 /**
- * Content-addressed migration hash over (metadata envelope sans
- * hints/signature, ops). See ADR 199 — Storage-only migration identity
- * for the rationale: the storage-hash bookends (`from`, `to`) inside the
+ * Content-addressed migration hash over (metadata envelope sans hints,
+ * ops). See ADR 199 — Storage-only migration identity for the
+ * rationale: the storage-hash bookends (`from`, `to`) inside the
  * envelope anchor the contract identity by hash, and planner hints are
  * advisory and must not affect identity. The full contract IRs are not
  * part of the manifest — they live in sibling `*-contract.json` files
@@ -46,12 +46,7 @@ export function computeMigrationHash(
   metadata: Omit<MigrationMetadata, 'migrationHash'> & { readonly migrationHash?: string },
   ops: MigrationOps,
 ): string {
-  const {
-    migrationHash: _migrationHash,
-    signature: _signature,
-    hints: _hints,
-    ...strippedMeta
-  } = metadata;
+  const { migrationHash: _migrationHash, hints: _hints, ...strippedMeta } = metadata;
 
   const canonicalMetadata = canonicalizeJson(strippedMeta);
   const canonicalOps = canonicalizeJson(ops);
