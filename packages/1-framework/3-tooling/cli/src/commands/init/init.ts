@@ -10,10 +10,7 @@ import { TerminalUI } from '../../utils/terminal-ui';
 import {
   formatSkillInstallCommand,
   LEGACY_SKILL_FILE,
-  markerFilePath,
   runProjectLevelSkillInstall,
-  runUserLevelSkillInstall,
-  writeMarker,
 } from './agent-skill-install';
 import {
   detectPackageManager,
@@ -437,11 +434,14 @@ export async function runInit(
     }
   }
 
-  // Agent-skill install. Project-level is unconditional (modulo
-  // `--no-skill`); user-level is opt-in via `--install-user-skill` or
-  // the FR5 first-run prompt. A project-level failure is fatal
-  // (`INIT_EXIT_SKILL_INSTALL_FAILED`); a user-level failure is a
-  // warning so the user's main scaffold is not blocked (FR10).
+  // Agent-skill install. Project-level is unconditional modulo
+  // `--no-skill`. We deliberately do **not** offer a user-level
+  // (global) install path: the skill's behaviour and surface track
+  // the project's Prisma Next version, and a host-wide install would
+  // have to pick a single version for every project on the machine,
+  // which breaks the version-locking invariant the rest of the
+  // framework relies on. A project-level failure is fatal
+  // (`INIT_EXIT_SKILL_INSTALL_FAILED`).
   //
   // Runs after install + emit because (1) `node_modules` is in place,
   // so any consumers downstream are coherent, and (2) the user has
@@ -449,7 +449,7 @@ export async function runInit(
   // potentially fails. We skip the install when the user passed
   // `--no-install` for the same reason — no `node_modules` means the
   // workspace isn't ready to consume the skill yet anyway.
-  const manualProjectSkillCommand = formatSkillInstallCommand(install.effectivePm, false);
+  const manualProjectSkillCommand = formatSkillInstallCommand(install.effectivePm);
   if (!inputs.installProjectSkill) {
     warnings.push(
       `Skipped @prisma-next/agent-skill install (--no-skill). To install later, run \`${manualProjectSkillCommand}\` in this project.`,
@@ -459,31 +459,6 @@ export async function runInit(
       `Skipped @prisma-next/agent-skill install because --no-install was passed. Once you run install manually, register the skill with \`${manualProjectSkillCommand}\`.`,
     );
   } else {
-    let installUserSkill = inputs.installUserSkill;
-    if (inputs.userSkillPromptPending && !flags.json && !flags.quiet) {
-      const answer = await clack.confirm({
-        message:
-          'Install @prisma-next/agent-skill at the user level too? (Your agent will pick it up across every project on this host.)',
-        initialValue: true,
-        output: process.stderr,
-      });
-      const answeredYes = !clack.isCancel(answer) && answer === true;
-      writeMarker({
-        userSkillPromptShown: true,
-        shownAt: new Date().toISOString(),
-        answeredYes,
-      });
-      installUserSkill = answeredYes;
-    } else if (inputs.installUserSkill) {
-      // Explicit `--install-user-skill` writes the marker too so a
-      // later interactive run does not re-prompt.
-      writeMarker({
-        userSkillPromptShown: true,
-        shownAt: new Date().toISOString(),
-        answeredYes: true,
-      });
-    }
-
     const spinner = ui.spinner();
     spinner.start('Registering @prisma-next/agent-skill with the agent runtime...');
     try {
@@ -501,26 +476,6 @@ export async function runInit(
         return emitError(ui, flags, error);
       }
       throw error;
-    }
-
-    if (installUserSkill) {
-      const userSpinner = ui.spinner();
-      userSpinner.start('Installing @prisma-next/agent-skill at the user level...');
-      const userResult = await runUserLevelSkillInstall({ baseDir, pm: install.effectivePm });
-      if (userResult.ok) {
-        userSpinner.stop(
-          `Installed @prisma-next/agent-skill at the user level — ran \`${userResult.command}\``,
-        );
-      } else {
-        userSpinner.stop('User-level install failed (non-fatal — continuing)');
-        warnings.push(userResult.warning);
-      }
-    }
-
-    if (inputs.userSkillPromptPending) {
-      warnings.push(
-        `Wrote ${markerFilePath()} so the user-level prompt won't appear again. Delete it to re-trigger.`,
-      );
     }
   }
 

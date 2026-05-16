@@ -68,9 +68,5 @@ export const INIT_EXIT_EMIT_FAILED = 5;
  * user can fix the underlying issue (network, registry reachability,
  * `npx skills` not on PATH) and run the install manually, or re-run
  * `init` with `--no-skill` to skip it.
- *
- * A *user-level* install failure (only when `--install-user-skill` was
- * passed or the user said yes to the first-run prompt) is a non-fatal
- * warning, not this code — it does not block the project's scaffold.
  */
 export const INIT_EXIT_SKILL_INSTALL_FAILED = 6;
