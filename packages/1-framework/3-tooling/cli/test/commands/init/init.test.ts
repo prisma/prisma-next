@@ -1470,18 +1470,23 @@ describe('runInit (--json output, FR1.5 / FR10.2)', { timeout: timeouts.database
     expect(Array.isArray(parsed['filesWritten'])).toBe(true);
     expect((parsed['filesWritten'] as string[]).length).toBeGreaterThan(0);
     expect(parsed['packagesInstalled']).toMatchObject({ skipped: true });
-    // The `nextSteps` array is part of the documented `--json` contract
-    // (FR1.5 / FR10.2). Agents and CI are expected to surface these
-    // strings to the user verbatim, so we lock the canonical anchor
-    // tokens (DATABASE_URL, the contract-emit command, the agent skill)
-    // rather than just asserting "non-empty". A rewording is fine;
-    // dropping any of these anchors needs to be a conscious change.
+    // The `nextSteps` array is part of the documented `--json` contract.
+    // Agents and CI are expected to surface these strings to the user
+    // verbatim, so we lock the canonical anchor tokens (DATABASE_URL,
+    // the contract-emit command) rather than just asserting "non-empty".
+    // A rewording is fine; dropping any of these anchors needs to be a
+    // conscious change.
     const nextSteps = parsed['nextSteps'] as string[];
     expect(Array.isArray(nextSteps)).toBe(true);
     const nextStepsText = nextSteps.join('\n');
     expect(nextStepsText).toContain('DATABASE_URL');
     expect(nextStepsText).toMatch(/(prisma-next|npx prisma-next) contract emit/);
-    expect(nextStepsText).toContain('@prisma-next/skills');
+    // The agent-skill install was skipped (`install: false` →
+    // `--no-install`), so `nextSteps` must not claim it is registered.
+    // The skip is surfaced via `warnings` with a manual-install hint.
+    expect(nextStepsText).not.toContain('@prisma-next/skills');
+    const warnings = parsed['warnings'] as string[];
+    expect(warnings.join('\n')).toContain('@prisma-next/skills');
   });
 
   it('writes a structured error to stdout in JSON mode when preconditions fail', async () => {
