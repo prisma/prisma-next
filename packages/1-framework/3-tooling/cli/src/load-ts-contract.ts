@@ -212,6 +212,14 @@ export async function loadContractFromTs(
 
     validatePurity(contract);
 
+    // Blind cast: the loaded module was authored by user code
+    // (typically via `defineContract` / a contract builder) and
+    // its runtime shape is structurally a `Contract`, but the
+    // dynamic import collapses the source typing. The contract
+    // structural validation that asserts the shape happens
+    // downstream at the `familyInstance.validateContract` seam
+    // (e.g. in `executeContractEmit`); this helper only checks
+    // purity here.
     return contract as unknown as Contract;
   } catch (error) {
     try {
