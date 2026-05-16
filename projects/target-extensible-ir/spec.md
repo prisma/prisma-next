@@ -548,9 +548,11 @@ The two tables are deliberately parallel: a developer who reads the SQL Postgres
 
   | AST entry | Postgres interpreter | SQLite interpreter | Mongo interpreter |
   |---|---|---|---|
-  | `__unspecified__` (implicit, top-level) | IR `public` slot (concrete schema) | IR singleton slot | IR connection-`db` slot |
-  | `unbound` (explicit `namespace unbound { … }`) | IR `__unbound__` slot (late-bound, `search_path`) | **reject** — diagnostic: "SQLite does not support namespace blocks" | **reject** — same diagnostic, Mongo-flavoured |
-  | named (`auth`, `public`, `foo`, …) | IR named schemas | **reject** (same diagnostic) | IR named databases |
+  | `__unspecified__` (implicit, top-level) | IR `public` slot (concrete `PostgresSchema`) | IR `__unbound__` slot (singleton `SqliteUnboundDatabase` — trivial binding) | IR `__unbound__` slot (singleton `MongoTargetUnboundDatabase` — connection's `db`) |
+  | `unbound` (explicit `namespace unbound { … }`) | IR `__unbound__` slot (`PostgresUnboundSchema`; `search_path` resolution) | **reject** — diagnostic: "SQLite does not support namespace blocks" | **reject** — same diagnostic, Mongo-flavoured |
+  | named (`auth`, `public`, `foo`, …) | IR named schemas | **reject** (same diagnostic) | **reject** (same diagnostic; Mongo's multi-database support is a future-work concern) |
+
+  The framework constant `UNBOUND_NAMESPACE_ID` names "the slot whose binding the target resolves at connection time" — Postgres uses it for `search_path`-resolved late binding (a non-trivial multi-tenancy concern); SQLite uses it for the trivial singleton (the only schema); Mongo uses it for the connection-`db` binding. Same slot id across all targets; per-target resolution semantics.
 
   **Same AST, different IR per target.** Reading D: the PSL AST is target-agnostic syntax; semantic meaning is assigned by the per-target interpreter. The same `namespace unbound { … }` source compiles to IR `__unbound__` in Postgres and to a diagnostic in SQLite — because `unbound` is a Postgres-flavoured keyword. SQLite and Mongo reject all explicit `namespace { … }` blocks today; future work can lift this per-target if either gains a use case (Mongo multi-database is plausible; SQLite probably never).
 
