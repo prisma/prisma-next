@@ -63,13 +63,23 @@ If either precondition is unmet, stop and surface the issue. Do **not** try to a
 
 3. **Bump.** From the new worktree, run `pnpm bump-minor`. The script reads the root `package.json` `version` from `git show HEAD:package.json` (in this worktree, HEAD is `origin/main`), computes the next minor, and writes it to every workspace `package.json` via `scripts/set-version.ts`.
 
-4. **Sanity-check the diff.** Confirm:
+   Note: `bump-minor` requires `node_modules` to resolve its dependencies (e.g. `pathe`). If the fresh worktree has no `node_modules`, run `pnpm install --frozen-lockfile --ignore-scripts` first.
 
-   - Every modified file is a `package.json`.
-   - The diff is exactly `version` field changes (no other fields).
-   - `pnpm-lock.yaml` is **not** modified (workspace-internal links use `workspace:*`, which doesn't carry a version, so the lockfile is unaffected by version bumps).
+4. **Refresh the lockfile.** Workspace-internal dependencies in this repo are pinned as `workspace:<version>` (not `workspace:*`), so the bump changes their specifiers in `pnpm-lock.yaml`. Run:
 
-5. **Commit.** Use the message:
+   ```bash
+   pnpm install --lockfile-only
+   ```
+
+   to update `pnpm-lock.yaml` in lockstep. Without this step, CI fails with `ERR_PNPM_OUTDATED_LOCKFILE` on the release PR.
+
+5. **Sanity-check the diff.** Confirm:
+
+   - Every modified file is either a `package.json` or `pnpm-lock.yaml`.
+   - The `package.json` diffs are exactly `version` field changes plus internal `workspace:<old> → workspace:<new>` specifier bumps (no other fields).
+   - The `pnpm-lock.yaml` diff is exactly `specifier: workspace:<old> → workspace:<new>` lines (no resolution churn for external packages).
+
+6. **Commit.** Stage `package.json` files and `pnpm-lock.yaml` together in a single commit:
 
    ```text
    chore(release): bump to <version>
@@ -77,9 +87,9 @@ If either precondition is unmet, stop and surface the issue. Do **not** try to a
 
    No body is required — the PR description will explain the bump in detail.
 
-6. **Push the branch** to `origin`.
+7. **Push the branch** to `origin`.
 
-7. **Open the PR** with `gh pr create`. Use the title:
+8. **Open the PR** with `gh pr create`. Use the title:
 
    ```text
    Bump to version <version>
@@ -92,7 +102,7 @@ If either precondition is unmet, stop and surface the issue. Do **not** try to a
    - Surface any release-notes-worthy changes the maintainer flagged in the pre-flight check (or state explicitly that none were flagged).
    - Note that **merging this PR ships the release**: the resulting push to `main` carries the bumped root `version`, the `Publish to npm` workflow detects the change and publishes `<new>` under dist-tag `latest`, and a matching GitHub Release is created automatically.
 
-8. **Stop and report** the PR URL **and the worktree path** to the maintainer. The maintainer can `git worktree remove ../release-<version>` after the PR merges. Do not merge the PR yourself; the merge is a human gate where someone confirms the release notes are acceptable. (Merging triggers the publish — there is no separate dispatch step.)
+9. **Stop and report** the PR URL **and the worktree path** to the maintainer. The maintainer can `git worktree remove ../release-<version>` after the PR merges. Do not merge the PR yourself; the merge is a human gate where someone confirms the release notes are acceptable. (Merging triggers the publish — there is no separate dispatch step.)
 
 ## Idempotency
 
