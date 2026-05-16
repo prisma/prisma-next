@@ -171,6 +171,12 @@ function toSpaceMember(
 ): ContractSpaceMember {
   return {
     spaceId: opts.space,
+    // Blind cast: `MultiSpaceRunnerPerSpaceOptions.destinationContract`
+    // is intentionally typed `unknown` at the framework boundary
+    // (the framework does not know which family's `Contract` shape
+    // a runner consumes). The caller is the aggregate runner,
+    // which only forwards a value already validated through the
+    // family `validateContract` seam at the aggregate boundary.
     contract: opts.destinationContract as unknown as Contract,
     headRef: { hash: '', invariants: [] },
     migrations: {

@@ -641,6 +641,13 @@ class ControlClientImpl implements ControlClient {
     });
 
     try {
+      // Blind cast: `contractRaw` is the unverified provider
+      // payload — `enrichContract` only adds capability + extension
+      // metadata onto whatever shape it receives. The structural
+      // check happens immediately afterwards via
+      // `familyInstance.validateContract(enrichedIR)`, which is
+      // the seam-of-record and the only thing that may surface
+      // structural errors to the caller.
       const enrichedIR = enrichContract(
         contractRaw as unknown as Contract,
         this.frameworkComponents ?? [],

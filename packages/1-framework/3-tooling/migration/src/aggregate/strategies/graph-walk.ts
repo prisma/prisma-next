@@ -1,4 +1,3 @@
-import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlan } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '../../constants';
 import { findPathWithDecision } from '../../migration-graph';
@@ -109,7 +108,7 @@ export function graphWalkStrategy(input: GraphWalkStrategyInputs): GraphWalkOutc
     result: {
       plan,
       displayOps: pathOps,
-      destinationContract: member.contract as unknown as Contract,
+      destinationContract: member.contract,
       strategy: 'graph-walk',
       migrationEdges: edgeRefs,
       pathDecision: outcome.decision,
