@@ -1,6 +1,6 @@
 ---
 name: prisma-next
-description: Route a vague Prisma Next prompt to the right specific skill. Use for "help me with Prisma Next", "what is Prisma Next", "explain Prisma Next", "I'm new to PN", "where do I start", "what can I do next with Prisma", "what can I do with Prisma next", "just ran createprisma", "tour of Prisma Next", "Prisma Next overview", and comparison questions like "Prisma Next vs Prisma 7", "PN vs Drizzle", "PN vs Kysely", "PN vs TypeORM". Do NOT use when the prompt clearly matches a workflow skill — adoption / quickstart / brownfield introspection / post-bootstrap orientation, schema / contract editing, migration authoring (db update / migration plan / migration apply), migration review on deploy / concurrent migrations, queries / db.orm / db.sql / TypedSQL, runtime / db.ts / middleware wiring, build / Vite plugin / Next.js plugin, debug / structured error envelopes / PN-* error codes, or feedback / bug report / feature request — load that sibling skill directly.
+description: Route a vague Prisma Next prompt to the right specific skill. Use for "help me with Prisma Next", "what is Prisma Next", "explain Prisma Next", "I'm new to PN", "where do I start", "what can I do with Prisma Next", "what can I do next with Prisma", "just ran createprisma", "tour of Prisma Next", "Prisma Next overview", and comparison questions like "Prisma Next vs Prisma 7", "PN vs Drizzle", "PN vs Kysely", "PN vs TypeORM". Do NOT use when the prompt clearly matches a workflow skill — adoption / quickstart / first-touch orientation / brownfield introspection, schema / contract editing, migration authoring (db update / migration plan / migration apply), migration review on deploy / concurrent migrations, queries / db.orm / db.sql / TypedSQL, runtime / db.ts / middleware wiring, build / Vite plugin / Next.js plugin, debug / structured error envelopes / PN-* error codes, or feedback / bug report / feature request — load that sibling skill directly.
 ---
 
 # Prisma Next — Router
@@ -34,7 +34,7 @@ If the user's prompt clearly matches one of the workflow skills, route there dir
 
 Otherwise, ask **one** disambiguating question. Pick from:
 
-- *"Did you just run `createprisma` and want to know where to start?"* → `prisma-next-quickstart` (post-bootstrap orientation path).
+- *"Are you new to Prisma Next and asking what you can do with it, or where to start?"* (and any *"what can I do with Prisma Next?"* / *"I just ran createprisma"* variant) → `prisma-next-quickstart` (first-touch orientation path).
 - *"Do you want to set up a new Prisma Next project, or wire it into an existing database?"* → `prisma-next-quickstart`.
 - *"Do you want to edit your data contract (add a model / field / relation), or work with the database (migrations, queries)?"* → `prisma-next-contract` vs the others.
 - *"Is this about authoring a migration, or about reviewing what's going to run on deploy?"* → `prisma-next-migrations` vs `prisma-next-migration-review`.
