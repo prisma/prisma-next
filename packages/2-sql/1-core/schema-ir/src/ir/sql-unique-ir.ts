@@ -19,7 +19,7 @@ export class SqlUniqueIR extends SqlSchemaIRNode {
 
   constructor(input: SqlUniqueIRInput) {
     super();
-    this.columns = input.columns;
+    this.columns = [...input.columns];
     if (input.name !== undefined) this.name = input.name;
     if (input.annotations !== undefined) this.annotations = input.annotations;
     freezeNode(this);
