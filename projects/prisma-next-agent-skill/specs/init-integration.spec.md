@@ -51,7 +51,7 @@ With `--no-skill`:
 $ pnpm dlx prisma-next init --no-skill
   ...
   ◇ Skipped agent-skill installation (--no-skill).
-    To install later, run `npx skills add @prisma-next/agent-skill` in this project.
+    To install later, run `npx skills add @prisma-next/agent-skill --all` in this project.
 ```
 
 ## Problem
@@ -86,13 +86,15 @@ The corresponding `filesToWrite` entry and the `agentSkillMd` import in [`init.t
 
 Project-level install is unconditional (modulo `--no-skill`; see piece 5). The `init` command always invokes `npx skills add @prisma-next/agent-skill` inside the scaffolded project's directory after the dependencies install step.
 
-User-level install is opt-in via `--install-user-skill`. When the flag is passed, `init` additionally invokes `npx skills add @prisma-next/agent-skill` at the user level (the `skills` CLI's user-level flag; current convention is `--user` but the spec defers to the canonical CLI shape at implementation time). The two installs are independent — a user-level install does not affect the project-level install, and vice versa.
+User-level install is opt-in via `--install-user-skill`. When the flag is passed, `init` additionally invokes `npx skills add @prisma-next/agent-skill --all -g` at the user level (the `skills` CLI's user-level flag is `-g`, not `--user` as initially assumed; verified against the upstream README). The two installs are independent — a user-level install does not affect the project-level install, and vice versa.
+
+Both project-level and user-level invocations pass `--all`, which auto-selects every skill in the published cluster and every agent runtime the `skills` CLI detects on the host machine, skipping the multi-select prompts the CLI shows by default. `init` runs as a non-interactive subprocess; prompting mid-scaffold would either hang or fail silently. The skill cluster is also designed to be installed as a unit — the router (`prisma-next`) routes between the workflow-scoped siblings, so any partial install would break the routing contract.
 
 ### 3. First-run prompt for user-level install
 
 When the user runs `init` for the first time on a host (no marker file yet — see piece 4), and the run is interactive (TTY attached, no `--non-interactive` / `--yes` flag), the `init` CLI surfaces a Clack prompt offering the user-level install:
 
-> Install `@prisma-next/agent-skill` at the user level so your agent uses it across every project you work on? (You can change this later with `npx skills remove --user @prisma-next/agent-skill`.) [Y/n]
+> Install `@prisma-next/agent-skill` at the user level so your agent uses it across every project you work on? (You can change this later with `npx skills remove -g @prisma-next/agent-skill`.) [Y/n]
 
 A "yes" answer triggers the user-level install (equivalent to passing `--install-user-skill`). A "no" answer does nothing further. Either answer writes the marker file (piece 4) so the prompt does not appear again on subsequent `init` runs.
 
@@ -118,7 +120,7 @@ Passing `--install-user-skill` explicitly does *not* require the marker file —
 
 `init --no-skill` skips both the project-level install and the user-level prompt. The CLI emits a single info line:
 
-> Skipped agent-skill installation (`--no-skill`). To install later, run `npx skills add @prisma-next/agent-skill` in this project.
+> Skipped agent-skill installation (`--no-skill`). To install later, run `npx skills add @prisma-next/agent-skill --all` in this project.
 
 The flag exists for environments where the `skills` install would fail or be inappropriate — air-gapped CI, no npm registry access, devcontainers without `npx`. It is the only escape hatch; the project-level install is otherwise unconditional.
 
@@ -144,7 +146,7 @@ This is structurally the cleanest piece of the change: removing the per-target t
 
 ### User-level install
 
-- **FR4. `--install-user-skill` flag.** A CLI flag that, when passed, additionally invokes the user-level install (`npx skills add --user @prisma-next/agent-skill` or the canonical equivalent at implementation time). The flag is opt-in.
+- **FR4. `--install-user-skill` flag.** A CLI flag that, when passed, additionally invokes the user-level install (`npx skills add @prisma-next/agent-skill --all -g`; `-g` is the canonical user-level flag in the upstream `skills` CLI). The flag is opt-in.
 
 - **FR5. First-run interactive prompt.** When `init` runs interactively (TTY attached, no `--yes` / `--non-interactive` flag) and the marker file (FR7) is absent, `init` shows a Clack prompt asking whether to install the skill at the user level. A "yes" triggers the user-level install; a "no" does nothing. Either answer writes the marker file (FR7).
 
@@ -166,16 +168,16 @@ This is structurally the cleanest piece of the change: removing the per-target t
 
 ### Opt-out for restricted environments
 
-- **FR8. `--no-skill` flag.** A CLI flag that skips both the project-level install (FR1) and the user-level prompt/install (FR4, FR5). When passed, `init` emits a single info-level message naming the manual fallback (`npx skills add @prisma-next/agent-skill` in this project) and proceeds with the rest of the scaffold. No marker file is written.
+- **FR8. `--no-skill` flag.** A CLI flag that skips both the project-level install (FR1) and the user-level prompt/install (FR4, FR5). When passed, `init` emits a single info-level message naming the manual fallback (`npx skills add @prisma-next/agent-skill --all` in this project) and proceeds with the rest of the scaffold. No marker file is written.
 
 - **FR9. Skill-install failure error.** A failure of the project-level install (network error, registry unreachable, `npx skills` not on PATH, exit code non-zero from the install subprocess) raises a `CliStructuredError` with a new exit code `INIT_EXIT_SKILL_INSTALL_FAILED` (added to [`exit-codes.ts`](../../../packages/1-framework/3-tooling/cli/src/commands/init/exit-codes.ts)). The error message names:
   - The failing subcommand and its stderr.
   - `--no-skill` as the workaround.
-  - The manual install command (`npx skills add @prisma-next/agent-skill`) for after-the-fact installation.
+  - The manual install command (`npx skills add @prisma-next/agent-skill --all`) for after-the-fact installation.
 
   The error is *non-rolling-back* — the project's scaffolded files stay on disk; the user can rerun `init --no-skill --reinit` or simply run the manual install command later. This matches the existing semantics of the dependency-install failure (`INIT_EXIT_INSTALL_FAILED`): scaffolding succeeded, just the post-scaffold step did not.
 
-- **FR10. User-level install failure does not fail the run.** If `--install-user-skill` was passed (or the user answered yes to the prompt) and the user-level install fails, the run logs a warning naming the failure and the manual command (`npx skills add --user @prisma-next/agent-skill`) but does *not* exit non-zero. The user's project is otherwise scaffolded successfully; the failure is opt-in surface and should not block the user from continuing.
+- **FR10. User-level install failure does not fail the run.** If `--install-user-skill` was passed (or the user answered yes to the prompt) and the user-level install fails, the run logs a warning naming the failure and the manual command (`npx skills add @prisma-next/agent-skill --all -g`) but does *not* exit non-zero. The user's project is otherwise scaffolded successfully; the failure is opt-in surface and should not block the user from continuing.
 
 ### Hand-rolled template removal
 

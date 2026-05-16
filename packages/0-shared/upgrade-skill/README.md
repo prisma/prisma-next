@@ -11,8 +11,10 @@ If you are an extension author, install [`@prisma-next/extension-upgrade-skill`]
 ## Installation
 
 ```bash
-npx skills add @prisma-next/upgrade-skill@latest
+npx skills add @prisma-next/upgrade-skill@latest --all
 ```
+
+`--all` skips the per-agent selection prompt and installs to every agent runtime the `skills` CLI detects on this machine. For a single-agent install, swap `--all` for `-a <agent>` (e.g. `-a claude-code`).
 
 Always install at `@latest`. Bug fixes to older per-transition upgrade instructions ship as part of the latest skill release; pinning to an older skill version can apply a known-broken translation.
 

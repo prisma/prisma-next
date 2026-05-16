@@ -25,7 +25,7 @@ Before doing anything else, ensure this skill is installed at `@latest` and relo
 Concretely: if the agent runtime supports an in-session refresh, perform it now. Otherwise, exit and ask the user to re-install:
 
 ```bash
-npx skills add @prisma-next/extension-upgrade-skill@latest
+npx skills add @prisma-next/extension-upgrade-skill@latest --all
 ```
 
 Then re-invoke this skill before proceeding.
