@@ -7,24 +7,12 @@
  * `migration plan`, `db init`, and `db update`.
  */
 
-import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import { defineConfig } from '@prisma-next/cli/config-types';
-import sql from '@prisma-next/family-sql/control';
-import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
-import postgres from '@prisma-next/target-postgres/control';
+import { defineConfig } from '@prisma-next/postgres/config';
 import audit from '../packages/audit/src/control';
 import featureFlags from '../packages/feature-flags/src/control';
 
 export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  extensionPacks: [audit, featureFlags],
-  contract: prismaContract('./src/contract.prisma', {
-    output: 'src/contract.json',
-    target: postgres,
-  }),
-  migrations: {
-    dir: 'migrations',
-  },
+  contract: './src/contract.prisma',
+  extensions: [audit, featureFlags],
+  migrations: { dir: 'migrations' },
 });

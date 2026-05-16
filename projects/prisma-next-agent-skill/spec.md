@@ -22,11 +22,12 @@ The versioning refactor and the upgrade-skill mechanism are paired: the refactor
 A user-facing trace of the published artifacts working together:
 
 ```text
-$ pnpm dlx prisma-next init my-app
+$ mkdir my-app && cd my-app
+$ pnpm dlx prisma-next init
   ✓ Scaffolds prisma-next.config.ts, schema.psl, package.json
   ✓ Installs @prisma-next/agent-skill at project level
 
-  $ cd my-app && open .
+  $ open .
 
   user> "add a Profile model with a unique email and let me list profiles"
   agent> (reads .agents/skill/prisma-next/SKILL.md, navigates to schema-editing entry)
@@ -113,7 +114,7 @@ The project-level requirements describe what each task must produce. Detailed FR
 ### Task 4 — `prisma-next init` integration
 
 - **FR11.** `prisma-next init` always installs `@prisma-next/agent-skill` at the project level. The current hand-rolled template ([`packages/1-framework/3-tooling/cli/src/commands/init/templates/agent-skill-postgres.md`](../../packages/1-framework/3-tooling/cli/src/commands/init/templates/agent-skill-postgres.md)) is removed.
-- **FR12.** `init` offers user-level installation as opt-in: a flag (e.g. `--install-user-skill`) and/or an interactive prompt. A marker file in the user's profile directory prevents re-prompting on subsequent `init`s.
+- **FR12.** The install is **always project-level** — there is no host-wide / global install path from `init`. The skill cluster's surface tracks the project's Prisma Next version, and a global install would have to pick a single version for every project on the host, which breaks the version-locking invariant `NFR2` establishes. Earlier drafts of this spec required a `--install-user-skill` flag and an XDG marker file for prompt suppression; that surface is gone. See [`specs/init-integration.spec.md`](specs/init-integration.spec.md) for the full rationale.
 - **FR13.** `init` is target-aware: when scaffolding a Mongo project (current or future), it installs the same `@prisma-next/agent-skill` — the skill is responsible for target-keyed content internally, not the CLI. (This pins the design that the usage skill is one published artifact, not one per target.)
 
 ## Non-Functional Requirements
@@ -141,8 +142,8 @@ The project-level requirements describe what each task must produce. Detailed FR
 - [ ] **AC5.** An agent with the skill installed completes each Layer-2 operation (schema edit, migration authoring, contract-diff handling, query authoring across all four lanes, capability-gated features, error envelope reading) without the user pasting external docs and without trial-and-error against the type-checker. Measured by per-operation journey tests the task spec defines. Covers FR7.
 - [ ] **AC6.** The skill's `SKILL.md` entry point is under 8KB and references sub-topic files by path; the agent's tool-call log for AC4 shows it loaded only the entry point plus the sub-topics relevant to the active journey. Covers FR8, NFR3.
 - [ ] **AC7.** An agent with the skill installed, given a checkout of [`examples/multi-extension-monorepo/`](../../examples/multi-extension-monorepo/), reasons correctly about which package's contract a requested change belongs to and operates against the right contract space. Covers FR9.
-- [ ] **AC8.** `prisma-next init my-app` installs `@prisma-next/agent-skill` into `my-app/` at the project level. The existing hand-rolled template file is removed from the CLI sources. Covers FR11.
-- [ ] **AC9.** `prisma-next init --install-user-skill` installs the skill at the user level and writes a marker file; subsequent `init` invocations on the same user account do not re-prompt. Covers FR12.
+- [ ] **AC8.** `prisma-next init` (run inside a fresh directory) installs `@prisma-next/agent-skill` at the project level alongside the rest of the scaffold. The existing hand-rolled template file is removed from the CLI sources. Covers FR11.
+- [ ] **AC9.** `prisma-next init` never installs `@prisma-next/agent-skill` at the user/global level — neither by flag nor by prompt. The CLI's flag surface contains no `--install-user-skill` and no `-g` mode for this package; the `init` command, in any mode, only ever runs the project-level invocation. Covers FR12.
 - [ ] **AC10.** `prisma-next init` against a Mongo target installs the same `@prisma-next/agent-skill` (no separate package per target). The skill itself handles target-keyed content internally. Covers FR13.
 
 # Other Considerations

@@ -27,7 +27,7 @@ This demo includes two runtime implementations demonstrating different approache
 Uses emitted `contract.json` and `contract.d.ts` files with the Postgres one-liner client. The emitted workflow uses `Contract` and `TypeMaps` explicitly: `postgres<Contract, TypeMaps>({ contractJson, url })`.
 
 - **Files**: `src/prisma/db.ts`, `src/main.ts`
-- **Contract source**: `src/prisma/contract.json` (emitted from `prisma/schema.prisma`)
+- **Contract source**: `src/prisma/contract.json` (emitted from `src/prisma/contract.prisma`)
 - **Usage**: `pnpm start -- [command]`
 - **Benefits**:
   - Contract is validated and normalized at emit time
@@ -202,7 +202,7 @@ Run `pnpm dev` for the Vite app that visualizes the contract. It renders directl
 
 ## Key Files
 
-- `prisma/schema.prisma` - Prisma schema (source of truth for emitted workflow)
+- `src/prisma/contract.prisma` - Prisma schema (source of truth for emitted workflow)
 - `prisma/contract.ts` - TypeScript contract (used by no-emit workflow)
 - `src/prisma/contract.json` - Emitted contract (emit workflow only)
 - `src/prisma/contract.d.ts` - Emitted types (emit workflow only)
@@ -223,22 +223,3 @@ Run `pnpm dev` for the Vite app that visualizes the contract. It renders directl
 
 - **Vector Similarity Search**: The demo includes a `similarity-search.ts` query that demonstrates cosine distance operations using the pgvector extension pack.
 - **Extension Packs**: Shows how to configure and use extension packs (pgvector) in `prisma-next.config.ts`.
-- **Kysely Lane Parity**: `src/kysely/` contains Kysely equivalents for demo queries:
-  - `get-user-by-id.ts`
-  - `get-user-posts.ts`
-  - `get-users.ts`
-  - `get-users-with-posts.ts`
-  - `dml-operations.ts`
-  - `insert-user-transaction.ts`
-  - `delete-without-where.ts`
-  - `get-all-posts-unbounded.ts`
-  - `update-without-where.ts`
-  - Run commands:
-    - `pnpm start -- user-kysely <id>`
-    - `pnpm start -- posts-kysely <userId>`
-    - `pnpm start -- users-kysely`
-    - `pnpm start -- users-with-posts-kysely`
-    - `pnpm start -- dml-kysely`
-    - `pnpm start -- user-transaction-kysely`
-    - `pnpm start -- guardrail-delete-kysely`
-  - Additional guardrail examples (`update-without-where.ts`, `get-all-posts-unbounded.ts`) are available in `src/kysely/` for direct invocation from tests or scripts.

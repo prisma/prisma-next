@@ -1,0 +1,33 @@
+{
+  "name": "@prisma-next/agent-skill",
+  "version": "0.0.1",
+  "description": "Agent skills for Prisma Next — eight workflow-scoped SKILL.md files an agent loads on demand to operate Prisma Next end-to-end.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "skills",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prisma/prisma-next.git",
+    "directory": "packages/0-shared/agent-skill"
+  },
+  "keywords": [
+    "prisma-next",
+    "agent-skill",
+    "agent-skills",
+    "skills",
+    "claude",
+    "cursor",
+    "anthropic"
+  ],
+  "scripts": {
+    "lint": "biome check . --error-on-warnings",
+    "test": "echo 'no automated tests; see journey-tests/'"
+  }
+}

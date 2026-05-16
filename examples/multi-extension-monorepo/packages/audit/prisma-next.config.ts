@@ -12,21 +12,9 @@
  * @see docs/architecture docs/adrs/ADR 212 - Contract spaces.md
  */
 
-import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import { defineConfig } from '@prisma-next/cli/config-types';
-import sql from '@prisma-next/family-sql/control';
-import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
-import postgres from '@prisma-next/target-postgres/control';
+import { defineConfig } from '@prisma-next/postgres/config';
 
 export default defineConfig({
-  family: sql,
-  target: postgres,
-  adapter: postgresAdapter,
-  contract: prismaContract('./src/contract.prisma', {
-    output: 'src/contract.json',
-    target: postgres,
-  }),
-  migrations: {
-    dir: 'migrations',
-  },
+  contract: './src/contract.prisma',
+  migrations: { dir: 'migrations' },
 });

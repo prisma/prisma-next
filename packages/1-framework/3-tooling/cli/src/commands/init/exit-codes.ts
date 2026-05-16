@@ -60,3 +60,13 @@ export const INIT_EXIT_INSTALL_FAILED = 4;
  * emit` manually.
  */
 export const INIT_EXIT_EMIT_FAILED = 5;
+
+/**
+ * The project-level `@prisma-next/agent-skill` install (`npx skills add
+ * @prisma-next/agent-skill`) failed after a successful dependency
+ * install + emit. The scaffolded project files remain on disk; the
+ * user can fix the underlying issue (network, registry reachability,
+ * `npx skills` not on PATH) and run the install manually, or re-run
+ * `init` with `--no-skill` to skip it.
+ */
+export const INIT_EXIT_SKILL_INSTALL_FAILED = 6;

@@ -31,6 +31,13 @@ export interface InitFlagOptions {
   readonly probeDb?: boolean;
   readonly strictProbe?: boolean;
   readonly install?: boolean;
+  /**
+   * `--no-skill` — skip the project-level skill install entirely.
+   * Documented escape hatch for air-gapped CI, restricted registries,
+   * and any environment where `npx skills` is
+   * not reachable.
+   */
+  readonly skill?: boolean;
 }
 
 /**
@@ -61,6 +68,14 @@ export interface ResolvedInitInputs {
    * is added separately via the install step.
    */
   readonly removePreviousFacade: string | null;
+  /**
+   * Whether to run `npx skills add @prisma-next/agent-skill` at the
+   * project level after install + emit. True by default; `--no-skill`
+   * sets it to `false`. The skill is always project-level (never
+   * user-level / global) so its version stays locked to the project's
+   * Prisma Next version — see `agent-skill-install.ts`.
+   */
+  readonly installProjectSkill: boolean;
 }
 
 const TARGET_ALIASES: ReadonlyMap<string, TargetId> = new Map([
@@ -161,6 +176,13 @@ export async function resolveInitInputs(ctx: {
     autoAcceptPrompts,
   });
 
+  // Skill-install gating. `--no-skill` (commander parses
+  // `options.skill === false`) is the only escape hatch; otherwise
+  // project-level install is unconditional. The skill is always
+  // installed at the project level so its version tracks the
+  // project's Prisma Next release.
+  const installProjectSkill = options.skill !== false;
+
   return {
     target: finalTarget,
     authoring: finalAuthoring,
@@ -171,6 +193,7 @@ export async function resolveInitInputs(ctx: {
     strictProbe: Boolean(options.strictProbe),
     reinit,
     removePreviousFacade,
+    installProjectSkill,
   };
 }
 

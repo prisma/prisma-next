@@ -335,6 +335,9 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:0.7.0
         version: link:../../packages/1-framework/3-tooling/migration
+      '@prisma-next/postgres':
+        specifier: workspace:0.7.0
+        version: link:../../packages/3-extensions/postgres
       '@prisma-next/sql-contract':
         specifier: workspace:0.7.0
         version: link:../../packages/2-sql/1-core/contract
@@ -1083,6 +1086,8 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+
+  packages/0-shared/agent-skill: {}
 
   packages/0-shared/extension-upgrade-skill: {}
 

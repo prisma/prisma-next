@@ -1,6 +1,12 @@
 {
   "packages": [
     {
+      "glob": "packages/0-shared/agent-skill/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
       "glob": "packages/1-framework/0-foundation/**",
       "domain": "framework",
       "layer": "foundation",
