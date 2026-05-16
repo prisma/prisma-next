@@ -277,7 +277,10 @@ type DescriptorTypeRef<Descriptor> = Descriptor extends {
   ? TypeRef
   : undefined;
 
-type LookupNamedStorageTypeKeyByValue<Definition, TypeRef extends StorageTypeInstance> = {
+type LookupNamedStorageTypeKeyByValue<
+  Definition,
+  TypeRef extends StorageTypeInstance | PostgresEnumStorageEntry,
+> = {
   [TypeName in keyof DefinitionTypes<Definition> & string]: [TypeRef] extends [
     DefinitionTypes<Definition>[TypeName],
   ]
@@ -289,7 +292,7 @@ type LookupNamedStorageTypeKeyByValue<Definition, TypeRef extends StorageTypeIns
 
 type ResolveNamedStorageTypeKey<Definition, TypeRef> = TypeRef extends string
   ? TypeRef
-  : TypeRef extends StorageTypeInstance
+  : TypeRef extends StorageTypeInstance | PostgresEnumStorageEntry
     ? [LookupNamedStorageTypeKeyByValue<Definition, TypeRef>] extends [never]
       ? string
       : LookupNamedStorageTypeKeyByValue<Definition, TypeRef>
