@@ -28,7 +28,7 @@ function hashContract(section: Record<string, unknown>): string {
   } as Contract;
   return canonicalizeContract(contract, {
     schemaVersion: SCHEMA_VERSION,
-    serializeContract: (c) => c as unknown as JsonObject,
+    serializeContract: (c) => JSON.parse(JSON.stringify(c)) as JsonObject,
   });
 }
 
