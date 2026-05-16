@@ -82,6 +82,32 @@ jobs:
       - name: Check fixtures are up to date
         run: pnpm fixtures:check
 
+  demo-migration-plan:
+    name: Demo `migration plan` (no-op)
+    # Regression gate for TML-2536: the bug crashed `prisma-next
+    # migration plan` against `examples/prisma-next-demo` because the
+    # demo's predecessor end-contract bypassed the family
+    # `ContractSerializer` seam. Closing the bug also requires that
+    # the demo's checked-in migration history continues to plan as a
+    # no-op end-to-end; this job exercises that path on every PR so
+    # the demo stops working = failed CI, not undetected rot.
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        with:
+          cache: true
+      - uses: pnpm/action-setup@91ab88e2619ed1f46221f0ba42d1492c02baf788 # v6.0.6
+      - name: Install dependencies (skip bin linking)
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build packages (needed for the CLI binary)
+        run: pnpm build
+      - name: Link bins
+        run: pnpm install --frozen-lockfile
+      - name: Run migration plan against checked-in history
+        run: pnpm --filter prisma-next-demo migration:plan:check
+
   build:
     name: Build
     runs-on: ubuntu-latest
