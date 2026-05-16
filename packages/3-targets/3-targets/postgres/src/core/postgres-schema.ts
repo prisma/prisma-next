@@ -1,5 +1,6 @@
 import {
   freezeNode,
+  type Namespace,
   NamespaceBase,
   UNBOUND_NAMESPACE_ID,
 } from '@prisma-next/framework-components/ir';
@@ -86,6 +87,17 @@ export class PostgresSchema extends NamespaceBase {
   schemaSqlExpression(): string {
     return `'${escapeLiteral(this.id)}'`;
   }
+
+  /**
+   * Postgres FR16c default. Named-schema concretions always claim
+   * `'public'` as the top-level default; the unbound singleton below
+   * overrides this to consult the contract's namespace map.
+   */
+  override resolveDefaultNamespaceForTopLevel(
+    _allNamespaces: Readonly<Record<string, Namespace>>,
+  ): string {
+    return 'public';
+  }
 }
 
 /**
@@ -119,6 +131,18 @@ export class PostgresUnboundSchema extends PostgresSchema {
 
   override schemaSqlExpression(): string {
     return 'current_schema()';
+  }
+
+  /**
+   * Default-namespace policy for Postgres-aware contracts. When a
+   * `public` schema is declared in the contract, top-level (unqualified)
+   * models default into it (FR16c). Otherwise top-level models stay in
+   * the late-bound slot so `search_path` decides at runtime.
+   */
+  override resolveDefaultNamespaceForTopLevel(
+    allNamespaces: Readonly<Record<string, Namespace>>,
+  ): string {
+    return 'public' in allNamespaces ? 'public' : UNBOUND_NAMESPACE_ID;
   }
 }
 

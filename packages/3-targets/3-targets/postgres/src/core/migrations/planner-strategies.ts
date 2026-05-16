@@ -35,7 +35,6 @@ import {
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PostgresEnumType } from '../postgres-enum-type';
-import { PostgresSchema } from '../postgres-schema';
 import { determineEnumDiff, readExistingEnumValues } from './enum-planning';
 import {
   AddColumnCall,
@@ -106,19 +105,15 @@ export interface StrategyContext {
  *    `regclassLiteral` calls dispatch via `postgresCreateNamespace` to
  *    `PostgresSchema(id)` (named) or `PostgresSchema.unbound` (elides
  *    so `search_path` resolves at runtime).
- * 2. When `namespaceId` is absent, inspect the contract's
- *    `SqlStorage.namespaces` map:
- *    - If the unbound slot carries a `PostgresSchema` concretion, the
- *      contract was authored with the Postgres-aware `createNamespace`
- *      factory (FR16a). FR16c then maps the implicit "no coordinate"
- *      bucket to `'public'` if the contract declared one, else to
- *      the framework `__unbound__` sentinel (the only other slot the
- *      author chose to populate).
- *    - Otherwise the namespaces map is the framework family default
- *      (`{ __unbound__: SqlUnboundNamespace.instance }`), which is the
- *      shape every legacy single-namespace contract carries — fall back
- *      to the planner's global `ctx.schemaName` to keep existing
- *      migration fixtures byte-identical.
+ * 2. When `namespaceId` is absent, ask the contract's unbound-namespace
+ *    concretion for its default-resolution policy via the polymorphic
+ *    `Namespace.resolveDefaultNamespaceForTopLevel` method:
+ *    - `PostgresUnboundSchema` returns `'public'` if the contract
+ *      declared a `public` namespace (FR16c), else `UNBOUND_NAMESPACE_ID`.
+ *    - The family-shared `SqlUnboundNamespace` placeholder (every legacy
+ *      single-namespace contract carries this) returns `undefined`, so
+ *      we fall back to the planner's global `ctx.schemaName` and keep
+ *      existing migration fixtures byte-identical.
  */
 export function effectiveSchemaForTable(ctx: StrategyContext, tableName: string): string {
   const table = ctx.toContract.storage.tables[tableName];
@@ -127,13 +122,7 @@ export function effectiveSchemaForTable(ctx: StrategyContext, tableName: string)
   }
   const namespaces = ctx.toContract.storage.namespaces;
   const unbound = namespaces[UNBOUND_NAMESPACE_ID];
-  if (!(unbound instanceof PostgresSchema)) {
-    return ctx.schemaName;
-  }
-  if (namespaces['public'] !== undefined) {
-    return 'public';
-  }
-  return UNBOUND_NAMESPACE_ID;
+  return unbound?.resolveDefaultNamespaceForTopLevel(namespaces) ?? ctx.schemaName;
 }
 
 // ============================================================================
