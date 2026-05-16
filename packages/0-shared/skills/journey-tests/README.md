@@ -11,19 +11,19 @@ Cross-runtime automation against a moving model surface is its own research proj
 
    ```bash
    # from the prisma-next repo root
-   npx skills add file:packages/0-shared/agent-skill/ --all
+   npx skills add file:packages/0-shared/skills/ --all
    ```
 
-   Or, once `@prisma-next/agent-skill` is published to npm, install from anywhere by package name:
+   Or, once `@prisma-next/skills` is published to npm, install from anywhere by package name:
 
    ```bash
-   npx skills add @prisma-next/agent-skill --all
+   npx skills add @prisma-next/skills --all
    ```
 
    To test against an in-flight PR branch (publishes via pkg.pr.new on every push):
 
    ```bash
-   npx skills add https://pkg.pr.new/prisma/prisma-next/@prisma-next/agent-skill@<pr-number> --all
+   npx skills add https://pkg.pr.new/prisma/prisma-next/@prisma-next/skills@<pr-number> --all
    ```
 
 3. Open the project in your agent's IDE (or attach the agent via its CLI).

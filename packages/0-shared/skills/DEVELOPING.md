@@ -1,4 +1,4 @@
-# Developing `@prisma-next/agent-skill`
+# Developing `@prisma-next/skills`
 
 Contributor guide for the agent-skill cluster. If you are *using* the skills, read [`README.md`](./README.md) and stop here. If you are *authoring or maintaining* a skill in this package, read this file first.
 
@@ -74,7 +74,7 @@ A skill that teaches the verbose form has handed the agent a worse mental model 
 **Verify each user-authored import:**
 
 ```bash
-rg "from '@prisma-next/" packages/0-shared/agent-skill/skills/<skill>/SKILL.md \
+rg "from '@prisma-next/" packages/0-shared/skills/skills/<skill>/SKILL.md \
   | rg -v '@prisma-next/(postgres|mongo|sqlite|extension-|[a-z]+-plugin-)' \
   | rg -v 'framework-rendered'
 ```

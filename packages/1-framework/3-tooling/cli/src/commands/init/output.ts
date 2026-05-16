@@ -130,7 +130,7 @@ export function buildNextSteps(options: {
       '4. Open prisma-next.md for a quick reference on how to write your first typed query.',
     );
     steps.push(
-      '5. @prisma-next/agent-skill is registered with your agent runtime — open the project in your IDE and ask the agent to add a model, run a query, or plan a migration.',
+      '5. @prisma-next/skills is registered with your agent runtime — open the project in your IDE and ask the agent to add a model, run a query, or plan a migration.',
     );
   } else {
     steps.push(
@@ -140,7 +140,7 @@ export function buildNextSteps(options: {
       '3. Open prisma-next.md for a quick reference on how to write your first typed query.',
     );
     steps.push(
-      '4. @prisma-next/agent-skill is registered with your agent runtime — open the project in your IDE and ask the agent to add a model, run a query, or plan a migration.',
+      '4. @prisma-next/skills is registered with your agent runtime — open the project in your IDE and ask the agent to add a model, run a query, or plan a migration.',
     );
   }
   return steps;

@@ -1084,9 +1084,9 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/0-shared/agent-skill: {}
-
   packages/0-shared/extension-upgrade-skill: {}
+
+  packages/0-shared/skills: {}
 
   packages/0-shared/upgrade-skill: {}
 

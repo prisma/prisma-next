@@ -18,7 +18,7 @@ const exec = promisify(execFile);
  * the rest of the framework relies on (skills, CLI, runtime, and
  * extension packs all ship at the same version per release).
  */
-export const AGENT_SKILL_PACKAGE = '@prisma-next/agent-skill';
+export const AGENT_SKILL_PACKAGE = '@prisma-next/skills';
 
 /**
  * The skill-install command, formatted for the project's detected
@@ -31,7 +31,7 @@ export const AGENT_SKILL_PACKAGE = '@prisma-next/agent-skill';
  * shows by default. A non-interactive scaffold step cannot present
  * prompts, and the cluster is designed to be installed as a unit (the
  * router skill routes between the workflow-scoped siblings). Users who
- * want a narrower install run `npx skills add @prisma-next/agent-skill`
+ * want a narrower install run `npx skills add @prisma-next/skills`
  * themselves after `init` with the flags they want.
  *
  * Exported for unit tests so the per-PM dispatch can be asserted
@@ -125,6 +125,6 @@ export function redactSecrets(stderr: string): string {
 /**
  * Hand-rolled skill stub path that init must not leave behind. Removed
  * on every init run so a project's `.agents/skills/prisma-next/` does
- * not shadow the published `@prisma-next/agent-skill` package.
+ * not shadow the published `@prisma-next/skills` package.
  */
 export const LEGACY_SKILL_FILE = '.agents/skills/prisma-next/SKILL.md';
