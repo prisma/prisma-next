@@ -205,7 +205,7 @@ await db.orm.User
 // → Array<{ id, email, posts: Array<{ id, title, createdAt }> }>
 ```
 
-Nested `1:N → 1:N` includes (e.g. `User → posts → comments`) require the contract to advertise the `lateral` + `jsonAgg` capabilities for the active target. The Postgres adapter advertises both by default, so most apps get this for free; if the type system rejects a nested include with a *missing capability* error, route to `prisma-next-debug`.
+Nested `1:N → 1:N` includes (e.g. `User → posts → comments`) require the contract to advertise the `lateral` + `jsonAgg` capabilities for the active target. The Postgres adapter advertises both by default, so most apps get this for free; if the type system rejects a nested include with a *missing capability* error, route to `prisma-next-contract` to add the required capability declarations and use `prisma-next-queries` for query-shape guidance.
 
 ## Workflow — ORM writes
 
