@@ -9,6 +9,8 @@ import {
   createBuiltinLikeControlMutationDefaults,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  sqliteScalarTypeDescriptors,
+  sqliteTarget,
 } from './fixtures';
 
 const baseInput = {
@@ -1079,5 +1081,104 @@ model User {
         }),
       ]),
     );
+  });
+
+  describe('per-target namespace dispatch (FR16c)', () => {
+    it('SQLite rejects every explicit `namespace { … }` block with a SQLite-flavoured diagnostic', () => {
+      const document = parsePslDocument({
+        schema: `namespace auth {
+  model User {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        target: sqliteTarget,
+        scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
+            message: expect.stringMatching(/SQLite/),
+          }),
+        ]),
+      );
+      const offending = result.failure.diagnostics.find(
+        (d) => d.code === 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
+      );
+      expect(offending?.message).toContain('auth');
+    });
+
+    it('SQLite also rejects `namespace unbound { … }` (no late-binding semantics on SQLite)', () => {
+      const document = parsePslDocument({
+        schema: `namespace unbound {
+  model Tenant {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        target: sqliteTarget,
+        scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
+            message: expect.stringMatching(/SQLite/),
+          }),
+        ]),
+      );
+    });
+
+    it('Postgres accepts `namespace unbound { … }` and `namespace auth { … }` without diagnostics', () => {
+      const document = parsePslDocument({
+        schema: `namespace unbound {
+  model Tenant {
+    id Int @id
+  }
+}
+
+namespace auth {
+  model User {
+    id Int @id
+  }
+}
+`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        ...baseInput,
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      // Storage-side namespace lowering is not yet wired (deferred); the
+      // round closes only the FR16c diagnostic surface here.
+      // Postgres must not surface any PSL_UNSUPPORTED_NAMESPACE_BLOCK
+      // diagnostic for either explicit block.
+      const namespaceDiagnostics = result.ok
+        ? []
+        : result.failure.diagnostics.filter((d) => d.code === 'PSL_UNSUPPORTED_NAMESPACE_BLOCK');
+      expect(namespaceDiagnostics).toEqual([]);
+    });
   });
 });

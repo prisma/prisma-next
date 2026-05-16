@@ -1679,4 +1679,60 @@ describe('interpretPslDocumentToMongoContract', () => {
       expect(required).not.toContain('address');
     });
   });
+
+  describe('per-target namespace dispatch (FR16c)', () => {
+    it('rejects explicit `namespace { … }` blocks with a Mongo-flavoured diagnostic', () => {
+      const result = interpret(`namespace auth {
+  model User {
+    id ObjectId @id @map("_id")
+  }
+}
+`);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
+            message: expect.stringMatching(/Mongo/),
+          }),
+        ]),
+      );
+      const offending = result.failure.diagnostics.find(
+        (d) => d.code === 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
+      );
+      expect(offending?.message).toContain('auth');
+    });
+
+    it('rejects `namespace unbound { … }` too — Mongo has no late-binding namespace surface yet', () => {
+      const result = interpret(`namespace unbound {
+  model Tenant {
+    id ObjectId @id @map("_id")
+  }
+}
+`);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
+            message: expect.stringMatching(/Mongo/),
+          }),
+        ]),
+      );
+    });
+
+    it('accepts top-level declarations (the implicit `__unspecified__` bucket) without diagnostics', () => {
+      const ir = interpretOk(`
+        model Item {
+          id ObjectId @id @map("_id")
+          name String
+        }
+      `);
+      expect(ir.models['Item']).toBeDefined();
+    });
+  });
 });

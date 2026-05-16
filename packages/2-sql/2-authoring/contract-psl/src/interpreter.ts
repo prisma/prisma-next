@@ -29,6 +29,7 @@ import type {
   PslField,
   PslModel,
   PslNamedTypeDeclaration,
+  PslNamespace,
 } from '@prisma-next/psl-parser';
 import {
   isPostgresEnumStorageEntry,
@@ -158,6 +159,55 @@ function mapParserDiagnostics(document: ParsePslDocumentResult): ContractSourceD
     sourceId: diagnostic.sourceId,
     span: diagnostic.span,
   }));
+}
+
+/**
+ * Name of the framework-parser synthesised bucket for top-level
+ * declarations. Re-declared here so the per-target dispatch does not
+ * have to import from `@prisma-next/framework-components/psl-ast`
+ * (which would cross a layer that the interpreter does not otherwise
+ * import from). The value is part of the framework parser's contract;
+ * if it changes there, the matching test in this package's
+ * `interpreter.diagnostics.test.ts` flips first.
+ */
+const UNSPECIFIED_PSL_NAMESPACE_NAME = '__unspecified__';
+
+/**
+ * Per-target FR16c validation: walk the AST's namespace buckets and
+ * emit diagnostics for syntactic constructs the target does not accept.
+ *
+ * - **SQLite** has no schema concept and rejects every explicit
+ *   `namespace { … }` block. The implicit `__unspecified__` bucket
+ *   (produced by the parser for top-level declarations outside any
+ *   block) is the only namespace SQLite accepts.
+ * - **Postgres** accepts every explicit block — `namespace unbound { … }`
+ *   is the late-binding opt-in (lowers to the IR `__unbound__` slot in
+ *   a follow-on commit), `namespace public { … }` reopen-merges with
+ *   the implicit bucket, and any other name lowers to a named schema.
+ *
+ * Storage-side lowering of these buckets to IR namespace slots is not
+ * yet wired; this helper closes only the diagnostic surface.
+ */
+function validateNamespaceBlocksForSqlTarget(input: {
+  readonly namespaces: readonly PslNamespace[];
+  readonly targetId: string;
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): void {
+  if (input.targetId !== 'sqlite') {
+    return;
+  }
+  for (const namespace of input.namespaces) {
+    if (namespace.name === UNSPECIFIED_PSL_NAMESPACE_NAME) {
+      continue;
+    }
+    input.diagnostics.push({
+      code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
+      message: `SQLite does not support \`namespace ${namespace.name} { … }\` blocks (SQLite has no schema concept; declare models at the document top level instead).`,
+      sourceId: input.sourceId,
+      span: namespace.span,
+    });
+  }
 }
 
 interface ProcessEnumDeclarationsInput {
@@ -1298,9 +1348,18 @@ export function interpretPslDocumentToSqlContract(
   }
 
   const diagnostics: ContractSourceDiagnostic[] = mapParserDiagnostics(input.document);
-  // Per-target namespace dispatch is not yet wired into the SQL interpreter;
-  // until it lands, every namespace bucket is flattened into the same
-  // declaration set the interpreter has always consumed.
+  validateNamespaceBlocksForSqlTarget({
+    namespaces: input.document.ast.namespaces,
+    targetId: input.target.targetId,
+    sourceId,
+    diagnostics,
+  });
+  // Storage-side per-target namespace lowering (assigning each table to the
+  // resolved IR namespace slot and populating `storage.namespaces`) is not
+  // yet wired into the SQL contract build pipeline; until it lands, every
+  // namespace bucket is flattened into the same declaration set the
+  // interpreter has always consumed, so single-namespace contracts behave
+  // identically to today.
   const models = input.document.ast.namespaces.flatMap((ns) => ns.models);
   const enums = input.document.ast.namespaces.flatMap((ns) => ns.enums);
   const compositeTypes = input.document.ast.namespaces.flatMap((ns) => ns.compositeTypes);

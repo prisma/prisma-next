@@ -16,7 +16,13 @@ import {
   MongoIndex,
   type MongoIndexKeyDirection,
 } from '@prisma-next/mongo-contract';
-import type { ParsePslDocumentResult, PslField, PslModel, PslSpan } from '@prisma-next/psl-parser';
+import type {
+  ParsePslDocumentResult,
+  PslField,
+  PslModel,
+  PslNamespace,
+  PslSpan,
+} from '@prisma-next/psl-parser';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { deriveJsonSchema, derivePolymorphicJsonSchema } from './derive-json-schema';
 import {
@@ -34,6 +40,40 @@ export interface InterpretPslDocumentToMongoContractInput {
   readonly document: ParsePslDocumentResult;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly codecLookup?: CodecLookup;
+}
+
+/**
+ * Name of the framework-parser synthesised bucket for top-level
+ * declarations. Re-declared locally so the interpreter does not have to
+ * import from `@prisma-next/framework-components/psl-ast`.
+ */
+const UNSPECIFIED_PSL_NAMESPACE_NAME = '__unspecified__';
+
+/**
+ * Mongo FR16c validation: Mongo's authoring DSL exposes the connection's
+ * database as the only namespace surface today, so the PSL interpreter
+ * rejects every explicit `namespace { … }` block. The implicit
+ * `__unspecified__` bucket (top-level declarations) is the only
+ * namespace Mongo accepts. `namespace unbound { … }` is rejected too —
+ * Mongo has no late-binding namespace concept on the PSL surface (the
+ * database name comes from the connection string, not from PSL).
+ */
+function validateNamespaceBlocksForMongoTarget(input: {
+  readonly namespaces: readonly PslNamespace[];
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): void {
+  for (const namespace of input.namespaces) {
+    if (namespace.name === UNSPECIFIED_PSL_NAMESPACE_NAME) {
+      continue;
+    }
+    input.diagnostics.push({
+      code: 'PSL_UNSUPPORTED_NAMESPACE_BLOCK',
+      message: `Mongo does not support \`namespace ${namespace.name} { … }\` blocks (the database is bound by the connection string; declare models at the document top level instead).`,
+      sourceId: input.sourceId,
+      span: namespace.span,
+    });
+  }
 }
 
 interface FieldMappings {
@@ -799,9 +839,16 @@ export function interpretPslDocumentToMongoContract(
   const { document, scalarTypeDescriptors, codecLookup } = input;
   const sourceId = document.ast.sourceId;
   const diagnostics: ContractSourceDiagnostic[] = [];
-  // Mongo does not yet expose multi-database namespacing; until per-target
-  // namespace dispatch lands, every namespace bucket is flattened into the
-  // same declaration set the interpreter has always consumed.
+  validateNamespaceBlocksForMongoTarget({
+    namespaces: document.ast.namespaces,
+    sourceId,
+    diagnostics,
+  });
+  // Mongo lowers only the implicit `__unspecified__` bucket today —
+  // explicit `namespace { … }` blocks were rejected above. The IR
+  // collection map remains flat (and the Mongo target represents
+  // databases via `MongoTargetDatabase`, populated at compose time by
+  // the connection string rather than authoring-time PSL).
   const allModels = document.ast.namespaces.flatMap((ns) => ns.models);
   const allCompositeTypes = document.ast.namespaces.flatMap((ns) => ns.compositeTypes);
   const modelNames = new Set(allModels.map((m) => m.name));
