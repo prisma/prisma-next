@@ -112,3 +112,8 @@ This mistake commonly appears in:
 
 - See `packages/2-sql/1-core/contract/src/validate.ts` for implementation details
 - See `packages/2-sql/1-core/contract/README.md` for usage examples
+
+## Related Rules
+
+- [`as-contract-cast-smell.mdc`](mdc:.cursor/rules/as-contract-cast-smell.mdc) — `JSON.parse(...) as Contract` in production code bypasses the family `ContractSerializer` seam. Use `validateContract<Contract>(JSON.parse(raw) as unknown)` instead.
+- [`contract-normalization-responsibilities.mdc`](mdc:.cursor/rules/contract-normalization-responsibilities.mdc) — the serializer seam is where structural validation and IR-class hydration happen together; consumers do not call them separately.
