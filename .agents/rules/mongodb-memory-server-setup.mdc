@@ -1,3 +1,8 @@
+---
+description: Setup rules for mongodb-memory-server (MMS) to prevent CI failures - pnpm catalog version, fixture cleanup, etc.
+alwaysApply: true
+---
+
 # mongodb-memory-server setup
 
 When adding `mongodb-memory-server` (MMS) to a package or writing tests that use it, follow these rules to prevent CI failures.

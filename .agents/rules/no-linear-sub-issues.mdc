@@ -1,3 +1,8 @@
+---
+description: Never use Linear's sub-issue (parentId) feature - use projects/milestones/labels for grouping instead
+alwaysApply: true
+---
+
 # No Linear sub-issues
 
 **Never** use Linear's sub-issue (`parentId`) feature when creating issues.

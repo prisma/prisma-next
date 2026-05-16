@@ -1,3 +1,8 @@
+---
+description: MongoDB - prefer aggregate() over the legacy find()/findOne() commands
+alwaysApply: true
+---
+
 # MongoDB: no obsolete commands
 
 MongoDB's `find` and `findOne` are legacy commands from older MongoDB versions. The MongoDB product team considers them obsolete.

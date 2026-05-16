@@ -28,7 +28,9 @@
     "lint:deps": "depcruise --config dependency-cruiser.config.mjs packages && node scripts/lint-framework-target-imports.mjs && node scripts/lint-app-space-id.mjs",
     "lint:rules": "node scripts/validate-rules.mjs",
     "lint:rules:footprint": "node scripts/rules-footprint.mjs --check",
+    "lint:rules:sync": "node scripts/sync-rules.mjs --check",
     "rules:footprint": "node scripts/rules-footprint.mjs",
+    "sync:rules": "node scripts/sync-rules.mjs",
     "lint:docs": "node scripts/validate-package-readmes.mjs",
     "lint:manifests": "node scripts/validate-package-manifests.mjs",
     "lint:workflows": "node scripts/lint-workflow-triggers.mjs",
@@ -44,7 +46,7 @@
     "typecheck:examples": "turbo run typecheck --filter='./examples/**'",
     "record": "turbo run record --filter=@prisma-next/cli --",
     "clean": "turbo run clean",
-    "prepare": "husky"
+    "prepare": "husky && node scripts/sync-rules.mjs --quiet"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
