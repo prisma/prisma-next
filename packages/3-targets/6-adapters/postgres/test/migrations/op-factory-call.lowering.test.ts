@@ -84,7 +84,7 @@ describe('renderOps', () => {
       new AddForeignKeyCall('public', 'user', {
         name: 'user_org_fk',
         columns: ['org_id'],
-        references: { table: 'org', columns: ['id'] },
+        target: { table: 'org', columns: ['id'] },
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),

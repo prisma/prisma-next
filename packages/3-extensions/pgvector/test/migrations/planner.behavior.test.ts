@@ -396,8 +396,8 @@ describe('NOT NULL column without default uses temporary default', () => {
         indexes: [],
         foreignKeys: [
           {
-            columns: ['orgId'],
-            references: { table: 'org', columns: ['id'] },
+            source: { columns: ['orgId'] },
+            target: { table: 'org', columns: ['id'] },
             constraint: true,
             index: true,
           },
@@ -548,8 +548,8 @@ function createTestContract(
         indexes: [],
         foreignKeys: [
           {
-            columns: ['userId'],
-            references: { table: 'user', columns: ['id'] },
+            source: { columns: ['userId'] },
+            target: { table: 'user', columns: ['id'] },
             constraint: true,
             index: true,
           },

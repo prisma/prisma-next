@@ -369,8 +369,8 @@ describe('SQL contract validators', () => {
               indexes: [],
               foreignKeys: [
                 {
-                  columns: ['userId'],
-                  references: { table: 'user', columns: ['id'] },
+                  source: { columns: ['userId'] },
+                  target: { table: 'user', columns: ['id'] },
                   index: true,
                 },
               ],
@@ -402,8 +402,8 @@ describe('SQL contract validators', () => {
               indexes: [],
               foreignKeys: [
                 {
-                  columns: ['userId'],
-                  references: { table: 'user', columns: ['id'] },
+                  source: { columns: ['userId'] },
+                  target: { table: 'user', columns: ['id'] },
                   constraint: true,
                 },
               ],
@@ -463,8 +463,8 @@ describe('SQL contract validators', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'user', columns: ['id'] },
                 onDelete: 'invalidAction',
               },
             ],

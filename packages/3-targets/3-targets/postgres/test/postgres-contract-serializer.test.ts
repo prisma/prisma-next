@@ -45,8 +45,8 @@ function makeContractWithTablesJson() {
           indexes: [],
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'user', columns: ['id'] },
+              source: { columns: ['userId'] },
+              target: { table: 'user', columns: ['id'] },
               constraint: true,
               index: true,
             },

@@ -150,7 +150,7 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:d8e55baf0ffe02a3c7ce7cba6bd7580a9e75774d47d41559f2f9781220643d1a",
+    "storageHash": "sha256:121e8427860bbe2ec6f196f766ecf5980c562d3c909ba0a6883682b823f0db26",
     "tables": {
       "post": {
         "columns": {
@@ -187,13 +187,15 @@
         },
         "foreignKeys": [
           {
-            "columns": [
-              "userId"
-            ],
             "constraint": true,
             "index": true,
             "name": "post_userId_fkey",
-            "references": {
+            "source": {
+              "columns": [
+                "userId"
+              ]
+            },
+            "target": {
               "columns": [
                 "id"
               ],

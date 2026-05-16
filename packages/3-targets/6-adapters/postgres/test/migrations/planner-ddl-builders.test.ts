@@ -247,8 +247,8 @@ describe('buildCreateTableSql', () => {
 
 describe('buildForeignKeySql', () => {
   const baseFk: ForeignKey = {
-    columns: ['author_id'],
-    references: { table: 'user', columns: ['id'] },
+    source: { columns: ['author_id'] },
+    target: { table: 'user', columns: ['id'] },
     constraint: true,
     index: true,
   };

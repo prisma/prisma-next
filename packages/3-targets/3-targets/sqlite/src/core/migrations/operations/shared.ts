@@ -44,7 +44,7 @@ export interface SqliteUniqueSpec {
 
 export interface SqliteForeignKeySpec {
   readonly columns: readonly string[];
-  readonly references: {
+  readonly target: {
     readonly table: string;
     readonly columns: readonly string[];
   };
@@ -109,7 +109,7 @@ export function renderColumnDefinition(column: SqliteColumnSpec): string {
 export function renderForeignKeyClause(fk: SqliteForeignKeySpec): string {
   if (!fk.constraint) return '';
   const name = fk.name ? `CONSTRAINT ${quoteIdentifier(fk.name)} ` : '';
-  let sql = `${name}FOREIGN KEY (${fk.columns.map(quoteIdentifier).join(', ')}) REFERENCES ${quoteIdentifier(fk.references.table)} (${fk.references.columns.map(quoteIdentifier).join(', ')})`;
+  let sql = `${name}FOREIGN KEY (${fk.columns.map(quoteIdentifier).join(', ')}) REFERENCES ${quoteIdentifier(fk.target.table)} (${fk.target.columns.map(quoteIdentifier).join(', ')})`;
   if (fk.onDelete !== undefined) {
     sql += ` ON DELETE ${REFERENTIAL_ACTION_SQL[fk.onDelete]}`;
   }

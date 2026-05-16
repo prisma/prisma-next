@@ -422,7 +422,7 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:e92df339aecf4a798943e8e5109cdb006b7f8737d88f674cf0bab6b0dff47adf",
+    "storageHash": "sha256:9e09547664341c1c79396ce82b0c422a351c836c99364b31e8eb8c2cc857f979",
     "tables": {
       "articles": {
         "columns": {
@@ -471,12 +471,14 @@
         },
         "foreignKeys": [
           {
-            "columns": [
-              "post_id"
-            ],
             "constraint": true,
             "index": true,
-            "references": {
+            "source": {
+              "columns": [
+                "post_id"
+              ]
+            },
+            "target": {
               "columns": [
                 "id"
               ],
@@ -525,12 +527,14 @@
         },
         "foreignKeys": [
           {
-            "columns": [
-              "user_id"
-            ],
             "constraint": true,
             "index": true,
-            "references": {
+            "source": {
+              "columns": [
+                "user_id"
+              ]
+            },
+            "target": {
               "columns": [
                 "id"
               ],
@@ -566,12 +570,14 @@
         },
         "foreignKeys": [
           {
-            "columns": [
-              "user_id"
-            ],
             "constraint": true,
             "index": true,
-            "references": {
+            "source": {
+              "columns": [
+                "user_id"
+              ]
+            },
+            "target": {
               "columns": [
                 "id"
               ],
@@ -654,12 +660,14 @@
         },
         "foreignKeys": [
           {
-            "columns": [
-              "invited_by_id"
-            ],
             "constraint": true,
             "index": true,
-            "references": {
+            "source": {
+              "columns": [
+                "invited_by_id"
+              ]
+            },
+            "target": {
               "columns": [
                 "id"
               ],

@@ -139,14 +139,14 @@ export default class M extends Migration {
       ),
       addForeignKey('public', 'post', {
         name: 'post_userId_fkey',
-        columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        source: { columns: ['userId'] },
+        target: { table: 'user', columns: ['id'] },
       }),
       createIndex('public', 'post', 'post_userId_idx', ['userId']),
       addForeignKey('public', 'task', {
         name: 'task_userId_fkey',
-        columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        source: { columns: ['userId'] },
+        target: { table: 'user', columns: ['id'] },
       }),
       createIndex('public', 'task', 'task_userId_idx', ['userId']),
     ];

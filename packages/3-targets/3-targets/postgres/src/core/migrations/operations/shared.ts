@@ -28,11 +28,16 @@ export interface ColumnSpec {
 /**
  * Literal-args shape for a foreign key definition. The referenced table is
  * assumed to live in the same schema as the constrained table.
+ *
+ * Mirrors the Contract IR's source-vs-target split (see
+ * `@prisma-next/sql-contract/types`'s `ForeignKey`), minus the source-side
+ * namespace (the source's namespace is implicit from the schemaName argument
+ * threaded through the planner).
  */
 export interface ForeignKeySpec {
   readonly name: string;
   readonly columns: readonly string[];
-  readonly references: {
+  readonly target: {
     readonly table: string;
     readonly columns: readonly string[];
   };

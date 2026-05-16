@@ -163,8 +163,8 @@ describe('contract definition constraint support', () => {
 
     expect(contract.storage.tables.post.foreignKeys).toHaveLength(1);
     expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
-      columns: ['userId'],
-      references: { table: 'user', columns: ['id'] },
+      source: { columns: ['userId'] },
+      target: { table: 'user', columns: ['id'] },
       constraint: true,
       index: true,
     });
@@ -179,8 +179,8 @@ describe('contract definition constraint support', () => {
 
     expect(contract.storage.tables.post.foreignKeys).toHaveLength(1);
     expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
-      columns: ['userId'],
-      references: { table: 'user', columns: ['id'] },
+      source: { columns: ['userId'] },
+      target: { table: 'user', columns: ['id'] },
       constraint: true,
       index: true,
       name: 'post_userId_fkey',
@@ -325,8 +325,8 @@ describe('contract definition constraint support', () => {
     });
 
     expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
-      columns: ['userId'],
-      references: { table: 'user', columns: ['id'] },
+      source: { columns: ['userId'] },
+      target: { table: 'user', columns: ['id'] },
       constraint: true,
       index: true,
     });
@@ -341,8 +341,8 @@ describe('contract definition constraint support', () => {
     });
 
     expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
-      columns: ['userId'],
-      references: { table: 'user', columns: ['id'] },
+      source: { columns: ['userId'] },
+      target: { table: 'user', columns: ['id'] },
       constraint: false,
       index: true,
     });
@@ -357,8 +357,8 @@ describe('contract definition constraint support', () => {
     });
 
     expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
-      columns: ['userId'],
-      references: { table: 'user', columns: ['id'] },
+      source: { columns: ['userId'] },
+      target: { table: 'user', columns: ['id'] },
       constraint: true,
       index: false,
     });

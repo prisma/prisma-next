@@ -215,8 +215,8 @@ describe('SQLite planner + introspection round-trip', () => {
           primaryKey: { columns: ['id'] },
           foreignKeys: [
             {
-              columns: ['author_id'],
-              references: { table: 'authors', columns: ['id'] },
+              source: { columns: ['author_id'] },
+              target: { table: 'authors', columns: ['id'] },
               onDelete: 'cascade',
               constraint: true,
               index: true,

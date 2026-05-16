@@ -54,7 +54,10 @@ describe('verifySqlSchema - constraints', () => {
           },
           {
             foreignKeys: [
-              { columns: ['author_id'], references: { table: 'user', columns: ['id'] } },
+              {
+                source: { columns: ['author_id'] },
+                target: { table: 'user', columns: ['id'] },
+              },
             ],
           },
         ),
@@ -210,8 +213,8 @@ describe('verifySqlSchema - constraints', () => {
           {
             foreignKeys: [
               {
-                columns: ['author_id'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['author_id'] },
+                target: { table: 'user', columns: ['id'] },
                 constraint: false,
                 index: false,
               },
@@ -252,8 +255,8 @@ describe('verifySqlSchema - constraints', () => {
           {
             foreignKeys: [
               {
-                columns: ['author_id'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['author_id'] },
+                target: { table: 'user', columns: ['id'] },
                 constraint: true,
                 index: false,
               },
@@ -298,8 +301,8 @@ describe('verifySqlSchema - constraints', () => {
           {
             foreignKeys: [
               {
-                columns: ['author_id'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['author_id'] },
+                target: { table: 'user', columns: ['id'] },
                 constraint: false,
                 index: false,
               },

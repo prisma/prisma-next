@@ -93,8 +93,8 @@ describe('SQL contract factories', () => {
     it('creates a ForeignKey', () => {
       const foreignKey = fk(['userId'], 'user', ['id']);
       expect(foreignKey).toEqual({
-        columns: ['userId'],
-        references: {
+        source: { columns: ['userId'] },
+        target: {
           table: 'user',
           columns: ['id'],
         },
@@ -106,8 +106,8 @@ describe('SQL contract factories', () => {
     it('creates foreign key with name', () => {
       const foreignKey = fk(['userId'], 'user', ['id'], { name: 'user_posts_fkey' });
       expect(foreignKey).toEqual({
-        columns: ['userId'],
-        references: {
+        source: { columns: ['userId'] },
+        target: {
           table: 'user',
           columns: ['id'],
         },
@@ -120,8 +120,8 @@ describe('SQL contract factories', () => {
     it('creates composite foreign key', () => {
       const foreignKey = fk(['tenantId', 'userId'], 'user', ['tenantId', 'id']);
       expect(foreignKey).toEqual({
-        columns: ['tenantId', 'userId'],
-        references: {
+        source: { columns: ['tenantId', 'userId'] },
+        target: {
           table: 'user',
           columns: ['tenantId', 'id'],
         },
@@ -133,8 +133,8 @@ describe('SQL contract factories', () => {
     it('creates foreign key with onDelete via options object', () => {
       const foreignKey = fk(['userId'], 'user', ['id'], { onDelete: 'cascade' });
       expect(foreignKey).toEqual({
-        columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        source: { columns: ['userId'] },
+        target: { table: 'user', columns: ['id'] },
         onDelete: 'cascade',
         constraint: true,
         index: true,
@@ -147,8 +147,8 @@ describe('SQL contract factories', () => {
         onUpdate: 'noAction',
       });
       expect(foreignKey).toEqual({
-        columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        source: { columns: ['userId'] },
+        target: { table: 'user', columns: ['id'] },
         onDelete: 'cascade',
         onUpdate: 'noAction',
         constraint: true,
@@ -163,8 +163,8 @@ describe('SQL contract factories', () => {
         onUpdate: 'cascade',
       });
       expect(foreignKey).toEqual({
-        columns: ['userId'],
-        references: { table: 'user', columns: ['id'] },
+        source: { columns: ['userId'] },
+        target: { table: 'user', columns: ['id'] },
         name: 'post_userId_fkey',
         onDelete: 'setNull',
         onUpdate: 'cascade',
@@ -248,8 +248,8 @@ describe('SQL contract factories', () => {
       );
       expect(postTable.foreignKeys).toEqual([
         {
-          columns: ['userId'],
-          references: { table: 'user', columns: ['id'] },
+          source: { columns: ['userId'] },
+          target: { table: 'user', columns: ['id'] },
           constraint: true,
           index: true,
         },
@@ -326,8 +326,8 @@ describe('SQL contract factories', () => {
       expect(postTable.indexes).toEqual([{ columns: ['userId'] }]);
       expect(postTable.foreignKeys).toEqual([
         {
-          columns: ['userId'],
-          references: { table: 'user', columns: ['id'] },
+          source: { columns: ['userId'] },
+          target: { table: 'user', columns: ['id'] },
           constraint: true,
           index: true,
         },

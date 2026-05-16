@@ -417,8 +417,8 @@ describe('contractToSchemaIR', () => {
           },
           foreignKeys: [
             {
-              columns: ['authorId'],
-              references: { table: 'User', columns: ['id'] },
+              source: { columns: ['authorId'] },
+              target: { table: 'User', columns: ['id'] },
               name: 'Post_authorId_fkey',
               constraint: true,
               index: true,
@@ -556,8 +556,8 @@ describe('contractToSchemaIR', () => {
           columns: { authorId: col({ nativeType: 'text' }) },
           foreignKeys: [
             {
-              columns: ['authorId'],
-              references: { table: 'User', columns: ['id'] },
+              source: { columns: ['authorId'] },
+              target: { table: 'User', columns: ['id'] },
               constraint: true,
               index: true,
             },
@@ -588,8 +588,8 @@ describe('contractToSchemaIR', () => {
           primaryKey: { columns: ['userId'] },
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'User', columns: ['id'] },
+              source: { columns: ['userId'] },
+              target: { table: 'User', columns: ['id'] },
               constraint: true,
               index: true,
             },
@@ -616,8 +616,8 @@ describe('contractToSchemaIR', () => {
           uniques: [{ columns: ['userId'] }],
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'User', columns: ['id'] },
+              source: { columns: ['userId'] },
+              target: { table: 'User', columns: ['id'] },
               constraint: true,
               index: true,
             },
@@ -643,14 +643,14 @@ describe('contractToSchemaIR', () => {
           columns: { userId: col({ nativeType: 'text' }) },
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'User', columns: ['id'] },
+              source: { columns: ['userId'] },
+              target: { table: 'User', columns: ['id'] },
               constraint: true,
               index: true,
             },
             {
-              columns: ['userId'],
-              references: { table: 'User', columns: ['id'] },
+              source: { columns: ['userId'] },
+              target: { table: 'User', columns: ['id'] },
               constraint: true,
               index: true,
             },

@@ -122,7 +122,12 @@ export function effectiveSchemaForTable(ctx: StrategyContext, tableName: string)
   }
   const namespaces = ctx.toContract.storage.namespaces;
   const unbound = namespaces[UNBOUND_NAMESPACE_ID];
-  return unbound?.resolveDefaultNamespaceForTopLevel(namespaces) ?? ctx.schemaName;
+  // `resolveDefaultNamespaceForTopLevel` is optional on the `Namespace`
+  // interface — JSON-imported contracts carry plain namespace literals
+  // without the method, in which case the call short-circuits to the
+  // planner's global `ctx.schemaName` fallback (the original legacy
+  // single-namespace behaviour).
+  return unbound?.resolveDefaultNamespaceForTopLevel?.(namespaces) ?? ctx.schemaName;
 }
 
 // ============================================================================
@@ -729,7 +734,8 @@ function canUseSharedTemporaryDefaultStrategy(options: {
   }
 
   for (const foreignKey of table.foreignKeys) {
-    if (foreignKey.constraint === false || !foreignKey.columns.includes(columnName)) continue;
+    if (foreignKey.constraint === false || !foreignKey.source.columns.includes(columnName))
+      continue;
     if (!schemaLookup || !hasForeignKey(schemaLookup, foreignKey)) return false;
   }
 

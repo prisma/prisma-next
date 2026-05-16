@@ -410,8 +410,8 @@ model Post {
           indexes: [{ columns: ['userId'] }],
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: {
+              source: { columns: ['userId'] },
+              target: {
                 table: 'user',
                 columns: ['id'],
               },
@@ -481,8 +481,8 @@ model Member {
           uniques: [{ columns: ['team_ref', 'member_id'] }],
           foreignKeys: [
             {
-              columns: ['team_ref'],
-              references: { table: 'org_team', columns: ['team_id'] },
+              source: { columns: ['team_ref'] },
+              target: { table: 'org_team', columns: ['team_id'] },
             },
           ],
         },

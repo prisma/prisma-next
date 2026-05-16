@@ -155,8 +155,8 @@ describe('shared contract definition lowering', () => {
     });
     expect(storage['tables']?.['blog_post']?.foreignKeys).toEqual([
       {
-        columns: ['author_id'],
-        references: {
+        source: { columns: ['author_id'] },
+        target: {
           table: 'app_user',
           columns: ['id'],
         },

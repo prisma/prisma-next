@@ -151,7 +151,7 @@ describe('hasForeignKey', () => {
   const lookup = buildSchemaLookupMap(schema).get('post')!;
 
   const fk = (
-    overrides: Partial<ForeignKey> & Pick<ForeignKey, 'columns' | 'references'>,
+    overrides: Partial<ForeignKey> & Pick<ForeignKey, 'source' | 'target'>,
   ): ForeignKey => ({
     constraint: true,
     index: true,
@@ -162,7 +162,7 @@ describe('hasForeignKey', () => {
     expect(
       hasForeignKey(
         lookup,
-        fk({ columns: ['author_id'], references: { table: 'user', columns: ['id'] } }),
+        fk({ source: { columns: ['author_id'] }, target: { table: 'user', columns: ['id'] } }),
       ),
     ).toBe(true);
   });
@@ -172,8 +172,8 @@ describe('hasForeignKey', () => {
       hasForeignKey(
         lookup,
         fk({
-          columns: ['org_id', 'team_id'],
-          references: { table: 'team', columns: ['org_id', 'id'] },
+          source: { columns: ['org_id', 'team_id'] },
+          target: { table: 'team', columns: ['org_id', 'id'] },
         }),
       ),
     ).toBe(true);
@@ -183,7 +183,7 @@ describe('hasForeignKey', () => {
     expect(
       hasForeignKey(
         lookup,
-        fk({ columns: ['author_id'], references: { table: 'account', columns: ['id'] } }),
+        fk({ source: { columns: ['author_id'] }, target: { table: 'account', columns: ['id'] } }),
       ),
     ).toBe(false);
   });
@@ -192,7 +192,7 @@ describe('hasForeignKey', () => {
     expect(
       hasForeignKey(
         lookup,
-        fk({ columns: ['author_id'], references: { table: 'user', columns: ['uid'] } }),
+        fk({ source: { columns: ['author_id'] }, target: { table: 'user', columns: ['uid'] } }),
       ),
     ).toBe(false);
   });
@@ -201,7 +201,7 @@ describe('hasForeignKey', () => {
     expect(
       hasForeignKey(
         lookup,
-        fk({ columns: ['user_id'], references: { table: 'user', columns: ['id'] } }),
+        fk({ source: { columns: ['user_id'] }, target: { table: 'user', columns: ['id'] } }),
       ),
     ).toBe(false);
   });

@@ -218,8 +218,8 @@ describe('SqlContractSerializer model validation', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'User', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'User', columns: ['id'] },
                 constraint: true,
                 index: true,
               },
@@ -286,8 +286,8 @@ describe('SqlContractSerializer model validation', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'User', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'User', columns: ['id'] },
                 constraint: true,
                 index: true,
               },

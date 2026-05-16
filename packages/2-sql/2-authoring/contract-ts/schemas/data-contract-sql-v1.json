@@ -369,21 +369,33 @@
     },
     "ForeignKey": {
       "type": "object",
-      "description": "Foreign key constraint definition",
+      "description": "Foreign key constraint definition with explicit source-vs-target sides. Cross-namespace references populate `target.namespaceId` with the target table's namespace coordinate; same-namespace references populate it with the source table's coordinate (or omit it when both are the unbound default).",
       "additionalProperties": false,
       "properties": {
-        "columns": {
-          "type": "array",
-          "description": "Column names in the referencing table",
-          "items": {
-            "type": "string"
-          }
-        },
-        "references": {
+        "source": {
           "type": "object",
-          "description": "Referenced table and columns",
+          "description": "Source-side columns (in the referencing table).",
           "additionalProperties": false,
           "properties": {
+            "columns": {
+              "type": "array",
+              "description": "Column names in the referencing table",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["columns"]
+        },
+        "target": {
+          "type": "object",
+          "description": "Referenced (target) side: namespace coordinate, table, and columns.",
+          "additionalProperties": false,
+          "properties": {
+            "namespaceId": {
+              "type": "string",
+              "description": "Namespace coordinate the referenced table inhabits. Optional — omitted when the reference is to the unbound default."
+            },
             "table": {
               "type": "string",
               "description": "Referenced table name"
@@ -411,7 +423,7 @@
           "description": "Whether to emit a backing index for the FK columns"
         }
       },
-      "required": ["columns", "references", "constraint", "index"]
+      "required": ["source", "target", "constraint", "index"]
     },
     "FieldType": {
       "type": "object",

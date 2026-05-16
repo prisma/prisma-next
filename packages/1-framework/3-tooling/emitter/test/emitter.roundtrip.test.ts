@@ -123,8 +123,8 @@ describe('emitter round-trip', () => {
               indexes: [],
               foreignKeys: [
                 {
-                  columns: ['user_id'],
-                  references: { table: 'user', columns: ['id'] },
+                  source: { columns: ['user_id'] },
+                  target: { table: 'user', columns: ['id'] },
                   name: 'post_user_id_fkey',
                 },
               ],

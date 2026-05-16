@@ -484,8 +484,8 @@ describe('verifySqlSchema - semantic satisfaction', () => {
           {
             foreignKeys: [
               {
-                columns: ['author_id'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['author_id'] },
+                target: { table: 'user', columns: ['id'] },
                 name: 'post_author_fk',
               },
             ],
@@ -538,8 +538,8 @@ describe('verifySqlSchema - semantic satisfaction', () => {
           {
             foreignKeys: [
               {
-                columns: ['author_id'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['author_id'] },
+                target: { table: 'user', columns: ['id'] },
                 name: 'post_author_fk',
               },
             ],
@@ -588,8 +588,8 @@ describe('verifySqlSchema - semantic satisfaction', () => {
           {
             foreignKeys: [
               {
-                columns: ['tenant_id', 'tenant_org_id'],
-                references: { table: 'tenant', columns: ['id', 'org_id'] },
+                source: { columns: ['tenant_id', 'tenant_org_id'] },
+                target: { table: 'tenant', columns: ['id', 'org_id'] },
                 name: 'document_tenant_fk',
               },
             ],

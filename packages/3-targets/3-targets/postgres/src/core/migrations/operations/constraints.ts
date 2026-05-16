@@ -15,7 +15,7 @@ function renderForeignKeySql(schemaName: string, tableName: string, fk: ForeignK
   let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
 ADD CONSTRAINT ${quoteIdentifier(fk.name)}
 FOREIGN KEY (${fk.columns.map(quoteIdentifier).join(', ')})
-REFERENCES ${qualifyTableName(schemaName, fk.references.table)} (${fk.references.columns
+REFERENCES ${qualifyTableName(schemaName, fk.target.table)} (${fk.target.columns
     .map(quoteIdentifier)
     .join(', ')})`;
 

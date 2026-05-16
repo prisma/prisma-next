@@ -8,7 +8,7 @@ This package provides TypeScript type definitions, Arktype validators, and facto
 
 ## Responsibilities
 
-- **SQL Contract Types**: Defines SQL-specific contract types (`SqlContract`, `SqlStorage`, `StorageTable`, `SqlModelStorage`, `SqlModelFieldStorage`, `ForeignKeysConfig`) that extend framework-level contract types
+- **SQL Contract Types**: Defines SQL-specific contract types (`SqlContract`, `SqlStorage`, `StorageTable`, `SqlModelStorage`, `SqlModelFieldStorage`, `ForeignKey`, `ForeignKeyReference`) that extend framework-level contract types
 - **Contract Validation**: Provides Arktype-based structural validators that the per-target `contractSerializer` SPI consumes for runtime-safe contract validation
 - **IR Factories**: Provides pure factory functions for constructing contract IR structures in tests and authoring
 - **Shared Plane Access**: Enables both migration-plane and runtime-plane packages to import SQL contract types without violating plane boundaries
@@ -66,11 +66,25 @@ When omitted, defaults to `{ constraints: true, indexes: true }`. See [ADR 161](
 type ReferentialAction = 'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault';
 
 type ForeignKey = {
-  readonly columns: readonly string[];
-  readonly references: ForeignKeyReferences;
+  readonly source: ForeignKeySource;
+  readonly target: ForeignKeyReference;
   readonly name?: string;
   readonly onDelete?: ReferentialAction;
   readonly onUpdate?: ReferentialAction;
+  readonly constraint: boolean;
+  readonly index: boolean;
+};
+
+type ForeignKeySource = {
+  readonly columns: readonly string[];
+};
+
+type ForeignKeyReference = {
+  // Optional — same-namespace FKs may omit it; cross-namespace
+  // references populate this with the target table's namespace coord.
+  readonly namespaceId?: string;
+  readonly table: string;
+  readonly columns: readonly string[];
 };
 ```
 

@@ -20,8 +20,8 @@ describe('verifySqlSchema - referential actions', () => {
         {
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'user', columns: ['id'] },
+              source: { columns: ['userId'] },
+              target: { table: 'user', columns: ['id'] },
               onDelete: 'cascade',
               index: false,
             },
@@ -74,8 +74,8 @@ describe('verifySqlSchema - referential actions', () => {
         {
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'user', columns: ['id'] },
+              source: { columns: ['userId'] },
+              target: { table: 'user', columns: ['id'] },
               onDelete: 'cascade',
               index: false,
             },
@@ -133,8 +133,8 @@ describe('verifySqlSchema - referential actions', () => {
         {
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'user', columns: ['id'] },
+              source: { columns: ['userId'] },
+              target: { table: 'user', columns: ['id'] },
               onUpdate: 'cascade',
               index: false,
             },
@@ -192,8 +192,8 @@ describe('verifySqlSchema - referential actions', () => {
         {
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'user', columns: ['id'] },
+              source: { columns: ['userId'] },
+              target: { table: 'user', columns: ['id'] },
               onDelete: 'noAction',
               onUpdate: 'noAction',
               index: false,
@@ -247,8 +247,8 @@ describe('verifySqlSchema - referential actions', () => {
         {
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'user', columns: ['id'] },
+              source: { columns: ['userId'] },
+              target: { table: 'user', columns: ['id'] },
               index: false,
             },
           ],

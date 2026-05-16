@@ -386,8 +386,8 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           indexes: [{ columns: ['parent_id'], name: 'child_parent_id_idx' }],
           foreignKeys: [
             {
-              columns: ['parent_id'],
-              references: { table: 'parent', columns: ['id'] },
+              source: { columns: ['parent_id'] },
+              target: { table: 'parent', columns: ['id'] },
               name: 'child_parent_id_fkey',
               constraint: true,
               index: true,
@@ -712,8 +712,8 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           indexes: [{ columns: ['parent_id'], name: 'child_parent_id_idx' }],
           foreignKeys: [
             {
-              columns: ['parent_id'],
-              references: { table: 'parent', columns: ['id'] },
+              source: { columns: ['parent_id'] },
+              target: { table: 'parent', columns: ['id'] },
               name: 'child_parent_id_fkey',
               constraint: true,
               index: true,
@@ -1314,8 +1314,8 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           indexes: [{ columns: ['parent_id'], name: 'child1_parent_id_idx' }],
           foreignKeys: [
             {
-              columns: ['parent_id'],
-              references: { table: 'parent', columns: ['id'] },
+              source: { columns: ['parent_id'] },
+              target: { table: 'parent', columns: ['id'] },
               name: 'fk_parent',
               constraint: true,
               index: true,
@@ -1332,8 +1332,8 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           indexes: [{ columns: ['parent_id'], name: 'child2_parent_id_idx' }],
           foreignKeys: [
             {
-              columns: ['parent_id'],
-              references: { table: 'parent', columns: ['id'] },
+              source: { columns: ['parent_id'] },
+              target: { table: 'parent', columns: ['id'] },
               name: 'fk_parent',
               constraint: true,
               index: true,
@@ -1365,8 +1365,8 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           indexes: [{ columns: ['parent_id'], name: 'child2_parent_id_idx' }],
           foreignKeys: [
             {
-              columns: ['parent_id'],
-              references: { table: 'parent', columns: ['id'] },
+              source: { columns: ['parent_id'] },
+              target: { table: 'parent', columns: ['id'] },
               name: 'fk_parent',
               constraint: true,
               index: true,

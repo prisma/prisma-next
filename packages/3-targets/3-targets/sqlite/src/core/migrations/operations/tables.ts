@@ -360,18 +360,18 @@ export function buildRecreatePostchecks(
 
   if (hasFkIssue) {
     for (const fk of spec.foreignKeys ?? []) {
-      const refTable = escapeLiteral(fk.references.table);
+      const refTable = escapeLiteral(fk.target.table);
       const colCount = fk.columns.length;
       // Build a `SUM(CASE WHEN ("from","to") IN ((…)) …)` so the check works
       // for both single- and multi-column FKs without depending on FK row
       // ordering inside `pragma_foreign_key_list`.
       const tuples = fk.columns
         .map((from, i) => {
-          const to = fk.references.columns[i] ?? from;
+          const to = fk.target.columns[i] ?? from;
           return `('${escapeLiteral(from)}', '${escapeLiteral(to)}')`;
         })
         .join(', ');
-      const description = `verify foreign key (${fk.columns.join(', ')}) → ${fk.references.table}(${fk.references.columns.join(', ')}) on "${tableName}"`;
+      const description = `verify foreign key (${fk.columns.join(', ')}) → ${fk.target.table}(${fk.target.columns.join(', ')}) on "${tableName}"`;
       checks.push({
         description,
         sql:

@@ -137,7 +137,7 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:83b74ecd053a5905fd5af2f034fc0367679338de2ca91aa85e3ad6fc77c70525",
+    "storageHash": "sha256:e7d35284424a4242d9654d8dd72413e31e489843dc642138ce2e92e20bc52f15",
     "tables": {
       "post": {
         "columns": {
@@ -171,12 +171,14 @@
         },
         "foreignKeys": [
           {
-            "columns": [
-              "userId"
-            ],
             "constraint": true,
             "index": true,
-            "references": {
+            "source": {
+              "columns": [
+                "userId"
+              ]
+            },
+            "target": {
               "columns": [
                 "id"
               ],

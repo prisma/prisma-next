@@ -4,7 +4,8 @@ import { validateContractDomain } from '@prisma-next/contract/validate-domain';
 import { type } from 'arktype';
 import {
   type ForeignKeyInput,
-  type ForeignKeyReferencesInput,
+  type ForeignKeyReferenceInput,
+  type ForeignKeySource,
   findTableByName,
   iterateTablesWithCoords,
   type PrimaryKeyInput,
@@ -153,8 +154,13 @@ export const IndexSchema = type({
   'options?': 'Record<string, unknown>',
 });
 
-export const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferencesInput>().type({
+export const ForeignKeyReferenceSchema = type.declare<ForeignKeyReferenceInput>().type({
+  'namespaceId?': 'string',
   table: 'string',
+  columns: type.string.array().readonly(),
+});
+
+export const ForeignKeySourceSchema = type.declare<ForeignKeySource>().type({
   columns: type.string.array().readonly(),
 });
 
@@ -163,8 +169,8 @@ export const ReferentialActionSchema = type
   .type("'noAction' | 'restrict' | 'cascade' | 'setNull' | 'setDefault'");
 
 export const ForeignKeySchema = type.declare<ForeignKeyInput>().type({
-  columns: type.string.array().readonly(),
-  references: ForeignKeyReferencesSchema,
+  source: ForeignKeySourceSchema,
+  target: ForeignKeyReferenceSchema,
   'name?': 'string',
   'onDelete?': ReferentialActionSchema,
   'onUpdate?': ReferentialActionSchema,
@@ -525,8 +531,8 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
     const seenForeignKeyDefinitions = new Set<string>();
     for (const fk of table.foreignKeys) {
       const signature = JSON.stringify({
-        columns: fk.columns,
-        references: fk.references,
+        source: fk.source,
+        target: fk.target,
         onDelete: fk.onDelete ?? null,
         onUpdate: fk.onUpdate ?? null,
         constraint: fk.constraint,
@@ -534,7 +540,7 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
       });
       if (seenForeignKeyDefinitions.has(signature)) {
         errors.push(
-          `Table "${tableName}": duplicate foreign key definition on columns [${fk.columns.join(', ')}]`,
+          `Table "${tableName}": duplicate foreign key definition on columns [${fk.source.columns.join(', ')}]`,
         );
         continue;
       }
@@ -542,7 +548,7 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
     }
 
     for (const fk of table.foreignKeys) {
-      for (const colName of fk.columns) {
+      for (const colName of fk.source.columns) {
         const column = table.columns[colName];
         if (!column) continue;
 
@@ -678,7 +684,7 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
     }
 
     for (const fk of table.foreignKeys) {
-      for (const colName of fk.columns) {
+      for (const colName of fk.source.columns) {
         if (!columnNames.has(colName)) {
           throw new ContractValidationError(
             `Table "${tableName}" foreignKey references non-existent column "${colName}"`,
@@ -687,28 +693,28 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
         }
       }
 
-      if (!tableNames.has(fk.references.table)) {
+      if (!tableNames.has(fk.target.table)) {
         throw new ContractValidationError(
-          `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+          `Table "${tableName}" foreignKey references non-existent table "${fk.target.table}"`,
           'storage',
         );
       }
 
-      const referencedTable = findTableByName(contract.storage, fk.references.table);
+      const referencedTable = findTableByName(contract.storage, fk.target.table);
       if (!referencedTable) continue;
       const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
-      for (const colName of fk.references.columns) {
+      for (const colName of fk.target.columns) {
         if (!referencedColumnNames.has(colName)) {
           throw new ContractValidationError(
-            `Table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.references.table}"`,
+            `Table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.target.table}"`,
             'storage',
           );
         }
       }
 
-      if (fk.columns.length !== fk.references.columns.length) {
+      if (fk.source.columns.length !== fk.target.columns.length) {
         throw new ContractValidationError(
-          `Table "${tableName}" foreignKey column count (${fk.columns.length}) does not match referenced column count (${fk.references.columns.length})`,
+          `Table "${tableName}" foreignKey column count (${fk.source.columns.length}) does not match referenced column count (${fk.target.columns.length})`,
           'storage',
         );
       }

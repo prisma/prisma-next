@@ -205,17 +205,17 @@ describe('Postgres call classes - per-class renderTypeScript coverage', () => {
     const minimal = new AddForeignKeyCall('public', 'post', {
       name: 'fk',
       columns: ['a'],
-      references: { table: 'u', columns: ['id'] },
+      target: { table: 'u', columns: ['id'] },
     });
     expect(minimal.renderTypeScript()).toBe(
-      'addForeignKey("public", "post", { name: "fk", columns: ["a"], references: { table: "u", columns: ["id"] } })',
+      'addForeignKey("public", "post", { name: "fk", columns: ["a"], target: { table: "u", columns: ["id"] } })',
     );
     expectFactoryImport(minimal, 'addForeignKey');
 
     const withActions = new AddForeignKeyCall('public', 'post', {
       name: 'post_author_fk',
       columns: ['author_id'],
-      references: { table: 'user', columns: ['id'] },
+      target: { table: 'user', columns: ['id'] },
       onDelete: 'cascade',
       onUpdate: 'restrict',
     });

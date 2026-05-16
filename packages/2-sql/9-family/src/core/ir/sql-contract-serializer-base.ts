@@ -71,7 +71,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
    * constructing a single `SqlStorage` instance — its constructor
    * cascades nested instantiation of `StorageTable`, `StorageColumn`,
    * `PrimaryKey`, `UniqueConstraint`, `Index`, `ForeignKey`,
-   * `ForeignKeyReferences`, and `StorageTypeInstance`. The rest of the
+   * `ForeignKeyReference`, and `StorageTypeInstance`. The rest of the
    * contract envelope (target identity, hashes, capabilities, models,
    * meta, …) is JSON-clean primitive data and passes through unchanged.
    *

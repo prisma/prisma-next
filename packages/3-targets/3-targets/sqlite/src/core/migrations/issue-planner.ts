@@ -239,8 +239,8 @@ export function toTableSpec(
     ...(u.name !== undefined ? { name: u.name } : {}),
   }));
   const foreignKeys: SqliteForeignKeySpec[] = table.foreignKeys.map((fk) => ({
-    columns: fk.columns,
-    references: { table: fk.references.table, columns: fk.references.columns },
+    columns: fk.source.columns,
+    target: { table: fk.target.table, columns: fk.target.columns },
     constraint: fk.constraint !== false,
     ...(fk.name !== undefined ? { name: fk.name } : {}),
     ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
@@ -316,9 +316,9 @@ function mapIssueToCall(
       }
       for (const fk of contractTable.foreignKeys) {
         if (fk.index === false) continue;
-        if (declaredIndexColumnKeys.has(fk.columns.join(','))) continue;
-        const indexName = defaultIndexName(issue.table, fk.columns);
-        calls.push(new CreateIndexCall(issue.table, indexName, fk.columns));
+        if (declaredIndexColumnKeys.has(fk.source.columns.join(','))) continue;
+        const indexName = defaultIndexName(issue.table, fk.source.columns);
+        calls.push(new CreateIndexCall(issue.table, indexName, fk.source.columns));
       }
       return ok(calls);
     }

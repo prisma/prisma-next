@@ -178,8 +178,8 @@ describe('SqlContractSerializer', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'NonExistent', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'NonExistent', columns: ['id'] },
                 constraint: true,
                 index: true,
               },

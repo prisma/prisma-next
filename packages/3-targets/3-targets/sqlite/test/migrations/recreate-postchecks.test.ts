@@ -102,12 +102,12 @@ describe('buildRecreatePostchecks - constraint coverage', () => {
       foreignKeys: [
         {
           columns: ['user_id'],
-          references: { table: 'users', columns: ['id'] },
+          target: { table: 'users', columns: ['id'] },
           constraint: true,
         },
         {
           columns: ['tenant_id', 'user_id'],
-          references: { table: 'memberships', columns: ['tenant_id', 'user_id'] },
+          target: { table: 'memberships', columns: ['tenant_id', 'user_id'] },
           constraint: true,
         },
       ],
@@ -140,9 +140,7 @@ describe('buildRecreatePostchecks - constraint coverage', () => {
       columns: [colSpec({ name: 'a' })],
       primaryKey: { columns: ['a'] },
       uniques: [{ columns: ['a'] }],
-      foreignKeys: [
-        { columns: ['a'], references: { table: 'x', columns: ['id'] }, constraint: true },
-      ],
+      foreignKeys: [{ columns: ['a'], target: { table: 'x', columns: ['id'] }, constraint: true }],
     });
     const issues: SchemaIssue[] = [
       {

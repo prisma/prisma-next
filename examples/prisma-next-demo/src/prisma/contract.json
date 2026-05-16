@@ -393,7 +393,7 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:51ce32e2159e8f86e86b9080bad41d16a7d3a2490fe4865b6eeab81fef78a85a",
+    "storageHash": "sha256:7d921ee2313b9aab5de241a6e0f2bde4f28e1e70fd44243f8d3b980a344ecc51",
     "tables": {
       "bug": {
         "columns": {
@@ -467,12 +467,14 @@
         },
         "foreignKeys": [
           {
-            "columns": [
-              "userId"
-            ],
             "constraint": true,
             "index": true,
-            "references": {
+            "source": {
+              "columns": [
+                "userId"
+              ]
+            },
+            "target": {
               "columns": [
                 "id"
               ],
@@ -539,12 +541,14 @@
         },
         "foreignKeys": [
           {
-            "columns": [
-              "userId"
-            ],
             "constraint": true,
             "index": true,
-            "references": {
+            "source": {
+              "columns": [
+                "userId"
+              ]
+            },
+            "target": {
               "columns": [
                 "id"
               ],

@@ -1112,7 +1112,7 @@ type HasForeignKeyForCols<
   FKs extends readonly unknown[],
   Cols extends readonly string[],
 > = FKs extends readonly [infer Head, ...infer Tail extends unknown[]]
-  ? Head extends { readonly columns: Cols }
+  ? Head extends { readonly source: { readonly columns: Cols } }
     ? true
     : HasForeignKeyForCols<Tail, Cols>
   : false;

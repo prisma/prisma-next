@@ -138,12 +138,12 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
     }
     for (const fk of contractTable.foreignKeys) {
       if (fk.index === false) continue;
-      const key = fk.columns.join(',');
+      const key = fk.source.columns.join(',');
       if (seenIndexColumnKeys.has(key)) continue;
       seenIndexColumnKeys.add(key);
       indexes.push({
-        name: defaultIndexName(tableName, fk.columns),
-        columns: fk.columns,
+        name: defaultIndexName(tableName, fk.source.columns),
+        columns: fk.source.columns,
       });
     }
 

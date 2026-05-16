@@ -90,8 +90,8 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'user', columns: ['id'] },
                 index: true,
                 constraint: true,
               },
@@ -134,8 +134,8 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
             indexes: [{ columns: ['userId'], name: 'idx_explicit' }],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'user', columns: ['id'] },
                 index: true,
                 constraint: true,
               },
@@ -297,8 +297,8 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'user', columns: ['id'] },
                 index: true,
                 constraint: true,
               },

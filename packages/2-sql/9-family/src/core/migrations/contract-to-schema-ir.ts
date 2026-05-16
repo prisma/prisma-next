@@ -147,9 +147,9 @@ function convertIndex(index: Index): SqlIndexIR {
 
 function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
   return {
-    columns: fk.columns,
-    referencedTable: fk.references.table,
-    referencedColumns: fk.references.columns,
+    columns: fk.source.columns,
+    referencedTable: fk.target.table,
+    referencedColumns: fk.target.columns,
     ...ifDefined('name', fk.name),
   };
 }
@@ -180,12 +180,12 @@ function convertTable(
   const fkBackingIndexes: SqlIndexIR[] = [];
   for (const fk of table.foreignKeys) {
     if (fk.index === false) continue;
-    const key = fk.columns.join(',');
+    const key = fk.source.columns.join(',');
     if (satisfiedIndexColumns.has(key)) continue;
     fkBackingIndexes.push({
-      columns: fk.columns,
+      columns: fk.source.columns,
       unique: false,
-      name: defaultIndexName(name, fk.columns),
+      name: defaultIndexName(name, fk.source.columns),
     });
     satisfiedIndexColumns.add(key);
   }

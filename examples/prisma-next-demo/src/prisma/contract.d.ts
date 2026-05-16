@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:51ce32e2159e8f86e86b9080bad41d16a7d3a2490fe4865b6eeab81fef78a85a'>;
+  StorageHashBase<'sha256:7d921ee2313b9aab5de241a6e0f2bde4f28e1e70fd44243f8d3b980a344ecc51'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e'>;
 export type ProfileHash =
@@ -203,8 +203,8 @@ type ContractBase = ContractType<
         indexes: readonly [];
         foreignKeys: readonly [
           {
-            readonly columns: readonly ['userId'];
-            readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
+            readonly source: { readonly columns: readonly ['userId'] };
+            readonly target: { readonly table: 'user'; readonly columns: readonly ['id'] };
             readonly constraint: true;
             readonly index: true;
           },
@@ -259,8 +259,8 @@ type ContractBase = ContractType<
         indexes: readonly [];
         foreignKeys: readonly [
           {
-            readonly columns: readonly ['userId'];
-            readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
+            readonly source: { readonly columns: readonly ['userId'] };
+            readonly target: { readonly table: 'user'; readonly columns: readonly ['id'] };
             readonly constraint: true;
             readonly index: true;
           },

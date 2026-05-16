@@ -75,8 +75,16 @@ export class StorageTable extends SqlNode {
       input.uniques.map((u) => (u instanceof UniqueConstraint ? u : new UniqueConstraint(u))),
     );
     this.indexes = Object.freeze(input.indexes.map((i) => (i instanceof Index ? i : new Index(i))));
+    const sourceNamespaceId = input.namespaceId ?? UNBOUND_NAMESPACE_ID;
     this.foreignKeys = Object.freeze(
-      input.foreignKeys.map((fk) => (fk instanceof ForeignKey ? fk : new ForeignKey(fk))),
+      input.foreignKeys.map((fk) => {
+        if (fk instanceof ForeignKey) return fk;
+        const target =
+          'namespaceId' in fk.target && fk.target.namespaceId !== undefined
+            ? fk.target
+            : { ...fk.target, namespaceId: sourceNamespaceId };
+        return new ForeignKey({ ...fk, target });
+      }),
     );
     if (input.namespaceId !== undefined && input.namespaceId !== UNBOUND_NAMESPACE_ID) {
       Object.defineProperty(this, 'namespaceId', {

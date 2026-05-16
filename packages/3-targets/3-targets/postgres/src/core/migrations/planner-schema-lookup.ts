@@ -49,6 +49,6 @@ export function hasIndex(lookup: SchemaTableLookup, columns: readonly string[]):
 
 export function hasForeignKey(lookup: SchemaTableLookup, fk: ForeignKey): boolean {
   return lookup.fkKeys.has(
-    `${fk.columns.join(',')}|${fk.references.table}|${fk.references.columns.join(',')}`,
+    `${fk.source.columns.join(',')}|${fk.target.table}|${fk.target.columns.join(',')}`,
   );
 }

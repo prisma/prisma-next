@@ -298,8 +298,8 @@ describe('SqlContractSerializer structural validation', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'User', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'User', columns: ['id'] },
                 constraint: true,
                 index: true,
               },
@@ -363,8 +363,8 @@ describe('SqlContractSerializer structural validation', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'User', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'User', columns: ['id'] },
                 constraint: true,
                 index: true,
               },
@@ -405,8 +405,8 @@ describe('SqlContractSerializer structural validation', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'user', columns: ['id'] },
                 constraint: true,
                 index: true,
               },
@@ -443,8 +443,8 @@ describe('SqlContractSerializer structural validation', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'user', columns: ['id'] },
                 constraint: false,
                 index: true,
               },

@@ -69,12 +69,12 @@ function TableCard({ tableName, table }: { tableName: string; table: StorageTabl
           </div>
         ))}
         {(table.foreignKeys ?? []).map((foreignKey) => (
-          <div key={foreignKey.columns.join(',')} className="column">
+          <div key={foreignKey.source.columns.join(',')} className="column">
             <span className="col-name">
-              {'\u2192'} {foreignKey.columns.join(', ')}
+              {'\u2192'} {foreignKey.source.columns.join(', ')}
             </span>
             <span className="col-type">
-              {'\u2192'} {foreignKey.references.table}({foreignKey.references.columns.join(', ')})
+              {'\u2192'} {foreignKey.target.table}({foreignKey.target.columns.join(', ')})
             </span>
           </div>
         ))}

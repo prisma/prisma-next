@@ -45,14 +45,21 @@ export interface Namespace extends IRNode {
    * Resolve the default namespace coordinate a top-level (un-namespaced)
    * storage object belongs to in this target's semantics.
    *
-   * The dispatch site (per-target planner / emitter) reads
-   * `storage.namespaces[UNBOUND_NAMESPACE_ID]?.resolveDefaultNamespaceForTopLevel(storage.namespaces)`.
+   * **Optional on the interface** — JSON-imported contract envelopes
+   * carry namespace entries as plain literal objects (`{ id: "public" }`),
+   * not as class instances, so the method may be absent at runtime. The
+   * dispatch site (per-target planner / emitter) reads
+   * `storage.namespaces[UNBOUND_NAMESPACE_ID]?.resolveDefaultNamespaceForTopLevel?.(storage.namespaces)`
+   * and falls back to a target-specific default when the call returns
+   * `undefined` (either because the method was absent or because the
+   * concretion explicitly declined to declare a top-level policy).
+   *
    * Each target's unbound-namespace concretion owns the policy:
    *
    * - Postgres (`PostgresUnboundSchema`): returns `'public'` when the
-   *   contract declared a `public` namespace (FR16c implicit default for
-   *   top-level models), else `UNBOUND_NAMESPACE_ID` (search_path resolves
-   *   at runtime).
+   *   contract declared a `public` namespace (Postgres' implicit default
+   *   for top-level models), else `UNBOUND_NAMESPACE_ID` (`search_path`
+   *   resolves at runtime).
    * - SQLite (`SqliteUnboundDatabase`) / Mongo (`MongoTargetUnboundDatabase`):
    *   return `undefined` — the singleton owns every table; the planner
    *   falls back to whatever connection-supplied schema name it carries
@@ -63,7 +70,7 @@ export interface Namespace extends IRNode {
    * Targets override on their per-target concretion when they want a
    * named-default policy.
    */
-  resolveDefaultNamespaceForTopLevel(
+  resolveDefaultNamespaceForTopLevel?(
     allNamespaces: Readonly<Record<string, Namespace>>,
   ): string | undefined;
 }

@@ -31,7 +31,7 @@ import {
   SqlStorage,
   SqlUnboundNamespace,
   type StorageColumn,
-  type StorageTable,
+  type StorageTableInput,
   type StorageTypeInstance,
   toStorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
@@ -279,7 +279,7 @@ export function buildSqlContractFromDefinition(
   const targetFamily = 'sql';
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
 
-  const storageTables: Record<string, StorageTable> = {};
+  const storageTables: Record<string, StorageTableInput> = {};
   const executionDefaults: ExecutionMutationDefault[] = [];
   const models: Record<string, ContractModel> = {};
   const roots: Record<string, string> = {};
@@ -352,8 +352,8 @@ export function buildSqlContractFromDefinition(
         'Foreign key',
       );
       return {
-        columns: fk.columns,
-        references: { table: fk.references.table, columns: fk.references.columns },
+        source: { columns: fk.columns },
+        target: { table: fk.references.table, columns: fk.references.columns },
         ...applyFkDefaults(
           {
             ...ifDefined('constraint', fk.constraint),

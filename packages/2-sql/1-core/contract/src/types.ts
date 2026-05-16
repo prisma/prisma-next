@@ -4,12 +4,13 @@ import type { ReferentialAction } from './ir/foreign-key';
 export {
   ForeignKey,
   type ForeignKeyInput,
+  type ForeignKeySource,
   type ReferentialAction,
 } from './ir/foreign-key';
 export {
-  ForeignKeyReferences,
-  type ForeignKeyReferencesInput,
-} from './ir/foreign-key-references';
+  ForeignKeyReference,
+  type ForeignKeyReferenceInput,
+} from './ir/foreign-key-reference';
 export {
   isPostgresEnumStorageEntry,
   POSTGRES_ENUM_KIND,

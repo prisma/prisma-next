@@ -367,8 +367,8 @@ describe('sql-target-family-hook', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['nonexistent'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['nonexistent'] },
+                target: { table: 'user', columns: ['id'] },
               },
             ],
           },
@@ -404,8 +404,8 @@ describe('sql-target-family-hook', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'nonexistent', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'nonexistent', columns: ['id'] },
               },
             ],
           },
@@ -441,8 +441,8 @@ describe('sql-target-family-hook', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['nonexistent'] },
+                source: { columns: ['userId'] },
+                target: { table: 'user', columns: ['nonexistent'] },
               },
             ],
           },
@@ -478,8 +478,8 @@ describe('sql-target-family-hook', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id', 'id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'user', columns: ['id', 'id'] },
               },
             ],
           },
@@ -714,8 +714,8 @@ describe('sql-target-family-hook', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'user', columns: ['id'] },
               },
             ],
           },
@@ -919,8 +919,8 @@ describe('sql-target-family-hook', () => {
             indexes: [{ columns: ['userId'] }],
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'user', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'user', columns: ['id'] },
               },
             ],
           },

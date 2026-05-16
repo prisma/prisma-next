@@ -39,8 +39,8 @@ describe('SqlContractSerializer logic validation', () => {
           indexes: [],
           foreignKeys: [
             {
-              columns: ['userId'],
-              references: { table: 'User', columns: ['id'] },
+              source: { columns: ['userId'] },
+              target: { table: 'User', columns: ['id'] },
               constraint: true,
               index: true,
             },
@@ -158,8 +158,8 @@ describe('SqlContractSerializer logic validation', () => {
             ...validContractInput.storage.tables.Post,
             foreignKeys: [
               {
-                columns: ['userId'],
-                references: { table: 'NonExistent', columns: ['id'] },
+                source: { columns: ['userId'] },
+                target: { table: 'NonExistent', columns: ['id'] },
                 constraint: true,
                 index: true,
               },
@@ -224,8 +224,8 @@ describe('SqlContractSerializer logic validation', () => {
             indexes: [],
             foreignKeys: [
               {
-                columns: ['userId', 'tenantId'],
-                references: { table: 'User', columns: ['id', 'tenantId'] },
+                source: { columns: ['userId', 'tenantId'] },
+                target: { table: 'User', columns: ['id', 'tenantId'] },
                 constraint: true,
                 index: true,
               },
@@ -361,8 +361,8 @@ describe('SqlContractSerializer logic validation', () => {
         )?.['Post'] as Record<string, unknown>
       )['foreignKeys'] = [
         {
-          columns: ['userId'],
-          references: { table: 'User', columns: ['id'] },
+          source: { columns: ['userId'] },
+          target: { table: 'User', columns: ['id'] },
           constraint: true,
           index: true,
         },
@@ -410,8 +410,8 @@ describe('SqlContractSerializer logic validation', () => {
         )?.['Post'] as Record<string, unknown>
       )['foreignKeys'] = [
         {
-          columns: ['userId'],
-          references: { table: 'User', columns: ['id'] },
+          source: { columns: ['userId'] },
+          target: { table: 'User', columns: ['id'] },
           constraint: true,
           index: true,
         },

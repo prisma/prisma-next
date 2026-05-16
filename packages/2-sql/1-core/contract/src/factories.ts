@@ -37,8 +37,8 @@ export function fk(
 ): ForeignKey {
   const defaults = applyFkDefaults({ constraint: opts?.constraint, index: opts?.index });
   return new ForeignKey({
-    columns,
-    references: { table: refTable, columns: refColumns },
+    source: { columns },
+    target: { table: refTable, columns: refColumns },
     ...(opts?.name !== undefined && { name: opts.name }),
     ...(opts?.onDelete !== undefined && { onDelete: opts.onDelete }),
     ...(opts?.onUpdate !== undefined && { onUpdate: opts.onUpdate }),
