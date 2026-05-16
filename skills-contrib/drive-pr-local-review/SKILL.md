@@ -221,6 +221,12 @@ Do not:
 - Flag issues in unchanged code unless directly impacted by the change.
 - Use absolute filesystem paths in the review.
 
+### Smells to surface during the principal-engineer pass
+
+These are repo-specific bypass-the-seam patterns that look fine in review but encode a class of bugs the codebase has already paid for. Cross-reference the relevant rule when you flag the smell.
+
+- **`as Contract` cast bypasses the family `ContractSerializer` seam.** Any `JSON.parse(...) as Contract` (or `as Contract<…>`) in `packages/**/src/**` outside the allowlist is a serializer-bypass smell — see [`.cursor/rules/as-contract-cast-smell.mdc`](mdc:.cursor/rules/as-contract-cast-smell.mdc) and [`.cursor/rules/contract-normalization-responsibilities.mdc`](mdc:.cursor/rules/contract-normalization-responsibilities.mdc). The replacement idiom is `validateContract<Contract>(JSON.parse(raw) as unknown)`. Originally surfaced by `TML-2536`.
+
 ### Acceptance-criteria verification (required)
 
 If the spec contains acceptance criteria, the code review **must verify each one** against the actual implementation. This is the most important part of the review — it answers "did we build what we said we'd build?"

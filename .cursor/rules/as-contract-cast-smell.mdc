@@ -1,0 +1,56 @@
+---
+description: `as Contract` casts in production code bypass the serializer seam — use validateContract
+globs: ["packages/**/src/**"]
+alwaysApply: false
+---
+
+# `as Contract` casts are a serializer-bypass smell
+
+## The smell
+
+```typescript
+// ❌ WRONG — bypasses the family ContractSerializer seam
+const contract = JSON.parse(raw) as Contract;
+const contract = JSON.parse(raw) as Contract<SqlStorage>;
+```
+
+Casting `JSON.parse(...)` directly to `Contract` looks innocent in review — `Contract` is a structural interface, so the cast compiles cleanly. The runtime cost is silent: structural arktype validation, IR-class hydration, and polymorphic-slot discriminator dispatch are all skipped, and the program proceeds with a JSON envelope masquerading as a hydrated `Contract`. That hides the class of bugs TML-2536 surfaced (untagged `storage.types` entries that crashed downstream consumers).
+
+## The fix
+
+Route every on-disk contract read through the family `ContractSerializer` seam:
+
+```typescript
+// ✅ CORRECT — crosses the validateContract seam
+const raw = await readFile(path, 'utf-8');
+const familyInstance = config.family.create(createControlStack(config));
+const contract = familyInstance.validateContract(JSON.parse(raw) as unknown);
+```
+
+The `as unknown` half is the explicit `JSON.parse → unknown` step — `JSON.parse` is typed `any` in TS today and the unknown narrowing makes the validator call the only place where structural assumptions get checked. This matches the pattern documented in [`typed-contract-in-tests.mdc`](mdc:.cursor/rules/typed-contract-in-tests.mdc).
+
+In production code that already has a `Contract` value validated upstream and just needs to pass it along, no cast is needed — the existing typing carries through.
+
+## Where the cast is allowed (allowlist)
+
+The grep-based lint (`pnpm lint:no-contract-cast`) walks `packages/**/src/**` and fails on `as Contract\b` / `as Contract<` hits **outside** these paths:
+
+- `**/*.test.ts`, `**/*.test-d.ts` — test files may cast to set up fixtures cheaply.
+- The serializer implementation files themselves:
+  - `packages/2-sql/9-family/src/core/ir/sql-contract-serializer-base.ts`
+  - `packages/2-sql/9-family/src/core/ir/sql-contract-serializer.ts`
+  - `packages/2-sql/9-family/src/core/control-instance.ts`
+  - `packages/3-targets/3-targets/postgres/src/core/postgres-contract-serializer.ts`
+  - `packages/2-mongo-family/9-family/src/core/ir/mongo-contract-serializer.ts`
+
+Adding a new allowlisted file requires a comment at the call site explaining why the seam can't be used (typically: the file *is* the seam).
+
+## Related rules
+
+- [`contract-normalization-responsibilities.mdc`](mdc:.cursor/rules/contract-normalization-responsibilities.mdc) — why the seam exists and what it does.
+- [`validate-contract-usage.mdc`](mdc:.cursor/rules/validate-contract-usage.mdc) — type-parameter discipline for `validateContract<TContract>(...)`.
+- [`type-predicates.mdc`](mdc:.cursor/rules/type-predicates.mdc) — `as unknown as X` is the documented blind-cast pattern; `as Contract` alone is the cast that bypasses validation.
+
+## Related tickets
+
+- `TML-2536` — original bug surfaced by an `as Contract` bypass in `readPredecessorEndContract`. The CLI + serializer + lint changes that fix it are the durable record of why this rule exists.
