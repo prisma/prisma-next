@@ -267,6 +267,17 @@ The probe surfaces no architectural surprises. The plan as written is implementa
 
 **Validation:** ACs 4a, 5, 6, 6a, 6b pass. Multi-namespace + multi-tenancy integration tests green. AC4 (cross-namespace FK demonstration) is *not* yet green at this milestone — it lands in M5b.
 
+**Validation gate (commands):**
+
+```bash
+pnpm typecheck
+pnpm lint:deps
+pnpm test:packages
+pnpm test:integration
+```
+
+`test:integration` is required because the namespace concretion rename touches the Mongo target's existing integration coverage and because M5a's multi-tenancy `unbound` work lands a new integration test against PGlite. Per-round implementer commits also run `rg "__unspecified__" -- packages/ ":!packages/1-framework/2-authoring/psl-parser"` after Task 1 to assert no surviving IR-layer references — the PSL AST identifier of the same name (in `psl-parser` only) stays untouched per FR14 / FR16d.
+
 ### M5b — Cross-namespace FK references + ForeignKey IR restructuring
 
 **Status: deferred to PR2 ([TML-2520](https://linear.app/prisma-company/issue/TML-2520) / TML-2473).** See § Delivery sequencing for rationale.
@@ -285,6 +296,19 @@ The probe surfaces no architectural surprises. The plan as written is implementa
 - [ ] **Integration test (PGlite):** a Postgres contract with `public.profiles.user_id REFERENCES auth.users(id)` migrates, emits, and verifies end-to-end (FL-02 scenario).
 
 **Validation:** AC4 (cross-namespace FK) passes. FL-02 acceptance demonstrated via PGlite integration test. The Supabase `auth.users` reference shape is now expressible in Prisma Next contracts. The `ForeignKey` IR shape is the post-rename / post-restructure shape across all tests, fixtures, and downstream consumers.
+
+**Validation gate (commands):**
+
+```bash
+pnpm typecheck
+pnpm lint:deps
+pnpm build
+pnpm test:packages
+pnpm test:integration
+pnpm test:e2e
+```
+
+`pnpm build` is required so downstream `.d.mts` declarations refresh after the `ForeignKey` IR restructuring (which exports new types `ForeignKeySource` / `ForeignKeyTarget` and renames `ForeignKeyReferences` → `ForeignKeyReference`). `pnpm test:e2e` is required for the FL-02 PGlite cross-namespace FK end-to-end scenario. Per-round implementer commits also run `rg "ForeignKeyReferences\b|references:" packages/2-sql/ -- :!*.md` after the FK rename + restructuring lands to assert no stale call sites use the pre-rename shape.
 
 ### M6 — Documentation + ADR drafts (PR1 scope)
 
