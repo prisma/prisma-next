@@ -93,6 +93,28 @@ export interface StrategyContext {
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
+/**
+ * Resolve the schema-coordinate string for a per-table migration op.
+ *
+ * Reads the table's `namespaceId` from the destination contract (the
+ * FR15 nested-by-namespace storage shape). When set, that coordinate
+ * flows through the migration ops verbatim — it can be a named schema
+ * (`"auth"`) or the framework-reserved `__unbound__` sentinel. The
+ * downstream planner-sql-checks helpers route `__unbound__` through
+ * the `PostgresUnboundSchema` singleton to elide the qualifier so
+ * `search_path` resolves the table at runtime.
+ *
+ * When the table has no explicit `namespaceId` (single-namespace
+ * contracts, including every contract authored before this slice
+ * landed), falls back to the planner's global `ctx.schemaName`. This
+ * keeps existing single-namespace migration plans byte-identical
+ * across the rewire.
+ */
+export function effectiveSchemaForTable(ctx: StrategyContext, tableName: string): string {
+  const table = ctx.toContract.storage.tables[tableName];
+  return table?.namespaceId ?? ctx.schemaName;
+}
+
 // ============================================================================
 // Call strategies (for issue planner)
 // ============================================================================
@@ -181,14 +203,15 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
 
     matched.push(issue);
     const spec = buildColumnSpec(issue.table, issue.column, ctx, { nullable: true });
+    const schemaForTable = effectiveSchemaForTable(ctx, issue.table);
     calls.push(
-      new AddColumnCall(ctx.schemaName, issue.table, spec),
+      new AddColumnCall(schemaForTable, issue.table, spec),
       new DataTransformCall(
         `backfill-${issue.table}-${issue.column}`,
         `backfill-${issue.table}-${issue.column}:check`,
         `backfill-${issue.table}-${issue.column}:run`,
       ),
-      new SetNotNullCall(ctx.schemaName, issue.table, issue.column),
+      new SetNotNullCall(schemaForTable, issue.table, issue.column),
     );
   }
 
@@ -227,8 +250,9 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
     if (!isSafeWidening && !dataAllowed) continue;
     matched.push(issue);
     const alterOpts = buildAlterTypeOptions(issue.table, issue.column, ctx);
+    const schemaForTable = effectiveSchemaForTable(ctx, issue.table);
     if (isSafeWidening) {
-      calls.push(new AlterColumnTypeCall(ctx.schemaName, issue.table, issue.column, alterOpts));
+      calls.push(new AlterColumnTypeCall(schemaForTable, issue.table, issue.column, alterOpts));
     } else {
       calls.push(
         new DataTransformCall(
@@ -236,7 +260,7 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
           `typechange-${issue.table}-${issue.column}:check`,
           `typechange-${issue.table}-${issue.column}:run`,
         ),
-        new AlterColumnTypeCall(ctx.schemaName, issue.table, issue.column, alterOpts),
+        new AlterColumnTypeCall(schemaForTable, issue.table, issue.column, alterOpts),
       );
     }
   }
@@ -266,13 +290,14 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
     if (column.nullable === true) continue;
 
     matched.push(issue);
+    const schemaForTable = effectiveSchemaForTable(ctx, issue.table);
     calls.push(
       new DataTransformCall(
         `handle-nulls-${issue.table}-${issue.column}`,
         `handle-nulls-${issue.table}-${issue.column}:check`,
         `handle-nulls-${issue.table}-${issue.column}:run`,
       ),
-      new SetNotNullCall(ctx.schemaName, issue.table, issue.column),
+      new SetNotNullCall(schemaForTable, issue.table, issue.column),
     );
   }
 
@@ -311,12 +336,17 @@ function enumRebuildCallRecipe(
     new CreateEnumTypeCall(ctx.schemaName, tempName, desiredValues),
     ...columnRefs.map((ref) => {
       const using = `${ref.column}::text::${tempName}`;
-      return new AlterColumnTypeCall(ctx.schemaName, ref.table, ref.column, {
-        qualifiedTargetType: tempName,
-        formatTypeExpected: tempName,
-        rawTargetTypeForLabel: tempName,
-        using,
-      });
+      return new AlterColumnTypeCall(
+        effectiveSchemaForTable(ctx, ref.table),
+        ref.table,
+        ref.column,
+        {
+          qualifiedTargetType: tempName,
+          formatTypeExpected: tempName,
+          rawTargetTypeForLabel: tempName,
+          using,
+        },
+      );
     }),
     new DropEnumTypeCall(ctx.schemaName, nativeType),
     new RenameTypeCall(ctx.schemaName, tempName, nativeType),
@@ -579,11 +609,13 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 
     matched.push(issue);
 
+    const schemaForTable = effectiveSchemaForTable(ctx, issue.table);
+
     if (canUseSharedTempDefault && temporaryDefault !== null) {
       calls.push(
         new RawSqlCall(
           buildAddNotNullColumnWithTemporaryDefaultOperation({
-            schema: ctx.schemaName,
+            schema: schemaForTable,
             tableName: issue.table,
             columnName: issue.column,
             column,
@@ -596,16 +628,16 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
       continue;
     }
 
-    const qualified = qualifyTableName(ctx.schemaName, issue.table);
+    const qualified = qualifyTableName(schemaForTable, issue.table);
     calls.push(
       new RawSqlCall({
-        ...buildAddColumnOperationIdentity(ctx.schemaName, issue.table, issue.column),
+        ...buildAddColumnOperationIdentity(schemaForTable, issue.table, issue.column),
         operationClass: 'additive',
         precheck: [
           {
             description: `ensure column "${issue.column}" is missing`,
             sql: columnExistsCheck({
-              schema: ctx.schemaName,
+              schema: schemaForTable,
               table: issue.table,
               column: issue.column,
               exists: false,
@@ -633,7 +665,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
           {
             description: `verify column "${issue.column}" exists`,
             sql: columnExistsCheck({
-              schema: ctx.schemaName,
+              schema: schemaForTable,
               table: issue.table,
               column: issue.column,
             }),
@@ -641,7 +673,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
           {
             description: `verify column "${issue.column}" is NOT NULL`,
             sql: columnNullabilityCheck({
-              schema: ctx.schemaName,
+              schema: schemaForTable,
               table: issue.table,
               column: issue.column,
               nullable: false,
