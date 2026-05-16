@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:fixture-postgres-enum",
+  "roots": {},
+  "models": {},
+  "storage": {
+    "storageHash": "sha256:fixture-postgres-enum",
+    "tables": {
+      "user": {
+        "columns": {
+          "role": {
+            "codecId": "pg/enum@1",
+            "nativeType": "user_role",
+            "nullable": false,
+            "typeRef": "user_role"
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": { "columns": ["role"] },
+        "uniques": []
+      }
+    },
+    "types": {
+      "user_role": {
+        "kind": "postgres-enum",
+        "name": "user_role",
+        "nativeType": "user_role",
+        "values": ["admin", "user"],
+        "codecId": "pg/enum@1"
+      }
+    }
+  },
+  "capabilities": {},
+  "extensionPacks": {},
+  "meta": {}
+}
