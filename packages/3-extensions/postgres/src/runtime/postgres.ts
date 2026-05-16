@@ -1,7 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
-import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
@@ -22,7 +21,7 @@ import {
   createSqlExecutionStack,
   withTransaction,
 } from '@prisma-next/sql-runtime';
-import postgresTarget from '@prisma-next/target-postgres/runtime';
+import postgresTarget, { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Client, Pool } from 'pg';
 import {
@@ -92,13 +91,13 @@ function hasContractJson<TContract extends Contract<SqlStorage>>(
   return 'contractJson' in options;
 }
 
-const sqlSerializer = new SqlContractSerializer();
+const contractSerializer = new PostgresContractSerializer();
 
 function resolveContract<TContract extends Contract<SqlStorage>>(
   options: PostgresOptions<TContract>,
 ): TContract {
   const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
-  return sqlSerializer.deserializeContract(contractInput) as TContract;
+  return contractSerializer.deserializeContract(contractInput) as TContract;
 }
 
 function toRuntimeBinding<TContract extends Contract<SqlStorage>>(

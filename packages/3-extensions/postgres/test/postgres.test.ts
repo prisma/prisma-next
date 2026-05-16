@@ -27,14 +27,6 @@ vi.mock('@prisma-next/sql-runtime', () => ({
   withTransaction: mocks.withTransaction,
 }));
 
-vi.mock('@prisma-next/family-sql/ir', () => ({
-  SqlContractSerializer: class {
-    deserializeContract(value: unknown) {
-      return mocks.deserializeContract(value);
-    }
-  },
-}));
-
 vi.mock('@prisma-next/sql-builder/runtime', () => ({
   sql: mocks.sqlBuilder,
 }));
@@ -45,6 +37,11 @@ vi.mock('@prisma-next/sql-orm-client', () => ({
 
 vi.mock('@prisma-next/target-postgres/runtime', () => ({
   default: { id: 'target-postgres' },
+  PostgresContractSerializer: class {
+    deserializeContract(value: unknown) {
+      return mocks.deserializeContract(value);
+    }
+  },
 }));
 
 vi.mock('@prisma-next/adapter-postgres/runtime', () => ({
