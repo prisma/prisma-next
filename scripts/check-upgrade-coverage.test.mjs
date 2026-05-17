@@ -377,6 +377,35 @@ describe('check-upgrade-coverage — new-entries rule', () => {
     );
   });
 
+  it('treats a git mv from outside the upgrades tree into a valid transition directory as a move, not an addition', () => {
+    // Mirrors the real-world tml-2535 case: the upgrade instructions were
+    // moved from packages/0-shared/upgrade-skill/ to skills/upgrade/…
+    // The gate must not flag the destination path as a "new entry in a stale
+    // transition directory" just because the source path is outside the
+    // watched pathspec.
+    writePackageJson('0.7.0');
+    writeRepoFile(
+      'packages/0-shared/upgrade-skill/upgrades/0.6-to-0.7/instructions.md',
+      '---\nfrom: "0.6"\nto: "0.7"\nchanges: []\n---\n',
+    );
+    commitAll('prev');
+    const prev = git('rev-parse', 'HEAD');
+
+    // Simulate `git mv` by writing the file at the new path (same content)
+    // and removing the old path. Git's rename detection (-M) infers the move.
+    writeRepoFile(
+      'skills/upgrade/prisma-next-upgrade/upgrades/0.6-to-0.7/instructions.md',
+      '---\nfrom: "0.6"\nto: "0.7"\nchanges: []\n---\n',
+    );
+    git('rm', 'packages/0-shared/upgrade-skill/upgrades/0.6-to-0.7/instructions.md');
+    git('add', 'skills/upgrade/prisma-next-upgrade/upgrades/0.6-to-0.7/instructions.md');
+    git('commit', '-m', 'move upgrade instructions to new cluster');
+
+    const result = runScript(['--prev', prev, '--head', 'HEAD']);
+    assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
+    assert.doesNotMatch(result.stderr, /new-entries-stale-transition/);
+  });
+
   it('accepts a modification to an existing file in a stale transition directory', () => {
     writePackageJson('0.7.0');
     writeRepoFile(

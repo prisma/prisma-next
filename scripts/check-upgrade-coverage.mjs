@@ -140,10 +140,39 @@ function diffPaths(repoRoot, prev, head, pathspecs) {
 }
 
 function diffAddedPaths(repoRoot, prev, head, pathspecs) {
-  const args = ['diff', '--name-only', '--diff-filter=A', `${prev}..${head}`, '--'];
-  args.push(...pathspecs);
-  const out = git(repoRoot, ...args);
-  return out.split('\n').filter(Boolean);
+  const addArgs = ['diff', '--name-only', '--diff-filter=A', `${prev}..${head}`, '--'];
+  addArgs.push(...pathspecs);
+  const added = git(repoRoot, ...addArgs)
+    .split('\n')
+    .filter(Boolean);
+
+  if (added.length === 0) return added;
+
+  // Rename detection requires seeing both ends of the rename pair, so we must
+  // query the full diff (no pathspec) with -M. Files that appear as rename
+  // destinations (R) in the repo-wide diff are moves, not genuine additions,
+  // and should be excluded.
+  const renameOut = git(
+    repoRoot,
+    'diff',
+    '-M',
+    '--name-status',
+    '--diff-filter=R',
+    `${prev}..${head}`,
+  );
+  const renameDestinations = new Set(
+    renameOut
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        // Each line is "R<score>\t<old-path>\t<new-path>"
+        const parts = line.split('\t');
+        return parts[2];
+      })
+      .filter(Boolean),
+  );
+
+  return added.filter((p) => !renameDestinations.has(p));
 }
 
 function resolveDefaultPrev(repoRoot, mode) {
