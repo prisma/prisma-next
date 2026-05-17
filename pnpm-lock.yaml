@@ -1090,9 +1090,7 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/0-shared/extension-upgrade-skill: {}
-
-  packages/0-shared/upgrade-skill: {}
+  packages/0-shared/extension-author-tools: {}
 
   packages/1-framework/0-foundation/contract:
     dependencies:
