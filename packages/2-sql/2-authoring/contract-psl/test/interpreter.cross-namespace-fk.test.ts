@@ -1,5 +1,6 @@
 import { freezeNode, type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
@@ -80,10 +81,11 @@ namespace public {
 
     expect(result.ok, JSON.stringify(result, null, 2)).toBe(true);
     if (!result.ok) return;
+    const storage = result.value.storage as SqlStorage;
     const profile = (
-      result.value.storage.tablesByNamespace?.['public'] as Record<string, ProfileTable> | undefined
+      storage.tablesByNamespace?.['public'] as Record<string, ProfileTable> | undefined
     )?.['profile'];
-    expect(profile, JSON.stringify(result.value.storage, null, 2)).toBeDefined();
+    expect(profile, JSON.stringify(storage, null, 2)).toBeDefined();
     const fk = profile?.foreignKeys?.[0];
     expect(fk).toBeDefined();
     expect(fk?.target.table).toBe('user');
@@ -152,8 +154,9 @@ namespace public {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    const storage = result.value.storage as SqlStorage;
     const profile = (
-      result.value.storage.tablesByNamespace?.['public'] as Record<string, ProfileTable> | undefined
+      storage.tablesByNamespace?.['public'] as Record<string, ProfileTable> | undefined
     )?.['profile'];
     const fk = profile?.foreignKeys?.[0];
     expect(fk?.target.table).toBe('user');
