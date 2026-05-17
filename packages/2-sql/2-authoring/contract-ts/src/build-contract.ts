@@ -235,7 +235,7 @@ function buildDomainField(
  */
 function buildStorageNamespaces(input: {
   readonly declared: readonly string[] | undefined;
-  readonly storageTables: Readonly<Record<string, { readonly namespaceId?: string }>>;
+  readonly storageTables: Readonly<Record<string, { readonly namespaceId: string }>>;
   readonly createNamespace: ((id: string) => Namespace) | undefined;
 }): Record<string, Namespace> {
   const ids = new Set<string>();
@@ -248,7 +248,7 @@ function buildStorageNamespaces(input: {
     }
   }
   for (const table of Object.values(input.storageTables)) {
-    if (table.namespaceId !== undefined && table.namespaceId.length > 0) {
+    if (table.namespaceId.length > 0) {
       ids.add(table.namespaceId);
     }
   }
@@ -287,6 +287,13 @@ export function buildSqlContractFromDefinition(
   for (const semanticModel of definition.models) {
     const tableName = semanticModel.tableName;
     roots[tableName] = semanticModel.modelName;
+
+    // Resolve the model's namespace coordinate up-front so it can be
+    // stamped on the StorageTable and consulted by FK lowering for
+    // same-namespace targets. Omitted = `UNBOUND_NAMESPACE_ID` (the
+    // late-bound sentinel); the Postgres default-resolution policy for
+    // omitted-but-`public`-aware contracts is a separate concern.
+    const sourceNamespaceId = semanticModel.namespaceId ?? UNBOUND_NAMESPACE_ID;
 
     // --- Build storage table ---
 
@@ -354,9 +361,9 @@ export function buildSqlContractFromDefinition(
       return {
         source: { columns: fk.columns },
         target: {
+          namespaceId: fk.references.namespaceId ?? sourceNamespaceId,
           table: fk.references.table,
           columns: fk.references.columns,
-          ...ifDefined('namespaceId', fk.references.namespaceId),
         },
         ...applyFkDefaults(
           {
@@ -372,7 +379,7 @@ export function buildSqlContractFromDefinition(
     });
 
     storageTables[tableName] = {
-      ...ifDefined('namespaceId', semanticModel.namespaceId),
+      namespaceId: sourceNamespaceId,
       columns,
       uniques: (semanticModel.uniques ?? []).map((u) => ({
         columns: u.columns,

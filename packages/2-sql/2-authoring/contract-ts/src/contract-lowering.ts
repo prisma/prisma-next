@@ -508,12 +508,9 @@ function lowerForeignKeyNode(
         targetSpec.fieldToColumn,
       ),
       // FR16b cross-namespace FKs: the model handle carries the
-      // referenced model's namespace coordinate so the FK lowering
-      // picks it up automatically when `targetSpec.namespace` differs
-      // from the referencing model's namespace. Same-namespace FKs
-      // also populate this; the `StorageTable` constructor then
-      // collapses agreeing coordinates to a single representation
-      // (see foreign-key-reference.ts default-resolution policy).
+      // referenced model's namespace coordinate; same-namespace FKs
+      // get the source's coordinate. Caller-normalises discipline —
+      // the StorageTable constructor never defaults the slot.
       ...(targetSpec.namespace !== undefined ? { namespaceId: targetSpec.namespace } : {}),
     },
     ...(foreignKey.name ? { name: foreignKey.name } : {}),
