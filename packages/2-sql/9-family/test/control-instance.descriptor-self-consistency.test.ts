@@ -8,7 +8,7 @@ import type {
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
-import { SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
+import { type SqlStorage, SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { createSqlFamilyInstance } from '../src/core/control-instance';
 import type { SqlControlExtensionDescriptor } from '../src/core/migrations/types';
@@ -18,15 +18,17 @@ const TARGET_FAMILY = 'sql' as const;
 
 const fixtureStorageBody = {
   tables: {
-    fixture_box: {
-      namespaceId: UNBOUND_NAMESPACE_ID,
-      columns: {
-        x: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
-        y: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
+    [UNBOUND_NAMESPACE_ID]: {
+      fixture_box: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
+        columns: {
+          x: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
+          y: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
+        },
+        uniques: [],
+        indexes: [],
+        foreignKeys: [],
       },
-      uniques: [],
-      indexes: [],
-      foreignKeys: [],
     },
   },
   namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
@@ -39,6 +41,11 @@ const FIXTURE_HEAD_HASH = computeStorageHash({
 });
 
 function buildContract(): Contract<SqlStorage> {
+  // `ContractSpace.contractJson` carries the persisted JSON envelope
+  // (loaded from disk via `import ... from './contract.json'`), not a
+  // hydrated `SqlStorage` class instance. The descriptor-self-consistency
+  // check recomputes the storage hash from this envelope, so the fixture
+  // must mirror the on-disk FR15 nested-by-namespace shape.
   return {
     target: TARGET,
     targetFamily: TARGET_FAMILY,
@@ -48,10 +55,10 @@ function buildContract(): Contract<SqlStorage> {
     extensionPacks: {},
     meta: {},
     profileHash: profileHash('fixture-profile-v1'),
-    storage: new SqlStorage({
+    storage: {
       ...fixtureStorageBody,
       storageHash: coreHash(FIXTURE_HEAD_HASH),
-    }),
+    } as unknown as SqlStorage,
   };
 }
 

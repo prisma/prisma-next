@@ -37,6 +37,14 @@ export function createTestContract(
   extensionPacks: Record<string, unknown> = {},
   storageTypes?: Record<string, import('@prisma-next/sql-contract/types').SqlStorageTypeEntry>,
 ): Contract<SqlStorage> {
+  const nestedTables: Record<string, Record<string, StorageTable>> = {};
+  for (const [name, table] of Object.entries(tables)) {
+    const ns = table.namespaceId;
+    if (nestedTables[ns] === undefined) nestedTables[ns] = {};
+    nestedTables[ns][name] = table;
+  }
+  const nestedTypes =
+    storageTypes === undefined ? undefined : { [UNBOUND_NAMESPACE_ID]: storageTypes };
   return {
     target: 'postgres',
     targetFamily: 'sql',
@@ -44,8 +52,8 @@ export function createTestContract(
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
       storageHash: 'sha256:test' as StorageHashBase<string>,
-      tables,
-      ...ifDefined('types', storageTypes),
+      tables: nestedTables,
+      ...ifDefined('types', nestedTypes),
     }),
     models: {},
     capabilities: {},

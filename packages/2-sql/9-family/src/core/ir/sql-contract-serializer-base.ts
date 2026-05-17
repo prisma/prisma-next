@@ -1,6 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
-import { SqlStorage, type SqlStorageTypeEntry } from '@prisma-next/sql-contract/types';
+import {
+  SqlStorage,
+  type SqlStorageTablesInput,
+  type SqlStorageTypeEntry,
+} from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import type { JsonObject } from '@prisma-next/utils/json';
 
@@ -116,11 +120,19 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
           )
         : undefined;
 
+    // `validated.storage.tables` carries the FR15 nested-by-namespace
+    // map on the wire — the only shape `validateSqlContractFully` accepts
+    // — but its static type is the deprecated flat-by-name view (kept
+    // structurally assignable to `SqlStorage` so user-facing emitted
+    // contract types remain compatible). Narrow the cast to just the
+    // property whose runtime shape we know.
     return {
       ...validated,
       storage: new SqlStorage({
-        ...validated.storage,
+        storageHash: validated.storage.storageHash,
+        tables: validated.storage.tables as unknown as SqlStorageTablesInput,
         ...(hydratedTypes !== undefined ? { types: hydratedTypes } : {}),
+        namespaces: validated.storage.namespaces,
       }),
     };
   }

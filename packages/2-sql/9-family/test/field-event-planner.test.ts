@@ -1,7 +1,7 @@
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { profileHash } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { planFieldEventOperations } from '../src/core/migrations/field-event-planner';
@@ -34,7 +34,7 @@ function table(columns: Record<string, StorageColumn>): StorageTable {
 function contract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
   const storage = new SqlStorage({
     storageHash: 'sha256:test' as StorageHashBase<string>,
-    tables,
+    tables: { [UNBOUND_NAMESPACE_ID]: tables },
   });
   return {
     target: 'postgres',
