@@ -14,13 +14,29 @@ import {
 } from '../src/validators';
 
 /**
- * Build a SqlStorage instance from a flat tables map. Tests use this when
- * they need the in-memory IR object (e.g. `validateStorageSemantics`).
+ * Build a SqlStorage instance from a flat-by-name tables map. The helper
+ * is the caller-normalisation boundary: it buckets each entry under its
+ * `namespaceId` back-pointer into the FR15 nested-by-namespace shape the
+ * constructor accepts, and stamps `namespaceId: '__unbound__'` on raw
+ * `StorageTableInput` entries that omit the field. Tests author flat
+ * input for ergonomic terseness; the canonical shape lives downstream of
+ * this helper.
  */
 function makeStorage(tables: Record<string, StorageTable | StorageTableInput>): SqlStorage {
+  const nested: Record<string, Record<string, StorageTable | StorageTableInput>> = {};
+  for (const [name, entry] of Object.entries(tables)) {
+    const namespaceId =
+      entry instanceof StorageTable
+        ? entry.namespaceId
+        : ((entry as { namespaceId?: string }).namespaceId ?? UNBOUND_NAMESPACE_ID);
+    const stamped =
+      entry instanceof StorageTable ? entry : { ...(entry as StorageTableInput), namespaceId };
+    if (nested[namespaceId] === undefined) nested[namespaceId] = {};
+    nested[namespaceId][name] = stamped;
+  }
   return new SqlStorage({
     storageHash: 'sha256:test' as SqlStorage['storageHash'],
-    tables,
+    tables: nested,
   });
 }
 
@@ -35,15 +51,6 @@ function makeStorageEnvelope(
   tables: Record<string, StorageTable | StorageTableInput>,
 ): Record<string, unknown> {
   return JSON.parse(JSON.stringify(makeStorage(tables))) as Record<string, unknown>;
-}
-
-/**
- * Project an arbitrary contract value through JSON so its `storage` is
- * rendered through `SqlStorage.toJSON` (the FR15 nested envelope shape).
- * Used to drive `validateSqlContract` tests with the canonical wire shape.
- */
-function projectContract(value: unknown): unknown {
-  return JSON.parse(JSON.stringify(value));
 }
 
 /**
@@ -88,8 +95,11 @@ describe('SQL contract validators', () => {
     it('throws on invalid table structure', () => {
       const invalid = {
         tables: {
-          user: {
-            columns: 'not-an-object',
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: 'not-an-object',
+            },
           },
         },
       } as unknown;
@@ -99,9 +109,12 @@ describe('SQL contract validators', () => {
     it('throws on invalid nativeType', () => {
       const invalid = {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 123, nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 123, nullable: false },
+              },
             },
           },
         },
@@ -112,9 +125,12 @@ describe('SQL contract validators', () => {
     it('throws on invalid nullable type', () => {
       const invalid = {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: 'yes' },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: 'yes' },
+              },
             },
           },
         },
@@ -414,28 +430,32 @@ describe('SQL contract validators', () => {
       const rawContract = createContract({
         storage: {
           tables: {
-            user: {
-              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-            post: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            __unbound__: {
+              user: {
+                namespaceId: '__unbound__',
+                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [
-                {
-                  source: { columns: ['userId'] },
-                  target: { table: 'user', columns: ['id'] },
-                  index: true,
+              post: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
                 },
-              ],
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [
+                  {
+                    source: { columns: ['userId'] },
+                    target: { namespaceId: '__unbound__', table: 'user', columns: ['id'] },
+                    index: true,
+                  },
+                ],
+              },
             },
           },
         },
@@ -447,28 +467,32 @@ describe('SQL contract validators', () => {
       const rawContract = createContract({
         storage: {
           tables: {
-            user: {
-              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
-            },
-            post: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            __unbound__: {
+              user: {
+                namespaceId: '__unbound__',
+                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [
-                {
-                  source: { columns: ['userId'] },
-                  target: { table: 'user', columns: ['id'] },
-                  constraint: true,
+              post: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
                 },
-              ],
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [
+                  {
+                    source: { columns: ['userId'] },
+                    target: { namespaceId: '__unbound__', table: 'user', columns: ['id'] },
+                    constraint: true,
+                  },
+                ],
+              },
             },
           },
         },
@@ -512,20 +536,23 @@ describe('SQL contract validators', () => {
     it('throws on invalid referential action string', () => {
       const invalid = {
         tables: {
-          post: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: { columns: ['userId'] },
-                target: { table: 'user', columns: ['id'] },
-                onDelete: 'invalidAction',
+          __unbound__: {
+            post: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
               },
-            ],
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: { columns: ['userId'] },
+                  target: { namespaceId: '__unbound__', table: 'user', columns: ['id'] },
+                  onDelete: 'invalidAction',
+                },
+              ],
+            },
           },
         },
       } as unknown;

@@ -19,7 +19,7 @@ import { validateStorage } from '../src/validators';
 
 const sha = 'sha256:multi-ns-round-trip' as const;
 
-function makeTable(name: string, namespaceId: string): StorageTable {
+function makeTable(_name: string, namespaceId: string): StorageTable {
   return new StorageTable({
     columns: { id: col('uuid', 'pg/uuid@1') },
     primaryKey: pk('id'),
@@ -70,8 +70,10 @@ describe('SqlStorage multi-namespace JSON round-trip', () => {
     const storage = new SqlStorage({
       storageHash: sha as SqlStorage['storageHash'],
       tables: {
-        User: makeTable('User', UNBOUND_NAMESPACE_ID),
-        Post: makeTable('Post', UNBOUND_NAMESPACE_ID),
+        [UNBOUND_NAMESPACE_ID]: {
+          User: makeTable('User', UNBOUND_NAMESPACE_ID),
+          Post: makeTable('Post', UNBOUND_NAMESPACE_ID),
+        },
       },
     });
 

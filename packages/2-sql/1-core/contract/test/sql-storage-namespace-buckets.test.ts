@@ -80,21 +80,6 @@ describe('SqlStorage — same-named tables across namespaces', () => {
     expect(() => findTableByName(storage, 'User')).toThrow(/multiple namespaces/);
   });
 
-  it('rejects flat input that names the same table twice within the unbound namespace', () => {
-    expect(
-      () =>
-        new SqlStorage({
-          storageHash: sha as SqlStorage['storageHash'],
-          tables: {
-            User: makeUserTable(UNBOUND_NAMESPACE_ID),
-            // Second key would shadow the first under the flat shape; we
-            // only verify the constructor's collision detection here by
-            // forcing the same map via property descriptors.
-          },
-        }),
-    ).not.toThrow();
-  });
-
   it('rejects nested input where the back-pointer disagrees with the enclosing key', () => {
     expect(
       () =>
@@ -107,26 +92,30 @@ describe('SqlStorage — same-named tables across namespaces', () => {
     ).toThrow(/back-pointer/);
   });
 
-  it('flat input lifts each table into its own namespace bucket', () => {
-    const storage = new SqlStorage({
-      storageHash: sha as SqlStorage['storageHash'],
-      tables: {
-        Account: makeUserTable('auth'),
-        Post: makeUserTable('public'),
-      },
-    });
-
-    expect(findTableByCoord(storage, 'auth', 'Account')).toBeDefined();
-    expect(findTableByCoord(storage, 'public', 'Post')).toBeDefined();
-    expect(findTableByCoord(storage, 'public', 'Account')).toBeUndefined();
+  it('rejects non-canonical flat input (table values keyed at the namespace level)', () => {
+    expect(
+      () =>
+        new SqlStorage({
+          storageHash: sha as SqlStorage['storageHash'],
+          // The constructor accepts only the FR15 nested-by-namespace
+          // shape; a top-level `{ tableName: StorageTable }` looks like a
+          // namespace bucket but the value is a `StorageTable`, surfacing
+          // the canonical-shape diagnostic.
+          tables: {
+            User: makeUserTable(UNBOUND_NAMESPACE_ID),
+          } as unknown as Record<string, Record<string, StorageTable>>,
+        }),
+    ).toThrow(/namespace bucket|flat/);
   });
 
-  it('single-namespace flat input round-trips byte-equivalently through tables (back-compat)', () => {
+  it('single-namespace canonical input round-trips through the flat-by-name view', () => {
     const storage = new SqlStorage({
       storageHash: sha as SqlStorage['storageHash'],
       tables: {
-        User: makeUserTable(UNBOUND_NAMESPACE_ID),
-        Post: makeUserTable(UNBOUND_NAMESPACE_ID),
+        [UNBOUND_NAMESPACE_ID]: {
+          User: makeUserTable(UNBOUND_NAMESPACE_ID),
+          Post: makeUserTable(UNBOUND_NAMESPACE_ID),
+        },
       },
     });
 
