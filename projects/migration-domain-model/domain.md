@@ -50,7 +50,7 @@ The CLI is namespaced by the *subject* of the command, not by whether it touches
 |---|---|---|
 | **`migrate`** (the verb itself) | The act of migrating a DB. | `migrate --to <ref>` |
 | **`db <verb>`** | A live database. | `db update`, `db verify`, `db sign`, `db init` |
-| **`migration <verb>`** | The migration artifacts and graph. | `migration plan`, `migration new`, `migration compile`, `migration show`, `migration list`, `migration graph`, `migration verify`, `migration preflight`, `migration status`, `migration log` |
+| **`migration <verb>`** | The migration artifacts and graph. | `migration plan`, `migration new`, `migration compile`, `migration show`, `migration list`, `migration graph`, `migration check`, `migration preflight`, `migration status`, `migration log` |
 | **`contract <verb>`** | Contracts. | `contract emit`, `contract show`, `contract diff` |
 | **`ref <verb>`** | Refs. | `ref set`, `ref show` |
 
@@ -299,10 +299,10 @@ Grouped by intent. *Italicised* entries are terms used in current CLI commands; 
 
 ### Verification
 
-Three verbs along two axes — *what's being verified* (live DB / migration artifact / migration behavior) and *whether the verb touches the database*.
+Three verbs along two axes — *what's being verified* (live DB / migration artifact / migration behavior) and *whether the verb touches the database*. Each verb has a distinct name because each answers a structurally different question; reusing `verify` for all three would force users to read the qualifier every time.
 
 - **`db verify`** — *"does the live DB currently satisfy its contract?"* Compares marker + live schema against the contract; reports drift kinds. Live, read-only.
-- **`migration verify <m>`** — *"is this migration artifact internally consistent?"* Recomputes hashes, checks the manifest matches `ops.json`, validates bookend hashes. Offline, read-only. Run graph-wide with no argument.
+- **`migration check [<m>]`** — *"are these migration artifacts internally consistent?"* With a migration argument: recomputes that migration's hashes, validates its `ops.json`/manifest match, confirms its on-disk shape is complete. With no argument: a holistic check over the whole graph — every migration self-consistent; every edge's `from` and `to` line up with neighbouring contracts; no orphan nodes; no dangling refs. Offline, read-only.
 - **`migration preflight <m>`** — *"would this migration actually do what it promises?"* Sandbox-executes a migration against a shadow DB (or PPg) and reports the outcome. The dev's behavioral verification tool when iterating on a tweaked migration. Live (against the sandbox), mutates only the shadow.
 
 ### Reading — live (touches the DB)
@@ -327,7 +327,7 @@ These map onto the commands above:
 - *"What path will be taken to reach `<ref>`?"* → `migration status --to <ref>`
 - *"What does this branch promise that mainline doesn't?"* → `migration graph` + `ref show production` (PR-review tooling can diff the ref pointers)
 - *"What's the graph shape?"* → `migration graph`
-- *"Is the graph well-formed?"* → `migration verify` (single migration or graph-wide). Recomputes hashes, checks manifest ↔ `ops.json` consistency. Read-only, offline. Distinct from `migration preflight` (sandbox-executes for behavioral verification) and `db verify` (checks the live DB against its contract).
+- *"Is the graph well-formed?"* → `migration check` (no argument: graph-wide). *"Is this one migration well-formed?"* → `migration check <m>`. Recomputes hashes, checks manifest ↔ `ops.json` consistency, validates edges/refs. Read-only, offline. Distinct from `migration preflight` (sandbox-executes for behavioral verification) and `db verify` (checks the live DB against its contract).
 
 ---
 
@@ -403,10 +403,31 @@ These are terms or distinctions that came up in discussion and have not yet been
 - **`db sign [<contract>]` (positional) or `db sign --contract <contract>` (explicit).** The argument names *the thing being signed* — neither `--to` (movement) nor `--at` (position) carries the right meaning. Defaults to the current `contract.json` when omitted.
 - **`ref set <name> <contract>`** is the direct-ref-write verb. `move` was rejected because refs are stored values, not entities that traverse the graph — the spatial-movement vocabulary is reserved for `migrate`.
 - **`head` ref dropped.** Refs are exclusively environment-named (`production`, `staging`, ...). The emitted `contract.json` already plays the role of "what the repo is working toward"; a `head` ref would have been redundant. The pinned per-space artifact named `refs/head.json` is implementation cleanup (rename or remove), not vocabulary.
-- **`migration preflight` confirmed.** No surveyed migration tool has a direct analog ("actually execute the migration in a sandbox and report on the outcome"). Atlas's `--dev-url` is a flag-bundled variant of apply, Prisma current's shadow replay is implicit-only, Liquibase's `update-sql` and `validate` are preview/structural, Sqitch's `verify` runs post-deploy. Preflight is industry-known from aviation ("the checks you run right before doing the thing for real") and gives us an uncontested word for the sandbox-execution verb. Distinct from `db verify` (live DB satisfies its contract) and `migration verify` (artifact integrity — see below).
-- **`migration verify <m>` for artifact integrity.** Parallel to `db verify`. Recomputes hashes, checks the manifest matches `ops.json`, validates the migration's internal consistency. Read-only, offline. Distinct from `migration preflight` (which executes against a sandbox to verify *behavior*).
+- **Three verification verbs, three distinct names.** Calling them all `verify` would force users to read the qualifier every time; "what kind of verification?" is the wrong question to make the user resolve at the call site.
+  - **`db verify`** — live DB satisfies its contract (marker + introspection vs. the contract). Live, read-only.
+  - **`migration check [<m>]`** — artifact / graph integrity. With `<m>`: that migration's hashes recompute and its on-disk artifacts are complete. Without: graph-wide consistency (every migration self-consistent; every edge's `from` and `to` line up with neighbouring contracts; no orphan nodes; no dangling refs). Offline, read-only. Verb borrowed from `cargo check` and Atlas's "pre-migration checks" — naturally scopes from a single artifact to a holistic sweep.
+  - **`migration preflight <m>`** — behavioral verification via sandbox execution. No surveyed tool has a direct analog (Atlas's `--dev-url` is bundled into apply; Prisma current's shadow replay is implicit-only inside `migrate dev`; Liquibase's `update-sql` / `validate` are preview/structural; Sqitch's `verify` runs post-deploy). Preflight is the aviation borrowing — "checks you run right before doing the thing for real" — uncontested across migration vocab.
 - **`db init` and `prisma-next init` both kept.** The namespace disambiguates: `prisma-next init` is project scaffolding; `prisma-next db init` lays down DB structure. No rename needed.
-- **`contract emit` and `migration plan + compile` are asymmetric on purpose.** Contracts are one-step (user-authored source → emit → canonical artifact). Migrations are two-step (framework plans → user edits the emitted `migration.ts` → compile lowers it to `ops.json`). The asymmetry tells the right story: contracts are user declarations, migrations are framework-scaffolded programs the user refines. Calling both "emit" would conflate scaffolding with lowering.
+- **`contract emit` and `migration plan + compile` are asymmetric on purpose — the asymmetry is structural, not stylistic.** The two operations have fundamentally different shapes:
+
+  Contract authoring is **one-step**:
+
+  ```
+  source (PSL/TS)  ──emit──►  contract.json + contract.d.ts
+  ```
+
+  Migration authoring is **two-step**, with an intermediate user-editable artifact:
+
+  ```
+  contract diff  ──plan──►  migration.ts (emitted by framework)  ──compile──►  ops.json
+  ```
+
+  The `migration.ts` is *itself* an emitted artifact — the planner emitted it. What the user does when they re-run `migration.ts` is **compile**: executing the planner's emitted source to produce its lowered form. The verbs encode who's authoring at each step:
+
+  - **emit** = user-authored canonical source → first-class artifact (one step, contract case)
+  - **plan + compile** = framework scaffolds the source + user edits + lowering (multi-step, migration case)
+
+  "Emit your migration" would conflate scaffolding with lowering and obscure which party owns the source. Saying "compile your migration" reads correctly because that *is* what the user does — they execute `migration.ts` and the result is the canonical `ops.json`. The asymmetry tells the right story: **contracts are user declarations the framework artifactizes; migrations are framework-scaffolded programs the user refines and lowers.** Using the same verb for both would smear that real difference.
 - **"Three-phase envelope" retired as a coined term.** The three phases — **precheck**, **execute**, **postcheck** — remain first-class vocabulary (they appear in blog posts and are the key conceptual hook for understanding migration ops). When referring to the wrapper, use descriptive prose ("the op's prechecks, execute, and postchecks") rather than the noun "envelope".
 - **"Operation class"** kept as user-facing vocabulary (appears in blog posts).
 - **"Routing" / "routing-visible"** kept as internal-only. Not user-facing CLI vocabulary.

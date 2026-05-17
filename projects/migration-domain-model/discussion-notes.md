@@ -109,14 +109,15 @@ After the DDD pass: audit existing CLI commands against the resulting model (the
 - **`db sign [<contract>]`** with optional explicit form `db sign --contract <contract>`. Rejected `--at` (overspatializes a static claim) and `--to` (movement metaphor doesn't apply to signing). The argument names the thing being signed.
 - **`ref set <name> <contract>`**, not `ref move`. Refs are stored values being written, not entities that traverse the graph; the spatial vocabulary stays with `migrate`. No default contract on `ref set` — too dangerous for production-class refs.
 - **`head` ref dropped.** Used today only in extension-metadata pinned artifacts (`refs/head.json`). The emitted `contract.json` already plays that role; a separate `head` ref carried no information. The pinned-artifact filename is implementation cleanup (rename or remove), not vocabulary.
-- **`migration preflight` confirmed.** No surveyed migration tool has a direct analog for "sandbox-execute and report behaviorally". Atlas's `--dev-url` is bundled into apply; Prisma current's shadow replay is implicit-only inside `migrate dev`; Liquibase's `update-sql` / `validate` are preview/structural; Sqitch's `verify` runs post-deploy. **Preflight** is the aviation borrowing — industry-known shorthand for "the checks you run right before doing the thing for real" — and gives us a word with no migration-system collisions.
-- **`migration verify <m>`** for artifact integrity (parallel to `db verify` on the artifact axis). Recomputes hashes, validates manifest ↔ `ops.json`. The two axes:
+- **Three verification verbs, three distinct names.** Sharing `verify` across all three was rejected — preflight is *also* a verification, and migrations are *also* artifacts, so calling the integrity verb `migration verify` would make "which verification?" the question at every call site. The final split:
 
   | Verb | What it verifies | Touches live DB? |
   |---|---|---|
   | `db verify` | Live DB satisfies its contract | Yes (read-only) |
-  | `migration verify` | Migration artifact's internal consistency | No |
-  | `migration preflight` | Migration's behavior on a sandbox | Sandbox only |
+  | `migration check [<m>]` | Migration artifact / graph integrity | No |
+  | `migration preflight <m>` | Migration's behavior on a sandbox | Sandbox only |
+
+  `migration check` is borrowed from `cargo check` and Atlas's "pre-migration checks" — naturally scopes from a single artifact (`migration check <m>`) to a holistic graph sweep (`migration check` with no argument: every migration self-consistent, every edge's `from`/`to` lines up, no orphan nodes, no dangling refs). `migration preflight` is the aviation borrowing — industry-known shorthand for "the checks you run right before doing the thing for real" — with no migration-system collisions (no surveyed tool has a direct analog: Atlas bundles `--dev-url` into apply, Prisma current's shadow replay is implicit-only inside `migrate dev`, Liquibase's `update-sql` / `validate` are preview/structural, Sqitch's `verify` runs post-deploy).
 
 - **`db init` and `prisma-next init` both kept.** Namespace disambiguates: `prisma-next init` is project scaffolding, `prisma-next db init` lays down DB structure. No rename needed.
 - **`contract emit` vs `migration plan` + `migration compile` — asymmetric on purpose.** Contracts are one-step authoring (source → emit → artifact). Migrations are two-step: framework plans → user edits the emitted `migration.ts` → compile lowers it to `ops.json`. Calling both "emit" would conflate scaffolding with lowering. The verbs encode the structural difference.
