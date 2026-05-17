@@ -629,18 +629,19 @@ withTempDir(({ createTempDir }) => {
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan0').toBe(0);
 
-          await swapContract(ctx, 'contract-v2');
+          await swapContract(ctx, 'contract-additive');
           const emit1 = await runContractEmit(ctx);
           expect(emit1.exitCode, 'emit1').toBe(0);
-          const plan1 = await runMigrationPlanAndEmit(ctx, ['--name', 'v2']);
+          const plan1 = await runMigrationPlanAndEmit(ctx, ['--name', 'additive']);
           expect(plan1.exitCode, 'plan1').toBe(0);
 
-          const hashA = parseJsonOutput(plan0)?.to as string;
+          const hashA = parseJsonOutput(plan0)?.['to'] as string;
 
           const status = await runMigrationStatus(ctx, ['--from', hashA, '--json']);
           expect(status.exitCode).toBe(0);
           const json = parseJsonOutput(status);
-          expect(json?.migrations?.length).toBeGreaterThan(0);
+          const migrations = json?.['migrations'] as readonly unknown[];
+          expect(migrations.length).toBeGreaterThan(0);
         },
         timeouts.spinUpPpgDev,
       );
