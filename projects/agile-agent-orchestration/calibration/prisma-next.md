@@ -107,8 +107,12 @@ A dispatch's brief may add gates specific to the work:
 ### Verification cadence
 
 - **Per-commit gates** (during the dispatch): typecheck and any grep gates the brief specifies.
-- **End-of-dispatch gates** (before reporting done): the full conditional set + brief-specified gates.
+- **End-of-dispatch gates** (before reporting done): the full conditional set + brief-specified gates. **`pnpm test:packages` is mandatory** when source or test code changed anywhere in the monorepo, even if the dispatch was scoped to a single package — cross-package regressions are common and the bulk run takes ~1 min. Per-package `pnpm test` is a development convenience, not a DoD gate.
 - **End-of-round gates** (orchestrator-side, post-implementer-report): orchestrator re-runs the grep gates independently to confirm; spot-checks the diff for spec compliance.
+
+### Pre-QA gates (always)
+
+A manual-QA dispatch (`drive-qa-run` or any human-style QA pass) MUST be preceded by a green full test suite (`pnpm test:packages` + `pnpm typecheck` + `pnpm fixtures:check`). The QA round's job is to surface what tests cannot meaningfully assert — diagnostic clarity, end-to-end journey breaks, judgement calls. **It is not a substitute for the test suite.** Dispatching QA against an unverified tree wastes the runner's time discovering broken assertions that a 1-minute `pnpm test:packages` would have surfaced — and contaminates the report with downstream artefacts of the un-caught regression. If the test suite has known-pre-existing failures, document them explicitly in the QA brief so the runner can filter them out of their findings.
 
 ---
 
@@ -205,6 +209,62 @@ Recorded failure modes with their detection signals and mitigations. Add a new e
 - Critical artefacts (project docs being written in real time) should not live untracked while subagents are in flight. Either commit, or accept the risk and have a recovery path (read from conversation history).
 
 **Reference incident.** 2026-05-17, dispatch `de1c1c20` (family-sql M-sized migration). The subagent apparently ran a setup cleanup (likely `git clean -fd`) that deleted `projects/agile-agent-orchestration/` (untracked at the time, ~1500 lines of methodology docs in flight). The protocol files survived only because the orchestrator had the full content in conversation context and could re-write them. Without that, the work would have been lost.
+
+### 3.6 Orchestrator widens check intervals once commits look clean
+
+**Symptom.** Orchestrator starts a dispatch with a 5-min standup cadence, observes 1-2 clean commits in the first 10 min, then drifts to 10/15/25-min check intervals because "the implementer seems on track." Drift compounds: the next missed check is later, the next is later still. The implementer can be 30+ min into unilateral scope expansion before the orchestrator looks again.
+
+**Detection signal.**
+
+- Orchestrator's poll/sleep cadence in the conversation transcript shows widening intervals (5 → 10 → 20 → 30 → 45 → 60 → 80 …).
+- A scope expansion (e.g. substrate change beyond the brief) lands in a commit several intervals before the orchestrator notices.
+- Orchestrator's rationale for widening is "git evidence looks clean" — file-system-proxy monitoring rather than diff-reading.
+
+**Mitigation.**
+
+- Keep `AwaitShell` `block_until_ms` at 5 min throughout the budget. The cost of an extra check is one shell call; the cost of missing drift is hours of rework.
+- The 5-min check is a *standup*, not a status request. Read the most recent commit's diff. Verify it lines up with the brief's stated discipline. Verify no out-of-brief files were touched.
+- Brief should pre-name the "blast zones" — packages / files the dispatch is authorised to touch and packages / files it is not. The 5-min check confirms the diff stays inside the authorised zone.
+- Logging discipline: every 5-min check produces a one-line orchestrator note (`T+15: commit Y lands; matches discipline Z; on track`). If a check produces no note, the check didn't happen — even if `AwaitShell` ran.
+
+**Reference incident.** 2026-05-17, demo-namespace lift dispatch (`5ea8bec8`). Orchestrator dropped from 5-min checks at T+10 to 10/15/25-min intervals through T+80. Scope expanded from M (demo lift) to L (demo lift + 3 substrate fixes including a 236-line SQL-stack propagation commit) between checks. The expansion turned out to be justified (real M5a/M5b gaps surfaced), but the orchestrator did not know that in real time. Could equally have been unjustified scope creep going uncaught.
+
+### 3.7 Per-package DoD gates miss cross-package regressions
+
+**Symptom.** Implementer brief specifies DoD gates scoped to the package(s) the dispatch is editing (e.g. `cd examples/X && pnpm test`). Implementer reports green; orchestrator accepts; downstream QA / merge / next-dispatch discovers test failures in *other* packages that consume the edited surface. The failures were always there — the gates just didn't run them.
+
+**Detection signal.**
+
+- Brief's DoD gate list scopes test runs to single packages (`cd path && pnpm test`, `pnpm --filter X test`).
+- Diff touches IR types, validators, serialisers, or anything else exported to consuming packages.
+- Implementer's report says "all tests pass" but the implicit scope is "all tests *in my package* pass."
+- QA / next dispatch / `pnpm test:packages` later surfaces failures in unmodified packages.
+
+**Mitigation.**
+
+- Every dispatch whose diff touches source or test code includes `pnpm test:packages` as a mandatory final gate (per § 2's pre-QA discipline). It takes ~1 min and catches cross-package fan-out.
+- Brief explicitly says "the full monorepo test suite is the gate; per-package runs are for your iteration loop." Per-package `pnpm test` is a development convenience that is NOT sufficient evidence the dispatch is done.
+- Orchestrator's end-of-round check re-runs `pnpm test:packages` independently rather than trusting the implementer's report.
+
+**Reference incident.** 2026-05-17, demo-namespace lift dispatch (`5ea8bec8`). Brief specified `cd examples/prisma-next-demo && pnpm test` as gate #2. Implementer reported green. The downstream QA round (`52750a6c`) discovered 20/21 failing tests in `packages/2-sql/2-authoring/contract-ts/test/contract.parameterized-types.test.ts` — pre-existing flat-shape fixture failures from the earlier reversal sweep that the demo-scoped gate never ran. The failures had been latent since the reversal commits landed and would have been caught by `pnpm test:packages` at any dispatch's end-of-round check. (Same failure class as the earlier "264 test failures" the session diagnosed as PGlite flakiness — bulk-test signal undervalued.)
+
+### 3.8 "If-available" preconditions degrade to "skip" exits
+
+**Symptom.** Brief specifies "if X is available, do Y; otherwise mark Not Run." Runner / implementer treats the absence of X as a terminal condition and skips Y entirely, rather than provisioning X. The coverage gap goes uncollected when the orchestrator could have specified a provisioning fallback.
+
+**Detection signal.**
+
+- Brief contains phrases like "if no PG is available, skip this step" / "if `.env` is configured, …" / "(optional, if real DB)".
+- Runner's report marks scenarios as "Not Run" with the reason being precondition absence rather than substantive blocker.
+- The precondition is trivially provisionable (docker run, prisma dev, local binary already installed) — the runner just wasn't told to provision.
+
+**Mitigation.**
+
+- Brief must specify the provisioning fallback for every precondition the runner can satisfy themselves. For Postgres: `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:17` then `DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres`. For Mongo: equivalent docker invocation. For prisma dev: `pnpm prisma dev`.
+- Briefs use the form "ensure X is available (provision via Y if needed)" rather than "if X is available, …".
+- A scenario / DoD gate can only legitimately be marked Not Run when the precondition is genuinely unprovisionable (e.g. external SaaS account, hardware, license).
+
+**Reference incident.** 2026-05-17, drive-qa-run dispatch (`52750a6c`). Brief said "if no PG, mark scenario 4 as Not Run." Runner correctly marked it Not Run. Cost: AC6 (the late-binding multi-tenancy scenario) was not exercised this QA round — the headline user-facing capability that scenario 4 was specifically designed to demonstrate. The brief should have said "if no PG, start one via `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:17` or `prisma dev`, then proceed."
 
 ---
 
