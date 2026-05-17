@@ -707,7 +707,7 @@ async function executeMigrationStatusCommand(
         message: 'There are multiple valid migration paths — you must select a target',
         hints: [
           "Use '--ref <name>' to select a target",
-          "Or 'prisma-next migration ref set <name> <hash>' to create one",
+          "Or 'prisma-next ref set <name> <hash>' to create one",
         ],
       });
     }
