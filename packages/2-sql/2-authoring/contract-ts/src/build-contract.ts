@@ -235,7 +235,7 @@ function buildDomainField(
  */
 function buildStorageNamespaces(input: {
   readonly declared: readonly string[] | undefined;
-  readonly storageTables: Readonly<Record<string, { readonly namespaceId: string }>>;
+  readonly storageTables: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
   readonly createNamespace: ((id: string) => Namespace) | undefined;
 }): Record<string, Namespace> {
   const ids = new Set<string>();
@@ -247,9 +247,9 @@ function buildStorageNamespaces(input: {
       }
     }
   }
-  for (const table of Object.values(input.storageTables)) {
-    if (table.namespaceId.length > 0) {
-      ids.add(table.namespaceId);
+  for (const namespaceId of Object.keys(input.storageTables)) {
+    if (namespaceId.length > 0) {
+      ids.add(namespaceId);
     }
   }
 
@@ -279,7 +279,7 @@ export function buildSqlContractFromDefinition(
   const targetFamily = 'sql';
   const modelsByName = new Map(definition.models.map((m) => [m.modelName, m]));
 
-  const storageTables: Record<string, StorageTableInput> = {};
+  const storageTables: Record<string, Record<string, StorageTableInput>> = {};
   const executionDefaults: ExecutionMutationDefault[] = [];
   const models: Record<string, ContractModel> = {};
   const roots: Record<string, string> = {};
@@ -385,7 +385,10 @@ export function buildSqlContractFromDefinition(
       };
     });
 
-    storageTables[tableName] = {
+    if (storageTables[sourceNamespaceId] === undefined) {
+      storageTables[sourceNamespaceId] = {};
+    }
+    storageTables[sourceNamespaceId][tableName] = {
       namespaceId: sourceNamespaceId,
       columns,
       uniques: (semanticModel.uniques ?? []).map((u) => ({

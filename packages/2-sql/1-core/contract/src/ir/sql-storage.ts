@@ -39,48 +39,48 @@ const DEFAULT_NAMESPACES: Readonly<Record<string, Namespace>> = Object.freeze({
 });
 
 /**
- * Flat (legacy) tables input shape: `{ [tableName]: StorageTable | StorageTableInput }`.
- * Each entry's `namespaceId` (defaulted to {@link UNBOUND_NAMESPACE_ID})
- * decides which nested namespace bucket the entry lifts into. Same-named
- * tables in different namespaces cannot be expressed via this shape; the
- * second occurrence collides on the `tableName` key — use the nested
- * input shape ({@link SqlStorageTablesNestedInput}) when authoring
- * cross-namespace same-named tables.
- *
- * Accepted as ergonomic sugar at the constructor boundary so existing
- * single-namespace authoring stays terse.
- */
-export type SqlStorageTablesFlatInput = Record<string, StorageTable | StorageTableInput>;
-
-/**
- * Nested (FR15) tables input shape:
+ * Canonical (FR15) tables input shape:
  * `{ [namespaceId]: { [tableName]: StorageTable | StorageTableInput } }`.
- * The only shape that can express two same-named tables in distinct
- * namespaces (`auth.User` + `public.User`) without collision.
+ *
+ * The only shape the constructor accepts. Same-named tables in distinct
+ * namespaces (`auth.User` + `public.User`) coexist without collision.
+ * Single-namespace contracts persist under
+ * `{ [UNBOUND_NAMESPACE_ID]: { ... } }` or whatever single coordinate
+ * they bind to.
+ *
+ * Every inner `StorageTableInput` carries a required `namespaceId`
+ * back-pointer; the constructor checks that the outer key agrees with
+ * each entry's `namespaceId` so the bucket boundary is unambiguous.
  */
-export type SqlStorageTablesNestedInput = Record<
+export type SqlStorageTablesInput = Record<
   string,
   Record<string, StorageTable | StorageTableInput>
 >;
 
-export type SqlStorageTypesFlatInput = Record<string, SqlStorageTypeEntry>;
-
-export type SqlStorageTypesNestedInput = Record<string, Record<string, SqlStorageTypeEntry>>;
+/**
+ * Canonical (FR15) types input shape:
+ * `{ [namespaceId]: { [typeName]: SqlStorageTypeEntry } }`.
+ *
+ * The only shape the constructor accepts. Single-namespace contracts
+ * persist under `{ [UNBOUND_NAMESPACE_ID]: { ... } }`.
+ */
+export type SqlStorageTypesInput = Record<string, Record<string, SqlStorageTypeEntry>>;
 
 export interface SqlStorageInput<THash extends string = string> {
   readonly storageHash: StorageHashBase<THash>;
   /**
-   * Tables map. Accepts the legacy flat shape (`{ [tableName]: ... }`)
-   * or the FR15 nested-by-namespace shape (`{ [namespaceId]: { [tableName]: ... } }`).
-   * Flat input is bucketed by each entry's `StorageTable.namespaceId`
-   * field (default {@link UNBOUND_NAMESPACE_ID}).
+   * Tables map in the FR15 nested-by-namespace shape:
+   * `{ [namespaceId]: { [tableName]: ... } }`. Non-canonical inputs
+   * (flat `{ [tableName]: ... }`, tables missing `namespaceId`, or
+   * tables whose `namespaceId` disagrees with the enclosing namespace
+   * key) are rejected at construction time.
    */
-  readonly tables: SqlStorageTablesFlatInput | SqlStorageTablesNestedInput;
+  readonly tables: SqlStorageTablesInput;
   /**
-   * Types map. Same dual-shape contract as `tables`. Flat input
-   * buckets under {@link UNBOUND_NAMESPACE_ID}.
+   * Types map in the FR15 nested-by-namespace shape. Same canonical
+   * shape as `tables`.
    */
-  readonly types?: SqlStorageTypesFlatInput | SqlStorageTypesNestedInput;
+  readonly types?: SqlStorageTypesInput;
   readonly namespaces?: Readonly<Record<string, Namespace>>;
 }
 
@@ -111,13 +111,17 @@ export interface SqlStorageInput<THash extends string = string> {
  *   tables across namespaces (e.g. `auth.User` + `public.User`)
  *   coexist here without collision.
  *
- * The constructor accepts either flat input (legacy authoring;
- * bucketed by each entry's `StorageTable.namespaceId`, default
- * {@link UNBOUND_NAMESPACE_ID}) or the FR15 nested shape directly.
+ * The constructor accepts the FR15 nested-by-namespace input shape
+ * only. Non-canonical inputs (flat `{ [tableName]: ... }`, tables
+ * missing `namespaceId`, or tables whose `namespaceId` disagrees with
+ * the enclosing namespace key) are rejected loudly. Callers (PSL
+ * interpreter, TS-builder lowering, fixture authors) resolve the
+ * namespace coordinate before constructing the IR; the constructor
+ * does no implicit defaulting or rewrapping.
  *
  * `StorageTable.namespaceId` is retained as a back-pointer for
- * ergonomic walks; the constructor validates it agrees with the
- * enclosing nested key when nested input is supplied.
+ * ergonomic walks; the constructor checks it agrees with the
+ * enclosing nested key.
  *
  * Use {@link iterateAllTables} / {@link iterateTablesWithCoords} for
  * "walk every table" consumers, {@link findTableByCoord} for
@@ -239,43 +243,21 @@ Object.defineProperty(SqlStorage.prototype, 'toJSON', {
 });
 
 /**
- * Discriminate between the (legacy) flat `tables` input shape and the
- * FR15 nested-by-namespace input shape, then normalise to the nested
- * in-memory shape.
+ * Walk the canonical FR15 nested input shape and normalise raw
+ * `StorageTableInput` values into `StorageTable` class instances.
  *
- * The TS-builder bottom-up construction path produces flat input where
- * each value is a `StorageTable` class instance — that's the only flat
- * input the constructor accepts. Everything else must arrive as the
- * canonical nested-by-namespace shape; the JSON envelope projected by
- * `SqlStorage.toJSON` and the validated arktype envelope both match.
- *
- * Every table carries a required `namespaceId` back-pointer; the nested
- * path enforces that the outer key agrees with each entry's
- * `namespaceId` so the bucket boundary is unambiguous.
+ * The constructor accepts only the canonical nested-by-namespace
+ * shape; non-canonical inputs (flat `{ [tableName]: ... }`, tables
+ * missing `namespaceId`, or tables whose `namespaceId` disagrees
+ * with the enclosing namespace key) are rejected here so every
+ * downstream consumer can rely on a single shape.
  */
 function normaliseTablesInput(
-  input: SqlStorageTablesFlatInput | SqlStorageTablesNestedInput,
+  input: SqlStorageTablesInput,
 ): Record<string, Record<string, StorageTable>> {
-  if (isFlatTablesInput(input)) {
-    const result: Record<string, Record<string, StorageTable>> = {};
-    for (const [name, entry] of Object.entries(input)) {
-      const table = entry instanceof StorageTable ? entry : new StorageTable(entry);
-      const namespaceId = table.namespaceId;
-      if (result[namespaceId] === undefined) {
-        result[namespaceId] = {};
-      }
-      const bucket = result[namespaceId];
-      if (Object.hasOwn(bucket, name)) {
-        throw new Error(
-          `SqlStorage: table "${name}" appears twice in namespace "${namespaceId}". The legacy flat input shape cannot express same-named tables across namespaces; rewrite as the nested \`Record<namespaceId, Record<tableName, StorageTable>>\` shape.`,
-        );
-      }
-      bucket[name] = table;
-    }
-    return result;
-  }
   const result: Record<string, Record<string, StorageTable>> = {};
   for (const [namespaceId, bucketInput] of Object.entries(input)) {
+    rejectIfFlatTableEntry(namespaceId, bucketInput);
     const bucket: Record<string, StorageTable> = {};
     for (const [name, entry] of Object.entries(bucketInput)) {
       const table = entry instanceof StorageTable ? entry : new StorageTable(entry);
@@ -291,27 +273,30 @@ function normaliseTablesInput(
   return result;
 }
 
-function isFlatTablesInput(
-  input: SqlStorageTablesFlatInput | SqlStorageTablesNestedInput,
-): input is SqlStorageTablesFlatInput {
-  for (const value of Object.values(input)) {
-    if (value instanceof StorageTable) return true;
-    // Flat raw-object input: each value is a `StorageTableInput`, which
-    // carries the required `namespaceId` back-pointer. Nested input
-    // values are `Record<TableName, StorageTable>` (no top-level
-    // `namespaceId`). The probe checks the load-bearing required
-    // coordinate field rather than an incidental structural marker.
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      typeof (value as { namespaceId?: unknown }).namespaceId === 'string'
-    ) {
-      return true;
-    }
-    return false;
+/**
+ * A nested bucket whose value is a `StorageTable`-shaped object (carries
+ * `namespaceId` / `columns`) is the canonical sign that the caller
+ * confused flat with nested input — the outer key was interpreted as
+ * a namespace id and the value should have been a `{[tableName]: ...}`
+ * bucket. Reject with a diagnostic that names the canonical shape.
+ */
+function rejectIfFlatTableEntry(namespaceId: string, bucketInput: unknown): void {
+  if (bucketInput instanceof StorageTable) {
+    throw new Error(
+      `SqlStorage: tables["${namespaceId}"] is a StorageTable instance; expected a namespace bucket \`Record<tableName, StorageTable>\`. Wrap the table under \`tables: { '${namespaceId}': { '${namespaceId}': table } }\` or correct the namespace key.`,
+    );
   }
-  // Empty input — treat as flat (no tables).
-  return true;
+  if (typeof bucketInput !== 'object' || bucketInput === null) {
+    throw new Error(
+      `SqlStorage: tables["${namespaceId}"] must be a \`Record<tableName, StorageTable>\` namespace bucket; received ${bucketInput === null ? 'null' : typeof bucketInput}.`,
+    );
+  }
+  const tableShaped = bucketInput as { namespaceId?: unknown; columns?: unknown };
+  if (typeof tableShaped.namespaceId === 'string' || tableShaped.columns !== undefined) {
+    throw new Error(
+      `SqlStorage: tables["${namespaceId}"] looks like a flat \`StorageTableInput\` (carries \`namespaceId\` or \`columns\`) rather than the canonical nested \`Record<namespaceId, Record<tableName, StorageTable>>\` shape. Rewrite the input as \`tables: { '<namespaceId>': { '<tableName>': { namespaceId: '<namespaceId>', ... } } }\`.`,
+    );
+  }
 }
 
 function freezeNestedTables(
@@ -402,17 +387,11 @@ function installAmbiguousFlatGetter(
 }
 
 function normaliseTypesInput(
-  input: SqlStorageTypesFlatInput | SqlStorageTypesNestedInput,
+  input: SqlStorageTypesInput,
 ): Record<string, Record<string, StorageTypeInstance | PostgresEnumStorageEntry>> {
-  if (isFlatTypesInput(input)) {
-    const bucket: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
-    for (const [name, entry] of Object.entries(input)) {
-      bucket[name] = normaliseTypeEntry(entry);
-    }
-    return { [UNBOUND_NAMESPACE_ID]: bucket };
-  }
   const out: Record<string, Record<string, StorageTypeInstance | PostgresEnumStorageEntry>> = {};
   for (const [namespaceId, bucketInput] of Object.entries(input)) {
+    rejectIfFlatTypeEntry(namespaceId, bucketInput);
     const bucket: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
     for (const [name, entry] of Object.entries(bucketInput)) {
       bucket[name] = normaliseTypeEntry(entry);
@@ -422,26 +401,29 @@ function normaliseTypesInput(
   return out;
 }
 
-function isFlatTypesInput(
-  input: SqlStorageTypesFlatInput | SqlStorageTypesNestedInput,
-): input is SqlStorageTypesFlatInput {
-  for (const value of Object.values(input)) {
-    if (value instanceof SqlNode) return true;
-    // Flat raw-object input: each value is a type entry carrying the
-    // load-bearing `kind` discriminator (`'codec-instance'`,
-    // `'postgres-enum'`, …) or a codec-typed input shape with
-    // `codecId`. Nested input values are `Record<TypeName, Entry>`
-    // (namespace buckets) with no top-level `kind` / `codecId`.
-    if (typeof value === 'object' && value !== null) {
-      const v = value as Record<string, unknown>;
-      if (typeof v['kind'] === 'string' || typeof v['codecId'] === 'string') {
-        return true;
-      }
-    }
-    return false;
+/**
+ * Symmetric guard for the types slot: a nested bucket whose value is a
+ * `kind`-discriminated entry (or a codec-typed input shape with `codecId`)
+ * is the canonical sign of flat-input confusion. Reject with a diagnostic
+ * that names the canonical shape.
+ */
+function rejectIfFlatTypeEntry(namespaceId: string, bucketInput: unknown): void {
+  if (bucketInput instanceof SqlNode) {
+    throw new Error(
+      `SqlStorage: types["${namespaceId}"] is a class-instance entry; expected a namespace bucket \`Record<typeName, ...>\`.`,
+    );
   }
-  // Empty input — treat as flat (no types).
-  return true;
+  if (typeof bucketInput !== 'object' || bucketInput === null) {
+    throw new Error(
+      `SqlStorage: types["${namespaceId}"] must be a \`Record<typeName, ...>\` namespace bucket; received ${bucketInput === null ? 'null' : typeof bucketInput}.`,
+    );
+  }
+  const v = bucketInput as Record<string, unknown>;
+  if (typeof v['kind'] === 'string' || typeof v['codecId'] === 'string') {
+    throw new Error(
+      `SqlStorage: types["${namespaceId}"] looks like a flat type entry (carries \`kind\` or \`codecId\`) rather than the canonical nested \`Record<namespaceId, Record<typeName, ...>>\` shape. Rewrite the input as \`types: { '<namespaceId>': { '<typeName>': { ... } } }\`.`,
+    );
+  }
 }
 
 function freezeNestedTypes(

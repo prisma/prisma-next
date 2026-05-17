@@ -31,11 +31,9 @@ export {
   listAllTableNames,
   SqlStorage,
   type SqlStorageInput,
-  type SqlStorageTablesFlatInput,
-  type SqlStorageTablesNestedInput,
+  type SqlStorageTablesInput,
   type SqlStorageTypeEntry,
-  type SqlStorageTypesFlatInput,
-  type SqlStorageTypesNestedInput,
+  type SqlStorageTypesInput,
 } from './ir/sql-storage';
 export { SqlUnboundNamespace } from './ir/sql-unbound-namespace';
 export { StorageColumn, type StorageColumnInput } from './ir/storage-column';
