@@ -51,14 +51,17 @@ describe('sql-target-family-hook', () => {
       },
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'sql/int@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'sql/int@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -84,14 +87,17 @@ describe('sql-target-family-hook', () => {
         },
         storage: {
           tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'sql/int@1', nullable: false },
+            __unbound__: {
+              user: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'sql/int@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -126,14 +132,17 @@ describe('sql-target-family-hook', () => {
         },
         storage: {
           tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'sql/int@1', nullable: false },
+            __unbound__: {
+              user: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'sql/int@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -163,14 +172,17 @@ describe('sql-target-family-hook', () => {
       },
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'sql/int@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'sql/int@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -224,13 +236,16 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -303,15 +318,18 @@ describe('sql-target-family-hook', () => {
       target: 'test-db',
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [{ columns: ['email'] }],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [{ columns: ['email'] }],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -328,15 +346,18 @@ describe('sql-target-family-hook', () => {
       target: 'test-db',
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [{ columns: ['email'], name: 'unique_email' }],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [{ columns: ['email'], name: 'unique_email' }],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -353,16 +374,19 @@ describe('sql-target-family-hook', () => {
       target: 'test-db',
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              first_name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              last_name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                first_name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                last_name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [{ columns: ['first_name', 'last_name'] }],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [{ columns: ['first_name', 'last_name'] }],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -379,15 +403,18 @@ describe('sql-target-family-hook', () => {
       target: 'test-db',
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [{ columns: ['email'] }],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [{ columns: ['email'] }],
-            foreignKeys: [],
           },
         },
       },
@@ -404,15 +431,18 @@ describe('sql-target-family-hook', () => {
       target: 'test-db',
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [{ columns: ['email'], name: 'idx_email' }],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [{ columns: ['email'], name: 'idx_email' }],
-            foreignKeys: [],
           },
         },
       },
@@ -429,29 +459,33 @@ describe('sql-target-family-hook', () => {
       target: 'test-db',
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          post: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: { columns: ['userId'] },
-                target: { table: 'user', columns: ['id'] },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
               },
-            ],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+            post: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: { columns: ['userId'] },
+                  target: { table: 'user', columns: ['id'] },
+                },
+              ],
+            },
           },
         },
       },
@@ -470,30 +504,34 @@ describe('sql-target-family-hook', () => {
       target: 'test-db',
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          post: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: { columns: ['userId'] },
-                target: { table: 'user', columns: ['id'] },
-                name: 'fk_post_user',
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
               },
-            ],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+            post: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: { columns: ['userId'] },
+                  target: { table: 'user', columns: ['id'] },
+                  name: 'fk_post_user',
+                },
+              ],
+            },
           },
         },
       },
@@ -510,14 +548,17 @@ describe('sql-target-family-hook', () => {
       target: 'test-db',
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'], name: 'pk_user' },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'], name: 'pk_user' },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -549,16 +590,19 @@ describe('sql-target-family-hook', () => {
       },
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -593,15 +637,18 @@ describe('sql-target-family-hook', () => {
       },
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -631,14 +678,17 @@ describe('sql-target-family-hook', () => {
       },
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -655,14 +705,17 @@ describe('sql-target-family-hook', () => {
       models: undefined,
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -691,18 +744,21 @@ describe('sql-target-family-hook', () => {
       },
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: {
-                nativeType: 'int4',
-                codecId: 'pg/int4@1',
-                nullable: undefined as unknown as boolean,
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: {
+                  nativeType: 'int4',
+                  codecId: 'pg/int4@1',
+                  nullable: undefined as unknown as boolean,
+                },
               },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -738,18 +794,21 @@ describe('sql-target-family-hook', () => {
       },
       storage: {
         tables: {
-          embedding: {
-            columns: {
-              vector: {
-                nativeType: 'vector',
-                codecId: 'pg/vector@1',
-                nullable: false,
-                typeParams: { length: 1536 },
+          __unbound__: {
+            embedding: {
+              namespaceId: '__unbound__',
+              columns: {
+                vector: {
+                  nativeType: 'vector',
+                  codecId: 'pg/vector@1',
+                  nullable: false,
+                  typeParams: { length: 1536 },
+                },
               },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -767,14 +826,17 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -798,31 +860,34 @@ describe('sql-target-family-hook', () => {
       target: 'test-db',
       storage: {
         tables: {
-          items: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [
-              {
-                columns: ['description'],
-                type: 'bm25',
-                name: 'search_idx',
-                options: {
-                  keyField: 'id',
-                  fields: [
-                    {
-                      column: 'description',
-                      tokenizer: 'simple',
-                      tokenizerParams: { stemmer: 'english' },
-                    },
-                  ],
-                },
+          __unbound__: {
+            items: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
               },
-            ],
-            foreignKeys: [],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [
+                {
+                  columns: ['description'],
+                  type: 'bm25',
+                  name: 'search_idx',
+                  options: {
+                    keyField: 'id',
+                    fields: [
+                      {
+                        column: 'description',
+                        tokenizer: 'simple',
+                        tokenizerParams: { stemmer: 'english' },
+                      },
+                    ],
+                  },
+                },
+              ],
+              foreignKeys: [],
+            },
           },
         },
       },
@@ -843,30 +908,33 @@ describe('sql-target-family-hook', () => {
       target: 'test-db',
       storage: {
         tables: {
-          items: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [
-              {
-                columns: ['description'],
-                type: 'bm25',
-                options: {
-                  keyField: 'id',
-                  fields: [
-                    {
-                      expression: "description || ' ' || category",
-                      alias: 'concat',
-                      tokenizer: 'simple',
-                    },
-                  ],
-                },
+          __unbound__: {
+            items: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
               },
-            ],
-            foreignKeys: [],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [
+                {
+                  columns: ['description'],
+                  type: 'bm25',
+                  options: {
+                    keyField: 'id',
+                    fields: [
+                      {
+                        expression: "description || ' ' || category",
+                        alias: 'concat',
+                        tokenizer: 'simple',
+                      },
+                    ],
+                  },
+                },
+              ],
+              foreignKeys: [],
+            },
           },
         },
       },
@@ -883,25 +951,28 @@ describe('sql-target-family-hook', () => {
       target: 'test-db',
       storage: {
         tables: {
-          items: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [
-              {
-                columns: ['description'],
-                type: 'bm25',
-                options: {
-                  keyField: 'id',
-                  'min-token-size': 2,
-                  fields: [{ column: 'description', tokenizerParams: { 'max-ngram': 5 } }],
-                },
+          __unbound__: {
+            items: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                description: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
               },
-            ],
-            foreignKeys: [],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [
+                {
+                  columns: ['description'],
+                  type: 'bm25',
+                  options: {
+                    keyField: 'id',
+                    'min-token-size': 2,
+                    fields: [{ column: 'description', tokenizerParams: { 'max-ngram': 5 } }],
+                  },
+                },
+              ],
+              foreignKeys: [],
+            },
           },
         },
       },
@@ -926,15 +997,18 @@ describe('sql-target-family-hook', () => {
       },
       storage: {
         tables: {
-          tags: {
-            columns: {
-              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          __unbound__: {
+            tags: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                name: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -993,12 +1067,15 @@ describe('sql-target-family-hook', () => {
         },
         storage: {
           tables: {
-            user: {
-              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
+            __unbound__: {
+              user: {
+                namespaceId: '__unbound__',
+                columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
+              },
             },
           },
         },
@@ -1057,15 +1134,18 @@ describe('sql-target-family-hook', () => {
         },
         storage: {
           tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                home_address: { nativeType: 'jsonb', codecId: 'pg/jsonb@1', nullable: true },
+            __unbound__: {
+              user: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  home_address: { nativeType: 'jsonb', codecId: 'pg/jsonb@1', nullable: true },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -1107,15 +1187,18 @@ describe('sql-target-family-hook', () => {
         },
         storage: {
           tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                addresses: { nativeType: 'jsonb', codecId: 'pg/jsonb@1', nullable: false },
+            __unbound__: {
+              user: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  addresses: { nativeType: 'jsonb', codecId: 'pg/jsonb@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },

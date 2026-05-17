@@ -29,9 +29,12 @@ describe('sql-target-family-hook', () => {
       },
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
             },
           },
         },
@@ -53,9 +56,12 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'unknown/type@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'unknown/type@1', nullable: false },
+              },
             },
           },
         },
@@ -76,9 +82,12 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'invalid-format', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'invalid-format', nullable: false },
+              },
             },
           },
         },
@@ -96,9 +105,12 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'postgres/int4@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'postgres/int4@1', nullable: false },
+              },
             },
           },
         },
@@ -118,9 +130,12 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nullable: false },
+              },
             },
           },
         },
@@ -138,9 +153,12 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'invalid@format', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'invalid@format', nullable: false },
+              },
             },
           },
         },
@@ -196,9 +214,12 @@ describe('sql-target-family-hook', () => {
     const ir = createContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
             },
           },
         },

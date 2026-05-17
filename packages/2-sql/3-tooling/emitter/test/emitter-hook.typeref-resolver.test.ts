@@ -65,27 +65,32 @@ describe('sqlEmission.resolveFieldTypeParams (integration via generateContractDt
       },
       storage: {
         tables: {
-          post: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              embedding: {
-                nativeType: 'vector',
-                codecId: 'pg/vector@1',
-                nullable: true,
-                typeRef: 'Embedding1536',
+          __unbound__: {
+            post: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                embedding: {
+                  nativeType: 'vector',
+                  codecId: 'pg/vector@1',
+                  nullable: true,
+                  typeRef: 'Embedding1536',
+                },
               },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
         types: {
-          Embedding1536: {
-            codecId: 'pg/vector@1',
-            nativeType: 'vector',
-            typeParams: { length: 1536 },
+          __unbound__: {
+            Embedding1536: {
+              codecId: 'pg/vector@1',
+              nativeType: 'vector',
+              typeParams: { length: 1536 },
+            },
           },
         },
       },
@@ -128,26 +133,31 @@ describe('sqlEmission.resolveFieldTypeParams (integration via generateContractDt
       },
       storage: {
         tables: {
-          post: {
-            columns: {
-              embedding: {
-                nativeType: 'vector',
-                codecId: 'pg/vector@1',
-                nullable: false,
-                typeRef: 'Embedding1536',
+          __unbound__: {
+            post: {
+              namespaceId: '__unbound__',
+              columns: {
+                embedding: {
+                  nativeType: 'vector',
+                  codecId: 'pg/vector@1',
+                  nullable: false,
+                  typeRef: 'Embedding1536',
+                },
               },
+              primaryKey: { columns: ['embedding'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['embedding'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
         types: {
-          Embedding1536: {
-            codecId: 'pg/vector@1',
-            nativeType: 'vector',
-            typeParams: { length: 1536 },
+          __unbound__: {
+            Embedding1536: {
+              codecId: 'pg/vector@1',
+              nativeType: 'vector',
+              typeParams: { length: 1536 },
+            },
           },
         },
       },

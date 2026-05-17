@@ -26,26 +26,31 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContract({
         storage: {
           tables: {
-            document: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            __unbound__: {
+              document: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            Vector1536: {
-              codecId: 'pg/vector@1',
-              nativeType: 'vector',
-              typeParams: { length: 1536 },
-            },
-            Vector768: {
-              codecId: 'pg/vector@1',
-              nativeType: 'vector',
-              typeParams: { length: 768 },
+            __unbound__: {
+              Vector1536: {
+                codecId: 'pg/vector@1',
+                nativeType: 'vector',
+                typeParams: { length: 1536 },
+              },
+              Vector768: {
+                codecId: 'pg/vector@1',
+                nativeType: 'vector',
+                typeParams: { length: 768 },
+              },
             },
           },
         },
@@ -66,14 +71,17 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContract({
         storage: {
           tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            __unbound__: {
+              user: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {},
@@ -89,14 +97,17 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContract({
         storage: {
           tables: {
-            user: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            __unbound__: {
+              user: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -111,21 +122,26 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContract({
         storage: {
           tables: {
-            data: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            __unbound__: {
+              data: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            ComplexType: {
-              codecId: 'custom/type@1',
-              nativeType: 'custom',
-              typeParams: { a: 1, b: 'hello', c: true },
+            __unbound__: {
+              ComplexType: {
+                codecId: 'custom/type@1',
+                nativeType: 'custom',
+                typeParams: { a: 1, b: 'hello', c: true },
+              },
             },
           },
         },
@@ -143,21 +159,26 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContract({
         storage: {
           tables: {
-            data: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            __unbound__: {
+              data: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            ArrayType: {
-              codecId: 'custom/type@1',
-              nativeType: 'custom',
-              typeParams: { items: [1, 2, 3] },
+            __unbound__: {
+              ArrayType: {
+                codecId: 'custom/type@1',
+                nativeType: 'custom',
+                typeParams: { items: [1, 2, 3] },
+              },
             },
           },
         },
@@ -173,21 +194,26 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContract({
         storage: {
           tables: {
-            data: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            __unbound__: {
+              data: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            NestedType: {
-              codecId: 'custom/type@1',
-              nativeType: 'custom',
-              typeParams: { config: { depth: 5, enabled: true } },
+            __unbound__: {
+              NestedType: {
+                codecId: 'custom/type@1',
+                nativeType: 'custom',
+                typeParams: { config: { depth: 5, enabled: true } },
+              },
             },
           },
         },
@@ -205,21 +231,26 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContract({
         storage: {
           tables: {
-            data: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            __unbound__: {
+              data: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            NullableType: {
-              codecId: 'custom/type@1',
-              nativeType: 'custom',
-              typeParams: { value: null },
+            __unbound__: {
+              NullableType: {
+                codecId: 'custom/type@1',
+                nativeType: 'custom',
+                typeParams: { value: null },
+              },
             },
           },
         },
@@ -235,21 +266,26 @@ describe('sql-target-family-hook parameterized type emission', () => {
       const ir = createContract({
         storage: {
           tables: {
-            data: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            __unbound__: {
+              data: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            UndefinedType: {
-              codecId: 'custom/type@1',
-              nativeType: 'custom',
-              typeParams: { value: undefined },
+            __unbound__: {
+              UndefinedType: {
+                codecId: 'custom/type@1',
+                nativeType: 'custom',
+                typeParams: { value: undefined },
+              },
             },
           },
         },
