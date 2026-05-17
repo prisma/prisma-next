@@ -102,7 +102,7 @@ withTempDir(({ createTempDir }) => {
      *
      * This happens when a developer clones a repo with existing migrations
      * and connects to a fresh database. The key signal is the missing
-     * marker — the user needs to run `migration apply` to bring the DB
+     * marker — the user needs to run `migrate` to bring the DB
      * up to date.
      */
     describe('fresh DB, migrations exist — MIGRATION.NO_MARKER', () => {
@@ -126,7 +126,7 @@ withTempDir(({ createTempDir }) => {
 
           expect(status.exitCode).toBe(0);
           expect(out).toContain('Database has not been initialized');
-          expect(out).toContain('migration apply');
+          expect(out).toContain('prisma-next migrate');
         },
         timeouts.spinUpPpgDev,
       );
@@ -173,7 +173,7 @@ withTempDir(({ createTempDir }) => {
      * This is the standard deployment scenario: a new migration was planned
      * (e.g. by a teammate) but hasn't been applied to this database. The
      * user needs to know how many migrations are pending and be told to
-     * run `migration apply`.
+     * run `migrate`.
      */
     describe('some pending — DATABASE_BEHIND', () => {
       const db = useDevDatabase();
@@ -204,7 +204,7 @@ withTempDir(({ createTempDir }) => {
 
           expect(status.exitCode).toBe(0);
           expect(out).toMatch(/1 pending migration/);
-          expect(out).toContain('migration apply');
+          expect(out).toContain('prisma-next migrate');
         },
         timeouts.spinUpPpgDev,
       );
