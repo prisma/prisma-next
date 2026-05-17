@@ -508,14 +508,12 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           columns: Object.freeze([...fk.columns]) as readonly string[],
           referencedTable: fk.referencedTable,
           referencedColumns: Object.freeze([...fk.referencedColumns]) as readonly string[],
-          // Only stamp `referencedNamespaceId` when the FK target lives in a
-          // different schema from the introspected one — single-schema
-          // introspections leave the field absent, keeping their IR shape
-          // byte-identical with pre-FR16b consumers (existing fixtures,
-          // verifier comparisons that pre-date the namespace dimension).
-          ...(fk.referencedNamespaceId !== schema
-            ? { referencedNamespaceId: fk.referencedNamespaceId }
-            : {}),
+          // Always stamp the resolved coordinate: same-schema FKs carry
+          // the introspection scope; cross-schema FKs carry the
+          // resolved target schema. Required by SqlForeignKeyIR's
+          // typology so the verifier compares with strict equality
+          // against the contract's `target.namespaceId`.
+          referencedNamespaceId: fk.referencedNamespaceId,
           name: fk.name,
           ...ifDefined('onDelete', mapReferentialAction(fk.deleteRule)),
           ...ifDefined('onUpdate', mapReferentialAction(fk.updateRule)),
