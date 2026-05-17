@@ -304,7 +304,7 @@ export function resolveUpsertConflictColumns(
   }
 
   const tableName = resolveModelTableName(contract, modelName);
-  const primaryKeyColumns = contract.storage.tables[tableName]?.primaryKey?.columns ?? [];
+  const primaryKeyColumns = findTableByName(contract.storage, tableName)?.primaryKey?.columns ?? [];
   return [...primaryKeyColumns];
 }
 
@@ -330,14 +330,14 @@ export function resolveTableSchema(
 }
 
 export function resolvePrimaryKeyColumn(contract: Contract<SqlStorage>, tableName: string): string {
-  return contract.storage.tables[tableName]?.primaryKey?.columns[0] ?? 'id';
+  return findTableByName(contract.storage, tableName)?.primaryKey?.columns[0] ?? 'id';
 }
 
 export function resolveRowIdentityColumns(
   contract: Contract<SqlStorage>,
   tableName: string,
 ): readonly string[] {
-  const table = contract.storage.tables[tableName];
+  const table = findTableByName(contract.storage, tableName);
   if (!table) {
     return [];
   }

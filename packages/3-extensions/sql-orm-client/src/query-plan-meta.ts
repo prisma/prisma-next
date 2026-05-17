@@ -1,6 +1,6 @@
 import type { Contract, PlanMeta } from '@prisma-next/contract/types';
 import type { AnnotationValue, OperationKind } from '@prisma-next/framework-components/runtime';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { findTableByName, type SqlStorage } from '@prisma-next/sql-contract/types';
 import { type AnyQueryAst, collectOrderedParamRefs } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -14,7 +14,7 @@ export function deriveParamsFromAst(ast: AnyQueryAst): {
 }
 
 export function resolveTableColumns(contract: Contract<SqlStorage>, tableName: string): string[] {
-  const table = contract.storage.tables[tableName];
+  const table = findTableByName(contract.storage, tableName);
   if (!table) {
     throw new Error(`Unknown table "${tableName}" in SQL ORM query planner`);
   }

@@ -19,11 +19,12 @@ import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type {
-  PostgresEnumStorageEntry,
-  SqlStorage,
-  StorageColumn,
-  StorageTypeInstance,
+import {
+  findTableByName,
+  type PostgresEnumStorageEntry,
+  type SqlStorage,
+  type StorageColumn,
+  type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
@@ -200,7 +201,7 @@ function mapIssueToCall(
         return notOk(
           issueConflict('unsupportedOperation', 'Missing table issue has no table name'),
         );
-      const contractTable = ctx.toContract.storage.tables[issue.table];
+      const contractTable = findTableByName(ctx.toContract.storage, issue.table);
       if (!contractTable) {
         return notOk(
           issueConflict(
@@ -273,7 +274,7 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Missing column issue has no table/column name'),
         );
       {
-        const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+        const column = findTableByName(ctx.toContract.storage, issue.table)?.columns[issue.column];
         if (!column)
           return notOk(
             issueConflict(
@@ -296,7 +297,7 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Default missing issue has no table/column name'),
         );
       {
-        const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+        const column = findTableByName(ctx.toContract.storage, issue.table)?.columns[issue.column];
         if (!column?.default) {
           return notOk(
             issueConflict(
@@ -384,7 +385,7 @@ function mapIssueToCall(
         return notOk(
           issueConflict('nullabilityConflict', 'Nullability mismatch has no table/column name'),
         );
-      const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+      const column = findTableByName(ctx.toContract.storage, issue.table)?.columns[issue.column];
       if (!column)
         return notOk(
           issueConflict(
@@ -404,7 +405,7 @@ function mapIssueToCall(
       if (!issue.table || !issue.column)
         return notOk(issueConflict('typeMismatch', 'Type mismatch has no table/column name'));
       {
-        const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+        const column = findTableByName(ctx.toContract.storage, issue.table)?.columns[issue.column];
         if (!column)
           return notOk(
             issueConflict(
@@ -434,7 +435,7 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Default mismatch has no table/column name'),
         );
       {
-        const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+        const column = findTableByName(ctx.toContract.storage, issue.table)?.columns[issue.column];
         if (!column?.default) return ok([]);
         const defaultSql = buildColumnDefaultSql(column.default, column);
         if (!defaultSql) return ok([]);
@@ -453,7 +454,7 @@ function mapIssueToCall(
       if (!issue.table)
         return notOk(issueConflict('indexIncompatible', 'Primary key issue has no table name'));
       if (isMissing(issue)) {
-        const pk = ctx.toContract.storage.tables[issue.table]?.primaryKey;
+        const pk = findTableByName(ctx.toContract.storage, issue.table)?.primaryKey;
         if (!pk)
           return notOk(
             issueConflict('indexIncompatible', `No primary key in contract for "${issue.table}"`),
@@ -496,8 +497,8 @@ function mapIssueToCall(
         return notOk(issueConflict('indexIncompatible', 'Index issue has no table name'));
       if (isMissing(issue) && issue.expected) {
         const columns = issue.expected.split(', ');
-        const contractIndex = ctx.toContract.storage.tables[issue.table]?.indexes.find((idx) =>
-          arraysEqual(idx.columns, columns),
+        const contractIndex = findTableByName(ctx.toContract.storage, issue.table)?.indexes.find(
+          (idx) => arraysEqual(idx.columns, columns),
         );
         const indexName = contractIndex?.name ?? `${issue.table}_${columns.join('_')}_idx`;
         const extras: { type?: string; options?: Record<string, unknown> } = {};
@@ -523,7 +524,7 @@ function mapIssueToCall(
         if (arrowIdx >= 0) {
           const columns = issue.expected.slice(0, arrowIdx).split(', ');
           const fkName = `${issue.table}_${columns.join('_')}_fkey`;
-          const fk = ctx.toContract.storage.tables[issue.table]?.foreignKeys.find(
+          const fk = findTableByName(ctx.toContract.storage, issue.table)?.foreignKeys.find(
             (k) => k.source.columns.join(', ') === columns.join(', '),
           );
           if (fk) {

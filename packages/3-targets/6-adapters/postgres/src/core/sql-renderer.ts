@@ -1,5 +1,6 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
+import { findTableByName } from '@prisma-next/sql-contract/types';
 import {
   type AggregateExpr,
   type AnyExpression,
@@ -636,7 +637,7 @@ function getInsertColumnOrder(
     return orderedColumns;
   }
 
-  const table = contract.storage.tables[tableName];
+  const table = findTableByName(contract.storage, tableName);
   if (!table) {
     throw new Error(`INSERT target table not found in contract storage: ${tableName}`);
   }

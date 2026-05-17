@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { findTableByName, type SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression,
   ColumnRef,
@@ -47,7 +47,7 @@ function toParamAssignments(
 } {
   const assignments: Record<string, ParamRef> = {};
 
-  const table = contract.storage.tables[tableName];
+  const table = findTableByName(contract.storage, tableName);
   if (!table) {
     throw new Error(`Unknown table "${tableName}"`);
   }
@@ -90,7 +90,7 @@ function normalizeInsertRows(
     }
   }
 
-  const table = contract.storage.tables[tableName];
+  const table = findTableByName(contract.storage, tableName);
   if (!table) {
     throw new Error(`Unknown table "${tableName}"`);
   }

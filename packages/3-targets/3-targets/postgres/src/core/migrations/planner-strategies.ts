@@ -28,6 +28,7 @@ import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-comp
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  findTableByName,
   isPostgresEnumStorageEntry,
   type PostgresEnumStorageEntry,
   type SqlStorage,
@@ -116,7 +117,7 @@ export interface StrategyContext {
  *      existing migration fixtures byte-identical.
  */
 export function effectiveSchemaForTable(ctx: StrategyContext, tableName: string): string {
-  const table = ctx.toContract.storage.tables[tableName];
+  const table = findTableByName(ctx.toContract.storage, tableName);
   if (table?.namespaceId !== undefined) {
     return table.namespaceId;
   }
@@ -162,7 +163,7 @@ function buildColumnSpec(
   ctx: StrategyContext,
   overrides?: { nullable?: boolean },
 ) {
-  const col = ctx.toContract.storage.tables[table]?.columns[column];
+  const col = findTableByName(ctx.toContract.storage, table)?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
   const mutableTypes = ctx.storageTypes as Record<
@@ -183,7 +184,7 @@ function buildAlterTypeOptions(
   ctx: StrategyContext,
   using?: string,
 ) {
-  const col = ctx.toContract.storage.tables[table]?.columns[column];
+  const col = findTableByName(ctx.toContract.storage, table)?.columns[column];
   if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
   const mutableTypes = ctx.storageTypes as Record<
@@ -212,7 +213,7 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
 
-    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    const column = findTableByName(ctx.toContract.storage, issue.table)?.columns[issue.column];
     if (!column) continue;
     if (column.nullable === true || column.default !== undefined) continue;
 
@@ -255,8 +256,10 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   for (const issue of issues) {
     if (issue.kind !== 'type_mismatch') continue;
     if (!issue.table || !issue.column) continue;
-    const fromColumn = ctx.fromContract?.storage.tables[issue.table]?.columns[issue.column];
-    const toColumn = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    const fromColumn = ctx.fromContract
+      ? findTableByName(ctx.fromContract.storage, issue.table)?.columns[issue.column]
+      : undefined;
+    const toColumn = findTableByName(ctx.toContract.storage, issue.table)?.columns[issue.column];
     if (!fromColumn || !toColumn) continue;
     const fromType = fromColumn.nativeType;
     const toType = toColumn.nativeType;
@@ -300,7 +303,7 @@ export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ct
   for (const issue of issues) {
     if (issue.kind !== 'nullability_mismatch' || !issue.table || !issue.column) continue;
 
-    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    const column = findTableByName(ctx.toContract.storage, issue.table)?.columns[issue.column];
     if (!column) continue;
     if (column.nullable === true) continue;
 
@@ -600,7 +603,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
-    const contractTable = ctx.toContract.storage.tables[issue.table];
+    const contractTable = findTableByName(ctx.toContract.storage, issue.table);
     const column = contractTable?.columns[issue.column];
     if (!column) continue;
 
