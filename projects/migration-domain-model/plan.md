@@ -7,18 +7,20 @@
 
 ## Summary
 
-Eight milestones, eight PRs. Milestones M2 through M7 are independent and could land in any order or in parallel (one PR each); M1 is foundational and must land first; M8 is close-out. The work is sized by how much it changes the user-facing CLI surface and how heavily the journey suite exercises the affected verbs.
+Seven milestones, seven PRs. Milestones M2 through M6 are independent and could land in any order or in parallel (one PR each); M1 is foundational and must land first; M7 is close-out. The work is sized by how much it changes the user-facing CLI surface and how heavily the journey suite exercises the affected verbs.
 
 ```
-M1 ── foundation ────────────────┐
-                                 ▼
-       M2 (migrate)   M3 (ref)   M4 (status split)   M5 (sign args)   M6 (check)   M7 (preflight)
-                                 │
-                                 ▼
-                              M8 ── close-out (docs + cleanup)
+M1 ── foundation ──────────────────────────────┐
+                                               ▼
+       M2 (migrate)   M3 (ref)   M4 (status split)   M5 (sign args)   M6 (check)
+                                               │
+                                               ▼
+                                            M7 ── close-out (docs + cleanup)
 ```
 
 The dominant per-milestone cost is **journey-test rewrite, not implementation**. Every milestone that renames or moves a verb touches `test/integration/test/cli-journeys/*.e2e.test.ts` and the helpers in `test/integration/test/utils/journey-test-helpers.ts`. We size each milestone accordingly.
+
+`migration preflight` is out of scope here ([spec § Non-goals](./spec.md#non-goals)); a separate project will design and ship it.
 
 ## Cross-project dependencies
 
@@ -29,9 +31,9 @@ None. The CLI is downstream of every framework subsystem this work doesn't touch
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
 | **Journey test churn** | High | Per-milestone PR review burden | Each milestone owns its journey-test updates atomically. No transitional aliases means tests rewrite once, not twice. |
-| **Reference resolver bugs** in M1 land everywhere downstream | Medium | Test failures appear in M2+ PRs and look like rename bugs | M1 ships with unit tests covering every grammar form, every ambiguity rule, every error path. Errors are localised to the resolver, not the consuming command. |
-| **`migration preflight` sandbox provisioning** | Medium | M7 may discover the existing test infra isn't reusable as-is | If discovered: scope M7 down to "framework + Postgres only" and file a follow-up for Mongo. PGlite is already a peer of every CLI integration test path. |
-| **Vocabulary drift in subsystem docs** | Medium | Docs reference removed verbs (`migration apply`, `migration ref`) and confuse future readers | M8 grep-sweeps `docs/` for the old names; the close-out PR is the gating point. |
+| **Reference resolver bugs** in M1 land everywhere downstream | Medium | Test failures appear in M2+ PRs and look like rename bugs | M1 ships with unit tests covering every grammar form, every ambiguity rule, every error path (including the wrong-grammar diagnostic matrix in [spec FR5](./spec.md#functional-requirements)). Errors are localised to the resolver, not the consuming command. |
+| **`migration check` exit-code drift** | Low | Scripts pinned to the wrong code | M6 lands the exit-code module (`commands/migration-check/exit-codes.ts`) as part of the PR and references it from spec FR6's table. |
+| **Vocabulary drift in subsystem docs** | Medium | Docs reference removed verbs (`migration apply`, `migration ref`) and confuse future readers | M7 grep-sweeps `docs/` for the old names; the close-out PR is the gating point. |
 | **Internal helper renames are opportunistic, then forgotten** | Low | Internal naming carries the rejected "applied" past close-out | The opportunistic rule is documented in the spec's Non-goals; a follow-up Linear ticket captures the residual sweep. |
 
 ## Milestones
@@ -64,7 +66,7 @@ The resolver yields one error type with cases for each failure mode in the spec'
 
 **Validation.** AC2 verified by unit test. `pnpm test:journeys` passes unchanged. No surface rename has happened yet — every command in the current surface still exists and accepts its current flag names.
 
-**Why this first.** Every subsequent milestone takes the resolver as a given. Landing it as a self-contained foundation means M2–M7 are pure verb-surface changes that don't also have to re-derive the grammar.
+**Why this first.** Every subsequent milestone takes the resolver as a given. Landing it as a self-contained foundation means M2–M6 are pure verb-surface changes that don't also have to re-derive the grammar.
 
 ---
 
@@ -79,11 +81,11 @@ The resolver yields one error type with cases for each failure mode in the spec'
 - [ ] Add `packages/1-framework/3-tooling/cli/src/commands/migrate.ts` implementing the new top-level verb. Implementation is the existing `migration-apply.ts` body with the flag renamed, the resolver from M1 wired in, and the help text rewritten.
 - [ ] Register the new command in `cli.ts`. Remove the `migrationApplyCommand` registration. Delete `migration-apply.ts`.
 - [ ] Update the help text and error envelopes in `cli.ts` "Unknown command" handler — running `prisma-next migration apply ...` now triggers an unknown-command error with a candidate-suggestion pointing at `migrate`.
-- [ ] Update `docs/architecture docs/subsystems/7. Migration System.md` for every reference to `migration apply`. (Scope: only the references that exist; the larger doc rewrite is M8.)
+- [ ] Update `docs/architecture docs/subsystems/7. Migration System.md` for every reference to `migration apply`. (Scope: only the references that exist; the larger doc rewrite is M7.)
 
-**Validation.** AC1 (no `migration apply` in `--help`), AC7 (journey suite green). Manual verification: `prisma-next migrate --to <hash>`, `prisma-next migrate --to production`, `prisma-next migrate --to ./other/contract.json` all do the right thing on a live test DB.
+**Validation.** AC1 (no `migration apply` in `--help`), AC8 (journey suite green). Manual verification: `prisma-next migrate --to <hash>`, `prisma-next migrate --to production`, `prisma-next migrate --to ./other/contract.json` all do the right thing on a live test DB.
 
-**Why before M3-M7.** This is the highest-leverage rename and the one most disruptive to the journey suite. Landing it first makes M3–M7's helper renames smaller deltas against a settled base.
+**Why before M3–M6.** This is the highest-leverage rename and the one most disruptive to the journey suite. Landing it first makes M3–M6's helper renames smaller deltas against a settled base.
 
 ---
 
@@ -98,7 +100,7 @@ The resolver yields one error type with cases for each failure mode in the spec'
 - [ ] Register the new top-level `ref` command in `cli.ts`. Remove the `migrationRefCommand` mounting under `migrationCommand`. Delete `migration-ref.ts`.
 - [ ] Update help text and unknown-command-suggestion paths.
 
-**Validation.** AC1 (no `migration ref` in `--help`), AC7 (journey suite green).
+**Validation.** AC1 (no `migration ref` in `--help`), AC8 (journey suite green).
 
 ---
 
@@ -128,8 +130,10 @@ The split is a mechanical extraction of the four response-rendering paths inside
 - [ ] Add `commands/migration-log.ts`, `commands/migration-list.ts`, `commands/migration-graph.ts`. Each is a thin entry point that calls the relevant renderer.
 - [ ] Slim `commands/migration-status.ts` down to the path/pending question + `--to`/`--from` flags. Remove `--ref`, `--graph`, `--all`, `--limit`.
 - [ ] Register the three new commands in `cli.ts`.
+- [ ] **Discoverability — See also** (per spec FR3 / AC7): add `setCommandSeeAlso(command, refs: readonly { verb: string; oneLiner: string }[])` in `utils/command-helpers.ts`, parallel to the existing `setCommandExamples`. Render it in `utils/formatters/help.ts` immediately under the Examples section. Wire it up on all four verbs (`status`, `log`, `list`, `graph`) cross-referencing the other three plus `show`.
+- [ ] **Discoverability — removed-flag hints** (per spec FR3 / AC7): when `migration status` receives `--graph`, `--all`, or `--ref`, the unknown-flag handler emits a `fix:` line naming the right replacement verb. Implement once in the status command's option parser (these flags are no longer declared, so commander.js will reject them as unknown — intercept and rewrite the error envelope). One assertion per flag in the milestone's journey-test set.
 
-**Validation.** AC1, AC3, AC7. Manual verification of each new verb's stdout against the previous all-in-one shape.
+**Validation.** AC1, AC3, AC7, AC8. Manual verification of each new verb's stdout against the previous all-in-one shape; manual verification of the removed-flag hints by running each old invocation.
 
 ---
 
@@ -151,7 +155,7 @@ The split is a mechanical extraction of the four response-rendering paths inside
 
 ---
 
-### M6 — `migration check [<m>]` (FR6 part 1)
+### M6 — `migration check [<m>]` (FR6)
 
 **Goal:** the artifact / graph integrity verb exists. With a `<m>` argument, checks one migration. Without, checks the graph.
 
@@ -159,76 +163,57 @@ The split is a mechanical extraction of the four response-rendering paths inside
 
 The functions for hash recomputation already exist (used by `migration plan`'s manifest emission); this verb wraps them in an interrogative shape.
 
+**Exit codes (per spec FR6).** `0` (`OK`), `2` (`PRECONDITION`, CLI-wide), `4` (`INTEGRITY_FAILED`, command-specific). The numeric code groups outcomes for shell-level branching; per-failure PN codes (`PN-MIG-CHECK-001` through `005`) discriminate precisely within the integrity-failed bucket.
+
 **Tasks (TDD; tests first):**
 
-- [ ] Adversarial-fixture journey tests covering AC6:
-  - Clean graph passes.
-  - Hand-mutated `ops.json` (hash mismatch) fails with a localized message.
-  - Corrupted manifest (missing files) fails.
-  - Orphan migration (no graph-connecting edge) fails.
-  - Dangling ref (target hash absent) fails.
-- [ ] Add `commands/migration-check.ts`. Per-migration and graph-wide code paths.
+- [ ] Add `commands/migration-check/exit-codes.ts` exporting named constants for `OK = 0`, `PRECONDITION = 2`, `INTEGRITY_FAILED = 4` per the Style Guide's reserved-code rules.
+- [ ] Adversarial-fixture journey tests covering AC5:
+  - Clean graph passes (exit `0`).
+  - Hand-mutated `ops.json` (hash mismatch) → exit `4`, PN code `PN-MIG-CHECK-001 HASH_MISMATCH`.
+  - Corrupted manifest (missing files) → exit `4`, `PN-MIG-CHECK-002 MANIFEST_INCOMPLETE`.
+  - Orphan migration (no graph-connecting edge) → exit `4`, `PN-MIG-CHECK-003 ORPHAN_MIGRATION`.
+  - Dangling ref (target hash absent) → exit `4`, `PN-MIG-CHECK-004 DANGLING_REF`.
+  - Mismatched edge → exit `4`, `PN-MIG-CHECK-005 EDGE_MISMATCH`.
+  - Non-existent named migration → exit `2`, `PRECONDITION`.
+- [ ] Add `commands/migration-check.ts`. Per-migration and graph-wide code paths share a result type carrying a list of `{ pnCode, where, why, fix }` entries; the renderer formats them into the standard human / JSON envelopes.
 - [ ] Register in `cli.ts`.
-- [ ] Resolve open question — exit-code semantics: integrity failure vs CLI-usage failure get distinct exit codes (see spec Open Questions).
 - [ ] Add to `journey-test-helpers.ts` as `runMigrationCheck`.
 
-**Validation.** AC6.
+**Validation.** AC5.
 
 ---
 
-### M7 — `migration preflight <m>` (FR6 part 2)
-
-**Goal:** the behavioral sandbox verb exists. Sandbox-executes a single migration and reports outcome. Production DB is untouched.
-
-**Architectural shape.** Reuses the existing test-infra primitives for ephemeral DB acquisition:
-
-- For Postgres: spin a PGlite instance in-process (the same mechanism `test/integration` uses).
-- For Mongo: `mongodb-memory-server` (likewise).
-- The sandbox is initialised to the migration's `from`-contract state, then the migration is executed against it. Outcome (success / failure / which op failed) is reported.
-
-The trick is that the framework already has a runner; preflight is a runner invocation against a sandbox + reporting wrapper. The infra to acquire a sandbox per-invocation needs to live in the CLI (not in `test-utils`, which is a test-only dependency).
-
-**Tasks (TDD; tests first):**
-
-- [ ] Journey tests for AC5: green migration → success + production untouched; data-violating migration → reported failure + production untouched. Two journeys: one Postgres-flavored, one Mongo-flavored.
-- [ ] Promote the test-utils sandbox-acquisition primitives that aren't test-specific into a CLI-consumable package, or move them to a position the CLI can depend on. Decide which during M7 design — may surface a layering question (`test/utils` is a test-tree package; the CLI is in `packages/`).
-- [ ] Add `commands/migration-preflight.ts`. Takes a `<m>` argument; resolves via M1 resolver; acquires sandbox; initialises to `from`-contract; runs the migration; reports.
-- [ ] Resolve open question on initial-sandbox state (spec Open Questions). Working assumption: initialise to `from`-contract by replaying every migration from `∅` up to but not including `<m>` on the sandbox. If that's too slow for graphs with many migrations, switch to "operator provides initial state" via a flag — but design first; don't optimise speculatively.
-- [ ] Register in `cli.ts`.
-
-**Validation.** AC5. **Highest-risk milestone** for unexpected scope. Worth dedicating spike time before committing to a one-PR shape.
-
----
-
-### M8 — Close-out (docs + cleanup)
+### M7 — Close-out (docs + cleanup)
 
 **Goal:** docs match the surface; the project directory is deleted; vocabulary lives in canonical locations.
 
 **Tasks:**
 
 - [ ] Promote `domain.md`'s settled vocabulary into `docs/glossary.md` (or fold and replace; depends on what's there).
-- [ ] Update `docs/architecture docs/subsystems/7. Migration System.md` for the full new verb taxonomy. Remove references to `migration apply`, `migration ref`, `migration status --ref/--graph/--all`. Add the verification triad. Update the Git-inspired analogy section to use the resolved vocabulary (contract / migration / ref distinctions).
-- [ ] Update `docs/CLI Style Guide.md` for the new top-level subjects.
+- [ ] Update `docs/architecture docs/subsystems/7. Migration System.md` for the full new verb taxonomy. Remove references to `migration apply`, `migration ref`, `migration status --ref/--graph/--all`. Add `migration check`. Note `migration preflight` as the next-vocab gap pending a separate project. Update the Git-inspired analogy section to use the resolved vocabulary (contract / migration / ref distinctions).
+- [ ] Update `docs/CLI Style Guide.md` for the new top-level subjects (`migrate`, `ref`).
 - [ ] Grep-sweep `docs/` and `packages/*/README.md` / `DEVELOPING.md` for references to removed verb names. Replace or remove.
+- [ ] File the follow-up Linear ticket for the `migration preflight` project (carries the design questions: sandbox lifecycle, initial-state strategy, Postgres + Mongo flavors).
 - [ ] File a follow-up Linear ticket for the residual internal renames (`MigrationApplied` event, `control-api/operations/` → `commands/`, etc.) that this project explicitly carries as non-goals.
 - [ ] Delete `projects/migration-domain-model/`.
 
-**Validation.** AC1, AC8. `pnpm fixtures:check` and `pnpm lint:deps` pass. `pnpm test:journeys` and `pnpm test:all` are green.
+**Validation.** AC1, AC9. `pnpm fixtures:check` and `pnpm lint:deps` pass. `pnpm test:journeys` and `pnpm test:all` are green.
 
 ## Implementation rules (apply to every milestone)
 
 - **Tests first.** Per the workspace rules — write the journey-test changes (the assertion against the new verb name / shape) *before* the implementation. The journey suite is the spec; failing tests pin the new shape down.
 - **No transitional aliases.** Each rename is atomic. If a milestone leaves the journey suite red on its own PR boundary, the milestone hasn't landed.
 - **Opportunistic internal renames only.** If a milestone touches `apply-aggregate.ts` and renaming it costs an extra five minutes, rename it. If the rename spans untouched files, it goes on the follow-up ticket.
-- **One PR per milestone.** Where M7 may be too large for one PR, split as `M7a` (Postgres preflight, journey + infrastructure) and `M7b` (Mongo preflight) — design-time decision, recorded in the milestone before opening the first PR.
+- **One PR per milestone.**
 - **Update `journey-test-helpers.ts` atomically.** Helpers follow the new verb names; callers update in the same PR. Don't leave helper names lagging behind the verbs.
-- **Help text and error envelopes are part of the rename.** The CLI's "Unknown command" suggestion engine should already help when somebody runs the old name; verify in each milestone that the suggestion lands on the right new verb.
+- **Help text and error envelopes are part of the rename.** The CLI's "Unknown command" suggestion engine should already help when somebody runs the old name; verify in each milestone that the suggestion lands on the right new verb. The "See also" cross-references introduced in M4 (FR3) apply to every multi-verb cluster — wire them up wherever applicable in M2 (`migrate`), M3 (`ref *`), M4 (status split), and M6 (`migration check`).
 
 ## Linear tracking
 
 Per the workspace rules, Linear issues exist for visibility, not for project bookkeeping. The intended cadence:
 
-- One Linear issue per milestone (M1–M8). Branch names and PR titles carry the issue ID so the GitHub-Linear integration auto-transitions issues on merge.
-- TML-2546 (the audit ticket) gets closed when M8 merges and the project directory is deleted.
+- One Linear issue per milestone (M1–M7). Branch names and PR titles carry the issue ID so the GitHub-Linear integration auto-transitions issues on merge.
+- TML-2546 (the audit ticket) gets closed when M7 merges and the project directory is deleted.
 
 Issues are created when a milestone starts, not up-front, to avoid stale tickets sitting around if the plan shifts.
