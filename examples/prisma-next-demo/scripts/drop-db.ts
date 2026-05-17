@@ -19,6 +19,10 @@ async function dropDatabase() {
     await client.query('CREATE SCHEMA public');
     console.log('✔ Dropped and recreated public schema');
 
+    // Drop the auth schema
+    await client.query('DROP SCHEMA IF EXISTS auth CASCADE');
+    console.log('✔ Dropped auth schema');
+
     // Also drop the prisma_contract schema if it exists
     await client.query('DROP SCHEMA IF EXISTS prisma_contract CASCADE');
     console.log('✔ Dropped prisma_contract schema');
