@@ -116,7 +116,7 @@ describe('createExecutionContext — column codec integrity', () => {
     readonly typeParams?: Record<string, unknown>;
     readonly typeRef?: string;
   }): Contract<SqlStorage> {
-    const storage: SqlStorage = {
+    const storage = new SqlStorage({
       storageHash: coreHash('sha256:test'),
       tables: {
         [UNBOUND_NAMESPACE_ID]: {
@@ -139,7 +139,7 @@ describe('createExecutionContext — column codec integrity', () => {
         },
       },
       namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
-    };
+    });
     return {
       targetFamily: 'sql',
       target: 'postgres',

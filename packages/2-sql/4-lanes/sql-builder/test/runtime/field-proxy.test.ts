@@ -1,7 +1,10 @@
 import { coreHash } from '@prisma-next/contract/types';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
-import { SqlUnboundNamespace } from '@prisma-next/sql-contract/types';
+import {
+  SqlStorage,
+  SqlUnboundNamespace,
+  type StorageTable,
+} from '@prisma-next/sql-contract/types';
 import { ColumnRef, IdentifierRef } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { tableToScope } from '../../src/runtime/builder-base';
@@ -75,19 +78,27 @@ describe('createFieldProxy', () => {
       indexes: [],
       foreignKeys: [],
     };
-    const storage: SqlStorage = {
-      tables: { Post: table },
-      types: {
-        Embedding1536: {
-          kind: 'codec-instance',
-          codecId: 'pgvector/vector@1',
-          nativeType: 'vector',
-          typeParams: { length: 1536 },
+    const storage = new SqlStorage({
+      storageHash: coreHash('sha256:h'),
+      tables: {
+        [UNBOUND_NAMESPACE_ID]: {
+          Post: {
+            ...table,
+          },
         },
       },
-      storageHash: coreHash('sha256:h'),
+      types: {
+        [UNBOUND_NAMESPACE_ID]: {
+          Embedding1536: {
+            kind: 'codec-instance',
+            codecId: 'pgvector/vector@1',
+            nativeType: 'vector',
+            typeParams: { length: 1536 },
+          },
+        },
+      },
       namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
-    };
+    });
     const scope = tableToScope('post_alias', table, { storage, tableName: 'Post' });
     expect(scope.namespaces['post_alias']?.['embedding']?.codec).toEqual({
       codecId: 'pgvector/vector@1',
