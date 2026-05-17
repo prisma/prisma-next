@@ -65,7 +65,7 @@ After the DDD pass: audit existing CLI commands against the resulting model (the
 - **"Freeze" rejected.** Nobody talks about "freezing" a migration. Need a different verb for the author-time act of turning a contract change into a committed migration package.
 - **Missing emission concepts.** Both contracts and migration artifacts are emitted; both have hashes. The first-cut catalog under-named this; expanded in [`domain.md`](./domain.md).
 - **Missing data invariants.** First-cut catalog had no entry for the invariant primitive; ADRs 176 + 208 supplied the model.
-- **Missing operations decomposition.** DDL vs data-transform, three-phase envelope, idempotency classes — added.
+- **Missing operations decomposition.** DDL vs data-transform, the three phases (precheck / execute / postcheck), idempotency classes — added. (The wrapper noun "three-phase envelope" was later retired; the three phase names remain first-class.)
 - **Missing contract spaces and pinned mirrors.** ADR 212 added.
 - **Git mapping corrected.** Earlier framing implied commit ≈ migration. Actually: commit (state) ≈ **contract**; commit hash ≈ **storageHash**; the closest Git analog for a *migration* is `git format-patch` (a packaged patch with explicit endpoints) — Git has no first-class equivalent. **The verb for producing a migration cannot borrow `commit` from Git.** Recorded as a mapping table in [`domain.md`](./domain.md).
 - **`migration` (noun) vs `migrate` (verb) made load-bearing.** "Migration" only refers to the on-disk artifact; "migrate" only refers to the live act of advancing a database. This creates a visible offline/live axis in the CLI surface — a user must always be able to tell from the verb alone whether the command touches a real DB.
@@ -81,7 +81,9 @@ After the DDD pass: audit existing CLI commands against the resulting model (the
 - **`db init` and `db sign` are not the same.** `db init` bootstraps an empty database (or applies initial migrations); `db sign` verifies a live DB satisfies a contract and writes the contract hash into the marker. `db sign` performs *no structural changes* and refuses if the DB doesn't already match.
 - **Verification was missing from the conventions analysis.** Two distinct verification questions exist: *"does the live DB satisfy the contract?"* (`db verify`, live, read-only) and *"would this migration actually do what it promises?"* (`migration preflight`, sandbox apply). Added.
 - **State specs — Git-style.** Every "where in the graph" argument accepts a uniform grammar: hash or hash-prefix (8+ chars, bare hex — no `sha256:` prefix), ref name, exact migration directory name, `<dir-name>^` for the migration's from-contract, or filesystem path. Modeled on Git's revspec, simplified.
-- **Migrations are identified by directory name only.** No slug-only or prefix matching on directory names. The directory name (`<UTC-timestamp>_<sanitized-slug>`) is unique within the app contract space by construction. Tab-completion / copy-paste covers the verbosity cost.
+- **Migrations are identified by directory name or migration hash.** Directory name and hash are both first-class. Directory name follows `<UTC-timestamp>_<sanitized-slug>` by convention but is user-controlled. Ambiguity (hex-named directory colliding with a hash prefix) is an explicit error with candidate listing.
+- **Two parallel reference grammars.** `<contract>` resolves to a storage hash (accepts hash, ref name, migration dir → to-contract, `<dir>^` → from-contract, filesystem path). `<migration>` resolves to a migration package (accepts migration hash or directory name). Command argument type determines which grammar applies.
+- **`db sign` flag.** First tried `--at <contract>` (static-position vs `--to`-movement); later refined to `db sign [<contract>]` positional, with explicit form `db sign --contract <contract>`. The argument names the thing being signed; both `--at` and `--to` overclaim spatial meaning for what is really a write-the-marker operation. **See the "Closing Phase 2" section below for the final form.** Default with no arg: hash the current `contract.json`, verify, sign.
 - **Read surface pinned.** `migration status [--to <ref>] [--from <state-spec>]` (path & pending; the load-bearing CI/CD question; live but offline-capable via `--from`), `migration log` (applied history from the ledger; live), `migration list` (flat enumeration; offline), `migration graph` (relational view; offline), `migration show <dir>` (single migration; offline).
 - **Namespace is by subject, not by safety.** The earlier "offline = `migration`, live = `db`" rule was wrong. `migration status` and `migration log` are *live but live in the `migration` namespace* because the subject is migrations. The safety axis is now "mutating vs read-only" + "live vs offline" — four classes — and is carried by the verb's documentation, not by namespace alone.
 - **Phase 2 — Ubiquitous Language pass for the four flagged clusters.**
@@ -100,14 +102,22 @@ After the DDD pass: audit existing CLI commands against the resulting model (the
 
 ## Open subthreads
 
-- The compile verb (`migration.ts` → `ops.json`). Lean: `build` or `lock`. Awaiting decision.
-- The direct ref-move verb (when not advancing as part of `migration plan`). Candidates: `ref move`, `ref advance`, `ref set`. Probably `ref move`, mirroring `git update-ref`.
-- Whether `head` is a useful ref name or whether environment-named refs (`production`, `staging`) carry the whole load.
-- Whether `db reset` should be a sibling of `migrate` or live somewhere else in the taxonomy. (Live verb; destructive; dev-only.)
-- `db init` vs `prisma-next init` homonym — needs resolution; one will get renamed.
+*(All Phase-2 subthreads landed. See `domain.md` "Resolved (no longer open)" for the full list.)*
 
-## What's next
+## Closing Phase 2 — final vocabulary decisions
 
-- Reference summaries of established migration systems land under [`references/`](./references/) (sub-agents dispatched).
-- Once references are in, re-enter Phase 1 close-out: name what's *missing* from the catalog that established systems consider load-bearing, and what we should *reject* that they take for granted.
-- Then transition into Phase 2 — Ubiquitous Language.
+- **`db sign [<contract>]`** with optional explicit form `db sign --contract <contract>`. Rejected `--at` (overspatializes a static claim) and `--to` (movement metaphor doesn't apply to signing). The argument names the thing being signed.
+- **`ref set <name> <contract>`**, not `ref move`. Refs are stored values being written, not entities that traverse the graph; the spatial vocabulary stays with `migrate`. No default contract on `ref set` — too dangerous for production-class refs.
+- **`head` ref dropped.** Used today only in extension-metadata pinned artifacts (`refs/head.json`). The emitted `contract.json` already plays that role; a separate `head` ref carried no information. The pinned-artifact filename is implementation cleanup (rename or remove), not vocabulary.
+- **`migration preflight` confirmed.** No surveyed migration tool has a direct analog for "sandbox-execute and report behaviorally". Atlas's `--dev-url` is bundled into apply; Prisma current's shadow replay is implicit-only inside `migrate dev`; Liquibase's `update-sql` / `validate` are preview/structural; Sqitch's `verify` runs post-deploy. **Preflight** is the aviation borrowing — industry-known shorthand for "the checks you run right before doing the thing for real" — and gives us a word with no migration-system collisions.
+- **`migration verify <m>`** for artifact integrity (parallel to `db verify` on the artifact axis). Recomputes hashes, validates manifest ↔ `ops.json`. The two axes:
+
+  | Verb | What it verifies | Touches live DB? |
+  |---|---|---|
+  | `db verify` | Live DB satisfies its contract | Yes (read-only) |
+  | `migration verify` | Migration artifact's internal consistency | No |
+  | `migration preflight` | Migration's behavior on a sandbox | Sandbox only |
+
+- **`db init` and `prisma-next init` both kept.** Namespace disambiguates: `prisma-next init` is project scaffolding, `prisma-next db init` lays down DB structure. No rename needed.
+- **`contract emit` vs `migration plan` + `migration compile` — asymmetric on purpose.** Contracts are one-step authoring (source → emit → artifact). Migrations are two-step: framework plans → user edits the emitted `migration.ts` → compile lowers it to `ops.json`. Calling both "emit" would conflate scaffolding with lowering. The verbs encode the structural difference.
+- **"Three-phase envelope" retired as a coined noun.** The three phases — **precheck**, **execute**, **postcheck** — remain first-class vocabulary (in blog posts; the conceptual hook for migration ops). When referring to the wrapper, use descriptive prose. **"Operation class"** kept (also in blog posts). **"Routing" / "routing-visible"** stays internal-only — not user-facing CLI vocabulary.

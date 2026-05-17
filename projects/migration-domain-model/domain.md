@@ -50,9 +50,9 @@ The CLI is namespaced by the *subject* of the command, not by whether it touches
 |---|---|---|
 | **`migrate`** (the verb itself) | The act of migrating a DB. | `migrate --to <ref>` |
 | **`db <verb>`** | A live database. | `db update`, `db verify`, `db sign`, `db init` |
-| **`migration <verb>`** | The migration artifacts and graph. | `migration plan`, `migration new`, `migration compile`, `migration show`, `migration list`, `migration graph`, `migration preflight`, `migration status`, `migration log` |
+| **`migration <verb>`** | The migration artifacts and graph. | `migration plan`, `migration new`, `migration compile`, `migration show`, `migration list`, `migration graph`, `migration verify`, `migration preflight`, `migration status`, `migration log` |
 | **`contract <verb>`** | Contracts. | `contract emit`, `contract show`, `contract diff` |
-| **`ref <verb>`** | Refs. | `ref move`, `ref show` |
+| **`ref <verb>`** | Refs. | `ref set`, `ref show` |
 
 ### Read-only vs mutating, not offline vs live
 
@@ -61,8 +61,9 @@ The earlier "offline vs live" axis is replaced by a finer-grained safety axis: *
 | Class | What it does | Examples |
 |---|---|---|
 | **Mutating live** | Changes the database | `migrate --to <ref>`, `db init`, `db update`, `db sign` |
-| **Read-only live** | Reads the database; answers questions about it | `db verify`, `migration status`, `migration log`, `migration preflight` *(sandbox apply; mutates only the shadow)* |
-| **Mutating offline** | Writes to the filesystem only | `migration plan`, `migration new`, `migration compile`, `contract emit`, `ref move` |
+| **Read-only live** | Reads the database; answers questions about it | `db verify`, `migration status`, `migration log` |
+| **Mutating sandbox** | Mutates only an ephemeral shadow database; the production DB is untouched | `migration preflight` |
+| **Mutating offline** | Writes to the filesystem only | `migration plan`, `migration new`, `migration compile`, `contract emit`, `ref set` |
 | **Read-only offline** | Reads filesystem only | `migration list`, `migration graph`, `migration show`, `contract show`, `contract diff` |
 
 **The load-bearing safety property:** users (and agents) must be able to tell from the verb whether it mutates state, and whether it touches a real DB. The verb's namespace alone is not sufficient — `migration status` (live, read-only) and `migration plan` (offline, mutating) share the `migration` namespace but differ on both axes. Help text and `--dry-run` discipline must surface this distinction.
@@ -86,43 +87,61 @@ We explicitly **reject the dev/deploy verb split** that other systems (notably P
 - `db update` → reconcile to current contract (the 90% case).
 - `db update --to <contract>` → reconcile to any contract we can name (see *Contract references* below).
 
-### Contract references
+### Contract references and migration references
 
-A **contract reference** is any way of identifying a contract in the migration graph. Every command that takes a "which contract" argument accepts the same grammar. A contract reference resolves to a contract (identified by `storageHash`).
+The CLI has **two parallel reference grammars** that share several forms but resolve in different namespaces.
 
-The grammar borrows two ideas from Git (prefix-matching on hashes and the `^` operator for "predecessor") but is otherwise specific to our model — there is no `~N`, no `@{N}` reflog, no `HEAD`.
+A **contract reference** identifies a contract in the migration graph (resolves to a `storageHash`).
+
+A **migration reference** identifies a migration (resolves to a migration package, or equivalently its `migrationHash`).
+
+The command's expected argument type determines which grammar applies — `migrate --to <contract>` uses contract references; `migration show <migration>` uses migration references. Hash-shaped input resolves in the active grammar's namespace.
+
+Both grammars borrow two ideas from Git (prefix-matching on hashes and the `^` operator) but are otherwise specific to our model — there is no `~N`, no `@{N}` reflog, no `HEAD`.
+
+#### Contract reference (`<contract>`)
 
 | Form | Meaning |
 |---|---|
-| `<hash>` or `<hash-prefix>` | Bare hex (no `sha256:` prefix required). 8+ char prefixes accepted; ambiguity → error listing candidates. Resolves to the contract directly. |
-| `<ref-name>` | A **ref** is a named contract reference — a named, persisted, on-disk pointer to a contract. The ref name resolves to the contract it points at. |
-| `<migration-dir-name>` | The migration's **`to` contract**. |
-| `<migration-dir-name>^` | The migration's **`from` contract**. |
+| `<hash>` or `<hash-prefix>` | Bare hex (no `sha256:` prefix). 8+ char prefixes accepted; matched against contract storage hashes. |
+| `<ref-name>` | The contract the named ref points at. |
+| `<migration-dir-name>` | The migration's **`to`-contract**. |
+| `<migration-dir-name>^` | The migration's **`from`-contract**. |
 | `<filesystem-path>` | The contract file at that path. |
 
-**A ref is just a specific kind of contract reference** — the named, file-backed, persistent kind. (By analogy: a pointer is a named memory address; "reference" is the family, "ref" is the named instance.)
+#### Migration reference (`<migration>`)
 
-**Migrations are named by their directory name** (e.g. `20260117T1042_add_users_table`). The directory name is guaranteed unique within the app contract space — the UTC-timestamp prefix ensures it. No slug-only matching, no prefix matching on directory names — exact match only. Tab-completion / copy-paste covers the verbosity.
+| Form | Meaning |
+|---|---|
+| `<hash>` or `<hash-prefix>` | Bare hex, matched against **migration hashes**. The canonical handle for scripts where stability-across-renames matters. |
+| `<migration-dir-name>` | The migration directly. |
 
-The `^` operator is only meaningful on a migration directory name — the only case where a "predecessor contract" is unambiguous (the migration's `from`). It is not generalized to refs or contract hashes because in our graph a contract can be the destination of multiple migrations.
+#### Ambiguity and resolution rules
 
-Hashes and directory names cannot collide: directory names always contain `T` and `_` (e.g. `20260117T1042_...`); bare hashes are pure hex.
+- **Migration directory names follow a `<timestamp>T<HHMM>_<slug>` convention by default but are user-controlled.** A user could create a directory called `1f3b7c4a` if they wanted.
+- When an input could match more than one form within the active grammar (e.g. a hex-named directory that also looks like a hash prefix), it is an **ambiguity error**. The CLI lists the candidates and asks the user to disambiguate by using a longer / different form (e.g. `./1f3b7c4a` to force the filesystem interpretation; the full migration hash for the migration interpretation).
+- Ambiguity *within* a namespace (two hashes sharing an 8-char prefix; two migrations sharing a 4-char hash prefix) is also an error with candidate listing — same rule Git uses for short SHAs.
+- The `^` operator is only meaningful on a migration directory name (or a hash-resolved migration) — the only case where a "predecessor contract" is unambiguous (the migration's `from`). Not generalized to refs or contract hashes (a contract can be the destination of multiple migrations).
 
-In CLI argument syntax, the placeholder is **`<contract>`** — there is no umbrella shorthand. The accepted forms are documented per-command and uniform across commands.
+#### Refs vs the umbrella
 
-Commands this grammar applies to (illustrative):
-- `migrate --to <contract>`
-- `db update --to <contract>`
-- `db sign --to <contract>`
-- `contract show <contract>` / `contract diff <contract> <contract>`
-- `migration show <migration-dir-name>` (resolves to the migration itself, not a contract)
+**A ref is a specific kind of contract reference** — the named, file-backed, persistent kind. The umbrella concept is "contract reference"; "ref" is one instance of it. (Pointer/memory-address analogy: pointer is the family, named pointer is a specific instance.)
 
-Why it matters: the dev iteration loop becomes self-documenting.
+#### CLI placeholder convention
+
+- `<contract>` — contract reference (per the first table above).
+- `<migration>` — migration reference (per the second table above).
+- No umbrella shorthand. Accepted forms documented per-command.
+
+#### Examples
 
 ```
-prisma-next migration compile
-prisma-next db update --to 20260117T1042_add_users_table^   # "rewind to just before this migration"
-prisma-next migrate --to production
+prisma-next migrate --to production                            # ref name → contract
+prisma-next migrate --to 1f3b7c4a                              # hash prefix → contract
+prisma-next migrate --to 20260117T1042_add_users_table         # migration dir → to-contract
+prisma-next db update --to 20260117T1042_add_users_table^      # migration dir + ^ → from-contract
+prisma-next migration show 20260117T1042_add_users_table       # migration dir → migration
+prisma-next migration show 1f3b7c4a                            # hash prefix → migration (by migration hash)
 ```
 
 ### Refs are defined by CD behavior, not Git habit
@@ -130,9 +149,8 @@ prisma-next migrate --to production
 The load-bearing semantics of a ref is **"the contract CD will `migrate --to` in this environment."** Everything else (naming, on-disk form, PR conventions) derives from that primitive.
 
 Consequences:
-- Refs are **environment-named** (`production`, `staging`, ...). Not the Git-generic `head`.
+- Refs are **environment-named** (`production`, `staging`, ...). The Git-generic `head` ref has been dropped — it carried no information the emitted `contract.json` doesn't already imply.
 - A ref is a *promise* the repo makes about the next CD run. The PR is the moment that promise is staked.
-- The emitted `contract.json` is the implicit "what I'm working toward" — a `head` ref may not need to exist as a stored object. *(open — does `head` ever carry info the contract doesn't?)*
 
 ### Initialization vs adoption-by-signing
 
@@ -194,7 +212,7 @@ Grouped by sub-area so the relationships are visible. Some terms appear in more 
 
 - **Migration** — a unit of intent that takes the database from one **contract** to another. The canonical user-facing term. Refers indifferently to the conceptual unit, the on-disk directory, and the graph entity — exact meaning falls out of context.
 - **Migration package** — internal/architectural term for the on-disk directory specifically (its files: `migration.json`, `ops.json`, `migration.ts`, `start-contract.json`, `end-contract.json`, optional typings). Used in dev docs when filesystem shape matters; in user-facing prose, just say "migration."
-- **Migration directory name** — the user-facing identifier for a migration: `<YYYYMMDDTHHMM>_<sanitized-slug>` (UTC, minute precision). Created at planning time from `--name <slug>`. **Unique within the app contract space**; the timestamp prefix guarantees ordering and uniqueness. The canonical name used everywhere in the CLI surface.
+- **Migration directory name** — the conventional user-facing identifier for a migration: `<YYYYMMDDTHHMM>_<sanitized-slug>` (UTC, minute precision). Created at planning time from `--name <slug>`. The timestamp prefix is **convention**, not invariant — the directory name is user-controlled. Uniqueness within the app contract space is enforced at planning time (collisions are rejected); ambiguity at resolution time (e.g. a hex-named directory colliding with a hash prefix) produces an explicit error.
 - **`migration.json`** / **Manifest** — the migration's metadata file. Records `from`, `to`, `migrationHash`, `providedInvariants`, `labels`, `createdAt`, and the (non-identity) `fromContract` / `toContract` snapshots.
 - **`ops.json`** — the migration's op list in post-lowering form. *The migration contract* — what the runner trusts and replays. Never compiled, never `eval`'d at execution time.
 - **`migration.ts`** — authoring surface (TypeScript). The file the developer edits. Self-emits `ops.json` + `migration.json` when run directly. Never loaded by `migrate` at execution time.
@@ -215,8 +233,7 @@ Grouped by sub-area so the relationships are visible. Some terms appear in more 
 - **`∅`** — the **empty database state**: introspection returns no objects. Conventional starting point for baseline migrations (where the manifest's `from` is `null`, per ADR 199). One specific state; not a "permissive contract".
 - **Null contract** — a hypothetical contract with no requirements; satisfied by any database state in non-strict mode. **Distinct from `∅`** (which is one specific database state). Mostly theoretical; named here to keep it from being conflated with `∅`.
 - **Path** — an ordered sequence of migrations connecting two contracts.
-- **Ref** — a named **contract reference**: a named, persisted, file-backed pointer to a contract. Today: `{ hash: string, invariants: string[] }`. Stored as JSON files under `migrations/refs/<name>.json`. Examples: `production`, `staging`. (By analogy: a pointer is a named memory address. Refs are a specific kind of contract reference; the umbrella is "contract reference.")
-- **Head** — *(candidate term, contested)* the latest-known contract of a contract space, often expressed as a special ref (`migrations/refs/head.json`).
+- **Ref** — a named **contract reference**: a named, persisted, file-backed pointer to a contract. Today: `{ hash: string, invariants: string[] }`. Stored as JSON files under `migrations/refs/<name>.json`. **Refs are environment-named** (`production`, `staging`, ...). The `head` ref has been dropped from user-facing vocabulary — it carried no information the `contract.json` doesn't already imply. (By analogy: a pointer is a named memory address. Refs are a specific kind of contract reference; the umbrella is "contract reference.")
 - **Invariant** / **Data invariant** — a named, checkable predicate over data (e.g. "all user phone numbers are normalized to E.164"). The correctness primitive for data that the contract hash cannot capture.
 - **Invariant id** (`invariantId`) — opt-in routing key on a data transform. When set, the transform is *routing-visible*: refs may require that id.
 - **Provided invariants** (`providedInvariants`) — the set of `invariantId`s a migration declares. Part of the migration's identity.
@@ -230,7 +247,7 @@ Grouped by sub-area so the relationships are visible. Some terms appear in more 
 - **Space-id** — identifier for a contract space. `[a-z][a-z0-9_-]{0,63}`. `'app'` is reserved for the application.
 - **App-space** — the application's contract space.
 - **Extension-space** — a contract space owned by an installed extension (e.g. `cipherstash`, `pgvector`).
-- **Pinned per-space artifacts** — the framework-owned on-disk mirror of each loaded extension's `contractSpace` (`migrations/<space-id>/{contract.json, contract.d.ts, refs/head.json, <migration dirs>}`). Execution-time and verify-time read *only* the pinned files, never the extension's descriptor module.
+- **Pinned per-space artifacts** — the framework-owned on-disk mirror of each loaded extension's `contractSpace` (`migrations/<space-id>/{contract.json, contract.d.ts, refs/, <migration dirs>}`). Execution-time and verify-time read *only* the pinned files, never the extension's descriptor module. *(Today's mirror includes a `refs/head.json` file; with `head` dropped from vocabulary that file is either retired or renamed to something descriptive like `current.json` — implementation cleanup, not vocabulary.)*
 - **Descriptor** — the runtime/control descriptor of an extension. Carries `contractSpace` when the extension contributes schema.
 
 ### Process roles (components / services)
@@ -271,19 +288,22 @@ Grouped by intent. *Italicised* entries are terms used in current CLI commands; 
 - **`migration plan`** — diff `<ref>` ref's contract → current contract; scaffold a migration package with ops auto-filled; advance the named ref to the new contract's hash. *The "freeze + promise" verb.*
 - **`migration new`** — scaffold a migration package with `from`/`to` storage hashes but **no ops**. For hand-authored migrations. *Sibling of `plan` — same artifact shape, different ops source.*
 - **`migration compile`** — execute `migration.ts`, (re)write `ops.json` + `migration.json`. The TS → JSON build step; consumers run this after editing `migration.ts` by hand.
-- **`ref move <name> <hash>`** — directly move a ref. Rarely used by hand; the normal path is `migration plan` advancing a ref atomically. *(open — verb name)*
+- **`ref set <name> <contract>`** — directly set a ref's target contract. Rarely used by hand; the normal path is `migration plan` advancing a ref atomically. Verb is `set` (not `move`) because refs are stored values being written, not entities traversing the graph — the spatial-movement vocabulary is reserved for `migrate`. No default contract: writing a production-class ref accidentally is too dangerous.
 
 ### Mutating a live database
 
 - **`migrate --to <contract>`** — *the* migration verb. Walks the graph from the marker's current contract to the target. Forward-only. Same verb everywhere (dev, staging, production); only the DB URL changes.
 - **`db init`** — bootstrap an empty database, or adopt an existing one by executing initial migrations from `∅`. Lays down structure. Live, may mutate.
 - **`db update`** — off-graph reconciliation. `db update` reconciles to the current contract; `db update --to <hash>` reconciles to any contract we can name on disk. **Dev-only.** Does not produce a migration, does not consult the graph, does not advance any ref.
-- **`db sign`** — verify the live DB satisfies a contract, then write the contract hash into the marker. **Refuses if it doesn't satisfy.** No structural mutation. The adoption path for an already-matching DB.
+- **`db sign [<contract>]`** *(explicit form: `db sign --contract <contract>`)* — verify the live DB satisfies a contract, then write the contract hash into the marker. **Refuses if it doesn't satisfy.** No structural mutation. The adoption path for an already-matching DB. Without an argument, defaults to the current `contract.json`. The argument names *the thing being signed* — distinct from `--to` (movement) used by `migrate` and `db update`.
 
-### Verification (live, read-only)
+### Verification
 
-- **`db verify`** — *"does the live DB currently satisfy the contract?"* Compares marker + live schema against the contract; reports drift. Read-only.
-- **`migration preflight <id>`** — *"would this migration actually do what it promises?"* Sandbox-applies a migration package against a shadow DB (or PPg) and reports the outcome. The dev's verification tool when iterating on a tweaked migration. *(verb name open — `preflight`, `dry-run`, `simulate`, `try`.)*
+Three verbs along two axes — *what's being verified* (live DB / migration artifact / migration behavior) and *whether the verb touches the database*.
+
+- **`db verify`** — *"does the live DB currently satisfy its contract?"* Compares marker + live schema against the contract; reports drift kinds. Live, read-only.
+- **`migration verify <m>`** — *"is this migration artifact internally consistent?"* Recomputes hashes, checks the manifest matches `ops.json`, validates bookend hashes. Offline, read-only. Run graph-wide with no argument.
+- **`migration preflight <m>`** — *"would this migration actually do what it promises?"* Sandbox-executes a migration against a shadow DB (or PPg) and reports the outcome. The dev's behavioral verification tool when iterating on a tweaked migration. Live (against the sandbox), mutates only the shadow.
 
 ### Reading — live (touches the DB)
 
@@ -307,7 +327,7 @@ These map onto the commands above:
 - *"What path will be taken to reach `<ref>`?"* → `migration status --to <ref>`
 - *"What does this branch promise that mainline doesn't?"* → `migration graph` + `ref show production` (PR-review tooling can diff the ref pointers)
 - *"What's the graph shape?"* → `migration graph`
-- *"Is the graph well-formed?"* → `migration list --check` or a dedicated `migration check` *(open — verb name TBD)*
+- *"Is the graph well-formed?"* → `migration verify` (single migration or graph-wide). Recomputes hashes, checks manifest ↔ `ops.json` consistency. Read-only, offline. Distinct from `migration preflight` (sandbox-executes for behavioral verification) and `db verify` (checks the live DB against its contract).
 
 ---
 
@@ -365,11 +385,7 @@ Phrased as questions the agent (or developer / db admin) needs to be able to ask
 
 These are terms or distinctions that came up in discussion and have not yet been resolved.
 
-- **Verb for moving a ref directly.** `move`, `advance`, `promote`, `point`, `set`. The common path is `migration plan` advancing a ref atomically; the direct-move verb is rarely needed but should exist.
-- **Does `head` ever carry information the contract doesn't?** If not, the emitted `contract.json` *is* the implicit head and we don't need to store `head` as a ref file. Refs become exclusively environment-named.
-- **Preflight verb name.** `preflight` (telegraphs the intent), `dry-run`, `simulate`, `try`. Open. `preflight` is what our internal docs use today.
-- **`db init` vs `prisma-next init`.** Homonym; one bootstraps a DB (live), the other scaffolds a project (offline). The CLI Style Guide already flags this; needs a rename on one side.
-- **`ledger`.** Useful internal term — does it ever appear in the user-facing CLI? Resolved: appears via `migration log`. Keep as a noun in user-facing prose where the audit-log concept matters.
+*(None outstanding. Recently closed items listed in the resolved section below.)*
 
 ## Resolved (no longer open)
 
@@ -382,7 +398,18 @@ These are terms or distinctions that came up in discussion and have not yet been
 - **`db init` vs `db sign`.** Distinct: init lays down structure (live, mutates); sign verifies + writes marker (no structural mutation, refuses if DB doesn't already satisfy the contract).
 - **"Freeze"** rejected. `migration plan` is the verb for the freeze-and-promise act.
 - **Dev/deploy split** rejected. The safety semantics belong to the DB URL, not the verb.
-- **Contract references.** Every "which contract" argument accepts: bare hash / hash-prefix (8+ chars, no `sha256:` prefix), ref name, exact migration directory name, `<migration-dir-name>^` (the migration's from-contract), filesystem path. Migrations are identified by directory name only — no slug matching, no prefix matching on directory names. Directory names are unique within the app contract space by construction. **In CLI argument syntax the placeholder is `<contract>`** — no umbrella shorthand. A **ref** is a specific kind of contract reference (named, persisted, file-backed); the umbrella is **contract reference**.
+- **Contract references and migration references.** Two parallel grammars sharing forms but resolving in different namespaces. `<contract>` resolves to a contract storage hash (accepts: hash, ref name, migration directory name → to-contract, `<dir>^` → from-contract, filesystem path). `<migration>` resolves to a migration (accepts: migration hash or directory name). The command's argument type determines which grammar applies — same hash-shaped input resolves in different namespaces depending on whether the command expects a `<contract>` or a `<migration>`. **In CLI argument syntax the placeholder is `<contract>` or `<migration>`** — no umbrella shorthand. A **ref** is a specific kind of contract reference (named, persisted, file-backed); the umbrella is **contract reference**.
+- **Directory names are user-controlled.** The default `<timestamp>T<HHMM>_<slug>` is convention, not invariant. Ambiguity between a directory name and a hash prefix is an explicit ambiguity error with candidate listing — same Git rule for short SHAs that collide with branch names. Disambiguate with `./<path>` for filesystem paths or with a longer / different form.
+- **`db sign [<contract>]` (positional) or `db sign --contract <contract>` (explicit).** The argument names *the thing being signed* — neither `--to` (movement) nor `--at` (position) carries the right meaning. Defaults to the current `contract.json` when omitted.
+- **`ref set <name> <contract>`** is the direct-ref-write verb. `move` was rejected because refs are stored values, not entities that traverse the graph — the spatial-movement vocabulary is reserved for `migrate`.
+- **`head` ref dropped.** Refs are exclusively environment-named (`production`, `staging`, ...). The emitted `contract.json` already plays the role of "what the repo is working toward"; a `head` ref would have been redundant. The pinned per-space artifact named `refs/head.json` is implementation cleanup (rename or remove), not vocabulary.
+- **`migration preflight` confirmed.** No surveyed migration tool has a direct analog ("actually execute the migration in a sandbox and report on the outcome"). Atlas's `--dev-url` is a flag-bundled variant of apply, Prisma current's shadow replay is implicit-only, Liquibase's `update-sql` and `validate` are preview/structural, Sqitch's `verify` runs post-deploy. Preflight is industry-known from aviation ("the checks you run right before doing the thing for real") and gives us an uncontested word for the sandbox-execution verb. Distinct from `db verify` (live DB satisfies its contract) and `migration verify` (artifact integrity — see below).
+- **`migration verify <m>` for artifact integrity.** Parallel to `db verify`. Recomputes hashes, checks the manifest matches `ops.json`, validates the migration's internal consistency. Read-only, offline. Distinct from `migration preflight` (which executes against a sandbox to verify *behavior*).
+- **`db init` and `prisma-next init` both kept.** The namespace disambiguates: `prisma-next init` is project scaffolding; `prisma-next db init` lays down DB structure. No rename needed.
+- **`contract emit` and `migration plan + compile` are asymmetric on purpose.** Contracts are one-step (user-authored source → emit → canonical artifact). Migrations are two-step (framework plans → user edits the emitted `migration.ts` → compile lowers it to `ops.json`). The asymmetry tells the right story: contracts are user declarations, migrations are framework-scaffolded programs the user refines. Calling both "emit" would conflate scaffolding with lowering.
+- **"Three-phase envelope" retired as a coined term.** The three phases — **precheck**, **execute**, **postcheck** — remain first-class vocabulary (they appear in blog posts and are the key conceptual hook for understanding migration ops). When referring to the wrapper, use descriptive prose ("the op's prechecks, execute, and postchecks") rather than the noun "envelope".
+- **"Operation class"** kept as user-facing vocabulary (appears in blog posts).
+- **"Routing" / "routing-visible"** kept as internal-only. Not user-facing CLI vocabulary.
 - **Interrogative surface.** `migration status [--to <contract>] [--from <contract>]` (path / pending; offline-capable via `--from`), `migration log` (execution history from the ledger; live), `migration list` (flat enumeration, Git-tree-style with branches on the left; offline), `migration graph` (visual relational view for debugging the graph; offline), `migration show <dir>` (single migration; offline). `status` and `log` are live read-only; `list`, `graph`, `show` are offline. `list` and `graph` stay as distinct verbs even though they render the same data structure — the verb indicates the user's intent, not the rendering.
 - **Safety axis is "what does this mutate?", not "offline or live?"** Four classes: mutating-live, read-only-live, mutating-offline, read-only-offline. Namespace (`migrate` / `db` / `migration` / `contract` / `ref`) is by *subject*, not by safety. The verb is responsible for being self-evidently classified.
 - **Cluster 1 — `schema` is the live database's structural definition.** Always. Never an authored artifact, never a contract, never anything else. Exception: "Postgres schema" (always qualified) for the namespace concept inside Postgres.
