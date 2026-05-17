@@ -26,8 +26,8 @@ import {
   runContractEmit,
   runMigrate,
   runMigrationPlanAndEmit,
-  runMigrationRef,
   runMigrationStatus,
+  runRef,
   setupJourney,
   swapContract,
   useDevDatabase,
@@ -70,9 +70,9 @@ withTempDir(({ createTempDir }) => {
         expect(applyProd0.exitCode, 'D.02: apply init to production').toBe(0);
 
         // D.03: set refs — staging and production both at C1
-        const refStaging = await runMigrationRef(staging, ['set', 'staging', c1Hash]);
+        const refStaging = await runRef(staging, ['set', 'staging', c1Hash]);
         expect(refStaging.exitCode, 'D.03: ref set staging=C1').toBe(0);
-        const refProd = await runMigrationRef(staging, ['set', 'production', c1Hash]);
+        const refProd = await runRef(staging, ['set', 'production', c1Hash]);
         expect(refProd.exitCode, 'D.03: ref set production=C1').toBe(0);
 
         // --- Staging branch: C1 → C2 → C3 ---
@@ -97,7 +97,7 @@ withTempDir(({ createTempDir }) => {
         expect(applyStaging2.exitCode, 'D.05: apply C3 to staging').toBe(0);
 
         // Update staging ref
-        const refStaging2 = await runMigrationRef(staging, ['set', 'staging', c3Hash]);
+        const refStaging2 = await runRef(staging, ['set', 'staging', c3Hash]);
         expect(refStaging2.exitCode, 'D.05: ref set staging=C3').toBe(0);
 
         // --- Production branch: C1 → C4 ---
@@ -117,7 +117,7 @@ withTempDir(({ createTempDir }) => {
         const c4Hash = parseJsonOutput<{ to: string }>(plan3).to;
 
         // Update production ref to C4 before applying
-        const refProd2 = await runMigrationRef(staging, ['set', 'production', c4Hash]);
+        const refProd2 = await runRef(staging, ['set', 'production', c4Hash]);
         expect(refProd2.exitCode, 'D.06: ref set production=C4').toBe(0);
 
         // Apply C1→C4 to production DB
@@ -157,9 +157,9 @@ withTempDir(({ createTempDir }) => {
         expect(c5HashFromProd, 'D.07: both merges target same C5').toBe(c5Hash);
 
         // Update refs to C5
-        const refStaging3 = await runMigrationRef(staging, ['set', 'staging', c5Hash]);
+        const refStaging3 = await runRef(staging, ['set', 'staging', c5Hash]);
         expect(refStaging3.exitCode, 'D.07: ref set staging=C5').toBe(0);
-        const refProd3 = await runMigrationRef(staging, ['set', 'production', c5Hash]);
+        const refProd3 = await runRef(staging, ['set', 'production', c5Hash]);
         expect(refProd3.exitCode, 'D.07: ref set production=C5').toBe(0);
 
         // D.08: apply merge to staging DB (C3→C5)

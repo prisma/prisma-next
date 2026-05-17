@@ -3,7 +3,6 @@ import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import {
   deleteRef,
-  readRef,
   readRefs,
   validateRefName,
   validateRefValue,
@@ -37,13 +36,6 @@ interface RefSetResult {
   readonly invariants: readonly string[];
 }
 
-interface RefGetResult {
-  readonly ok: true;
-  readonly ref: string;
-  readonly hash: string;
-  readonly invariants: readonly string[];
-}
-
 interface RefDeleteResult {
   readonly ok: true;
   readonly ref: string;
@@ -69,14 +61,7 @@ function cliErrorInvalidRefName(name: string): CliStructuredError {
   });
 }
 
-function cliErrorInvalidRefValue(hash: string): CliStructuredError {
-  return errorRuntime(`Invalid contract hash "${hash}"`, {
-    why: `"${hash}" is not a valid contract hash`,
-    fix: 'Contract hashes must match the format "sha256:<64 hex chars>". Copy the hash from `prisma-next contract emit` or `migration status --json`.',
-  });
-}
-
-async function executeRefSetCommand(
+export async function executeRefSetCommand(
   name: string,
   contractInput: string,
   options: { config?: string },
@@ -89,8 +74,6 @@ async function executeRefSetCommand(
     const config = await loadConfig(options.config);
     const { appMigrationsDir, refsDir } = resolveMigrationPaths(options.config, config);
 
-    // When the input is already a full valid hash, skip resolution (fast path
-    // that works even when no migrations exist on disk yet).
     let resolvedHash: string;
     if (validateRefValue(contractInput)) {
       resolvedHash = contractInput;
@@ -113,22 +96,7 @@ async function executeRefSetCommand(
   }
 }
 
-async function executeRefGetCommand(
-  name: string,
-  options: { config?: string },
-): Promise<Result<RefGetResult, CliStructuredError>> {
-  try {
-    const config = await loadConfig(options.config);
-    const { refsDir } = resolveMigrationPaths(options.config, config);
-    const entry = await readRef(refsDir, name);
-    return ok({ ok: true as const, ref: name, hash: entry.hash, invariants: entry.invariants });
-  } catch (error) {
-    if (error instanceof CliStructuredError) return notOk(error);
-    return notOk(mapError(error));
-  }
-}
-
-async function executeRefDeleteCommand(
+export async function executeRefDeleteCommand(
   name: string,
   options: { config?: string },
 ): Promise<Result<RefDeleteResult, CliStructuredError>> {
@@ -143,7 +111,7 @@ async function executeRefDeleteCommand(
   }
 }
 
-async function executeRefListCommand(options: {
+export async function executeRefListCommand(options: {
   config?: string;
 }): Promise<Result<RefListResult, CliStructuredError>> {
   try {
@@ -182,37 +150,6 @@ function createRefSetCommand(): Command {
             ui.output(JSON.stringify(value));
           } else if (!flags.quiet) {
             ui.output(`Set ref "${value.ref}" → ${value.hash}`);
-          }
-        });
-        process.exit(exitCode);
-      },
-    );
-  return command;
-}
-
-function createRefGetCommand(): Command {
-  const command = new Command('get');
-  setCommandDescriptions(
-    command,
-    'Get the hash for a ref',
-    'Reads a named ref from migrations/refs/ and prints its contract hash.',
-  );
-  addGlobalOptions(command)
-    .argument('<name>', 'Ref name to look up')
-    .option('--config <path>', 'Path to prisma-next.config.ts')
-    .action(
-      async (
-        name: string,
-        options: { config?: string; json?: string | boolean; quiet?: boolean },
-      ) => {
-        const flags = parseGlobalFlags(options);
-        const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
-        const result = await executeRefGetCommand(name, options);
-        const exitCode = handleResult(result, flags, ui, (value) => {
-          if (flags.json) {
-            ui.output(JSON.stringify(value));
-          } else {
-            ui.output(value.hash);
           }
         });
         process.exit(exitCode);
@@ -278,20 +215,11 @@ function createRefListCommand(): Command {
   return command;
 }
 
-export {
-  cliErrorInvalidRefName,
-  cliErrorInvalidRefValue,
-  executeRefDeleteCommand,
-  executeRefGetCommand,
-  executeRefListCommand,
-  executeRefSetCommand,
-};
-
-export function createMigrationRefCommand(): Command {
+export function createRefCommand(): Command {
   const command = new Command('ref');
   setCommandDescriptions(
     command,
-    'Manage migration refs',
+    'Manage contract refs',
     'Manage named refs in migrations/refs/. Refs map logical environment\n' +
       'names (e.g., staging, production) to contract hashes.',
   );
@@ -300,7 +228,6 @@ export function createMigrationRefCommand(): Command {
     subcommandDescription: () => '',
   });
   command.addCommand(createRefSetCommand());
-  command.addCommand(createRefGetCommand());
   command.addCommand(createRefDeleteCommand());
   command.addCommand(createRefListCommand());
   return command;

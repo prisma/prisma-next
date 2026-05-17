@@ -27,9 +27,9 @@ import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import { createMigrateCommand } from '@prisma-next/cli/commands/migrate';
 import { createMigrationNewCommand } from '@prisma-next/cli/commands/migration-new';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
-import { createMigrationRefCommand } from '@prisma-next/cli/commands/migration-ref';
 import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-show';
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
+import { createRefCommand } from '@prisma-next/cli/commands/ref';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import type { Command } from 'commander';
 import { isAbsolute, join, resolve } from 'pathe';
@@ -461,12 +461,12 @@ export async function runMigrationPlanAndEmit(
   return planResult;
 }
 
-export async function runMigrationRef(
+export async function runRef(
   ctx: JourneyContext,
   subcommandArgs: readonly string[],
 ): Promise<CommandResult> {
   const [subcommand, ...rest] = subcommandArgs;
-  return runCommandRaw(createMigrationRefCommand(), ctx.testDir, [
+  return runCommandRaw(createRefCommand(), ctx.testDir, [
     subcommand!,
     '--config',
     ctx.configPath,

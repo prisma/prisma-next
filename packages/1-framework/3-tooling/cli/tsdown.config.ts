@@ -16,7 +16,7 @@ export default defineConfig({
     'src/commands/migrate.ts',
     'src/commands/migration-new.ts',
     'src/commands/migration-plan.ts',
-    'src/commands/migration-ref.ts',
+    'src/commands/ref.ts',
     'src/commands/migration-show.ts',
     'src/commands/migration-status.ts',
     'src/config-loader.ts',

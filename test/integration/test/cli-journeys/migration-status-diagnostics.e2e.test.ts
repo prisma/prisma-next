@@ -23,8 +23,8 @@ import {
   runDbUpdate,
   runMigrate,
   runMigrationPlanAndEmit,
-  runMigrationRef,
   runMigrationStatus,
+  runRef,
   setupJourney,
   swapContract,
   timeouts,
@@ -533,7 +533,7 @@ withTempDir(({ createTempDir }) => {
           expect(planB.exitCode, 'plan B').toBe(0);
           const hashB = parseJsonOutput<{ to: string }>(planB).to;
 
-          const setRef = await runMigrationRef(ctx, ['set', 'production', hashB]);
+          const setRef = await runRef(ctx, ['set', 'production', hashB]);
           expect(setRef.exitCode, 'ref set').toBe(0);
 
           const status = await runMigrationStatus(ctx, ['--ref', 'production']);
@@ -599,7 +599,7 @@ withTempDir(({ createTempDir }) => {
           ]);
           expect(planB.exitCode, 'plan B').toBe(0);
 
-          const setRef = await runMigrationRef(ctx, ['set', 'production', hashA]);
+          const setRef = await runRef(ctx, ['set', 'production', hashA]);
           expect(setRef.exitCode, 'ref set').toBe(0);
 
           const status = await runMigrationStatus(ctx, ['--ref', 'production']);

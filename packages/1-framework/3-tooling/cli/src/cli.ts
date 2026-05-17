@@ -15,9 +15,9 @@ import { createDbVerifyCommand } from './commands/db-verify';
 import { createMigrateCommand } from './commands/migrate';
 import { createMigrationNewCommand } from './commands/migration-new';
 import { createMigrationPlanCommand } from './commands/migration-plan';
-import { createMigrationRefCommand } from './commands/migration-ref';
 import { createMigrationShowCommand } from './commands/migration-show';
 import { createMigrationStatusCommand } from './commands/migration-status';
+import { createRefCommand } from './commands/ref';
 import { setCommandDescriptions } from './utils/command-helpers';
 import { formatCommandHelp, formatRootHelp } from './utils/formatters/help';
 import { parseGlobalFlags } from './utils/global-flags';
@@ -30,6 +30,7 @@ import { suggestCommands } from './utils/suggest-command';
  */
 const removedVerbRedirects: Record<string, string> = {
   'migration:apply': 'Use `prisma-next migrate --to <contract>` instead.',
+  'migration:ref': 'Use `prisma-next ref set|list|delete` instead.',
 };
 
 /**
@@ -256,14 +257,15 @@ migrationCommand.addCommand(migrationShowCommand);
 const migrationStatusCommand = createMigrationStatusCommand();
 migrationCommand.addCommand(migrationStatusCommand);
 
-const migrationRefCommand = createMigrationRefCommand();
-migrationCommand.addCommand(migrationRefCommand);
-
 program.addCommand(migrationCommand);
 
 // Top-level migrate command (replaces `migration apply`)
 const migrateCommand = createMigrateCommand();
 program.addCommand(migrateCommand);
+
+// Top-level ref command (replaces `migration ref`)
+const refCommand = createRefCommand();
+program.addCommand(refCommand);
 
 // Register init command (top-level, not nested)
 const initCommand = createInitCommand();

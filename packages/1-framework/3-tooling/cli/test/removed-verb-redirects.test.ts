@@ -32,4 +32,30 @@ describe('removed verb redirects', () => {
       expect(err.stderr).toContain('prisma-next migrate --to <contract>');
     }
   });
+
+  it('`migration ref set` exits 2 and suggests `ref set|list|delete`', async () => {
+    try {
+      await execFileAsync('node', [CLI_PATH, 'migration', 'ref', 'set', 'prod', 'sha256:abc'], {
+        timeout: 5000,
+      });
+      expect.unreachable('should have exited with non-zero');
+    } catch (error) {
+      const err = error as { code?: number; stderr?: string };
+      expect(err.code).toBe(2);
+      expect(err.stderr).toContain('prisma-next ref set|list|delete');
+    }
+  });
+
+  it('`migration ref` with no subcommand exits 2 and suggests `ref`', async () => {
+    try {
+      await execFileAsync('node', [CLI_PATH, 'migration', 'ref'], {
+        timeout: 5000,
+      });
+      expect.unreachable('should have exited with non-zero');
+    } catch (error) {
+      const err = error as { code?: number; stderr?: string };
+      expect(err.code).toBe(2);
+      expect(err.stderr).toContain('prisma-next ref set|list|delete');
+    }
+  });
 });

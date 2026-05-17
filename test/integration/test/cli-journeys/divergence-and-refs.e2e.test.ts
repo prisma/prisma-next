@@ -17,8 +17,8 @@ import {
   runContractEmit,
   runMigrate,
   runMigrationPlanAndEmit,
-  runMigrationRef,
   runMigrationStatus,
+  runRef,
   setupJourney,
   swapContract,
   timeouts,
@@ -77,7 +77,7 @@ withTempDir(({ createTempDir }) => {
         expect(statusData.targetHash, 'L.04: target is C3 (contract hash)').toBe(c3Hash);
 
         // L.05: set ref production=C3
-        const refSet = await runMigrationRef(ctx, ['set', 'production', c3Hash]);
+        const refSet = await runRef(ctx, ['set', 'production', c3Hash]);
         expect(refSet.exitCode, 'L.05: ref set production').toBe(0);
 
         // L.06: apply with --ref production → routes via C1→C3

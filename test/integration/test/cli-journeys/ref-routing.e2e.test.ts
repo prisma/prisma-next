@@ -20,8 +20,8 @@ import {
   runContractEmit,
   runMigrate,
   runMigrationPlanAndEmit,
-  runMigrationRef,
   runMigrationStatus,
+  runRef,
   setupJourney,
   swapContract,
   timeouts,
@@ -58,9 +58,9 @@ withTempDir(({ createTempDir }) => {
         const c2Hash = parseJsonOutput<{ to: string }>(plan1).to;
 
         // M.03: set refs — production=C1, staging=C2
-        const refProd = await runMigrationRef(ctx, ['set', 'production', c1Hash]);
+        const refProd = await runRef(ctx, ['set', 'production', c1Hash]);
         expect(refProd.exitCode, 'M.03: ref set production=C1').toBe(0);
-        const refStaging = await runMigrationRef(ctx, ['set', 'staging', c2Hash]);
+        const refStaging = await runRef(ctx, ['set', 'staging', c2Hash]);
         expect(refStaging.exitCode, 'M.03: ref set staging=C2').toBe(0);
 
         // M.04: status --ref production → at-target (DB marker = C1, ref = C1)
