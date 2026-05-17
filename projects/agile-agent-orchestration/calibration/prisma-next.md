@@ -286,6 +286,24 @@ Recorded failure modes with their detection signals and mitigations. Add a new e
 
 **Reference incident.** 2026-05-17, sql-orm-client migration dispatch on `claude-4.6-sonnet-low-thinking`. Implementer spent 15+ min in recon (running tests, reading files) with zero file modifications. After an orchestrator kick at T+15 with explicit `grep` + `find` commands, implementer executed correctly in <5 min and even diagnosed the real `structuredClone`-strips-non-enumerable root cause. Same model tier had been used for three earlier dispatches that committed cleanly — the difference was the sql-orm-client surface required identifying shared helpers, which Sonnet-low couldn't plan upfront without prompting.
 
+### 3.11 Recon grep undercounts consumer surface when IR type changes shape
+
+**Symptom.** A substrate refactor changes the type of a widely-consumed field (e.g. `SqlStorage.tables` from flat `Record<string, StorageTable>` to nested `Record<string, Record<string, StorageTable>>`). The dispatch brief's recon greps for the about-to-be-deleted symbols (`tablesByNamespace`, `nestedTablesView`, etc.) and for flat subscript access (`storage.tables[someName]`). Both greps return a manageable hit list. The implementer proceeds, commits the substrate change, and discovers at typecheck time that the real consumer surface is 3-5x larger: source code and test fixtures in downstream packages that typed `storage.tables` as flat, constructed `SqlStorage` with flat fixture shapes, or accessed `.tables[name]` via a variable not caught by the literal-string grep.
+
+**Detection signal.**
+
+- Recon grep returns ~5-10 hits; full `pnpm typecheck` after the substrate commit surfaces 50-100 errors across 10+ files.
+- Errors are in packages the recon grep didn't scan (e.g. `family-sql`, `extensions`, `adapters`) or in fixture-construction sites where the flat shape was inlined rather than subscripted.
+- The substrate change is clean and correct; the gap is in consumer migration volume, not substrate design.
+
+**Mitigation.**
+
+- After the substrate commit, run `pnpm typecheck` immediately (before committing consumer migrations) to discover the true consumer surface. The typecheck is a 5-second operation and reveals every site the type system can see.
+- If typecheck reveals >20 additional sites, STOP and re-estimate: the dispatch is probably L, not M. Commit what's done, report PARTIAL, and sequence the consumer migration as its own M dispatch.
+- Phase-1 fixture migration ("migrate ALL fixtures to canonical-nested") must be verified by typecheck against the new type, not by grep alone. Grep catches string-literal patterns; typecheck catches structural incompatibility.
+
+**Reference incident.** 2026-05-17, "kill dual-shape storage" dispatch. Recon grep for `tablesByNamespace|nestedTablesView|freezeFlatTablesView` found ~6 consumer files. After the substrate commit, `pnpm typecheck` revealed 50+ errors across `family-sql` source (`contract-to-schema-ir.ts`, `field-event-planner.ts`, `verify-sql-schema.ts`), `family-sql` test fixtures (`contract-to-schema-ir.test.ts`, `schema-verify.basic.test.ts`), and extension/target test files. The substrate change was correct; Phase 1 had not migrated all fixture-construction sites to the nested shape. The dispatch was correctly stopped at PARTIAL and the remaining consumer migration sequenced as follow-up.
+
 ---
 
 ## 4. Grep library
@@ -309,6 +327,9 @@ rg "'columns' in" packages/
 
 # Deleted helpers that should not return:
 rg 'foreignKeyNamespacesMatch' packages/
+
+# Deleted dual-shape storage helpers (killed in "kill dual-shape storage" dispatch):
+rg 'tablesByNamespace|typesByNamespace|nestedTablesView|nestedTypesView|freezeFlatTablesView|freezeFlatTypesView|installAmbiguousFlatGetter' packages/
 ```
 
 ### Test-literal hygiene (post-canonical-shape-enforcement)
