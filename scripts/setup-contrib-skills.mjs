@@ -16,7 +16,7 @@
 // (`npx skills add prisma/prisma-next/skills#v<version>`); they never
 // run this script.
 
-import { existsSync, lstatSync, mkdirSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -85,7 +85,7 @@ function isSymlinkPointingTo(target, source) {
   try {
     const stat = lstatSync(target);
     if (!stat.isSymbolicLink()) return false;
-    const resolved = resolve(dirname(target), require('node:fs').readlinkSync(target));
+    const resolved = resolve(dirname(target), readlinkSync(target));
     return resolved === source;
   } catch {
     return false;
