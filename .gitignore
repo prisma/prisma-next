@@ -50,3 +50,8 @@ test/**/fixtures/generated/
 !test/e2e/framework/test/sqlite/fixtures/generated/**
 !test/integration/test/mongo/fixtures/generated/
 !test/integration/test/mongo/fixtures/generated/**
+
+.agents/
+.claude/
+.devin/
+.windsurf/
