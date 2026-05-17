@@ -43,7 +43,13 @@ The grep-based lint (`pnpm lint:no-contract-cast`) walks `packages/**/src/**` an
   - `packages/3-targets/3-targets/postgres/src/core/postgres-contract-serializer.ts`
   - `packages/2-mongo-family/9-family/src/core/ir/mongo-contract-serializer.ts`
 
-Adding a new allowlisted file requires a comment at the call site explaining why the seam can't be used (typically: the file *is* the seam).
+Adding a new allowlisted file requires three things, kept in sync:
+
+1. A comment at the call site explaining why the seam can't be used (typically: the file *is* the seam).
+2. The path added to the allowlist array in [`scripts/lint-no-contract-cast.mjs`](mdc:scripts/lint-no-contract-cast.mjs) so `pnpm lint:no-contract-cast` keeps passing.
+3. The path appended to the bulleted list above so this rule reflects the lint's allowlist.
+
+Updating only one of the two locations is the common drift mode; both must move together.
 
 ## Related rules
 
