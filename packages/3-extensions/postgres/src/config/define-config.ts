@@ -7,6 +7,7 @@ import type { ControlExtensionDescriptor } from '@prisma-next/framework-componen
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
 import { typescriptContractFromPath } from '@prisma-next/sql-contract-ts/config-types';
 import postgres from '@prisma-next/target-postgres/control';
+import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { extname } from 'pathe';
 
@@ -40,6 +41,7 @@ export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'
       : prismaContract(options.contract, {
           output,
           target: postgres,
+          createNamespace: postgresCreateNamespace,
         });
 
   return coreDefineConfig({

@@ -390,12 +390,74 @@
   "storage": {
     "namespaces": {
       "__unbound__": {
-        "id": "__unbound__"
+        "id": "__unbound__",
+        "kind": "schema"
+      },
+      "auth": {
+        "id": "auth",
+        "kind": "schema"
+      },
+      "public": {
+        "id": "public",
+        "kind": "schema"
       }
     },
-    "storageHash": "sha256:c3363610586d32fb9e7c3cb7576070c61c6475f2f27f4556dce3740d328a2eb2",
+    "storageHash": "sha256:e6f860c806e651e2d0253c01304989e3914db86fffded47c0eda9ae4081f47d3",
     "tables": {
-      "__unbound__": {
+      "auth": {
+        "user": {
+          "columns": {
+            "address": {
+              "codecId": "pg/jsonb@1",
+              "nativeType": "jsonb",
+              "nullable": true
+            },
+            "createdAt": {
+              "codecId": "pg/timestamptz@1",
+              "default": {
+                "expression": "now()",
+                "kind": "function"
+              },
+              "nativeType": "timestamptz",
+              "nullable": false
+            },
+            "displayName": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "email": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "id": {
+              "codecId": "sql/char@1",
+              "nativeType": "character",
+              "nullable": false,
+              "typeParams": {
+                "length": 36
+              }
+            },
+            "kind": {
+              "codecId": "pg/enum@1",
+              "nativeType": "user_type",
+              "nullable": false,
+              "typeRef": "user_type"
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [],
+          "namespaceId": "auth",
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
+          },
+          "uniques": []
+        }
+      },
+      "public": {
         "bug": {
           "columns": {
             "severity": {
@@ -411,7 +473,7 @@
           },
           "foreignKeys": [],
           "indexes": [],
-          "namespaceId": "__unbound__",
+          "namespaceId": "public",
           "uniques": []
         },
         "feature": {
@@ -429,7 +491,7 @@
           },
           "foreignKeys": [],
           "indexes": [],
-          "namespaceId": "__unbound__",
+          "namespaceId": "public",
           "uniques": []
         },
         "post": {
@@ -481,13 +543,13 @@
                 "columns": [
                   "id"
                 ],
-                "namespaceId": "__unbound__",
+                "namespaceId": "auth",
                 "table": "user"
               }
             }
           ],
           "indexes": [],
-          "namespaceId": "__unbound__",
+          "namespaceId": "public",
           "primaryKey": {
             "columns": [
               "id"
@@ -557,64 +619,13 @@
                 "columns": [
                   "id"
                 ],
-                "namespaceId": "__unbound__",
+                "namespaceId": "auth",
                 "table": "user"
               }
             }
           ],
           "indexes": [],
-          "namespaceId": "__unbound__",
-          "primaryKey": {
-            "columns": [
-              "id"
-            ]
-          },
-          "uniques": []
-        },
-        "user": {
-          "columns": {
-            "address": {
-              "codecId": "pg/jsonb@1",
-              "nativeType": "jsonb",
-              "nullable": true
-            },
-            "createdAt": {
-              "codecId": "pg/timestamptz@1",
-              "default": {
-                "expression": "now()",
-                "kind": "function"
-              },
-              "nativeType": "timestamptz",
-              "nullable": false
-            },
-            "displayName": {
-              "codecId": "pg/text@1",
-              "nativeType": "text",
-              "nullable": false
-            },
-            "email": {
-              "codecId": "pg/text@1",
-              "nativeType": "text",
-              "nullable": false
-            },
-            "id": {
-              "codecId": "sql/char@1",
-              "nativeType": "character",
-              "nullable": false,
-              "typeParams": {
-                "length": 36
-              }
-            },
-            "kind": {
-              "codecId": "pg/enum@1",
-              "nativeType": "user_type",
-              "nullable": false,
-              "typeRef": "user_type"
-            }
-          },
-          "foreignKeys": [],
-          "indexes": [],
-          "namespaceId": "__unbound__",
+          "namespaceId": "public",
           "primaryKey": {
             "columns": [
               "id"
