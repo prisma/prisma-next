@@ -83,7 +83,10 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
       profileHash: profileHash('sha256:test'),
       models: {},
       roots: {},
-      storage: new SqlStorage({ storageHash: coreHash('sha256:test'), tables }),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:test'),
+        tables: { [UNBOUND_NAMESPACE_ID]: tables },
+      }),
       extensionPacks: {},
       capabilities: {},
       meta: {},
@@ -188,23 +191,24 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
       };
     }
 
+    const flatTypes = types
+      ? Object.fromEntries(
+          Object.entries(types).map(([name, params]) => [
+            name,
+            {
+              codecId: 'pgvector/vector@1',
+              nativeType: 'vector',
+              typeParams: params as Record<string, unknown>,
+            },
+          ]),
+        )
+      : undefined;
     const storage = new SqlStorage({
       storageHash: coreHash('sha256:test'),
-      tables,
+      tables: { [UNBOUND_NAMESPACE_ID]: tables },
       ...ifDefined(
         'types',
-        types
-          ? Object.fromEntries(
-              Object.entries(types).map(([name, params]) => [
-                name,
-                {
-                  codecId: 'pgvector/vector@1',
-                  nativeType: 'vector',
-                  typeParams: params as Record<string, unknown>,
-                },
-              ]),
-            )
-          : undefined,
+        flatTypes === undefined ? undefined : { [UNBOUND_NAMESPACE_ID]: flatTypes },
       ),
     });
 
@@ -435,7 +439,10 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
       profileHash: profileHash('sha256:test'),
       models: {},
       roots: {},
-      storage: new SqlStorage({ storageHash: coreHash('sha256:test'), tables }),
+      storage: new SqlStorage({
+        storageHash: coreHash('sha256:test'),
+        tables: { [UNBOUND_NAMESPACE_ID]: tables },
+      }),
       extensionPacks: {},
       capabilities: {},
       meta: {},

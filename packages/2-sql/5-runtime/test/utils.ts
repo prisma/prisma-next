@@ -9,12 +9,18 @@ import {
   instantiateExecutionStack,
   type RuntimeDriverDescriptor,
 } from '@prisma-next/framework-components/execution';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
-import { SqlStorage, type SqlStorageInput } from '@prisma-next/sql-contract/types';
+import {
+  SqlStorage,
+  type SqlStorageTypeEntry,
+  type StorageTable,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
   Codec,
@@ -389,18 +395,38 @@ export function createTestContract(
   contract: Partial<Omit<Contract<SqlStorage>, 'profileHash' | 'storage'>> & {
     storageHash?: string;
     profileHash?: string;
-    storage?: Omit<SqlStorageInput, 'storageHash'>;
+    storage?: {
+      readonly tables: Record<string, StorageTable | StorageTableInput>;
+      readonly types?: Record<string, SqlStorageTypeEntry>;
+    };
   },
 ): Contract<SqlStorage> {
   const { execution, ...rest } = contract;
   const storageHashValue = coreHash(rest['storageHash'] ?? 'sha256:testcore');
+  const buildStorage = (): SqlStorage => {
+    const storageInput = rest['storage'];
+    if (storageInput === undefined) {
+      return new SqlStorage({ storageHash: storageHashValue, tables: {} });
+    }
+    const nestedTables: Record<string, Record<string, StorageTable | StorageTableInput>> = {};
+    for (const [name, t] of Object.entries(storageInput.tables)) {
+      const ns = t.namespaceId;
+      if (nestedTables[ns] === undefined) nestedTables[ns] = {};
+      nestedTables[ns][name] = t;
+    }
+    const nestedTypes =
+      storageInput.types === undefined ? undefined : { [UNBOUND_NAMESPACE_ID]: storageInput.types };
+    return new SqlStorage({
+      storageHash: storageHashValue,
+      tables: nestedTables,
+      ...(nestedTypes !== undefined ? { types: nestedTypes } : {}),
+    });
+  };
 
   return {
     target: rest['target'] ?? 'postgres',
     targetFamily: rest['targetFamily'] ?? 'sql',
-    storage: rest['storage']
-      ? new SqlStorage({ ...rest['storage'], storageHash: storageHashValue })
-      : new SqlStorage({ storageHash: storageHashValue, tables: {} }),
+    storage: buildStorage(),
     models: rest['models'] ?? {},
     roots: rest['roots'] ?? {},
     capabilities: rest['capabilities'] ?? {},

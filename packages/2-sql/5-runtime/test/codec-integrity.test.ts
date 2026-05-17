@@ -119,21 +119,23 @@ describe('createExecutionContext — column codec integrity', () => {
     const storage: SqlStorage = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        Doc: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            field: {
-              nativeType: column.nativeType,
-              codecId: column.codecId,
-              nullable: false,
-              ...(column.typeParams ? { typeParams: column.typeParams } : {}),
-              ...(column.typeRef ? { typeRef: column.typeRef } : {}),
+        [UNBOUND_NAMESPACE_ID]: {
+          Doc: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              field: {
+                nativeType: column.nativeType,
+                codecId: column.codecId,
+                nullable: false,
+                ...(column.typeParams ? { typeParams: column.typeParams } : {}),
+                ...(column.typeRef ? { typeRef: column.typeRef } : {}),
+              },
             },
+            primaryKey: { columns: ['field'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['field'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
       namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
@@ -266,28 +268,32 @@ describe('createExecutionContext — column codec integrity', () => {
     const storage: SqlStorage = new SqlStorage({
       storageHash: coreHash('sha256:test'),
       tables: {
-        Doc: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            embedding: {
-              nativeType: 'vector',
-              codecId: 'pgvector/vector@1',
-              nullable: false,
-              typeRef: 'V1536',
+        __unbound__: {
+          Doc: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              embedding: {
+                nativeType: 'vector',
+                codecId: 'pgvector/vector@1',
+                nullable: false,
+                typeRef: 'V1536',
+              },
             },
+            primaryKey: { columns: ['embedding'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['embedding'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
       types: {
-        V1536: {
-          kind: 'codec-instance',
-          codecId: 'pgvector/vector@1',
-          nativeType: 'vector',
-          typeParams: { length: 1536 },
+        __unbound__: {
+          V1536: {
+            kind: 'codec-instance',
+            codecId: 'pgvector/vector@1',
+            nativeType: 'vector',
+            typeParams: { length: 1536 },
+          },
         },
       },
       namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },

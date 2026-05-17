@@ -1,4 +1,5 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
@@ -10,7 +11,6 @@ import {
   type SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { defineTestCodec } from './test-codec';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   createStubAdapter,
   createTestAdapterDescriptor,
@@ -295,14 +295,16 @@ describe('contract/stack validation errors', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         tables: {
-          user: {
-            namespaceId: UNBOUND_NAMESPACE_ID,
-            columns: {
-              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: UNBOUND_NAMESPACE_ID,
+              columns: {
+                id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       }),
@@ -339,15 +341,17 @@ describe('contract/stack validation errors', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         tables: {
-          user: {
-            namespaceId: UNBOUND_NAMESPACE_ID,
-            columns: {
-              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: UNBOUND_NAMESPACE_ID,
+              columns: {
+                id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       }),
@@ -386,14 +390,16 @@ describe('contract/stack validation errors', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         tables: {
-          user: {
-            namespaceId: UNBOUND_NAMESPACE_ID,
-            columns: {
-              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: UNBOUND_NAMESPACE_ID,
+              columns: {
+                id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       }),
@@ -422,16 +428,18 @@ describe('applyMutationDefaults', () => {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        __unbound__: {
+          user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     }),
@@ -535,15 +543,17 @@ describe('applyMutationDefaults', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         tables: {
-          user: {
-            namespaceId: UNBOUND_NAMESPACE_ID,
-            columns: {
-              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-              touchedAt: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: UNBOUND_NAMESPACE_ID,
+              columns: {
+                id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                touchedAt: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       }),
@@ -626,16 +636,18 @@ describe('applyMutationDefaults', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         tables: {
-          event: {
-            namespaceId: UNBOUND_NAMESPACE_ID,
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              causation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              correlation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          __unbound__: {
+            event: {
+              namespaceId: UNBOUND_NAMESPACE_ID,
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                causation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                correlation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       }),
@@ -709,14 +721,16 @@ describe('applyMutationDefaults', () => {
       storage: new SqlStorage({
         storageHash: coreHash('sha256:test'),
         tables: {
-          user: {
-            namespaceId: UNBOUND_NAMESPACE_ID,
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: UNBOUND_NAMESPACE_ID,
+              columns: {
+                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       }),

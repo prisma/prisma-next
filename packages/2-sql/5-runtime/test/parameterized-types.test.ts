@@ -1,10 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   CodecDescriptor,
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type SqlStorageTypeEntry } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -56,18 +56,23 @@ function createParamTypesTestContract(
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
       tables: {
-        test: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: options?.tableColumns ?? {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+        __unbound__: {
+          test: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: options?.tableColumns ?? {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
-      ...ifDefined('types', options?.types),
+      ...ifDefined(
+        'types',
+        options?.types === undefined ? undefined : { [UNBOUND_NAMESPACE_ID]: options.types },
+      ),
     }),
     extensionPacks: {},
     capabilities: {},

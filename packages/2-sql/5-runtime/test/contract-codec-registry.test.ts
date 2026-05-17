@@ -140,8 +140,8 @@ function createTestContract(
     roots: {},
     storage: new SqlStorage({
       storageHash: coreHash('sha256:test'),
-      tables: tableEntries,
-      ...ifDefined('types', types),
+      tables: { [UNBOUND_NAMESPACE_ID]: tableEntries },
+      ...ifDefined('types', types === undefined ? undefined : { [UNBOUND_NAMESPACE_ID]: types }),
     }),
     extensionPacks: {},
     capabilities: {},
