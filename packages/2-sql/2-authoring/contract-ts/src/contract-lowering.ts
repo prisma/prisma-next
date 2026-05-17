@@ -246,11 +246,29 @@ function resolveRelationForeignKeys(
 ): readonly ForeignKeyConstraint[] {
   const foreignKeys: ForeignKeyConstraint[] = [];
 
+  // Skip auto-FK synthesis for `belongsTo` relations whose source
+  // columns are already covered by an explicit `constraints.foreignKey`
+  // in the same model's sqlSpec. This keeps the FK list de-duplicated
+  // when authors declare both a `rel.belongsTo` (for the relations
+  // graph) and a `constraints.foreignKey` (for explicit FK naming /
+  // referential actions) over the same columns.
+  const explicitFkColumnKeys = new Set(
+    (spec.sqlSpec?.foreignKeys ?? []).map((fk) =>
+      mapFieldNamesToColumnNames(spec.modelName, fk.fields, spec.fieldToColumn).join(','),
+    ),
+  );
+
   for (const [relationName, relationBuilder] of Object.entries(spec.relations)) {
     const relation = relationBuilder.build();
-    if (relation.kind !== 'belongsTo' || !relation.sql?.fk) {
+    if (relation.kind !== 'belongsTo') {
       continue;
     }
+    // `belongsTo` lowers to a foreign-key constraint at the contract-IR
+    // layer; per-FK `constraint`/`index` slots (and the global
+    // `foreignKeyDefaults`) decide whether the DDL emits the CONSTRAINT
+    // and the backing index. `.sql({ fk })` is the override hook for
+    // naming and referential actions.
+    const fk = relation.sql?.fk;
 
     const targetModelName = resolveRelationModelName(relation.toModel);
     if (!allSpecs.has(targetModelName)) {
@@ -270,18 +288,25 @@ function resolveRelationForeignKeys(
       rightFields: targetFields,
     });
 
+    const sourceColumnKey = mapFieldNamesToColumnNames(
+      spec.modelName,
+      fields,
+      spec.fieldToColumn,
+    ).join(',');
+    if (explicitFkColumnKeys.has(sourceColumnKey)) {
+      continue;
+    }
+
     foreignKeys.push({
       kind: 'fk',
       fields,
       targetModel: targetModelName,
       targetFields,
-      ...(relation.sql.fk.name ? { name: relation.sql.fk.name } : {}),
-      ...(relation.sql.fk.onDelete ? { onDelete: relation.sql.fk.onDelete } : {}),
-      ...(relation.sql.fk.onUpdate ? { onUpdate: relation.sql.fk.onUpdate } : {}),
-      ...(relation.sql.fk.constraint !== undefined
-        ? { constraint: relation.sql.fk.constraint }
-        : {}),
-      ...(relation.sql.fk.index !== undefined ? { index: relation.sql.fk.index } : {}),
+      ...(fk?.name ? { name: fk.name } : {}),
+      ...(fk?.onDelete ? { onDelete: fk.onDelete } : {}),
+      ...(fk?.onUpdate ? { onUpdate: fk.onUpdate } : {}),
+      ...(fk?.constraint !== undefined ? { constraint: fk.constraint } : {}),
+      ...(fk?.index !== undefined ? { index: fk.index } : {}),
     });
   }
 
