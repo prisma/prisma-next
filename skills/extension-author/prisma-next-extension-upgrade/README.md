@@ -1,29 +1,31 @@
-# @prisma-next/extension-upgrade-skill
+# prisma-next-extension-upgrade
 
 An agent skill that upgrades a Prisma Next **extension** package from one minor version to the next. The skill carries the per-step bump-install-instructions-check-pins-validate-commit flow plus the cumulative set of per-transition *upgrade instructions* (one directory per `(from-minor, to-minor)` pair).
 
-This package additionally ships a `prisma-next-check-pins` CLI as a `bin` for use in extension authors' CI.
+The companion CLI `prisma-next-check-pins` ships separately from [`@prisma-next/extension-author-tools`](../../../packages/0-shared/extension-author-tools/) — extension authors install that as a normal `devDependency` and wire it into CI.
 
 ## Audience
 
 This skill is for **authors of Prisma Next extensions** — packages that consume the framework SPI and expose contract / middleware / codec / migration surfaces to downstream apps.
 
-If you are a user of Prisma Next (your project imports `@prisma-next/postgres`, `@prisma-next/mongo`, etc. from your application code), install [`@prisma-next/upgrade-skill`](https://www.npmjs.com/package/@prisma-next/upgrade-skill) instead. If your repo contains both an app and an extension, install both.
+If you are a user of Prisma Next (your project imports `@prisma-next/postgres`, `@prisma-next/mongo`, etc. from your application code), install the [`prisma-next-upgrade`](../../upgrade/prisma-next-upgrade/SKILL.md) skill instead. If your repo contains both an app and an extension, install both.
 
 ## Installation
 
+### The skill (always-latest)
+
 ```bash
-npx skills add @prisma-next/extension-upgrade-skill@latest --all
+npx skills add prisma/prisma-next/skills/extension-author --all
 ```
 
 `--all` skips the per-agent selection prompt and installs to every agent runtime the `skills` CLI detects. For a single-agent install, swap `--all` for `-a <agent>` (e.g. `-a claude-code`).
 
-Always install at `@latest`. Bug fixes to older per-transition upgrade instructions ship as part of the latest skill release; pinning to an older skill version can apply a known-broken translation.
+The extension-author subpath is intentionally **unpinned** (always tracks `main`). Bug fixes to older per-transition upgrade instructions ship as part of the cumulative latest skill content; pinning to an older revision can apply a known-broken translation.
 
-For the CLI, add the package as a `devDependency` (the `npx skills add` step above already does this if you accept its defaults):
+### The CLI tool (normal devDependency)
 
 ```bash
-pnpm add -D @prisma-next/extension-upgrade-skill@latest
+pnpm add -D @prisma-next/extension-author-tools
 ```
 
 Then wire `pnpm exec prisma-next-check-pins` into your CI.
@@ -55,10 +57,6 @@ Wire into your CI alongside your build/test step:
 ```yaml
 - run: pnpm exec prisma-next-check-pins
 ```
-
-## Versioning
-
-This package is version-locked to the rest of Prisma Next: every Prisma Next release publishes the same version of this skill. The version is publication discipline (one release per Prisma Next release), not a compatibility selector — install at `@latest`.
 
 ## What the skill does
 

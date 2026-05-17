@@ -13,13 +13,13 @@ description: >-
 
 # Upgrade Prisma Next (user app)
 
-This skill upgrades a project that **consumes** Prisma Next via the public package API (`@prisma-next/postgres`, `@prisma-next/mongo`, the contract files in `prisma/`, etc.). If the project is itself a Prisma Next *extension*, use `@prisma-next/extension-upgrade-skill` instead — or both, if the repo contains both an app and an extension package.
+This skill upgrades a project that **consumes** Prisma Next via the public package API (`@prisma-next/postgres`, `@prisma-next/mongo`, the contract files in `prisma/`, etc.). If the project is itself a Prisma Next *extension*, use the `prisma-next-extension-upgrade` skill instead — or both, if the repo contains both an app and an extension package.
 
 ## Step 0 — Ensure the skill is up to date
 
 Before anything else, ensure this skill is installed at `@latest` and reload it. Bug fixes to *old* per-transition upgrade instructions ship in the latest skill release as part of its cumulative set; running against a stale skill can apply a known-broken translation.
 
-If the agent runtime supports an in-session refresh, perform it now. Otherwise, exit and ask the user to re-install (`npx skills add @prisma-next/upgrade-skill@latest --all`), then re-invoke.
+If the agent runtime supports an in-session refresh, perform it now. Otherwise, exit and ask the user to re-install (`npx skills add prisma/prisma-next/skills/upgrade --all`), then re-invoke. The upgrade-skill subpath is intentionally unpinned (always `main`) — the cumulative instruction set is the source of truth, and the latest release fixes apply to every prior transition.
 
 ## Pre-flight — extension compatibility
 
@@ -45,7 +45,7 @@ This skill applies when the project **consumes** Prisma Next:
 - `package.json` declares one or more `@prisma-next/*` packages under `dependencies` / `devDependencies`, and
 - the package is *not* itself an extension (no `@prisma-next/contract` (or other SPI) under `dependencies`/`peerDependencies`; name does not match `^@.*/extension-`; not referenced from a sibling app's `prisma-next.config.ts`).
 
-If the project also matches the extension-author role, install `@prisma-next/extension-upgrade-skill` and run **this** flow first, then that one in the same session. If detection is ambiguous, ask the user.
+If the project also matches the extension-author role, install the `prisma-next-extension-upgrade` skill (`npx skills add prisma/prisma-next/skills/extension-author --all`) and run **this** flow first, then that one in the same session. If detection is ambiguous, ask the user.
 
 ## Version detection
 
@@ -70,7 +70,7 @@ The chain order does not depend on which extensions are installed; the pre-fligh
 
 For each `(from, to)` step in the chain:
 
-1. **Bump `@prisma-next/*` deps.** Rewrite every `@prisma-next/*` entry in the project's `package.json` to the exact `<to>` version (no caret, no tilde). All entries advance to the same version. Cover `dependencies` and `devDependencies`. Also update the `@prisma-next/upgrade-skill` entry itself to `<to>` (so the skill content matches the target).
+1. **Bump `@prisma-next/*` deps.** Rewrite every `@prisma-next/*` entry in the project's `package.json` to the exact `<to>` version (no caret, no tilde). All entries advance to the same version. Cover `dependencies` and `devDependencies`. The upgrade skill itself is delivered through `npx skills add` and lives under `.agents/skills/prisma-next-upgrade/` (or the equivalent CLI-managed directory) — there is no `@prisma-next/upgrade-skill` npm entry to bump.
 
 2. **Install.** Run `pnpm install` (or the project's lockfile-managing command). The project's code is now broken against the new types — the upgrade instructions for `<from> → <to>` exist to fix it.
 
