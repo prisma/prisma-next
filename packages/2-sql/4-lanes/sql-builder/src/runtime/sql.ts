@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { findTableByName, type SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Db } from '../types/db';
@@ -24,7 +25,11 @@ export function sql<C extends Contract<SqlStorage>>(options: SqlOptions<C>): Db<
     get(_target, prop: string) {
       const table = findTableByName(context.contract.storage, prop);
       if (table) {
-        return new TableProxyImpl(prop, table, prop, ctx);
+        const schema =
+          table.namespaceId !== UNBOUND_NAMESPACE_ID && table.namespaceId !== 'public'
+            ? table.namespaceId
+            : undefined;
+        return new TableProxyImpl(prop, table, prop, ctx, schema);
       }
       return undefined;
     },

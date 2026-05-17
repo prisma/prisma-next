@@ -3,6 +3,7 @@ import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter'
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { PostgresEnumStorageEntry } from '@prisma-next/sql-contract/types';
 import type {
   AnyQueryAst,
@@ -204,6 +205,39 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     driver: ControlDriverInstance<'sql', 'postgres'>,
     _contract?: unknown,
     schema = 'public',
+  ): Promise<SqlSchemaIR> {
+    const schemas = schemasFromContract(_contract, schema);
+    const results: SqlSchemaIR[] = [];
+    for (const s of schemas) {
+      results.push(await this.introspectSingleSchema(driver, s));
+    }
+    const mergedTables: Record<string, SqlTableIR> = {};
+    const mergedStorageTypes: Record<string, PostgresEnumStorageEntry> = {};
+    for (const r of results) {
+      Object.assign(mergedTables, r.tables);
+      const sTypes = (
+        r.annotations as { pg: { storageTypes?: Record<string, PostgresEnumStorageEntry> } }
+      ).pg.storageTypes;
+      if (sTypes) Object.assign(mergedStorageTypes, sTypes);
+    }
+    return {
+      tables: mergedTables,
+      annotations: {
+        pg: {
+          schema: results[0]?.annotations.pg.schema ?? schema,
+          version: results[0]?.annotations.pg.version ?? 'unknown',
+          ...ifDefined(
+            'storageTypes',
+            Object.keys(mergedStorageTypes).length > 0 ? mergedStorageTypes : undefined,
+          ),
+        },
+      },
+    };
+  }
+
+  private async introspectSingleSchema(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+    schema: string,
   ): Promise<SqlSchemaIR> {
     // Execute all queries in parallel for efficiency (6 queries instead of 5T+1)
     const [tablesResult, columnsResult, pkResult, fkResult, uniqueResult, indexResult] =
@@ -754,4 +788,20 @@ function groupBy<T, K extends keyof T>(items: readonly T[], key: K): Map<T[K], T
     group.push(item);
   }
   return map;
+}
+
+function schemasFromContract(contract: unknown, fallback: string): string[] {
+  if (contract !== null && typeof contract === 'object') {
+    const storage = (contract as Record<string, unknown>)['storage'];
+    if (storage !== null && typeof storage === 'object') {
+      const namespaces = (storage as Record<string, unknown>)['namespaces'];
+      if (namespaces !== null && typeof namespaces === 'object') {
+        const ids = Object.keys(namespaces as Record<string, unknown>).filter(
+          (id) => id !== UNBOUND_NAMESPACE_ID,
+        );
+        if (ids.length > 0) return ids;
+      }
+    }
+  }
+  return [fallback];
 }

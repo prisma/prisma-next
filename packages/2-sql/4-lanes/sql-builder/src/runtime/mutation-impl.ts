@@ -118,6 +118,7 @@ export class InsertQueryImpl<
   readonly #returningColumns: string[];
   readonly #rowFields: Record<string, ScopeField>;
   readonly #annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
+  readonly #schema: string | undefined;
 
   constructor(
     tableName: string,
@@ -128,6 +129,7 @@ export class InsertQueryImpl<
     returningColumns: string[] = [],
     rowFields: Record<string, ScopeField> = {},
     annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> = new Map(),
+    schema: string | undefined = undefined,
   ) {
     super(ctx);
     this.#tableName = tableName;
@@ -137,6 +139,7 @@ export class InsertQueryImpl<
     this.#returningColumns = returningColumns;
     this.#rowFields = rowFields;
     this.#annotations = annotations;
+    this.#schema = schema;
   }
 
   returning = this._gate<ReturningCapability, string[], InsertQuery<QC, AvailableScope, never>>(
@@ -158,6 +161,7 @@ export class InsertQueryImpl<
         columns,
         newRowFields,
         this.#annotations,
+        this.#schema,
       ) as unknown as InsertQuery<QC, AvailableScope, never>;
     },
   );
@@ -184,6 +188,7 @@ export class InsertQueryImpl<
         this.#annotations,
         annotations as readonly AnnotationValue<unknown, OperationKind>[],
       ),
+      this.#schema,
     );
   }
 
@@ -196,7 +201,9 @@ export class InsertQueryImpl<
       this.ctx,
     );
 
-    let ast = InsertAst.into(TableSource.named(this.#tableName)).withValues(paramValues);
+    let ast = InsertAst.into(
+      TableSource.named(this.#tableName, undefined, this.#schema),
+    ).withValues(paramValues);
 
     if (this.#returningColumns.length > 0) {
       ast = ast.withReturning(
@@ -228,6 +235,7 @@ export class UpdateQueryImpl<
   readonly #returningColumns: string[];
   readonly #rowFields: Record<string, ScopeField>;
   readonly #annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
+  readonly #schema: string | undefined;
 
   constructor(
     tableName: string,
@@ -239,6 +247,7 @@ export class UpdateQueryImpl<
     returningColumns: string[] = [],
     rowFields: Record<string, ScopeField> = {},
     annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> = new Map(),
+    schema: string | undefined = undefined,
   ) {
     super(ctx);
     this.#tableName = tableName;
@@ -249,6 +258,7 @@ export class UpdateQueryImpl<
     this.#returningColumns = returningColumns;
     this.#rowFields = rowFields;
     this.#annotations = annotations;
+    this.#schema = schema;
   }
 
   where(expr: ExpressionBuilder<AvailableScope, QC>): UpdateQuery<QC, AvailableScope, RowType> {
@@ -262,6 +272,7 @@ export class UpdateQueryImpl<
       this.#returningColumns,
       this.#rowFields,
       this.#annotations,
+      this.#schema,
     );
   }
 
@@ -285,6 +296,7 @@ export class UpdateQueryImpl<
         columns,
         newRowFields,
         this.#annotations,
+        this.#schema,
       ) as unknown as UpdateQuery<QC, AvailableScope, never>;
     },
   );
@@ -310,6 +322,7 @@ export class UpdateQueryImpl<
         this.#annotations,
         annotations as readonly AnnotationValue<unknown, OperationKind>[],
       ),
+      this.#schema,
     );
   }
 
@@ -328,7 +341,7 @@ export class UpdateQueryImpl<
       ),
     );
 
-    let ast = UpdateAst.table(TableSource.named(this.#tableName))
+    let ast = UpdateAst.table(TableSource.named(this.#tableName, undefined, this.#schema))
       .withSet(setParams)
       .withWhere(whereExpr);
 
@@ -360,6 +373,7 @@ export class DeleteQueryImpl<
   readonly #returningColumns: string[];
   readonly #rowFields: Record<string, ScopeField>;
   readonly #annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
+  readonly #schema: string | undefined;
 
   constructor(
     tableName: string,
@@ -369,6 +383,7 @@ export class DeleteQueryImpl<
     returningColumns: string[] = [],
     rowFields: Record<string, ScopeField> = {},
     annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> = new Map(),
+    schema: string | undefined = undefined,
   ) {
     super(ctx);
     this.#tableName = tableName;
@@ -377,6 +392,7 @@ export class DeleteQueryImpl<
     this.#returningColumns = returningColumns;
     this.#rowFields = rowFields;
     this.#annotations = annotations;
+    this.#schema = schema;
   }
 
   where(expr: ExpressionBuilder<AvailableScope, QC>): DeleteQuery<QC, AvailableScope, RowType> {
@@ -388,6 +404,7 @@ export class DeleteQueryImpl<
       this.#returningColumns,
       this.#rowFields,
       this.#annotations,
+      this.#schema,
     );
   }
 
@@ -409,6 +426,7 @@ export class DeleteQueryImpl<
         columns,
         newRowFields,
         this.#annotations,
+        this.#schema,
       ) as unknown as DeleteQuery<QC, AvailableScope, never>;
     },
   );
@@ -431,6 +449,7 @@ export class DeleteQueryImpl<
         this.#annotations,
         annotations as readonly AnnotationValue<unknown, OperationKind>[],
       ),
+      this.#schema,
     );
   }
 
@@ -441,7 +460,9 @@ export class DeleteQueryImpl<
       ),
     );
 
-    let ast = DeleteAst.from(TableSource.named(this.#tableName)).withWhere(whereExpr);
+    let ast = DeleteAst.from(TableSource.named(this.#tableName, undefined, this.#schema)).withWhere(
+      whereExpr,
+    );
 
     if (this.#returningColumns.length > 0) {
       ast = ast.withReturning(

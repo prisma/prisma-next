@@ -54,13 +54,25 @@ export class TableProxyImpl<
   readonly #table: StorageTable;
   readonly #fromSource: TableSource;
   readonly #scope: Scope;
+  readonly #schema: string | undefined;
 
-  constructor(tableName: string, table: StorageTable, alias: string, ctx: BuilderContext) {
+  constructor(
+    tableName: string,
+    table: StorageTable,
+    alias: string,
+    ctx: BuilderContext,
+    schema?: string,
+  ) {
     super(ctx);
     this.#tableName = tableName;
     this.#table = table;
+    this.#schema = schema;
     this.#scope = tableToScope(alias, table, { storage: ctx.storage, tableName });
-    this.#fromSource = TableSource.named(tableName, alias !== tableName ? alias : undefined);
+    this.#fromSource = TableSource.named(
+      tableName,
+      alias !== tableName ? alias : undefined,
+      schema,
+    );
   }
 
   lateralJoin = this._gate(
@@ -105,7 +117,7 @@ export class TableProxyImpl<
   as<NewAlias extends string>(
     newAlias: NewAlias,
   ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>> {
-    return new TableProxyImpl(this.#tableName, this.#table, newAlias, this.ctx);
+    return new TableProxyImpl(this.#tableName, this.#table, newAlias, this.ctx, this.#schema);
   }
 
   select<Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
@@ -156,15 +168,45 @@ export class TableProxyImpl<
   }
 
   insert(values: Record<string, unknown>): InsertQuery<QC, AvailableScope, EmptyRow> {
-    return new InsertQueryImpl(this.#tableName, this.#table, this.#scope, values, this.ctx);
+    return new InsertQueryImpl(
+      this.#tableName,
+      this.#table,
+      this.#scope,
+      values,
+      this.ctx,
+      [],
+      {},
+      new Map(),
+      this.#schema,
+    );
   }
 
   update(set: Record<string, unknown>): UpdateQuery<QC, AvailableScope, EmptyRow> {
-    return new UpdateQueryImpl(this.#tableName, this.#table, this.#scope, set, this.ctx);
+    return new UpdateQueryImpl(
+      this.#tableName,
+      this.#table,
+      this.#scope,
+      set,
+      this.ctx,
+      [],
+      [],
+      {},
+      new Map(),
+      this.#schema,
+    );
   }
 
   delete(): DeleteQuery<QC, AvailableScope, EmptyRow> {
-    return new DeleteQueryImpl(this.#tableName, this.#scope, this.ctx);
+    return new DeleteQueryImpl(
+      this.#tableName,
+      this.#scope,
+      this.ctx,
+      [],
+      [],
+      {},
+      new Map(),
+      this.#schema,
+    );
   }
 
   #toJoined(): JoinedTables<QC, AvailableScope> {

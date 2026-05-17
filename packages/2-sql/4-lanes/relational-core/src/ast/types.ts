@@ -288,17 +288,19 @@ abstract class Expression extends AstNode implements ExpressionSource {
 export class TableSource extends FromSource {
   readonly kind = 'table-source' as const;
   readonly name: string;
+  readonly schema: string | undefined;
   readonly alias: string | undefined;
 
-  constructor(name: string, alias?: string) {
+  constructor(name: string, alias?: string, schema?: string) {
     super();
     this.name = name;
+    this.schema = schema;
     this.alias = alias;
     this.freeze();
   }
 
-  static named(name: string, alias?: string): TableSource {
-    return new TableSource(name, alias);
+  static named(name: string, alias?: string, schema?: string): TableSource {
+    return new TableSource(name, alias, schema);
   }
 
   override rewrite(rewriter: AstRewriter): AnyFromSource {
@@ -312,6 +314,7 @@ export class TableSource extends FromSource {
 
 export interface TableRef {
   readonly name: string;
+  readonly schema?: string;
   readonly alias?: string;
 }
 

@@ -28,6 +28,7 @@ import {
   type PolymorphismInfo,
   resolvePolymorphismInfo,
   resolvePrimaryKeyColumn,
+  resolveTableSchema,
 } from './collection-contract';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import type { CollectionState, IncludeExpr } from './types';
@@ -136,9 +137,9 @@ function createTableRefRemapper(fromTable: string, toTable: string): AstRewriter
   return {
     columnRef: (col) => (col.table === fromTable ? ColumnRef.of(toTable, col.column) : col),
     tableSource: (source) => {
-      if (source.alias === fromTable) return TableSource.named(source.name, toTable);
+      if (source.alias === fromTable) return TableSource.named(source.name, toTable, source.schema);
       if (!source.alias && source.name === fromTable)
-        return TableSource.named(source.name, toTable);
+        return TableSource.named(source.name, toTable, source.schema);
       return source;
     },
     eqColJoinOn: (on) =>
@@ -245,7 +246,13 @@ function buildIncludeChildRowsSelect(
   );
   const whereExpr = childWhere ? AndExpr.of([joinExpr, childWhere]) : joinExpr;
 
-  let childRows = SelectAst.from(TableSource.named(include.relatedTableName, childTableAlias))
+  let childRows = SelectAst.from(
+    TableSource.named(
+      include.relatedTableName,
+      childTableAlias,
+      resolveTableSchema(contract, include.relatedTableName),
+    ),
+  )
     .withProjection([...childProjection, ...hiddenOrderProjection])
     .withWhere(whereExpr);
 
@@ -357,7 +364,9 @@ function buildSelectAst(
   const projection = [...scalarProjection, ...(options.includeProjection ?? [])];
   const where = options.where ?? buildStateWhere(contract, tableName, state);
 
-  let ast = SelectAst.from(TableSource.named(tableName)).withProjection(projection);
+  let ast = SelectAst.from(
+    TableSource.named(tableName, undefined, resolveTableSchema(contract, tableName)),
+  ).withProjection(projection);
   if (where) {
     ast = ast.withWhere(where);
   }
@@ -406,8 +415,22 @@ function buildMtiJoins(
     );
     const join =
       joinType === 'inner'
-        ? JoinAst.inner(TableSource.named(variant.table), joinOn)
-        : JoinAst.left(TableSource.named(variant.table), joinOn);
+        ? JoinAst.inner(
+            TableSource.named(
+              variant.table,
+              undefined,
+              resolveTableSchema(contract, variant.table),
+            ),
+            joinOn,
+          )
+        : JoinAst.left(
+            TableSource.named(
+              variant.table,
+              undefined,
+              resolveTableSchema(contract, variant.table),
+            ),
+            joinOn,
+          );
     joins.push(join);
 
     const variantColumns = resolveTableColumns(contract, variant.table);

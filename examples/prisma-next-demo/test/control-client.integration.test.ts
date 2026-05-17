@@ -28,15 +28,15 @@ describe('control client integration', () => {
         const pool = new Pool({ connectionString });
         try {
           const result = await pool.query(`
-            SELECT table_name
+            SELECT table_schema, table_name
             FROM information_schema.tables
-            WHERE table_schema = 'public'
-            ORDER BY table_name
+            WHERE table_schema IN ('public', 'auth')
+            ORDER BY table_schema, table_name
           `);
-          const tableNames = result.rows.map((r) => r.table_name);
+          const tableNames = result.rows.map((r) => `${r.table_schema}.${r.table_name}`);
 
-          expect(tableNames).toContain('user');
-          expect(tableNames).toContain('post');
+          expect(tableNames).toContain('auth.user');
+          expect(tableNames).toContain('public.post');
         } finally {
           await pool.end();
         }

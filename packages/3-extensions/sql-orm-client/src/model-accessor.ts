@@ -20,6 +20,7 @@ import {
   modelOf,
   resolveFieldToColumn,
   resolveModelTableName,
+  resolveTableSchema,
 } from './collection-contract';
 import { and, not } from './filters';
 import {
@@ -265,7 +266,13 @@ function buildExistsExpr<TContract extends Contract<SqlStorage>>(
   }
 
   const selectProjectionColumn = firstTargetColumn(context.contract, relation) ?? 'id';
-  const subquery = SelectAst.from(TableSource.named(relatedTableName))
+  const subquery = SelectAst.from(
+    TableSource.named(
+      relatedTableName,
+      undefined,
+      resolveTableSchema(context.contract, relatedTableName),
+    ),
+  )
     .withProjection([
       ProjectionItem.of('_exists', ColumnRef.of(relatedTableName, selectProjectionColumn)),
     ])

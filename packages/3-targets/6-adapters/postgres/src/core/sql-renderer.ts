@@ -253,6 +253,13 @@ function renderDistinctPrefix(
   return '';
 }
 
+function renderQualifiedTable(source: { name: string; schema?: string }): string {
+  if (source.schema) {
+    return `${quoteIdentifier(source.schema)}.${quoteIdentifier(source.name)}`;
+  }
+  return quoteIdentifier(source.name);
+}
+
 function renderSource(
   source: AnyFromSource,
   contract: PostgresContract,
@@ -261,7 +268,7 @@ function renderSource(
   const node = source;
   switch (node.kind) {
     case 'table-source': {
-      const table = quoteIdentifier(node.name);
+      const table = renderQualifiedTable(node);
       if (!node.alias) {
         return table;
       }
@@ -655,7 +662,7 @@ function renderInsertValue(value: InsertValue | undefined, pim: ParamIndexMap): 
 }
 
 function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamIndexMap): string {
-  const table = quoteIdentifier(ast.table.name);
+  const table = renderQualifiedTable(ast.table);
   const rows = ast.rows;
   if (rows.length === 0) {
     throw new Error('INSERT requires at least one row');
@@ -731,7 +738,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
 }
 
 function renderUpdate(ast: UpdateAst, contract: PostgresContract, pim: ParamIndexMap): string {
-  const table = quoteIdentifier(ast.table.name);
+  const table = renderQualifiedTable(ast.table);
   const setEntries = Object.entries(ast.set);
   if (setEntries.length === 0) {
     throw new Error('UPDATE requires at least one SET assignment');
@@ -764,7 +771,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract, pim: ParamInde
 }
 
 function renderDelete(ast: DeleteAst, contract: PostgresContract, pim: ParamIndexMap): string {
-  const table = quoteIdentifier(ast.table.name);
+  const table = renderQualifiedTable(ast.table);
   const whereClause = ast.where ? ` WHERE ${renderWhere(ast.where, contract, pim)}` : '';
   const returningClause = ast.returning?.length
     ? ` RETURNING ${renderReturning(ast.returning, contract, pim)}`

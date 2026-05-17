@@ -1,5 +1,6 @@
 import type { Contract, ContractFieldType } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { findTableByName, type SqlStorage } from '@prisma-next/sql-contract/types';
 import type { RelationCardinalityTag } from './types';
 
 type ModelStorageFields = Record<string, { column?: string }>;
@@ -316,6 +317,16 @@ export function resolveModelTableName(contract: Contract<SqlStorage>, modelName:
     return model.storage.table;
   }
   throw new Error(`Model "${modelName}" has invalid or missing storage.table in the contract`);
+}
+
+export function resolveTableSchema(
+  contract: Contract<SqlStorage>,
+  tableName: string,
+): string | undefined {
+  const table = findTableByName(contract.storage, tableName);
+  if (!table) return undefined;
+  const ns = table.namespaceId;
+  return ns === UNBOUND_NAMESPACE_ID || ns === 'public' ? undefined : ns;
 }
 
 export function resolvePrimaryKeyColumn(contract: Contract<SqlStorage>, tableName: string): string {

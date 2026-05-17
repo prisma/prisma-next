@@ -15,6 +15,7 @@ import {
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { resolveTableSchema } from './collection-contract';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import { combineWhereExprs } from './where-utils';
 
@@ -127,7 +128,9 @@ export function compileInsertReturning(
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   const { rows: normalizedRows } = normalizeInsertRows(contract, tableName, rows);
-  const ast = InsertAst.into(TableSource.named(tableName))
+  const ast = InsertAst.into(
+    TableSource.named(tableName, undefined, resolveTableSchema(contract, tableName)),
+  )
     .withRows(normalizedRows)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
   const { params } = deriveParamsFromAst(ast);
@@ -140,7 +143,9 @@ export function compileInsertCount(
   rows: readonly Record<string, unknown>[],
 ): SqlQueryPlan<Record<string, unknown>> {
   const { rows: normalizedRows } = normalizeInsertRows(contract, tableName, rows);
-  const ast = InsertAst.into(TableSource.named(tableName)).withRows(normalizedRows);
+  const ast = InsertAst.into(
+    TableSource.named(tableName, undefined, resolveTableSchema(contract, tableName)),
+  ).withRows(normalizedRows);
   const { params } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params);
 }
@@ -231,7 +236,9 @@ export function compileUpsertReturning(
         conflictColumns.map((column) => ColumnRef.of(tableName, column)),
       ).doNothing();
 
-  const ast = InsertAst.into(TableSource.named(tableName))
+  const ast = InsertAst.into(
+    TableSource.named(tableName, undefined, resolveTableSchema(contract, tableName)),
+  )
     .withValues(createAssignments.assignments)
     .withOnConflict(onConflict)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
@@ -249,7 +256,9 @@ export function compileUpdateReturning(
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
   const { assignments } = toParamAssignments(contract, tableName, setValues);
-  let ast = UpdateAst.table(TableSource.named(tableName))
+  let ast = UpdateAst.table(
+    TableSource.named(tableName, undefined, resolveTableSchema(contract, tableName)),
+  )
     .withSet(assignments)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
   if (where) {
@@ -267,7 +276,9 @@ export function compileUpdateCount(
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
   const { assignments } = toParamAssignments(contract, tableName, setValues);
-  let ast = UpdateAst.table(TableSource.named(tableName)).withSet(assignments);
+  let ast = UpdateAst.table(
+    TableSource.named(tableName, undefined, resolveTableSchema(contract, tableName)),
+  ).withSet(assignments);
   if (where) {
     ast = ast.withWhere(where);
   }
@@ -282,9 +293,9 @@ export function compileDeleteReturning(
   returningColumns: readonly string[] | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
-  let ast = DeleteAst.from(TableSource.named(tableName)).withReturning(
-    buildReturningColumns(contract, tableName, returningColumns),
-  );
+  let ast = DeleteAst.from(
+    TableSource.named(tableName, undefined, resolveTableSchema(contract, tableName)),
+  ).withReturning(buildReturningColumns(contract, tableName, returningColumns));
   if (where) {
     ast = ast.withWhere(where);
   }
@@ -298,7 +309,9 @@ export function compileDeleteCount(
   filters: readonly AnyExpression[],
 ): SqlQueryPlan<Record<string, unknown>> {
   const where = combineWhereExprs(filters);
-  let ast = DeleteAst.from(TableSource.named(tableName));
+  let ast = DeleteAst.from(
+    TableSource.named(tableName, undefined, resolveTableSchema(contract, tableName)),
+  );
   if (where) {
     ast = ast.withWhere(where);
   }
