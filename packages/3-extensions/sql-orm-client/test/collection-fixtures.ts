@@ -1,9 +1,12 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
 import type { MockRuntime, TestContract } from './helpers';
 import { createMockRuntime, getTestContext, getTestContract } from './helpers';
+
+const fixtureSerializer = new SqlContractSerializer();
 
 export type TestModelName = Extract<keyof TestContract['models'], string>;
 
@@ -48,11 +51,14 @@ export function withReturningCapability(contract: TestContract = baseContract): 
 }
 
 export function withoutDefaultInInsert(contract: TestContract = baseContract): TestContract {
-  const clone = structuredClone(contract);
-  if (clone.capabilities?.['sql']) {
-    delete (clone.capabilities['sql'] as Record<string, unknown>)['defaultInInsert'];
+  const raw = JSON.parse(JSON.stringify(contract));
+  const sqlCaps = (raw.capabilities as Record<string, Record<string, unknown>> | undefined)?.[
+    'sql'
+  ];
+  if (sqlCaps) {
+    delete sqlCaps['defaultInInsert'];
   }
-  return clone;
+  return fixtureSerializer.deserializeContract(raw) as TestContract;
 }
 
 export function createReturningCollectionWithoutDefaultInInsert<ModelName extends TestModelName>(

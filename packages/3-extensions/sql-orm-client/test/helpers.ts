@@ -15,12 +15,17 @@ export function isSelectAst(ast: unknown): ast is SelectAst {
   return typeof ast === 'object' && ast !== null && 'kind' in ast && ast.kind === 'select';
 }
 
-const baseTestContract = new SqlContractSerializer().deserializeContract(contractJson) as Contract;
+const serializer = new SqlContractSerializer();
+const baseTestContract = serializer.deserializeContract(contractJson) as Contract;
 
 export type TestContract = Contract;
 
 export function getTestContract(): TestContract {
-  return structuredClone(baseTestContract);
+  return serializer.deserializeContract(contractJson) as TestContract;
+}
+
+function rehydrateContract(raw: unknown): TestContract {
+  return serializer.deserializeContract(raw) as TestContract;
 }
 
 /**
@@ -104,7 +109,8 @@ export function buildMixedPolyContract(): TestContract {
     base: 'Task',
   };
 
-  raw.storage.tables.tasks = {
+  raw.storage.tables.__unbound__.tasks = {
+    namespaceId: '__unbound__',
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -117,7 +123,8 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  raw.storage.tables.features = {
+  raw.storage.tables.__unbound__.features = {
+    namespaceId: '__unbound__',
     columns: {
       id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
       priority: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -128,7 +135,7 @@ export function buildMixedPolyContract(): TestContract {
     foreignKeys: [],
   };
 
-  return raw as TestContract;
+  return rehydrateContract(raw);
 }
 
 /**
@@ -165,23 +172,23 @@ export function buildStiPolyContract(): TestContract {
     base: 'User',
   };
 
-  raw.storage.tables.users.columns.kind = {
+  raw.storage.tables.__unbound__.users.columns.kind = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: false,
   };
-  raw.storage.tables.users.columns.role = {
+  raw.storage.tables.__unbound__.users.columns.role = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
   };
-  raw.storage.tables.users.columns.plan = {
+  raw.storage.tables.__unbound__.users.columns.plan = {
     codecId: 'pg/text@1',
     nativeType: 'text',
     nullable: true,
   };
 
-  return raw as TestContract;
+  return rehydrateContract(raw);
 }
 
 export function createMockRuntime(): MockRuntime {
