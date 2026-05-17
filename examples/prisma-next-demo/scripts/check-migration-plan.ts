@@ -35,7 +35,7 @@ function runMigrationPlan(): unknown {
     'dist',
     'cli.js',
   );
-  const stdout = execFileSync('node', [cliEntry, 'migration', 'plan'], {
+  const stdout = execFileSync('node', [cliEntry, 'migration', 'plan', '--json'], {
     cwd: demoRoot,
     encoding: 'utf-8',
     stdio: ['ignore', 'pipe', 'inherit'],
