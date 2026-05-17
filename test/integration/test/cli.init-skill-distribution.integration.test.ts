@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { delimiter as pathDelimiter } from 'node:path';
 import { join, resolve } from 'pathe';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { INIT_EXIT_OK } from '../../../packages/1-framework/3-tooling/cli/src/commands/init/exit-codes';
 import { runInit } from '../../../packages/1-framework/3-tooling/cli/src/commands/init/init';
 import { createIntegrationTestDir } from './utils/cli-test-helpers';
@@ -36,6 +36,12 @@ let workspaceClone: string;
 beforeAll(() => {
   workspaceClone = makeWorkspaceClone();
 }, 30_000);
+
+afterAll(() => {
+  if (workspaceClone) {
+    rmSync(workspaceClone, { recursive: true, force: true });
+  }
+});
 
 describe('init skill distribution (offline integration, real CLI)', () => {
   const testDirs = new Set<string>();
