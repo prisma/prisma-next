@@ -1,5 +1,6 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { describe, expect, it } from 'vitest';
@@ -7,6 +8,8 @@ import { Collection } from '../src/collection';
 import { withReturningCapability } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
 import { createMockRuntime, getTestContract } from './helpers';
+
+const tagSerializer = new SqlContractSerializer();
 
 // Synthetic 36-char Tag ids — Tag.id is typed `Char<36>` in the test contract.
 const TAG_ID_1 =
@@ -23,9 +26,9 @@ const tagId = (s: string): TagId => s as unknown as TagId;
 // both onCreate and onUpdate. The postgres test stack already registers
 // the `timestampNow` runtime generator, so the contract round-trips.
 function buildTagWithUpdatedAtContract(): TestContract {
-  const contract = structuredClone(withReturningCapability(getTestContract()));
+  const raw = JSON.parse(JSON.stringify(withReturningCapability(getTestContract())));
 
-  const tagModel = contract.models['Tag'] as Record<string, unknown> | undefined;
+  const tagModel = raw.models['Tag'] as Record<string, unknown> | undefined;
   if (!tagModel) {
     throw new Error('Test contract is missing the Tag model');
   }
@@ -38,7 +41,7 @@ function buildTagWithUpdatedAtContract(): TestContract {
   const tagStorageFields = tagStorage['fields'] as Record<string, unknown>;
   tagStorageFields['updatedAt'] = { column: 'updated_at' };
 
-  const tagsTable = contract.storage.tables['tags'] as
+  const tagsTable = raw.storage.tables['__unbound__']?.['tags'] as
     | { columns: Record<string, unknown> }
     | undefined;
   if (!tagsTable) {
@@ -50,7 +53,7 @@ function buildTagWithUpdatedAtContract(): TestContract {
     nullable: false,
   };
 
-  const execution = contract.execution as unknown as
+  const execution = raw.execution as
     | { mutations: { defaults: Array<Record<string, unknown>> } }
     | undefined;
   if (!execution) {
@@ -62,7 +65,7 @@ function buildTagWithUpdatedAtContract(): TestContract {
     onUpdate: { kind: 'generator', id: 'timestampNow' },
   });
 
-  return contract;
+  return tagSerializer.deserializeContract(raw) as TestContract;
 }
 
 function setupTagCollection(): {

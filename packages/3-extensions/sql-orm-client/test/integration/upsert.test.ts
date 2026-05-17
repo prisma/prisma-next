@@ -1,8 +1,12 @@
+import { SqlContractSerializer } from '@prisma-next/family-sql/ir';
 import type { InsertAst } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { Collection } from '../../src/collection';
 import { withReturningCapability } from '../collection-fixtures';
-import { getTestContext, getTestContract } from '../helpers';
+import { getTestContext, getTestContract, type TestContract } from '../helpers';
+
+const upsertSerializer = new SqlContractSerializer();
+
 import {
   createReturningTagsCollection,
   createReturningUsersCollection,
@@ -98,8 +102,11 @@ describe('integration/upsert', () => {
     'upsert() rejects when no conflict columns can be resolved',
     async () => {
       await withCollectionRuntime(async (runtime) => {
-        const contract = withReturningCapability(getTestContract());
-        delete (contract.storage.tables.users as { primaryKey?: unknown }).primaryKey;
+        const raw = JSON.parse(JSON.stringify(withReturningCapability(getTestContract()))) as {
+          storage: { tables: { __unbound__: { users: { primaryKey?: unknown } } } };
+        };
+        delete raw.storage.tables.__unbound__.users.primaryKey;
+        const contract = upsertSerializer.deserializeContract(raw) as TestContract;
         const context = { ...getTestContext(), contract };
         const users = new Collection({ runtime, context }, 'User');
 
