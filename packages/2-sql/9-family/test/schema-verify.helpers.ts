@@ -9,6 +9,7 @@ import {
   type StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyFkDefaults,
   type ReferentialAction,
@@ -86,9 +87,12 @@ export function createContractTable(
       type?: string;
       options?: Record<string, unknown>;
     }>;
+    namespaceId?: string;
   },
 ): StorageTable {
+  const namespaceId = options?.namespaceId ?? UNBOUND_NAMESPACE_ID;
   const result: StorageTable = {
+    namespaceId,
     columns: Object.fromEntries(
       Object.entries(columns).map(([name, col]) => [
         name,
@@ -102,6 +106,10 @@ export function createContractTable(
     ),
     foreignKeys: (options?.foreignKeys ?? []).map((fk) => ({
       ...fk,
+      target: {
+        ...fk.target,
+        namespaceId: fk.target.namespaceId ?? namespaceId,
+      },
       ...applyFkDefaults(fk),
     })),
     uniques: options?.uniques ?? [],
@@ -126,6 +134,7 @@ export function createSchemaTable(
       columns: readonly string[];
       referencedTable: string;
       referencedColumns: readonly string[];
+      referencedNamespaceId?: string;
       name?: string;
       onDelete?: SqlReferentialAction;
       onUpdate?: SqlReferentialAction;
@@ -138,8 +147,10 @@ export function createSchemaTable(
       type?: string;
       options?: Record<string, unknown>;
     }>;
+    introspectionScope?: string;
   },
 ): SqlTableIR {
+  const scope = options?.introspectionScope ?? UNBOUND_NAMESPACE_ID;
   const result: SqlTableIR = {
     name,
     columns: Object.fromEntries(
@@ -153,7 +164,10 @@ export function createSchemaTable(
         },
       ]),
     ),
-    foreignKeys: options?.foreignKeys ?? [],
+    foreignKeys: (options?.foreignKeys ?? []).map((fk) => ({
+      ...fk,
+      referencedNamespaceId: fk.referencedNamespaceId ?? scope,
+    })),
     uniques: options?.uniques ?? [],
     indexes: options?.indexes ?? [],
   };
