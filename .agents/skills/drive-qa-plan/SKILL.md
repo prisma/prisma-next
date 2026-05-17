@@ -36,6 +36,7 @@ A good manual-QA script is a structured accompaniment to a spec: it walks a huma
 - **Negative-control scenarios state their coverage boundary.** Proving a guard fires on one corrupted input only proves the gate works for that instance. The scenario must explicitly name the class boundary it covers and what's outside ("this proves the strict throw fires on a missing `kind`; it does not prove every possible malformed shape is rejected — only the one we constructed").
 - **Be honest about coverage gaps.** Not every AC has a meaningful manual-QA scenario. Marking ACs as N/A with a one-line rationale ("pure unit-test infrastructure; CI covers it") is better than padding the script with scenarios that re-run tests to keep the matrix full. The N/A entries are part of the script's contract.
 - **TOC-first structure.** Readers should grasp scope in the first ~50 lines. Provide a table of contents up front that summarises each scenario in one line and names the ACs it covers — so a reader can decide what to skip without scrolling.
+- **The reader does not have the spec open.** A QA runner picking up the script weeks later, or a reviewer skimming the PR, needs the *minimum context to make the scenarios legible* embedded in the script itself. That's the "What this script is testing" block — bug + fix + manual-QA-vs-CI delta — derived from the spec's Summary so the reader isn't forced to context-switch to a separate doc just to know what's being tested. A link to the spec is not a substitute; it is the source the section is derived from.
 
 ## The litmus test for every scenario
 
@@ -68,6 +69,14 @@ Every manual-QA script follows this structure. Aim for ~300–500 lines for a si
 > **Spec:** `<path>`
 > **Plan:** `<path>` (if any)
 > **PR:**  `<URL>`
+
+## What this script is testing
+
+**The bug / motivation.** <One paragraph derived from the spec's Summary / Background: what was broken, what user-facing flow triggered it, and why it shipped. If this work isn't fixing a bug, replace with "**The change**: <what behaviour this PR adds or alters and what user-facing surface it touches>".>
+
+**The fix / what changed.** <One short paragraph or a numbered list — 3–5 bullets max — of the substantive changes the PR makes, in the *user's* mental model, not the implementer's. "We added a strict throw at the deserializer and a lint that rejects the bypass pattern" not "we removed line 129 of `sql-storage.ts`".>
+
+**Why manual QA matters here.** <One paragraph naming the specific gaps the scripted tests / CI cannot meaningfully close — the things a human's judgement is the only honest oracle for. This is the bridge between the spec and the litmus test; every scenario below should target one of the gaps named here.>
 
 ## Table of contents
 
@@ -165,7 +174,17 @@ It is *correct and expected* for some ACs to come out N/A. If you find you've la
 
 Write the TOC table before any scenario body. It forces the script into a one-line-summary-per-scenario shape and lets you sanity-check coverage at a glance. The columns are mandatory: number, scenario name (verb phrase), one-line claim, AC IDs covered. If two TOC rows would have the same one-line claim, you have one scenario with two write-ups — collapse them.
 
-### 4. Write each scenario in the canonical shape
+### 4. Write the "What this script is testing" block before the scenarios
+
+Derive it from the spec's Summary / Background. Three paragraphs (or short blocks):
+
+1. **The bug / motivation** — what was broken (or what behaviour the PR adds), described in the user's mental model, not the implementer's. If the spec opens with an originally-failing flow, name the exact flow and the error the user saw.
+2. **The fix / what changed** — the substantive changes in 3–5 bullets, framed by user-observable surface ("we now throw a strict diagnostic at the deserializer"), not by file/line ("we removed line 129 of `sql-storage.ts`").
+3. **Why manual QA matters here** — the specific gaps that scripted tests / CI cannot meaningfully close. This is the bridge between the spec's intent and the script's litmus test; every scenario you write should target one of the gaps you name in this paragraph.
+
+If you find yourself unable to write paragraph 3 — i.e. you can't name a gap that CI doesn't already cover — that's a signal the entire script may be redundant. Re-read the "When Not to Use" section.
+
+### 5. Write each scenario in the canonical shape
 
 Each scripted scenario has exactly these subsections, in this order:
 
@@ -180,7 +199,7 @@ Each scripted scenario has exactly these subsections, in this order:
 
 For exploratory scenarios, the shape is different: charter, covers, time budget, notes-capture instruction. No steps, no failure modes (the runner discovers them).
 
-### 5. Add the "Scenarios deliberately not in this script" table
+### 6. Add the "Scenarios deliberately not in this script" table
 
 This is load-bearing. It documents which ACs you chose *not* to cover and why. A future reader (or a different QA round) will check it before assuming a coverage gap means an oversight.
 
@@ -193,11 +212,11 @@ Common entries:
 | "Fixtures exist on disk" | Pure test infrastructure. `ls`-ing the fixture directory is not a QA pass. |
 | "Type-check passes" | Same. Compile-time gate, not a user observation. |
 
-### 6. Build the sign-off coverage map
+### 7. Build the sign-off coverage map
 
 The coverage map mirrors the TOC's AC mapping verbatim. Every AC appears exactly once. N/A rows point at the "deliberately not in this script" table. **No result column** — the report owns results.
 
-### 7. Place the script in the canonical location
+### 8. Place the script in the canonical location
 
 By convention this repo's project artefacts live at `projects/<project-name>/`. Manual-QA scripts go at `projects/<project-name>/manual-qa.md`. If the project has multiple milestones with materially different QA shape, prefer `projects/<project-name>/manual-qa/<milestone>.md` and link them from a slim index. Reports (one per QA pass) accumulate at `projects/<project-name>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md` — owned by `drive-qa-run`.
 
@@ -215,6 +234,7 @@ By convention this repo's project artefacts live at `projects/<project-name>/`. 
 10. **No exploratory scenario.** Symptom: the script enumerates everything the author thought of; nothing invites the runner to look beyond. Fix: add at least one charter scenario with a time budget. Unknown unknowns are the whole point of charters.
 11. **Pre-classifying severity in failure modes.** Symptom: "Red flag (blocker): the original bug returns". Fix: the script-author doesn't know the runtime context (release stage, blast radius, surrounding changes) at execution time. Enumerate the failure category; let the runner classify in the report.
 12. **Using `wip/` for the script.** Symptom: the file lands at `wip/manual-qa.md`. Cause: the author treated it as scratch. Fix: manual-QA scripts are durable artefacts that ship alongside the spec — they belong in `projects/<project>/` (tracked) and travel with the PR. `wip/` is gitignored and the script would vanish.
+13. **Spec link without spec summary.** Symptom: the script jumps from the frame block straight to the TOC, with only a `**Spec:** <path>` link. A reader who hasn't opened the spec sees a TOC of scenarios with no context for *why* they exist. Fix: write the "What this script is testing" block (bug + fix + manual-QA-vs-CI delta), derived from the spec's Summary. The link to the spec stays — but it points at the source the section was derived from, not at a doc the reader has to context-switch into.
 
 ## What this skill doesn't do
 
@@ -231,7 +251,8 @@ By convention this repo's project artefacts live at `projects/<project-name>/`. 
 ## Checklist
 
 - [ ] Script lives at `projects/<project-name>/manual-qa.md` (or per-milestone equivalent), not `wip/`.
-- [ ] First ~50 lines give a reader the full scope: frame paragraph + "Out of scope of this script" + spec/plan/PR links + TOC table.
+- [ ] First page gives a reader the full scope: frame paragraph + "Out of scope of this script" + spec/plan/PR links + **"What this script is testing"** block + TOC table.
+- [ ] **"What this script is testing"** has three blocks — bug/motivation, fix/what changed, why manual QA matters — and is derived from the spec's Summary, not a stand-in link.
 - [ ] TOC table has one row per scenario with: number, verb-phrase title, one-line claim, AC IDs covered.
 - [ ] Every scripted scenario has all seven sections: What you're proving, Covers, **Oracle**, **Preconditions**, Steps, What you should see, Failure modes (+ Restore if state-mutating).
 - [ ] At least one **exploratory charter** scenario with a time budget.
