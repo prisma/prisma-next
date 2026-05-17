@@ -1,0 +1,33 @@
+# @prisma-next/extension-author-tools
+
+CLI tools that pair with the [`prisma-next-extension-upgrade`](../../../skills/extension-author/prisma-next-extension-upgrade/SKILL.md) agent skill. Today this package ships one tool; future tools for extension authors using the upgrade-skill flow will land here.
+
+The agent-readable upgrade procedure itself (the SKILL.md, the `upgrades/<from>-to-<to>/instructions.md` set, the README) lives at [`skills/extension-author/prisma-next-extension-upgrade/`](../../../skills/extension-author/prisma-next-extension-upgrade/) and is distributed via `npx skills add prisma/prisma-next/skills/extension-author --all`. This package is the npm-published companion that supplies the CI bin the skill drives.
+
+## Installation
+
+```bash
+pnpm add -D @prisma-next/extension-author-tools
+# or:
+npm install --save-dev @prisma-next/extension-author-tools
+```
+
+## Tools
+
+### `prisma-next-check-pins`
+
+CI guard for extension packages. Asserts that every `@prisma-next/*` entry under the package's `peerDependencies` (and, optionally, `dependencies`) is pinned to an exact version, not a range.
+
+This is the invariant the [`prisma-next-extension-upgrade`](../../../skills/extension-author/prisma-next-extension-upgrade/SKILL.md) skill relies on at upgrade time: extension authors pin every `@prisma-next/*` peer to a single exact version per release of their extension, so the skill can mechanically advance both the framework deps and the extension's published version in lockstep.
+
+Run from the extension's repository root:
+
+```bash
+pnpm exec prisma-next-check-pins
+```
+
+Exit code is `0` if every `@prisma-next/*` peerDep is exact, non-zero otherwise. Suitable for use in a GitHub Actions `run:` step, a pre-commit hook, or `package.json` `scripts.lint`.
+
+## Source location
+
+`packages/0-shared/extension-author-tools/`

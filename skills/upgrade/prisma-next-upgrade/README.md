@@ -1,4 +1,4 @@
-# @prisma-next/upgrade-skill
+# prisma-next-upgrade
 
 An agent skill that upgrades a project consuming Prisma Next from one minor version to the next. The skill carries the per-step bump-install-instructions-validate-commit flow plus the cumulative set of per-transition *upgrade instructions* (one directory per `(from-minor, to-minor)` pair).
 
@@ -6,17 +6,17 @@ An agent skill that upgrades a project consuming Prisma Next from one minor vers
 
 This skill is for **users** of Prisma Next — projects that depend on the public package API (`@prisma-next/postgres`, `@prisma-next/mongo`, the contract files in `prisma/`, etc.).
 
-If you are an extension author, install [`@prisma-next/extension-upgrade-skill`](https://www.npmjs.com/package/@prisma-next/extension-upgrade-skill) instead. If your repo contains both an app and an extension, install both.
+If you are an extension author, install the [`prisma-next-extension-upgrade`](../../extension-author/prisma-next-extension-upgrade/SKILL.md) skill instead. If your repo contains both an app and an extension, install both.
 
 ## Installation
 
 ```bash
-npx skills add @prisma-next/upgrade-skill@latest --all
+npx skills add prisma/prisma-next/skills/upgrade --all
 ```
 
 `--all` skips the per-agent selection prompt and installs to every agent runtime the `skills` CLI detects on this machine. For a single-agent install, swap `--all` for `-a <agent>` (e.g. `-a claude-code`).
 
-Always install at `@latest`. Bug fixes to older per-transition upgrade instructions ship as part of the latest skill release; pinning to an older skill version can apply a known-broken translation.
+The upgrade-skill subpath is intentionally **unpinned** (always tracks `main`). Bug fixes to older per-transition upgrade instructions ship as part of the cumulative latest skill content; pinning to an older revision can apply a known-broken translation. This is the only Prisma Next skill cluster that is unpinned by design — the user-facing usage skills under `skills/*` install pinned to the project's installed Prisma Next version (see [`prisma-next init`](../../../packages/1-framework/3-tooling/cli/) for the canonical wiring).
 
 ## Usage
 
@@ -27,10 +27,6 @@ Please upgrade Prisma Next to the latest version.
 ```
 
 The agent reads `SKILL.md`, detects the current and target versions, applies one transition at a time, and commits each transition step separately.
-
-## Versioning
-
-This package is version-locked to the rest of Prisma Next: every Prisma Next release publishes the same version of this skill. The version is publication discipline (one release per Prisma Next release), not a compatibility selector — consumers always install at `@latest`.
 
 ## What the skill does
 
