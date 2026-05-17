@@ -8,27 +8,31 @@ type TestContract = Contract<
   {
     readonly storageHash: StorageHashBase<string>;
     readonly tables: {
-      readonly document: {
-        readonly namespaceId: '__unbound__';
-        readonly columns: {
-          readonly id: {
-            readonly nativeType: 'int4';
-            readonly codecId: 'pg/int4@1';
-            nullable: false;
+      readonly __unbound__: {
+        readonly document: {
+          readonly namespaceId: '__unbound__';
+          readonly columns: {
+            readonly id: {
+              readonly nativeType: 'int4';
+              readonly codecId: 'pg/int4@1';
+              nullable: false;
+            };
           };
+          readonly primaryKey: { readonly columns: readonly ['id'] };
+          readonly uniques: readonly [];
+          readonly indexes: readonly [];
+          readonly foreignKeys: readonly [];
         };
-        readonly primaryKey: { readonly columns: readonly ['id'] };
-        readonly uniques: readonly [];
-        readonly indexes: readonly [];
-        readonly foreignKeys: readonly [];
       };
     };
     readonly types: {
-      readonly Vector1536: {
-        readonly kind: 'codec-instance';
-        readonly codecId: 'pg/vector@1';
-        readonly nativeType: 'vector';
-        readonly typeParams: { readonly length: 1536 };
+      readonly __unbound__: {
+        readonly Vector1536: {
+          readonly kind: 'codec-instance';
+          readonly codecId: 'pg/vector@1';
+          readonly nativeType: 'vector';
+          readonly typeParams: { readonly length: 1536 };
+        };
       };
     };
     readonly namespaces: { readonly __unbound__: { readonly id: '__unbound__' } };

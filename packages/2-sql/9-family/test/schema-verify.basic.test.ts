@@ -50,20 +50,22 @@ describe('verifySqlSchema - basic', () => {
         storage: {
           storageHash: 'sha256:test' as StorageHashBase<string>,
           tables: {
-            user: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
-              columns: {
-                email: {
-                  nativeType: 'character varying',
-                  codecId: 'sql/varchar@1',
-                  nullable: false,
-                  typeParams: { length: 255 },
+            [UNBOUND_NAMESPACE_ID]: {
+              user: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                columns: {
+                  email: {
+                    nativeType: 'character varying',
+                    codecId: 'sql/varchar@1',
+                    nullable: false,
+                    typeParams: { length: 255 },
+                  },
                 },
+                primaryKey: { columns: ['email'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['email'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
@@ -206,20 +208,22 @@ describe('verifySqlSchema - basic', () => {
         storage: {
           storageHash: 'sha256:test' as StorageHashBase<string>,
           tables: {
-            user: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
-              columns: {
-                email: {
-                  nativeType: 'character varying',
-                  codecId: 'sql/varchar@1',
-                  nullable: false,
-                  typeParams: { length: 255 },
+            [UNBOUND_NAMESPACE_ID]: {
+              user: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                columns: {
+                  email: {
+                    nativeType: 'character varying',
+                    codecId: 'sql/varchar@1',
+                    nullable: false,
+                    typeParams: { length: 255 },
+                  },
                 },
+                primaryKey: { columns: ['email'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['email'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },

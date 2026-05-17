@@ -2,9 +2,12 @@ import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
 import {
   type ForeignKey,
+  findTableByName,
   type Index,
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
+  iterateTablesWithCoords,
+  iterateTypesWithCoords,
   type PostgresEnumStorageEntry,
   type SqlStorage,
   type StorageColumn,
@@ -216,12 +219,11 @@ export function detectDestructiveChanges(
 ): readonly MigrationPlannerConflict[] {
   if (!from) return [];
 
-  const hasOwn = (value: object, key: string): boolean => Object.hasOwn(value, key);
-
   const conflicts: MigrationPlannerConflict[] = [];
 
-  for (const tableName of Object.keys(from.tables)) {
-    if (!hasOwn(to.tables, tableName)) {
+  for (const { name: tableName, table: fromTable } of iterateTablesWithCoords(from)) {
+    const toTable = findTableByName(to, tableName);
+    if (!toTable) {
       conflicts.push({
         kind: 'tableRemoved',
         summary: `Table "${tableName}" was removed`,
@@ -229,12 +231,8 @@ export function detectDestructiveChanges(
       continue;
     }
 
-    const toTable = to.tables[tableName] as StorageTable;
-    const fromTable = from.tables[tableName];
-    if (!fromTable) continue;
-
     for (const columnName of Object.keys(fromTable.columns)) {
-      if (!hasOwn(toTable.columns, columnName)) {
+      if (!Object.hasOwn(toTable.columns, columnName)) {
         conflicts.push({
           kind: 'columnRemoved',
           summary: `Column "${tableName}"."${columnName}" was removed`,
@@ -279,9 +277,9 @@ export function contractToSchemaIR(
   }
 
   const storage = contract.storage;
-  const storageTypes = (storage.types ?? {}) as ResolvedStorageTypes;
+  const storageTypes = resolveTypes(storage);
   const tables: Record<string, SqlTableIR> = {};
-  for (const [tableName, tableDef] of Object.entries(storage.tables)) {
+  for (const { name: tableName, table: tableDef } of iterateTablesWithCoords(storage)) {
     tables[tableName] = convertTable(
       tableName,
       tableDef,
@@ -299,25 +297,30 @@ export function contractToSchemaIR(
   };
 }
 
+function resolveTypes(storage: SqlStorage): ResolvedStorageTypes {
+  const resolved: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+  for (const { name, entry } of iterateTypesWithCoords(storage)) {
+    resolved[name] = entry;
+  }
+  return resolved as ResolvedStorageTypes;
+}
+
 function deriveAnnotations(
   storage: SqlStorage,
   annotationNamespace: string,
 ): SqlAnnotations | undefined {
-  const types = storage.types as ResolvedStorageTypes | undefined;
-  if (!types || Object.keys(types).length === 0) return undefined;
-  // Re-key by nativeType, normalising every variant to the codec-typed
-  // annotation shape `{codecId, nativeType, typeParams}` produced by the
-  // adapter introspector (`introspectPostgresEnumTypes` writes that shape;
-  // see also `enum-planning.ts § readExistingEnumValues`, which reads
-  // `existing.codecId` + `existing.typeParams.values`). Without this
-  // normalisation, the projector would emit the raw
-  // `PostgresEnumStorageEntry` shape (top-level `values`, no `typeParams`)
-  // and downstream Schema IR consumers that walk the codec-typed shape
-  // would see enum entries as new (e.g. the planner emits a fresh
-  // `CreateEnumTypeCall` instead of the rebuild recipe). Unknown future
-  // kinds without `nativeType` are skipped rather than crashing.
+  if (!storage.types) return undefined;
+  let hasEntries = false;
+  for (const bucket of Object.values(storage.types)) {
+    if (Object.keys(bucket).length > 0) {
+      hasEntries = true;
+      break;
+    }
+  }
+  if (!hasEntries) return undefined;
+
   const byNativeType: Record<string, StorageTypeInstance> = {};
-  for (const typeInstance of Object.values(types)) {
+  for (const { entry: typeInstance } of iterateTypesWithCoords(storage)) {
     if (isPostgresEnumStorageEntry(typeInstance)) {
       byNativeType[typeInstance.nativeType] = toStorageTypeInstance({
         codecId: typeInstance.codecId,

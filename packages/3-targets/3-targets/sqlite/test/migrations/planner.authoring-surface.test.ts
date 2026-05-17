@@ -15,16 +15,18 @@ function createContract(): Contract<SqlStorage> {
     storage: {
       storageHash: coreHash('sha256:to'),
       tables: {
-        user: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+        [UNBOUND_NAMESPACE_ID]: {
+          user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
       namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },

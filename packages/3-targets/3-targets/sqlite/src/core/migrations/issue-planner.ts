@@ -17,12 +17,13 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import type {
-  PostgresEnumStorageEntry,
-  SqlStorage,
-  StorageColumn,
-  StorageTable,
-  StorageTypeInstance,
+import {
+  findTableByName,
+  type PostgresEnumStorageEntry,
+  type SqlStorage,
+  type StorageColumn,
+  type StorageTable,
+  type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -297,7 +298,7 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Missing table issue has no table name'),
         );
       }
-      const contractTable = ctx.toContract.storage.tables[issue.table];
+      const contractTable = findTableByName(ctx.toContract.storage, issue.table);
       if (!contractTable) {
         return notOk(
           issueConflict(
@@ -329,7 +330,7 @@ function mapIssueToCall(
           issueConflict('unsupportedOperation', 'Missing column issue has no table/column name'),
         );
       }
-      const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+      const column = findTableByName(ctx.toContract.storage, issue.table)?.columns[issue.column];
       if (!column) {
         return notOk(
           issueConflict(
@@ -338,7 +339,7 @@ function mapIssueToCall(
           ),
         );
       }
-      const contractTable = ctx.toContract.storage.tables[issue.table];
+      const contractTable = findTableByName(ctx.toContract.storage, issue.table);
       const columnSpec = toColumnSpec(
         issue.column,
         column,
@@ -362,7 +363,7 @@ function mapIssueToCall(
         );
       }
       const columns = issue.expected.split(', ');
-      const contractTable = ctx.toContract.storage.tables[issue.table];
+      const contractTable = findTableByName(ctx.toContract.storage, issue.table);
       if (!contractTable) {
         return notOk(
           issueConflict(

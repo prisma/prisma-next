@@ -24,7 +24,12 @@
 
 import type { Contract } from '@prisma-next/contract/types';
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
-import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  iterateTablesWithCoords,
+  type SqlStorage,
+  type StorageColumn,
+  type StorageTable,
+} from '@prisma-next/sql-contract/types';
 import type { CodecControlHooks, FieldEvent, FieldEventContext } from './types';
 
 export interface PlanFieldEventOperationsOptions {
@@ -61,17 +66,17 @@ interface FieldEntry {
 export function planFieldEventOperations(
   options: PlanFieldEventOperationsOptions,
 ): readonly OpFactoryCall[] {
-  const priorTables = options.priorContract?.storage.tables ?? {};
-  const newTables = options.newContract.storage.tables;
+  const priorTablesFlat = flattenTables(options.priorContract?.storage);
+  const newTablesFlat = flattenTables(options.newContract.storage);
 
   const added: FieldEntry[] = [];
   const dropped: FieldEntry[] = [];
   const altered: FieldEntry[] = [];
 
-  const tableNames = unionSorted(Object.keys(priorTables), Object.keys(newTables));
+  const tableNames = unionSorted(Object.keys(priorTablesFlat), Object.keys(newTablesFlat));
   for (const tableName of tableNames) {
-    const priorTable = priorTables[tableName];
-    const newTable = newTables[tableName];
+    const priorTable = priorTablesFlat[tableName];
+    const newTable = newTablesFlat[tableName];
     const fieldNames = unionSorted(
       priorTable ? Object.keys(priorTable.columns) : [],
       newTable ? Object.keys(newTable.columns) : [],
@@ -184,6 +189,15 @@ function sameJson(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a === undefined || b === undefined) return false;
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function flattenTables(storage: SqlStorage | undefined): Record<string, StorageTable> {
+  if (!storage) return {};
+  const flat: Record<string, StorageTable> = {};
+  for (const { name, table } of iterateTablesWithCoords(storage)) {
+    flat[name] = table;
+  }
+  return flat;
 }
 
 function unionSorted(a: readonly string[], b: readonly string[]): readonly string[] {

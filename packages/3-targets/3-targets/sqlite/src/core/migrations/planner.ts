@@ -17,6 +17,11 @@ import type {
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
+import {
+  iterateTypesWithCoords,
+  type PostgresEnumStorageEntry,
+  type StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import { parseSqliteDefault } from '../default-normalizer';
 import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
@@ -98,7 +103,14 @@ export class SqliteMigrationPlanner
 
     const schemaIssues = this.collectSchemaIssues(options);
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
-    const storageTypes = options.contract.storage.types ?? {};
+    const storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>> =
+      (() => {
+        const flat: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+        for (const { name, entry } of iterateTypesWithCoords(options.contract.storage)) {
+          flat[name] = entry;
+        }
+        return flat;
+      })();
 
     const result = planIssues({
       issues: schemaIssues,

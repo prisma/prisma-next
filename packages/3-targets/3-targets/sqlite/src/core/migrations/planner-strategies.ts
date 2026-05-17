@@ -21,10 +21,11 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import type {
-  PostgresEnumStorageEntry,
-  SqlStorage,
-  StorageTypeInstance,
+import {
+  findTableByName,
+  type PostgresEnumStorageEntry,
+  type SqlStorage,
+  type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -114,7 +115,7 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
 
   const calls: SqliteOpFactoryCall[] = [];
   for (const [tableName, entry] of byTable) {
-    const contractTable = ctx.toContract.storage.tables[tableName];
+    const contractTable = findTableByName(ctx.toContract.storage, tableName);
     const schemaTable = ctx.schema.tables[tableName];
     if (!contractTable || !schemaTable) continue;
     const operationClass: MigrationOperationClass = entry.hasDestructive
@@ -206,7 +207,7 @@ export const nullabilityTighteningBackfillStrategy: CallMigrationStrategy = (iss
     // needs no backfill.
     if (issue.expected === 'true') continue;
 
-    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    const column = findTableByName(ctx.toContract.storage, issue.table)?.columns[issue.column];
     if (!column || column.nullable === true) continue;
 
     calls.push(

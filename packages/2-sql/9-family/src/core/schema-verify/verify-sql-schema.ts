@@ -15,11 +15,15 @@ import type {
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
 import {
+  findTableByName,
   isPostgresEnumStorageEntry,
   isStorageTypeInstance,
+  iterateTablesWithCoords,
+  iterateTypesWithCoords,
   type PostgresEnumStorageEntry,
   type SqlStorage,
   type StorageColumn,
+  type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -128,9 +132,7 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   const { contractStorageHash, contractProfileHash, contractTarget } =
     extractContractMetadata(contract);
-  const storageTypes = (contract.storage.types ?? {}) as Readonly<
-    Record<string, PostgresEnumStorageEntry | StorageTypeInstance>
-  >;
+  const storageTypes = flattenTypes(contract.storage);
   const { issues, rootChildren } = verifySchemaTables({
     contract,
     schema,
@@ -144,10 +146,6 @@ export function verifySqlSchema(options: VerifySqlSchemaOptions): VerifyDatabase
 
   validateFrameworkComponentsForExtensions(contract, options.frameworkComponents);
 
-  // Verify storage type instances. PostgresEnumStorageEntry entries are walked
-  // natively (using the bridging adapter `resolveExistingEnumValues`);
-  // remaining codec-typed entries continue to dispatch through the
-  // generic codec-hook `verifyType` path.
   const storageTypeEntries = Object.entries(storageTypes);
   if (storageTypeEntries.length > 0) {
     const typeNodes: SchemaVerificationNode[] = [];
@@ -335,10 +333,11 @@ function verifySchemaTables(options: {
   } = options;
   const issues: SchemaIssue[] = [];
   const rootChildren: SchemaVerificationNode[] = [];
-  const contractTables = contract.storage.tables;
   const schemaTables = schema.tables;
 
-  for (const [tableName, contractTable] of Object.entries(contractTables)) {
+  for (const { name: tableName, table: contractTable } of iterateTablesWithCoords(
+    contract.storage,
+  )) {
     const schemaTable = schemaTables[tableName];
     const tablePath = `storage.tables.${tableName}`;
 
@@ -380,7 +379,7 @@ function verifySchemaTables(options: {
 
   if (strict) {
     for (const tableName of Object.keys(schemaTables)) {
-      if (!contractTables[tableName]) {
+      if (!findTableByName(contract.storage, tableName)) {
         issues.push({
           kind: 'extra_table',
           table: tableName,
@@ -405,7 +404,7 @@ function verifySchemaTables(options: {
 }
 
 function verifyTableChildren(options: {
-  contractTable: Contract<SqlStorage>['storage']['tables'][string];
+  contractTable: StorageTable;
   schemaTable: SqlSchemaIR['tables'][string];
   tableName: string;
   tablePath: string;
@@ -563,7 +562,7 @@ function verifyTableChildren(options: {
 }
 
 function collectContractColumnNodes(options: {
-  contractTable: Contract<SqlStorage>['storage']['tables'][string];
+  contractTable: StorageTable;
   schemaTable: SqlSchemaIR['tables'][string];
   tableName: string;
   tablePath: string;
@@ -637,7 +636,7 @@ function collectContractColumnNodes(options: {
 }
 
 function appendExtraColumnNodes(options: {
-  contractTable: Contract<SqlStorage>['storage']['tables'][string];
+  contractTable: StorageTable;
   schemaTable: SqlSchemaIR['tables'][string];
   tableName: string;
   tablePath: string;
@@ -671,7 +670,7 @@ function appendExtraColumnNodes(options: {
 function verifyColumn(options: {
   tableName: string;
   columnName: string;
-  contractColumn: Contract<SqlStorage>['storage']['tables'][string]['columns'][string];
+  contractColumn: StorageColumn;
   schemaColumn: SqlSchemaIR['tables'][string]['columns'][string];
   columnPath: string;
   issues: SchemaIssue[];
@@ -1020,7 +1019,7 @@ function validateFrameworkComponentsForExtensions(
  * target-specific adapters (like Postgres) to provide their own expansion logic.
  */
 function renderExpectedNativeType(
-  contractColumn: Contract<SqlStorage>['storage']['tables'][string]['columns'][string],
+  contractColumn: StorageColumn,
   storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
   codecHooks: Map<string, CodecControlHooks>,
   context?: {
@@ -1195,6 +1194,16 @@ function literalValuesEqual(a: unknown, b: unknown): boolean {
     }
   }
   return false;
+}
+
+function flattenTypes(
+  storage: SqlStorage,
+): Readonly<Record<string, PostgresEnumStorageEntry | StorageTypeInstance>> {
+  const flat: Record<string, PostgresEnumStorageEntry | StorageTypeInstance> = {};
+  for (const { name, entry } of iterateTypesWithCoords(storage)) {
+    flat[name] = entry;
+  }
+  return flat;
 }
 
 function formatLiteralValue(value: unknown): string {
