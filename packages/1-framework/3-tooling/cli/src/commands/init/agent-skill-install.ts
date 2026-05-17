@@ -7,52 +7,103 @@ import { errorInitSkillInstallFailed } from './errors';
 const exec = promisify(execFile);
 
 /**
- * Default skills source for published CLI builds.
- *
- * Points at the Prisma Next monorepo tag that matches the CLI's own
- * package version, with the `skills/` subpath so discovery's `searchPath`
- * is the user-facing cluster directly. Contributor skills live in a
- * top-level `skills-contrib/` directory that's not on upstream's
- * priority-discovery allowlist, so the subpath form gives consumers
- * exactly the user-facing skills regardless of upstream's `--all`
- * semantics.
- *
- * Background: upstream's `--all` flag deliberately bypasses the
- * `metadata.internal: true` filter, so frontmatter is not a reliable
- * defence against contributor-skill leakage. The subpath URL is.
+ * Default base for the GitHub-URL form `<owner>/<repo>` consumed by
+ * upstream `skills add`. Each `SkillSource` joins this base with its
+ * own subpath (and optional `#ref` for version-pinned clusters).
  */
-export const DEFAULT_AGENT_SKILL_SOURCE = `prisma/prisma-next/skills#v${cliVersion}`;
+export const DEFAULT_AGENT_SKILL_BASE = 'prisma/prisma-next';
 
 /**
- * Test-only escape hatch for pinning a local or in-flight skills source.
- * Production runs leave this unset, so installs always use
- * `DEFAULT_AGENT_SKILL_SOURCE`.
+ * One discovery scope inside the Prisma Next monorepo. The CLI emits
+ * one `skills add <base>/<subpath>[#ref] --all` invocation per source
+ * during `init`.
+ *
+ * `ref` semantics:
+ * - `cli`: pin to the CLI's own package version (lockstep with the
+ *   skills' SPI). Used for the version-locked usage cluster — the
+ *   skills under `skills/<X>/SKILL.md`, which describe the public
+ *   package API and are pinned to the version of `@prisma-next/*`
+ *   currently installed in the consumer's project.
+ * - `null`: no ref. The cluster is "always-latest" — the cumulative
+ *   instruction set is the source of truth, and the latest revision
+ *   on `main` includes bug fixes for every prior transition. Used
+ *   for the upgrade and extension-author clusters.
  */
-function resolveAgentSkillSource(): string {
-  const override = process.env['PRISMA_NEXT_SKILLS_REF']?.trim();
-  return override && override.length > 0 ? override : DEFAULT_AGENT_SKILL_SOURCE;
+export interface SkillSource {
+  readonly subpath: string;
+  readonly ref: 'cli' | null;
+  readonly description: string;
+}
+
+export const DEFAULT_AGENT_SKILL_SOURCES: readonly SkillSource[] = [
+  {
+    subpath: 'skills',
+    ref: 'cli',
+    description: 'usage skills (version-locked to installed Prisma Next)',
+  },
+  {
+    subpath: 'skills/upgrade',
+    ref: null,
+    description: 'upgrade skill (always tracks `main`)',
+  },
+  {
+    subpath: 'skills/extension-author',
+    ref: null,
+    description: 'extension-author skill (always tracks `main`)',
+  },
+];
+
+/**
+ * Test-only escape hatch for pinning the install base to a local
+ * checkout. Production runs leave this unset, so installs always use
+ * `DEFAULT_AGENT_SKILL_BASE`.
+ *
+ * When set to an absolute filesystem path (typical for tests), the
+ * `#ref` fragment is dropped — local-path mode in upstream's CLI does
+ * not accept refs, and the local clone has whatever content the test
+ * checked into it anyway. When set to anything else (e.g. a fork name
+ * `myuser/prisma-next`), the ref policy is preserved.
+ */
+function resolveAgentSkillBase(): string {
+  const override = process.env['PRISMA_NEXT_SKILLS_BASE']?.trim();
+  return override && override.length > 0 ? override : DEFAULT_AGENT_SKILL_BASE;
+}
+
+function isLocalPath(base: string): boolean {
+  return base.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(base);
 }
 
 /**
- * The skill-install command, formatted for the project's detected
- * package manager. `npx`/`pnpm dlx`/`bunx` are interchangeable to the
- * user; we pick the variant that matches the rest of the install step
- * so a single project consistently uses one runner.
+ * Build the `<base>/<subpath>[#ref]` URL the `skills` CLI will
+ * resolve. Exported for unit tests so the per-source format can be
+ * asserted without going through the full install loop.
+ */
+export function formatSkillSourceUrl(source: SkillSource): string {
+  const base = resolveAgentSkillBase();
+  const url = `${base}/${source.subpath}`;
+  if (source.ref === null) return url;
+  if (isLocalPath(base)) return url;
+  if (source.ref === 'cli') return `${url}#v${cliVersion}`;
+  return url;
+}
+
+/**
+ * The skill-install command for one source, formatted for the
+ * project's detected package manager. `npx`/`pnpm dlx`/`bunx` are
+ * interchangeable to the user; we pick the variant that matches the
+ * rest of the install step so a single project consistently uses one
+ * runner.
  *
  * `--all` auto-selects every skill in the cluster and every detected
  * agent runtime, skipping the multi-select prompts the `skills` CLI
  * shows by default. A non-interactive scaffold step cannot present
- * prompts, and the cluster is designed to be installed as a unit (the
- * router skill routes between the workflow-scoped siblings). Users who
- * want a narrower install run
- * `npx skills add prisma/prisma-next/skills#v<version>` themselves
- * after `init` with the flags they want.
+ * prompts.
  *
  * Exported for unit tests so the per-PM dispatch can be asserted
  * without a live subprocess.
  */
-export function formatSkillInstallCommand(pm: PackageManager): string {
-  const args = ['skills', 'add', resolveAgentSkillSource(), '--all'];
+export function formatSkillInstallCommand(pm: PackageManager, source: SkillSource): string {
+  const args = ['skills', 'add', formatSkillSourceUrl(source), '--all'];
   switch (pm) {
     case 'pnpm':
       return `pnpm dlx ${args.join(' ')}`;
@@ -83,31 +134,37 @@ function commandToExec(command: string): {
 }
 
 /**
- * Runs the project-level skill install. Returns `{ ok: true, command }`
- * on success; throws a structured `errorInitSkillInstallFailed` on
- * failure. The throw is intentionally fatal — project-level skill
- * install is unconditional (modulo `--no-skill`) and the user opted
- * into Prisma Next by running `init`. A silent skip would defeat the
- * onboarding-to-zero contract.
+ * Runs the project-level skill install for every source in
+ * `DEFAULT_AGENT_SKILL_SOURCES`, in order. Returns
+ * `{ ok: true, commands }` on success; throws a structured
+ * `errorInitSkillInstallFailed` on the first failure (subsequent
+ * sources are not attempted — the user opted into Prisma Next by
+ * running `init` and a partial install would leave the project in an
+ * ambiguous state). The throw is intentionally fatal — project-level
+ * skill install is unconditional (modulo `--no-skill`).
  */
 export async function runProjectLevelSkillInstall(ctx: {
   readonly baseDir: string;
   readonly pm: PackageManager;
   readonly filesWritten: readonly string[];
-}): Promise<{ readonly ok: true; readonly command: string }> {
-  const command = formatSkillInstallCommand(ctx.pm);
-  const { file, args } = commandToExec(command);
-  try {
-    await exec(file, args, { cwd: ctx.baseDir });
-    return { ok: true, command };
-  } catch (err) {
-    throw errorInitSkillInstallFailed({
-      skillInstallCommand: command,
-      filesWritten: ctx.filesWritten,
-      cause:
-        redactSecrets(readChildStderr(err)) || (err instanceof Error ? err.message : String(err)),
-    });
+}): Promise<{ readonly ok: true; readonly commands: readonly string[] }> {
+  const commands: string[] = [];
+  for (const source of DEFAULT_AGENT_SKILL_SOURCES) {
+    const command = formatSkillInstallCommand(ctx.pm, source);
+    const { file, args } = commandToExec(command);
+    try {
+      await exec(file, args, { cwd: ctx.baseDir });
+      commands.push(command);
+    } catch (err) {
+      throw errorInitSkillInstallFailed({
+        skillInstallCommand: command,
+        filesWritten: ctx.filesWritten,
+        cause:
+          redactSecrets(readChildStderr(err)) || (err instanceof Error ? err.message : String(err)),
+      });
+    }
   }
+  return { ok: true, commands };
 }
 
 function readChildStderr(err: unknown): string {

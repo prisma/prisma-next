@@ -8,6 +8,7 @@ import { formatErrorJson, formatErrorOutput } from '../../utils/formatters/error
 import type { GlobalFlags } from '../../utils/global-flags';
 import { TerminalUI } from '../../utils/terminal-ui';
 import {
+  DEFAULT_AGENT_SKILL_SOURCES,
   formatSkillInstallCommand,
   LEGACY_SKILL_FILE,
   runProjectLevelSkillInstall,
@@ -449,15 +450,18 @@ export async function runInit(
   // potentially fails. We skip the install when the user passed
   // `--no-install` for the same reason — no `node_modules` means the
   // workspace isn't ready to consume the skill yet anyway.
-  const manualProjectSkillCommand = formatSkillInstallCommand(install.effectivePm);
+  const manualProjectSkillCommands = DEFAULT_AGENT_SKILL_SOURCES.map((source) =>
+    formatSkillInstallCommand(install.effectivePm, source),
+  );
+  const manualProjectSkillSummary = manualProjectSkillCommands.map((c) => `\`${c}\``).join(' && ');
   let skillRegistered = false;
   if (!inputs.installProjectSkill) {
     warnings.push(
-      `Skipped Prisma Next skills install (--no-skill). To install later, run \`${manualProjectSkillCommand}\` in this project.`,
+      `Skipped Prisma Next skills install (--no-skill). To install later, run ${manualProjectSkillSummary} in this project.`,
     );
   } else if (install.skipped) {
     warnings.push(
-      `Skipped Prisma Next skills install because --no-install was passed. Once you run install manually, register the skill with \`${manualProjectSkillCommand}\`.`,
+      `Skipped Prisma Next skills install because --no-install was passed. Once you run install manually, register the skill with ${manualProjectSkillSummary}.`,
     );
   } else {
     const spinner = ui.spinner();
@@ -468,7 +472,9 @@ export async function runInit(
         pm: install.effectivePm,
         filesWritten,
       });
-      spinner.stop(`Registered Prisma Next skills (project level) — ran \`${project.command}\``);
+      spinner.stop(
+        `Registered Prisma Next skills (project level) — ran ${project.commands.map((c) => `\`${c}\``).join(', ')}`,
+      );
       skillRegistered = true;
     } catch (error) {
       spinner.stop('Agent-skill install failed');

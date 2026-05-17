@@ -1,46 +1,114 @@
 import { describe, expect, it } from 'vitest';
 import { version as cliVersion } from '../../../package.json' with { type: 'json' };
-import { formatSkillInstallCommand } from '../../../src/commands/init/agent-skill-install';
+import {
+  DEFAULT_AGENT_SKILL_BASE,
+  DEFAULT_AGENT_SKILL_SOURCES,
+  formatSkillInstallCommand,
+  formatSkillSourceUrl,
+} from '../../../src/commands/init/agent-skill-install';
 import type { PackageManager } from '../../../src/commands/init/detect-package-manager';
 
-describe('formatSkillInstallCommand', () => {
-  const source = `prisma/prisma-next/skills#v${cliVersion}`;
+const PRESERVED_ENV = ['PRISMA_NEXT_SKILLS_BASE'] as const;
 
-  it.each([
-    ['npm', `npx skills add ${source} --all`],
-    ['pnpm', `pnpm dlx skills add ${source} --all`],
-    ['yarn', `yarn dlx skills add ${source} --all`],
-    ['bun', `bunx skills add ${source} --all`],
-    ['deno', `deno run -A npm:skills add ${source} --all`],
-  ] satisfies ReadonlyArray<
-    readonly [PackageManager, string]
-  >)('formats %s command with cli-version source', (pm, expected) => {
-    const previous = process.env['PRISMA_NEXT_SKILLS_REF'];
-    delete process.env['PRISMA_NEXT_SKILLS_REF'];
-    try {
-      expect(formatSkillInstallCommand(pm)).toBe(expected);
-    } finally {
-      if (previous === undefined) {
-        delete process.env['PRISMA_NEXT_SKILLS_REF'];
+function withCleanEnv<T>(fn: () => T): T {
+  const previous: Record<string, string | undefined> = {};
+  for (const key of PRESERVED_ENV) {
+    previous[key] = process.env[key];
+    delete process.env[key];
+  }
+  try {
+    return fn();
+  } finally {
+    for (const key of PRESERVED_ENV) {
+      const value = previous[key];
+      if (value === undefined) {
+        delete process.env[key];
       } else {
-        process.env['PRISMA_NEXT_SKILLS_REF'] = previous;
+        process.env[key] = value;
       }
     }
+  }
+}
+
+const usageSource = DEFAULT_AGENT_SKILL_SOURCES.find((s) => s.subpath === 'skills');
+const upgradeSource = DEFAULT_AGENT_SKILL_SOURCES.find((s) => s.subpath === 'skills/upgrade');
+const extAuthorSource = DEFAULT_AGENT_SKILL_SOURCES.find(
+  (s) => s.subpath === 'skills/extension-author',
+);
+
+if (!usageSource || !upgradeSource || !extAuthorSource) {
+  throw new Error('DEFAULT_AGENT_SKILL_SOURCES is missing expected entries');
+}
+
+describe('formatSkillSourceUrl', () => {
+  it('pins the usage cluster to the CLI version', () => {
+    withCleanEnv(() => {
+      expect(formatSkillSourceUrl(usageSource)).toBe(
+        `${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion}`,
+      );
+    });
   });
 
-  it('uses PRISMA_NEXT_SKILLS_REF override when set', () => {
-    const previous = process.env['PRISMA_NEXT_SKILLS_REF'];
-    process.env['PRISMA_NEXT_SKILLS_REF'] = 'file:/tmp/prisma-next-skills';
-    try {
-      expect(formatSkillInstallCommand('pnpm')).toBe(
-        'pnpm dlx skills add file:/tmp/prisma-next-skills --all',
+  it('leaves the upgrade cluster unpinned (always tracks main)', () => {
+    withCleanEnv(() => {
+      expect(formatSkillSourceUrl(upgradeSource)).toBe(
+        `${DEFAULT_AGENT_SKILL_BASE}/skills/upgrade`,
       );
-    } finally {
-      if (previous === undefined) {
-        delete process.env['PRISMA_NEXT_SKILLS_REF'];
-      } else {
-        process.env['PRISMA_NEXT_SKILLS_REF'] = previous;
-      }
-    }
+    });
+  });
+
+  it('leaves the extension-author cluster unpinned (always tracks main)', () => {
+    withCleanEnv(() => {
+      expect(formatSkillSourceUrl(extAuthorSource)).toBe(
+        `${DEFAULT_AGENT_SKILL_BASE}/skills/extension-author`,
+      );
+    });
+  });
+
+  it('substitutes the base from PRISMA_NEXT_SKILLS_BASE when set', () => {
+    withCleanEnv(() => {
+      process.env['PRISMA_NEXT_SKILLS_BASE'] = 'myuser/prisma-next';
+      expect(formatSkillSourceUrl(usageSource)).toBe(`myuser/prisma-next/skills#v${cliVersion}`);
+    });
+  });
+
+  it('drops the #ref fragment when the base is an absolute local path', () => {
+    withCleanEnv(() => {
+      process.env['PRISMA_NEXT_SKILLS_BASE'] = '/tmp/clone';
+      expect(formatSkillSourceUrl(usageSource)).toBe('/tmp/clone/skills');
+      expect(formatSkillSourceUrl(upgradeSource)).toBe('/tmp/clone/skills/upgrade');
+    });
+  });
+});
+
+describe('formatSkillInstallCommand', () => {
+  it.each([
+    ['npm', `npx skills add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['pnpm', `pnpm dlx skills add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['yarn', `yarn dlx skills add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['bun', `bunx skills add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
+    ['deno', `deno run -A npm:skills add ${DEFAULT_AGENT_SKILL_BASE}/skills#v${cliVersion} --all`],
+  ] satisfies ReadonlyArray<
+    readonly [PackageManager, string]
+  >)('formats %s command with the version-pinned usage source', (pm, expected) => {
+    withCleanEnv(() => {
+      expect(formatSkillInstallCommand(pm, usageSource)).toBe(expected);
+    });
+  });
+
+  it('pnpm command for the upgrade source omits the #ref fragment', () => {
+    withCleanEnv(() => {
+      expect(formatSkillInstallCommand('pnpm', upgradeSource)).toBe(
+        `pnpm dlx skills add ${DEFAULT_AGENT_SKILL_BASE}/skills/upgrade --all`,
+      );
+    });
+  });
+
+  it('pnpm command for the extension-author source omits the #ref fragment', () => {
+    withCleanEnv(() => {
+      expect(formatSkillInstallCommand('pnpm', extAuthorSource)).toBe(
+        `pnpm dlx skills add ${DEFAULT_AGENT_SKILL_BASE}/skills/extension-author --all`,
+      );
+    });
   });
 });
