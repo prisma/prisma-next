@@ -615,8 +615,8 @@ rm -rf "$PN_QA_TMP/scenario-7"
 
 ### What you should see
 
-- Step 2: exit non-zero. Stderr includes `skills/upgrade/prisma-next-upgrade/upgrades/<from>-to-<to>/` (the new path) and names `examples/prisma-next-demo/src/main.ts` in the sample-diff list. **Critically: the path does not say `packages/0-shared/upgrade-skill/`** — that string appearing would mean the script didn't get repointed.
-- Step 3: exit zero. Stdout reports coverage satisfied.
+- Step 2: exit non-zero. Stderr contains a `[coverage]` violation that names the required upgrade-instructions directory: `skills/upgrade/prisma-next-upgrade/upgrades/<from>-to-<to>/instructions.md`. **Critically: the path must say `skills/upgrade/...`, not `packages/0-shared/upgrade-skill/...`** — the old path appearing would mean the script was not updated for the cluster move. The sample diff paths shown by the gate come from committed examples/ changes between `origin/main` and `HEAD`; the working-tree `main.ts` edit from step 1 is intentionally not committed and therefore does not appear in the gate's diagnostic (it is the mechanism that would trigger the coverage requirement on a branch that lacks the pre-existing examples/ diff).
+- Step 3: exit zero. Coverage satisfied by the placeholder entry.
 
 ### Failure modes
 
