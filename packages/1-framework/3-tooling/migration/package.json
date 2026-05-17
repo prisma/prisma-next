@@ -74,6 +74,10 @@
       "types": "./dist/exports/refs.d.mts",
       "import": "./dist/exports/refs.mjs"
     },
+    "./ref-resolution": {
+      "types": "./dist/exports/ref-resolution.d.mts",
+      "import": "./dist/exports/ref-resolution.mjs"
+    },
     "./constants": {
       "types": "./dist/exports/constants.d.mts",
       "import": "./dist/exports/constants.mjs"
