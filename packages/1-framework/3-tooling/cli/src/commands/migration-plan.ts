@@ -104,7 +104,7 @@ export interface MigrationPlanResult {
    * Surfacing these in the result (rather than only via `ui.step` log
    * lines) makes the cross-space side effect explicit to JSON consumers
    * and the success-summary renderer — the same multi-space side effect
-   * that `migration apply` will replay.
+   * that `migrate` will replay.
    */
   readonly emittedExtensionDirs: readonly { readonly spaceId: string; readonly dirName: string }[];
   readonly operations: readonly {
@@ -587,7 +587,7 @@ export function formatMigrationPlanOutput(result: MigrationPlanResult, flags: Gl
     }
     lines.push('');
     lines.push(
-      `Next: review the extension migrations above, then run ${green_('prisma-next migration apply')}.`,
+      `Next: review the extension migrations above, then run ${green_('prisma-next migrate')}.`,
     );
   }
 
@@ -658,11 +658,11 @@ export function formatMigrationPlanOutput(result: MigrationPlanResult, flags: Gl
 
   lines.push('');
   // The "Next:" hint always points at the canonical apply path
-  // (`prisma-next migration apply`) regardless of how many spaces
-  // were materialised — `db update` is a dev-time convenience, not
-  // the canonical replay step.
+  // (`prisma-next migrate`) regardless of how many spaces were
+  // materialised — `db update` is a dev-time convenience, not the
+  // canonical replay step.
   lines.push(
-    `Next: review ${green_(result.dir ?? '<dir>')} if needed, then run ${green_('prisma-next migration apply')}.`,
+    `Next: review ${green_(result.dir ?? '<dir>')} if needed, then run ${green_('prisma-next migrate')}.`,
   );
 
   if (result.preview && result.preview.statements.length > 0) {

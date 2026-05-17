@@ -96,7 +96,7 @@ export interface MigrationStatusEntry {
  *
  * - `headHash`: the on-disk head ref's hash (where the space is going).
  * - `markerHash`: the live marker hash for the space, or null if no
- *    marker has been written yet (greenfield, or pre-`migration apply`).
+ *    marker has been written yet (greenfield, or pre-`migrate`).
  * - `pendingCount`: number of migration edges between marker and head.
  *    Computed via {@link graphWalkStrategy}; 0 means the space is
  *    already at head.
@@ -873,7 +873,7 @@ async function executeMigrationStatusCommand(
       code: 'MIGRATION.NO_MARKER',
       severity: 'warn',
       message: 'Database has not been initialized — no migration marker found',
-      hints: ["Run 'prisma-next migration apply' to apply pending migrations"],
+      hints: ["Run 'prisma-next migrate' to apply pending migrations"],
     });
   }
 
@@ -933,7 +933,7 @@ async function executeMigrationStatusCommand(
   let missingInvariants: readonly string[] | undefined;
   let effectiveRequired = new Set<string>();
   if (mode === 'online') {
-    // Mirrors `migration-apply.ts`: compute `effectiveRequired = required −
+    // Mirrors `migrate.ts`: compute `effectiveRequired = required −
     // marker.invariants` directly, then derive the display fields from it.
     // `appliedInvariants` is the intersection (`required ∩ marker`), which
     // is what JSON consumers see for the active ref; the unfiltered set
@@ -961,11 +961,11 @@ async function executeMigrationStatusCommand(
     } else if (pendingCount === 0 && !hasInvariantWork) {
       summary = `Database is up to date (${appliedCount} migration${appliedCount !== 1 ? 's' : ''} applied)`;
     } else if (pendingCount === 0 && hasInvariantWork) {
-      summary = `Missing invariant(s): ${missingList} — run 'prisma-next migration apply --ref ${activeRefName ?? '<ref>'}' to apply`;
+      summary = `Missing invariant(s): ${missingList} — run 'prisma-next migrate --to ${activeRefName ?? '<ref>'}' to apply`;
     } else if (markerHash === undefined) {
       summary = `${pendingCount} pending migration(s) — database has no marker`;
     } else {
-      summary = `${pendingCount} pending migration(s) — run 'prisma-next migration apply' to apply`;
+      summary = `${pendingCount} pending migration(s) — run 'prisma-next migrate' to apply`;
     }
   } else {
     summary = `${entries.length} migration(s) on disk`;
@@ -1007,8 +1007,7 @@ async function executeMigrationStatusCommand(
       diagnostics.push({
         code: 'MIGRATION.MARKER_NOT_IN_HISTORY',
         severity: 'warn',
-        message:
-          'Database matches the current contract but was updated directly (not via migration apply)',
+        message: 'Database matches the current contract but was updated directly (not via migrate)',
         hints: ["Run 'prisma-next migration plan' to plan a migration to your current contract"],
       });
     } else if (pendingCount > 0) {
@@ -1016,7 +1015,7 @@ async function executeMigrationStatusCommand(
         code: 'MIGRATION.DATABASE_BEHIND',
         severity: 'info',
         message: `${pendingCount} migration(s) pending`,
-        hints: ["Run 'prisma-next migration apply' to apply pending migrations"],
+        hints: ["Run 'prisma-next migrate' to apply pending migrations"],
       });
     } else if (hasInvariantWork) {
       diagnostics.push({
@@ -1024,7 +1023,7 @@ async function executeMigrationStatusCommand(
         severity: 'info',
         message: `Missing required invariant(s): ${missingList}`,
         hints: [
-          `Run 'prisma-next migration apply --ref ${activeRefName ?? '<ref>'}' to apply a path that covers the required invariants`,
+          `Run 'prisma-next migrate --to ${activeRefName ?? '<ref>'}' to apply a path that covers the required invariants`,
         ],
       });
     } else if (!routingUnreachable) {
@@ -1222,7 +1221,7 @@ export function formatStatusSummary(result: MigrationStatusResult, colorize: boo
     if (total > 0) {
       lines.push('');
       lines.push(
-        `${c(yellow, '⧗')} ${total} pending migration(s) across ${result.spaces.length} space(s) — run 'prisma-next migration apply' to apply`,
+        `${c(yellow, '⧗')} ${total} pending migration(s) across ${result.spaces.length} space(s) — run 'prisma-next migrate' to apply`,
       );
     }
   }
