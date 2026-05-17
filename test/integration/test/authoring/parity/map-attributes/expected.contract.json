@@ -74,7 +74,7 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:2183798067f22121a54305ca6e8749f0a3797c4d530613d49117f89330fcaa0d",
+    "storageHash": "sha256:25c5ac0257fcf52a1d064a8c4b804b7438b851844cf1c1f885bae638bb1a2fbd",
     "tables": {
       "org_team": {
         "columns": {
@@ -106,13 +106,15 @@
         },
         "foreignKeys": [
           {
-            "columns": ["team_ref"],
             "constraint": true,
             "index": true,
             "name": "team_member_team_ref_fkey",
             "onDelete": "cascade",
             "onUpdate": "cascade",
-            "references": {
+            "source": {
+              "columns": ["team_ref"]
+            },
+            "target": {
               "columns": ["team_id"],
               "table": "org_team"
             }

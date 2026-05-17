@@ -83,7 +83,7 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:277d45cac77361dd61965568ce2b8e67c093ab9f56d57f20056101d8f54e98fc",
+    "storageHash": "sha256:dd323b48d0b8f469f01f16966ddfcd694abc5d22ba57763017d72a78c2d26443",
     "tables": {
       "post": {
         "columns": {
@@ -100,12 +100,14 @@
         },
         "foreignKeys": [
           {
-            "columns": ["userId"],
             "constraint": true,
             "index": true,
             "onDelete": "cascade",
             "onUpdate": "cascade",
-            "references": {
+            "source": {
+              "columns": ["userId"]
+            },
+            "target": {
               "columns": ["id"],
               "table": "user"
             }
