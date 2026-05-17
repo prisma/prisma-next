@@ -52,7 +52,7 @@ The CLI is namespaced by the *subject* of the command, not by whether it touches
 | **`db <verb>`** | A live database. | `db update`, `db verify`, `db sign`, `db init` |
 | **`migration <verb>`** | The migration artifacts and graph. | `migration plan`, `migration new`, `migration compile`, `migration show`, `migration list`, `migration graph`, `migration check`, `migration preflight`, `migration status`, `migration log` |
 | **`contract <verb>`** | Contracts. | `contract emit`, `contract show`, `contract diff` |
-| **`ref <verb>`** | Refs. | `ref set`, `ref show` |
+| **`ref <verb>`** | Refs. | `ref set`, `ref list`, `ref delete` |
 
 ### Read-only vs mutating, not offline vs live
 
@@ -325,7 +325,7 @@ Three verbs along two axes — *what's being verified* (live DB / migration arti
 
 These map onto the commands above:
 - *"What path will be taken to reach `<ref>`?"* → `migration status --to <ref>`
-- *"What does this branch promise that mainline doesn't?"* → `migration graph` + `ref show production` (PR-review tooling can diff the ref pointers)
+- *"What does this branch promise that mainline doesn't?"* → `migration graph` + `ref list` (PR-review tooling can diff the ref pointers)
 - *"What's the graph shape?"* → `migration graph`
 - *"Is the graph well-formed?"* → `migration check` (no argument: graph-wide). *"Is this one migration well-formed?"* → `migration check <m>`. Recomputes hashes, checks manifest ↔ `ops.json` consistency, validates edges/refs. Read-only, offline. Distinct from `migration preflight` (sandbox-executes for behavioral verification) and `db verify` (checks the live DB against its contract).
 
@@ -445,6 +445,7 @@ These are terms or distinctions that came up in discussion and have not yet been
   - For migration-package lifecycle conditions (in-progress, partially-executed, etc.), use **status**, **phase**, or **progress** — never "state".
   - **`∅`** is the empty database state (introspection returns no objects). One specific state, not a contract. Conventional starting point for baseline migrations.
   - **Null contract** is a (theoretical) contract with no requirements. Distinct from `∅`; not user-facing.
+- **`show` verb across subjects.** `migration show <m>` and `contract show <c>` are retained from the current CLI as the inspect-one verbs in their respective namespaces; both *resolve a reference and render the resolved artifact*, which is real value beyond `cat`. `ref show <name>` was rejected — refs are `{hash, invariants[]}`; small enough that `ref list` (with the named ref filtered) covers the same ground without a separate verb. This was not deliberated during Phase 2 — `show` was carried in from the current CLI without explicit discussion. Reconsidered during Phase 3 audit; only `ref show` failed the keep-it-or-not test.
 
 ---
 

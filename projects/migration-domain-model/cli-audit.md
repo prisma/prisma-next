@@ -69,7 +69,6 @@ prisma-next
 │   └── preflight <m>                 # sandbox-execute to verify behavior
 └── ref
     ├── set <name> <contract>
-    ├── show <name>
     ├── list
     └── delete <name>
 ```
@@ -82,7 +81,7 @@ Each migration directory's `migration.ts` remains independently executable. No `
 |---|---|---|---|
 | Top-level "advance the live DB" verb | `prisma-next migration apply [--ref <name>]` | `prisma-next migrate --to <contract>` | rename + move + flag grammar |
 | Refs subject | nested as `prisma-next migration ref *` | top-level `prisma-next ref *` | move |
-| Ref read verb | `migration ref get` | `ref show` | rename for cross-subject consistency |
+| Ref read verb | `migration ref get` | (dropped) | covered by `ref list`; no separate inspect-one verb |
 | `migration status` target flag | `--ref <name>` (ref-only grammar) | `--to <contract>` (full reference grammar) | flag rename + grammar broadening |
 | Graph topology query | `migration status --graph` | `migration graph` | split into own verb |
 | Execution-history query | `migration status --all` | `migration log` | split into own verb |
@@ -149,7 +148,7 @@ invokes `prisma-next migration ref set production <hash>`.
 
 **Vocabulary.** A ref is a named **contract reference**. It points to a contract (a graph node), not to a migration (a graph edge). Refs and contracts share a noun family; refs and migrations do not. The vocabulary puts `ref` at the top level alongside `contract` and `migration`.
 
-**Gap.** `prisma-next migration ref *` is intended to be `prisma-next ref *`. The subcommand surface keeps the same shape; only the parent moves. Separately, the read verb `migration ref get` becomes `ref show` for cross-subject consistency with `contract show` and `migration show`.
+**Gap.** `prisma-next migration ref *` is intended to be `prisma-next ref *`. The parent moves; `set`, `list`, `delete` keep their names. The current `get` verb is dropped — a ref is `{hash, invariants[]}`, small enough that `ref list` (filtered by name) covers the same ground without a dedicated inspect-one verb. (Contrast with `migration show` and `contract show`, which both *resolve a reference and render an aggregated artifact* — real work that justifies the verb.)
 
 ---
 

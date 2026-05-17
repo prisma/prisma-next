@@ -5,7 +5,7 @@
 Bring the `prisma-next` CLI surface in line with the vocabulary settled in [`domain.md`](./domain.md) and the gap analysis in [`cli-audit.md`](./cli-audit.md). Six surface changes land:
 
 1. Promote the live-DB advance verb to top-level: `prisma-next migration apply [--ref X]` → `prisma-next migrate --to <contract>`.
-2. Promote `ref` to a top-level subject; rename `ref get` → `ref show`.
+2. Promote `ref` to a top-level subject; drop the `get` inspect-one verb (covered by `ref list` filtered by name).
 3. Split `prisma-next migration status` into five purpose-specific verbs: `status`, `log`, `list`, `graph` (plus the existing `show`).
 4. Add contract-naming arguments to `db sign`: `db sign [<contract>]` and `db sign --contract <contract>`.
 5. Unify the contract-reference grammar across every flag that names a contract: `--to <contract>` / `--from <contract>` accept hashes, ref names, migration directory names, `<dir>^`, and filesystem paths.
@@ -81,7 +81,6 @@ prisma-next
 │   └── check [<m>]
 └── ref
     ├── set <name> <contract>
-    ├── show <name>
     ├── list
     └── delete <name>
 ```
@@ -110,7 +109,7 @@ Per the audit's findings; each FR corresponds to one audit-section.
 
 **FR1 (audit F1) — top-level `migrate`.** A new top-level command `prisma-next migrate` accepts `--to <contract>` and walks the migration graph from the marker to the named contract, executing each migration on the live database. Removes `prisma-next migration apply`. The `<contract>` argument accepts the full contract-reference grammar (FR5).
 
-**FR2 (audit F2) — top-level `ref`.** Refs become a top-level subject. Subcommands: `ref set <name> <contract>`, `ref show <name>` (renamed from `get`), `ref list`, `ref delete <name>`. Removes `prisma-next migration ref`. The `<contract>` argument accepts the full contract-reference grammar.
+**FR2 (audit F2) — top-level `ref`.** Refs become a top-level subject. Subcommands: `ref set <name> <contract>`, `ref list`, `ref delete <name>`. Removes `prisma-next migration ref`. The `<contract>` argument accepts the full contract-reference grammar. The current `get` inspect-one verb is dropped — a ref is `{hash, invariants[]}` and `ref list` (filtered by name) covers the same ground without a dedicated verb. (Contrast: `migration show` and `contract show` are retained because they aggregate multi-file packages or resolve-and-render artifacts; both do real work beyond `cat`.)
 
 **FR3 (audit F3) — split `migration status`.** Five purpose-specific verbs replace the flag-overloaded one:
 

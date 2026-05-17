@@ -91,12 +91,12 @@ The resolver yields one error type with cases for each failure mode in the spec'
 
 ### M3 — Top-level `ref` namespace (FR2)
 
-**Goal:** `prisma-next ref *` replaces `prisma-next migration ref *`. The `get` sub-verb becomes `show`.
+**Goal:** `prisma-next ref *` replaces `prisma-next migration ref *`. The `get` sub-verb is dropped; the new surface is `set` / `list` / `delete`.
 
 **Tasks (TDD; tests first):**
 
 - [ ] Update `runMigrationRef(ctx, ['set', name, hash])` → `runRef(ctx, ['set', name, hash])` in `journey-test-helpers.ts`. Update every call site (~5 journeys, predominantly `ref-routing` and `divergence-and-refs`).
-- [ ] Add `packages/1-framework/3-tooling/cli/src/commands/ref.ts` (or `commands/ref/` for the four subcommands) hosting `set`, `show`, `list`, `delete`. Implementation copies from `migration-ref.ts` with `get` renamed to `show`. The `<contract>` argument goes through the M1 resolver.
+- [ ] Add `packages/1-framework/3-tooling/cli/src/commands/ref.ts` (or `commands/ref/` for the three subcommands) hosting `set`, `list`, `delete`. Implementation copies from `migration-ref.ts`; the previous `get` body is deleted (callers who want to inspect one ref use `ref list` and filter by name). The `<contract>` argument goes through the M1 resolver.
 - [ ] Register the new top-level `ref` command in `cli.ts`. Remove the `migrationRefCommand` mounting under `migrationCommand`. Delete `migration-ref.ts`.
 - [ ] Update help text and unknown-command-suggestion paths.
 
