@@ -1,8 +1,6 @@
 ---
 name: create-pr
 description: Creates a GitHub PR with a Linear-ticket-prefixed title and a decision-led, narrative description for prisma-next. Use when the user wants to create a pull request, open a PR, or submit changes for review.
-metadata:
-  internal: true
 ---
 
 # Create PR Skill

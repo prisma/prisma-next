@@ -3,7 +3,6 @@ name: drive-pr-local-review
 description: Generate local PR/branch review artifacts for the current branch vs its base — an in-repo canonical spec (if present) or an inferred review `spec.md`, plus `system-design-review.md`, `code-review.md`, and `walkthrough.md`. Multi-persona — adopts `tech-lead` as orchestrator, transitions to `architect` for the system-design pass, to `principal-engineer` for the code-review pass, then reloads `tech-lead` for the walkthrough and synthesis. Writes artifacts to disk (next to the in-repo spec when present, otherwise under `wip/`). Use when the user asks for a local PR/branch review, a code review, a system-design review, to "review this branch", or to produce written review docs. Do not modify implementation code.
 metadata:
   version: "2026.5.11"
-  internal: true
 ---
 
 # Local PR Review

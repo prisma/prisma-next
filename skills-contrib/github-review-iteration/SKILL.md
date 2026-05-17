@@ -3,8 +3,6 @@ name: github-review-iteration
 description: Orchestrates a GitHub PR review loop by delegating triage and implementation to dedicated sub-agents, then repeating until actionable review items are cleared. Use when the user says “address PR review”, “triage review comments”, or “iterate until review is clean”.
 argument-hint: "[triage|implement|iterate] [pr-url] [output-dir]"
 disable-model-invocation: true
-metadata:
-  internal: true
 ---
 
 # GitHub Review Iteration

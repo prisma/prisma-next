@@ -5,7 +5,6 @@ description: >
   then hand off to drive-create-spec / drive-create-plan.
 metadata:
   version: "2026.3.1"
-  internal: true
 ---
 
 # Create Project Workspace

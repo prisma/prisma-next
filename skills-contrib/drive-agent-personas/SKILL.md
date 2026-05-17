@@ -2,8 +2,6 @@
 name: drive-agent-personas
 description: Library of agent personas — named bias-frames that other skills load to shift execution-time defaults. Skills name a persona by ID (e.g. "Adopt the architect persona"), and this skill resolves that ID to the persona doc that frames the executor for the rest of the task. Use when authoring a new skill that needs a particular reviewer/implementer/orchestrator stance, or when an existing skill instructs you to adopt a named persona.
 disable-model-invocation: true
-metadata:
-  internal: true
 ---
 
 # Agent Personas

@@ -7,7 +7,6 @@ description: >
   for *recording* a design, not for facilitating design discussion (different skills handle that).
 metadata:
   version: "2026.3.06"
-  internal: true
 ---
 
 # Create Spec

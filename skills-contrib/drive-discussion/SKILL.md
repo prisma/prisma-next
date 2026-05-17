@@ -2,8 +2,6 @@
 name: drive-discussion
 description: Drops the agent into a structured Q&A mode that iterates with the user toward a complete understanding of a topic, then documents the outcome (project spec, plan, decision record, or whatever shape fits). The agent adopts one or more personas from the `drive-agent-personas` library — named explicitly by the user, or inferred from conversation context and announced. Typical use is design work at the start of a task, or mid-implementation when a load-bearing assumption has been falsified. Use ONLY when the user explicitly invokes this skill (e.g. "discussion mode", "pressure-test this", "let's design this", "design mode", "tech design mode", "product mode", "pm mode", "challenge my idea"). Never auto-invoke.
 disable-model-invocation: true
-metadata:
-  internal: true
 ---
 
 # Discussion mode

@@ -4,7 +4,6 @@ description: Generates PR descriptions by analyzing git diffs between the curren
 metadata:
   author: Tyler Benfield
   version: "2026.2.3"
-  internal: true
 ---
 
 # PR Description Generator

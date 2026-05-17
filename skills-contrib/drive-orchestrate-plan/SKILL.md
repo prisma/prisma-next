@@ -8,7 +8,6 @@ description: >
   before the team's PR-opening skill.
 metadata:
   version: "2026.5.13"
-  internal: true
 ---
 
 # Drive: Orchestrate Plan

@@ -6,8 +6,6 @@ description: >-
   diffs noisy and reflow awkward. Use when creating or editing .md files, PR bodies, ADRs,
   READMEs, rulecards, or any Markdown where the user cares about readable source and clean
   diffs — or when the user asks to avoid "hard wrapping" or "80-column" line breaks in prose.
-metadata:
-  internal: true
 ---
 
 # Markdown: no artificial line wraps

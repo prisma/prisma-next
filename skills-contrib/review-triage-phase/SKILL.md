@@ -2,8 +2,6 @@
 name: review-triage-phase
 description: Produces canonical review actions from fetched review state and renders action markdown. Use when the user wants only triage/action-planning for the review-framework workflow.
 argument-hint: "[pr-url] [output-dir]"
-metadata:
-  internal: true
 ---
 
 # Review Triage Phase

@@ -1,8 +1,6 @@
 ---
 name: record-gotchas
 description: Capture surprises, workarounds, and rough edges hit while *consuming* the public surface of Prisma Next, Prisma Compute, or Prisma Postgres — anything a real user of these products would experience. Fires whenever an operator (or agent) writes a workaround, hits a surprising failure mode, or finds undocumented behaviour while using one of these three products from the outside (extension authoring, example apps, integration tests, customer reproductions, internal demos, manual repros). Does NOT fire on bugs in code the operator's own team maintains — those are normal product-backlog bugs. In product-team repos (e.g. `prisma-next-ws`), surfaces the gotcha and offers the operator three paths (capture-as-gotcha, file a normal bug, or note-and-move-on). Outside product-team repos (pet projects, hackathon entries, customer codebases), silent-captures into the project's gotchas log AND a Triage-state Linear ticket in the matching gotchas project — no operator escalation. Do not skip the recording step.
-metadata:
-  internal: true
 ---
 
 # Record a gotcha

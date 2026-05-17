@@ -5,8 +5,6 @@ description: >-
   for the engineering team. Use when creating, updating, or reviewing docs
   under docs/architecture docs/, or when the user asks you to write
   documentation that describes the system's design.
-metadata:
-  internal: true
 ---
 
 # Writing Architecture Documentation

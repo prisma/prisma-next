@@ -6,8 +6,6 @@ description: >-
   (commands, IR nodes, factory calls) that will be switched over in 2+
   places, or when refactoring an existing union type that has grown
   multiple switch sites.
-metadata:
-  internal: true
 ---
 
 # AST Class/Visitor Pattern
