@@ -33,7 +33,20 @@
 ## Pre-flight
 
 1. Working tree is on the PR branch (`tml-2535-bug-dont-use-npm-to-publish-skills`) and clean — `git status` reports nothing modified, no untracked files outside the usual `.agents/skills/`, `.claude/skills/`, `wip/`, `test/integration/.tmp/` set.
-2. `pnpm install && pnpm build` has been run at least once on this branch (the postinstall script symlinks `.agents/skills/` and `.claude/skills/` into `skills-contrib/`, and the CLI build produces the binary the integration tests exec).
+2. The CLI dist is fresh against HEAD. Run an explicit, package-scoped rebuild rather than relying on turbo's cache:
+
+   ```bash
+   pnpm install && pnpm --filter @prisma-next/cli build
+   ```
+
+   - `pnpm install` fires the postinstall script that symlinks `.agents/skills/` and `.claude/skills/` into `skills-contrib/`.
+   - The scoped build ensures the CLI binary reflects this branch's source.
+
+   Then smoke-check the dist contains the three-cluster summary symbol so a stale build can't impersonate a passing run:
+
+   ```bash
+   rg -q 'manualProjectSkillSummary' packages/1-framework/3-tooling/cli/dist/init-*.mjs && echo "CLI dist is fresh" || { echo "CLI dist appears stale; rebuild failed"; exit 1; }
+   ```
 3. Set a workspace-root variable for use throughout:
 
    ```bash
@@ -47,13 +60,13 @@
    echo "scratchpad at $PN_QA_TMP"
    ```
 
-5. Confirm the renamed package's bin is on the workspace `node_modules/.bin/`:
+5. Confirm the renamed package's bin exists at its direct path:
 
    ```bash
-   ls -l "$PN_REPO"/node_modules/.bin/prisma-next-check-pins
+   ls -l "$PN_REPO/packages/0-shared/extension-author-tools/bin/prisma-next-check-pins.mjs"
    ```
 
-   It should resolve to `packages/0-shared/extension-author-tools/bin/prisma-next-check-pins.mjs`. If it doesn't, re-run `pnpm install`.
+   This bin is not hoisted to `node_modules/.bin/` in the workspace root (the package is for downstream extension authors, not a root devDependency). Scenarios that invoke `prisma-next-check-pins` use the direct path `$PN_REPO/node_modules/.bin/prisma-next-check-pins` after running `pnpm install` inside a tmpdir consumer — see scenario 7 for the pattern. If the direct path is missing, re-run `pnpm install`.
 
 ## Scenario 1 — Re-enact the originally-failing install command
 
@@ -181,7 +194,7 @@ git -C "$PN_REPO" status --short
 - Init exits with code 0 (echoed after the run).
 - `ls .agents/skills/ | wc -l` reports 12.
 - The set of directory names equals the union of immediate-child skill-bearing directories under `$PN_REPO/skills/` (10 names, including `prisma-next` and `prisma-next-quickstart`), `$PN_REPO/skills/upgrade/` (`prisma-next-upgrade`), and `$PN_REPO/skills/extension-author/` (`prisma-next-extension-upgrade`).
-- None of the names match a directory under `$PN_REPO/skills-contrib/` (e.g. `babysit`, `commit-as-you-go`, `record-upgrade-instructions`).
+- None of the names match a directory under `$PN_REPO/skills-contrib/` (e.g. `babysit`, `adr-review`, `record-upgrade-instructions`).
 - Each `SKILL.md` head shows valid YAML frontmatter (a `name:` and a `description:` field). `prisma-next-upgrade/SKILL.md` says "ensure this skill is installed at `@latest`" and the install URL it advertises is `npx skills add prisma/prisma-next/skills/upgrade --all`, not anything mentioning `@prisma-next/upgrade-skill`.
 - `scenario-2.log` shows three `pnpm dlx skills add` invocations with the expected subpath suffixes (`/skills`, `/skills/upgrade`, `/skills/extension-author`).
 
@@ -378,8 +391,8 @@ rm -rf "$PN_QA_TMP/scenario-4-subpath" "$PN_QA_TMP/scenario-4-bare"
 
    ```bash
    ls "$PN_REPO/.agents/skills/" | head -5
-   diff "$PN_REPO/.agents/skills/commit-as-you-go/SKILL.md" \
-        "$PN_REPO/skills-contrib/commit-as-you-go/SKILL.md"
+   diff "$PN_REPO/.agents/skills/adr-review/SKILL.md" \
+        "$PN_REPO/skills-contrib/adr-review/SKILL.md"
    ```
 
 3. Re-fire the postinstall on a system that does *not* yet have the symlinks (simulate by removing them first):
@@ -490,7 +503,7 @@ rm -rf "$PN_QA_TMP/scenario-6"
 **Preconditions:**
 
 - `PN_QA_TMP` is set.
-- `node_modules/.bin/prisma-next-check-pins` resolves to the renamed package (verified in pre-flight step 5).
+- `$PN_REPO/packages/0-shared/extension-author-tools/bin/prisma-next-check-pins.mjs` exists (verified in pre-flight step 5).
 
 ### Steps
 
@@ -513,7 +526,7 @@ rm -rf "$PN_QA_TMP/scenario-6"
 2. Run the gate against the exact-pin fixture:
 
    ```bash
-   "$PN_REPO/node_modules/.bin/prisma-next-check-pins"
+   node "$PN_REPO/packages/0-shared/extension-author-tools/bin/prisma-next-check-pins.mjs"
    echo "exit: $?"
    ```
 
@@ -526,7 +539,7 @@ rm -rf "$PN_QA_TMP/scenario-6"
 4. Re-run the gate:
 
    ```bash
-   "$PN_REPO/node_modules/.bin/prisma-next-check-pins" 2>&1 | tee scenario-7-fail.log
+   node "$PN_REPO/packages/0-shared/extension-author-tools/bin/prisma-next-check-pins.mjs" 2>&1 | tee scenario-7-fail.log
    echo "exit: $?"
    ```
 
@@ -539,7 +552,7 @@ rm -rf "$PN_QA_TMP/scenario-6"
 
 - Exit-zero on the range-pin fixture (the gate did not fire — defeats the whole point of the bin).
 - The diagnostic does not name the offending dep / pin (a CI maintainer reading the log can't tell what to fix).
-- The bin is missing or unresolvable (`prisma-next-check-pins: command not found`) — means the package rename's `bin` map did not propagate; re-run `pnpm install` and inspect `packages/0-shared/extension-author-tools/package.json`.
+- The bin file is missing (`No such file or directory`) — means the package source is absent or the path changed; inspect `packages/0-shared/extension-author-tools/bin/` and `packages/0-shared/extension-author-tools/package.json`.
 
 ### Restore
 
@@ -579,19 +592,23 @@ rm -rf "$PN_QA_TMP/scenario-7"
    echo "exit: $?"
    ```
 
-3. Plant a placeholder entry in the directory the diagnostic named:
+3. Plant a placeholder entry in the in-flight upgrade directory:
 
    ```bash
-   IN_FLIGHT=$(rg -o 'skills/upgrade/prisma-next-upgrade/upgrades/[0-9.]+-to-[0-9.]+' /tmp/scenario-8-fail.log | head -1)
-   mkdir -p "$IN_FLIGHT"
+   # In-flight transition: <prevMinor>-to-<currentMinor> for the workspace's
+   # current root version. After a minor bump, update both segments below.
+   IN_FLIGHT="$PN_REPO/skills/upgrade/prisma-next-upgrade/upgrades/0.8-to-0.9"
+   IN_FLIGHT_EXT="$PN_REPO/skills/extension-author/prisma-next-extension-upgrade/upgrades/0.8-to-0.9"
+   mkdir -p "$IN_FLIGHT" "$IN_FLIGHT_EXT"
    cat > "$IN_FLIGHT/instructions.md" <<'EOF'
    ---
-   from: "0.7"
-   to: "0.8"
+   from: "0.8"
+   to: "0.9"
    changes: []
    ---
    QA placeholder; will be removed in restore.
    EOF
+   cp "$IN_FLIGHT/instructions.md" "$IN_FLIGHT_EXT/instructions.md"
    pnpm check:upgrade-coverage --prev origin/main --head HEAD 2>&1 | tee /tmp/scenario-8-pass.log
    echo "exit: $?"
    ```
@@ -611,11 +628,11 @@ rm -rf "$PN_QA_TMP/scenario-7"
 
 ```bash
 git -C "$PN_REPO" restore examples/prisma-next-demo/src/main.ts
-rm -rf "$IN_FLIGHT"
+rm -rf "$IN_FLIGHT" "$IN_FLIGHT_EXT"
 git -C "$PN_REPO" status --short
 ```
 
-`git status` should be unchanged. (The `IN_FLIGHT` directory is untracked, so the `rm` is sufficient — no `git restore` needed there.)
+`git status` should be unchanged. (The `IN_FLIGHT` and `IN_FLIGHT_EXT` directories are untracked, so the `rm` is sufficient — no `git restore` needed there.)
 
 ## Scenario 9 — Judgement: install-summary legibility
 
