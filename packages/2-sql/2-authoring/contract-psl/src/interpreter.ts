@@ -21,7 +21,7 @@ import type {
   ControlMutationDefaults,
   MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
-import type { Namespace } from '@prisma-next/framework-components/ir';
+import { type Namespace, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   ParsePslDocumentResult,
   PslAttribute,
@@ -235,35 +235,32 @@ const UNSPECIFIED_PSL_NAMESPACE_NAME = '__unspecified__';
  *   the connection's `search_path` resolves at runtime. Every other
  *   explicit bucket name (e.g. `auth`, `public`) passes through as a
  *   named schema id. The implicit `__unspecified__` bucket — top-level
- *   declarations outside any `namespace { … }` block — leaves the
- *   coordinate unset; downstream consumers treat unset as the
- *   late-bound default, and TS / PSL authoring stay byte-identical
- *   on single-namespace contracts. (A future round will add a
- *   target-default-namespace surface so `__unspecified__` lowers to
- *   `public` consistently on both authoring paths.)
+ *   declarations outside any `namespace { … }` block — resolves to the
+ *   `UNBOUND_NAMESPACE_ID` sentinel (the late-bound default; a future
+ *   refinement may collapse omitted-but-Postgres-`public`-aware
+ *   contracts onto `public` instead, but that is a separable concern).
  * - **SQLite**: SQLite has no schema concept; every namespace
- *   collapses to the late-bound default. The FR16c validation step
- *   has already rejected any explicit `namespace { … }` block on
- *   SQLite, so the only bucket the lowering ever sees there is
- *   `__unspecified__`.
+ *   collapses to the late-bound default (`UNBOUND_NAMESPACE_ID`). The
+ *   FR16c validation step has already rejected any explicit
+ *   `namespace { … }` block on SQLite, so the only bucket the lowering
+ *   ever sees there is `__unspecified__`.
  *
- * Returns `undefined` for targets / bucket names with no explicit
- * namespaceId to assign — callers leave the model's `namespaceId`
- * slot empty (which means the late-bound default at the `StorageTable`
- * layer; emitted JSON omits the field).
+ * Always returns a resolved coordinate — callers stamp the result on
+ * the model's `namespaceId` slot at construction time per the
+ * caller-normalises discipline.
  */
 function resolveNamespaceIdForSqlTarget(input: {
   readonly bucketName: string;
   readonly targetId: string;
-}): string | undefined {
+}): string {
   if (input.targetId !== 'postgres') {
-    return undefined;
+    return UNBOUND_NAMESPACE_ID;
   }
   if (input.bucketName === UNSPECIFIED_PSL_NAMESPACE_NAME) {
-    return undefined;
+    return UNBOUND_NAMESPACE_ID;
   }
   if (input.bucketName === 'unbound') {
-    return '__unbound__';
+    return UNBOUND_NAMESPACE_ID;
   }
   return input.bucketName;
 }
@@ -1078,17 +1075,19 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         })
       : undefined;
 
-    // FR16b cross-namespace FK lowering: populate `target.namespaceId`
-    // when the target model lives in a different namespace from the
-    // declaring model. Same-namespace FKs leave the slot defaulted by
-    // the StorageTable constructor (so single-namespace fixtures stay
-    // byte-stable).
-    const declaringNamespaceId = input.modelNamespaceIds.get(model.name);
+    // FR16b cross-namespace FK lowering: always stamp `target.namespaceId`
+    // with the target model's resolved coordinate (caller-normalises
+    // discipline). Same-namespace FKs end up with the same coordinate
+    // as the declaring model; cross-namespace FKs carry the target's
+    // resolved coordinate end-to-end. The map is fully populated
+    // upstream (every PSL model resolves through per-target dispatch),
+    // so any miss here is a parser/interpreter invariant violation.
     const targetNamespaceId = input.modelNamespaceIds.get(targetMapping.model.name);
-    const fkTargetNamespaceId =
-      targetNamespaceId !== undefined && targetNamespaceId !== declaringNamespaceId
-        ? targetNamespaceId
-        : undefined;
+    if (targetNamespaceId === undefined) {
+      throw new Error(
+        `PSL interpreter invariant: model "${targetMapping.model.name}" has no resolved namespaceId.`,
+      );
+    }
 
     foreignKeyNodes.push({
       columns: localColumns,
@@ -1096,7 +1095,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         model: targetMapping.model.name,
         table: targetMapping.tableName,
         columns: referencedColumns,
-        ...ifDefined('namespaceId', fkTargetNamespaceId),
+        namespaceId: targetNamespaceId,
       },
       ...ifDefined('name', parsedRelation.constraintName),
       ...ifDefined('onDelete', onDelete),
@@ -1500,9 +1499,7 @@ export function interpretPslDocumentToSqlContract(
     });
     for (const model of namespace.models) {
       models.push(model);
-      if (resolvedNamespaceId !== undefined) {
-        modelNamespaceIds.set(model.name, resolvedNamespaceId);
-      }
+      modelNamespaceIds.set(model.name, resolvedNamespaceId);
     }
   }
   const enums = input.document.ast.namespaces.flatMap((ns) => ns.enums);
@@ -1574,11 +1571,12 @@ export function interpretPslDocumentToSqlContract(
       diagnostics,
     });
     const resolvedNamespaceId = modelNamespaceIds.get(model.name);
-    modelNodes.push(
-      resolvedNamespaceId !== undefined
-        ? { ...result.modelNode, namespaceId: resolvedNamespaceId }
-        : result.modelNode,
-    );
+    if (resolvedNamespaceId === undefined) {
+      throw new Error(
+        `PSL interpreter invariant: model "${model.name}" has no resolved namespaceId.`,
+      );
+    }
+    modelNodes.push({ ...result.modelNode, namespaceId: resolvedNamespaceId });
     fkRelationMetadata.push(...result.fkRelationMetadata);
     backrelationCandidates.push(...result.backrelationCandidates);
     modelResolvedFields.set(model.name, result.resolvedFields);
