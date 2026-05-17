@@ -353,7 +353,11 @@ export function buildSqlContractFromDefinition(
       );
       return {
         source: { columns: fk.columns },
-        target: { table: fk.references.table, columns: fk.references.columns },
+        target: {
+          table: fk.references.table,
+          columns: fk.references.columns,
+          ...ifDefined('namespaceId', fk.references.namespaceId),
+        },
         ...applyFkDefaults(
           {
             ...ifDefined('constraint', fk.constraint),

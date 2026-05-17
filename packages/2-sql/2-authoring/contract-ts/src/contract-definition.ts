@@ -44,6 +44,18 @@ export interface ForeignKeyNode {
     readonly model: string;
     readonly table: string;
     readonly columns: readonly string[];
+    /**
+     * Namespace coordinate of the referenced table. Populated by
+     * `lowerForeignKeyNode` from the target model's resolved
+     * `namespace` field so cross-namespace FKs (FR16b) carry the
+     * target's coordinate end-to-end through to the `StorageTable`
+     * constructor's `target.namespaceId` slot.
+     *
+     * Optional: same-namespace FKs (the common case) leave this
+     * undefined and the `StorageTable` constructor defaults
+     * `target.namespaceId` to the source table's coordinate.
+     */
+    readonly namespaceId?: string;
   };
   readonly name?: string;
   readonly onDelete?: ReferentialAction;
