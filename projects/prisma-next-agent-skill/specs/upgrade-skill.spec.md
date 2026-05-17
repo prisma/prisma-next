@@ -1,3 +1,21 @@
+# Amendments (round 2 — distribution-fix follow-on)
+
+The original spec body below was authored when both upgrade skills were planned to ship as version-locked npm packages (`@prisma-next/upgrade-skill`, `@prisma-next/extension-upgrade-skill`). The distribution-fix work falsified two of that plan's assumptions:
+
+1. **`vercel-labs/skills` does not consume npm package identifiers.** Its source URL is GitHub (`<owner>/<repo>[/<subpath>][#<ref>]`) or a local filesystem path. There is no path through `npx skills add` that resolves an npm tag, so the package-per-skill model never could have worked.
+2. **The upgrade flow benefits from "always-latest", not version-pinning.** The cumulative-instruction-set design (every published skill release contains every prior transition's latest entry) means the latest revision on `main` is the only correct revision to install: it carries the bug fixes for prior transitions too. Version-locking the upgrade skill to PN's own version would have been dead weight.
+
+Locked-in adjustments (the rest of the spec body still describes the right design — only the *home* of the artefacts and their *distribution* changed):
+
+- **The user-facing upgrade skill lives at [`skills/upgrade/prisma-next-upgrade/`](../../../skills/upgrade/prisma-next-upgrade/)**, distributed via `npx skills add prisma/prisma-next/skills/upgrade --all`. The subpath URL is intentionally **unpinned** (always tracks `main`).
+- **The extension-author upgrade skill lives at [`skills/extension-author/prisma-next-extension-upgrade/`](../../../skills/extension-author/prisma-next-extension-upgrade/)**, distributed via `npx skills add prisma/prisma-next/skills/extension-author --all`. Same unpinned semantics.
+- **`prisma-next-check-pins` ships as `@prisma-next/extension-author-tools`** — a bin-only npm package at [`packages/0-shared/extension-author-tools/`](../../../packages/0-shared/extension-author-tools/). Extension authors install it as a normal `devDependency` and wire `pnpm exec prisma-next-check-pins` into their CI. Future tooling for extension authors employing the upgrade skill ships from this package.
+- **The two former workspace packages (`packages/0-shared/upgrade-skill/` and `packages/0-shared/extension-upgrade-skill/`) are gone.** The user-skill package is deleted outright (no published artefact); the extension-skill package was renamed to `extension-author-tools` and stripped down to its `bin/` + `test/`. There is no longer an npm artefact named `@prisma-next/upgrade-skill` or `@prisma-next/extension-upgrade-skill`.
+- **`prisma-next init` invokes three subpath installs** (one per cluster: usage, upgrade, extension-author). The usage cluster is version-pinned (`#v<cli-version>`); the upgrade and extension-author clusters are unpinned. See [`init-integration.spec.md`](init-integration.spec.md) for the wiring.
+- **The release-pipeline coverage gate (`pnpm check:upgrade-coverage`) follows the moved paths** — `skills/upgrade/prisma-next-upgrade/upgrades/<X>-to-<Y>/` for the user-skill side and `skills/extension-author/prisma-next-extension-upgrade/upgrades/<X>-to-<Y>/` for the extension side. The gate's enforcement semantics are unchanged.
+
+Read the body below as design-of-record; substitute the new package-or-skill homes wherever the body says `@prisma-next/upgrade-skill` / `@prisma-next/extension-upgrade-skill` / `packages/0-shared/<x>-skill/`.
+
 # Summary
 
 Define two published agent skills — `@prisma-next/upgrade-skill` (for users of Prisma Next) and `@prisma-next/extension-upgrade-skill` (for authors of Prisma Next extensions) — both version-locked to Prisma Next, each carrying a versioned set of *upgrade instructions* an agent can read and execute to translate a project (or an extension) from one PN version to the next. Define the in-repo authoring workflow that mandates a validated upgrade-instruction entry in the appropriate skill whenever a PR touches the relevant surface, and the release-pipeline gate that enforces it. Define the *exact-pin rule* for in-repo extensions' `@prisma-next/*` workspace deps and the publish-time mechanic that produces exact pins in the published artefact. The extension-upgrade-skill ships a small `prisma-next-check-pins` CLI (as a `bin`) that extension authors run in their own CI to enforce the exact-pin rule on their package.
