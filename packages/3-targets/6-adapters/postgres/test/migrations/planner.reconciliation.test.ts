@@ -3,11 +3,11 @@ import {
   APP_SPACE_ID,
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { describe, expect, it } from 'vitest';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 const RECONCILIATION_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'],
@@ -176,11 +176,20 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
 });
 
 function createContract(tables: Contract<SqlStorage>['storage']['tables']): Contract<SqlStorage> {
+  const nestedTables: Record<string, Record<string, (typeof tables)[string]>> = {};
+  for (const [name, t] of Object.entries(tables)) {
+    const ns = t.namespaceId;
+    if (nestedTables[ns] === undefined) nestedTables[ns] = {};
+    nestedTables[ns][name] = t;
+  }
   return {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({ storageHash: coreHash('sha256:reconciliation-contract'), tables }),
+    storage: new SqlStorage({
+      storageHash: coreHash('sha256:reconciliation-contract'),
+      tables: nestedTables,
+    }),
     roots: {},
     models: {},
     capabilities: {},

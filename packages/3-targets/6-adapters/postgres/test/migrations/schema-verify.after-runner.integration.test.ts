@@ -1,6 +1,7 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { PostgresEnumType, PostgresSchema } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -121,27 +122,29 @@ describe.sequential('Schema verification after runner - integration', () => {
         storage: new SqlStorage({
           storageHash: coreHash('sha256:contract-with-defaults'),
           tables: {
-            user: {
-              namespaceId: 'public',
-              columns: {
-                id: {
-                  nativeType: 'int4',
-                  codecId: 'pg/int4@1',
-                  nullable: false,
-                  default: { kind: 'function', expression: 'autoincrement()' },
+            public: {
+              user: {
+                namespaceId: 'public',
+                columns: {
+                  id: {
+                    nativeType: 'int4',
+                    codecId: 'pg/int4@1',
+                    nullable: false,
+                    default: { kind: 'function', expression: 'autoincrement()' },
+                  },
+                  createdAt: {
+                    nativeType: 'timestamptz',
+                    codecId: 'pg/timestamptz@1',
+                    nullable: false,
+                    default: { kind: 'function', expression: 'now()' },
+                  },
+                  email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
                 },
-                createdAt: {
-                  nativeType: 'timestamptz',
-                  codecId: 'pg/timestamptz@1',
-                  nullable: false,
-                  default: { kind: 'function', expression: 'now()' },
-                },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           namespaces: { public: new PostgresSchema('public') },
@@ -183,29 +186,33 @@ describe.sequential('Schema verification after runner - integration', () => {
           storageHash: coreHash('sha256:contract-enum-mixed-case'),
           namespaces: { public: new PostgresSchema('public') },
           tables: {
-            Organization: {
-              namespaceId: 'public',
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                billingState: {
-                  nativeType: 'BillingState',
-                  codecId: 'pg/enum@1',
-                  nullable: false,
-                  typeRef: 'BillingState',
+            public: {
+              Organization: {
+                namespaceId: 'public',
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  billingState: {
+                    nativeType: 'BillingState',
+                    codecId: 'pg/enum@1',
+                    nullable: false,
+                    typeRef: 'BillingState',
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            BillingState: new PostgresEnumType({
-              name: 'BillingState',
-              nativeType: 'BillingState',
-              values: ['ok', 'atRisk', 'blocked'],
-            }),
+            [UNBOUND_NAMESPACE_ID]: {
+              BillingState: new PostgresEnumType({
+                name: 'BillingState',
+                nativeType: 'BillingState',
+                values: ['ok', 'atRisk', 'blocked'],
+              }),
+            },
           },
         }),
         roots: {},

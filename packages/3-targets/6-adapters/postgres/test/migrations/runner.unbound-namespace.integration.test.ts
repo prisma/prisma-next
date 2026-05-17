@@ -48,16 +48,18 @@ function buildUnboundContract(): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:unbound-multi-tenant'),
       tables: {
-        tenant: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            label: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        __unbound__: {
+          tenant: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              label: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
       namespaces: {

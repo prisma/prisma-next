@@ -102,7 +102,7 @@ describe('planFieldEventOperations driving the cipherstash hook', () => {
       profileHash: profileHash('sha256:test'),
       storage: new SqlStorage({
         storageHash: 'sha256:test' as StorageHashBase<string>,
-        tables,
+        tables: { [UNBOUND_NAMESPACE_ID]: tables },
       }),
       models: {},
       roots: {},

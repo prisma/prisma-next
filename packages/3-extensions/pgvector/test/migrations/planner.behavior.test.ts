@@ -7,9 +7,11 @@ import {
 import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   SqlStorage,
   type SqlStorageInput,
+  type SqlStorageTypesInput,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -17,7 +19,6 @@ import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/pla
 import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   const planner = createPostgresMigrationPlanner();
@@ -50,10 +51,10 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       spaceId: APP_SPACE_ID,
     });
 
-    expect(result).toMatchObject({
-      kind: 'success',
-      plan: { operations: [] },
-    });
+    expect(result.kind).toBe('success');
+    if (result.kind === 'success') {
+      expect(result.plan.operations).toHaveLength(0);
+    }
   });
 
   it('plans additive operations for subset schema (missing column/index/fk)', () => {
@@ -285,11 +286,13 @@ describe('NOT NULL column without default uses temporary default', () => {
       {
         frameworkComponents: [pgvectorDescriptor],
         extraStorageTypes: {
-          Embedding3: {
-            kind: 'codec-instance',
-            codecId: 'pg/vector@1',
-            nativeType: 'vector',
-            typeParams: { length: 3 },
+          [UNBOUND_NAMESPACE_ID]: {
+            Embedding3: {
+              kind: 'codec-instance',
+              codecId: 'pg/vector@1',
+              nativeType: 'vector',
+              typeParams: { length: 3 },
+            },
           },
         },
       },
@@ -532,35 +535,37 @@ function createTestContract(
   const storageHashValue = coreHash('sha256:contract');
   const storage = overrides?.storage ?? {
     tables: {
-      user: {
-        namespaceId: 'public',
-        columns: {
-          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-        },
-        primaryKey: { columns: ['id'] },
-        uniques: [{ columns: ['email'] }],
-        indexes: [{ columns: ['email'] }],
-        foreignKeys: [],
-      },
-      post: {
-        namespaceId: 'public',
-        columns: {
-          id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-          title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-        },
-        primaryKey: { columns: ['id'] },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [
-          {
-            source: { columns: ['userId'] },
-            target: { namespaceId: 'public', table: 'user', columns: ['id'] },
-            constraint: true,
-            index: true,
+      public: {
+        user: {
+          namespaceId: 'public',
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
           },
-        ],
+          primaryKey: { columns: ['id'] },
+          uniques: [{ columns: ['email'] }],
+          indexes: [{ columns: ['email'] }],
+          foreignKeys: [],
+        },
+        post: {
+          namespaceId: 'public',
+          columns: {
+            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [
+            {
+              source: { columns: ['userId'] },
+              target: { namespaceId: 'public', table: 'user', columns: ['id'] },
+              constraint: true,
+              index: true,
+            },
+          ],
+        },
       },
     },
   };
@@ -609,7 +614,7 @@ function planAddColumn(
   },
   options?: {
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>;
-    extraStorageTypes?: Contract<SqlStorage>['storage']['types'];
+    extraStorageTypes?: SqlStorageTypesInput;
   },
 ) {
   const operations = planUserTableOperations(
@@ -657,8 +662,8 @@ function planUserTableOperations(
   schemaUserTable: SqlSchemaIR['tables'][string],
   options?: {
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>;
-    extraStorageTypes?: Contract<SqlStorage>['storage']['types'];
-    extraContractTables?: Contract<SqlStorage>['storage']['tables'];
+    extraStorageTypes?: SqlStorageTypesInput;
+    extraContractTables?: Record<string, StorageTable>;
     extraSchemaTables?: SqlSchemaIR['tables'];
   },
 ) {
@@ -666,8 +671,10 @@ function planUserTableOperations(
   const contract = createTestContract({
     storage: {
       tables: {
-        ...(options?.extraContractTables ?? {}),
-        user: userTable,
+        [userTable.namespaceId]: {
+          ...(options?.extraContractTables ?? {}),
+          user: userTable,
+        },
       },
       ...(options?.extraStorageTypes ? { types: options.extraStorageTypes } : {}),
     },
@@ -723,7 +730,7 @@ function buildPostTableSchema(): SqlSchemaIR['tables'][string] {
       {
         columns: ['userId'],
         referencedTable: 'user',
-        referencedNamespaceId: UNBOUND_NAMESPACE_ID,
+        referencedNamespaceId: 'public',
         referencedColumns: ['id'],
         name: 'post_userId_fkey',
       },

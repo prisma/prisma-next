@@ -12,10 +12,10 @@ import {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   SqlStorage,
   type SqlStorageInput,
-  type SqlStorageTablesFlatInput,
   type StorageColumn,
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
@@ -24,7 +24,6 @@ import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/pla
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
 const expandParameterizedNativeType: NativeTypeExpander = (input) => {
@@ -107,17 +106,19 @@ describe('contractToSchemaIR → planner round-trip', () => {
     const storage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+        [UNBOUND_NAMESPACE_ID]: {
+          user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [{ columns: ['email'] }],
+            indexes: [{ columns: ['name'] }],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [{ columns: ['email'] }],
-          indexes: [{ columns: ['name'] }],
-          foreignKeys: [],
         },
       },
     };
@@ -148,16 +149,18 @@ describe('contractToSchemaIR → planner round-trip', () => {
     const storage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        [UNBOUND_NAMESPACE_ID]: {
+          user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     };
@@ -190,15 +193,17 @@ describe('contractToSchemaIR → planner round-trip', () => {
     const fromStorage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        [UNBOUND_NAMESPACE_ID]: {
+          user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     };
@@ -206,26 +211,28 @@ describe('contractToSchemaIR → planner round-trip', () => {
     const toStorage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        [UNBOUND_NAMESPACE_ID]: {
+          user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-        post: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+          post: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     };
@@ -261,27 +268,29 @@ describe('contractToSchemaIR → planner round-trip', () => {
     const storage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        item: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            status: {
-              nativeType: 'text',
-              codecId: 'pg/text@1',
-              nullable: false,
-              default: { kind: 'literal', value: 'active' },
+        [UNBOUND_NAMESPACE_ID]: {
+          item: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              status: {
+                nativeType: 'text',
+                codecId: 'pg/text@1',
+                nullable: false,
+                default: { kind: 'literal', value: 'active' },
+              },
+              createdAt: {
+                nativeType: 'timestamptz',
+                codecId: 'pg/timestamptz@1',
+                nullable: false,
+                default: { kind: 'function', expression: 'now()' },
+              },
             },
-            createdAt: {
-              nativeType: 'timestamptz',
-              codecId: 'pg/timestamptz@1',
-              nullable: false,
-              default: { kind: 'function', expression: 'now()' },
-            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     };
@@ -314,27 +323,31 @@ describe('planner — additive scenarios', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-            email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+              email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-            email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-            age: col({ nativeType: 'int4', codecId: 'pg/int4@1', nullable: true }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+              email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+              age: col({ nativeType: 'int4', codecId: 'pg/int4@1', nullable: true }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
@@ -352,31 +365,35 @@ describe('planner — additive scenarios', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
-        post: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-            title: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+          post: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+              title: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
@@ -393,34 +410,38 @@ describe('planner — additive scenarios', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
-        post: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-            title: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-            slug: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [{ columns: ['slug'] }],
-          indexes: [{ columns: ['title'] }],
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+          post: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+              title: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+              slug: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [{ columns: ['slug'] }],
+            indexes: [{ columns: ['title'] }],
+          }),
+        },
       },
     };
 
@@ -440,13 +461,15 @@ describe('planner — additive scenarios', () => {
     const storage: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-            email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+              email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
@@ -464,27 +487,31 @@ describe('detectDestructiveChanges', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-            email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-            name: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+              email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+              name: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-            email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+              email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
@@ -499,24 +526,28 @@ describe('detectDestructiveChanges', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
-          primaryKey: { columns: ['id'] },
-        }),
-        post: table({
-          columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
+            primaryKey: { columns: ['id'] },
+          }),
+          post: table({
+            columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
@@ -531,27 +562,31 @@ describe('detectDestructiveChanges', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-            name: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
-        post: table({
-          columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+              name: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+          post: table({
+            columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
@@ -569,26 +604,30 @@ describe('planner — type and nullability change behavior', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-            name: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+              name: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-            name: col({ nativeType: 'int4', codecId: 'pg/int4@1' }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+              name: col({ nativeType: 'int4', codecId: 'pg/int4@1' }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
@@ -608,26 +647,30 @@ describe('planner — type and nullability change behavior', () => {
     const from: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-            bio: col({ nativeType: 'text', codecId: 'pg/text@1', nullable: true }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+              bio: col({ nativeType: 'text', codecId: 'pg/text@1', nullable: true }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
     const to: SqlStorageInput = {
       storageHash: coreHash('sha256:test'),
       tables: {
-        user: table({
-          columns: {
-            id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
-            bio: col({ nativeType: 'text', codecId: 'pg/text@1', nullable: false }),
-          },
-          primaryKey: { columns: ['id'] },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          user: table({
+            columns: {
+              id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }),
+              bio: col({ nativeType: 'text', codecId: 'pg/text@1', nullable: false }),
+            },
+            primaryKey: { columns: ['id'] },
+          }),
+        },
       },
     };
 
@@ -705,71 +748,75 @@ function createAdapterHooksComponent(): TargetBoundComponentDescriptor<'sql', st
   };
 }
 
-const DEMO_BASE_STORAGE: SqlStorageInput & { tables: SqlStorageTablesFlatInput } = {
+const DEMO_BASE_STORAGE: SqlStorageInput = {
   storageHash: coreHash('sha256:test'),
   tables: {
-    user: table({
-      columns: {
-        id: col({
-          nativeType: 'character',
-          codecId: 'sql/char@1',
-          typeParams: { length: 36 },
-        }),
-        email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-        createdAt: col({
-          nativeType: 'timestamptz',
-          codecId: 'pg/timestamptz@1',
-          default: { kind: 'function', expression: 'now()' },
-        }),
-        kind: col({
-          nativeType: 'user_type',
-          codecId: 'pg/enum@1',
-          typeRef: 'user_type',
-        }),
-      },
-      primaryKey: { columns: ['id'] },
-      uniques: [{ columns: ['email'] }],
-    }),
-    post: table({
-      columns: {
-        id: col({
-          nativeType: 'character',
-          codecId: 'sql/char@1',
-          typeParams: { length: 36 },
-        }),
-        title: col({ nativeType: 'text', codecId: 'pg/text@1' }),
-        userId: col({
-          nativeType: 'character',
-          codecId: 'sql/char@1',
-          typeParams: { length: 36 },
-        }),
-        createdAt: col({
-          nativeType: 'timestamptz',
-          codecId: 'pg/timestamptz@1',
-          default: { kind: 'function', expression: 'now()' },
-        }),
-        embedding: col({
-          nativeType: 'vector',
-          codecId: 'pg/vector@1',
-          nullable: true,
-        }),
-      },
-      primaryKey: { columns: ['id'] },
-      foreignKeys: [
-        {
-          source: { columns: ['userId'] },
-          target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
-          constraint: true,
-          index: true,
+    [UNBOUND_NAMESPACE_ID]: {
+      user: table({
+        columns: {
+          id: col({
+            nativeType: 'character',
+            codecId: 'sql/char@1',
+            typeParams: { length: 36 },
+          }),
+          email: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+          createdAt: col({
+            nativeType: 'timestamptz',
+            codecId: 'pg/timestamptz@1',
+            default: { kind: 'function', expression: 'now()' },
+          }),
+          kind: col({
+            nativeType: 'user_type',
+            codecId: 'pg/enum@1',
+            typeRef: 'user_type',
+          }),
         },
-      ],
-    }),
+        primaryKey: { columns: ['id'] },
+        uniques: [{ columns: ['email'] }],
+      }),
+      post: table({
+        columns: {
+          id: col({
+            nativeType: 'character',
+            codecId: 'sql/char@1',
+            typeParams: { length: 36 },
+          }),
+          title: col({ nativeType: 'text', codecId: 'pg/text@1' }),
+          userId: col({
+            nativeType: 'character',
+            codecId: 'sql/char@1',
+            typeParams: { length: 36 },
+          }),
+          createdAt: col({
+            nativeType: 'timestamptz',
+            codecId: 'pg/timestamptz@1',
+            default: { kind: 'function', expression: 'now()' },
+          }),
+          embedding: col({
+            nativeType: 'vector',
+            codecId: 'pg/vector@1',
+            nullable: true,
+          }),
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [
+          {
+            source: { columns: ['userId'] },
+            target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
+            constraint: true,
+            index: true,
+          },
+        ],
+      }),
+    },
   },
   types: {
-    user_type: {
-      codecId: 'pg/enum@1',
-      nativeType: 'user_type',
-      typeParams: { values: ['admin', 'user'] },
+    [UNBOUND_NAMESPACE_ID]: {
+      user_type: {
+        codecId: 'pg/enum@1',
+        nativeType: 'user_type',
+        typeParams: { values: ['admin', 'user'] },
+      },
     },
   },
 };
@@ -800,14 +847,16 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
     const toStorage: Omit<SqlStorageInput, 'storageHash'> = {
       ...DEMO_BASE_STORAGE,
       tables: {
-        ...DEMO_BASE_STORAGE.tables,
-        user: table({
-          ...DEMO_BASE_STORAGE.tables['user']!,
-          columns: {
-            ...DEMO_BASE_STORAGE.tables['user']!.columns,
-            name: col({ nativeType: 'text', codecId: 'pg/text@1', nullable: true }),
-          },
-        }),
+        [UNBOUND_NAMESPACE_ID]: {
+          ...DEMO_BASE_STORAGE.tables[UNBOUND_NAMESPACE_ID],
+          user: table({
+            ...DEMO_BASE_STORAGE.tables[UNBOUND_NAMESPACE_ID]!['user']!,
+            columns: {
+              ...DEMO_BASE_STORAGE.tables[UNBOUND_NAMESPACE_ID]!['user']!.columns,
+              name: col({ nativeType: 'text', codecId: 'pg/text@1', nullable: true }),
+            },
+          }),
+        },
       },
     };
 

@@ -51,20 +51,22 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash(`sha256:pg-ext-contract-v${version}`),
       tables: {
-        _ext_helper: {
-          namespaceId: 'public',
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            ...(version === 2
-              ? {
-                  note: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
-                }
-              : {}),
+        public: {
+          _ext_helper: {
+            namespaceId: 'public',
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              ...(version === 2
+                ? {
+                    note: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
+                  }
+                : {}),
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
       namespaces: { public: new PostgresSchema('public') },
@@ -166,7 +168,7 @@ async function writeExtensionContractSpaceArtefacts(args: {
   await mkdir(migrationsDir, { recursive: true });
 
   await emitContractSpaceArtefacts(migrationsDir, EXT_SPACE_ID, {
-    contract: args.contract,
+    contract: JSON.parse(JSON.stringify(args.contract)),
     contractDts: '// placeholder\nexport {};\n',
     headRef: { hash: args.headHash, invariants: [...args.invariants] },
   });
@@ -341,7 +343,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
       // migration package. The graph now has two edges (null→v1, v1→v2);
       // the marker is at v1 so only the second edge walks.
       await emitContractSpaceArtefacts(baseline.migrationsDir, EXT_SPACE_ID, {
-        contract: extContractV2,
+        contract: JSON.parse(JSON.stringify(extContractV2)),
         contractDts: '// placeholder\nexport {};\n',
         headRef: { hash: extContractV2.storage.storageHash, invariants: [] },
       });
@@ -439,7 +441,7 @@ describe.sequential('db init / db update aggregate pipeline (CLI) - postgres', (
 
       // Bump extension to v2 with a failing op.
       await emitContractSpaceArtefacts(baseline.migrationsDir, EXT_SPACE_ID, {
-        contract: extContractV2,
+        contract: JSON.parse(JSON.stringify(extContractV2)),
         contractDts: '// placeholder\nexport {};\n',
         headRef: { hash: extContractV2.storage.storageHash, invariants: [] },
       });

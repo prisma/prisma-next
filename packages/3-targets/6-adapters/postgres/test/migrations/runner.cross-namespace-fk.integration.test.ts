@@ -55,36 +55,40 @@ function buildCrossNamespaceContract(): Contract<SqlStorage> {
     storage: new SqlStorage({
       storageHash: coreHash('sha256:cross-namespace-fk'),
       tables: {
-        user: {
-          namespaceId: AUTH_SCHEMA,
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-        profile: {
-          namespaceId: APP_SCHEMA,
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            handle: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [
-            {
-              source: { columns: ['user_id'] },
-              target: { namespaceId: AUTH_SCHEMA, table: 'user', columns: ['id'] },
-              name: 'profile_user_id_fkey',
-              constraint: true,
-              index: true,
+        [AUTH_SCHEMA]: {
+          user: {
+            namespaceId: AUTH_SCHEMA,
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
             },
-          ],
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+        [APP_SCHEMA]: {
+          profile: {
+            namespaceId: APP_SCHEMA,
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              user_id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              handle: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                source: { columns: ['user_id'] },
+                target: { namespaceId: AUTH_SCHEMA, table: 'user', columns: ['id'] },
+                name: 'profile_user_id_fkey',
+                constraint: true,
+                index: true,
+              },
+            ],
+          },
         },
       },
       namespaces: {

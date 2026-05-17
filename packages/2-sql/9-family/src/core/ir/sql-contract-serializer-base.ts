@@ -42,13 +42,19 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   ) {}
 
   deserializeContract(json: unknown): TContract {
+    // Round-trip through JSON so any class instances (notably `SqlStorage`,
+    // which exposes a flat `tables` view) are reduced to their serialized
+    // JSON form (the FR15 nested envelope from `toJSON`) before the
+    // structural validator runs. This mirrors what `validateContract` does
+    // in the family control-instance.
+    const plainJson = JSON.parse(JSON.stringify(json));
     // `parseSqlContractStructure` -> `validateSqlContractFully` runs
     // arktype structural validation, framework-shared domain checks,
     // and SQL storage consistency/semantic/model-ref checks against the
     // validated JSON envelope (which the consistency helpers walk via
     // `iterateTablesWithCoords`). Hydration below lifts the validated
     // envelope into the IR class hierarchy without re-running checks.
-    const validated = this.parseSqlContractStructure(json);
+    const validated = this.parseSqlContractStructure(plainJson);
     const hydrated = this.hydrateSqlStorage(validated);
     return this.constructTargetContract(hydrated);
   }

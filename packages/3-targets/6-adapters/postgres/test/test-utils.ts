@@ -7,17 +7,38 @@
 
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
-import { SqlStorage, type StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  SqlStorage,
+  type SqlStorageTypeEntry,
+  type StorageTable,
+  type StorageTableInput,
+  type StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 
-export function createTestContract(storage: Partial<SqlStorage> = {}): Contract<SqlStorage> {
-  const { storageHash, ...rest } = storage;
+export function createTestContract(
+  storage: {
+    readonly storageHash?: SqlStorage['storageHash'];
+    readonly tables?: Record<string, StorageTable | StorageTableInput>;
+    readonly types?: Record<string, SqlStorageTypeEntry>;
+  } = {},
+): Contract<SqlStorage> {
+  const { storageHash, tables: flatTables, types: flatTypes } = storage;
+  const nestedTables: Record<string, Record<string, StorageTable | StorageTableInput>> = {};
+  if (flatTables !== undefined) {
+    for (const [name, t] of Object.entries(flatTables)) {
+      const ns = t.namespaceId;
+      if (nestedTables[ns] === undefined) nestedTables[ns] = {};
+      nestedTables[ns][name] = t;
+    }
+  }
+  const nestedTypes = flatTypes === undefined ? {} : { [UNBOUND_NAMESPACE_ID]: flatTypes };
   return createContract<SqlStorage>({
     storage: new SqlStorage({
-      tables: {},
-      types: {},
-      storageHash: storageHash ?? ('sha256:test' as never),
-      ...rest,
+      tables: nestedTables,
+      types: nestedTypes,
+      storageHash: storageHash ?? ('sha256:test' as SqlStorage['storageHash']),
     }),
   });
 }
