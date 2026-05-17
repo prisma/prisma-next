@@ -298,7 +298,9 @@ function renderViolations(result, write) {
         `  [new-entries-stale-transition] added ${v.path}\n` +
           `              transition is "${v.observedTransition}" but only the following are accepted:\n` +
           `                ${v.allowedTransitions.join(', ')}\n` +
-          '              move the new file under packages/0-shared/<skill>/upgrades/<one-of-the-above>/\n',
+          '              move the new file under one of:\n' +
+          '                skills/upgrade/prisma-next-upgrade/upgrades/<one-of-the-above>/instructions.md\n' +
+          '                skills/extension-author/prisma-next-extension-upgrade/upgrades/<one-of-the-above>/instructions.md\n',
       );
     }
   }
