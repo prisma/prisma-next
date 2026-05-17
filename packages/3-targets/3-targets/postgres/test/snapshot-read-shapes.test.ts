@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { join, relative, resolve } from 'pathe';
 import { describe, expect, it } from 'vitest';
 import { PostgresContractSerializer } from '../src/core/postgres-contract-serializer';
 import { PostgresEnumType } from '../src/core/postgres-enum-type';
