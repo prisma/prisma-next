@@ -47,27 +47,23 @@ describe('init skill distribution (offline integration, real CLI)', () => {
     testDirs.clear();
   });
 
-  it('installs only user-facing skills via the subpath URL', { timeout: 30_000 }, async () => {
+  it('invokes the three subpath URLs and installs the union of their skills', {
+    timeout: 60_000,
+  }, async () => {
     const testDir = createIntegrationTestDir();
     testDirs.add(testDir);
     writeFileSync(join(testDir, 'pnpm-lock.yaml'), '', 'utf8');
 
-    // Stub `pnpm dlx skills add ...` with the locally-installed `skills`
-    // binary so the exec is offline-real (no `dlx` resolution, no network).
     const { fakeBinDir, logPath } = createFakeDlxHarness(testDir);
 
     const previousPath = process.env['PATH'];
-    const previousRef = process.env['PRISMA_NEXT_SKILLS_REF'];
+    const previousBase = process.env['PRISMA_NEXT_SKILLS_BASE'];
     const previousLog = process.env['TEST_FAKE_DLX_LOG'];
     const previousInternal = process.env['INSTALL_INTERNAL_SKILLS'];
     const previousAuto = process.env['SKILLS_AGENT_AUTO'];
 
     process.env['PATH'] = `${fakeBinDir}${pathDelimiter}${previousPath ?? ''}`;
-    // Init derives the install URL from `DEFAULT_AGENT_SKILL_SOURCE`
-    // unless `PRISMA_NEXT_SKILLS_REF` overrides; we override here to
-    // point the real CLI at the hermetic clone instead of the public
-    // GitHub URL it normally constructs.
-    process.env['PRISMA_NEXT_SKILLS_REF'] = `${workspaceClone}/skills`;
+    process.env['PRISMA_NEXT_SKILLS_BASE'] = workspaceClone;
     process.env['TEST_FAKE_DLX_LOG'] = logPath;
     delete process.env['INSTALL_INTERNAL_SKILLS'];
     process.env['SKILLS_AGENT_AUTO'] = 'cursor-cli';
@@ -83,21 +79,27 @@ describe('init skill distribution (offline integration, real CLI)', () => {
 
       const loggedCommands = readLoggedCommands(logPath);
       expect(loggedCommands).toContain(`dlx skills add ${workspaceClone}/skills --all`);
+      expect(loggedCommands).toContain(`dlx skills add ${workspaceClone}/skills/upgrade --all`);
+      expect(loggedCommands).toContain(
+        `dlx skills add ${workspaceClone}/skills/extension-author --all`,
+      );
 
       const installed = readInstalledSkillDirs(testDir);
-      const userFacing = readUserFacingSkillNames();
-      expect(installed).toEqual(userFacing);
+      const expected = [
+        ...readSkillNamesFrom(join(workspaceClone, 'skills')),
+        ...readSkillNamesFrom(join(workspaceClone, 'skills/upgrade')),
+        ...readSkillNamesFrom(join(workspaceClone, 'skills/extension-author')),
+      ];
+      const expectedSorted = Array.from(new Set(expected)).sort();
+      expect(installed).toEqual(expectedSorted);
       expect(installed.length).toBeGreaterThan(0);
 
-      // Defence-in-depth: contributor skills must not leak even though
-      // upstream's `--all` flag bypasses `metadata.internal` filtering.
-      // We rely on directory placement (`skills-contrib/`) for safety.
       const contributorNames = new Set(readContributorSkillNames());
       const leaks = installed.filter((name) => contributorNames.has(name));
       expect(leaks).toEqual([]);
     } finally {
       restoreEnvVar('PATH', previousPath);
-      restoreEnvVar('PRISMA_NEXT_SKILLS_REF', previousRef);
+      restoreEnvVar('PRISMA_NEXT_SKILLS_BASE', previousBase);
       restoreEnvVar('TEST_FAKE_DLX_LOG', previousLog);
       restoreEnvVar('INSTALL_INTERNAL_SKILLS', previousInternal);
       restoreEnvVar('SKILLS_AGENT_AUTO', previousAuto);
@@ -105,7 +107,7 @@ describe('init skill distribution (offline integration, real CLI)', () => {
   });
 
   it('subpath URL form is invoked verbatim (no implicit fallback to bare repo URL)', {
-    timeout: 30_000,
+    timeout: 60_000,
   }, async () => {
     const testDir = createIntegrationTestDir();
     testDirs.add(testDir);
@@ -114,12 +116,12 @@ describe('init skill distribution (offline integration, real CLI)', () => {
     const { fakeBinDir, logPath } = createFakeDlxHarness(testDir);
 
     const previousPath = process.env['PATH'];
-    const previousRef = process.env['PRISMA_NEXT_SKILLS_REF'];
+    const previousBase = process.env['PRISMA_NEXT_SKILLS_BASE'];
     const previousLog = process.env['TEST_FAKE_DLX_LOG'];
     const previousAuto = process.env['SKILLS_AGENT_AUTO'];
 
     process.env['PATH'] = `${fakeBinDir}${pathDelimiter}${previousPath ?? ''}`;
-    process.env['PRISMA_NEXT_SKILLS_REF'] = `${workspaceClone}/skills`;
+    process.env['PRISMA_NEXT_SKILLS_BASE'] = workspaceClone;
     process.env['TEST_FAKE_DLX_LOG'] = logPath;
     process.env['SKILLS_AGENT_AUTO'] = 'cursor-cli';
 
@@ -131,15 +133,19 @@ describe('init skill distribution (offline integration, real CLI)', () => {
       });
 
       const loggedCommands = readLoggedCommands(logPath);
-      const skillsAddCommand = loggedCommands.find((c) => c.startsWith('dlx skills add'));
-      expect(skillsAddCommand).toBeDefined();
-      // Subpath URL form: ends with `/skills` (or has `/skills#` for tagged refs).
-      // A bare repo URL would not contain `/skills`, and would leak
-      // contributor skills via priority discovery of `.agents/skills/`.
-      expect(skillsAddCommand).toMatch(/\/skills(?:#|\s|$)/);
+      const skillsAddCommands = loggedCommands.filter((c) => c.startsWith('dlx skills add'));
+      // Three subpath sources: usage, upgrade, extension-author.
+      expect(skillsAddCommands).toHaveLength(3);
+      for (const command of skillsAddCommands) {
+        // Each call's source ends at one of the three known subpaths
+        // (with optional `#ref`). A bare repo URL (no `/skills`) would
+        // leak contributor skills via priority discovery of
+        // `.agents/skills/`; assert the subpath form here.
+        expect(command).toMatch(/\/(skills|skills\/upgrade|skills\/extension-author)(?:#|\s|$)/);
+      }
     } finally {
       restoreEnvVar('PATH', previousPath);
-      restoreEnvVar('PRISMA_NEXT_SKILLS_REF', previousRef);
+      restoreEnvVar('PRISMA_NEXT_SKILLS_BASE', previousBase);
       restoreEnvVar('TEST_FAKE_DLX_LOG', previousLog);
       restoreEnvVar('SKILLS_AGENT_AUTO', previousAuto);
     }
@@ -194,11 +200,11 @@ import { spawnSync } from 'node:child_process';
 const args = process.argv.slice(2);
 const cwd = process.cwd();
 const logPath = process.env.TEST_FAKE_DLX_LOG;
-if (logPath) {
-  fs.appendFileSync(logPath, JSON.stringify({ cwd, args }) + '\\n', 'utf8');
-}
 
 if (args[0] === 'add' || args[0] === 'install' || args[0] === 'prisma-next') {
+  if (logPath) {
+    fs.appendFileSync(logPath, JSON.stringify({ cwd, args, status: 0 }) + '\\n', 'utf8');
+  }
   process.exit(0);
 }
 
@@ -207,12 +213,32 @@ if (args[0] === 'dlx' && args[1] === 'skills' && args[2] === 'add') {
   const skillsArgs = args.slice(2);
   const result = spawnSync(${JSON.stringify(SKILLS_BIN)}, skillsArgs, {
     cwd,
-    stdio: 'inherit',
+    stdio: 'pipe',
     env: { ...process.env, SKILLS_AGENT_AUTO: process.env.SKILLS_AGENT_AUTO || 'cursor-cli' },
   });
+  if (logPath) {
+    fs.appendFileSync(
+      logPath,
+      JSON.stringify({
+        cwd,
+        args,
+        status: result.status,
+        stdout: result.stdout?.toString('utf8') ?? '',
+        stderr: result.stderr?.toString('utf8') ?? '',
+      }) + '\\n',
+      'utf8',
+    );
+  }
+  if (result.status !== 0) {
+    process.stderr.write(result.stderr ?? Buffer.from(''));
+    process.stdout.write(result.stdout ?? Buffer.from(''));
+  }
   process.exit(result.status ?? 1);
 }
 
+if (logPath) {
+  fs.appendFileSync(logPath, JSON.stringify({ cwd, args, status: 0 }) + '\\n', 'utf8');
+}
 process.exit(0);
 `,
     'utf8',
@@ -246,10 +272,6 @@ function readInstalledSkillDirs(testDir: string): readonly string[] {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
-}
-
-function readUserFacingSkillNames(): readonly string[] {
-  return readSkillNamesFrom(join(workspaceClone, 'skills'));
 }
 
 function readContributorSkillNames(): readonly string[] {
