@@ -15,7 +15,6 @@ import type { Timetz } from '@prisma-next/target-postgres/codec-types';
 import type { Interval } from '@prisma-next/target-postgres/codec-types';
 import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';
 import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
-import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';
 import type { QueryOperationTypes as PgVectorQueryOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
@@ -31,16 +30,16 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:5618dcac53bc3aebf85f5da0f74670d6d2b2d340d449adc73219d7cbba360d69'>;
+  StorageHashBase<'sha256:e6f860c806e651e2d0253c01304989e3914db86fffded47c0eda9ae4081f47d3'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
-export type OperationTypes = PgVectorOperationTypes;
 export type LaneCodecTypes = CodecTypes;
-export type QueryOperationTypes = PgAdapterQueryOps & PgVectorQueryOperationTypes;
+export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
+  PgVectorQueryOperationTypes<CodecTypes>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
   : _Encoded;
@@ -70,7 +69,7 @@ export type FieldOutputTypes = {
     readonly title: CodecTypes['pg/text@1']['output'];
     readonly userId: CodecTypes['pg/text@1']['output'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-    readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
+    readonly embedding: Vector<1536> | null;
   };
   readonly Task: {
     readonly id: Char<36>;
@@ -84,9 +83,9 @@ export type FieldOutputTypes = {
   readonly User: {
     readonly id: Char<36>;
     readonly email: CodecTypes['pg/text@1']['output'];
-    readonly displayName: CodecTypes['pg/text@1']['output'] | null;
+    readonly displayName: CodecTypes['pg/text@1']['output'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-    readonly kind: CodecTypes['pg/enum@1']['output'];
+    readonly kind: 'admin' | 'user';
     readonly address: AddressOutput | null;
   };
 };
@@ -118,7 +117,7 @@ export type FieldInputTypes = {
   readonly User: {
     readonly id: CodecTypes['sql/char@1']['input'];
     readonly email: CodecTypes['pg/text@1']['input'];
-    readonly displayName: CodecTypes['pg/text@1']['input'] | null;
+    readonly displayName: CodecTypes['pg/text@1']['input'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
     readonly kind: CodecTypes['pg/enum@1']['input'];
     readonly address: AddressInput | null;
@@ -126,7 +125,6 @@ export type FieldInputTypes = {
 };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
-  OperationTypes,
   QueryOperationTypes,
   FieldOutputTypes,
   FieldInputTypes
@@ -136,6 +134,7 @@ type ContractBase = ContractType<
   {
     readonly tables: {
       readonly bug: {
+        namespaceId: 'public';
         columns: {
           readonly severity: {
             readonly nativeType: 'text';
@@ -153,6 +152,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly feature: {
+        namespaceId: 'public';
         columns: {
           readonly priority: {
             readonly nativeType: 'text';
@@ -170,6 +170,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly post: {
+        namespaceId: 'public';
         columns: {
           readonly id: {
             readonly nativeType: 'character';
@@ -205,14 +206,19 @@ type ContractBase = ContractType<
         indexes: readonly [];
         foreignKeys: readonly [
           {
-            readonly columns: readonly ['userId'];
-            readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
+            readonly source: { readonly columns: readonly ['userId'] };
+            readonly target: {
+              readonly namespaceId: 'auth';
+              readonly table: 'user';
+              readonly columns: readonly ['id'];
+            };
             readonly constraint: true;
             readonly index: true;
           },
         ];
       };
       readonly task: {
+        namespaceId: 'public';
         columns: {
           readonly id: {
             readonly nativeType: 'character';
@@ -261,14 +267,19 @@ type ContractBase = ContractType<
         indexes: readonly [];
         foreignKeys: readonly [
           {
-            readonly columns: readonly ['userId'];
-            readonly references: { readonly table: 'user'; readonly columns: readonly ['id'] };
+            readonly source: { readonly columns: readonly ['userId'] };
+            readonly target: {
+              readonly namespaceId: 'auth';
+              readonly table: 'user';
+              readonly columns: readonly ['id'];
+            };
             readonly constraint: true;
             readonly index: true;
           },
         ];
       };
       readonly user: {
+        namespaceId: 'auth';
         columns: {
           readonly id: {
             readonly nativeType: 'character';
@@ -284,7 +295,7 @@ type ContractBase = ContractType<
           readonly displayName: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
-            readonly nullable: true;
+            readonly nullable: false;
           };
           readonly createdAt: {
             readonly nativeType: 'timestamptz';
@@ -312,15 +323,22 @@ type ContractBase = ContractType<
     };
     readonly types: {
       readonly user_type: {
+        readonly kind: 'codec-instance';
         readonly codecId: 'pg/enum@1';
         readonly nativeType: 'user_type';
         readonly typeParams: { readonly values: readonly ['admin', 'user'] };
       };
       readonly Embedding1536: {
+        readonly kind: 'codec-instance';
         readonly codecId: 'pg/vector@1';
         readonly nativeType: 'vector';
         readonly typeParams: { readonly length: 1536 };
       };
+    };
+    readonly namespaces: {
+      readonly __unbound__: { readonly id: '__unbound__' };
+      readonly auth: { readonly id: 'auth' };
+      readonly public: { readonly id: 'public' };
     };
     readonly storageHash: StorageHash;
   },
@@ -493,7 +511,7 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
         };
         readonly displayName: {
-          readonly nullable: true;
+          readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
         };
         readonly createdAt: {
