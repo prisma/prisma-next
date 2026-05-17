@@ -17,7 +17,7 @@ import {
   parseJsonOutput,
   runContractEmit,
   runDbVerify,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlanAndEmit,
   setupJourney,
   sql,
@@ -45,7 +45,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit0.exitCode, 'emit base').toBe(0);
         const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(plan0.exitCode, 'plan initial').toBe(0);
-        const apply0 = await runMigrationApply(ctx);
+        const apply0 = await runMigrate(ctx);
         expect(apply0.exitCode, 'apply initial').toBe(0);
 
         // Swap contract and re-emit WITHOUT planning
@@ -54,7 +54,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit1.exitCode, 'emit additive').toBe(0);
 
         // Apply with no planned edge for the new contract → failure
-        const apply1 = await runMigrationApply(ctx, ['--json']);
+        const apply1 = await runMigrate(ctx, ['--json']);
         expect(apply1.exitCode, 'apply fails').toBe(1);
         const output = stripAnsi(apply1.stdout);
         expect(output, 'error mentions no path').toMatch(
@@ -84,7 +84,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit0.exitCode, 'emit base').toBe(0);
         const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(plan0.exitCode, 'plan initial').toBe(0);
-        const apply0 = await runMigrationApply(ctx, ['--json']);
+        const apply0 = await runMigrate(ctx, ['--json']);
         expect(apply0.exitCode, 'apply initial').toBe(0);
 
         const firstResult = parseJsonOutput<{ migrationsApplied: number; markerHash: string }>(
@@ -106,7 +106,7 @@ withTempDir(({ createTempDir }) => {
         expect(plan1.exitCode, 'plan add-unique-email').toBe(0);
 
         // Apply fails because duplicate emails violate the unique constraint
-        const applyFail = await runMigrationApply(ctx, ['--json']);
+        const applyFail = await runMigrate(ctx, ['--json']);
         expect(applyFail.exitCode, 'apply fails on duplicate key').toBe(1);
 
         // Marker stays at the first migration's target hash
@@ -126,7 +126,7 @@ withTempDir(({ createTempDir }) => {
         );
 
         // Resume: apply succeeds now that duplicates are resolved
-        const applyResume = await runMigrationApply(ctx, ['--json']);
+        const applyResume = await runMigrate(ctx, ['--json']);
         expect(applyResume.exitCode, 'resume succeeds').toBe(0);
 
         const resumeResult = parseJsonOutput<{ migrationsApplied: number; markerHash: string }>(
@@ -158,7 +158,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit0.exitCode, 'emit base').toBe(0);
         const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(plan0.exitCode, 'plan initial').toBe(0);
-        const apply0 = await runMigrationApply(ctx);
+        const apply0 = await runMigrate(ctx);
         expect(apply0.exitCode, 'apply initial').toBe(0);
 
         // Verify email column exists before drop
@@ -177,7 +177,7 @@ withTempDir(({ createTempDir }) => {
         expect(plan1.exitCode, 'plan drop-email').toBe(0);
 
         // Apply destructive migration
-        const apply1 = await runMigrationApply(ctx, ['--json']);
+        const apply1 = await runMigrate(ctx, ['--json']);
         expect(apply1.exitCode, 'apply destructive').toBe(0);
 
         const result = parseJsonOutput<{
@@ -247,7 +247,7 @@ withTempDir(({ createTempDir }) => {
         expect(plan2.exitCode, 'plan drop-email').toBe(0);
 
         // Batch apply all three from empty DB
-        const apply = await runMigrationApply(ctx, ['--json']);
+        const apply = await runMigrate(ctx, ['--json']);
         expect(apply.exitCode, 'batch apply').toBe(0);
 
         const result = parseJsonOutput<{

@@ -21,7 +21,7 @@ import {
   parseJsonOutput,
   runContractEmit,
   runDbUpdate,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlanAndEmit,
   runMigrationRef,
   runMigrationStatus,
@@ -153,7 +153,7 @@ withTempDir(({ createTempDir }) => {
           expect(emit.exitCode, 'emit').toBe(0);
           const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan.exitCode, 'plan').toBe(0);
-          const apply = await runMigrationApply(ctx);
+          const apply = await runMigrate(ctx);
           expect(apply.exitCode, 'apply').toBe(0);
 
           const status = await runMigrationStatus(ctx);
@@ -190,7 +190,7 @@ withTempDir(({ createTempDir }) => {
           expect(emit0.exitCode, 'emit base').toBe(0);
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan init').toBe(0);
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply init').toBe(0);
 
           swapContract(ctx, 'contract-additive');
@@ -234,7 +234,7 @@ withTempDir(({ createTempDir }) => {
           expect(emit0.exitCode, 'emit').toBe(0);
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan').toBe(0);
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply').toBe(0);
 
           swapContract(ctx, 'contract-additive');
@@ -277,7 +277,7 @@ withTempDir(({ createTempDir }) => {
           expect(emit0.exitCode, 'emit').toBe(0);
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan').toBe(0);
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply').toBe(0);
 
           swapContract(ctx, 'contract-additive');
@@ -325,7 +325,7 @@ withTempDir(({ createTempDir }) => {
           expect(emit0.exitCode, 'emit').toBe(0);
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan').toBe(0);
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply').toBe(0);
 
           // Push marker off-graph via db update to contract-additive
@@ -378,7 +378,7 @@ withTempDir(({ createTempDir }) => {
           expect(emit.exitCode, 'emit').toBe(0);
           const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan.exitCode, 'plan').toBe(0);
-          const apply = await runMigrationApply(ctx);
+          const apply = await runMigrate(ctx);
           expect(apply.exitCode, 'apply').toBe(0);
 
           const status = await runMigrationStatus(ctx, ['--json']);
@@ -433,7 +433,7 @@ withTempDir(({ createTempDir }) => {
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
           expect(plan0.exitCode, 'plan init').toBe(0);
           const baseHash = parseJsonOutput<{ to: string }>(plan0).to;
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply init').toBe(0);
 
           swapContract(ctx, 'contract-phone');
@@ -502,7 +502,7 @@ withTempDir(({ createTempDir }) => {
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
           expect(plan0.exitCode, 'plan init').toBe(0);
           const baseHash = parseJsonOutput<{ to: string }>(plan0).to;
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply init').toBe(0);
 
           // Branch A: plan + apply
@@ -516,7 +516,7 @@ withTempDir(({ createTempDir }) => {
             baseHash,
           ]);
           expect(planA.exitCode, 'plan A').toBe(0);
-          const applyA = await runMigrationApply(ctx);
+          const applyA = await runMigrate(ctx);
           expect(applyA.exitCode, 'apply A').toBe(0);
 
           // Branch B: plan (don't apply) + set ref to B's target
@@ -572,7 +572,7 @@ withTempDir(({ createTempDir }) => {
           const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
           expect(plan0.exitCode, 'plan init').toBe(0);
           const baseHash = parseJsonOutput<{ to: string }>(plan0).to;
-          const apply0 = await runMigrationApply(ctx);
+          const apply0 = await runMigrate(ctx);
           expect(apply0.exitCode, 'apply init').toBe(0);
 
           swapContract(ctx, 'contract-phone');

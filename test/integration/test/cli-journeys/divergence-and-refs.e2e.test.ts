@@ -15,7 +15,7 @@ import {
   type JourneyContext,
   parseJsonOutput,
   runContractEmit,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlanAndEmit,
   runMigrationRef,
   runMigrationStatus,
@@ -43,7 +43,7 @@ withTempDir(({ createTempDir }) => {
         const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
         expect(plan0.exitCode, 'L.01: plan init').toBe(0);
         const c1Hash = parseJsonOutput<{ to: string }>(plan0).to;
-        const apply0 = await runMigrationApply(ctx);
+        const apply0 = await runMigrate(ctx);
         expect(apply0.exitCode, 'L.01: apply init').toBe(0);
 
         // L.02: swap to contract-phone (C2) → emit → plan add-phone (don't apply)
@@ -81,7 +81,7 @@ withTempDir(({ createTempDir }) => {
         expect(refSet.exitCode, 'L.05: ref set production').toBe(0);
 
         // L.06: apply with --ref production → routes via C1→C3
-        const applyRef = await runMigrationApply(ctx, ['--ref', 'production', '--json']);
+        const applyRef = await runMigrate(ctx, ['--to', 'production', '--json']);
         expect(applyRef.exitCode, 'L.06: apply --ref production').toBe(0);
         const applyResult = parseJsonOutput<{
           ok: boolean;

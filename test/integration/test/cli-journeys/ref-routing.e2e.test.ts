@@ -18,7 +18,7 @@ import {
   type JourneyContext,
   parseJsonOutput,
   runContractEmit,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlanAndEmit,
   runMigrationRef,
   runMigrationStatus,
@@ -46,7 +46,7 @@ withTempDir(({ createTempDir }) => {
         const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
         expect(plan0.exitCode, 'M.01: plan init').toBe(0);
         const c1Hash = parseJsonOutput<{ to: string }>(plan0).to;
-        const apply0 = await runMigrationApply(ctx);
+        const apply0 = await runMigrate(ctx);
         expect(apply0.exitCode, 'M.01: apply init').toBe(0);
 
         // M.02: swap to contract-phone (C2) → emit → plan add-phone (C1→C2)
@@ -84,7 +84,7 @@ withTempDir(({ createTempDir }) => {
         expect(stagingPending, 'M.05: staging has 1 pending').toBe(1);
 
         // M.06: apply --ref staging → advances DB to C2
-        const applyStaging = await runMigrationApply(ctx, ['--ref', 'staging', '--json']);
+        const applyStaging = await runMigrate(ctx, ['--to', 'staging', '--json']);
         expect(applyStaging.exitCode, 'M.06: apply --ref staging').toBe(0);
         const applyStagingResult = parseJsonOutput<{
           ok: boolean;
@@ -100,7 +100,7 @@ withTempDir(({ createTempDir }) => {
         // This transitions into the P-6 scenario (marker ahead of ref).
 
         // N.01: apply --ref production fails (DB at C2, ref at C1, no backward edge)
-        const applyProdFail = await runMigrationApply(ctx, ['--ref', 'production', '--json']);
+        const applyProdFail = await runMigrate(ctx, ['--to', 'production', '--json']);
         expect(applyProdFail.exitCode, 'N.01: apply --ref production fails').toBe(1);
 
         // N.02: status --ref production reports ahead-of-ref condition

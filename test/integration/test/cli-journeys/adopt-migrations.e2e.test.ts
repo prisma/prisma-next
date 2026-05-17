@@ -14,7 +14,7 @@ import {
   parseJsonOutput,
   runContractEmit,
   runDbUpdate,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlanAndEmit,
   runMigrationStatus,
   setupJourney,
@@ -56,7 +56,7 @@ withTempDir(({ createTempDir }) => {
         const c2Hash = baselineResult.to;
 
         // O.04: apply baseline → no-op (DB already at C2 from db update)
-        const applyBaseline = await runMigrationApply(ctx, ['--json']);
+        const applyBaseline = await runMigrate(ctx, ['--json']);
         expect(applyBaseline.exitCode, 'O.04: apply baseline').toBe(0);
         const applyBaselineResult = parseJsonOutput<{
           ok: boolean;
@@ -78,7 +78,7 @@ withTempDir(({ createTempDir }) => {
         const c3Hash = incrementalResult.to;
 
         // O.06: apply incremental → advances DB from C2 to C3
-        const applyIncremental = await runMigrationApply(ctx, ['--json']);
+        const applyIncremental = await runMigrate(ctx, ['--json']);
         expect(applyIncremental.exitCode, 'O.06: apply incremental').toBe(0);
         const applyIncrementalResult = parseJsonOutput<{
           ok: boolean;

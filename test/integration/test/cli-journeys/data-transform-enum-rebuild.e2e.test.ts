@@ -28,7 +28,7 @@ import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
   runContractEmit,
-  runMigrationApply,
+  runMigrate,
   runMigrationEmit,
   runMigrationPlan,
   runMigrationPlanAndEmit,
@@ -60,7 +60,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit0.exitCode, `emit base: ${emit0.stderr}`).toBe(0);
         const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(plan0.exitCode, `plan initial: ${plan0.stderr}`).toBe(0);
-        const apply0 = await runMigrationApply(ctx);
+        const apply0 = await runMigrate(ctx);
         expect(apply0.exitCode, `apply initial: ${apply0.stderr}`).toBe(0);
 
         await sql(
@@ -160,7 +160,7 @@ withTempDir(({ createTempDir }) => {
         expect(dataTransformOp.execute).toHaveLength(1);
         expect(dataTransformOp.postcheck).toHaveLength(1);
 
-        const apply1 = await runMigrationApply(ctx);
+        const apply1 = await runMigrate(ctx);
         expect(apply1.exitCode, `apply: ${apply1.stdout}\n${apply1.stderr}`).toBe(0);
 
         // Doomed row must have been remapped; surviving rows

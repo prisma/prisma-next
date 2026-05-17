@@ -1466,7 +1466,7 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli/commands/migration-plan`**: Exports `createMigrationPlanCommand`
 - **`@prisma-next/cli/commands/migration-show`**: Exports `createMigrationShowCommand`
 - **`@prisma-next/cli/commands/migration-status`**: Exports `createMigrationStatusCommand`
-- **`@prisma-next/cli/commands/migration-apply`**: Exports `createMigrationApplyCommand`
+- **`@prisma-next/cli/commands/migrate`**: Exports `createMigrateCommand`
 - **`@prisma-next/cli/config-loader`**: Exports `loadConfig` function
 
 **Important**: `loadContractFromTs` is exported from the main package (`@prisma-next/cli`). See `.cursor/rules/cli-package-exports.mdc` for import patterns.
