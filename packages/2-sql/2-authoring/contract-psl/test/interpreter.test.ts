@@ -773,7 +773,7 @@ model OrderItem {
   });
 
   describe('per-target namespace resolution (FR15 slice 2 / FR16c)', () => {
-    it('Postgres leaves implicit top-level declarations on the late-bound default slot (TS/PSL byte parity for single-namespace contracts)', () => {
+    it('Postgres stamps `__unbound__` on implicit top-level declarations (single-namespace contracts carry the sentinel)', () => {
       const document = parsePslDocument({
         schema: `model User {
   id Int @id
@@ -790,9 +790,9 @@ model OrderItem {
       const storage = result.value.storage as SqlStorage;
       const table = storage.tables['user'];
       expect(table).toBeDefined();
-      expect(table?.namespaceId).toBeUndefined();
+      expect(table?.namespaceId).toBe('__unbound__');
       const json = JSON.parse(JSON.stringify(table)) as Record<string, unknown>;
-      expect(json).not.toHaveProperty('namespaceId');
+      expect(json['namespaceId']).toBe('__unbound__');
     });
 
     it('Postgres lowers `namespace unbound { … }` to the late-binding sentinel slot', () => {
@@ -815,12 +815,12 @@ model OrderItem {
       const tenant = storage.tables['tenant'];
       expect(tenant).toBeDefined();
       // `namespace unbound { … }` lowers to `__unbound__` — the
-      // sentinel value is the late-bound default and the storage
-      // layer treats it identically to an unset field (no envelope
-      // entry; runtime resolved via `?? UNBOUND_NAMESPACE_ID`).
-      expect(tenant?.namespaceId).toBeUndefined();
+      // sentinel value is the late-bound coordinate and the
+      // interpreter stamps it explicitly so the envelope carries an
+      // unambiguous `(namespaceId, table)` pair end-to-end.
+      expect(tenant?.namespaceId).toBe('__unbound__');
       const json = JSON.parse(JSON.stringify(tenant)) as Record<string, unknown>;
-      expect(json).not.toHaveProperty('namespaceId');
+      expect(json['namespaceId']).toBe('__unbound__');
     });
 
     it('Postgres lowers named `namespace auth { … }` to its eponymous schema slot', () => {
@@ -876,12 +876,13 @@ namespace unbound {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = result.value.storage as SqlStorage;
-      // Top-level `Post` and `Tenant` both stay on the late-bound
-      // default (unset). Named bucket `auth` records the coordinate
-      // explicitly.
-      expect(storage.tables['post']?.namespaceId).toBeUndefined();
+      // Top-level `Post` and `Tenant` (under `namespace unbound`) both
+      // lower to the `__unbound__` sentinel. Named bucket `auth`
+      // records the coordinate explicitly. Every table carries its
+      // resolved coordinate.
+      expect(storage.tables['post']?.namespaceId).toBe('__unbound__');
       expect(storage.tables['user']?.namespaceId).toBe('auth');
-      expect(storage.tables['tenant']?.namespaceId).toBeUndefined();
+      expect(storage.tables['tenant']?.namespaceId).toBe('__unbound__');
     });
   });
 });

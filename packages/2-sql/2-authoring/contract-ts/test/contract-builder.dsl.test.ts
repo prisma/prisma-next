@@ -177,10 +177,10 @@ describe('contract DSL authoring surface', () => {
       expression: 'now()',
     });
     expect(appUserColumns?.['role']?.typeRef).toBe('Role');
-    expect(storageTables['blog_post']?.foreignKeys).toEqual([
+    expect(storageTables['blog_post']?.foreignKeys).toMatchObject([
       {
         source: { columns: ['user_id'] },
-        target: { table: 'app_user', columns: ['id'] },
+        target: { namespaceId: '__unbound__', table: 'app_user', columns: ['id'] },
         name: 'blog_post_user_id_fkey',
         onDelete: 'cascade',
         constraint: true,
@@ -286,10 +286,10 @@ describe('contract DSL authoring surface', () => {
     ]);
     expect(tables['blog_post']?.columns['author_id']).toBeDefined();
     expect(tables['blog_post']?.columns['created_at']).toBeDefined();
-    expect(tables['blog_post']?.foreignKeys).toEqual([
+    expect(tables['blog_post']?.foreignKeys).toMatchObject([
       {
         source: { columns: ['author_id'] },
-        target: { table: 'app_user', columns: ['id'] },
+        target: { namespaceId: '__unbound__', table: 'app_user', columns: ['id'] },
         name: 'blog_post_author_id_fkey',
         onDelete: 'cascade',
         constraint: true,

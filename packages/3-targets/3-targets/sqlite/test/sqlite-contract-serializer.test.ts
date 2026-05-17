@@ -64,8 +64,8 @@ describe('SqliteContractSerializer', () => {
     const json = serializer.serializeContract(contract);
     const reparsed = JSON.parse(JSON.stringify(json));
     expect(reparsed.storage).not.toHaveProperty('kind');
-    expect(reparsed.storage.tables.user).not.toHaveProperty('kind');
-    expect(reparsed.storage.tables.user.columns.id).not.toHaveProperty('kind');
+    expect(reparsed.storage.tables['__unbound__'].user).not.toHaveProperty('kind');
+    expect(reparsed.storage.tables['__unbound__'].user.columns.id).not.toHaveProperty('kind');
   });
 });
 

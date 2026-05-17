@@ -402,7 +402,7 @@ model Document {
     const storage = result.value.storage as {
       readonly types?: Record<string, unknown>;
     };
-    expect(storage.types).toEqual({});
+    expect(storage.types).toBeUndefined();
     expect(result.value.storage).toMatchObject({
       tables: {
         document: {

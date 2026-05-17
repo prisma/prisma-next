@@ -19,7 +19,18 @@ export type SqlEntityHydrationFactory = (entry: unknown) => SqlStorageTypeEntry;
 function normalizeStorageForHydration(
   storage: Contract<SqlStorage>['storage'],
 ): Contract<SqlStorage>['storage'] {
-  const record = storage as Record<string, unknown>;
+  const record = storage as unknown as Record<string, unknown>;
+  // SqlStorage class instances expose `tables` as the flat-by-name
+  // view; the FR15 nested truth lives on the (non-enumerable)
+  // `tablesByNamespace` back-pointer. Read it directly so we don't
+  // misclassify an instance's flat projection as legacy flat *input*.
+  const nestedView = (storage as unknown as { tablesByNamespace?: unknown }).tablesByNamespace;
+  if (nestedView !== undefined && typeof nestedView === 'object' && nestedView !== null) {
+    return {
+      ...(storage as object),
+      tables: nestedView as Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+    } as unknown as Contract<SqlStorage>['storage'];
+  }
   const tables = record['tables'];
   if (tables === undefined || typeof tables !== 'object' || tables === null) {
     return storage;
@@ -31,9 +42,9 @@ function normalizeStorageForHydration(
       bucket[name] = stampNamespaceOnTable(entry, UNBOUND_NAMESPACE_ID);
     }
     return {
-      ...storage,
+      ...(storage as object),
       tables: { [UNBOUND_NAMESPACE_ID]: bucket },
-    } as Contract<SqlStorage>['storage'];
+    } as unknown as Contract<SqlStorage>['storage'];
   }
   const rewrittenTables: Record<string, unknown> = {};
   let changed = false;
@@ -52,7 +63,10 @@ function normalizeStorageForHydration(
     rewrittenTables[namespaceId] = inner;
   }
   if (!changed) return storage;
-  return { ...storage, tables: rewrittenTables } as Contract<SqlStorage>['storage'];
+  return {
+    ...(storage as object),
+    tables: rewrittenTables,
+  } as unknown as Contract<SqlStorage>['storage'];
 }
 
 function looksLikeFlatTableMap(tables: Record<string, unknown>): boolean {

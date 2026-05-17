@@ -237,18 +237,20 @@ export function buildForeignKeySql(
   // target's namespace, not the source's. Same-namespace FKs land here
   // with `target.namespaceId` equal to the source coordinate (callers
   // stamp the resolved value at construction time), so a direct
-  // assignment suffices. The unbound sentinel falls back to the source
-  // schema so SQL rendering stays grounded in the introspection scope.
+  // assignment suffices. The unbound sentinel renders as an unqualified
+  // identifier so `search_path` resolves the schema at runtime.
   const targetSchema =
     foreignKey.target.namespaceId === UNBOUND_NAMESPACE_ID
-      ? schemaName
+      ? undefined
       : foreignKey.target.namespaceId;
+  const targetRef =
+    targetSchema !== undefined
+      ? qualifyTableName(targetSchema, foreignKey.target.table)
+      : quoteIdentifier(foreignKey.target.table);
   let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
 ADD CONSTRAINT ${quoteIdentifier(fkName)}
 FOREIGN KEY (${foreignKey.source.columns.map(quoteIdentifier).join(', ')})
-REFERENCES ${qualifyTableName(targetSchema, foreignKey.target.table)} (${foreignKey.target.columns
-    .map(quoteIdentifier)
-    .join(', ')})`;
+REFERENCES ${targetRef} (${foreignKey.target.columns.map(quoteIdentifier).join(', ')})`;
 
   if (foreignKey.onDelete !== undefined) {
     const action = REFERENTIAL_ACTION_SQL[foreignKey.onDelete];

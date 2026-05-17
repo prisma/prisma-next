@@ -99,15 +99,17 @@ describe('PostgresContractSerializer', () => {
       targetFamily: 'sql',
       storage: {
         tables: {
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+          __unbound__: {
+            user: {
+              columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
+            },
           },
         },
       },
     });
     expect(reparsed.storage).not.toHaveProperty('kind');
-    expect(reparsed.storage.tables.user).not.toHaveProperty('kind');
-    expect(reparsed.storage.tables.user.columns.id).not.toHaveProperty('kind');
+    expect(reparsed.storage.tables['__unbound__'].user).not.toHaveProperty('kind');
+    expect(reparsed.storage.tables['__unbound__'].user.columns.id).not.toHaveProperty('kind');
   });
 
   it('hydrates storage.types entries via the family registry dispatch path', () => {
@@ -133,7 +135,9 @@ describe('PostgresContractSerializer', () => {
           storage: {
             ...base.storage,
             types: {
-              fake_thing: { kind: 'fake-test-entity' as const },
+              __unbound__: {
+                fake_thing: { kind: 'fake-test-entity' as const },
+              },
             },
           },
         } as unknown as Contract<SqlStorage>;

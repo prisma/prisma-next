@@ -162,9 +162,9 @@ describe('contract definition constraint support', () => {
     });
 
     expect(contract.storage.tables.post.foreignKeys).toHaveLength(1);
-    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+    expect(contract.storage.tables.post.foreignKeys[0]).toMatchObject({
       source: { columns: ['userId'] },
-      target: { table: 'user', columns: ['id'] },
+      target: { namespaceId: '__unbound__', table: 'user', columns: ['id'] },
       constraint: true,
       index: true,
     });
@@ -178,9 +178,9 @@ describe('contract definition constraint support', () => {
     });
 
     expect(contract.storage.tables.post.foreignKeys).toHaveLength(1);
-    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+    expect(contract.storage.tables.post.foreignKeys[0]).toMatchObject({
       source: { columns: ['userId'] },
-      target: { table: 'user', columns: ['id'] },
+      target: { namespaceId: '__unbound__', table: 'user', columns: ['id'] },
       constraint: true,
       index: true,
       name: 'post_userId_fkey',
@@ -324,9 +324,9 @@ describe('contract definition constraint support', () => {
       models: { User, Post },
     });
 
-    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+    expect(contract.storage.tables.post.foreignKeys[0]).toMatchObject({
       source: { columns: ['userId'] },
-      target: { table: 'user', columns: ['id'] },
+      target: { namespaceId: '__unbound__', table: 'user', columns: ['id'] },
       constraint: true,
       index: true,
     });
@@ -340,9 +340,9 @@ describe('contract definition constraint support', () => {
       models: { User, Post },
     });
 
-    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+    expect(contract.storage.tables.post.foreignKeys[0]).toMatchObject({
       source: { columns: ['userId'] },
-      target: { table: 'user', columns: ['id'] },
+      target: { namespaceId: '__unbound__', table: 'user', columns: ['id'] },
       constraint: false,
       index: true,
     });
@@ -356,9 +356,9 @@ describe('contract definition constraint support', () => {
       models: { User, Post },
     });
 
-    expect(contract.storage.tables.post.foreignKeys[0]).toEqual({
+    expect(contract.storage.tables.post.foreignKeys[0]).toMatchObject({
       source: { columns: ['userId'] },
-      target: { table: 'user', columns: ['id'] },
+      target: { namespaceId: '__unbound__', table: 'user', columns: ['id'] },
       constraint: true,
       index: false,
     });

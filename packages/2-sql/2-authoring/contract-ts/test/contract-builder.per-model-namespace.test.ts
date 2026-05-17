@@ -75,7 +75,7 @@ describe('FR16a per-model `namespace` field (TS builder)', () => {
     expect(table?.namespaceId).toBe('auth');
   });
 
-  it('omits `namespaceId` for models that do not set `namespace` — the late-bound default stays implicit', () => {
+  it('stamps the late-bound sentinel on models that do not set `namespace`', () => {
     const contract = defineContract({
       family: sqlFamilyPack,
       target: postgresTargetPack,
@@ -86,8 +86,8 @@ describe('FR16a per-model `namespace` field (TS builder)', () => {
       },
     });
 
-    const table = contract.storage.tables['User'] as { readonly namespaceId?: string } | undefined;
-    expect(table?.namespaceId).toBeUndefined();
+    const table = contract.storage.tables['User'] as { readonly namespaceId: string } | undefined;
+    expect(table?.namespaceId).toBe('__unbound__');
   });
 
   it('rejects per-model `namespace` that does not appear in the declared list', () => {

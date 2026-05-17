@@ -2,9 +2,8 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
-import { PostgresEnumType } from '@prisma-next/target-postgres/types';
+import { PostgresEnumType, PostgresSchema } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   contract,
   createDriver,
@@ -123,7 +122,7 @@ describe.sequential('Schema verification after runner - integration', () => {
           storageHash: coreHash('sha256:contract-with-defaults'),
           tables: {
             user: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
+              namespaceId: 'public',
               columns: {
                 id: {
                   nativeType: 'int4',
@@ -145,6 +144,7 @@ describe.sequential('Schema verification after runner - integration', () => {
               foreignKeys: [],
             },
           },
+          namespaces: { public: new PostgresSchema('public') },
         }),
         roots: {},
         models: {},
@@ -181,9 +181,10 @@ describe.sequential('Schema verification after runner - integration', () => {
         profileHash: profileHash('sha256:test'),
         storage: new SqlStorage({
           storageHash: coreHash('sha256:contract-enum-mixed-case'),
+          namespaces: { public: new PostgresSchema('public') },
           tables: {
             Organization: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
+              namespaceId: 'public',
               columns: {
                 id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
                 billingState: {

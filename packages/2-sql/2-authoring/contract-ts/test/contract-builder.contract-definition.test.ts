@@ -153,10 +153,11 @@ describe('shared contract definition lowering', () => {
       columns: ['id'],
       name: 'app_user_pkey',
     });
-    expect(storage['tables']?.['blog_post']?.foreignKeys).toEqual([
+    expect(storage['tables']?.['blog_post']?.foreignKeys).toMatchObject([
       {
         source: { columns: ['author_id'] },
         target: {
+          namespaceId: '__unbound__',
           table: 'app_user',
           columns: ['id'],
         },

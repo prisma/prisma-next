@@ -146,11 +146,12 @@ namespace auth {
     });
     const tsStorage = tsContract.storage as SqlStorage;
 
-    // Neither path stamps a per-table `namespaceId` (top-level / no
-    // declared namespace means the late-bound default; the on-disk
-    // envelope is byte-stable with pre-FR15 contracts).
-    expect(pslStorage.tables['tenant']?.namespaceId).toBeUndefined();
-    expect(tsStorage.tables['tenant']?.namespaceId).toBeUndefined();
+    // Both surfaces resolve top-level / undeclared-namespace models to
+    // the `__unbound__` sentinel and stamp it explicitly on every
+    // table, so the on-disk envelope addresses each table with an
+    // unambiguous `(namespaceId, name)` pair regardless of surface.
+    expect(pslStorage.tables['tenant']?.namespaceId).toBe('__unbound__');
+    expect(tsStorage.tables['tenant']?.namespaceId).toBe('__unbound__');
 
     expect(Object.keys(pslStorage.namespaces)).toEqual(Object.keys(tsStorage.namespaces));
   });

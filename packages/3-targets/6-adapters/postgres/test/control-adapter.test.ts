@@ -696,6 +696,7 @@ describe('PostgresControlAdapter', () => {
       expect(result.tables['post']?.foreignKeys).toEqual([
         {
           columns: ['user_id'],
+          referencedNamespaceId: 'public',
           referencedTable: 'user',
           referencedColumns: ['id'],
           name: 'post_user_id_fkey',
@@ -781,6 +782,7 @@ describe('PostgresControlAdapter', () => {
       expect(result.tables['order']?.foreignKeys).toEqual([
         {
           columns: ['user_id', 'account_id'],
+          referencedNamespaceId: 'public',
           referencedTable: 'account',
           referencedColumns: ['user_id', 'id'],
           name: 'order_account_fkey',

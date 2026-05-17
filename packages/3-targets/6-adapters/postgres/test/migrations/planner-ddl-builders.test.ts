@@ -251,7 +251,11 @@ describe('buildCreateTableSql', () => {
 describe('buildForeignKeySql', () => {
   const baseFk: ForeignKey = {
     source: { columns: ['author_id'] },
-    target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
+    // Same-namespace FKs carry the resolved coordinate (here `'public'`),
+    // not the late-bound sentinel — the caller stamps the value before
+    // construction. The unbound-sentinel case is covered separately
+    // below.
+    target: { namespaceId: 'public', table: 'user', columns: ['id'] },
     constraint: true,
     index: true,
   };

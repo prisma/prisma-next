@@ -139,11 +139,10 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
     }
     const storage = result.value.storage as SqlStorage;
     const post = storage.tables['post'];
-    // Top-level declarations carry no explicit coordinate — single-
-    // namespace contracts stay byte-stable with TS-authored
-    // counterparts, and the planner falls back to its
-    // `ctx.schemaName` (today `"public"`) when no per-table
-    // coordinate is set.
-    expect(post?.namespaceId).toBeUndefined();
+    // Top-level declarations resolve to the late-bound `__unbound__`
+    // sentinel — single-namespace contracts carry the sentinel
+    // explicitly so the on-disk envelope addresses every table with an
+    // unambiguous `(namespaceId, name)` pair.
+    expect(post?.namespaceId).toBe('__unbound__');
   });
 });
