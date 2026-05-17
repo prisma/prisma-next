@@ -166,7 +166,19 @@ export function verifyPrimaryKey(
  * Verifies foreign keys match between contract and schema.
  * Returns verification nodes for the tree.
  *
- * Uses semantic satisfaction: identity is based on (table + columns + referenced table + referenced columns).
+ * Uses semantic satisfaction: identity is based on
+ * (table + columns + referenced (namespace, table) + referenced columns).
+ *
+ * The referenced-namespace dimension (FR16b) is consulted only when
+ * the schema FK carries `referencedNamespaceId` and the contract FK
+ * carries `target.namespaceId`. Same-namespace introspections (the
+ * common single-schema case) leave the schema FK's
+ * `referencedNamespaceId` undefined; same-namespace contracts default
+ * `target.namespaceId` to the source's coordinate. Either-side
+ * undefined collapses the comparison to table+column equality —
+ * preserving today's verification behaviour for the long tail of
+ * single-namespace contracts.
+ *
  * Name differences are ignored by default (names are for DDL/diagnostics, not identity).
  */
 export function verifyForeignKeys(
@@ -186,7 +198,8 @@ export function verifyForeignKeys(
       return (
         arraysEqual(fk.columns, contractFK.source.columns) &&
         fk.referencedTable === contractFK.target.table &&
-        arraysEqual(fk.referencedColumns, contractFK.target.columns)
+        arraysEqual(fk.referencedColumns, contractFK.target.columns) &&
+        foreignKeyNamespacesMatch(contractFK, fk)
       );
     });
 
@@ -258,7 +271,8 @@ export function verifyForeignKeys(
         return (
           arraysEqual(fk.source.columns, schemaFK.columns) &&
           fk.target.table === schemaFK.referencedTable &&
-          arraysEqual(fk.target.columns, schemaFK.referencedColumns)
+          arraysEqual(fk.target.columns, schemaFK.referencedColumns) &&
+          foreignKeyNamespacesMatch(fk, schemaFK)
         );
       });
 
@@ -588,4 +602,23 @@ function getReferentialActionMismatches(
  */
 function normalizeReferentialAction(action: string | undefined): string | undefined {
   return action === 'noAction' ? undefined : action;
+}
+
+/**
+ * Compare the FK target namespace coordinate between a contract FK and a
+ * schema FK. Either-side undefined collapses to a structural match — that
+ * carries the common single-schema cases where the introspector omits the
+ * `referencedNamespaceId` (target lives in the introspected schema) and
+ * the contract leaves `target.namespaceId` unset.
+ *
+ * When both sides explicitly carry coordinates (FR16b cross-namespace
+ * FKs), they must agree.
+ */
+function foreignKeyNamespacesMatch(contractFK: ForeignKey, schemaFK: SqlForeignKeyIR): boolean {
+  const contractNamespace = contractFK.target.namespaceId;
+  const schemaNamespace = schemaFK.referencedNamespaceId;
+  if (contractNamespace === undefined || schemaNamespace === undefined) {
+    return true;
+  }
+  return contractNamespace === schemaNamespace;
 }

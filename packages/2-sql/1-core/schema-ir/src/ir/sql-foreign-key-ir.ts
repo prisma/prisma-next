@@ -8,6 +8,16 @@ export interface SqlForeignKeyIRInput {
   readonly columns: readonly string[];
   readonly referencedTable: string;
   readonly referencedColumns: readonly string[];
+  /**
+   * Namespace coordinate of the referenced table. Populated by the
+   * introspector from the database's `referenced_table_schema`
+   * (Postgres: `pg_namespace.nspname` of `pg_class.relnamespace` on
+   * the confrelid table). Omitted when the introspector cannot
+   * distinguish the target namespace from the source's — keeps
+   * single-schema introspections byte-identical with their pre-FR16b
+   * shape.
+   */
+  readonly referencedNamespaceId?: string;
   readonly name?: string;
   readonly onDelete?: SqlReferentialAction;
   readonly onUpdate?: SqlReferentialAction;
@@ -26,6 +36,7 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode {
   readonly columns: readonly string[];
   readonly referencedTable: string;
   readonly referencedColumns: readonly string[];
+  declare readonly referencedNamespaceId?: string;
   declare readonly name?: string;
   declare readonly onDelete?: SqlReferentialAction;
   declare readonly onUpdate?: SqlReferentialAction;
@@ -36,6 +47,9 @@ export class SqlForeignKeyIR extends SqlSchemaIRNode {
     this.columns = input.columns;
     this.referencedTable = input.referencedTable;
     this.referencedColumns = input.referencedColumns;
+    if (input.referencedNamespaceId !== undefined) {
+      this.referencedNamespaceId = input.referencedNamespaceId;
+    }
     if (input.name !== undefined) this.name = input.name;
     if (input.onDelete !== undefined) this.onDelete = input.onDelete;
     if (input.onUpdate !== undefined) this.onUpdate = input.onUpdate;

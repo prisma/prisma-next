@@ -479,6 +479,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         {
           columns: string[];
           referencedTable: string;
+          referencedNamespaceId: string;
           referencedColumns: string[];
           name: string;
           deleteRule: string;
@@ -494,6 +495,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           foreignKeysMap.set(fkRow.constraint_name, {
             columns: [fkRow.column_name],
             referencedTable: fkRow.referenced_table_name,
+            referencedNamespaceId: fkRow.referenced_table_schema,
             referencedColumns: [fkRow.referenced_column_name],
             name: fkRow.constraint_name,
             deleteRule: fkRow.delete_rule,
@@ -506,6 +508,14 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           columns: Object.freeze([...fk.columns]) as readonly string[],
           referencedTable: fk.referencedTable,
           referencedColumns: Object.freeze([...fk.referencedColumns]) as readonly string[],
+          // Only stamp `referencedNamespaceId` when the FK target lives in a
+          // different schema from the introspected one — single-schema
+          // introspections leave the field absent, keeping their IR shape
+          // byte-identical with pre-FR16b consumers (existing fixtures,
+          // verifier comparisons that pre-date the namespace dimension).
+          ...(fk.referencedNamespaceId !== schema
+            ? { referencedNamespaceId: fk.referencedNamespaceId }
+            : {}),
           name: fk.name,
           ...ifDefined('onDelete', mapReferentialAction(fk.deleteRule)),
           ...ifDefined('onUpdate', mapReferentialAction(fk.updateRule)),
