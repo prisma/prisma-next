@@ -17,15 +17,18 @@ describe('SqlContractSerializer structure validation', () => {
     storage: {
       storageHash: 'sha256:test',
       tables: {
-        User: {
-          columns: {
-            id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+        __unbound__: {
+          User: {
+            namespaceId: '__unbound__',
+            columns: {
+              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     },
@@ -33,7 +36,7 @@ describe('SqlContractSerializer structure validation', () => {
 
   it('accepts valid contract structure', () => {
     const result = validateSqlContractFully<Contract<SqlStorage>>(validContractInput);
-    expect(result.storage.tables).toHaveProperty('User');
+    expect(result.storage.tables['__unbound__']).toHaveProperty('User');
   });
 
   it('throws on missing targetFamily', () => {
@@ -79,9 +82,12 @@ describe('SqlContractSerializer structure validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: {
-              id: { nativeType: 123 as unknown as string, codecId: 'pg/text@1', nullable: false },
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { nativeType: 123 as unknown as string, codecId: 'pg/text@1', nullable: false },
+              },
             },
           },
         },
@@ -99,12 +105,15 @@ describe('SqlContractSerializer structure validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: {
-              id: {
-                nativeType: 'text',
-                codecId: 'pg/text@1',
-                nullable: 'yes' as unknown as boolean,
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: {
+                  nativeType: 'text',
+                  codecId: 'pg/text@1',
+                  nullable: 'yes' as unknown as boolean,
+                },
               },
             },
           },

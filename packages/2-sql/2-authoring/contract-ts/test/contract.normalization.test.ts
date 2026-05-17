@@ -17,14 +17,17 @@ function validContractInput(overrides?: Record<string, unknown>) {
     storage: {
       storageHash: 'sha256:test',
       tables: {
-        User: {
-          columns: {
-            id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+        __unbound__: {
+          User: {
+            namespaceId: '__unbound__',
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     },
@@ -35,7 +38,9 @@ function validContractInput(overrides?: Record<string, unknown>) {
 describe('SqlContractSerializer structural validation', () => {
   it('accepts a valid contract with explicit nullable', () => {
     const contract = validateSqlContractFully<Contract<SqlStorage>>(validContractInput());
-    expect(contract.storage.tables['User']?.columns['id']?.nullable).toBe(false);
+    expect(contract.storage.tables).toMatchObject({
+      __unbound__: { User: { columns: { id: { nullable: false } } } },
+    });
   });
 
   it('rejects missing uniques array', () => {
@@ -43,13 +48,16 @@ describe('SqlContractSerializer structural validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -62,13 +70,16 @@ describe('SqlContractSerializer structural validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            foreignKeys: [],
           },
         },
       },
@@ -81,13 +92,16 @@ describe('SqlContractSerializer structural validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
           },
         },
       },
@@ -97,7 +111,7 @@ describe('SqlContractSerializer structural validation', () => {
 
   it('accepts table with columns present', () => {
     const contract = validateSqlContractFully<Contract<SqlStorage>>(validContractInput());
-    expect(contract.storage.tables['User']).toBeDefined();
+    expect(contract.storage.tables['__unbound__']).toHaveProperty('User');
   });
 
   it('rejects table without columns property', () => {
@@ -105,11 +119,14 @@ describe('SqlContractSerializer structural validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
           },
         },
       },
@@ -123,12 +140,15 @@ describe('SqlContractSerializer structural validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: null,
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: null,
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
           },
         },
       },
@@ -142,11 +162,14 @@ describe('SqlContractSerializer structural validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: {},
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: {},
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
           },
         },
       },
@@ -160,20 +183,24 @@ describe('SqlContractSerializer structural validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          Post: {
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+            Post: {
+              namespaceId: '__unbound__',
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
           },
         },
       },
@@ -226,19 +253,23 @@ describe('SqlContractSerializer structural validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          user: {
-            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          post: {
-            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+            post: {
+              namespaceId: '__unbound__',
+              columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
           },
         },
       },
@@ -281,29 +312,33 @@ describe('SqlContractSerializer structural validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          Post: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: { columns: ['userId'] },
-                target: { table: 'User', columns: ['id'] },
-                constraint: true,
-                index: true,
+            Post: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
-            ],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: { columns: ['userId'] },
+                  target: { namespaceId: '__unbound__', table: 'User', columns: ['id'] },
+                  constraint: true,
+                  index: true,
+                },
+              ],
+            },
           },
         },
       },
@@ -346,29 +381,33 @@ describe('SqlContractSerializer structural validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          Post: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: { columns: ['userId'] },
-                target: { table: 'User', columns: ['id'] },
-                constraint: true,
-                index: true,
+            Post: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
-            ],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: { columns: ['userId'] },
+                  target: { namespaceId: '__unbound__', table: 'User', columns: ['id'] },
+                  constraint: true,
+                  index: true,
+                },
+              ],
+            },
           },
         },
       },
@@ -388,37 +427,41 @@ describe('SqlContractSerializer structural validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          user: {
-            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          post: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: { columns: ['userId'] },
-                target: { table: 'user', columns: ['id'] },
-                constraint: true,
-                index: true,
+            post: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
-            ],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: { columns: ['userId'] },
+                  target: { namespaceId: '__unbound__', table: 'user', columns: ['id'] },
+                  constraint: true,
+                  index: true,
+                },
+              ],
+            },
           },
         },
       },
     });
     const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
-    const fk = contract.storage.tables['post']?.foreignKeys[0];
-    expect(fk?.constraint).toBe(true);
-    expect(fk?.index).toBe(true);
+    expect(contract.storage.tables).toMatchObject({
+      __unbound__: { post: { foreignKeys: [{ constraint: true, index: true }] } },
+    });
   });
 
   it('preserves explicit per-FK constraint/index fields', () => {
@@ -426,36 +469,40 @@ describe('SqlContractSerializer structural validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          user: {
-            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          post: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: { columns: ['userId'] },
-                target: { table: 'user', columns: ['id'] },
-                constraint: false,
-                index: true,
+            post: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
-            ],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: { columns: ['userId'] },
+                  target: { namespaceId: '__unbound__', table: 'user', columns: ['id'] },
+                  constraint: false,
+                  index: true,
+                },
+              ],
+            },
           },
         },
       },
     });
     const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
-    const fk = contract.storage.tables['post']?.foreignKeys[0];
-    expect(fk?.constraint).toBe(false);
-    expect(fk?.index).toBe(true);
+    expect(contract.storage.tables).toMatchObject({
+      __unbound__: { post: { foreignKeys: [{ constraint: false, index: true }] } },
+    });
   });
 });

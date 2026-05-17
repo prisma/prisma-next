@@ -63,14 +63,17 @@ describe('SqlContractSerializer edge cases', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -95,11 +98,14 @@ describe('SqlContractSerializer edge cases', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
           },
         },
       },
@@ -136,14 +142,17 @@ describe('SqlContractSerializer edge cases', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -181,14 +190,17 @@ describe('SqlContractSerializer edge cases', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -237,24 +249,28 @@ describe('SqlContractSerializer edge cases', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            user: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          post: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            post: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },

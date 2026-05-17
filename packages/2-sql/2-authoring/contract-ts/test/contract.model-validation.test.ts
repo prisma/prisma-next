@@ -17,15 +17,18 @@ describe('SqlContractSerializer model validation', () => {
     storage: {
       storageHash: 'sha256:test',
       tables: {
-        User: {
-          columns: {
-            id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+        __unbound__: {
+          User: {
+            namespaceId: '__unbound__',
+            columns: {
+              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     },
@@ -69,13 +72,16 @@ describe('SqlContractSerializer model validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -142,24 +148,28 @@ describe('SqlContractSerializer model validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          Post: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            Post: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -199,31 +209,35 @@ describe('SqlContractSerializer model validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          Post: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: { columns: ['userId'] },
-                target: { table: 'User', columns: ['id'] },
-                constraint: true,
-                index: true,
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
-            ],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+            Post: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: { columns: ['userId'] },
+                  target: { namespaceId: '__unbound__', table: 'User', columns: ['id'] },
+                  constraint: true,
+                  index: true,
+                },
+              ],
+            },
           },
         },
       },
@@ -267,31 +281,35 @@ describe('SqlContractSerializer model validation', () => {
       storage: {
         storageHash: 'sha256:test',
         tables: {
-          User: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          Post: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: { columns: ['userId'] },
-                target: { table: 'User', columns: ['id'] },
-                constraint: true,
-                index: true,
+          __unbound__: {
+            User: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
               },
-            ],
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
+            },
+            Post: {
+              namespaceId: '__unbound__',
+              columns: {
+                id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [
+                {
+                  source: { columns: ['userId'] },
+                  target: { namespaceId: '__unbound__', table: 'User', columns: ['id'] },
+                  constraint: true,
+                  index: true,
+                },
+              ],
+            },
           },
         },
       },
