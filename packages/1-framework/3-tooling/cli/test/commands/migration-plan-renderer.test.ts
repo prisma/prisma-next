@@ -48,7 +48,7 @@ describe('formatMigrationPlanOutput: extension materialisation surfaces in short
 
       expect(out).toContain('No changes detected');
       expect(out).not.toContain('Emitted extension migrations:');
-      expect(out).not.toContain('prisma-next migration apply');
+      expect(out).not.toContain('prisma-next migrate');
     });
 
     it('surfaces emitted extension directories and apply hint when extensions emitted', () => {
@@ -64,7 +64,7 @@ describe('formatMigrationPlanOutput: extension materialisation surfaces in short
       expect(out).toContain('Emitted extension migrations:');
       expect(out).toContain('audit → migrations/audit/20260101000000_bump');
       expect(out).toContain('flags → migrations/flags/20260102000000_bump');
-      expect(out).toContain('prisma-next migration apply');
+      expect(out).toContain('prisma-next migrate');
     });
   });
 
@@ -74,7 +74,7 @@ describe('formatMigrationPlanOutput: extension materialisation surfaces in short
 
       expect(out).toContain('placeholder');
       expect(out).not.toContain('Emitted extension migrations:');
-      expect(out).not.toContain('prisma-next migration apply');
+      expect(out).not.toContain('prisma-next migrate');
     });
 
     it('surfaces emitted extension directories and apply hint when extensions emitted', () => {
@@ -86,7 +86,7 @@ describe('formatMigrationPlanOutput: extension materialisation surfaces in short
       expect(out).toContain('placeholder');
       expect(out).toContain('Emitted extension migrations:');
       expect(out).toContain('audit → migrations/audit/20260101000000_bump');
-      expect(out).toContain('prisma-next migration apply');
+      expect(out).toContain('prisma-next migrate');
     });
   });
 });
