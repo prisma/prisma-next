@@ -293,4 +293,29 @@ describe('buildForeignKeySql', () => {
     expect(sql).toContain('ON DELETE CASCADE');
     expect(sql).toContain('ON UPDATE RESTRICT');
   });
+
+  it('qualifies the REFERENCES clause through the target namespace for cross-namespace FKs', () => {
+    const fk = {
+      source: { columns: ['user_id'] },
+      target: { namespaceId: 'auth', table: 'User', columns: ['id'] },
+      constraint: true,
+      index: true,
+    } as unknown as ForeignKey;
+    const sql = buildForeignKeySql('public', 'profile', 'profile_user_id_fkey', fk);
+    expect(sql).toContain('ALTER TABLE "public"."profile"');
+    expect(sql).toContain('REFERENCES "auth"."User" ("id")');
+    expect(sql).not.toContain('REFERENCES "public"."User"');
+  });
+
+  it('renders unqualified REFERENCES clause when target namespace is the unbound sentinel', () => {
+    const fk = {
+      source: { columns: ['author_id'] },
+      target: { namespaceId: '__unbound__', table: 'user', columns: ['id'] },
+      constraint: true,
+      index: true,
+    } as unknown as ForeignKey;
+    const sql = buildForeignKeySql('public', 'post', 'fk', fk);
+    expect(sql).toContain('REFERENCES "user" ("id")');
+    expect(sql).not.toContain('"__unbound__"');
+  });
 });

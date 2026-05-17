@@ -6,6 +6,7 @@ import {
   type ForeignKeyInput,
   type ForeignKeyReferenceInput,
   type ForeignKeySource,
+  findTableByCoord,
   findTableByName,
   iterateTablesWithCoords,
   type PrimaryKeyInput,
@@ -633,12 +634,16 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
  * counts match their referenced columns. Throws on the first mismatch.
  */
 export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): void {
+  const tableCoords = new Set<string>();
   const tableNames = new Set<string>();
-  for (const { name } of iterateTablesWithCoords(contract.storage)) {
+  for (const { namespaceId, name } of iterateTablesWithCoords(contract.storage)) {
+    tableCoords.add(`${namespaceId}\u0000${name}`);
     tableNames.add(name);
   }
 
-  for (const { name: tableName, table } of iterateTablesWithCoords(contract.storage)) {
+  for (const { namespaceId: sourceNamespaceId, name: tableName, table } of iterateTablesWithCoords(
+    contract.storage,
+  )) {
     const columnNames = new Set(Object.keys(table.columns));
 
     if (table.primaryKey) {
@@ -693,15 +698,30 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
         }
       }
 
-      if (!tableNames.has(fk.target.table)) {
+      // Cross-namespace FK lookup (FR16b): the target carries its own
+      // namespace coordinate so resolution is namespace-aware. Same-namespace
+      // FKs (the common case) leave `target.namespaceId` defaulted to the
+      // source's namespace via the StorageTable constructor.
+      const targetNamespaceId = fk.target.namespaceId ?? sourceNamespaceId;
+      const referencedTable = findTableByCoord(
+        contract.storage,
+        targetNamespaceId,
+        fk.target.table,
+      );
+      if (!referencedTable) {
+        if (!tableNames.has(fk.target.table)) {
+          throw new ContractValidationError(
+            `Table "${tableName}" foreignKey references non-existent table "${fk.target.table}"`,
+            'storage',
+          );
+        }
+        // The table exists under a different namespace than declared; surface
+        // the namespace mismatch with both coordinates explicit.
         throw new ContractValidationError(
-          `Table "${tableName}" foreignKey references non-existent table "${fk.target.table}"`,
+          `Table "${tableName}" foreignKey references table "${fk.target.table}" in namespace "${targetNamespaceId}" but no such (namespace, table) pair exists in the contract`,
           'storage',
         );
       }
-
-      const referencedTable = findTableByName(contract.storage, fk.target.table);
-      if (!referencedTable) continue;
       const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
       for (const colName of fk.target.columns) {
         if (!referencedColumnNames.has(colName)) {

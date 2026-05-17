@@ -26,18 +26,24 @@ export interface ColumnSpec {
 }
 
 /**
- * Literal-args shape for a foreign key definition. The referenced table is
- * assumed to live in the same schema as the constrained table.
+ * Literal-args shape for a foreign key definition.
  *
  * Mirrors the Contract IR's source-vs-target split (see
  * `@prisma-next/sql-contract/types`'s `ForeignKey`), minus the source-side
  * namespace (the source's namespace is implicit from the schemaName argument
  * threaded through the planner).
+ *
+ * `target.schema` is the namespace coordinate the referenced table inhabits.
+ * When omitted, the renderer falls back to the source schema (same-namespace
+ * FK, byte-stable with single-namespace fixtures); when populated with a
+ * distinct namespace id, the rendered `REFERENCES` clause is qualified with
+ * the target schema (`REFERENCES "auth"."User" (...)`).
  */
 export interface ForeignKeySpec {
   readonly name: string;
   readonly columns: readonly string[];
   readonly target: {
+    readonly schema?: string;
     readonly table: string;
     readonly columns: readonly string[];
   };

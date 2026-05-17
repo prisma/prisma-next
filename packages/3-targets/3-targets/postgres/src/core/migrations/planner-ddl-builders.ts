@@ -231,10 +231,16 @@ export function buildForeignKeySql(
   fkName: string,
   foreignKey: ForeignKey,
 ): string {
+  // Cross-namespace FKs (FR16b): the target carries its own namespace
+  // coordinate so the rendered `REFERENCES` clause qualifies through the
+  // target's namespace, not the source's. Same-namespace FKs (the common
+  // case) leave `target.namespaceId` either equal to the source's
+  // namespace or undefined; both branches reduce to the source schema.
+  const targetSchema = foreignKey.target.namespaceId ?? schemaName;
   let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
 ADD CONSTRAINT ${quoteIdentifier(fkName)}
 FOREIGN KEY (${foreignKey.source.columns.map(quoteIdentifier).join(', ')})
-REFERENCES ${qualifyTableName(schemaName, foreignKey.target.table)} (${foreignKey.target.columns
+REFERENCES ${qualifyTableName(targetSchema, foreignKey.target.table)} (${foreignKey.target.columns
     .map(quoteIdentifier)
     .join(', ')})`;
 

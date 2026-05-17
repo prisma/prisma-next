@@ -235,7 +235,13 @@ function mapIssueToCall(
           const fkSpec: ForeignKeySpec = {
             name: fkName,
             columns: fk.source.columns,
-            target: { table: fk.target.table, columns: fk.target.columns },
+            target: {
+              ...(fk.target.namespaceId !== undefined && fk.target.namespaceId !== schemaForTable
+                ? { schema: fk.target.namespaceId }
+                : {}),
+              table: fk.target.table,
+              columns: fk.target.columns,
+            },
             ...(fk.onDelete !== undefined && { onDelete: fk.onDelete }),
             ...(fk.onUpdate !== undefined && { onUpdate: fk.onUpdate }),
           };
@@ -517,14 +523,21 @@ function mapIssueToCall(
             (k) => k.source.columns.join(', ') === columns.join(', '),
           );
           if (fk) {
+            const sourceSchema = tableSchema(issue.table);
             const fkSpec: ForeignKeySpec = {
               name: fkName,
               columns: fk.source.columns,
-              target: { table: fk.target.table, columns: fk.target.columns },
+              target: {
+                ...(fk.target.namespaceId !== undefined && fk.target.namespaceId !== sourceSchema
+                  ? { schema: fk.target.namespaceId }
+                  : {}),
+                table: fk.target.table,
+                columns: fk.target.columns,
+              },
               ...(fk.onDelete !== undefined && { onDelete: fk.onDelete }),
               ...(fk.onUpdate !== undefined && { onUpdate: fk.onUpdate }),
             };
-            return ok([new AddForeignKeyCall(tableSchema(issue.table), issue.table, fkSpec)]);
+            return ok([new AddForeignKeyCall(sourceSchema, issue.table, fkSpec)]);
           }
           return notOk(
             issueConflict(

@@ -12,10 +12,11 @@ const REFERENTIAL_ACTION_SQL: Record<ReferentialAction, string> = {
 };
 
 function renderForeignKeySql(schemaName: string, tableName: string, fk: ForeignKeySpec): string {
+  const targetSchema = fk.target.schema ?? schemaName;
   let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
 ADD CONSTRAINT ${quoteIdentifier(fk.name)}
 FOREIGN KEY (${fk.columns.map(quoteIdentifier).join(', ')})
-REFERENCES ${qualifyTableName(schemaName, fk.target.table)} (${fk.target.columns
+REFERENCES ${qualifyTableName(targetSchema, fk.target.table)} (${fk.target.columns
     .map(quoteIdentifier)
     .join(', ')})`;
 
