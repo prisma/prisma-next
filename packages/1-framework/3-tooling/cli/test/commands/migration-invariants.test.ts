@@ -249,7 +249,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     const exitCode = await runAndCaptureExit(() =>
-      executeCommand(createMigrateCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrateCommand(), ['--to', 'prod', '--json']),
     );
 
     expect(exitCode).not.toBe(0);
@@ -304,7 +304,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     await runAndCaptureExit(() =>
-      executeCommand(createMigrateCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrateCommand(), ['--to', 'prod', '--json']),
     );
 
     // The contract under test is the pre-check: an invariant that
@@ -390,7 +390,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     const exitCode = await runAndCaptureExit(() =>
-      executeCommand(createMigrateCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrateCommand(), ['--to', 'prod', '--json']),
     );
 
     const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
