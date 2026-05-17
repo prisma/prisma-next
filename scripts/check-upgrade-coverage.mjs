@@ -39,8 +39,8 @@ import { existsSync } from 'node:fs';
 import { argv, cwd, exit, stderr, stdout } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-const USER_SKILL_PKG = 'packages/0-shared/upgrade-skill';
-const EXT_SKILL_PKG = 'packages/0-shared/extension-upgrade-skill';
+const USER_SKILL_PKG = 'skills/upgrade/prisma-next-upgrade';
+const EXT_SKILL_PKG = 'skills/extension-author/prisma-next-extension-upgrade';
 
 /**
  * Parse a `<major>.<minor>.<patch>[-<prerelease>]` version string into
@@ -97,15 +97,15 @@ export function coverageTransitionLabel(head, prev) {
 }
 
 /**
- * Parse a path under `<pkg>/upgrades/<transition>/...` and return the
- * transition segment, or null if the path does not match.
+ * Parse a path under `<skill-pkg>/upgrades/<transition>/...` and return
+ * the transition segment, or null if the path does not match.
  *
- * Example: `packages/0-shared/upgrade-skill/upgrades/0.7-to-0.8/foo.ts`
+ * Example: `skills/upgrade/prisma-next-upgrade/upgrades/0.7-to-0.8/foo.ts`
  *  → `'0.7-to-0.8'`
  */
 export function parseTransitionFromPath(path) {
   const match =
-    /^packages\/0-shared\/(?:upgrade-skill|extension-upgrade-skill)\/upgrades\/([^/]+)\//.exec(
+    /^skills\/(?:upgrade\/prisma-next-upgrade|extension-author\/prisma-next-extension-upgrade)\/upgrades\/([^/]+)\//.exec(
       path,
     );
   return match ? match[1] : null;
