@@ -82,8 +82,9 @@ The resolver yields one error type with cases for each failure mode in the spec'
 - [ ] Register the new command in `cli.ts`. Remove the `migrationApplyCommand` registration. Delete `migration-apply.ts`.
 - [ ] Update the help text and error envelopes in `cli.ts` "Unknown command" handler — running `prisma-next migration apply ...` now triggers an unknown-command error with a candidate-suggestion pointing at `migrate`.
 - [ ] Update `docs/architecture docs/subsystems/7. Migration System.md` for every reference to `migration apply`. (Scope: only the references that exist; the larger doc rewrite is M7.)
+- [ ] **Add `--to <contract>` flag to `db update`.** The intended-surface diagram in the spec shows `db update [--to <contract>]`, but no milestone owned the addition; M1's implementer surfaced this gap. The flag is structurally identical to `migrate --to`: argument routes through the M1 resolver; when present, the verb advances the database to the named contract instead of auto-resolving to the emitted one. Implementation slots cleanly alongside the new `migrate` command in M2's commit cluster. Help text + a single journey-test assertion for the new flag round it out.
 
-**Validation.** AC1 (no `migration apply` in `--help`), AC8 (journey suite green). Manual verification: `prisma-next migrate --to <hash>`, `prisma-next migrate --to production`, `prisma-next migrate --to ./other/contract.json` all do the right thing on a live test DB.
+**Validation.** AC1 (no `migration apply` in `--help`), AC8 (journey suite green). Manual verification: `prisma-next migrate --to <hash>`, `prisma-next migrate --to production`, `prisma-next migrate --to ./other/contract.json`, and `prisma-next db update --to <hash>` all do the right thing on a live test DB.
 
 **Why before M3–M6.** This is the highest-leverage rename and the one most disruptive to the journey suite. Landing it first makes M3–M6's helper renames smaller deltas against a settled base.
 
