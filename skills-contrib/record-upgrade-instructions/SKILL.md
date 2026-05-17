@@ -19,8 +19,8 @@ This skill fires on PRs **inside this repo** that make a breaking change to Pris
 
 The published skills you will be authoring entries into:
 
-- `skills/upgrade/prisma-next-upgrade/` — distributed via `npx skills add prisma/prisma-next/skills/upgrade --all`. **Audience: users of Prisma Next** (consumers of the public package API: `@prisma-next/postgres`, `@prisma-next/mongo`, the contract files in `prisma/`, on-disk migration shape).
-- `skills/extension-author/prisma-next-extension-upgrade/` — distributed via `npx skills add prisma/prisma-next/skills/extension-author --all`. **Audience: authors of Prisma Next extensions** (consumers of the framework SPI: `@prisma-next/contract`, `@prisma-next/framework-components`, `@prisma-next/migration-tools`, etc.).
+- `skills/upgrade/prisma-next-upgrade/` — distributed via `pnpm dlx skills add prisma/prisma-next/skills/upgrade --all`. **Audience: users of Prisma Next** (consumers of the public package API: `@prisma-next/postgres`, `@prisma-next/mongo`, the contract files in `prisma/`, on-disk migration shape).
+- `skills/extension-author/prisma-next-extension-upgrade/` — distributed via `pnpm dlx skills add prisma/prisma-next/skills/extension-author --all`. **Audience: authors of Prisma Next extensions** (consumers of the framework SPI: `@prisma-next/contract`, `@prisma-next/framework-components`, `@prisma-next/migration-tools`, etc.).
 
 The two skill clusters are independent (no shared content). Cross-audience breaking changes — where the same on-disk transformation applies to both substrates — are recorded *separately* in each cluster, including duplicated colocated scripts.
 
@@ -109,7 +109,7 @@ The human reviewer + the CI gate (`pnpm check:upgrade-coverage`) both check this
 When a breaking change affects both substrates, the same on-disk transformation may apply to both `examples/` and `packages/3-extensions/`. Author entries in **both** packages:
 
 - Append a `changes[]` entry to each skill's `instructions.md`. The two entries may have the same `id`, `summary`, and `detection` — that is fine; they are independent records in independent skill clusters.
-- Copy the colocated script into both directories. Do **not** symlink (the GitHub-URL `npx skills add` flow discards symlinks); do **not** import one from the other (the two clusters have no cross-dep).
+- Copy the colocated script into both directories. Do **not** symlink (the GitHub-URL `pnpm dlx skills add` flow discards symlinks); do **not** import one from the other (the two clusters have no cross-dep).
 
 Bug fixes to either copy land via normal PRs. Yes, duplication carries small ongoing maintenance cost. The trade-off is deliberate — the two skill clusters must remain independent so a consumer can install either, both, or neither without one transitively pulling in the other.
 

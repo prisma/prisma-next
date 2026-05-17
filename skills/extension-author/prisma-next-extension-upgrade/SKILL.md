@@ -25,7 +25,7 @@ Before doing anything else, ensure this skill is installed at `@latest` and relo
 Concretely: if the agent runtime supports an in-session refresh, perform it now. Otherwise, exit and ask the user to re-install:
 
 ```bash
-npx skills add prisma/prisma-next/skills/extension-author --all
+pnpm dlx skills add prisma/prisma-next/skills/extension-author --all
 ```
 
 The extension-author skill subpath is intentionally unpinned (always `main`) — the cumulative instruction set is the source of truth and the latest release fixes apply to every prior transition.
@@ -40,7 +40,7 @@ This skill applies when the project **is** a Prisma Next extension. Heuristics:
 - the package's `name` matches `^@.*/extension-` (the in-tree convention used by `@prisma-next/extension-cipherstash`, etc.), or
 - the package is referenced as an `extensionPacks` entry from a sibling app's `prisma-next.config.ts` in the same monorepo.
 
-If the project additionally consumes Prisma Next from its own app code, install the `prisma-next-upgrade` skill (`npx skills add prisma/prisma-next/skills/upgrade --all`) and run the user flow first, then this flow in the same session.
+If the project additionally consumes Prisma Next from its own app code, install the `prisma-next-upgrade` skill (`pnpm dlx skills add prisma/prisma-next/skills/upgrade --all`) and run the user flow first, then this flow in the same session.
 
 If detection is ambiguous, ask the user which role to operate under.
 
@@ -67,7 +67,7 @@ This flow assumes you are an **external extension author** — your extension li
 
 For each `(from, to)` step in the chain:
 
-1. **Bump `@prisma-next/*` deps.** Rewrite every `@prisma-next/*` entry in the extension's `package.json` to the exact `<to>` version (e.g. `"0.8.0"` — no caret, no tilde, no range, no `workspace:` specifier; the exact-pin rule below details why). All entries advance to the same version. Cover whichever dep field(s) the extension uses today — `dependencies` and/or `peerDependencies` — and any `optionalDependencies`. The extension-upgrade skill itself ships via `npx skills add` (see Step 0); there is no `@prisma-next/extension-upgrade-skill` npm entry to bump. The companion CLI tool is `@prisma-next/extension-author-tools` — leave its pin at the version the extension's CI is currently using; bumping it is independent of the framework upgrade and is normally a no-op.
+1. **Bump `@prisma-next/*` deps.** Rewrite every `@prisma-next/*` entry in the extension's `package.json` to the exact `<to>` version (e.g. `"0.8.0"` — no caret, no tilde, no range, no `workspace:` specifier; the exact-pin rule below details why). All entries advance to the same version. Cover whichever dep field(s) the extension uses today — `dependencies` and/or `peerDependencies` — and any `optionalDependencies`. The extension-upgrade skill itself ships via `pnpm dlx skills add` (see Step 0); there is no `@prisma-next/extension-upgrade-skill` npm entry to bump. The companion CLI tool is `@prisma-next/extension-author-tools` — leave its pin at the version the extension's CI is currently using; bumping it is independent of the framework upgrade and is normally a no-op.
 
 2. **Install.** Run `pnpm install` (or the project's lockfile-managing command). The extension's source is now broken against the new SPI — the upgrade instructions for `<from> → <to>` exist to fix it.
 
