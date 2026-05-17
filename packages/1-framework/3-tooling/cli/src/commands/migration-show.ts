@@ -12,6 +12,8 @@ import {
   reconstructGraph,
 } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
+import { parseMigrationRef } from '@prisma-next/migration-tools/ref-resolution';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import { spaceMigrationDirectory } from '@prisma-next/migration-tools/spaces';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -26,6 +28,7 @@ import {
   errorRuntime,
   errorUnexpected,
   mapMigrationToolsError,
+  mapRefResolutionError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -339,9 +342,25 @@ async function executeMigrationShowCommand(
         );
       }
       if (target) {
-        const resolved = resolveByHashPrefix(allPackages, target);
-        if (!resolved.ok) return resolved;
-        appPkg = resolved.value;
+        const graph = reconstructGraph(allPackages);
+        const refsDir = resolveMigrationPaths(options.config, config).refsDir;
+        const refs = await readRefs(refsDir);
+        const migResult = parseMigrationRef(target, { graph, refs });
+        if (!migResult.ok) {
+          return notOk(mapRefResolutionError(migResult.failure));
+        }
+        const matchedPkg = allPackages.find(
+          (p) => p.metadata.migrationHash === migResult.value.migrationHash,
+        );
+        if (!matchedPkg) {
+          return notOk(
+            errorRuntime('Migration package not found', {
+              why: `Resolved migration "${migResult.value.dirName}" but the package was not loaded`,
+              fix: 'The migrations directory may be corrupted. Inspect the migration.json files.',
+            }),
+          );
+        }
+        appPkg = matchedPkg;
       } else {
         const graph = reconstructGraph(allPackages);
         const latestMigration = findLatestMigration(graph);
@@ -416,7 +435,10 @@ export function createMigrationShowCommand(): Command {
     'prisma-next migration show sha256:a1b2c3',
   ]);
   addGlobalOptions(command)
-    .argument('[target]', 'App-space migration path or migrationHash prefix (defaults to latest)')
+    .argument(
+      '[target]',
+      'Migration reference: directory name, hash/prefix, or path (defaults to latest)',
+    )
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (target: string | undefined, options: MigrationShowOptions) => {
       const flags = parseGlobalFlags(options);

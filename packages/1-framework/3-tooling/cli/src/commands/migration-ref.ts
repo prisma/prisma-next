@@ -1,4 +1,5 @@
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import {
   deleteRef,
@@ -16,9 +17,11 @@ import {
   errorRuntime,
   errorUnexpected,
   mapMigrationToolsError,
+  mapRefResolutionError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
+  loadMigrationPackages,
   resolveMigrationPaths,
   setCommandDescriptions,
 } from '../utils/command-helpers';
@@ -75,22 +78,35 @@ function cliErrorInvalidRefValue(hash: string): CliStructuredError {
 
 async function executeRefSetCommand(
   name: string,
-  hash: string,
+  contractInput: string,
   options: { config?: string },
 ): Promise<Result<RefSetResult, CliStructuredError>> {
   if (!validateRefName(name)) {
     return notOk(cliErrorInvalidRefName(name));
   }
-  if (!validateRefValue(hash)) {
-    return notOk(cliErrorInvalidRefValue(hash));
-  }
 
   try {
     const config = await loadConfig(options.config);
-    const { refsDir } = resolveMigrationPaths(options.config, config);
-    const entry: RefEntry = { hash, invariants: [] };
+    const { appMigrationsDir, refsDir } = resolveMigrationPaths(options.config, config);
+
+    // When the input is already a full valid hash, skip resolution (fast path
+    // that works even when no migrations exist on disk yet).
+    let resolvedHash: string;
+    if (validateRefValue(contractInput)) {
+      resolvedHash = contractInput;
+    } else {
+      const { graph } = await loadMigrationPackages(appMigrationsDir);
+      const refs = await readRefs(refsDir);
+      const refResult = parseContractRef(contractInput, { graph, refs });
+      if (!refResult.ok) {
+        return notOk(mapRefResolutionError(refResult.failure));
+      }
+      resolvedHash = refResult.value.hash;
+    }
+
+    const entry: RefEntry = { hash: resolvedHash, invariants: [] };
     await writeRef(refsDir, name, entry);
-    return ok({ ok: true as const, ref: name, hash, invariants: [] });
+    return ok({ ok: true as const, ref: name, hash: resolvedHash, invariants: [] });
   } catch (error) {
     if (error instanceof CliStructuredError) return notOk(error);
     return notOk(mapError(error));
@@ -150,7 +166,7 @@ function createRefSetCommand(): Command {
   );
   addGlobalOptions(command)
     .argument('<name>', 'Ref name (e.g., staging, production)')
-    .argument('<hash>', 'Contract hash to point to')
+    .argument('<contract>', 'Contract reference (hash, prefix, ref name, or migration dir name)')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(
       async (

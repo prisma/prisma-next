@@ -18,6 +18,8 @@ import {
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { findLatestMigration } from '@prisma-next/migration-tools/migration-graph';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
+import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
@@ -28,10 +30,10 @@ import {
   errorContractValidationFailed,
   errorFileNotFound,
   errorMigrationPlanningFailed,
-  errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
   mapMigrationToolsError,
+  mapRefResolutionError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -214,24 +216,17 @@ async function executeMigrationPlanCommand(
     const { bundles, graph } = await loadMigrationPackages(appMigrationsDir);
 
     if (options.from) {
-      const resolved = resolveBundleByPrefix(bundles, options.from);
-      if (!resolved.ok) {
-        const f = resolved.failure;
-        return notOk(
-          f.reason === 'ambiguous'
-            ? errorRuntime('Multiple matching migrations found', {
-                why: `Prefix "${options.from}" matches ${f.count} migrations in ${appMigrationsRelative}`,
-                fix: 'Provide a longer prefix to disambiguate, or omit --from to use the latest migration target.',
-              })
-            : errorRuntime('Starting contract not found', {
-                why: `No migration with to hash matching "${options.from}" exists in ${appMigrationsRelative}`,
-                fix: 'Check that the --from hash matches a known migration target hash, or omit --from to use the latest migration target.',
-              }),
-        );
+      const refs = await readRefs(resolveMigrationPaths(options.config, config).refsDir);
+      const refResult = parseContractRef(options.from, { graph, refs });
+      if (!refResult.ok) {
+        return notOk(mapRefResolutionError(refResult.failure));
       }
-      fromHash = resolved.value.metadata.to;
-      fromContractSourceDir = resolved.value.dirPath;
-      fromContract = await readPredecessorEndContract(fromContractSourceDir);
+      fromHash = refResult.value.hash;
+      const matchingBundle = bundles.find((p) => p.metadata.to === fromHash);
+      if (matchingBundle) {
+        fromContractSourceDir = matchingBundle.dirPath;
+        fromContract = await readPredecessorEndContract(fromContractSourceDir);
+      }
     } else {
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
@@ -523,7 +518,10 @@ export function createMigrationPlanCommand(): Command {
   addGlobalOptions(command)
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option('--name <slug>', 'Name slug for the migration directory', 'migration')
-    .option('--from <hash>', 'Explicit starting contract hash (overrides latest migration target)')
+    .option(
+      '--from <contract>',
+      'Starting contract reference (hash, prefix, ref name, or migration dir name)',
+    )
     .action(async (options: MigrationPlanOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();

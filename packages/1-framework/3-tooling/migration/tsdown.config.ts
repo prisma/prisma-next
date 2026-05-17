@@ -11,6 +11,7 @@ export default defineConfig({
     'exports/invariants': 'src/exports/invariants.ts',
     'exports/migration-graph': 'src/exports/migration-graph.ts',
     'exports/refs': 'src/exports/refs.ts',
+    'exports/ref-resolution': 'src/exports/ref-resolution.ts',
     'exports/constants': 'src/exports/constants.ts',
     'exports/migration-ts': 'src/exports/migration-ts.ts',
     'exports/migration': 'src/exports/migration.ts',

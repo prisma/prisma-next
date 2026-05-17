@@ -7,6 +7,8 @@ import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import type { PathDecision } from '@prisma-next/migration-tools/migration-graph';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
+import type { RefResolutionContext } from '@prisma-next/migration-tools/ref-resolution';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import { APP_SPACE_ID, spaceMigrationDirectory } from '@prisma-next/migration-tools/spaces';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
@@ -216,6 +218,19 @@ export async function loadMigrationPackages(migrationsDir: string): Promise<{
   const bundles = await readMigrationsDir(migrationsDir);
   const graph = reconstructGraph(bundles);
   return { bundles, graph };
+}
+
+/**
+ * Build the context required by `parseContractRef` / `parseMigrationRef`.
+ * Loads the app-space migration graph and refs index from disk.
+ */
+export async function buildRefResolutionContext(
+  appMigrationsDir: string,
+  refsDir: string,
+): Promise<{ ctx: RefResolutionContext; bundles: readonly OnDiskMigrationPackage[] }> {
+  const { bundles, graph } = await loadMigrationPackages(appMigrationsDir);
+  const refs = await readRefs(refsDir);
+  return { ctx: { graph, refs }, bundles };
 }
 
 /**

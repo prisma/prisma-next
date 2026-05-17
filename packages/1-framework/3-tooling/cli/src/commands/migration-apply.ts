@@ -1,8 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { errorUnknownInvariant, MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
-import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -25,6 +26,7 @@ import {
   errorTargetMigrationNotSupported,
   errorUnexpected,
   mapMigrationToolsError,
+  mapRefResolutionError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -144,7 +146,17 @@ async function executeMigrationApplyCommand(
   if (refName) {
     try {
       const refs = await readRefs(refsDir);
-      refEntry = resolveRef(refs, refName);
+      const { graph } = await loadMigrationPackages(appMigrationsDir);
+      const refResult = parseContractRef(refName, { graph, refs });
+      if (!refResult.ok) {
+        return notOk(mapRefResolutionError(refResult.failure));
+      }
+      if (refResult.value.provenance.kind === 'ref') {
+        const resolved = refs[refResult.value.provenance.refName];
+        if (resolved) refEntry = resolved;
+      } else {
+        refEntry = { hash: refResult.value.hash, invariants: [] };
+      }
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));
@@ -313,7 +325,10 @@ export function createMigrationApplyCommand(): Command {
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--ref <name>', 'App-space target ref name from migrations/app/refs/')
+    .option(
+      '--ref <contract>',
+      'App-space target contract reference (hash, prefix, ref name, or migration dir name)',
+    )
     .action(async (options: MigrationApplyCommandOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();

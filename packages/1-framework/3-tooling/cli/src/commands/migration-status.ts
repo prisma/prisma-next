@@ -19,8 +19,9 @@ import {
   findReachableLeaves,
 } from '@prisma-next/migration-tools/migration-graph';
 import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
+import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
-import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { cyan, dim, magenta, yellow } from 'colorette';
@@ -33,6 +34,7 @@ import {
   errorRuntime,
   errorUnexpected,
   mapMigrationToolsError,
+  mapRefResolutionError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -582,10 +584,18 @@ async function executeMigrationStatusCommand(
   }
 
   if (options.ref) {
-    activeRefName = options.ref;
     try {
-      activeRefEntry = resolveRef(allRefs, activeRefName);
-      activeRefHash = activeRefEntry.hash;
+      const { graph: earlyGraph } = await loadMigrationPackages(appMigrationsDir);
+      const refResult = parseContractRef(options.ref, { graph: earlyGraph, refs: allRefs });
+      if (!refResult.ok) {
+        return notOk(mapRefResolutionError(refResult.failure));
+      }
+      activeRefHash = refResult.value.hash;
+      if (refResult.value.provenance.kind === 'ref') {
+        const resolvedRefName = refResult.value.provenance.refName;
+        activeRefName = resolvedRefName;
+        activeRefEntry = allRefs[resolvedRefName];
+      }
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));
@@ -1068,7 +1078,10 @@ export function createMigrationStatusCommand(): Command {
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
-    .option('--ref <name>', 'Target ref name from migrations/refs/')
+    .option(
+      '--ref <contract>',
+      'Target contract reference (hash, prefix, ref name, or migration dir name)',
+    )
     .option('--graph', 'Show the full migration graph with all branches')
     .option('--limit <n>', 'Maximum number of migrations to display (default: 10)')
     .option('--all', 'Show full history (disables truncation)')
