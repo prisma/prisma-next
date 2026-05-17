@@ -1,4 +1,5 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
+import { findTableByName, type SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { interpretPslDocumentToSqlContract } from '../src/interpreter';
 import {
@@ -250,10 +251,8 @@ model Member {
 
     expect(result.value.roots).toEqual({ org_team: 'Team', team_member: 'Member' });
 
-    const storage = result.value.storage as unknown as {
-      readonly tables: Record<string, { readonly foreignKeys?: readonly unknown[] }>;
-    };
-    const memberTable = storage.tables['team_member'];
+    const storage = result.value.storage as SqlStorage;
+    const memberTable = findTableByName(storage, 'team_member');
     expect(memberTable).toBeDefined();
     const fks = memberTable?.foreignKeys ?? [];
     expect(fks.length).toBe(1);

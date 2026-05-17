@@ -1,5 +1,6 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
+import { findTableByName } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
 
@@ -228,7 +229,7 @@ describe('shared contract definition lowering', () => {
       codecLookup,
     );
 
-    expect(contract.storage.tables['event']?.columns['scheduled_at']?.default).toEqual({
+    expect(findTableByName(contract.storage, 'event')?.columns['scheduled_at']?.default).toEqual({
       kind: 'literal',
       value: '2025-01-01T00:00:00.000Z',
     });

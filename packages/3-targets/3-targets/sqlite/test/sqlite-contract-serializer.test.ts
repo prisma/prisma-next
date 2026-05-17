@@ -1,6 +1,11 @@
 import { createSqlContract } from '@prisma-next/contract/testing';
 import { SqlContractSerializerBase } from '@prisma-next/family-sql/ir';
-import { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import {
+  findTableByName,
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
+} from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import sqliteControlTargetDescriptor from '../src/core/control-target';
 import { SqliteContractSerializer } from '../src/core/sqlite-contract-serializer';
@@ -50,7 +55,7 @@ describe('SqliteContractSerializer', () => {
     const contract = serializer.deserializeContract(makeContractWithTablesJson());
 
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const userTable = contract.storage.tables['user'];
+    const userTable = findTableByName(contract.storage, 'user');
     expect(userTable).toBeInstanceOf(StorageTable);
     expect(userTable?.columns['id']).toBeInstanceOf(StorageColumn);
   });

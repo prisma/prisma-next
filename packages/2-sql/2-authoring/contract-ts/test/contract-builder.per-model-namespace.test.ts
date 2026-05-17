@@ -1,5 +1,6 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { freezeNode, type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
+import { findTableByName } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -70,7 +71,7 @@ describe('FR16a per-model `namespace` field (TS builder)', () => {
       },
     });
 
-    const table = contract.storage.tables['User'] as { readonly namespaceId?: string } | undefined;
+    const table = findTableByName(contract.storage, 'User');
     expect(table).toBeDefined();
     expect(table?.namespaceId).toBe('auth');
   });
@@ -86,7 +87,7 @@ describe('FR16a per-model `namespace` field (TS builder)', () => {
       },
     });
 
-    const table = contract.storage.tables['User'] as { readonly namespaceId: string } | undefined;
+    const table = findTableByName(contract.storage, 'User');
     expect(table?.namespaceId).toBe('__unbound__');
   });
 

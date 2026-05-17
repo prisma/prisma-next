@@ -1,7 +1,7 @@
 import { freezeNode, type Namespace, NamespaceBase } from '@prisma-next/framework-components/ir';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { findTableByName, type SqlStorage } from '@prisma-next/sql-contract/types';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import {
@@ -261,7 +261,7 @@ model Comment {
     // `toMatchObject` with `primaryKey: undefined` requires the key to be
     // present — assert absence directly via a narrowed accessor instead.
     const storage = result.value.storage as SqlStorage;
-    expect(storage.tables['idlessThing']?.primaryKey).toBeUndefined();
+    expect(findTableByName(storage, 'idlessThing')?.primaryKey).toBeUndefined();
     expect(result.value.models).toMatchObject({
       IdlessThing: {
         storage: {
@@ -532,7 +532,7 @@ model AuditLog {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = result.value.storage as SqlStorage;
-      expect(storage.tables['audit_log']?.primaryKey).toBeUndefined();
+      expect(findTableByName(storage, 'audit_log')?.primaryKey).toBeUndefined();
       expect(result.value.models).toMatchObject({
         AuditLog: { storage: { table: 'audit_log' } },
       });
@@ -788,7 +788,7 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = result.value.storage as SqlStorage;
-      const table = storage.tables['user'];
+      const table = findTableByName(storage, 'user');
       expect(table).toBeDefined();
       expect(table?.namespaceId).toBe('__unbound__');
       const json = JSON.parse(JSON.stringify(table)) as Record<string, unknown>;
@@ -812,12 +812,8 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = result.value.storage as SqlStorage;
-      const tenant = storage.tables['tenant'];
+      const tenant = findTableByName(storage, 'tenant');
       expect(tenant).toBeDefined();
-      // `namespace unbound { … }` lowers to `__unbound__` — the
-      // sentinel value is the late-bound coordinate and the
-      // interpreter stamps it explicitly so the envelope carries an
-      // unambiguous `(namespaceId, table)` pair end-to-end.
       expect(tenant?.namespaceId).toBe('__unbound__');
       const json = JSON.parse(JSON.stringify(tenant)) as Record<string, unknown>;
       expect(json['namespaceId']).toBe('__unbound__');
@@ -841,7 +837,7 @@ model OrderItem {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const storage = result.value.storage as SqlStorage;
-      const user = storage.tables['user'];
+      const user = findTableByName(storage, 'user');
       expect(user).toBeDefined();
       expect(user?.namespaceId).toBe('auth');
       const json = JSON.parse(JSON.stringify(user)) as Record<string, unknown>;
@@ -880,9 +876,9 @@ namespace unbound {
       // lower to the `__unbound__` sentinel. Named bucket `auth`
       // records the coordinate explicitly. Every table carries its
       // resolved coordinate.
-      expect(storage.tables['post']?.namespaceId).toBe('__unbound__');
-      expect(storage.tables['user']?.namespaceId).toBe('auth');
-      expect(storage.tables['tenant']?.namespaceId).toBe('__unbound__');
+      expect(findTableByName(storage, 'post')?.namespaceId).toBe('__unbound__');
+      expect(findTableByName(storage, 'user')?.namespaceId).toBe('auth');
+      expect(findTableByName(storage, 'tenant')?.namespaceId).toBe('__unbound__');
     });
   });
 });

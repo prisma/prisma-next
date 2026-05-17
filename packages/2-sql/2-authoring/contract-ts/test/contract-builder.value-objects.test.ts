@@ -1,6 +1,7 @@
 import type { ContractField, ContractValueObject } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
+import { findTableByName } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { buildSqlContractFromDefinition } from '../src/contract-builder';
 
@@ -104,7 +105,7 @@ describe('value objects in contract definition builder', () => {
       codecLookup,
     );
 
-    expect(contract.storage.tables['invoice']?.columns['total']?.default).toEqual({
+    expect(findTableByName(contract.storage, 'invoice')?.columns['total']?.default).toEqual({
       kind: 'literal',
       value: {
         amount: '12',
@@ -264,14 +265,7 @@ describe('value objects in contract definition builder', () => {
       ],
     });
 
-    const storage = contract.storage as unknown as {
-      readonly tables: Record<
-        string,
-        { readonly columns: Record<string, { nativeType: string; codecId: string }> }
-      >;
-    };
-
-    expect(storage.tables['user']?.columns['home_address']).toMatchObject({
+    expect(findTableByName(contract.storage, 'user')?.columns['home_address']).toMatchObject({
       nativeType: 'jsonb',
       codecId: 'pg/jsonb@1',
       nullable: true,

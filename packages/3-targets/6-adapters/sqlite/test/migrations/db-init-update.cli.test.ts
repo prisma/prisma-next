@@ -15,7 +15,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { findTableByName, SqlStorage } from '@prisma-next/sql-contract/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -450,7 +450,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
       },
     };
 
-    const userTable = appContract.storage.tables['user']!;
+    const userTable = findTableByName(appContract.storage, 'user')!;
     const hookedAppContract: Contract<SqlStorage> = {
       ...appContract,
       storage: new SqlStorage({

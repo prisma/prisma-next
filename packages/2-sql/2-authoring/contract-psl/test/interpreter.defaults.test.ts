@@ -1,5 +1,5 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { findTableByName, type SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
@@ -300,7 +300,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    expect(storage.tables['timestamped']?.columns['createdAt']?.default).toEqual({
+    expect(findTableByName(storage, 'timestamped')?.columns['createdAt']?.default).toEqual({
       kind: 'function',
       expression: 'now()',
     });
@@ -335,7 +335,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     if (!result.ok) return;
 
     const storage = result.value.storage as SqlStorage;
-    expect(storage.tables['timestamped']?.columns['updatedAt']).toMatchObject({
+    expect(findTableByName(storage, 'timestamped')?.columns['updatedAt']).toMatchObject({
       codecId: 'sqlite/datetime@1',
       nativeType: 'text',
       nullable: false,

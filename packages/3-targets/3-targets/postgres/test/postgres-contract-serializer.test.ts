@@ -6,6 +6,7 @@ import {
 } from '@prisma-next/family-sql/ir';
 import {
   ForeignKey,
+  findTableByName,
   PrimaryKey,
   SqlStorage,
   StorageColumn,
@@ -80,11 +81,11 @@ describe('PostgresContractSerializer', () => {
     const contract = serializer.deserializeContract(makeContractWithTablesJson());
 
     expect(contract.storage).toBeInstanceOf(SqlStorage);
-    const userTable = contract.storage.tables['user'];
+    const userTable = findTableByName(contract.storage, 'user');
     expect(userTable).toBeInstanceOf(StorageTable);
     expect(userTable?.columns['id']).toBeInstanceOf(StorageColumn);
     expect(userTable?.primaryKey).toBeInstanceOf(PrimaryKey);
-    const postTable = contract.storage.tables['post'];
+    const postTable = findTableByName(contract.storage, 'post');
     expect(postTable).toBeInstanceOf(StorageTable);
     expect(postTable?.foreignKeys[0]).toBeInstanceOf(ForeignKey);
   });
