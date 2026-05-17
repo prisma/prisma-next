@@ -268,6 +268,11 @@ function hasCrossNamespaceNameCollision(
  * value that "looks like a table" (a `StorageTable` instance, or an
  * input object carrying the `columns` field). A nested input has
  * record-of-records values.
+ *
+ * Both paths require `namespaceId` on every table input — flat callers
+ * pre-resolve the coordinate per the caller-normalises discipline, and
+ * the nested path stamps the outer key when an entry omits it (matching
+ * the JSON envelope hydration convention).
  */
 function normaliseTablesInput(
   input: SqlStorageTablesFlatInput | SqlStorageTablesNestedInput,
@@ -276,7 +281,7 @@ function normaliseTablesInput(
     const result: Record<string, Record<string, StorageTable>> = {};
     for (const [name, entry] of Object.entries(input)) {
       const table = entry instanceof StorageTable ? entry : new StorageTable(entry);
-      const namespaceId = table.namespaceId ?? UNBOUND_NAMESPACE_ID;
+      const namespaceId = table.namespaceId;
       if (result[namespaceId] === undefined) {
         result[namespaceId] = {};
       }
@@ -294,11 +299,17 @@ function normaliseTablesInput(
   for (const [namespaceId, bucketInput] of Object.entries(input)) {
     const bucket: Record<string, StorageTable> = {};
     for (const [name, entry] of Object.entries(bucketInput)) {
-      const table = entry instanceof StorageTable ? entry : new StorageTable(entry);
-      const explicit = table.namespaceId;
-      if (explicit !== undefined && explicit !== namespaceId) {
+      const table =
+        entry instanceof StorageTable
+          ? entry
+          : new StorageTable(
+              'namespaceId' in (entry as object)
+                ? (entry as StorageTableInput)
+                : { ...(entry as Omit<StorageTableInput, 'namespaceId'>), namespaceId },
+            );
+      if (table.namespaceId !== namespaceId) {
         throw new Error(
-          `SqlStorage: table "${name}" carries namespaceId "${explicit}" but is keyed under namespace "${namespaceId}". The nested map key must agree with the back-pointer (or omit the back-pointer).`,
+          `SqlStorage: table "${name}" carries namespaceId "${table.namespaceId}" but is keyed under namespace "${namespaceId}". The nested map key must agree with the back-pointer.`,
         );
       }
       bucket[name] = table;

@@ -1,4 +1,4 @@
-import { freezeNode, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { freezeNode } from '@prisma-next/framework-components/ir';
 import { ForeignKey, type ForeignKeyInput } from './foreign-key';
 import { PrimaryKey, type PrimaryKeyInput } from './primary-key';
 import { Index, type IndexInput } from './sql-index';
@@ -14,13 +14,12 @@ export interface StorageTableInput {
   readonly foreignKeys: ReadonlyArray<ForeignKey | ForeignKeyInput>;
   /**
    * Namespace coordinate this table inhabits — the key into the parent
-   * `SqlStorage.namespaces` map. Omitting the field (or passing the
-   * framework's `UNBOUND_NAMESPACE_ID` sentinel) selects the late-bound
-   * slot, which renders as unqualified DDL (Postgres `search_path`
-   * resolves the schema at connection time; SQLite always emits
-   * unqualified).
+   * `SqlStorage.namespaces` map. Required: callers (PSL interpreter,
+   * TS-builder lowering, JSON envelope hydration, fixture authors)
+   * resolve the coordinate before construction. The `UNBOUND_NAMESPACE_ID`
+   * sentinel is the explicit value for the late-bound slot.
    */
-  readonly namespaceId?: string;
+  readonly namespaceId: string;
 }
 
 /**
@@ -35,11 +34,9 @@ export interface StorageTableInput {
  * the parent `SqlStorage.tables: Record<string, StorageTable>` map.
  *
  * The `namespaceId` coordinate identifies which entry in the parent
- * `SqlStorage.namespaces` map the table inhabits. The property is
- * **optional** — single-namespace contracts (every table on the
- * late-bound default) leave it `undefined`, which keeps existing
- * contract JSON envelopes byte-stable. Consumers that need the
- * resolved id read `table.namespaceId ?? UNBOUND_NAMESPACE_ID`.
+ * `SqlStorage.namespaces` map the table inhabits. The field is
+ * **required** — callers resolve the coordinate at construction time,
+ * using the `UNBOUND_NAMESPACE_ID` sentinel for the late-bound slot.
  */
 export class StorageTable extends SqlNode {
   readonly columns: Readonly<Record<string, StorageColumn>>;
@@ -47,16 +44,16 @@ export class StorageTable extends SqlNode {
   readonly indexes: ReadonlyArray<Index>;
   readonly foreignKeys: ReadonlyArray<ForeignKey>;
   declare readonly primaryKey?: PrimaryKey;
-  /**
-   * Coordinate into `SqlStorage.namespaces`. Optional — `undefined`
-   * means the late-bound default (`UNBOUND_NAMESPACE_ID`); any
-   * explicit non-default value is also written enumerably so it
-   * appears in the persisted JSON envelope.
-   */
-  declare readonly namespaceId?: string;
+  readonly namespaceId: string;
 
   constructor(input: StorageTableInput) {
     super();
+    if (input.namespaceId === undefined) {
+      throw new Error(
+        'StorageTable: `namespaceId` is required. Callers must resolve the namespace coordinate before construction (use `UNBOUND_NAMESPACE_ID` for the late-bound slot).',
+      );
+    }
+    this.namespaceId = input.namespaceId;
     this.columns = Object.freeze(
       Object.fromEntries(
         Object.entries(input.columns).map(([name, col]) => [
@@ -75,25 +72,9 @@ export class StorageTable extends SqlNode {
       input.uniques.map((u) => (u instanceof UniqueConstraint ? u : new UniqueConstraint(u))),
     );
     this.indexes = Object.freeze(input.indexes.map((i) => (i instanceof Index ? i : new Index(i))));
-    const sourceNamespaceId = input.namespaceId ?? UNBOUND_NAMESPACE_ID;
     this.foreignKeys = Object.freeze(
-      input.foreignKeys.map((fk) => {
-        if (fk instanceof ForeignKey) return fk;
-        const target =
-          'namespaceId' in fk.target && fk.target.namespaceId !== undefined
-            ? fk.target
-            : { ...fk.target, namespaceId: sourceNamespaceId };
-        return new ForeignKey({ ...fk, target });
-      }),
+      input.foreignKeys.map((fk) => (fk instanceof ForeignKey ? fk : new ForeignKey(fk))),
     );
-    if (input.namespaceId !== undefined && input.namespaceId !== UNBOUND_NAMESPACE_ID) {
-      Object.defineProperty(this, 'namespaceId', {
-        value: input.namespaceId,
-        enumerable: true,
-        writable: false,
-        configurable: false,
-      });
-    }
     freezeNode(this);
   }
 }

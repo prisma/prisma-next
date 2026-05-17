@@ -156,7 +156,7 @@ export const IndexSchema = type({
 });
 
 export const ForeignKeyReferenceSchema = type.declare<ForeignKeyReferenceInput>().type({
-  'namespaceId?': 'string',
+  namespaceId: 'string',
   table: 'string',
   columns: type.string.array().readonly(),
 });
@@ -186,11 +186,11 @@ const StorageTableSchema = type({
   uniques: UniqueConstraintSchema.array().readonly(),
   indexes: IndexSchema.array().readonly(),
   foreignKeys: ForeignKeySchema.array().readonly(),
-  // Optional namespace back-pointer. Single-namespace contracts omit
-  // it (byte-identity preserved on the legacy envelope); multi-namespace
-  // contracts persist it enumerably so the JSON envelope round-trips
-  // through `validateStorage` back into the nested-by-namespace IR.
-  'namespaceId?': 'string',
+  // Required namespace back-pointer. The JSON envelope keys each
+  // table under its namespace bucket and the hydrator stamps the
+  // outer key onto the StorageTable input, so every persisted row
+  // carries an unambiguous coordinate.
+  namespaceId: 'string',
 });
 
 /**

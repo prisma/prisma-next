@@ -1,16 +1,14 @@
-import { freezeNode, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import { freezeNode } from '@prisma-next/framework-components/ir';
 import { SqlNode } from './sql-node';
 
 export interface ForeignKeyReferenceInput {
   /**
-   * Namespace coordinate the referenced table inhabits. Optional on the
-   * input shape — when omitted the constructor defaults it to
-   * {@link UNBOUND_NAMESPACE_ID} (the late-bound sentinel). For
-   * same-namespace FKs the containing {@link StorageTable} constructor
-   * pre-populates this field with its own `namespaceId` so the FK target
-   * carries an unambiguous coordinate.
+   * Namespace coordinate the referenced table inhabits. Required:
+   * callers resolve the coordinate before construction (same-namespace
+   * FKs stamp the source table's coordinate; cross-namespace FKs stamp
+   * the target's). Use `UNBOUND_NAMESPACE_ID` for the late-bound slot.
    */
-  readonly namespaceId?: string;
+  readonly namespaceId: string;
   readonly table: string;
   readonly columns: readonly string[];
 }
@@ -27,39 +25,25 @@ export interface ForeignKeyReferenceInput {
  * extend additively to `(spaceId, namespaceId, table)` without
  * restructuring the IR.
  *
- * The `namespaceId` field is **optional** on the IR class, mirroring
- * the `StorageTable.namespaceId` convention: same-namespace FKs whose
- * source table omits an explicit coordinate also omit the field on the
- * target (and the persisted JSON envelope stays byte-stable for the
- * single-namespace fixtures). The containing {@link StorageTable}
- * constructor pre-populates this field with the source table's
- * coordinate when the source carries one but the FK input did not.
- * Explicit non-default coordinates — and any future cross-namespace
- * lowerings — write the field enumerably.
+ * `namespaceId` is **required** on every reference: callers stamp the
+ * resolved coordinate at construction time and the IR carries an
+ * unambiguous `(namespaceId, table, columns)` triple end-to-end.
  */
 export class ForeignKeyReference extends SqlNode {
-  /**
-   * Namespace coordinate of the referenced table. Omitted (undefined)
-   * when the source table inhabits the framework-default unbound slot
-   * and the reference is same-namespace; written enumerably when the
-   * coordinate is an explicit named namespace.
-   */
-  declare readonly namespaceId?: string;
+  readonly namespaceId: string;
   readonly table: string;
   readonly columns: readonly string[];
 
   constructor(input: ForeignKeyReferenceInput) {
     super();
+    if (input.namespaceId === undefined) {
+      throw new Error(
+        'ForeignKeyReference: `namespaceId` is required. Callers must resolve the namespace coordinate before construction (use `UNBOUND_NAMESPACE_ID` for the late-bound slot).',
+      );
+    }
+    this.namespaceId = input.namespaceId;
     this.table = input.table;
     this.columns = input.columns;
-    if (input.namespaceId !== undefined && input.namespaceId !== UNBOUND_NAMESPACE_ID) {
-      Object.defineProperty(this, 'namespaceId', {
-        value: input.namespaceId,
-        enumerable: true,
-        writable: false,
-        configurable: false,
-      });
-    }
     freezeNode(this);
   }
 }
