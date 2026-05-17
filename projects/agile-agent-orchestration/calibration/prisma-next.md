@@ -266,6 +266,26 @@ Recorded failure modes with their detection signals and mitigations. Add a new e
 
 **Reference incident.** 2026-05-17, drive-qa-run dispatch (`52750a6c`). Brief said "if no PG, mark scenario 4 as Not Run." Runner correctly marked it Not Run. Cost: AC6 (the late-binding multi-tenancy scenario) was not exercised this QA round — the headline user-facing capability that scenario 4 was specifically designed to demonstrate. The brief should have said "if no PG, start one via `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:17` or `prisma dev`, then proceed."
 
+### 3.10 Sonnet-low under-reasons through strict anti-pattern guards
+
+**Symptom.** A dispatch with explicit anti-pattern guards (e.g. "no `wrapInUnbound` helper", "no `'columns' in` probe", "canonical shape only") on `claude-4.6-sonnet-low-thinking` exhibits one or both of:
+- **Recon paralysis.** Implementer spends 10+ min reading files / running test suites without making any edits, falling into the § 3.3 pattern of using the test suite as a discovery mechanism instead of grep.
+- **Soft adherence to guards.** Implementer technically avoids the named anti-pattern but reintroduces functionally-equivalent behaviour under a different name (§ 3.1).
+
+**Detection signal.**
+
+- 5-min standup at T+10 shows `git status -s` returns zero modifications despite a 25-min M dispatch.
+- Implementer's first action after a brief that explicitly says "use grep" is to run `pnpm test:packages`.
+- Diff includes a small helper with a docstring like "for compatibility with X-shape inputs" — the alibi for the relocated dual-shape support.
+
+**Mitigation.**
+
+- Route per § 5: `composer-2` (or `claude-4.6-opus-high-thinking` for judgment-heavy) for any dispatch with strict anti-pattern guards. Reserve `claude-4.6-sonnet-low-thinking` for XS dispatches with no rule to enforce.
+- If you must use Sonnet-low, the brief's anti-pattern section must be even more explicit (concrete forbidden function names, concrete grep patterns to run first) and the standup interval must drop from 5 min to 3 min.
+- Orchestrator kick at T+10 (not T+15) if `git status -s` shows zero modifications.
+
+**Reference incident.** 2026-05-17, sql-orm-client migration dispatch on `claude-4.6-sonnet-low-thinking`. Implementer spent 15+ min in recon (running tests, reading files) with zero file modifications. After an orchestrator kick at T+15 with explicit `grep` + `find` commands, implementer executed correctly in <5 min and even diagnosed the real `structuredClone`-strips-non-enumerable root cause. Same model tier had been used for three earlier dispatches that committed cleanly — the difference was the sql-orm-client surface required identifying shared helpers, which Sonnet-low couldn't plan upfront without prompting.
+
 ---
 
 ## 4. Grep library
@@ -336,18 +356,20 @@ Add a new pattern when:
 
 ## 5. Model-tier routing (project-specific)
 
-Per [`decomposition-and-cost.md`](../principles/decomposition-and-cost.md), dispatches route to model tiers based on dispatch shape. For prisma-next:
+Per [`decomposition-and-cost.md`](../principles/decomposition-and-cost.md), dispatches route to model tiers based on dispatch shape. **Models routed are Claude-family + composer-2 only** (the prisma-next worktree avoids GPT). For prisma-next:
 
 | Dispatch shape | Recommended tier |
 |---|---|
-| Substrate change / design judgment / spec interpretation | Opus (orchestrator tier) |
-| Codemod / mechanical migration / batch fix | Sonnet or composer-2 |
-| Test-literal rewrites / fixture regen | composer-2 or composer-2-fast |
-| Spike (read, count, structure findings) | Sonnet or composer-2 |
-| Architect-class finding remediation (single discipline, narrow surface) | Sonnet |
-| Long-running validation gate runs (typecheck, test:packages) | Whichever tier the parent dispatch chose (no model dispatch — just bash) |
+| Substrate change / design judgment / spec interpretation / refactor with cross-package fanout | `claude-4.6-opus-high-thinking` (or `claude-opus-4-7-thinking-xhigh` for the heaviest refactors) |
+| Codemod / mechanical migration / batch fix WITH strict canonical-shape rules | `composer-2` (NOT Sonnet-low — see § 3.10) |
+| Test-literal rewrites / fixture regen — small surface, no interpretation needed | `composer-2-fast` |
+| Spike (read, count, structure findings) | `composer-2` |
+| Architect-class finding remediation (single discipline, narrow surface) | `composer-2` if mechanical, `claude-4.6-opus-high-thinking` if judgment-heavy |
+| Long-running validation gate runs (typecheck, test:packages) | No model dispatch — just bash |
 
-This is a starting calibration. Update as we learn which tier successfully completes which dispatch shape.
+**Anti-routing.** `claude-4.6-sonnet-low-thinking` is too low-reasoning for dispatches with strict anti-pattern guards (see § 3.10). Reserve for trivial XS dispatches (one-file mechanical edits with no rule to enforce). Default to `composer-2` for anything larger.
+
+This is a calibration based on observed outcomes; update as we learn which tier successfully completes which dispatch shape.
 
 ---
 
