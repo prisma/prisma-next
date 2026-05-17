@@ -216,7 +216,7 @@ The coverage map mirrors the TOC's AC mapping verbatim. Every AC appears exactly
 
 ### 7. Place the script in the canonical location
 
-By convention this repo's project artefacts live at `projects/<project-name>/`. Manual-QA scripts go at `projects/<project-name>/manual-qa.md`. If the project has multiple milestones with materially different QA shape, prefer `projects/<project-name>/manual-qa/<milestone>.md` and link them from a slim index. Reports (one per QA pass) accumulate at `projects/<project-name>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md` — owned by `drive-qa-run`.
+Place the script in the project directory alongside the project spec, following the repo's project-workspace convention. The script is a project artefact that ships with the PR. If the project has multiple milestones with materially different QA shape, prefer a per-milestone file (e.g. `manual-qa/<milestone>.md`) and link them from a slim index. Reports (one per QA pass) accumulate in a sibling `manual-qa-reports/` directory — owned by `drive-qa-run`.
 
 ## Common Pitfalls
 
@@ -231,7 +231,7 @@ By convention this repo's project artefacts live at `projects/<project-name>/`. 
 9. **TOC written after the scenarios.** Symptom: the TOC row summaries don't match the scenario bodies, or rows are missing. Cause: TOC was bolted on at the end. Fix: write TOC first; scenarios are the expansion.
 10. **No exploratory scenario.** Symptom: the script enumerates everything the author thought of; nothing invites the runner to look beyond. Fix: add at least one charter scenario with a time budget. Unknown unknowns are the whole point of charters.
 11. **Pre-classifying severity in failure modes.** Symptom: "Red flag (blocker): the original bug returns". Fix: the script-author doesn't know the runtime context (release stage, blast radius, surrounding changes) at execution time. Enumerate the failure category; let the runner classify in the report.
-12. **Using `wip/` for the script.** Symptom: the file lands at `wip/manual-qa.md`. Cause: the author treated it as scratch. Fix: manual-QA scripts are durable artefacts that ship alongside the spec — they belong in `projects/<project>/` (tracked) and travel with the PR. `wip/` is gitignored and the script would vanish.
+12. **Using `wip/` for the script.** Symptom: the file lands at `wip/manual-qa.md`. Cause: the author treated it as scratch. Fix: manual-QA scripts are durable artefacts that ship alongside the spec — they belong in the project directory (tracked) and travel with the PR. `wip/` is gitignored and the script would vanish.
 13. **Missing isolation tags.** Symptom: scenarios have no Isolation field; the runner falls back to running them serially. Fix: every scripted scenario carries one of `tmpdir` / `workspace` / `read-only` / `external`. Exploratory charters too. The runner can't parallelise what the script doesn't tag.
 14. **Over-tagging isolation.** Symptom: every scenario tagged `workspace` "to be safe". Fix: the runner allocates a fresh `git worktree` per `workspace` scenario; tagging a tmpdir-only scenario as `workspace` doubles its setup cost for no benefit. Pick the strictest tag the scenario *actually* needs.
 15. **Phantom dependencies.** Symptom: scenarios list "Preconditions: scenario 1 completed" defensively, with no actual data flow. Cause: the author confused "the script lists scenario 1 first" with "scenario N consumes scenario 1's output". Fix: only declare a dependency if the scenario reads an artefact the prerequisite produced. False dependencies serialise the DAG for no reason.
@@ -251,7 +251,7 @@ By convention this repo's project artefacts live at `projects/<project-name>/`. 
 
 ## Checklist
 
-- [ ] Script lives at `projects/<project-name>/manual-qa.md` (or per-milestone equivalent), not `wip/`.
+- [ ] Script lives in the project directory (not `wip/`).
 - [ ] First ~50 lines give a reader the full scope: frame paragraph + "Out of scope of this script" + spec/plan/PR links + TOC table.
 - [ ] TOC table has one row per scenario with: number, verb-phrase title, one-line claim, **Isolation tag**, AC IDs covered.
 - [ ] Every scripted scenario has all required sections: What you're proving, Covers, **Isolation**, **Oracle**, **Preconditions**, Steps, What you should see, Failure modes (+ Restore if the scenario mutates state outside its isolation context).
