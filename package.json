@@ -44,7 +44,9 @@
     "typecheck:examples": "turbo run typecheck --filter='./examples/**'",
     "record": "turbo run record --filter=@prisma-next/cli --",
     "clean": "turbo run clean",
-    "prepare": "husky"
+    "prepare": "husky",
+    "setup:contrib-skills": "node scripts/setup-contrib-skills.mjs",
+    "postinstall": "node scripts/setup-contrib-skills.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
@@ -57,6 +59,7 @@
     "lint-staged": "^16.2.6",
     "pathe": "^2.0.3",
     "pkg-pr-new": "0.0.71",
+    "skills": "^1.5.7",
     "tslib": "^2.8.1",
     "tsx": "^4.20.6",
     "turbo": "^2.6.1",

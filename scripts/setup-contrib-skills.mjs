@@ -1,59 +1,93 @@
 #!/usr/bin/env node
-// Installs the contributor agent-skills cluster into `.agents/skills/`
-// (and the agent-specific symlinks) by invoking the local `skills` CLI
-// against the tracked source of truth in `skills-contrib/`.
+// Materialises contributor agent skills into the locations agent runtimes
+// read from, by symlinking the canonical source `skills-contrib/` into
+// `.agents/skills/` and `.claude/skills/`.
 //
-// Why this exists:
-//   - The canonical home for contributor skills is `skills-contrib/` (tracked).
-//   - Agent runtimes (Cursor, Claude Code, etc.) expect to find skills under
-//     `.agents/skills/`, `.claude/skills/`, etc. Those locations are gitignored
-//     and populated by this script.
-//   - We dispatch through `skills add` so the materialized layout matches what
-//     external consumers get from `npx skills add prisma/prisma-next/...`.
+// Why direct symlinks (not `skills add`):
+//   - Upstream `skills add --all` deliberately installs to *every*
+//     detected agent target, including ones that overlay our tracked
+//     `skills/` user-facing directory (e.g. OpenClaw → `skills/`). That
+//     pollutes the user-facing cluster with contributor skills.
+//   - For local dev, agents read directly from their respective
+//     directories. A single symlink per agent root is sufficient and
+//     side-effect-free.
 //
-// The script is intentionally idempotent: re-running on `pnpm install`
-// overwrites the install target without leaving stale cruft.
+// External consumers go through the public install path
+// (`npx skills add prisma/prisma-next/skills#v<version>`); they never
+// run this script.
 
-import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, lstatSync, mkdirSync, rmSync, symlinkSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
 const contribRoot = resolve(repoRoot, 'skills-contrib');
 
+if (process.env['PRISMA_NEXT_SKIP_CONTRIB_SKILLS'] === '1') {
+  console.log('[setup-contrib-skills] PRISMA_NEXT_SKIP_CONTRIB_SKILLS=1 set; skipping.');
+  process.exit(0);
+}
+
 if (!existsSync(contribRoot)) {
-  // Repo is in a state where the source isn't present (e.g. partial clone).
-  // No-op rather than fail the install.
   console.warn(
     `[setup-contrib-skills] ${contribRoot} not found; skipping contributor skill install.`,
   );
   process.exit(0);
 }
 
-if (process.env['PRISMA_NEXT_SKIP_CONTRIB_SKILLS'] === '1') {
-  console.log('[setup-contrib-skills] PRISMA_NEXT_SKIP_CONTRIB_SKILLS=1 set; skipping.');
-  process.exit(0);
+const targets = [resolve(repoRoot, '.agents/skills'), resolve(repoRoot, '.claude/skills')];
+
+for (const target of targets) {
+  ensureSymlink(target, contribRoot);
 }
 
-// Pass an absolute path (not a `file://` URL): the upstream `skills` CLI
-// treats absolute paths as local sources and discovers in-place, while
-// `file://` URLs are routed through `git clone`, which fails on a
-// non-repo subdirectory.
-const args = ['exec', 'skills', 'add', contribRoot, '--all'];
+console.log(
+  `[setup-contrib-skills] linked ${relative(repoRoot, contribRoot)} → ` +
+    targets.map((t) => relative(repoRoot, t)).join(', '),
+);
 
-const result = spawnSync('pnpm', args, {
-  cwd: repoRoot,
-  stdio: 'inherit',
-  env: { ...process.env, SKILLS_AGENT_AUTO: process.env['SKILLS_AGENT_AUTO'] ?? 'cursor-cli' },
-});
+/**
+ * Atomic-ish symlink: replace anything currently at `target` with a
+ * symlink to `source`. Idempotent on re-run.
+ *
+ * Special-cases: if `target` is already the desired symlink, leave it
+ * alone so we don't churn mtimes on every `pnpm install`.
+ */
+function ensureSymlink(target, source) {
+  const targetParent = dirname(target);
+  mkdirSync(targetParent, { recursive: true });
 
-// `skills add` exits non-zero if discovery finds nothing. We treat that as
-// fatal because the tracked source dir is non-empty by construction.
-if (result.status !== 0) {
-  console.error(
-    `[setup-contrib-skills] \`pnpm ${args.join(' ')}\` exited with status ${result.status}`,
-  );
-  process.exit(result.status ?? 1);
+  if (existsSync(target) || lstatExists(target)) {
+    if (isSymlinkPointingTo(target, source)) {
+      return;
+    }
+    rmSync(target, { recursive: true, force: true });
+  }
+
+  // Use a relative target for the symlink so the link is stable across
+  // repo relocations (the absolute repo path will differ on each
+  // contributor's machine).
+  const linkBody = relative(targetParent, source);
+  symlinkSync(linkBody, target, 'dir');
+}
+
+function lstatExists(path) {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isSymlinkPointingTo(target, source) {
+  try {
+    const stat = lstatSync(target);
+    if (!stat.isSymbolicLink()) return false;
+    const resolved = resolve(dirname(target), require('node:fs').readlinkSync(target));
+    return resolved === source;
+  } catch {
+    return false;
+  }
 }
