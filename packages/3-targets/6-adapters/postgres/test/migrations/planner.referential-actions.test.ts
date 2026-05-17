@@ -28,26 +28,28 @@ function createRefActionContract(
     storage: {
       storageHash: coreHash('sha256:contract'),
       tables: {
-        user: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+        [UNBOUND_NAMESPACE_ID]: {
+          user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-        post: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+          post: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [fk],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [fk],
         },
       },
       namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },

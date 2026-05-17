@@ -20,35 +20,37 @@ function createFkTestContract(fkConfig: {
     storage: {
       storageHash: coreHash('sha256:contract'),
       tables: {
-        user: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-        post: {
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: {
-            id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-            title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: (fkConfig.includeUserIndex ?? true) ? [{ columns: ['userId'] }] : [],
-          foreignKeys: [
-            {
-              source: { columns: ['userId'] },
-              target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
-              constraint: fkConfig.constraint,
-              index: fkConfig.index,
+        [UNBOUND_NAMESPACE_ID]: {
+          user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
             },
-          ],
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+          post: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: (fkConfig.includeUserIndex ?? true) ? [{ columns: ['userId'] }] : [],
+            foreignKeys: [
+              {
+                source: { columns: ['userId'] },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
+                constraint: fkConfig.constraint,
+                index: fkConfig.index,
+              },
+            ],
+          },
         },
       },
       namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },

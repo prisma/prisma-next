@@ -4,7 +4,7 @@ import {
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { describe, expect, it } from 'vitest';
@@ -175,8 +175,8 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
   });
 });
 
-function createContract(tables: Contract<SqlStorage>['storage']['tables']): Contract<SqlStorage> {
-  const nestedTables: Record<string, Record<string, (typeof tables)[string]>> = {};
+function createContract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
+  const nestedTables: Record<string, Record<string, StorageTable>> = {};
   for (const [name, t] of Object.entries(tables)) {
     const ns = t.namespaceId;
     if (nestedTables[ns] === undefined) nestedTables[ns] = {};

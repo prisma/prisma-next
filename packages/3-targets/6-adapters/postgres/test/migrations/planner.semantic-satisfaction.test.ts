@@ -25,16 +25,18 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         storage: {
           storageHash: coreHash('sha256:test'),
           tables: {
-            user: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            [UNBOUND_NAMESPACE_ID]: {
+              user: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [{ columns: ['email'] }],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [{ columns: ['email'] }], // Requires unique constraint
-              indexes: [],
-              foreignKeys: [],
             },
           },
           namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
@@ -82,16 +84,18 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         storage: {
           storageHash: coreHash('sha256:test'),
           tables: {
-            user: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            [UNBOUND_NAMESPACE_ID]: {
+              user: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [{ columns: ['email'] }],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [{ columns: ['email'] }], // Requires index (non-unique)
-              foreignKeys: [],
             },
           },
           namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
@@ -137,16 +141,18 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         storage: {
           storageHash: coreHash('sha256:test'),
           tables: {
-            user: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            [UNBOUND_NAMESPACE_ID]: {
+              user: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [{ columns: ['email'] }],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [{ columns: ['email'] }], // Requires index (non-unique)
-              foreignKeys: [],
             },
           },
           namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
@@ -194,16 +200,18 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         storage: {
           storageHash: coreHash('sha256:test'),
           tables: {
-            user: {
-              namespaceId: UNBOUND_NAMESPACE_ID,
-              columns: {
-                id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
-                email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            [UNBOUND_NAMESPACE_ID]: {
+              user: {
+                namespaceId: UNBOUND_NAMESPACE_ID,
+                columns: {
+                  id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+                  email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                },
+                primaryKey: { columns: ['id'], name: 'user_pk' },
+                uniques: [{ columns: ['email'], name: 'user_email_unique' }],
+                indexes: [{ columns: ['email'], name: 'user_email_index' }],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'], name: 'user_pk' },
-              uniques: [{ columns: ['email'], name: 'user_email_unique' }],
-              indexes: [{ columns: ['email'], name: 'user_email_index' }],
-              foreignKeys: [],
             },
           },
           namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
