@@ -55,36 +55,38 @@ import { collectSupportedCodecTypeIds } from './verify';
 function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
   const typeIds = new Set<string>();
 
-  // Type guard for SQL contract structure
   if (
-    typeof contract === 'object' &&
-    contract !== null &&
-    'storage' in contract &&
-    typeof contract.storage === 'object' &&
-    contract.storage !== null &&
-    'tables' in contract.storage
+    typeof contract !== 'object' ||
+    contract === null ||
+    !('storage' in contract) ||
+    typeof contract.storage !== 'object' ||
+    contract.storage === null ||
+    !('tables' in contract.storage)
   ) {
-    const storage = contract.storage as { tables?: Record<string, unknown> };
-    if (storage.tables && typeof storage.tables === 'object') {
-      for (const table of Object.values(storage.tables)) {
+    return [];
+  }
+  // `storage.tables` is the FR15 nested-by-namespace envelope
+  // (`Record<NamespaceId, Record<TableName, Table>>`). Walk it
+  // bucket-by-bucket so we always reach the column map, regardless of
+  // how many namespace coordinates are populated.
+  const storage = contract.storage as {
+    tables?: Record<string, Record<string, { columns?: Record<string, { codecId?: string }> }>>;
+  };
+  if (!storage.tables || typeof storage.tables !== 'object') return [];
+  for (const bucket of Object.values(storage.tables)) {
+    if (typeof bucket !== 'object' || bucket === null) continue;
+    for (const table of Object.values(bucket)) {
+      if (typeof table !== 'object' || table === null) continue;
+      const columns = table.columns;
+      if (typeof columns !== 'object' || columns === null) continue;
+      for (const column of Object.values(columns)) {
         if (
-          typeof table === 'object' &&
-          table !== null &&
-          'columns' in table &&
-          typeof table.columns === 'object' &&
-          table.columns !== null
+          column &&
+          typeof column === 'object' &&
+          'codecId' in column &&
+          typeof column.codecId === 'string'
         ) {
-          const columns = table.columns as Record<string, { codecId: string } | undefined>;
-          for (const column of Object.values(columns)) {
-            if (
-              column &&
-              typeof column === 'object' &&
-              'codecId' in column &&
-              typeof column.codecId === 'string'
-            ) {
-              typeIds.add(column.codecId);
-            }
-          }
+          typeIds.add(column.codecId);
         }
       }
     }

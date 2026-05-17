@@ -239,17 +239,19 @@ Object.defineProperty(SqlStorage.prototype, 'toJSON', {
 });
 
 /**
- * Discriminate between the legacy flat `tables` input shape and the
+ * Discriminate between the (legacy) flat `tables` input shape and the
  * FR15 nested-by-namespace input shape, then normalise to the nested
- * in-memory shape. A flat input is detected by spotting an immediate
- * value that "looks like a table" (a `StorageTable` instance, or an
- * input object carrying the `columns` field). A nested input has
- * record-of-records values.
+ * in-memory shape.
  *
- * Both paths require `namespaceId` on every table input — flat callers
- * pre-resolve the coordinate per the caller-normalises discipline, and
- * the nested path stamps the outer key when an entry omits it (matching
- * the JSON envelope hydration convention).
+ * The TS-builder bottom-up construction path produces flat input where
+ * each value is a `StorageTable` class instance — that's the only flat
+ * input the constructor accepts. Everything else must arrive as the
+ * canonical nested-by-namespace shape; the JSON envelope projected by
+ * `SqlStorage.toJSON` and the validated arktype envelope both match.
+ *
+ * Every table carries a required `namespaceId` back-pointer; the nested
+ * path enforces that the outer key agrees with each entry's
+ * `namespaceId` so the bucket boundary is unambiguous.
  */
 function normaliseTablesInput(
   input: SqlStorageTablesFlatInput | SqlStorageTablesNestedInput,
@@ -276,14 +278,7 @@ function normaliseTablesInput(
   for (const [namespaceId, bucketInput] of Object.entries(input)) {
     const bucket: Record<string, StorageTable> = {};
     for (const [name, entry] of Object.entries(bucketInput)) {
-      const table =
-        entry instanceof StorageTable
-          ? entry
-          : new StorageTable(
-              'namespaceId' in (entry as object)
-                ? (entry as StorageTableInput)
-                : { ...(entry as Omit<StorageTableInput, 'namespaceId'>), namespaceId },
-            );
+      const table = entry instanceof StorageTable ? entry : new StorageTable(entry);
       if (table.namespaceId !== namespaceId) {
         throw new Error(
           `SqlStorage: table "${name}" carries namespaceId "${table.namespaceId}" but is keyed under namespace "${namespaceId}". The nested map key must agree with the back-pointer.`,
@@ -301,10 +296,15 @@ function isFlatTablesInput(
 ): input is SqlStorageTablesFlatInput {
   for (const value of Object.values(input)) {
     if (value instanceof StorageTable) return true;
+    // Flat raw-object input: each value is a `StorageTableInput`, which
+    // carries the required `namespaceId` back-pointer. Nested input
+    // values are `Record<TableName, StorageTable>` (no top-level
+    // `namespaceId`). The probe checks the load-bearing required
+    // coordinate field rather than an incidental structural marker.
     if (
       typeof value === 'object' &&
       value !== null &&
-      'columns' in (value as Record<string, unknown>)
+      typeof (value as { namespaceId?: unknown }).namespaceId === 'string'
     ) {
       return true;
     }
@@ -426,11 +426,21 @@ function isFlatTypesInput(
   input: SqlStorageTypesFlatInput | SqlStorageTypesNestedInput,
 ): input is SqlStorageTypesFlatInput {
   for (const value of Object.values(input)) {
-    if (typeof value !== 'object' || value === null) return true;
-    if ('kind' in (value as Record<string, unknown>)) return true;
-    if ('codecId' in (value as Record<string, unknown>)) return true;
+    if (value instanceof SqlNode) return true;
+    // Flat raw-object input: each value is a type entry carrying the
+    // load-bearing `kind` discriminator (`'codec-instance'`,
+    // `'postgres-enum'`, …) or a codec-typed input shape with
+    // `codecId`. Nested input values are `Record<TypeName, Entry>`
+    // (namespace buckets) with no top-level `kind` / `codecId`.
+    if (typeof value === 'object' && value !== null) {
+      const v = value as Record<string, unknown>;
+      if (typeof v['kind'] === 'string' || typeof v['codecId'] === 'string') {
+        return true;
+      }
+    }
     return false;
   }
+  // Empty input — treat as flat (no types).
   return true;
 }
 
@@ -505,67 +515,18 @@ function normaliseTypeEntry(
  *
  * Class-instance storages (built via `new SqlStorage(...)`) expose the
  * nested truth through the non-enumerable `tablesByNamespace`
- * back-pointer; the helper returns it directly.
- *
- * Plain JSON-deserialised storages (`JSON.parse(contract.json)` without
- * hydration through a target serializer) carry the FR15 nested envelope
- * directly on `tables`. The helper detects that shape and returns it
- * as-is.
- *
- * User-facing contract structures the emitter / `defineContract` builds
- * bottom-up from a flat `tables` shape (each table carrying its
- * `namespaceId` back-pointer) are re-bucketed into the nested view on
- * read.
+ * back-pointer. JSON-deserialised storages (without hydration through a
+ * target serializer) carry the canonical FR15 nested envelope directly
+ * on `tables` — the only persisted shape `SqlStorage.toJSON` emits and
+ * the only shape `validateStorage` accepts.
  */
 function nestedTablesView(
   storage: Pick<SqlStorage, 'tables' | 'tablesByNamespace'>,
 ): Readonly<Record<string, Readonly<Record<string, StorageTable>>>> {
   if (storage.tablesByNamespace !== undefined) return storage.tablesByNamespace;
-  const tables = storage.tables as Record<string, unknown>;
-  if (looksLikeNestedTablesMap(tables)) {
-    return tables as Readonly<Record<string, Readonly<Record<string, StorageTable>>>>;
-  }
-  return bucketFlatTablesByNamespace(storage.tables);
-}
-
-/**
- * A nested tables map's values are namespace buckets — records whose
- * own values look like tables (carry a `columns` field). A flat tables
- * map's values are the tables themselves (also carrying `columns`).
- * Detecting the nested shape requires peeking through the outer record:
- * a value with a `columns` field is a table; a value that does not
- * itself have `columns` but contains objects with `columns` is a
- * namespace bucket.
- */
-function looksLikeNestedTablesMap(tables: Record<string, unknown>): boolean {
-  for (const value of Object.values(tables)) {
-    if (typeof value !== 'object' || value === null) return false;
-    if ('columns' in (value as Record<string, unknown>)) return false;
-    for (const inner of Object.values(value as Record<string, unknown>)) {
-      if (
-        typeof inner === 'object' &&
-        inner !== null &&
-        'columns' in (inner as Record<string, unknown>)
-      ) {
-        return true;
-      }
-      return false;
-    }
-    return false;
-  }
-  return false;
-}
-
-function bucketFlatTablesByNamespace(
-  tables: Readonly<Record<string, StorageTable>>,
-): Readonly<Record<string, Readonly<Record<string, StorageTable>>>> {
-  const out: Record<string, Record<string, StorageTable>> = {};
-  for (const [name, table] of Object.entries(tables)) {
-    const nsId = table.namespaceId;
-    if (out[nsId] === undefined) out[nsId] = {};
-    out[nsId][name] = table;
-  }
-  return out;
+  return storage.tables as unknown as Readonly<
+    Record<string, Readonly<Record<string, StorageTable>>>
+  >;
 }
 
 function nestedTypesView(
@@ -575,38 +536,9 @@ function nestedTypesView(
 > {
   if (storage.typesByNamespace !== undefined) return storage.typesByNamespace;
   if (storage.types === undefined) return {};
-  const types = storage.types as Record<string, unknown>;
-  if (looksLikeNestedTypesMap(types)) {
-    return types as Readonly<
-      Record<string, Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>>
-    >;
-  }
-  return { [UNBOUND_NAMESPACE_ID]: storage.types };
-}
-
-function looksLikeNestedTypesMap(types: Record<string, unknown>): boolean {
-  for (const value of Object.values(types)) {
-    if (typeof value !== 'object' || value === null) return false;
-    if (
-      'kind' in (value as Record<string, unknown>) ||
-      'codecId' in (value as Record<string, unknown>)
-    ) {
-      return false;
-    }
-    for (const inner of Object.values(value as Record<string, unknown>)) {
-      if (
-        typeof inner === 'object' &&
-        inner !== null &&
-        ('kind' in (inner as Record<string, unknown>) ||
-          'codecId' in (inner as Record<string, unknown>))
-      ) {
-        return true;
-      }
-      return false;
-    }
-    return false;
-  }
-  return false;
+  return storage.types as unknown as Readonly<
+    Record<string, Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>>
+  >;
 }
 
 /**
