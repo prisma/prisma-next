@@ -55,12 +55,18 @@ function makeTable(overrides: Partial<StorageTable> = {}): StorageTable {
 }
 
 function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
+  const nestedTables: Record<string, Record<string, StorageTable>> = {};
+  for (const [name, t] of Object.entries(tables)) {
+    const ns = t.namespaceId;
+    if (nestedTables[ns] === undefined) nestedTables[ns] = {};
+    nestedTables[ns][name] = t;
+  }
   return {
     target: 'sqlite',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
-      tables,
+      tables: nestedTables,
       storageHash: coreHash(`sha256:test-${Date.now()}`),
     }),
     roots: {},

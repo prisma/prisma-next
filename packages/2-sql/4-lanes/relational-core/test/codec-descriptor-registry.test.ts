@@ -2,8 +2,9 @@ import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   SqlStorage,
-  SqlStorageTablesFlatInput,
+  SqlStorageTablesInput,
   SqlStorageTypeEntry,
+  StorageTableInput,
 } from '@prisma-next/sql-contract/types';
 import {
   SqlStorage as SqlStorageClass,
@@ -75,13 +76,20 @@ describe('buildCodecDescriptorRegistry', () => {
 
 describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
   function storageWith(parts: {
-    tables: SqlStorageTablesFlatInput;
+    tables: Record<string, StorageTableInput>;
     types?: Record<string, SqlStorageTypeEntry>;
   }): SqlStorage {
+    const nestedTables: SqlStorageTablesInput = {};
+    for (const [name, entry] of Object.entries(parts.tables)) {
+      const ns = entry.namespaceId;
+      if (nestedTables[ns] === undefined) nestedTables[ns] = {};
+      nestedTables[ns][name] = entry;
+    }
+    const nestedTypes = parts.types ? { [UNBOUND_NAMESPACE_ID]: parts.types } : undefined;
     return new SqlStorageClass({
       storageHash: 'sha256:test' as SqlStorage['storageHash'],
-      tables: parts.tables,
-      ...ifDefined('types', parts.types),
+      tables: nestedTables,
+      ...ifDefined('types', nestedTypes),
       namespaces: { [UNBOUND_NAMESPACE_ID]: SqlUnboundNamespace.instance },
     });
   }

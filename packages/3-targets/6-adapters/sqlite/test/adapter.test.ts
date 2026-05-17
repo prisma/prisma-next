@@ -40,25 +40,29 @@ const contract = new SqlContractSerializer().deserializeContract({
   storage: {
     storageHash: 'sha256:test-core',
     tables: {
-      user: {
-        columns: {
-          id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
-          email: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
-          metadata: { codecId: 'sqlite/json@1', nativeType: 'text', nullable: true },
+      __unbound__: {
+        user: {
+          namespaceId: '__unbound__',
+          columns: {
+            id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
+            email: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
+            metadata: { codecId: 'sqlite/json@1', nativeType: 'text', nullable: true },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
-      },
-      post: {
-        columns: {
-          id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
-          userId: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
-          title: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
+        post: {
+          namespaceId: '__unbound__',
+          columns: {
+            id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
+            userId: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
+            title: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
       },
     },
   },

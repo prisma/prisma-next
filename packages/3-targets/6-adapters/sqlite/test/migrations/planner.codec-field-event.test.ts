@@ -18,11 +18,17 @@ function table(columns: Record<string, StorageColumn>): StorageTable {
 }
 
 function contract(tables: Record<string, StorageTable>, hash = 'sha256:c'): Contract<SqlStorage> {
+  const nestedTables: Record<string, Record<string, StorageTable>> = {};
+  for (const [name, t] of Object.entries(tables)) {
+    const ns = t.namespaceId;
+    if (nestedTables[ns] === undefined) nestedTables[ns] = {};
+    nestedTables[ns][name] = t;
+  }
   return {
     target: 'sqlite',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
-    storage: new SqlStorage({ storageHash: coreHash(hash), tables }),
+    storage: new SqlStorage({ storageHash: coreHash(hash), tables: nestedTables }),
     models: {},
     roots: {},
     capabilities: {},

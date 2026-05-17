@@ -4,7 +4,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { col, fk, index, model, pk, table, unique } from '../src/factories';
 import { SqlStorage } from '../src/ir/sql-storage';
-import { StorageTable, type StorageTableInput } from '../src/ir/storage-table';
+import type { StorageTable, StorageTableInput } from '../src/ir/storage-table';
 import type { ReferentialAction } from '../src/types';
 import {
   validateModel,
@@ -25,14 +25,9 @@ import {
 function makeStorage(tables: Record<string, StorageTable | StorageTableInput>): SqlStorage {
   const nested: Record<string, Record<string, StorageTable | StorageTableInput>> = {};
   for (const [name, entry] of Object.entries(tables)) {
-    const namespaceId =
-      entry instanceof StorageTable
-        ? entry.namespaceId
-        : ((entry as { namespaceId?: string }).namespaceId ?? UNBOUND_NAMESPACE_ID);
-    const stamped =
-      entry instanceof StorageTable ? entry : { ...(entry as StorageTableInput), namespaceId };
+    const namespaceId = entry.namespaceId;
     if (nested[namespaceId] === undefined) nested[namespaceId] = {};
-    nested[namespaceId][name] = stamped;
+    nested[namespaceId][name] = entry;
   }
   return new SqlStorage({
     storageHash: 'sha256:test' as SqlStorage['storageHash'],

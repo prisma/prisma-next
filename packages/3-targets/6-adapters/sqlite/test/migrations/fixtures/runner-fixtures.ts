@@ -9,13 +9,13 @@ import sqlFamilyDescriptor, {
   type SqlMigrationRunnerFailure,
 } from '@prisma-next/family-sql/control';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
 import type { SqlStatement } from '@prisma-next/target-sqlite/statement-builders';
 import sqliteAdapterDescriptor from '../../../src/exports/control';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 export const contract: Contract<SqlStorage> = {
   target: 'sqlite',
@@ -24,16 +24,18 @@ export const contract: Contract<SqlStorage> = {
   storage: new SqlStorage({
     storageHash: coreHash('sha256:contract'),
     tables: {
-      user: {
-        namespaceId: UNBOUND_NAMESPACE_ID,
-        columns: {
-          id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
-          email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+      __unbound__: {
+        user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
+          columns: {
+            id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
+            email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          uniques: [{ columns: ['email'] }],
+          indexes: [{ columns: ['email'] }],
+          foreignKeys: [],
         },
-        primaryKey: { columns: ['id'] },
-        uniques: [{ columns: ['email'] }],
-        indexes: [{ columns: ['email'] }],
-        foreignKeys: [],
       },
     },
   }),
