@@ -67,12 +67,44 @@ After the DDD pass: audit existing CLI commands against the resulting model (the
 - **Missing data invariants.** First-cut catalog had no entry for the invariant primitive; ADRs 176 + 208 supplied the model.
 - **Missing operations decomposition.** DDL vs data-transform, three-phase envelope, idempotency classes — added.
 - **Missing contract spaces and pinned mirrors.** ADR 212 added.
+- **Git mapping corrected.** Earlier framing implied commit ≈ migration. Actually: commit (state) ≈ **contract**; commit hash ≈ **storageHash**; the closest Git analog for a *migration* is `git format-patch` (a packaged patch with explicit endpoints) — Git has no first-class equivalent. **The verb for producing a migration cannot borrow `commit` from Git.** Recorded as a mapping table in [`domain.md`](./domain.md).
+- **`migration` (noun) vs `migrate` (verb) made load-bearing.** "Migration" only refers to the on-disk artifact; "migrate" only refers to the live act of advancing a database. This creates a visible offline/live axis in the CLI surface — a user must always be able to tell from the verb alone whether the command touches a real DB.
+- **`migrate dev` rejected as an anti-pattern.** Environment-name-as-verb is forbidden. So are god-commands. Every retained verb must answer one question.
+- **`migrate` is forward-only.** Walking the directed graph from marker to ref. Backward motion for dev iteration is `db reset --to <ref>` (separate, destructive, dev-only). Refusing the "smart `migrate` that rewinds" temptation explicitly.
+- **Refs are defined by CD behavior.** A ref means "the state CD will `migrate --to` in this environment." Environment-named (`production`, `staging`) rather than Git-generic (`head`). The PR is the moment the promise (ref advancement) is staked.
+- **`db update` is off-graph live reconciliation.** Not the dev-DB equivalent of `migrate`. It does not produce a migration, does not walk the graph, does not advance a ref. Conceptually closer to "rebuild from desired state."
+- **`plan` + `new` confirmed as the two authoring entry points.** `migration plan` = diff contracts and fill ops; `migration new` = scaffold an empty package with `from`/`to` set, ops blank. Both offline.
+- **`migration compile`** confirmed as the verb for `migration.ts` → `ops.json`.
+- **Dev/deploy verb split rejected.** No `migrate dev`, no `migrate deploy`. The "safety semantics" Prisma current attaches to `migrate dev` (shadow replay, drift checks) belong to a separate explicit verification step (`db verify`, `migration preflight`). The migration verb itself doesn't care about environment.
+- **`db reset` dropped.** Dev rewind is `db update --to <hash>` — off-graph reconciliation parameterized by target. Same verb covers steady-state ("match current contract") and rewind ("match this earlier contract on disk").
+- **"Baseline" dropped from vocabulary.** A migration whose `from` is `∅` is just a regular migration. We don't need a separate noun.
+- **`db init` and `db sign` are not the same.** `db init` bootstraps an empty database (or applies initial migrations); `db sign` verifies a live DB satisfies a contract and writes the contract hash into the marker. `db sign` performs *no structural changes* and refuses if the DB doesn't already match.
+- **Verification was missing from the conventions analysis.** Two distinct verification questions exist: *"does the live DB satisfy the contract?"* (`db verify`, live, read-only) and *"would this migration actually do what it promises?"* (`migration preflight`, sandbox apply). Added.
+- **State specs — Git-style.** Every "where in the graph" argument accepts a uniform grammar: hash or hash-prefix (8+ chars, bare hex — no `sha256:` prefix), ref name, exact migration directory name, `<dir-name>^` for the migration's from-contract, or filesystem path. Modeled on Git's revspec, simplified.
+- **Migrations are identified by directory name only.** No slug-only or prefix matching on directory names. The directory name (`<UTC-timestamp>_<sanitized-slug>`) is unique within the app contract space by construction. Tab-completion / copy-paste covers the verbosity cost.
+- **Read surface pinned.** `migration status [--to <ref>] [--from <state-spec>]` (path & pending; the load-bearing CI/CD question; live but offline-capable via `--from`), `migration log` (applied history from the ledger; live), `migration list` (flat enumeration; offline), `migration graph` (relational view; offline), `migration show <dir>` (single migration; offline).
+- **Namespace is by subject, not by safety.** The earlier "offline = `migration`, live = `db`" rule was wrong. `migration status` and `migration log` are *live but live in the `migration` namespace* because the subject is migrations. The safety axis is now "mutating vs read-only" + "live vs offline" — four classes — and is carried by the verb's documentation, not by namespace alone.
+- **Phase 2 — Ubiquitous Language pass for the four flagged clusters.**
+  - *Cluster 1, `schema`:* always means the **live database's structural definition**. Never refers to authored artifacts. Exception: "Postgres schema" (always qualified) for the namespace concept. The contract *declares* what the schema must look like; the schema *is* what the database actually has.
+  - *Cluster 2, migration nouns:* "Migration" is canonical user-facing. "Migration package" reserved for architectural prose where filesystem shape matters. "Migration artifact" retired. "Migration edge" is the graph-context term; never bare "edge".
+  - *Cluster 3, marker vs ledger:* both first-class, both distinct. Marker = where you are (mutable, one row, framework-trusted). Ledger = how you got here (append-only, surfaced via `migration log`).
+  - *Cluster 4, hashes:* unqualified "hash" = storage hash. "Migration hash" always qualified; users normally refer to migrations by directory name and only invoke the hash for unambiguous identity. **Profile hash is not user-facing and is flagged as a retirement candidate.**
+- **Phase 2 — secondary clusters.**
+  - *Cluster 5, `apply` → `execute`:* migrations are programs and are **executed**. Past participle in `migration log`: "executed". `apply` is retired from the user-facing surface; internal helpers (`apply-aggregate`, `MigrationApplied` event, etc.) get renamed opportunistically.
+  - *Cluster 6, `plan`:* migration plan vs query plan — both kept in their domains; qualify only when crossing.
+  - *Cluster 7, `operation` → `op` for migrations:* migration ops are **ops** (matches `ops.json`). "Operation" without qualification is reserved for runtime / query / registry contexts. Gives migration ops their own visual identity.
+  - *Cluster 8, `state` reframed:* the migration graph is a **graph of contracts**, edges are migrations. **State** is reserved for the CS sense — the literal condition of a database at a point in time (schema + data + marker + ledger). "Current state" → "current contract". For migration-package lifecycle, use "status" / "phase" / "progress", never "state".
+  - **Empty caution:** `∅` (the empty database state, introspection returns no objects) vs **null contract** (a hypothetical contract with no requirements) are different things. Don't conflate. `∅` is conventional starting point for baseline migrations (`from: null`).
+  - **State spec → contract reference.** The umbrella for "ways of identifying a contract" is **contract reference**; a **ref** is a specific kind (named, persisted, file-backed) — pointer / memory-address analogy. CLI argument placeholder is `<contract>`.
+- **Adoption UX concern (parked).** Bringing a non-empty existing database into the migration graph is not "migration from `∅`". It's *introspect → derive contract hash → match-or-create graph node → sign marker → optionally plan onward migration*. This path needs to be one or two steps for users, not five. Vocabulary is fine; the verbs and their compositions need to make it ergonomic. Revisit during the CLI audit.
 
 ## Open subthreads
 
-- The "advance ref" verb. Picked deferred (not the core focus per the user); will be settled by the chosen analog (Git vocabulary suggests `move` or `update`).
-- The collapse of `migration plan` / `migration new` and of `db update` / `migration apply` — both gated on the Phase 2 ubiquitous-language pass.
+- The compile verb (`migration.ts` → `ops.json`). Lean: `build` or `lock`. Awaiting decision.
+- The direct ref-move verb (when not advancing as part of `migration plan`). Candidates: `ref move`, `ref advance`, `ref set`. Probably `ref move`, mirroring `git update-ref`.
 - Whether `head` is a useful ref name or whether environment-named refs (`production`, `staging`) carry the whole load.
+- Whether `db reset` should be a sibling of `migrate` or live somewhere else in the taxonomy. (Live verb; destructive; dev-only.)
+- `db init` vs `prisma-next init` homonym — needs resolution; one will get renamed.
 
 ## What's next
 

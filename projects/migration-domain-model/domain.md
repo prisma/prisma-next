@@ -14,7 +14,143 @@
 
 ## Mental-model anchor
 
-**Git** (refs, branches, HEAD, commits, "checkout this branch into the working tree") is the deliberate analog. Where our model maps cleanly onto Git, we should reuse Git's vocabulary rather than invent our own — both because the typical user already has internalised it and because we want users to think of the migration graph as a Git-like DAG of states.
+**Git** (refs, branches, "checkout this branch into the working tree") is the deliberate analog. Where our model maps cleanly onto Git, we should reuse Git's vocabulary rather than invent our own.
+
+**Corrected mapping** (the previous "commit ≈ migration" framing was wrong):
+
+| Git | Our domain |
+|---|---|
+| Commit / tree | **Contract** (with `storageHash` as identity) |
+| Commit hash | `storageHash` |
+| Parent edge + diff (computed) | **Migration** (we make the edge explicit and addressable) |
+| `git format-patch` output | **Migration package** (the cleanest Git analog) |
+| Ref / branch | **Ref** (environment-named — `production`, `staging`) |
+| HEAD's tree | The emitted contract |
+| Working tree | The **live database** |
+| `git checkout <ref>` | `migrate --to <ref>` |
+| `git log` | walk the migration graph |
+| `git revert` | author a new forward migration whose `to` is an earlier contract |
+
+**Key divergence from Git:** a migration is a *patch*, not a commit. Git has no first-class addressable-patch object; we do. That means the verb for "produce a migration" cannot borrow `commit` from Git — there is no clean Git verb for what we're doing (`format-patch` is the closest semantic and isn't a well-known user-facing verb).
+
+## Design rules that fall out of the model
+
+These are constraints any CLI verb must respect.
+
+### `migration` (noun) vs `migrate` (verb)
+
+- **`migration`** is always **a noun**: the on-disk artifact (a package, a hash, an edge in the graph). Static. Filesystem.
+- **`migrate`** is always **a verb**: the single act of advancing a *live database instance* along the graph.
+
+### Namespacing rule: subject, not surface
+
+The CLI is namespaced by the *subject* of the command, not by whether it touches a DB:
+
+| Namespace | Subject | Examples |
+|---|---|---|
+| **`migrate`** (the verb itself) | The act of migrating a DB. | `migrate --to <ref>` |
+| **`db <verb>`** | A live database. | `db update`, `db verify`, `db sign`, `db init` |
+| **`migration <verb>`** | The migration artifacts and graph. | `migration plan`, `migration new`, `migration compile`, `migration show`, `migration list`, `migration graph`, `migration preflight`, `migration status`, `migration log` |
+| **`contract <verb>`** | Contracts. | `contract emit`, `contract show`, `contract diff` |
+| **`ref <verb>`** | Refs. | `ref move`, `ref show` |
+
+### Read-only vs mutating, not offline vs live
+
+The earlier "offline vs live" axis is replaced by a finer-grained safety axis: **does this command mutate state, and what state does it mutate?**
+
+| Class | What it does | Examples |
+|---|---|---|
+| **Mutating live** | Changes the database | `migrate --to <ref>`, `db init`, `db update`, `db sign` |
+| **Read-only live** | Reads the database; answers questions about it | `db verify`, `migration status`, `migration log`, `migration preflight` *(sandbox apply; mutates only the shadow)* |
+| **Mutating offline** | Writes to the filesystem only | `migration plan`, `migration new`, `migration compile`, `contract emit`, `ref move` |
+| **Read-only offline** | Reads filesystem only | `migration list`, `migration graph`, `migration show`, `contract show`, `contract diff` |
+
+**The load-bearing safety property:** users (and agents) must be able to tell from the verb whether it mutates state, and whether it touches a real DB. The verb's namespace alone is not sufficient — `migration status` (live, read-only) and `migration plan` (offline, mutating) share the `migration` namespace but differ on both axes. Help text and `--dry-run` discipline must surface this distinction.
+
+### `migrate` is forward-only
+
+`migrate --to <contract>` walks the migration graph from the marker's current contract to the target contract. It never reverses, never rewinds, never resets. Backward motion is **not a migration** — there is no such thing.
+
+Dev iteration on a tweaked migration uses `db update --to <hash>`, which is off-graph reconciliation (see below), not a graph walk.
+
+### One verb for migrating, regardless of environment
+
+There is **one** operation that walks the migration graph against a live database: `migrate --to <ref>`. It is the same verb in dev, staging, and production. **What changes between environments is the database URL**, not the verb name and not the verb's behavior.
+
+We explicitly **reject the dev/deploy verb split** that other systems (notably Prisma current) introduce. The safety properties Prisma current bundles into `migrate dev` (shadow-DB drift checks, sandbox replay, etc.) are a *separate, explicit verification step* in our model — you ask for them by name, you don't get them as a hidden side effect of a god-command.
+
+### Off-graph reconciliation is not migration
+
+`db update` reconciles a live database to a target contract **without walking the migration graph**. It does not produce a migration, does not advance a ref, does not consult the marker's prior contract. It is dev-only.
+
+- `db update` → reconcile to current contract (the 90% case).
+- `db update --to <contract>` → reconcile to any contract we can name (see *Contract references* below).
+
+### Contract references
+
+A **contract reference** is any way of identifying a contract in the migration graph. Every command that takes a "which contract" argument accepts the same grammar. A contract reference resolves to a contract (identified by `storageHash`).
+
+The grammar borrows two ideas from Git (prefix-matching on hashes and the `^` operator for "predecessor") but is otherwise specific to our model — there is no `~N`, no `@{N}` reflog, no `HEAD`.
+
+| Form | Meaning |
+|---|---|
+| `<hash>` or `<hash-prefix>` | Bare hex (no `sha256:` prefix required). 8+ char prefixes accepted; ambiguity → error listing candidates. Resolves to the contract directly. |
+| `<ref-name>` | A **ref** is a named contract reference — a named, persisted, on-disk pointer to a contract. The ref name resolves to the contract it points at. |
+| `<migration-dir-name>` | The migration's **`to` contract**. |
+| `<migration-dir-name>^` | The migration's **`from` contract**. |
+| `<filesystem-path>` | The contract file at that path. |
+
+**A ref is just a specific kind of contract reference** — the named, file-backed, persistent kind. (By analogy: a pointer is a named memory address; "reference" is the family, "ref" is the named instance.)
+
+**Migrations are named by their directory name** (e.g. `20260117T1042_add_users_table`). The directory name is guaranteed unique within the app contract space — the UTC-timestamp prefix ensures it. No slug-only matching, no prefix matching on directory names — exact match only. Tab-completion / copy-paste covers the verbosity.
+
+The `^` operator is only meaningful on a migration directory name — the only case where a "predecessor contract" is unambiguous (the migration's `from`). It is not generalized to refs or contract hashes because in our graph a contract can be the destination of multiple migrations.
+
+Hashes and directory names cannot collide: directory names always contain `T` and `_` (e.g. `20260117T1042_...`); bare hashes are pure hex.
+
+In CLI argument syntax, the placeholder is **`<contract>`** — there is no umbrella shorthand. The accepted forms are documented per-command and uniform across commands.
+
+Commands this grammar applies to (illustrative):
+- `migrate --to <contract>`
+- `db update --to <contract>`
+- `db sign --to <contract>`
+- `contract show <contract>` / `contract diff <contract> <contract>`
+- `migration show <migration-dir-name>` (resolves to the migration itself, not a contract)
+
+Why it matters: the dev iteration loop becomes self-documenting.
+
+```
+prisma-next migration compile
+prisma-next db update --to 20260117T1042_add_users_table^   # "rewind to just before this migration"
+prisma-next migrate --to production
+```
+
+### Refs are defined by CD behavior, not Git habit
+
+The load-bearing semantics of a ref is **"the contract CD will `migrate --to` in this environment."** Everything else (naming, on-disk form, PR conventions) derives from that primitive.
+
+Consequences:
+- Refs are **environment-named** (`production`, `staging`, ...). Not the Git-generic `head`.
+- A ref is a *promise* the repo makes about the next CD run. The PR is the moment that promise is staked.
+- The emitted `contract.json` is the implicit "what I'm working toward" — a `head` ref may not need to exist as a stored object. *(open — does `head` ever carry info the contract doesn't?)*
+
+### Initialization vs adoption-by-signing
+
+Two distinct entry points for bringing a database under contract control:
+
+- **`db init`** — bootstrap. The DB is empty (greenfield) or being adopted by *executing* an initial migration (brownfield-incremental). Lays down structure. Live, may mutate.
+- **`db sign`** — declare that an existing live database satisfies a contract. Verifies live schema satisfies the contract, then writes the contract hash into the marker. **Refuses if it doesn't satisfy.** No structural changes. The adoption path when the DB already happens to match.
+
+`db sign` is a sibling of `db verify` (both verify the live DB against a contract), not a sibling of `migrate` (no structural mutation).
+
+### Anti-patterns (rejected by name)
+
+- **`migrate dev`** — environment-name-as-verb. Also a god-command that does emission + planning + execution + drift detection in one. Both forbidden.
+- **`migrate deploy`** — same anti-pattern in the other direction. You don't "deploy" a migration; you `migrate --to <ref>`.
+- **The dev/deploy verb split itself.** Other systems have it because their migration verb conflates "walk the graph" with "do the dev-time safety checks." We separate those.
+- **`freeze`** — not how anyone talks. Replaced with explicit verbs (`migration plan`, `migration new`).
+- **Single verb that touches both filesystem and a live DB.** Verbs must be one or the other.
+- **"Baseline"** as a separate concept. A migration from `∅` is just a regular `migration plan` with no prior ref — there is no special "baseline" noun.
 
 ## Source material
 
@@ -34,51 +170,53 @@ Grouped by sub-area so the relationships are visible. Some terms appear in more 
 
 ### Contracts, hashes, and identity
 
-- **Contract** — the application's stated desired schema, capabilities, and policies. The system boundary; the centre of gravity. Authored in PSL or TypeScript; emitted to `contract.json` + `contract.d.ts`.
+- **Contract** — the application's declaration of what the database must contain, support, and enforce. The system boundary; the centre of gravity. Authored in PSL or TypeScript; emitted to `contract.json` + `contract.d.ts`. The contract is **not a schema**; when applied, the contract is what *produces* the schema in the live database.
 - **Contract artifact** — the emitted, on-disk representation of a contract (`contract.json` + `contract.d.ts`). What downstream tools and the runtime consume.
 - **Contract IR** — the in-memory canonical form of a contract (before emission).
 - **PSL** — Prisma Schema Language. One of two authoring surfaces for contracts (and the canonical one for extensions).
 - **TypeScript contract** — TypeScript-authored contract using `typescriptContract(...)`. Second authoring surface.
-- **Storage hash** (`storageHash`) — deterministic hash over the contract's storage-affecting parts (`schemaVersion`, `targetFamily`, `target`, `storage`). The identity of a *state* the database can be at. (Formerly `coreHash`.)
-- **Profile hash** (`profileHash`) — deterministic hash over the contract's declared capabilities. The identity of a *capability profile* the database must satisfy.
-- **Migration hash** (`migrationHash` / `migrationId`) — content-addressed hash over `(strippedManifest, ops)`. The identity of a migration as a *physical effect on storage*, independent of cosmetic contract details.
+- **Storage hash** (`storageHash`) — deterministic hash over the contract's storage-affecting parts (`schemaVersion`, `targetFamily`, `target`, `storage`). The identity of a *contract* in the migration graph. (Formerly `coreHash`.) **User-facing convention:** when the CLI says "hash" without qualification, it means the storage hash. Contract references resolve to one.
+- **Profile hash** (`profileHash`) — deterministic hash over the contract's declared capabilities. The identity of a *capability profile* the database must satisfy. **Not user-facing. Candidate for retirement.** Should not appear in CLI output; if it does, it must be qualified.
+- **Migration hash** (`migrationHash` / `migrationId`) — content-addressed hash over `(strippedManifest, ops)`. The identity of a migration as a *physical effect on storage*, independent of cosmetic contract details. **Always qualified as "migration hash" in user-facing prose.** Used only when a migration must be referred to by unambiguous identity (integrity checks, error messages about hash mismatch). The common path is referring to a migration by its directory name.
 - **Canonical version** — the version of the canonicalization rules used when a hash was computed. Stored on the marker.
 - **Canonicalization** — deterministic JSON ordering that makes hashes reproducible across runs and machines.
 
 ### Database state
 
 - **Database** — the live target instance, identified externally by a connection URL.
-- **Marker** — the database's self-record of which state(s) it is currently at. One row per **contract space**. Stores `storageHash`, `profileHash`, `invariants[]`, `canonicalVersion`, optional contract JSON. The framework's *guarantee record* about the database.
-- **Ledger** — append-only audit log of applied edges (per-DB). User-owned; framework reads only the marker, never the ledger, for routing decisions.
-- **Live schema** — the actual schema structure observed in the database by introspection. Distinct from the contract (the *intended* schema).
-- **Drift** — divergence between contract and database. Taxonomy includes marker-level (missing / corrupt / stale / hash-mismatch), schema-level (manual DDL / partial apply / concurrent apply), graph-level (orphan database / no path / path breakage / cycle), capability (missing / downgrade / profile mismatch), transactional, cache / replica freshness, canonicalization.
+- **Marker** — the database's self-record of which contract(s) it currently claims to satisfy. One row per **contract space**. Stores `storageHash`, `profileHash`, `invariants[]`, `canonicalVersion`, optional contract JSON. The framework's *guarantee record* about the database.
+- **Ledger** — append-only audit log of executed migrations (per-DB). User-owned; framework reads only the marker, never the ledger, for routing decisions.
+- **Schema** — the structural definition of a live database, as observed by introspection. **Always refers to the live database**, never to a contract or an authored artifact. The contract *declares* what the schema must look like; the schema *is* what the database actually has.
+- **Postgres schema** — the Postgres-specific namespace concept (tables grouped under a name like `public`). Always qualified as "Postgres schema" to disambiguate from the general "schema" sense above.
+- **Drift** — divergence between contract and database. Taxonomy includes marker-level (missing / corrupt / stale / hash-mismatch), schema-level (manual DDL / partial execution / concurrent execution), graph-level (orphan database / no path / path breakage / cycle), capability (missing / downgrade / profile mismatch), transactional, cache / replica freshness, canonicalization.
 
 ### Operations and migrations
 
-- **Migration** — a unit of intent that takes the database from one **state** to another. The artifact that records the intent and the operations.
-- **Migration package** — the on-disk directory containing a migration's files (`migration.json`, `ops.json`, `migration.ts`, `start-contract.json`, `end-contract.json`, optional typings).
-- **Migration artifact** — collective name for the files in a migration package, especially the ones the runner consumes (`migration.json` + `ops.json`).
+- **Migration** — a unit of intent that takes the database from one **contract** to another. The canonical user-facing term. Refers indifferently to the conceptual unit, the on-disk directory, and the graph entity — exact meaning falls out of context.
+- **Migration package** — internal/architectural term for the on-disk directory specifically (its files: `migration.json`, `ops.json`, `migration.ts`, `start-contract.json`, `end-contract.json`, optional typings). Used in dev docs when filesystem shape matters; in user-facing prose, just say "migration."
+- **Migration directory name** — the user-facing identifier for a migration: `<YYYYMMDDTHHMM>_<sanitized-slug>` (UTC, minute precision). Created at planning time from `--name <slug>`. **Unique within the app contract space**; the timestamp prefix guarantees ordering and uniqueness. The canonical name used everywhere in the CLI surface.
 - **`migration.json`** / **Manifest** — the migration's metadata file. Records `from`, `to`, `migrationHash`, `providedInvariants`, `labels`, `createdAt`, and the (non-identity) `fromContract` / `toContract` snapshots.
-- **`ops.json`** — the migration's operation list in post-lowering form. *The migration contract* — what the runner trusts and replays. Never compiled, never `eval`'d at apply time.
-- **`migration.ts`** — authoring surface (TypeScript). The file the developer edits. Self-emits `ops.json` + `migration.json` when run directly. Never loaded by `apply`.
+- **`ops.json`** — the migration's op list in post-lowering form. *The migration contract* — what the runner trusts and replays. Never compiled, never `eval`'d at execution time.
+- **`migration.ts`** — authoring surface (TypeScript). The file the developer edits. Self-emits `ops.json` + `migration.json` when run directly. Never loaded by `migrate` at execution time.
 - **Start contract** / **End contract** — bookend snapshots of the contracts at the migration's `from` and `to` storage hashes. Author-time conveniences; not part of identity.
-- **Edge** — the graph view of a migration. An edge from `from`-state to `to`-state. (`migration` and `edge` are the same thing seen from different angles.)
+- **Migration edge** — the graph-theoretic view of a migration: a directed edge from the `from`-contract to the `to`-contract. **Used only when speaking about the migration graph** (path-finding, reachability, drift taxonomy). Never as bare "edge". In all other contexts, "migration" is the right word.
 - **Operation** — a single declarative step inside a migration. Carries an envelope (precheck / execute / postcheck) and an `operationClass` (`widening`, `destructive`, `data`).
 - **DDL operation** — structural schema operation (create/alter/drop table, index, column, …).
 - **Data transform** — operation that mutates data, often alongside structural change. Carries `operationClass: 'data'` and may carry an `invariantId`.
 - **Operation envelope** / **Three-phase envelope** — the shared shape of every operation: `precheck[]` → `execute[]` → `postcheck[]`.
-- **Idempotency class** — `fully idempotent` / `conditionally idempotent` / `non-idempotent`. Determines whether a partially-applied migration can be safely retried.
+- **Idempotency class** — `fully idempotent` / `conditionally idempotent` / `non-idempotent`. Determines whether a partially-executed migration can be safely retried.
 - **Placeholder** — a `never`-returning function used as a scaffolded slot in `migration.ts` for parts the planner could not derive. Throws `PN-MIG-2001` at emit time.
-- **Intermediate state** — a fully-attested migration package whose `ops.json` is `[]` because `migration.ts` still contains unfilled placeholders. Visible to the runner but applies zero ops.
+- **Intermediate migration** — a fully-attested migration package whose `ops.json` is `[]` because `migration.ts` still contains unfilled placeholders. Visible to the runner but executes zero ops. (Avoid "intermediate state" — "state" is reserved for database state.)
 
 ### Graph and routing
 
-- **Migration graph** — the directed graph (possibly cyclic) of edges and the states they connect. Reconstructed from the on-disk migration packages.
-- **State** — a position the database can be at, identified by a `storageHash`. Nodes in the migration graph.
-- **Baseline** — a migration whose `from` is `null` (no prior state). Bootstraps a database to a known state. (`∅ → H₀`)
-- **Path** — an ordered sequence of edges connecting two states.
-- **Ref** — a named pointer to a desired state. Today: `{ hash: string, invariants: string[] }`. Stored as JSON files under `migrations/refs/<name>.json`. Examples: `production`, `staging`, `head`. *(The Git-analog term.)*
-- **Head** — *(candidate term, contested)* the latest-known state of a contract space, often expressed as a special ref (`migrations/refs/head.json`).
+- **Migration graph** — the directed graph (possibly cyclic) of **contracts** connected by **migrations** (the edges). Reconstructed from the on-disk migration packages.
+- **Database state** (or just **state**) — the literal condition of a database at a point in time: its schema, data, marker, ledger — everything. **Not a graph node.** A database has a state; the migration graph has contracts. The marker records *which contract* a database's state currently claims to satisfy. (CS sense of "state": the condition of a system at a point.)
+- **`∅`** — the **empty database state**: introspection returns no objects. Conventional starting point for baseline migrations (where the manifest's `from` is `null`, per ADR 199). One specific state; not a "permissive contract".
+- **Null contract** — a hypothetical contract with no requirements; satisfied by any database state in non-strict mode. **Distinct from `∅`** (which is one specific database state). Mostly theoretical; named here to keep it from being conflated with `∅`.
+- **Path** — an ordered sequence of migrations connecting two contracts.
+- **Ref** — a named **contract reference**: a named, persisted, file-backed pointer to a contract. Today: `{ hash: string, invariants: string[] }`. Stored as JSON files under `migrations/refs/<name>.json`. Examples: `production`, `staging`. (By analogy: a pointer is a named memory address. Refs are a specific kind of contract reference; the umbrella is "contract reference.")
+- **Head** — *(candidate term, contested)* the latest-known contract of a contract space, often expressed as a special ref (`migrations/refs/head.json`).
 - **Invariant** / **Data invariant** — a named, checkable predicate over data (e.g. "all user phone numbers are normalized to E.164"). The correctness primitive for data that the contract hash cannot capture.
 - **Invariant id** (`invariantId`) — opt-in routing key on a data transform. When set, the transform is *routing-visible*: refs may require that id.
 - **Provided invariants** (`providedInvariants`) — the set of `invariantId`s a migration declares. Part of the migration's identity.
@@ -92,7 +230,7 @@ Grouped by sub-area so the relationships are visible. Some terms appear in more 
 - **Space-id** — identifier for a contract space. `[a-z][a-z0-9_-]{0,63}`. `'app'` is reserved for the application.
 - **App-space** — the application's contract space.
 - **Extension-space** — a contract space owned by an installed extension (e.g. `cipherstash`, `pgvector`).
-- **Pinned per-space artifacts** — the framework-owned on-disk mirror of each loaded extension's `contractSpace` (`migrations/<space-id>/{contract.json, contract.d.ts, refs/head.json, <migration dirs>}`). Apply-time and verify-time read *only* the pinned files, never the extension's descriptor module.
+- **Pinned per-space artifacts** — the framework-owned on-disk mirror of each loaded extension's `contractSpace` (`migrations/<space-id>/{contract.json, contract.d.ts, refs/head.json, <migration dirs>}`). Execution-time and verify-time read *only* the pinned files, never the extension's descriptor module.
 - **Descriptor** — the runtime/control descriptor of an extension. Carries `contractSpace` when the extension contributes schema.
 
 ### Process roles (components / services)
@@ -104,7 +242,7 @@ Grouped by sub-area so the relationships are visible. Some terms appear in more 
 - **Verifier** — compares contract (or aggregated spaces) against the live database; reports structured drift kinds.
 - **Adapter** — target-family-specific lowering of operations into a wire form.
 - **Driver** — target-specific transport (the connection-bound thing that actually talks to the database).
-- **Preflight (service)** — sandbox apply for validation. Local: shadow DB or EXPLAIN-only. Hosted: PPg (Prisma Postgres).
+- **Preflight (service)** — sandbox execution for validation. Local: shadow DB or EXPLAIN-only. Hosted: PPg (Prisma Postgres).
 - **PPg** / **Prisma Postgres** — contract-aware Postgres service that hosts preflight and a contract ledger.
 - **Advisory lock** — per-DB lock that prevents concurrent applies (Postgres).
 - **CAS** — compare-and-swap, used as concurrency control for Mongo marker writes.
@@ -113,9 +251,11 @@ Grouped by sub-area so the relationships are visible. Some terms appear in more 
 
 - **Adoption** — bringing an existing database under contract control. Three paths: **greenfield**, **brownfield-conservative**, **brownfield-incremental**.
 - **Introspection** — read-only schema discovery of a live database.
-- **Initialization** — `db init`. Bootstraps a database from `∅` to the current contract using additive-only operations.
-- **Reconciliation** — `db update`. Live-introspect, diff against contract, apply the difference. Dev-only first-class workflow.
-- **Squash** — collapsing a range of migrations into a single equivalent baseline.
+- **Initialization** — `db init`. Bootstraps an empty database (greenfield) or applies initial migrations to an existing one. Lays down structure.
+- **Signing** — `db sign`. Verifies a live DB satisfies a contract, then writes the contract hash into the marker. The adoption path for an already-matching database. No structural changes.
+- **Reconciliation** — `db update`. Live-introspect, diff against a target contract, execute the difference. Off-graph; dev-only first-class workflow.
+- **Preflight** — sandbox execution of a migration to verify the migration behaves as promised. Distinct from `verify` (which is about the live DB), and distinct from `migrate` (which mutates the real DB).
+- **Squash** — collapsing a range of migrations into a single equivalent migration.
 - **Promotion** — moving a ref forward (typically: advancing `production` to match a freshly-merged change).
 
 ---
@@ -124,40 +264,50 @@ Grouped by sub-area so the relationships are visible. Some terms appear in more 
 
 Grouped by intent. *Italicised* entries are terms used in current CLI commands; **bold** entries are candidate canonical verbs we may want to consolidate around.
 
-### Authoring (produce or edit artifacts)
+### Authoring (offline — filesystem only)
 
 - **Author** — write a contract or migration in PSL or TypeScript (the meta-verb).
-- ***Emit*** — produce the canonical artifacts from authored sources. Applies to:
-  - Contracts: `contract emit` writes `contract.json` + `contract.d.ts`.
-  - Migrations: running `migration.ts` rewrites `ops.json` + `migration.json` (self-emission).
-- ***Plan*** — diff two contracts, scaffold a migration package. Today: `migration plan`.
-- ***New*** — scaffold an empty migration package for hand authoring. Today: `migration new`. *Candidate for consolidation with `plan` if we choose to.*
-- **Advance (a ref)** — move a ref to point at a new state. *(The promise mechanic from the dev workflow — verb TBD: `move`, `advance`, `promote`, `point`.)*
+- **`contract emit`** — produce `contract.json` + `contract.d.ts` from contract source.
+- **`migration plan`** — diff `<ref>` ref's contract → current contract; scaffold a migration package with ops auto-filled; advance the named ref to the new contract's hash. *The "freeze + promise" verb.*
+- **`migration new`** — scaffold a migration package with `from`/`to` storage hashes but **no ops**. For hand-authored migrations. *Sibling of `plan` — same artifact shape, different ops source.*
+- **`migration compile`** — execute `migration.ts`, (re)write `ops.json` + `migration.json`. The TS → JSON build step; consumers run this after editing `migration.ts` by hand.
+- **`ref move <name> <hash>`** — directly move a ref. Rarely used by hand; the normal path is `migration plan` advancing a ref atomically. *(open — verb name)*
 
-### Mutating (change live state)
+### Mutating a live database
 
-- ***Apply*** — execute a migration's `ops.json` against the live database. Today: `migration apply`.
-- **Migrate (database to ref)** — *user's preferred verb for the canonical "bring this DB to state X" command*. Today this maps to `migration apply --ref X`. The user proposed `prisma-next migrate --db URL --to REF` as the surface form.
-- ***Init*** — `db init`: bootstrap a database with all additive operations needed to reach the current contract.
-- ***Update*** — `db update`: reconcile live database against current contract. Dev-only.
-- ***Sign*** — `db sign`: write/update the marker with the current contract hashes.
+- **`migrate --to <contract>`** — *the* migration verb. Walks the graph from the marker's current contract to the target. Forward-only. Same verb everywhere (dev, staging, production); only the DB URL changes.
+- **`db init`** — bootstrap an empty database, or adopt an existing one by executing initial migrations from `∅`. Lays down structure. Live, may mutate.
+- **`db update`** — off-graph reconciliation. `db update` reconciles to the current contract; `db update --to <hash>` reconciles to any contract we can name on disk. **Dev-only.** Does not produce a migration, does not consult the graph, does not advance any ref.
+- **`db sign`** — verify the live DB satisfies a contract, then write the contract hash into the marker. **Refuses if it doesn't satisfy.** No structural mutation. The adoption path for an already-matching DB.
 
-### Reading (interrogate state)
+### Verification (live, read-only)
 
-- ***Verify*** — `db verify`: check marker + live schema both match the contract.
-- ***Status*** — `migration status`: report applied / pending against a ref.
-- ***Show*** — `migration show`: dump a migration package's operations and metadata.
-- ***Schema*** — `db schema`: print the live schema (tree or JSON).
-- ***Infer*** — `contract infer`: read live schema, write inferred PSL contract.
-- **Preflight** — sandbox apply for validation. Today: not exposed at top level; PPg-only and partial local support.
+- **`db verify`** — *"does the live DB currently satisfy the contract?"* Compares marker + live schema against the contract; reports drift. Read-only.
+- **`migration preflight <id>`** — *"would this migration actually do what it promises?"* Sandbox-applies a migration package against a shadow DB (or PPg) and reports the outcome. The dev's verification tool when iterating on a tweaked migration. *(verb name open — `preflight`, `dry-run`, `simulate`, `try`.)*
 
-### Reading the graph specifically (interrogative gap)
+### Reading — live (touches the DB)
 
-These don't have explicit commands today and are the ticket's named gap:
-- **What path will be taken?** — given marker + ref, show the routed path.
-- **What does this branch promise?** — given a branch's refs, show the diff vs. mainline's refs.
-- **What's the graph shape?** — render the graph (or branch tips, or unreachable nodes).
-- **Is the graph well-formed?** — check on-disk integrity (hashes verify, no orphan dirs, all refs point at known states).
+- **`db verify`** — *"does the live DB satisfy the contract?"* Compares marker + introspection against the contract; reports drift kinds.
+- **`migration status [--to <contract>] [--from <contract>]`** — *"what needs to happen to reach the target contract?"* (equivalently: *"what will `migrate --to <contract>` do?"*). Reads the marker, computes the path, lists migrations + ops + ref changes. With `--from <contract>`, becomes offline (answer the question without touching the DB) — used by PR review / CI that doesn't have DB access. **The load-bearing CI/CD question.**
+- **`migration log`** — *"what did this DB execute, and when?"* Reads the ledger. Audit history of executed migrations.
+- **`db schema`** — print the live schema (tree or JSON).
+
+### Reading — offline (filesystem only)
+
+- **`migration list`** — flat enumeration of migrations on disk, topologically ordered. Cheap, scriptable.
+- **`migration graph`** — relational view of the graph (ASCII tree with branch points and ref markers, or DOT, or JSON). Human-readable companion to `list`.
+- **`migration show <dir-name>`** — details of a single migration: ops, checks, invariants, bookend hashes.
+- **`contract show <contract>`** — pretty-print a contract.
+- **`contract diff <contract> <contract>`** — structural diff between two contracts.
+- **`contract infer`** — read a live schema, write an inferred PSL contract (live read, but the output is offline). *Edge case: lives in the contract namespace because contracts are the subject; the live read is incidental.*
+
+### Reading-the-graph questions (the ticket's named gap)
+
+These map onto the commands above:
+- *"What path will be taken to reach `<ref>`?"* → `migration status --to <ref>`
+- *"What does this branch promise that mainline doesn't?"* → `migration graph` + `ref show production` (PR-review tooling can diff the ref pointers)
+- *"What's the graph shape?"* → `migration graph`
+- *"Is the graph well-formed?"* → `migration list --check` or a dedicated `migration check` *(open — verb name TBD)*
 
 ---
 
@@ -168,12 +318,12 @@ Used both for runner telemetry and for understanding which transitions a workflo
 - **ContractEmitted** — contract source authored → artifacts produced.
 - **MigrationPlanned** — a new migration package was scaffolded from a contract diff.
 - **MigrationEmitted** — `migration.ts` was run; `ops.json` + `migration.json` were (re)written.
-- **MigrationApplied** — runner executed a migration's ops; marker advanced.
+- **MigrationExecuted** — runner executed a migration's ops; marker advanced. *(Existing internal name: `MigrationApplied`; opportunistically renaming when touched.)*
 - **MarkerAdvanced** — marker write succeeded for a contract space.
 - **InvariantSatisfied** — a data transform's postcondition passed and its `invariantId` was unioned into the marker's invariants set.
-- **RefMoved** — a ref's pointed state changed on disk.
+- **RefMoved** — the contract a ref points at changed on disk.
 - **DriftDetected** — verifier or runtime found a mismatch.
-- **PreflightCompleted** — sandbox apply succeeded with diagnostics.
+- **PreflightCompleted** — sandbox execution succeeded with diagnostics.
 
 ---
 
@@ -186,16 +336,16 @@ Phrased as questions the agent (or developer / db admin) needs to be able to ask
 - *Where is this database right now?* — what is its marker per space (`storageHash`, `profileHash`, `invariants`)?
 - *Does the live schema match the contract?* — verifier outcome.
 - *Does the marker match the contract?* — hash equality check.
-- *Is the app bundle signed against the same state as this database?* — equality of the app's expected `storageHash` and the marker's.
+- *Is the app bundle signed against the same contract as this database?* — equality of the app's expected `storageHash` and the marker's.
 
 ### About the graph and refs
 
 - *What is `<ref>` pointing at, and what invariants does it require?*
-- *What path connects state A to state B?* — including invariant coverage.
+- *What path connects contract A to contract B?* — including invariant coverage.
 - *What will run when I migrate to `<ref>`?* — the *load-bearing CI/CD question*; effectively *"resolve path from marker to ref, list ops and ref changes"*.
 - *What migrations are pending against this database for `<ref>`?*
-- *What are the branch tips of the graph?* — reachable leaves from a given state.
-- *Is the graph internally consistent?* — every package's `migrationHash` recomputes; every ref points at a known state; no orphan dirs; no marker rows for unloaded spaces.
+- *What are the branch tips of the graph?* — reachable leaves from a given contract.
+- *Is the graph internally consistent?* — every package's migration hash recomputes; every ref points at a known contract; no orphan dirs; no marker rows for unloaded spaces.
 
 ### About a specific migration
 
@@ -215,16 +365,38 @@ Phrased as questions the agent (or developer / db admin) needs to be able to ask
 
 These are terms or distinctions that came up in discussion and have not yet been resolved.
 
-- **"Freeze"** — rejected by the user as not how anyone actually talks. Need a replacement verb for the act of turning an in-progress contract change into a committed migration package. Candidates: *plan*, *author*, *capture*, *materialise*, *commit*.
-- **"Advance" vs "promote" vs "move" (a ref)** — verb for the dev declaring "this branch should advance `<ref>` to state X". Git uses "move" (`git update-ref`) and "merge" (which moves a branch ref). Pick deliberately.
-- **`migration plan` vs `migration new`** — both scaffold a migration package; one is from a contract diff, the other empty. Do they collapse into one verb with a flag?
-- **`db update` vs `migration apply`** — both advance the database, from different sources. Do they share a verb (`apply`, `migrate`) with different flags?
-- **`db init` vs `prisma-next init`** — homonym; one bootstraps a DB, the other scaffolds a new project. The CLI Style Guide already flags this.
-- **`migration` (overloaded)** — a directory on disk, an edge in a graph, the artifact, the act of applying. Which sense is canonical for user-facing prose?
-- **`head` vs `production` vs `main` (ref names)** — Git's analog is `HEAD` / branches. Should our default ref be called `head`, or something more environment-flavored?
-- **`schema` (overloaded)** — sometimes "PSL file", sometimes "live database structure", sometimes "the contract". Disambiguate.
-- **`migration emit` vs running `migration.ts` directly** — the same action, but the CLI surface uses one term in command form and another in prose. Pick one.
-- **`ledger`** — useful internal term, but does it ever appear in the user-facing CLI? If not, keep it internal-only.
+- **Verb for moving a ref directly.** `move`, `advance`, `promote`, `point`, `set`. The common path is `migration plan` advancing a ref atomically; the direct-move verb is rarely needed but should exist.
+- **Does `head` ever carry information the contract doesn't?** If not, the emitted `contract.json` *is* the implicit head and we don't need to store `head` as a ref file. Refs become exclusively environment-named.
+- **Preflight verb name.** `preflight` (telegraphs the intent), `dry-run`, `simulate`, `try`. Open. `preflight` is what our internal docs use today.
+- **`db init` vs `prisma-next init`.** Homonym; one bootstraps a DB (live), the other scaffolds a project (offline). The CLI Style Guide already flags this; needs a rename on one side.
+- **`ledger`.** Useful internal term — does it ever appear in the user-facing CLI? Resolved: appears via `migration log`. Keep as a noun in user-facing prose where the audit-log concept matters.
+
+## Resolved (no longer open)
+
+- **`migration` (noun) vs `migrate` (verb).** Noun = on-disk artifact; verb = the live act of walking the graph. Offline/live axis is load-bearing across the CLI.
+- **One verb for migrating.** `migrate --to <ref>`, same in dev/staging/prod. No `migrate dev`, no `migrate deploy`.
+- **`migration plan` vs `migration new`.** Two distinct authoring entry points: `plan` derives ops from a contract diff; `new` scaffolds an empty package for hand-authored ops. Kept separate.
+- **`migration compile`** for `migration.ts` → `ops.json`. Confirmed.
+- **No `db reset`.** Dev iteration uses `db update --to <hash>`. Off-graph reconciliation parameterized by target.
+- **No "baseline" noun.** A `∅ → H` migration is just a regular migration.
+- **`db init` vs `db sign`.** Distinct: init lays down structure (live, mutates); sign verifies + writes marker (no structural mutation, refuses if DB doesn't already satisfy the contract).
+- **"Freeze"** rejected. `migration plan` is the verb for the freeze-and-promise act.
+- **Dev/deploy split** rejected. The safety semantics belong to the DB URL, not the verb.
+- **Contract references.** Every "which contract" argument accepts: bare hash / hash-prefix (8+ chars, no `sha256:` prefix), ref name, exact migration directory name, `<migration-dir-name>^` (the migration's from-contract), filesystem path. Migrations are identified by directory name only — no slug matching, no prefix matching on directory names. Directory names are unique within the app contract space by construction. **In CLI argument syntax the placeholder is `<contract>`** — no umbrella shorthand. A **ref** is a specific kind of contract reference (named, persisted, file-backed); the umbrella is **contract reference**.
+- **Interrogative surface.** `migration status [--to <contract>] [--from <contract>]` (path / pending; offline-capable via `--from`), `migration log` (execution history from the ledger; live), `migration list` (flat enumeration, Git-tree-style with branches on the left; offline), `migration graph` (visual relational view for debugging the graph; offline), `migration show <dir>` (single migration; offline). `status` and `log` are live read-only; `list`, `graph`, `show` are offline. `list` and `graph` stay as distinct verbs even though they render the same data structure — the verb indicates the user's intent, not the rendering.
+- **Safety axis is "what does this mutate?", not "offline or live?"** Four classes: mutating-live, read-only-live, mutating-offline, read-only-offline. Namespace (`migrate` / `db` / `migration` / `contract` / `ref`) is by *subject*, not by safety. The verb is responsible for being self-evidently classified.
+- **Cluster 1 — `schema` is the live database's structural definition.** Always. Never an authored artifact, never a contract, never anything else. Exception: "Postgres schema" (always qualified) for the namespace concept inside Postgres.
+- **Cluster 2 — "Migration" is the canonical noun.** "Migration package" survives only in architectural prose where filesystem shape matters. "Migration artifact" is retired. "Migration edge" appears only when speaking about the migration graph specifically; never as bare "edge".
+- **Cluster 3 — `Marker` and `Ledger` are both first-class and both distinct.** Marker = where you are (mutable, one row, framework-trusted). Ledger = how you got here (append-only, framework reads only for `migration log`).
+- **Cluster 4 — Hash discipline.** Unqualified "hash" in user-facing prose = storage hash. "Migration hash" always qualified; rarely user-facing (the directory name is the normal handle). Profile hash is not user-facing and is a candidate for retirement.
+- **Cluster 5 — `execute` / "executed".** Migrations are *executed* (they are programs). The past participle "executed" appears in `migration log` output and prose. `apply` / "applied" is retired from the user-facing surface; internal helpers (`apply-aggregate`, `db-apply-aggregate`, `MigrationApplied` event) get renamed opportunistically when touched.
+- **Cluster 6 — `plan`.** Two senses (migration plan, query plan) survive in their respective domains. Qualify only when crossing domains.
+- **Cluster 7 — `operation` → `op` for migrations.** Migration operations are **ops** (idiomatic short form; matches `ops.json`). "Operation" without qualification is reserved for runtime / query / registry contexts. "Op" gives migration operations a distinct visual identity and lets the longer word stand for the other senses without ambiguity.
+- **Cluster 8 — `state` reframed.** "State" is not a graph node. Graph nodes are **contracts** (identified by storage hash). "State" is reserved for the CS sense: the literal condition of a database at a point in time (schema + data + marker + ledger). The migration graph is a graph of contracts; a database has a state.
+  - Replace "current state" → "current contract", "target state" → "target contract", "graph node" → "contract".
+  - For migration-package lifecycle conditions (in-progress, partially-executed, etc.), use **status**, **phase**, or **progress** — never "state".
+  - **`∅`** is the empty database state (introspection returns no objects). One specific state, not a contract. Conventional starting point for baseline migrations.
+  - **Null contract** is a (theoretical) contract with no requirements. Distinct from `∅`; not user-facing.
 
 ---
 

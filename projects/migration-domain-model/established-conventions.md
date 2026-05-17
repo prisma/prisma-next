@@ -219,7 +219,7 @@ Some additional verbs we'll need that are well-established:
 
 ---
 
-## 7. Dev vs Production split
+## 7. Dev vs Production split — *rejected*
 
 ### Convention
 
@@ -229,23 +229,61 @@ Some additional verbs we'll need that are well-established:
 
 ### Design pressure
 
-The dev/deploy split exists because **the safety nets that make a dev workflow ergonomic are dangerous in production**: shadow-replay drift detection requires the ability to drop and recreate a sibling database; autodetected migration generation requires writing to the project tree; reset / migrate-down assumes the data is safe to lose. Prisma's docs are explicit: *"`migrate deploy` does not detect drift, does not reset, does not use a shadow database"*.
+The dev/deploy split exists in Prisma current because the safety nets a dev workflow wants (shadow-replay drift detection, autodetected migration generation, reset / migrate-down) are dangerous in production. The Prisma response was a different verb in each environment.
 
-The cost: two verbs for what users initially think is one operation. Atlas avoided this by parameterizing instead.
+The cost: two verbs for what users initially think is one operation. And `migrate dev` becomes a god-command — it emits, plans, applies, detects drift, runs the generator. No CI can review it; no agent can predict what it'll do.
 
 ### Fit to our model
 
-Our **`db update` (dev) vs `migration apply` (deploy)** is the Prisma pattern, by intent. The user confirmed `db update` is a first-class dev-only workflow.
+**We reject the split.** There is exactly one operation that walks the migration graph against a live database: `migrate --to <ref>`. Same verb in dev, staging, production — the DB URL is what changes.
 
-The user's proposed `migrate --db URL --to <ref>` is closest to Atlas's parameterized-target model. **Combining both could read as `migrate --db URL --to <ref>` for the production verb (precise, ref-typed) and a separately-named convenience for dev (today: `db update`).**
+The "safety semantics" Prisma current attaches to `migrate dev` are not part of the migration verb in our model. They are **separate, explicit verification verbs** (see § 7b below): you ask for them by name when you want them, you don't get them as a hidden side effect.
+
+Atlas's parameterized model is the closer ancestor; we go one step further by giving verification its own verbs rather than its own flags.
 
 ### Verdict
 
-**Preserve the dev/deploy split, but reconsider the vocabulary.** *(open — depends on how much we want to lean into Prisma-current's framing vs. Atlas's parameterized framing.)* The dev verb could be `db update` (today's name; clear; but `db` namespace is heterogeneous) or `migrate dev` (mirrors Prisma; explicit). The production verb is `migrate --to <ref>` (user's preference). The shadow-database concept may or may not surface as user-facing — today we don't use shadow DBs, but Atlas and Prisma both rely on them for diff safety; this is a real design space we haven't filled.
+**Reject the dev/deploy verb split.** `migrate --to <ref>` is the canonical and only forward-execution verb. `db update` (off-graph reconciliation, dev-only) and `migrate --to <ref>` (graph walk, environment-agnostic) are two different operations, not two flavors of one.
+
+The shadow-DB concept does surface in our model, but as a **preflight** verb (§ 7b) — not as a flag on the migrate verb.
 
 ---
 
-## 8. Adoption / baselining
+## 7b. Verification and preflight
+
+### Convention
+
+Verification has been notably absent from the apply-side of every surveyed system *except* in entangled forms:
+
+- **Prisma current** entangles drift detection inside `migrate dev`. There is no separate "is my DB drifted?" verb.
+- **Atlas** has `schema inspect` / `schema diff` (live schema vs declared schema) and uses `--dev-url` for sandbox apply. Two distinct verbs for two distinct questions.
+- **Liquibase** has `diff` (live DB vs changelog state) and `update-sql` (preview).
+- **Sqitch** has per-change `verify` scripts (postconditions after deploy), not a holistic DB-vs-contract check.
+- **ActiveRecord, Django** have no first-class verification verb (the structure file is the assumed source of truth).
+
+### Design pressure
+
+Two distinct verification questions exist, and surveyed systems mostly conflate or omit them:
+
+1. *"Does the live database currently satisfy my contract?"* — a read-only question about an existing DB.
+2. *"Would this migration actually do what it promises?"* — a sandbox question about a migration package.
+
+Most surveyed systems answer #1 implicitly (during apply) and #2 only via shadow-DB replay inside an apply god-command. Splitting them into named verbs lets agents and CI ask either question on its own.
+
+### Fit to our model
+
+Two explicit verbs:
+
+- **`db verify`** — answers #1. Live, read-only. Compares marker + introspection against the contract; reports drift kinds (matches ADR 123's taxonomy).
+- **`migration preflight <id>`** — answers #2. Sandbox apply of a migration against a shadow DB (locally) or PPg (hosted). Reports the would-be outcome.
+
+### Verdict
+
+**Adopt both as first-class verbs.** Don't entangle them into `migrate`. The verb name for #2 is open (`preflight`, `dry-run`, `simulate`, `try`); `preflight` is what our internal docs already use.
+
+---
+
+## 8. Adoption
 
 ### Convention
 
@@ -262,17 +300,25 @@ The user's proposed `migrate --db URL --to <ref>` is closest to Atlas's paramete
 
 ### Design pressure
 
-Adoption is a different operation from forward execution, with different safety constraints — the database already has the structure; running CREATE TABLE again would fail. Atlas's split between **baseline** (mark a specific version as applied, then continue) and **allow-dirty** (apply normally against a non-empty DB) captures two distinct adoption shapes.
+Adoption is two different operations conflated by most surveyed systems:
+
+1. **Bootstrap structure** — the DB is empty (or near-empty); apply migrations from `∅` to lay down schema.
+2. **Sign an already-matching DB** — the DB already has the structure; the framework just needs to record that it satisfies the contract (write the marker).
+
+Surveyed systems mostly handle #2 via a `--fake`-style flag bolted onto the apply verb, with the side effect that *they don't actually check the live DB matches what the flag claims*. The flag is a trust-the-operator escape hatch.
 
 ### Fit to our model
 
-Our `db init` is the adoption / bootstrap entry point. ADR 122 names three adoption paths (greenfield, brownfield-conservative, brownfield-incremental). The vocabulary is already richer than most surveyed systems.
+Two explicit verbs, neither conflated with `migrate`:
 
-The user-facing question is what the *verb* should be. Today: `db init`. Alternative: `migrate --init` (parameterizes the same verb). Most surveyed systems use a distinct verb or flag for the adoption case — the operation is rare enough that a different name helps.
+- **`db init`** — case #1. Lay down structure. Live, may mutate. Handles greenfield and brownfield-incremental.
+- **`db sign`** — case #2. **Verifies** that the live DB satisfies the contract, then writes the contract hash into the marker. **Refuses if it doesn't satisfy** (unlike `--fake`, which trusts the operator blindly). No structural mutation.
 
 ### Verdict
 
-**Keep adoption as a distinct verb.** *(open — `db init` vs `migrate --init` vs something else.)* The three adoption paths from ADR 122 can stay internal; the user-facing experience is a single command. Don't import the word "baseline" wholesale — it has too many meanings across systems (Atlas's baseline ≠ Prisma's baseline ≠ Django's `--fake-initial`); if we use it, single-sense definition required.
+**Keep `db init` and `db sign` as distinct verbs.** The two-verb split is more precise than the surveyed systems' single-flag conflation, and it matches the actual operations. Don't import "baseline" — it overloads to mean different things in Atlas / Django / Prisma. A migration from `∅` is just a regular migration.
+
+ADR 122's three adoption paths (greenfield, brownfield-conservative, brownfield-incremental) compose from these two verbs plus regular `migration plan` — they don't need user-facing verbs of their own.
 
 ---
 
@@ -360,12 +406,14 @@ The audit-against-CLI step (the ticket's stated final goal) walks this table for
 | **`migrate` as forward-execution verb** | **Adopt** | User's `migrate --db URL --to <ref>` is excellent and matches Rails/Django/Atlas/Prisma. |
 | **`status` for inspection** | **Adopt** | Universal. |
 | **`plan` / `diff` for migration authoring** | **Adopt** | `migration plan` is the analog of `atlas migrate diff`. |
-| **dev / deploy verb split** | *(open)* | Currently follow Prisma's pattern via `db update` (dev) vs `migration apply` (deploy). Atlas-style parameterization is an alternative. |
-| **adoption as distinct verb** | **Adopt** | Today's `db init`. Don't import "baseline" wholesale. |
+| **dev / deploy verb split** | **Reject** | One verb (`migrate --to <ref>`) regardless of environment. Safety semantics belong to the DB URL, not the verb. Verification splits out into its own verbs (`db verify`, `migration preflight`). |
+| **adoption as distinct verb** | **Adopt — but split into two verbs** | `db init` lays down structure; `db sign` verifies + writes marker for an already-matching DB. Don't import "baseline" wholesale (overloaded across systems). |
+| **verification as its own verb(s)** | **Adopt — first-class** | Two questions, two verbs: `db verify` (does live DB satisfy contract?) and `migration preflight <id>` (does this migration actually do what it promises?). Most surveyed systems entangle these into `apply`. |
 | **drift** | **Adopt** with two-level surface | Marker drift vs schema drift in user-facing prose; ADR 123's full taxonomy in diagnostics. |
 | **refs** (named pointers to desired state) | **Novel — keep, anchor on Git** | No surveyed migration system has this. Borrow Git's mental model. |
 | **invariants** | **Novel — keep** | Sqitch's `verify` is narrower; we want the broader correctness primitive. |
 | **contract spaces** | **Novel — keep** | Django's apps + Sqitch's foreign-project refs are closest analogs; neither is sufficient. |
 | **cyclic graph** | **Novel — don't expose** | Path-finding handles cycles internally; users see only refs and `migrate --to`. |
-| **emission** (canonical artifacts from authoring source) | **Adopt the underlying concept; keep `emit` as the verb** | Atlas's `migrate diff` is the closest analog. Our `contract emit` and migration self-emission share the verb. |
-| **shadow database** | *(open)* | Atlas and Prisma both rely on shadow DBs for diff safety. We don't today. Possibly a future addition. |
+| **emission** (canonical artifacts from authoring source) | **Adopt the underlying concept; keep `emit` as the verb** | Atlas's `migrate diff` is the closest analog. For migration source, use **`migration compile`** (TS → JSON) — `emit` reads wrong because `migration.ts` already *is* the migration. |
+| **shadow database** | **Surface as `migration preflight`** | Atlas and Prisma both rely on shadow DBs for diff safety, but bundled into `apply`. We surface it as an explicit, named verification verb. |
+| **baseline** (the noun) | **Reject** | Atlas's baseline ≠ Prisma's baseline ≠ Django's `--fake-initial`. A migration from `∅` is just a regular migration. |
