@@ -1,6 +1,11 @@
+import { readFile } from 'node:fs/promises';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
+import { readRefs } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
+import { join } from 'pathe';
 import { ContractValidationError } from '../control-api/errors';
 import type { DbUpdateFailure } from '../control-api/types';
 import {
@@ -11,9 +16,12 @@ import {
   errorMigrationPlanningFailed,
   errorRunnerFailed,
   errorUnexpected,
+  mapMigrationToolsError,
+  mapRefResolutionError,
 } from '../utils/cli-errors';
 import type { MigrationCommandOptions } from '../utils/command-helpers';
 import {
+  loadMigrationPackages,
   resolveMigrationPaths,
   sanitizeErrorMessage,
   setCommandDescriptions,
@@ -33,7 +41,9 @@ import {
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
-type DbUpdateOptions = MigrationCommandOptions;
+interface DbUpdateOptions extends MigrationCommandOptions {
+  readonly to?: string;
+}
 
 /**
  * Maps a DbUpdateFailure to a CliStructuredError for consistent error handling.
@@ -81,9 +91,38 @@ async function executeDbUpdateCommand(
   if (!ctxResult.ok) {
     return ctxResult;
   }
-  const { client, config, contractJson, dbConnection, onProgress, contractPathAbsolute } =
-    ctxResult.value;
-  const { migrationsDir } = resolveMigrationPaths(options.config, config);
+  const { client, config, dbConnection, onProgress, contractPathAbsolute } = ctxResult.value;
+  let { contractJson } = ctxResult.value;
+  const { migrationsDir, appMigrationsDir, refsDir } = resolveMigrationPaths(
+    options.config,
+    config,
+  );
+
+  if (options.to) {
+    try {
+      const { bundles, graph } = await loadMigrationPackages(appMigrationsDir);
+      const refs = await readRefs(refsDir);
+      const refResult = parseContractRef(options.to, { graph, refs });
+      if (!refResult.ok) {
+        return notOk(mapRefResolutionError(refResult.failure));
+      }
+      const targetHash = refResult.value.hash;
+      const matchingBundle = bundles.find((p) => p.metadata.to === targetHash);
+      if (matchingBundle) {
+        const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
+        const raw = await readFile(endContractPath, 'utf-8');
+        contractJson = JSON.parse(raw) as Record<string, unknown>;
+      }
+    } catch (error) {
+      if (MigrationToolsError.is(error)) {
+        return notOk(mapMigrationToolsError(error));
+      }
+      if (CliStructuredError.is(error)) {
+        return notOk(error);
+      }
+      throw error;
+    }
+  }
 
   try {
     await client.connect(dbConnection);
@@ -185,6 +224,10 @@ export function createDbUpdateCommand(): Command {
     'prisma-next db update --db $DATABASE_URL --dry-run',
   ]);
   addMigrationCommandOptions(command);
+  command.option(
+    '--to <contract>',
+    'Target contract reference (hash, prefix, ref name, or migration dir name)',
+  );
   command.action(async (options: DbUpdateOptions) => {
     const flags = parseGlobalFlags(options);
     const startTime = Date.now();
