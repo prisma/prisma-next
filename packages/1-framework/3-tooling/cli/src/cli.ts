@@ -24,6 +24,15 @@ import { parseGlobalFlags } from './utils/global-flags';
 import { suggestCommands } from './utils/suggest-command';
 
 /**
+ * Lookup table mapping removed subcommands to their replacement verbs.
+ * Keyed by `<parent>:<subcommand>` (e.g. `migration:apply`).
+ * The handler consults this before falling back to the fuzzy suggest engine.
+ */
+const removedVerbRedirects: Record<string, string> = {
+  'migration:apply': 'Use `prisma-next migrate --to <contract>` instead.',
+};
+
+/**
  * Formats the "Did you mean ...?" hint for an unknown command.
  */
 function formatSuggestion(input: string, candidates: readonly string[]): string {
@@ -325,7 +334,17 @@ if (args.length > 0) {
       const helpText = formatRootHelp({ program, flags });
       process.stderr.write(`${helpText}\n`);
       process.exit(2);
-    } else if (command.commands.length > 0 && args.length === 1) {
+    } else if (command.commands.length > 0 && args.length >= 2) {
+      const subcommandName = args[1];
+      const redirectKey = `${commandName}:${subcommandName}`;
+      const redirect = removedVerbRedirects[redirectKey];
+      if (redirect) {
+        process.stderr.write(`Unknown command: ${subcommandName}\n${redirect}\n`);
+        process.exit(2);
+      }
+    }
+
+    if (command.commands.length > 0 && args.length === 1) {
       // Parent command called with no subcommand. Same shape as the
       // no-args case above: the user did not request help, we are
       // voluntarily rendering it as decoration around an underspecified
