@@ -565,18 +565,31 @@ async function executeMigrationStatusCommand(
     throw error;
   }
 
-  if (options.to) {
+  let fromOverrideHash: string | undefined;
+
+  if (options.to || options.from) {
     try {
       const { graph: earlyGraph } = await loadMigrationPackages(appMigrationsDir);
-      const refResult = parseContractRef(options.to, { graph: earlyGraph, refs: allRefs });
-      if (!refResult.ok) {
-        return notOk(mapRefResolutionError(refResult.failure));
+
+      if (options.to) {
+        const refResult = parseContractRef(options.to, { graph: earlyGraph, refs: allRefs });
+        if (!refResult.ok) {
+          return notOk(mapRefResolutionError(refResult.failure));
+        }
+        activeRefHash = refResult.value.hash;
+        if (refResult.value.provenance.kind === 'ref') {
+          const resolvedRefName = refResult.value.provenance.refName;
+          activeRefName = resolvedRefName;
+          activeRefEntry = allRefs[resolvedRefName];
+        }
       }
-      activeRefHash = refResult.value.hash;
-      if (refResult.value.provenance.kind === 'ref') {
-        const resolvedRefName = refResult.value.provenance.refName;
-        activeRefName = resolvedRefName;
-        activeRefEntry = allRefs[resolvedRefName];
+
+      if (options.from) {
+        const fromResult = parseContractRef(options.from, { graph: earlyGraph, refs: allRefs });
+        if (!fromResult.ok) {
+          return notOk(mapRefResolutionError(fromResult.failure));
+        }
+        fromOverrideHash = fromResult.value.hash;
       }
     } catch (error) {
       if (MigrationToolsError.is(error)) {
@@ -604,6 +617,9 @@ async function executeMigrationStatusCommand(
     }
     if (activeRefName) {
       details.push({ label: 'ref', value: activeRefName });
+    }
+    if (options.from) {
+      details.push({ label: 'from', value: options.from });
     }
     if (activeRefEntry && activeRefEntry.invariants.length > 0) {
       details.push({
@@ -741,6 +757,11 @@ async function executeMigrationStatusCommand(
     } finally {
       await client.close();
     }
+  }
+
+  if (fromOverrideHash !== undefined) {
+    markerHash = fromOverrideHash;
+    mode = 'offline';
   }
 
   // Build the aggregate enumeration of contract spaces. Lossy on

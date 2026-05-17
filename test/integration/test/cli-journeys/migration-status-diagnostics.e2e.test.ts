@@ -612,5 +612,38 @@ withTempDir(({ createTempDir }) => {
         timeouts.spinUpPpgDev,
       );
     });
+
+    describe('--from constrains the path origin', () => {
+      const db = useDevDatabase();
+
+      it(
+        'emit → plan twice → status --from <hash> computes path from that contract',
+        async () => {
+          const ctx: JourneyContext = setupJourney({
+            connectionString: db.connectionString,
+            createTempDir,
+          });
+
+          const emit0 = await runContractEmit(ctx);
+          expect(emit0.exitCode, 'emit0').toBe(0);
+          const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
+          expect(plan0.exitCode, 'plan0').toBe(0);
+
+          await swapContract(ctx, 'contract-v2');
+          const emit1 = await runContractEmit(ctx);
+          expect(emit1.exitCode, 'emit1').toBe(0);
+          const plan1 = await runMigrationPlanAndEmit(ctx, ['--name', 'v2']);
+          expect(plan1.exitCode, 'plan1').toBe(0);
+
+          const hashA = parseJsonOutput(plan0)?.to as string;
+
+          const status = await runMigrationStatus(ctx, ['--from', hashA, '--json']);
+          expect(status.exitCode).toBe(0);
+          const json = parseJsonOutput(status);
+          expect(json?.migrations?.length).toBeGreaterThan(0);
+        },
+        timeouts.spinUpPpgDev,
+      );
+    });
   });
 });
