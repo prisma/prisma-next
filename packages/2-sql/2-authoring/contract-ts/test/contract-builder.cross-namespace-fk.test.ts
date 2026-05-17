@@ -95,9 +95,10 @@ describe('FR16b cross-namespace FK lowering (TS builder)', () => {
       models: { User, Profile },
     });
 
-    const profile = contract.storage.tablesByNamespace?.['public']?.['profile'] as
-      | NamespacedFkTargetTable
-      | undefined;
+    const storage = contract.storage as {
+      readonly tablesByNamespace?: Record<string, Record<string, NamespacedFkTargetTable>>;
+    };
+    const profile = storage.tablesByNamespace?.['public']?.['profile'];
     expect(profile).toBeDefined();
     const fk = profile?.foreignKeys?.[0];
     expect(fk).toBeDefined();
@@ -137,9 +138,10 @@ describe('FR16b cross-namespace FK lowering (TS builder)', () => {
       models: { User, Profile },
     });
 
-    const profile = contract.storage.tablesByNamespace?.['public']?.['profile'] as
-      | NamespacedFkTargetTable
-      | undefined;
+    const storage = contract.storage as {
+      readonly tablesByNamespace?: Record<string, Record<string, NamespacedFkTargetTable>>;
+    };
+    const profile = storage.tablesByNamespace?.['public']?.['profile'];
     const fk = profile?.foreignKeys?.[0];
     expect(fk?.target.table).toBe('User');
     expect(fk?.target.namespaceId).toBe('auth');
@@ -173,9 +175,10 @@ describe('FR16b cross-namespace FK lowering (TS builder)', () => {
       models: { User, Profile },
     });
 
-    const profile = contract.storage.tablesByNamespace?.['public']?.['profile'] as
-      | NamespacedFkTargetTable
-      | undefined;
+    const storage = contract.storage as {
+      readonly tablesByNamespace?: Record<string, Record<string, NamespacedFkTargetTable>>;
+    };
+    const profile = storage.tablesByNamespace?.['public']?.['profile'];
     const fk = profile?.foreignKeys?.[0];
     expect(fk?.target.table).toBe('User');
     expect(fk?.target.namespaceId).toBe('public');

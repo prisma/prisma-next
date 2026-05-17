@@ -132,6 +132,32 @@ function buildComposedExtensionPackRefs(
   );
 }
 
+/**
+ * Split a relation-field type position into a (namespaceId, modelName)
+ * pair. The framework parser preserves dot-qualified type tokens
+ * verbatim — `auth.User` arrives as `typeName === "auth.User"` — so the
+ * SQL interpreter splits the namespace coordinate off the model name
+ * before relation lookups (FR16b cross-namespace FKs).
+ *
+ * The split is on the **last** dot so future namespace coordinates that
+ * themselves contain dots stay representable; the leading dotted prefix
+ * is treated as the namespace id and the trailing identifier as the
+ * model name. Undotted tokens have `namespaceId === undefined`.
+ */
+function splitNamespacedTypeName(typeName: string): {
+  readonly namespaceId: string | undefined;
+  readonly modelName: string;
+} {
+  const dotIndex = typeName.lastIndexOf('.');
+  if (dotIndex < 0) {
+    return { namespaceId: undefined, modelName: typeName };
+  }
+  return {
+    namespaceId: typeName.slice(0, dotIndex),
+    modelName: typeName.slice(dotIndex + 1),
+  };
+}
+
 function diagnosticDedupKey(diagnostic: ContractSourceDiagnostic): string {
   const span = diagnostic.span;
   const spanKey = span
@@ -560,6 +586,14 @@ interface BuildModelNodeInput {
   readonly mapping: ModelNameMapping;
   readonly modelMappings: ReadonlyMap<string, ModelNameMapping>;
   readonly modelNames: Set<string>;
+  /**
+   * Per-target resolved namespace coordinate for every namespaced model
+   * in the document, keyed by **unqualified** model name. Threaded into
+   * relation handling so dot-qualified type references (`auth.User`)
+   * can validate the declared coordinate matches the actual one and
+   * populate `target.namespaceId` on the cross-namespace FK IR.
+   */
+  readonly modelNamespaceIds: ReadonlyMap<string, string>;
   readonly compositeTypeNames: ReadonlySet<string>;
   readonly enumTypeDescriptors: Map<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: Map<string, ColumnDescriptor>;
@@ -624,7 +658,23 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
 
   const resultBackrelationCandidates: ModelBackrelationCandidate[] = [];
   for (const field of model.fields) {
-    if (!field.list || !input.modelNames.has(field.typeName)) {
+    if (!field.list) {
+      continue;
+    }
+    const splitTypeName = splitNamespacedTypeName(field.typeName);
+    if (!input.modelNames.has(splitTypeName.modelName)) {
+      continue;
+    }
+    if (
+      splitTypeName.namespaceId !== undefined &&
+      input.modelNamespaceIds.get(splitTypeName.modelName) !== splitTypeName.namespaceId
+    ) {
+      diagnostics.push({
+        code: 'PSL_INVALID_RELATION_TARGET',
+        message: `Backrelation field "${model.name}.${field.name}" references namespace "${splitTypeName.namespaceId}.${splitTypeName.modelName}" but model "${splitTypeName.modelName}" is not in namespace "${splitTypeName.namespaceId}"`,
+        sourceId,
+        span: field.span,
+      });
       continue;
     }
     const attributesValid = validateNavigationListFieldAttributes({
@@ -678,7 +728,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       modelName: model.name,
       tableName,
       field,
-      targetModelName: field.typeName,
+      targetModelName: splitTypeName.modelName,
       ...ifDefined('relationName', relationName),
     });
   }
@@ -916,10 +966,24 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
 
-    if (!input.modelNames.has(relationAttribute.field.typeName)) {
+    const splitTypeName = splitNamespacedTypeName(relationAttribute.field.typeName);
+    if (!input.modelNames.has(splitTypeName.modelName)) {
       diagnostics.push({
         code: 'PSL_INVALID_RELATION_TARGET',
         message: `Relation field "${model.name}.${relationAttribute.field.name}" references unknown model "${relationAttribute.field.typeName}"`,
+        sourceId,
+        span: relationAttribute.field.span,
+      });
+      continue;
+    }
+
+    if (
+      splitTypeName.namespaceId !== undefined &&
+      input.modelNamespaceIds.get(splitTypeName.modelName) !== splitTypeName.namespaceId
+    ) {
+      diagnostics.push({
+        code: 'PSL_INVALID_RELATION_TARGET',
+        message: `Relation field "${model.name}.${relationAttribute.field.name}" references "${splitTypeName.namespaceId}.${splitTypeName.modelName}" but model "${splitTypeName.modelName}" is not in namespace "${splitTypeName.namespaceId}"`,
         sourceId,
         span: relationAttribute.field.span,
       });
@@ -946,7 +1010,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
 
-    const targetMapping = input.modelMappings.get(relationAttribute.field.typeName);
+    const targetMapping = input.modelMappings.get(splitTypeName.modelName);
     if (!targetMapping) {
       diagnostics.push({
         code: 'PSL_INVALID_RELATION_TARGET',
@@ -1014,12 +1078,25 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         })
       : undefined;
 
+    // FR16b cross-namespace FK lowering: populate `target.namespaceId`
+    // when the target model lives in a different namespace from the
+    // declaring model. Same-namespace FKs leave the slot defaulted by
+    // the StorageTable constructor (so single-namespace fixtures stay
+    // byte-stable).
+    const declaringNamespaceId = input.modelNamespaceIds.get(model.name);
+    const targetNamespaceId = input.modelNamespaceIds.get(targetMapping.model.name);
+    const fkTargetNamespaceId =
+      targetNamespaceId !== undefined && targetNamespaceId !== declaringNamespaceId
+        ? targetNamespaceId
+        : undefined;
+
     foreignKeyNodes.push({
       columns: localColumns,
       references: {
         model: targetMapping.model.name,
         table: targetMapping.tableName,
         columns: referencedColumns,
+        ...ifDefined('namespaceId', fkTargetNamespaceId),
       },
       ...ifDefined('name', parsedRelation.constraintName),
       ...ifDefined('onDelete', onDelete),
@@ -1482,6 +1559,7 @@ export function interpretPslDocumentToSqlContract(
       mapping,
       modelMappings,
       modelNames,
+      modelNamespaceIds,
       compositeTypeNames,
       enumTypeDescriptors: enumResult.enumTypeDescriptors,
       namedTypeDescriptors: namedTypeResult.namedTypeDescriptors,

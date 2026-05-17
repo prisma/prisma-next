@@ -211,7 +211,14 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
   const resolvedFields: ResolvedField[] = [];
 
   for (const field of model.fields) {
-    const isModelField = modelNames.has(field.typeName);
+    // FR16b: dot-qualified relation field types (`auth.User`) split the
+    // namespace coordinate off the model name. The presence of a dot
+    // when the trailing identifier matches a known model is a strong
+    // signal the field is a model relation; the interpreter validates
+    // the namespace match and emits diagnostics for mismatches.
+    const dotIndex = field.typeName.lastIndexOf('.');
+    const baseTypeName = dotIndex >= 0 ? field.typeName.slice(dotIndex + 1) : field.typeName;
+    const isModelField = modelNames.has(field.typeName) || modelNames.has(baseTypeName);
 
     if (field.list && isModelField) {
       continue;
