@@ -512,7 +512,9 @@ export function buildSqlContractFromDefinition(
     // wrapper. Pinning the same emptiness convention end-to-end keeps
     // the storage hash recomputed by `assertDescriptorSelfConsistency`
     // identical to the value `build-contract` pinned.
-    ...(Object.keys(storageTypes).length > 0 ? { types: storageTypes } : {}),
+    ...(Object.keys(storageTypes).length > 0
+      ? { types: { [UNBOUND_NAMESPACE_ID]: storageTypes } }
+      : {}),
     namespaces,
   };
   // The persisted contract envelope carries the FR15 nested-by-namespace
