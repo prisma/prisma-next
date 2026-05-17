@@ -2,9 +2,7 @@
   "from": null,
   "to": "sha256:122f088a8542e8c19593d8cb5ab77a7b047061fdeabb09f17edeb12b2a38db3c",
   "labels": [],
-  "providedInvariants": [
-    "pgvector:install-vector-v1"
-  ],
+  "providedInvariants": ["pgvector:install-vector-v1"],
   "createdAt": "2026-06-01T00:00:00.000Z",
   "fromContract": null,
   "toContract": {
@@ -60,5 +58,5 @@
     "applied": [],
     "plannerVersion": "2.0.0"
   },
-  "migrationHash": "sha256:1fc34d84ab29274ca653e28a438044d4cb337e5bb46044c64a277fa5211a7af2"
+  "migrationHash": "sha256:0f59971e20ae310527256af67ddd356def1ab65408ddc43776e914ea51a57bdd"
 }

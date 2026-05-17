@@ -18,6 +18,7 @@ import type {
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   PostgresEnumStorageEntry,
   SqlStorage,
@@ -36,6 +37,7 @@ import {
   AlterColumnTypeCall,
   CreateEnumTypeCall,
   CreateIndexCall,
+  CreateSchemaCall,
   CreateTableCall,
   DropColumnCall,
   DropConstraintCall,
@@ -214,9 +216,11 @@ function mapIssueToCall(
       const primaryKey = contractTable.primaryKey
         ? { columns: contractTable.primaryKey.columns }
         : undefined;
-      const calls: PostgresOpFactoryCall[] = [
-        new CreateTableCall(schemaForTable, issue.table, columns, primaryKey),
-      ];
+      const calls: PostgresOpFactoryCall[] = [];
+      if (schemaForTable !== 'public' && schemaForTable !== UNBOUND_NAMESPACE_ID) {
+        calls.push(new CreateSchemaCall(schemaForTable));
+      }
+      calls.push(new CreateTableCall(schemaForTable, issue.table, columns, primaryKey));
       for (const index of contractTable.indexes) {
         const indexName = index.name ?? `${issue.table}_${index.columns.join('_')}_idx`;
         const extras: { type?: string; options?: Record<string, unknown> } = {};
