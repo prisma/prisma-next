@@ -54,12 +54,12 @@ Two cross-cutting rules:
 
 ## The report skeleton
 
-Reports live at `projects/<project-name>/manual-qa-reports/<YYYY-MM-DD>-<runner-handle>.md`. One report per run. Reports accumulate (never overwrite) so the QA history is auditable.
+Reports live in a `manual-qa-reports/` directory in the project workspace, named `<YYYY-MM-DD>-<runner-handle>.md`. One report per run. Reports accumulate (never overwrite) so the QA history is auditable.
 
 ```markdown
 # Manual QA report — <TICKET-ID> (<short title>) — <YYYY-MM-DD>
 
-> **Script:** `projects/<project>/manual-qa.md` (commit `<sha>` at run time)
+> **Script:** `manual-qa.md` (commit `<sha>` at run time)
 > **Runner:** <name or LLM session id>
 > **Environment:** <OS, Node version, branch + commit, any other relevant facts>
 > **Started / finished:** <ISO timestamps>
@@ -241,7 +241,7 @@ When you observe a failure-mode match or a mismatch with "What you should see":
 5. Fill in the **Coverage outcome** table by walking the script's "Sign-off coverage map" row-by-row. Each AC inherits its result from the worst-severity finding in any of the scenarios that covered it (Blocker > High > Follow-up > Pass). N/A rows stay N/A.
 6. Write **Suggested follow-ups** that cross-reference the disposition map. Each bullet should name the finding ID and its disposition (so a reader can see at a glance whether the bullet is "file this ticket" or "verify this post-merge").
 7. Set the **finished** timestamp.
-8. Save the report to `projects/<project-name>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md`. Add the artefacts directory at the sibling `manual-qa-reports/artefacts/F-N/` paths.
+8. Save the report to the project's `manual-qa-reports/<YYYY-MM-DD>-<runner>.md`. Add the artefacts directory at the sibling `manual-qa-reports/artefacts/F-N/` paths.
 
 ### 6. Hand off
 
@@ -268,7 +268,7 @@ Surface the report to the orchestrator / implementer / spec-author. The hand-off
 8. **Letting the exploratory scenario blow its budget.** Symptom: runner is on minute 90 of a 30-minute charter, has filed 5 follow-ups, hasn't started the final scripted scenario. Fix: respect the time budget; remaining ideas go in "Suggested follow-ups".
 9. **Filing findings against the script when they belong to the system.** Symptom: "F-3 — script said `migration plan` is a no-op but actually proposed an operation". Cause: runner attributed an observed-vs-expected mismatch to script staleness instead of a behavioural regression. Fix: only when you've verified the script *is* stale (e.g. the spec changed) does the finding belong to the script. If the script reflects current spec and reality diverges, the finding belongs to the system.
 10. **Confabulating cleanup.** Symptom: report says "restored to clean state" but `git status` was never actually run. Fix: paste the literal `git status` output (or its short form) into the report at the end of each state-mutating scenario, even when clean. Evidence over claims.
-11. **Using `wip/` for the report.** Symptom: report lands at `wip/qa-report.md`. Cause: runner treated it as ephemeral. Fix: reports are durable audit trail. They belong at `projects/<project>/manual-qa-reports/`. `wip/` is gitignored and the report would vanish.
+11. **Using `wip/` for the report.** Symptom: report lands at `wip/qa-report.md`. Cause: runner treated it as ephemeral. Fix: reports are durable audit trail. They belong in the project's `manual-qa-reports/` directory. `wip/` is gitignored and the report would vanish.
 12. **Serialising scenarios out of caution.** Symptom: runner dispatches scenarios one at a time even though they're tagged `tmpdir` or `read-only`. Cause: runner ignored the isolation tags. Fix: trust the tags. The cost of a mis-trusted tag is one false positive in the next QA round; the cost of pessimistic serialisation is every QA round taking 5x longer than it should. If the script genuinely under-tags, file that as a 📝 Follow-up against `drive-qa-plan` and run with the cautious schedule *this round only*.
 13. **Running `workspace` scenarios in the live workspace.** Symptom: runner skips the `git worktree add` step and runs the planted-file scenario directly in the project root. Cause: runner conflated "the scenario tagged `workspace`" with "execute against the user's checkout". Fix: `workspace` means "needs its own working tree", which the runner manufactures via `git worktree`. The user's actual checkout stays clean throughout the run.
 14. **Confusing isolation contexts in artefact paths.** Symptom: `manual-qa-reports/artefacts/F-3/` references a path under a worktree that's been removed by the time someone reads the report. Fix: copy artefacts into the durable `artefacts/F-N/` directory *before* tearing down the source worktree or tmpdir. Worktree paths are ephemeral; artefact directories are durable.
@@ -310,6 +310,6 @@ Surface the report to the orchestrator / implementer / spec-author. The hand-off
 - [ ] Coverage outcome table walks every AC the script's coverage map enumerates; each AC inherits the worst-severity finding from its covering scenarios.
 - [ ] Verdict in header keys off the disposition map: ✅ Pass only when every finding is ✅ resolved, 🔍 Triage required when any finding awaits orchestrator confirmation, ❌ Fail when any finding has a 🔧 fix-in-PR disposition or the runner observed an in-flight blocker.
 - [ ] "✅ Pass-with-follow-ups" never appears as a verdict — that wording was retired (see Common Pitfalls #17).
-- [ ] Report saved to `projects/<project>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md`, artefacts under sibling `artefacts/F-N/`.
+- [ ] Report saved to the project's `manual-qa-reports/<YYYY-MM-DD>-<runner>.md`, artefacts under sibling `artefacts/F-N/`.
 - [ ] Worktrees torn down with `git worktree remove --force`; tmpdirs cleaned up; user's checkout left clean.
 - [ ] Did NOT edit the script in place; script-quality issues filed as 📝 Follow-up findings instead.
