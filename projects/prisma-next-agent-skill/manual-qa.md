@@ -13,20 +13,22 @@
 
 ## Table of contents
 
-| #  | Scenario                                                          | What it proves                                                                                                              | Covers                          |
-| -- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| 1  | Re-enact the originally-failing install command                   | The `npx skills add @prisma-next/skills` form is not what the docs / init now drive users to                                | AC-DIST-4                       |
-| 2  | End-to-end `prisma-next init` against a fresh project             | Init exits zero; the union of three subpath installs lands the expected 12 skills, no contributor leak                      | AC-DIST-1, AC-DIST-2, AC-R2-1, AC-R2-2 |
-| 3  | Negative control — contributor-leak guardrail                     | A fake skill planted in `skills-contrib/` does not leak through the user-facing install URL; opt-in URL still installs it   | AC-DIST-2, AC-DIST-5            |
-| 4  | Negative control — subpath URL guardrail                          | The `/skills` subpath is what scopes discovery; a bare-repo install installs a different (wider) set                        | AC-DIST-2                       |
-| 5  | Local-dev contributor setup re-enactment                          | `pnpm install` symlinks `.agents/skills` and `.claude/skills` at `skills-contrib/`; agents pick up contributor skills locally | AC-DIST-5 (local-dev path)      |
-| 6  | Upgrade-skill journey — install + read SKILL.md as a fresh user   | The upgrade subpath URL installs the renamed skill; the SKILL.md it ships tells the user a re-install URL that actually works | AC-R2-1 (judgement)             |
-| 7  | `prisma-next-check-pins` from `@prisma-next/extension-author-tools` | The bin still works after the package rename; it fires on a range pin with a useful diagnostic                              | AC-R2-3 (negative control)      |
-| 8  | Negative control — `pnpm check:upgrade-coverage` after the move   | The coverage gate fires on a substrate diff, naming the new skill-cluster directory                                         | AC-R2-1 (negative control)      |
-| 9  | Judgement — install-summary legibility                            | The end-of-init summary reads cleanly with three install commands stitched together                                         | AC-R2-2 (judgement)             |
-| 10 | Exploratory charter — init flag combinations                      | Probe `--no-skill` / `--no-install` / `--target mongo` paths for diagnostics that read poorly                               | (no AC; charter)                |
+| #  | Scenario                                                          | What it proves                                                                                                              | Isolation  | Covers                                 |
+| -- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------- | -------------------------------------- |
+| 1  | Re-enact the originally-failing install command                   | The `npx skills add @prisma-next/skills` form is not what the docs / init now drive users to                                | external   | AC-DIST-4                              |
+| 2  | End-to-end `prisma-next init` against a fresh project             | Init exits zero; the union of three subpath installs lands the expected 12 skills, no contributor leak                      | tmpdir     | AC-DIST-1, AC-DIST-2, AC-R2-1, AC-R2-2 |
+| 3  | Negative control — contributor-leak guardrail                     | A fake skill planted in `skills-contrib/` does not leak through the user-facing install URL; opt-in URL still installs it   | workspace  | AC-DIST-2, AC-DIST-5                   |
+| 4  | Negative control — subpath URL guardrail                          | The `/skills` subpath is what scopes discovery; a bare-repo install installs a different (wider) set                        | tmpdir     | AC-DIST-2                              |
+| 5  | Local-dev contributor setup re-enactment                          | `pnpm install` symlinks `.agents/skills` and `.claude/skills` at `skills-contrib/`; agents pick up contributor skills locally | workspace  | AC-DIST-5 (local-dev path)             |
+| 6  | Upgrade-skill journey — install + read SKILL.md as a fresh user   | The upgrade subpath URL installs the renamed skill; the SKILL.md it ships tells the user a re-install URL that actually works | tmpdir     | AC-R2-1 (judgement)                    |
+| 7  | `prisma-next-check-pins` from `@prisma-next/extension-author-tools` | The bin still works after the package rename; it fires on a range pin with a useful diagnostic                              | tmpdir     | AC-R2-3 (negative control)             |
+| 8  | Negative control — `pnpm check:upgrade-coverage` after the move   | The coverage gate fires on a substrate diff, naming the new skill-cluster directory                                         | workspace  | AC-R2-1 (negative control)             |
+| 9  | Judgement — install-summary legibility                            | The end-of-init summary reads cleanly with three install commands stitched together                                         | read-only  | AC-R2-2 (judgement)                    |
+| 10 | Exploratory charter — init flag combinations                      | Probe `--no-skill` / `--no-install` / `--target mongo` paths for diagnostics that read poorly                               | tmpdir     | (no AC; charter)                       |
 
-> Scenarios marked **(negative control)** plant a violation, observe the gate fire, then restore. Scenarios marked **(judgement)** require human evaluation that no test can assert. Scenarios marked **(exploratory)** are time-boxed charters with no scripted steps.
+> Scenarios marked **(negative control)** plant a violation, observe the gate fire, then restore. Scenarios marked **(judgement)** require runner evaluation against an explicit oracle that no test can easily assert. Scenarios marked **(exploratory)** are time-boxed charters with no scripted steps.
+>
+> The **Isolation** column tells the runner how to schedule the scenario in parallel: `tmpdir` (own scratch dir, shared read-only clone), `workspace` (own `git worktree`), `read-only` (no isolation needed), or `external` (network-bound; rate-limit-aware). Scenario 9 (`read-only`) declares a dependency on scenario 2's output and waits for it; everything else is independent. With a concurrency cap of 5, the run completes in ~max-of-the-longest-scenario time rather than sum-of-all.
 
 ## Pre-flight
 
@@ -58,6 +60,8 @@
 **What you're proving from the user's seat:** A user reading old docs / Slack threads / Linear tickets who runs `npx skills add @prisma-next/skills --all` does not get a working install. We did not (and cannot) fix the upstream `vercel-labs/skills` parsing of `@a/b` identifiers as a GitHub `owner/repo`; what we fixed is that the docs no longer drive anyone here. This is the "did we route around the bug we reported" check.
 
 **Covers:** AC-DIST-4
+
+**Isolation:** `external` (hits the npm registry to attempt the legacy `@prisma-next/skills` install; runs entirely inside `$PN_QA_TMP/scenario-1`).
 
 **Oracle:** The CI ripgrep gate (AC-DIST-4 implementation) returns zero matches for the broken command in tracked files. The user-side observation: running the broken command from a fresh tmpdir does not produce a Prisma-Next-shaped install (it either fails or installs from a non-Prisma-Next GitHub repo named `prisma-next/skills`, depending on how the upstream CLI happens to interpret `@prisma-next/skills` today).
 
@@ -122,6 +126,8 @@ git -C "$PN_REPO" status --short
 **What you're proving from the user's seat:** A user who runs `prisma-next init` on a fresh project gets all three skill clusters installed end-to-end (usage + upgrade + extension-author), with no contributor leak, and the install summary tells them what just happened. This is the developer-journey smoke test for the round-2 multi-cluster wiring — three install commands stitched into one user-visible step.
 
 **Covers:** AC-DIST-1, AC-DIST-2, AC-R2-1, AC-R2-2
+
+**Isolation:** `tmpdir` (init runs against a fresh project under `$PN_QA_TMP/scenario-2`; `PRISMA_NEXT_SKILLS_BASE` points at the shared read-only clone, so no network).
 
 **Oracle:** The set of directory names in `.agents/skills/` after init exits equals the set produced by enumerating immediate children of `$PN_REPO/skills/`, `$PN_REPO/skills/upgrade/`, and `$PN_REPO/skills/extension-author/` that contain a `SKILL.md`. Today that's 12 skills. The init's stdout summary names three install commands.
 
@@ -204,6 +210,8 @@ git -C "$PN_REPO" status --short
 
 **Covers:** AC-DIST-2 (defence-in-depth on top of the integration test); AC-DIST-5 (the explicit opt-in path).
 
+**Isolation:** `workspace` (plants a fake skill into `skills-contrib/` and runs an install against the local clone of *this worktree*; the runner allocates a dedicated `git worktree` so the planted file does not race with other scenarios or pollute the user's checkout).
+
 **Coverage boundary:** This proves directory-placement scoping works for one planted skill at the immediate-child level of `skills-contrib/`. It does *not* prove every conceivable layout (deeply-nested, frontmatter-only, agent-plugin grouping) is filtered identically — that surface belongs to upstream CLI tests.
 
 **Oracle:** The installed skill set after `prisma/prisma-next/skills` does not contain `__qa-leak-probe`. The installed skill set after `prisma/prisma-next/skills-contrib` does contain it.
@@ -281,6 +289,8 @@ git -C "$PN_REPO" status --short
 
 **Covers:** AC-DIST-2
 
+**Isolation:** `tmpdir` (two `npx skills add` invocations run against the shared read-only clone, both writing into `$PN_QA_TMP/scenario-4`).
+
 **Coverage boundary:** This proves the subpath form scopes discovery for the layout *as of this branch*. It does not prove every possible bare-repo layout would leak the same set, and it does not prove `--full-depth` can be safely added. Rerun this scenario whenever upstream's `discoverSkills` priority list changes.
 
 **Oracle:** The set of skills installed by `npx skills add <clone>/skills --all` against a fresh tmpdir is a strict subset of (or equal to) the set installed by `npx skills add <clone> --all` (bare path). The difference, if any, is contributor or out-of-cluster content.
@@ -346,6 +356,8 @@ rm -rf "$PN_QA_TMP/scenario-4-subpath" "$PN_QA_TMP/scenario-4-bare"
 
 **Covers:** AC-DIST-5 (local-dev path; the published-consumer path is in scenario 3)
 
+**Isolation:** `workspace` (runs `pnpm install` and inspects `node_modules/`, `.agents/skills/`, `.claude/skills/` — all paths inside the worktree. The runner allocates a dedicated `git worktree` so the populated `node_modules` does not interfere with other scenarios).
+
 **Oracle:** `.agents/skills` and `.claude/skills` resolve (via `readlink`) to `$PN_REPO/skills-contrib/`. Reading a contributor SKILL.md *through* the symlink yields the same content as reading it directly from `skills-contrib/`.
 
 **Preconditions:**
@@ -403,6 +415,8 @@ git -C "$PN_REPO" status --short
 **What you're proving from the user's seat:** A user who is told (by docs, by an agent, by a Linear ticket) "install the upgrade skill" can run a single command, get the renamed `prisma-next-upgrade` skill, and the SKILL.md it ships will tell them a re-install URL that actually works against the new distribution. Catches the class of bug where doc text and shipped behaviour drift apart.
 
 **Covers:** AC-R2-1 (cluster move) + judgement (SKILL.md prose / install-URL freshness)
+
+**Isolation:** `tmpdir` (installs the upgrade subpath into `$PN_QA_TMP/scenario-6` against the shared read-only clone; reads the resulting `SKILL.md`).
 
 **Oracle:** The SKILL.md's Step 0 install URL exactly matches the URL the user just ran. No mention of `@prisma-next/upgrade-skill` (the dead npm package name) survives anywhere in the SKILL.md or its README.
 
@@ -466,6 +480,8 @@ rm -rf "$PN_QA_TMP/scenario-6"
 **What you're proving from the user's seat:** An extension author who installs `@prisma-next/extension-author-tools` as a `devDependency` (the new home of the `prisma-next-check-pins` bin) gets the same CI gate they had under `@prisma-next/extension-upgrade-skill`. The negative control fires on a range pin with a useful diagnostic.
 
 **Covers:** AC-R2-3 (the bin-only npm package retains the bin and exits with a useful diagnostic on a range pin)
+
+**Isolation:** `tmpdir` (creates a fake consumer `package.json` with a range pin under `$PN_QA_TMP/scenario-7` and runs `prisma-next-check-pins` against it; reads the bin from the workspace's `node_modules/.bin/` but does not mutate the workspace).
 
 **Coverage boundary:** This proves the gate fires on a single `^` range pin in `peerDependencies`. The package's own unit tests (`packages/0-shared/extension-author-tools/test/check-pins.test.mjs`) cover the broader matrix (`~`, `*`, `workspace:`, `dependencies` vs `peerDependencies`, multi-version mismatch); this scenario does not re-prove that matrix end-to-end.
 
@@ -537,6 +553,8 @@ rm -rf "$PN_QA_TMP/scenario-7"
 
 **Covers:** AC-R2-1 (the cluster move's coverage-gate dependency)
 
+**Isolation:** `workspace` (plants a substrate diff into the project's working tree and runs `pnpm check:upgrade-coverage` against it; the runner allocates a dedicated `git worktree` so the planted diff is restricted to one scenario).
+
 **Coverage boundary:** This proves the gate fires on a single fake substrate diff under `examples/` and names the new path. It does not re-prove every transition-directory edge case (rebase scenarios, publish-mode prev/head asymmetry) — those are covered by `scripts/check-upgrade-coverage.test.mjs` which CI runs on every push.
 
 **Oracle:** Without an entry directory, the gate exits non-zero with a stderr that includes the substring `skills/upgrade/prisma-next-upgrade/upgrades/`. With a placeholder entry in that directory, the gate exits zero. After restoring, the gate behaves as it did at the start of the scenario.
@@ -601,9 +619,11 @@ git -C "$PN_REPO" status --short
 
 ## Scenario 9 — Judgement: install-summary legibility
 
-**What you're proving from the user's seat:** When `init` runs three skill-install subprocesses in sequence, the user-visible summary line is something a human can read and act on. This is the kind of thing CI cannot meaningfully assert — the unit tests cover the data shape (three commands, each in backticks, joined by some separator), but only a human can say whether the result is *legible*.
+**What you're proving from the user's seat:** When `init` runs three skill-install subprocesses in sequence, the user-visible summary line is something a reader can read and act on. This is the kind of thing CI cannot meaningfully assert — the unit tests cover the data shape (three commands, each in backticks, joined by some separator), but only a structural-but-judgement read against an explicit oracle can say whether the result is *legible*.
 
 **Covers:** AC-R2-2 (judgement)
+
+**Isolation:** `read-only` — reads scenario 2's stdout / log (no mutation). Depends on scenario 2; the runner waits for scenario 2 to finish before dispatching this one.
 
 **Oracle:** A fresh user (imagine an SRE pasting init's output into Slack to ask for help) can answer two questions from the summary alone: (a) which install commands ran; (b) which one would they re-run if they suspected a regression. If the answer to either question is "I'd have to read the source", the summary is not legible enough.
 
@@ -644,6 +664,8 @@ git -C "$PN_REPO" status --short
 **Charter.** "Explore `prisma-next init` against fresh tmpdirs for 30 minutes, varying the flag matrix (`--target`, `--authoring`, `--no-skill`, `--no-install`, missing lockfile, missing `package.json`, mid-run interruption with Ctrl-C). Discover diagnostics that read poorly, install-summary text that contradicts itself across flag combinations, and any state combination the scripted scenarios skipped."
 
 **Covers:** (no specific AC; surfaces unknowns)
+
+**Isolation:** `tmpdir` (each `init` probe runs in its own subdirectory of `$PN_QA_TMP/scenario-10`; no workspace mutation).
 
 **Time budget:** 30 minutes. Stop when the timer rings even if you have more ideas — log them as candidate scenarios for a future round.
 
