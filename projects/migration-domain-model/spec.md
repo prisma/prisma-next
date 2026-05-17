@@ -9,7 +9,9 @@ Bring the `prisma-next` CLI surface in line with the vocabulary settled in [`dom
 3. Split `prisma-next migration status` into five purpose-specific verbs: `status`, `log`, `list`, `graph` (plus the existing `show`).
 4. Add contract-naming arguments to `db sign`: `db sign [<contract>]` and `db sign --contract <contract>`.
 5. Unify the contract-reference grammar across every flag that names a contract: `--to <contract>` / `--from <contract>` accept hashes, ref names, migration directory names, `<dir>^`, and filesystem paths.
-6. Add two net-new verification verbs: `migration check [<m>]` (artifact/graph integrity) and `migration preflight <m>` (sandbox behavioral check).
+6. Add the net-new artifact-integrity verb `migration check [<m>]`.
+
+`migration preflight <m>` is a separate concern (net-new sandbox-execution feature, not a restructure) and is **out of scope** for this project. It remains in the vocabulary and the audit; building it will be its own project.
 
 No transitional aliases. Each rename is atomic; the journey suite updates in lockstep with each verb change. No external users; no migration-of-users concern. No deprecation window.
 
@@ -53,7 +55,7 @@ prisma-next
         └── delete <name>
 ```
 
-### Intended surface
+### Intended surface (this project)
 
 ```
 prisma-next
@@ -76,8 +78,7 @@ prisma-next
 │   ├── log
 │   ├── list
 │   ├── graph
-│   ├── check [<m>]
-│   └── preflight <m>
+│   └── check [<m>]
 └── ref
     ├── set <name> <contract>
     ├── show <name>
@@ -85,12 +86,14 @@ prisma-next
     └── delete <name>
 ```
 
+`migration preflight <m>` is documented in the audit as the next-vocab gap after this project lands but is deferred to a separate project.
+
 ## Objectives
 
 1. **Verbs match the model.** The user-facing CLI surface reads like the domain. Top-level subjects are `init`, `migrate`, `contract`, `db`, `migration`, `ref`. The `migration` namespace contains only artifact-and-graph operations.
 2. **One reference grammar.** Wherever the CLI accepts a contract as input, it accepts any **contract reference**: hash (full or prefix), ref name, migration directory name, `<dir>^`, or filesystem path. The flag is `--to <contract>` for targets and `--from <contract>` for origins. Same grammar; same resolver; same error messages.
 3. **One question per verb.** Each verb answers exactly one question about exactly one subject. The two diagnostic modes on `db verify` (`--schema-only`, `--marker-only`) are sensibly-flagged debugging variants of one canonical question; they remain. The five-questions-under-one-verb shape of `migration status` does not.
-4. **Verification is split by what's being verified.** Three distinct verbs along two axes: `db verify` (live DB satisfies its contract), `migration check` (artifact / graph integrity), `migration preflight` (migration's behavior on a sandbox).
+4. **Verification is partly split by what's being verified.** Two of the three vocab verbs land here: `db verify` (live DB satisfies its contract) and `migration check` (artifact / graph integrity). `migration preflight` (sandbox behavioral check) is deferred.
 5. **Journey suite is the regression contract.** Every milestone's PR carries the journey-test updates needed to keep `pnpm test:journeys` green. Helper functions in `journey-test-helpers.ts` follow the new verb names.
 
 ## Non-goals
@@ -98,7 +101,7 @@ prisma-next
 - **`db verify` modes.** The `--schema-only` / `--marker-only` / `--strict` flag shape stays. The audit (F8) concluded the flags are clear and the verb is one verb; no change.
 - **Internal naming of legacy "apply" / "applied".** The vocab work resolved these as opportunistic renames; this project doesn't carry that work as gating. Files touched by milestones in this project can be renamed in the same PR (e.g., `apply-aggregate` → `migrate-aggregate` if it's already on the diff); a separate sweep of `MigrationApplied` events, `control-api/operations/` → `commands/`, etc., is out of scope here and tracked separately.
 - **Migration-from-old-CLI tooling.** No prior version is in users' hands; no compatibility shim. The CLI changes are absolute.
-- **New runtime capabilities.** `migration preflight`'s sandbox runtime is bounded to what the existing test infrastructure already provides (PGlite / mongodb-memory-server). Building new sandbox infra is a follow-on project if needed.
+- **`migration preflight`.** Net-new sandbox-execution feature, not a restructure. It needs its own design — sandbox lifecycle, initial-state strategy, framework-runner reuse, Postgres + Mongo flavors — and that design is non-trivial. Tracked separately; the vocabulary still includes it and the audit still flags it as a remaining gap after this project lands.
 - **Glossary / subsystem-doc rewrite.** The close-out milestone promotes the settled vocabulary into `docs/glossary.md` and updates the affected subsystem docs (`7. Migration System.md`, `CLI Style Guide.md`). It does not rewrite the subsystem docs from scratch.
 
 ## Functional requirements
@@ -119,6 +122,13 @@ Per the audit's findings; each FR corresponds to one audit-section.
 
 The `--graph`, `--all`, `--limit`, `--ref` flags on the current `status` verb do not survive the split; their behaviors are reachable through the new verbs.
 
+**Discoverability across the split.** The journey from "I want to see the graph" to `migration graph` runs through two failure modes the help system must absorb:
+
+- *The operator runs `migration status --graph` (or `--all` / `--ref X`).* The flag is no longer recognised by `status`. The CLI emits its standard unknown-flag error (exit `2`) and the `fix:` line names the verb that now owns this behavior: e.g., `Use \`prisma-next migration graph\` to view the migration graph.` This builds on the existing unknown-command suggestion machinery in `cli.ts` and extends it one step to unknown-flag-with-known-replacement.
+- *The operator runs `migration status --help`.* The help text includes a **See also** section listing `migration log`, `migration list`, `migration graph`, `migration show <m>` with one-line descriptions. Implemented via a new `setCommandSeeAlso(command, refs)` helper that parallels the existing `setCommandExamples(...)` registration and is rendered by the help formatter in `utils/formatters/help.ts` immediately under the Examples section.
+
+Each of the four new verbs (`status`, `log`, `list`, `graph`) cross-references the others via the same "See also" section so operators can navigate between them without consulting external docs.
+
 **FR4 (audit F4) — `db sign` accepts a contract argument.** Positional form `db sign [<contract>]` and explicit form `db sign --contract <contract>`. With no argument, defaults to signing with the current `contract.json` (current behavior).
 
 **FR5 (audit F5) — unified contract-reference grammar.** The argument grammar for `<contract>` is:
@@ -131,12 +141,35 @@ The `--graph`, `--all`, `--limit`, `--ref` flags on the current `status` verb do
 
 A parallel `<migration>` grammar accepts migration hashes and migration directory names. The command's argument *type* — `<contract>` vs `<migration>` — determines which grammar applies.
 
-Every flag that names a contract or migration uses this shared grammar: `migrate --to`, `db update --to`, `db sign --contract`, `migration plan --from`, `migration status --to/--from`, `ref set`'s second argument, and the positional arguments to `migration show`, `migration check`, `migration preflight`.
+Every flag that names a contract or migration uses this shared grammar: `migrate --to`, `db update --to`, `db sign --contract`, `migration plan --from`, `migration status --to/--from`, `ref set`'s second argument, and the positional arguments to `migration show` and `migration check`.
 
-**FR6 (audit F6) — two new verification verbs.**
+**Wrong-grammar diagnostics.** A common failure mode is passing a `<contract>` reference (e.g., a ref name like `production`) where the verb expects a `<migration>`, or vice versa. The resolver detects this by checking the input against the *other* grammar's known values before falling back to a generic "not found":
+
+| Input shape | `<contract>` resolver | `<migration>` resolver |
+|---|---|---|
+| Matches a known ref name | resolves to the ref's target | "Ref name passed where a migration is expected — `migration show` takes a migration hash or directory name. Did you mean `…<related verb>` for refs?" |
+| Matches a migration directory name | resolves to the migration's `to`-contract | resolves to the migration |
+| `<dir>^` | resolves to the migration's `from`-contract | "`^` syntax addresses contracts, not migrations" |
+| Hex prefix matching a contract hash but no migration hash | resolves to the contract | "Hash matched a contract but not a migration — pass `migration show <dir>` for a specific migration" |
+| Hex prefix matching neither | "Not a known contract reference" | "Not a known migration reference" |
+
+The error envelope carries the input the user supplied verbatim and lists candidate alternatives where useful (Git-style); the `fix:` line names the closest matching verb-grammar pair.
+
+**FR6 (audit F6, partial) — one new verification verb.**
 
 - `migration check [<m>]` — artifact / graph integrity. With a `<m>` argument: recompute that migration's hashes; validate its `ops.json` / manifest match; confirm its on-disk shape is complete. With no argument: a graph-wide sweep — every migration self-consistent; every edge's `from` and `to` line up with neighbouring contracts; no orphan nodes; no dangling refs. Read-only, offline.
-- `migration preflight <m>` — sandbox-execute the migration against a shadow database and report the outcome. Read-only with respect to the production database; mutates only the sandbox. The sandbox is acquired from the existing test infrastructure (PGlite for Postgres, mongodb-memory-server for Mongo); no new sandbox provisioning code in this project.
+
+  `migration check` follows the [CLI Style Guide](../../docs/CLI%20Style%20Guide.md#exit-codes) exit-code taxonomy:
+
+  | Exit | Name | Meaning |
+  |---|---|---|
+  | `0` | `OK` | All checks passed. |
+  | `2` | `PRECONDITION` | CLI usage error — bad argument, named migration does not exist, malformed reference. Reserved CLI-wide code. |
+  | `4` | `INTEGRITY_FAILED` | One or more integrity checks reported a failure. Command-specific code, exported from `commands/migration-check/exit-codes.ts`. |
+
+  Fine-grained discrimination uses PN codes carried on the structured error envelope. Each failure mode gets its own PN code (`PN-MIG-CHECK-001 HASH_MISMATCH`, `PN-MIG-CHECK-002 MANIFEST_INCOMPLETE`, `PN-MIG-CHECK-003 ORPHAN_MIGRATION`, `PN-MIG-CHECK-004 DANGLING_REF`, `PN-MIG-CHECK-005 EDGE_MISMATCH`). The `--json` output carries the full error envelope per the Style Guide.
+
+`migration preflight` is out of scope (see [Non-goals](#non-goals)).
 
 ## Acceptance criteria
 
@@ -156,13 +189,19 @@ Ambiguity (a hex-shaped string that's both a hash prefix and a directory name; a
 
 **AC4 — sign with contract.** `db sign abc123` (positional hash prefix), `db sign --contract abc123` (explicit), `db sign --contract production` (ref name), and `db sign` (no argument) all succeed when the live DB satisfies the named contract, and produce identical marker rows. All four refuse with the same error envelope when the DB does not satisfy the named contract.
 
-**AC5 — preflight sandbox correctness.** `migration preflight <m>` against a green-path migration reports success and leaves the production DB untouched (verified by marker-row inspection before and after). `migration preflight <m>` against a migration that would fail on production data reports failure with the specific operation that failed, and likewise leaves the production DB untouched.
+**AC5 — check covers the graph.** `migration check` with no argument over a clean graph passes with exit `0`. Adversarial fixtures — a hand-mutated `ops.json` (hash mismatch), a corrupted manifest (missing files), an orphan migration (no edge to anywhere), a dangling ref (points at a non-existent contract), a mismatched edge (a migration's `to`-contract doesn't match the next migration's `from`-contract) — each produce exit `4` (`INTEGRITY_FAILED`) and a structured error envelope carrying a distinct PN code per failure mode.
 
-**AC6 — check covers the graph.** `migration check` with no argument over a clean graph passes. Adversarial fixtures — a hand-mutated `ops.json` (hash mismatch), a corrupted manifest (missing files), an orphan migration (no edge to anywhere), a dangling ref (points at a non-existent contract) — each produce a distinct failure with a localized message identifying the bad artifact.
+**AC6 — wrong-grammar errors point operators at the right verb.** Passing a ref name to `migration show` (a `<migration>` argument) produces an error whose `fix:` line distinguishes ref-from-migration, not a generic "not found". Passing a migration directory to a `<contract>` argument resolves silently (to the migration's `to`-contract; this is intentional grammar overlap). Passing a `<dir>^` form to `migration show` (a `<migration>` argument) produces "`^` syntax addresses contracts, not migrations."
 
-**AC7 — journey suite green at every milestone boundary.** `pnpm test:journeys` passes at the end of every milestone's PR. No milestone leaves the suite red.
+**AC7 — discoverability across the status split.** Three behaviors hold:
 
-**AC8 — docs match the surface.** At close-out:
+- `prisma-next migration status --graph` exits `2` with a `fix:` line naming `migration graph`. Likewise `--all` → `migration log`; `--ref X` → `migration status --to X`.
+- `prisma-next migration status --help` includes a **See also** section listing `migration log`, `migration list`, `migration graph`, `migration show`.
+- Each of the four split verbs cross-references the other three in its **See also** section.
+
+**AC8 — journey suite green at every milestone boundary.** `pnpm test:journeys` passes at the end of every milestone's PR. No milestone leaves the suite red.
+
+**AC9 — docs match the surface.** At close-out:
 
 - `docs/glossary.md` contains the canonical definitions from `domain.md` (or links to them).
 - `docs/architecture docs/subsystems/7. Migration System.md` describes the new verb taxonomy.
@@ -171,7 +210,4 @@ Ambiguity (a hex-shaped string that's both a hash prefix and a directory name; a
 
 ## Open questions
 
-- **`migration preflight` sandbox lifecycle.** The verb takes a single migration argument and executes it on a fresh sandbox. The unresolved sub-question is whether the *initial* sandbox state should be the migration's `from`-contract (so the sandbox starts at a state where the migration is applicable). Probably yes — otherwise the operator has to provision the sandbox separately. Confirm during M6 design.
-- **`migration check` exit-code semantics.** Today's CLI uses exit 0/1/2 (success/runtime error/CLI usage error). With a per-migration argument the verb has two failure modes — "bad CLI input" (the named migration doesn't exist) and "integrity check failed" (the migration is corrupt). Both warrant non-zero exits; they should map to different codes. Confirm during M6 design.
-- **Migration-reference grammar for `<m>` arguments.** The audit established two parallel grammars — `<contract>` and `<migration>`. The migration-reference grammar is simpler (directory name or hash), and we should confirm the resolver yields a clear error when an operator passes a contract reference where a `<migration>` is expected (e.g., a ref name to `migration show`).
-- **Help-text strategy for split verbs.** Splitting `migration status` removes four flags from one help page and creates four new help pages. We should confirm during M4 that the help text for `migration status` itself points operators at the related verbs (so somebody who's looking for "graph" lands on `migration graph` quickly).
+*(None. The preflight scope question was settled by deferring preflight to a separate project; the three remaining open questions from the initial draft are settled in FR3 (help-text strategy), FR5 (wrong-grammar errors), and FR6 (exit codes).)*
