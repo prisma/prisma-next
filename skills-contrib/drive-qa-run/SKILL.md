@@ -63,11 +63,11 @@ Reports live at `projects/<project-name>/manual-qa-reports/<YYYY-MM-DD>-<runner-
 > **Runner:** <name or LLM session id>
 > **Environment:** <OS, Node version, branch + commit, any other relevant facts>
 > **Started / finished:** <ISO timestamps>
-> **Verdict:** ✅ Pass / ✅ Pass-with-follow-ups / ❌ Fail
+> **Verdict:** ✅ Pass / 🔍 Triage required / ❌ Fail
 
 ## Summary
 
-<2–4 sentences. State the verdict and the headline reason. If 🛑 Blocker findings exist, name them. If 📝 Follow-ups outnumber acted-on scenarios meaningfully, note that.>
+<2–4 sentences. State the verdict and the headline reason. If 🛑 Blocker findings exist, name them. If the verdict is 🔍 Triage required, lead with the count of findings awaiting disposition.>
 
 ## Findings
 
@@ -121,9 +121,36 @@ Reports live at `projects/<project-name>/manual-qa-reports/<YYYY-MM-DD>-<runner-
 | AC-2  | 5           | ❌ fail | F-1 (script's negative control did not fire) |
 | AC-N  | (CI; not manual-QA scope) | N/A | — |
 
+## Disposition map (required when any finding exists)
+
+Every finding must have a proposed disposition before the report is handed off. The runner suggests; the orchestrator confirms or overrides. **No finding is allowed to live as "📝 follow-up" with no further classification — that's the loophole this section closes.**
+
+| Finding | Severity | Proposed disposition | Evidence / next step |
+| ------- | -------- | -------------------- | -------------------- |
+| F-1 | 🛑 Blocker | 🔧 fix-in-PR | Same code path as commit `<sha>`; fix scoped to `<file>` |
+| F-2 | ⚠️ High | 🎫 ticket | Pre-existing on `main`; surfaced by the new fresh-consumer scenario; not caused by this PR |
+| F-3 | 📝 Follow-up | ⏳ post-merge | URL pre-merge returns "no skills found"; verifiable only after merge to `main` |
+| F-4 | 📝 Follow-up | 🔧 fix-in-PR | Script-quality fix; small docs edit |
+| F-5 | 📝 Follow-up | ❌ accepted-as-is | <one-line rationale: cost vs. risk> |
+
+Allowed disposition tags:
+
+- **🔧 fix-in-PR** — must be addressed on this branch before merge. Names the file/area + a one-line scope sketch.
+- **🎫 ticket** — must be tracked as a separate Linear ticket *now* (not "we'll get to it"). The orchestrator files the ticket and the runner records the ticket ID here on the orchestrator's pass.
+- **⏳ post-merge** — legitimate deferral until after merge. Requires a sentence explaining *why* the verification can't happen pre-merge (e.g. "GitHub URL only resolves once `main` carries the change"). Not a parking lot for "we don't feel like fixing this now".
+- **❌ accepted-as-is** — the project explicitly accepts the cost. Requires a one-line rationale + the orchestrator's name attached. Rare; should never apply to anything ⚠️ High or 🛑 Blocker.
+- **✅ resolved** — fixed during the run cycle (a remediation pass produced commits before final report). Requires the commit SHA.
+
+The verdict policy keys off the disposition map:
+
+- All findings have ✅ resolved → ✅ Pass.
+- All findings have a non-fix-in-PR disposition (🎫 / ⏳ / ❌) and at least one finding exists → 🔍 Triage required if dispositions are still proposals; ✅ Pass after the orchestrator confirms.
+- Any finding has 🔧 fix-in-PR disposition → ❌ Fail. The PR is not merge-ready until those land.
+- Any finding lacks a disposition → 🔍 Triage required, full stop. The runner has not finished the job.
+
 ## Suggested follow-ups
 
-<Bulleted list — usually a mix of: file these findings as tickets; consider these script improvements; consider these test additions to close gaps the QA round surfaced.>
+<Bulleted list — usually a mix of: file these findings as tickets (cross-reference the disposition map); consider these script improvements; consider these test additions to close gaps the QA round surfaced.>
 ```
 
 ## Workflow
@@ -201,24 +228,33 @@ When you observe a failure-mode match or a mismatch with "What you should see":
 
 ### 5. After the last scenario, assemble the report
 
-1. Fill in the **Verdict** in the header block based on findings:
-   - No findings → ✅ Pass
-   - Only 📝 Follow-ups → ✅ Pass-with-follow-ups
-   - Any ⚠️ High or 🛑 Blocker → ❌ Fail
-2. Write the **Summary** (2–4 sentences; lead with the verdict and the headline reason).
-3. Fill in the **Per-scenario log** table — one row per scenario, mark passed / failed / pass-with-follow-ups, list finding IDs.
-4. Fill in the **Coverage outcome** table by walking the script's "Sign-off coverage map" row-by-row. Each AC inherits its result from the worst-severity finding in any of the scenarios that covered it (Blocker > High > Follow-up > Pass). N/A rows stay N/A.
-5. Write **Suggested follow-ups** — typically a mix of: file these findings as tickets (with severity in the proposed title), consider these script improvements, consider these test additions to close gaps the QA round surfaced.
-6. Set the **finished** timestamp.
-7. Save the report to `projects/<project-name>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md`. Add the artefacts directory at the sibling `manual-qa-reports/artefacts/F-N/` paths.
+1. **Fill in the Disposition map** (required when any finding exists). Walk every finding and propose one of `🔧 fix-in-PR` / `🎫 ticket` / `⏳ post-merge` / `❌ accepted-as-is` / `✅ resolved`. The runner proposes; the orchestrator confirms. **Do not skip a finding.** A finding with no proposed disposition means triage is incomplete.
+2. Fill in the **Verdict** in the header block. The verdict keys off the disposition map, not the severity-tag distribution:
+   - All findings ✅ resolved → ✅ Pass.
+   - At least one finding exists with a proposed disposition that is not yet orchestrator-confirmed → 🔍 Triage required.
+   - Any finding has a 🔧 fix-in-PR disposition that has not been resolved → ❌ Fail (the PR is not merge-ready).
+   - The runner observed an in-flight 🛑 Blocker that prevented subsequent dispatch → ❌ Fail regardless of disposition map.
+
+   "✅ Pass-with-follow-ups" is **not** a valid verdict. It papers over disposition work the orchestrator must do; use 🔍 Triage required and force the conversation.
+3. Write the **Summary** (2–4 sentences; lead with the verdict and, when 🔍 Triage required, the count of findings awaiting orchestrator disposition).
+4. Fill in the **Per-scenario log** table — one row per scenario, with isolation tag, wallclock, result, and finding IDs.
+5. Fill in the **Coverage outcome** table by walking the script's "Sign-off coverage map" row-by-row. Each AC inherits its result from the worst-severity finding in any of the scenarios that covered it (Blocker > High > Follow-up > Pass). N/A rows stay N/A.
+6. Write **Suggested follow-ups** that cross-reference the disposition map. Each bullet should name the finding ID and its disposition (so a reader can see at a glance whether the bullet is "file this ticket" or "verify this post-merge").
+7. Set the **finished** timestamp.
+8. Save the report to `projects/<project-name>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md`. Add the artefacts directory at the sibling `manual-qa-reports/artefacts/F-N/` paths.
 
 ### 6. Hand off
 
-Surface the report to the implementer / spec-author:
+Surface the report to the orchestrator / implementer / spec-author. The hand-off message is **not** a victory lap; it routes work.
 
-- If verdict is ✅ Pass, the response is the report path + a one-line confirmation.
-- If verdict is ✅ Pass-with-follow-ups, list the 📝 findings briefly so the user can decide which to ticket immediately versus defer.
-- If verdict is ❌ Fail, lead with the blockers and quote the headline observed-vs-expected diff verbatim. Don't editorialise; the runner's job is observation, not advocacy.
+- **If verdict is ✅ Pass**: report path + a one-line confirmation. Done.
+- **If verdict is 🔍 Triage required**: lead with the count of findings awaiting orchestrator disposition. Reproduce the disposition map verbatim in the hand-off so the orchestrator can read it without opening the report. Explicitly name:
+  - findings the runner proposed as 🔧 fix-in-PR (these block merge);
+  - findings the runner proposed as 🎫 ticket (the orchestrator must file these tickets *now*, not "later");
+  - findings the runner proposed as ⏳ post-merge with the per-finding rationale (the orchestrator must accept the rationale);
+  - findings with no proposed disposition (the runner did not finish triage; flag this as a runner failure).
+  Do not soften the message. "Pass-with-follow-ups" is not what 🔍 Triage required means; the work is not done until every finding has a confirmed disposition.
+- **If verdict is ❌ Fail**: lead with the blockers and the in-scope-fix-required findings. Quote the headline observed-vs-expected diff verbatim. Don't editorialise; the runner's job is observation, not advocacy. The PR cannot merge until the 🔧 fix-in-PR findings land.
 
 ## Common Pitfalls
 
@@ -238,6 +274,8 @@ Surface the report to the implementer / spec-author:
 14. **Confusing isolation contexts in artefact paths.** Symptom: `manual-qa-reports/artefacts/F-3/` references a path under a worktree that's been removed by the time someone reads the report. Fix: copy artefacts into the durable `artefacts/F-N/` directory *before* tearing down the source worktree or tmpdir. Worktree paths are ephemeral; artefact directories are durable.
 15. **Forgetting `--detach` on `git worktree add`.** Symptom: a `workspace` scenario's worktree is on a branch named after the scenario; if the scenario commits anything, the runner risks accidentally pushing it. Fix: `git worktree add --detach <path> HEAD`. The detach prevents accidental branch-tracking.
 16. **Ignoring un-dispatched scenarios in the per-scenario log.** Symptom: report lists 8 of 10 scenarios as ✅ pass and silently omits the 2 that were blocked. Fix: every scenario the script lists appears in the per-scenario log. If un-dispatched, its row says so explicitly with the blocking finding ID.
+17. **Reporting "Pass-with-follow-ups" as if it's a green light.** Symptom: the report concludes with a long list of 📝 follow-ups labelled "carry-over" / "minor" / "script quality", and the verdict is ✅. The orchestrator reads the verdict, not the list, and merges. Fix: the verdict policy keys off the disposition map. Every finding gets a disposition tag (🔧 / 🎫 / ⏳ / ❌ / ✅ resolved). If any finding lacks a disposition, the verdict is 🔍 Triage required — *not* ✅. If any finding has a 🔧 fix-in-PR disposition, the verdict is ❌ until that fix lands. "Pass-with-follow-ups" was retired specifically because it lets observation results drift into the merge channel without a routing decision.
+18. **"Carry-over" findings used as a get-out-of-disposition card.** Symptom: a re-run report copies the prior run's 📝 findings into a "F-N-carry" section and treats them as already-disposed. Fix: a carry-over finding still needs a disposition in *this* run's disposition map. The fact that the prior run also observed it is not, by itself, a triage decision. If the prior run's disposition still applies (e.g. ⏳ post-merge for a network-bound check), repeat that disposition explicitly in the new map; if anything has changed (e.g. the orchestrator has now decided to fix it in-PR), update accordingly.
 
 ## What this skill doesn't do
 
@@ -264,11 +302,14 @@ Surface the report to the implementer / spec-author:
 - [ ] Every scenario's Restore step ran inside its isolation context; `git status` (or equivalent) captured as evidence.
 - [ ] Each finding captured *immediately* with artefacts (command, full output, HEAD sha, status, mutated files), copied into `manual-qa-reports/artefacts/F-N/` *before* the source worktree/tmpdir was reclaimed.
 - [ ] Each finding classified using the severity rubric — original-bug regressions and failed negative controls always 🛑 Blocker.
+- [ ] **Disposition map filled in for every finding.** Each row carries a proposed disposition (🔧 / 🎫 / ⏳ / ❌ / ✅ resolved) plus evidence/next-step text. No finding has an empty disposition cell.
+- [ ] Carry-over findings from a prior run carry an explicit disposition in *this* run's map (re-stated even when unchanged); they are not treated as auto-disposed by virtue of being carry-overs.
 - [ ] On 🛑 Blocker: stopped dispatching new scenarios; let in-flight ones complete; un-dispatched scenarios marked "⏸ not dispatched (blocked by F-N)" or "⏸ not dispatched (dependency F-N failed)".
-- [ ] Exploratory charter ran within its time budget; remaining ideas filed under Suggested follow-ups.
+- [ ] Exploratory charter ran within its time budget; remaining ideas filed under Suggested follow-ups (with a proposed disposition for any that the runner believes need tracking).
 - [ ] Per-scenario log includes every scenario the script listed, with isolation tag + wallclock + result + finding IDs (or "⏸ not dispatched" with blocking finding ID).
 - [ ] Coverage outcome table walks every AC the script's coverage map enumerates; each AC inherits the worst-severity finding from its covering scenarios.
-- [ ] Verdict in header matches the worst severity in Findings (Blocker → Fail, High → Fail, Follow-up only → Pass-with-follow-ups, none → Pass).
+- [ ] Verdict in header keys off the disposition map: ✅ Pass only when every finding is ✅ resolved, 🔍 Triage required when any finding awaits orchestrator confirmation, ❌ Fail when any finding has a 🔧 fix-in-PR disposition or the runner observed an in-flight blocker.
+- [ ] "✅ Pass-with-follow-ups" never appears as a verdict — that wording was retired (see Common Pitfalls #17).
 - [ ] Report saved to `projects/<project>/manual-qa-reports/<YYYY-MM-DD>-<runner>.md`, artefacts under sibling `artefacts/F-N/`.
 - [ ] Worktrees torn down with `git worktree remove --force`; tmpdirs cleaned up; user's checkout left clean.
 - [ ] Did NOT edit the script in place; script-quality issues filed as 📝 Follow-up findings instead.
