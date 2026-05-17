@@ -1,6 +1,19 @@
 ---
 name: prisma-next-quickstart
-description: Adopt Prisma Next into a new project, onto an existing database, or as the first move after a bootstrap tool dropped you into a scaffold. Use for "what can I do with Prisma Next", "what can I do next with Prisma", "where do I start", "what should I do first", "just ran createprisma", "createprisma", "npx createprisma", "npx create-prisma", "first steps", "first query", "I have a scaffolded Prisma Next project what now"; for `pnpm dlx prisma-next init` greenfield setup; and for `prisma-next contract infer` + `db sign` against an existing database. Also covers the connect-write-read first-arc orientation, the day-to-day commands (`contract emit`, `db init`, `db update`, `migration plan`, `migration apply`, `db schema`, `db verify`), and routing to `prisma-next-contract` / `prisma-next-queries` / `prisma-next-runtime` for the next move. Flags: --target, --authoring, --schema-path, --probe-db, --output.
+description: >-
+  Adopt Prisma Next into a new project, onto an existing database, or as the
+  first move after a bootstrap tool dropped you into a scaffold. Use for "what
+  can I do with Prisma Next", "what can I do next with Prisma", "where do I
+  start", "what should I do first", "just ran createprisma", "createprisma",
+  "npx createprisma", "npx create-prisma", "first steps", "first query", "I
+  have a scaffolded Prisma Next project what now"; for `pnpm dlx prisma-next
+  init` greenfield setup; and for `prisma-next contract infer` + `db sign`
+  against an existing database. Also covers the connect-write-read first-arc
+  orientation, the day-to-day commands (`contract emit`, `db init`, `db
+  update`, `migration plan`, `migration apply`, `db schema`, `db verify`), and
+  routing to `prisma-next-contract` / `prisma-next-queries` /
+  `prisma-next-runtime` for the next move. Flags --target, --authoring,
+  --schema-path, --probe-db, --output.
 ---
 
 # Prisma Next — Quickstart (Adoption)
