@@ -64,7 +64,7 @@ withTempDir(({ createTempDir }) => {
         expect(refStaging.exitCode, 'M.03: ref set staging=C2').toBe(0);
 
         // M.04: status --ref production → at-target (DB marker = C1, ref = C1)
-        const statusProd = await runMigrationStatus(ctx, ['--ref', 'production', '--json']);
+        const statusProd = await runMigrationStatus(ctx, ['--to', 'production', '--json']);
         expect(statusProd.exitCode, 'M.04: status --ref production').toBe(0);
         const prodStatus = parseJsonOutput<{
           migrations: readonly { status: string }[];
@@ -73,7 +73,7 @@ withTempDir(({ createTempDir }) => {
         expect(prodPending, 'M.04: production has 0 pending').toBe(0);
 
         // M.05: status --ref staging → 1 pending (DB marker = C1, ref = C2)
-        const statusStaging = await runMigrationStatus(ctx, ['--ref', 'staging', '--json']);
+        const statusStaging = await runMigrationStatus(ctx, ['--to', 'staging', '--json']);
         expect(statusStaging.exitCode, 'M.05: status --ref staging').toBe(0);
         const stagingStatus = parseJsonOutput<{
           migrations: readonly { status: string }[];
@@ -104,7 +104,7 @@ withTempDir(({ createTempDir }) => {
         expect(applyProdFail.exitCode, 'N.01: apply --ref production fails').toBe(1);
 
         // N.02: status --ref production reports ahead-of-ref condition
-        const statusProdAfter = await runMigrationStatus(ctx, ['--ref', 'production', '--json']);
+        const statusProdAfter = await runMigrationStatus(ctx, ['--to', 'production', '--json']);
         const prodAfterOutput = stripAnsi(statusProdAfter.stdout);
         expect(prodAfterOutput, 'N.02: production status indicates ahead-of-ref condition').toMatch(
           /ahead|no.*path|mismatch/i,

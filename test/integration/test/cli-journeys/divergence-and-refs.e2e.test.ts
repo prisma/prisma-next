@@ -93,7 +93,7 @@ withTempDir(({ createTempDir }) => {
         expect(applyResult.markerHash, 'L.06: marker at C3').toBe(c3Hash);
 
         // L.07: status with --ref production
-        const statusRef = await runMigrationStatus(ctx, ['--ref', 'production', '--json']);
+        const statusRef = await runMigrationStatus(ctx, ['--to', 'production', '--json']);
         expect(statusRef.exitCode, 'L.07: status --ref production').toBe(0);
       },
       timeouts.spinUpPpgDev,

@@ -273,7 +273,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     const exitCode = await runAndCaptureExit(() =>
-      executeCommand(createMigrationStatusCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrationStatusCommand(), ['--to', 'prod', '--json']),
     );
 
     expect(exitCode).not.toBe(0);
@@ -335,7 +335,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     const exitCode = await runAndCaptureExit(() =>
-      executeCommand(createMigrationStatusCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrationStatusCommand(), ['--to', 'prod', '--json']),
     );
 
     const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
@@ -364,7 +364,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     const exitCode = await runAndCaptureExit(() =>
-      executeCommand(createMigrationStatusCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrationStatusCommand(), ['--to', 'prod', '--json']),
     );
     expect(exitCode).toBe(0);
 

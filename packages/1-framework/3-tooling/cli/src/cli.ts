@@ -13,6 +13,9 @@ import { createDbSignCommand } from './commands/db-sign';
 import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
 import { createMigrateCommand } from './commands/migrate';
+import { createMigrationGraphCommand } from './commands/migration-graph';
+import { createMigrationListCommand } from './commands/migration-list';
+import { createMigrationLogCommand } from './commands/migration-log';
 import { createMigrationNewCommand } from './commands/migration-new';
 import { createMigrationPlanCommand } from './commands/migration-plan';
 import { createMigrationShowCommand } from './commands/migration-show';
@@ -31,6 +34,19 @@ import { suggestCommands } from './utils/suggest-command';
 const removedVerbRedirects: Record<string, string> = {
   'migration:apply': 'Use `prisma-next migrate --to <contract>` instead.',
   'migration:ref': 'Use `prisma-next ref set|list|delete` instead.',
+};
+
+/**
+ * Removed flags on specific subcommands. Keyed by `<parent>:<sub>:<flag>`.
+ * Checked during the pre-parse argv scan before commander sees the flags.
+ */
+const removedFlagRedirects: Record<string, string> = {
+  'migration:status:--graph': 'Use `prisma-next migration graph` to view the migration graph.',
+  'migration:status:--all':
+    'Use `prisma-next migration log --db <url>` to view the full execution history.',
+  'migration:status:--limit':
+    'Use `prisma-next migration log --db <url>` to view the full execution history.',
+  'migration:status:--ref': 'Use `--to <contract>` instead of `--ref`.',
 };
 
 /**
@@ -257,6 +273,15 @@ migrationCommand.addCommand(migrationShowCommand);
 const migrationStatusCommand = createMigrationStatusCommand();
 migrationCommand.addCommand(migrationStatusCommand);
 
+const migrationLogCommand = createMigrationLogCommand();
+migrationCommand.addCommand(migrationLogCommand);
+
+const migrationListCommand = createMigrationListCommand();
+migrationCommand.addCommand(migrationListCommand);
+
+const migrationGraphCommand = createMigrationGraphCommand();
+migrationCommand.addCommand(migrationGraphCommand);
+
 program.addCommand(migrationCommand);
 
 // Top-level migrate command (replaces `migration apply`)
@@ -343,6 +368,14 @@ if (args.length > 0) {
       if (redirect) {
         process.stderr.write(`Unknown command: ${subcommandName}\n${redirect}\n`);
         process.exit(2);
+      }
+      for (let i = 2; i < args.length; i++) {
+        const flagKey = `${commandName}:${subcommandName}:${args[i]}`;
+        const flagRedirect = removedFlagRedirects[flagKey];
+        if (flagRedirect) {
+          process.stderr.write(`Unknown option: ${args[i]}\n${flagRedirect}\n`);
+          process.exit(2);
+        }
       }
     }
 

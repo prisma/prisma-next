@@ -469,7 +469,7 @@ withTempDir(({ createTempDir }) => {
 
           expect(status.exitCode).toBe(0);
           expect(out).toContain('multiple valid migration paths');
-          expect(out).toContain('--ref');
+          expect(out).toContain('--to');
         },
         timeouts.spinUpPpgDev,
       );
@@ -536,7 +536,7 @@ withTempDir(({ createTempDir }) => {
           const setRef = await runRef(ctx, ['set', 'production', hashB]);
           expect(setRef.exitCode, 'ref set').toBe(0);
 
-          const status = await runMigrationStatus(ctx, ['--ref', 'production']);
+          const status = await runMigrationStatus(ctx, ['--to', 'production']);
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);
@@ -602,7 +602,7 @@ withTempDir(({ createTempDir }) => {
           const setRef = await runRef(ctx, ['set', 'production', hashA]);
           expect(setRef.exitCode, 'ref set').toBe(0);
 
-          const status = await runMigrationStatus(ctx, ['--ref', 'production']);
+          const status = await runMigrationStatus(ctx, ['--to', 'production']);
           const out = stripAnsi(status.stdout);
 
           expect(status.exitCode).toBe(0);

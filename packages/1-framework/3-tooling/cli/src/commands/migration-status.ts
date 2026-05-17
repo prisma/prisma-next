@@ -45,6 +45,7 @@ import {
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
+  setCommandSeeAlso,
   toPathDecisionResult,
   toStructuralEdge,
 } from '../utils/command-helpers';
@@ -72,10 +73,8 @@ import { TerminalUI } from '../utils/terminal-ui';
 interface MigrationStatusOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly ref?: string;
-  readonly graph?: boolean;
-  readonly limit?: string;
-  readonly all?: boolean;
+  readonly to?: string;
+  readonly from?: string;
 }
 
 export interface MigrationStatusEntry {
@@ -422,23 +421,6 @@ function resolveDisplayChain(
   return toTarget;
 }
 
-const DEFAULT_LIMIT = 10;
-
-function determineLimit(opts: MigrationStatusOptions) {
-  if (opts.all) {
-    // No limit
-    return;
-  }
-  if (!opts.limit) {
-    return DEFAULT_LIMIT;
-  }
-  const parsed = Number.parseInt(opts.limit, 10);
-  if (Number.isNaN(parsed)) {
-    return DEFAULT_LIMIT;
-  }
-  return parsed;
-}
-
 /**
  * Build the aggregate enumeration of contract spaces for the status
  * output. Loads the aggregate from disk (lossy on failure — extension
@@ -583,10 +565,10 @@ async function executeMigrationStatusCommand(
     throw error;
   }
 
-  if (options.ref) {
+  if (options.to) {
     try {
       const { graph: earlyGraph } = await loadMigrationPackages(appMigrationsDir);
-      const refResult = parseContractRef(options.ref, { graph: earlyGraph, refs: allRefs });
+      const refResult = parseContractRef(options.to, { graph: earlyGraph, refs: allRefs });
       if (!refResult.ok) {
         return notOk(mapRefResolutionError(refResult.failure));
       }
@@ -706,7 +688,7 @@ async function executeMigrationStatusCommand(
         severity: 'warn',
         message: 'There are multiple valid migration paths — you must select a target',
         hints: [
-          "Use '--ref <name>' to select a target",
+          "Use '--to <contract>' to select a target",
           "Or 'prisma-next ref set <name> <hash>' to create one",
         ],
       });
@@ -1065,40 +1047,38 @@ export function createMigrationStatusCommand(): Command {
   const command = new Command('status');
   setCommandDescriptions(
     command,
-    'Show migration history and applied status',
-    'Displays the migration history in order. When a database connection\n' +
-      'is available, shows which migrations are applied and which are pending.\n' +
-      'Without a database connection, shows the history from disk only.',
+    'Show migration path and pending status',
+    'Shows which migrations are pending between the database marker and\n' +
+      'the target contract. Requires a database connection for live status.\n' +
+      'Use `migration graph` for topology, `migration log` for history,\n' +
+      'and `migration list` for on-disk enumeration.',
   );
   setCommandExamples(command, [
-    'prisma-next migration status',
     'prisma-next migration status --db $DATABASE_URL',
+    'prisma-next migration status --to production --db $DATABASE_URL',
+  ]);
+  setCommandSeeAlso(command, [
+    { verb: 'migration log', oneLiner: 'Show executed migration history' },
+    { verb: 'migration list', oneLiner: 'List on-disk migrations' },
+    { verb: 'migration graph', oneLiner: 'Show the migration graph topology' },
+    { verb: 'migration show', oneLiner: 'Display migration package contents' },
   ]);
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option(
-      '--ref <contract>',
+      '--to <contract>',
       'Target contract reference (hash, prefix, ref name, or migration dir name)',
     )
-    .option('--graph', 'Show the full migration graph with all branches')
-    .option('--limit <n>', 'Maximum number of migrations to display (default: 10)')
-    .option('--all', 'Show full history (disables truncation)')
+    .option('--from <contract>', 'Origin contract reference (for offline path computation)')
     .action(async (options: MigrationStatusOptions) => {
       const flags = parseGlobalFlags(options);
-
       const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
 
       const result = await executeMigrationStatusCommand(options, flags, ui);
 
       const exitCode = handleResult(result, flags, ui, (statusResult) => {
         if (flags.json) {
-          // Strip non-JSON-shape fields before emitting. These belong to
-          // the in-memory result so the human renderer can avoid
-          // recomputing them, but they would either bloat the wire format
-          // (graph, bundles, edgeStatuses) or expose internals
-          // (activeRefHash, activeRefName, diverged) that consumers should
-          // read off `pathDecision` / `refs` instead.
           const {
             graph: _graph,
             bundles: _bundles,
@@ -1113,7 +1093,6 @@ export function createMigrationStatusCommand(): Command {
           const colorize = flags.color !== false;
 
           if (statusResult.graph) {
-            const limit = determineLimit(options);
             const renderInput = migrationGraphToRenderInput({
               graph: statusResult.graph,
               mode: statusResult.mode,
@@ -1125,16 +1104,13 @@ export function createMigrationStatusCommand(): Command {
               edgeStatuses: statusResult.edgeStatuses,
             });
 
-            const graphToRender =
-              options.graph || statusResult.diverged
-                ? renderInput.graph
-                : extractRelevantSubgraph(renderInput.graph, renderInput.relevantPaths);
-            const dagreOptions =
-              !options.graph && isLinearGraph(graphToRender) ? { ranksep: 1 } : undefined;
+            const graphToRender = statusResult.diverged
+              ? renderInput.graph
+              : extractRelevantSubgraph(renderInput.graph, renderInput.relevantPaths);
+            const dagreOptions = isLinearGraph(graphToRender) ? { ranksep: 1 } : undefined;
             const renderOptions = {
               ...renderInput.options,
               colorize,
-              ...ifDefined('limit', limit),
               ...ifDefined('dagreOptions', dagreOptions),
             };
             const graphOutput = graphRenderer.render(graphToRender, renderOptions);

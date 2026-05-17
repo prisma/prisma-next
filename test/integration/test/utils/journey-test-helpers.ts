@@ -25,6 +25,9 @@ import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
 import { createDbUpdateCommand } from '@prisma-next/cli/commands/db-update';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import { createMigrateCommand } from '@prisma-next/cli/commands/migrate';
+import { createMigrationGraphCommand } from '@prisma-next/cli/commands/migration-graph';
+import { createMigrationListCommand } from '@prisma-next/cli/commands/migration-list';
+import { createMigrationLogCommand } from '@prisma-next/cli/commands/migration-log';
 import { createMigrationNewCommand } from '@prisma-next/cli/commands/migration-new';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
 import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-show';
@@ -392,6 +395,27 @@ export async function runMigrationShow(
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
   return runCommand(createMigrationShowCommand(), ctx, extraArgs);
+}
+
+export async function runMigrationLog(
+  ctx: JourneyContext,
+  extraArgs: readonly string[] = [],
+): Promise<CommandResult> {
+  return runCommand(createMigrationLogCommand(), ctx, extraArgs);
+}
+
+export async function runMigrationList(
+  ctx: JourneyContext,
+  extraArgs: readonly string[] = [],
+): Promise<CommandResult> {
+  return runCommand(createMigrationListCommand(), ctx, extraArgs);
+}
+
+export async function runMigrationGraph(
+  ctx: JourneyContext,
+  extraArgs: readonly string[] = [],
+): Promise<CommandResult> {
+  return runCommand(createMigrationGraphCommand(), ctx, extraArgs);
 }
 
 /**

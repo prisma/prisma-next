@@ -465,7 +465,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
 
     // Mongo-O.09: status --ref prod surfaces the three invariant sets and
     // proves the marker doc accumulated the invariant via $setUnion.
-    const statusRef = await migrationStatus(ctx, ['--ref', 'prod', '--json']);
+    const statusRef = await migrationStatus(ctx, ['--to', 'prod', '--json']);
     expect(statusRef.exitCode, 'Mongo-O.09: status --ref prod').toBe(0);
     const statusResult = parseJsonOutput<{
       requiredInvariants?: readonly string[];
@@ -552,7 +552,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
     expect(offlineState.markerHash, 'Mongo-P.05: marker did not advance to C2').not.toBe(c2Hash);
 
     // Mongo-P.06: status --ref also fatal (parity with apply).
-    const statusFail = await migrationStatus(ctx, ['--ref', 'prod', '--json']);
+    const statusFail = await migrationStatus(ctx, ['--to', 'prod', '--json']);
     expect(statusFail.exitCode, 'Mongo-P.06: status exits 1').toBe(1);
     const statusEnvelope = parseJsonOutput<{ meta?: { code?: string } }>(statusFail);
     expect(statusEnvelope.meta?.code, 'Mongo-P.06: status error code').toBe(

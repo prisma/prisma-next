@@ -17,6 +17,10 @@ import { parseGlobalFlags } from './global-flags';
 
 const longDescriptions = new WeakMap<Command, string>();
 const commandExamples = new WeakMap<Command, readonly string[]>();
+const commandSeeAlso = new WeakMap<
+  Command,
+  readonly { readonly verb: string; readonly oneLiner: string }[]
+>();
 
 /**
  * Sets both short and long descriptions for a command.
@@ -55,6 +59,27 @@ export function getLongDescription(command: Command): string | undefined {
  */
 export function getCommandExamples(command: Command): readonly string[] | undefined {
   return commandExamples.get(command);
+}
+
+/**
+ * Sets cross-references to related commands, rendered in a "See also"
+ * section below the Examples block in help output.
+ */
+export function setCommandSeeAlso(
+  command: Command,
+  refs: readonly { readonly verb: string; readonly oneLiner: string }[],
+): Command {
+  commandSeeAlso.set(command, refs);
+  return command;
+}
+
+/**
+ * Gets the see-also cross-references from a command.
+ */
+export function getCommandSeeAlso(
+  command: Command,
+): readonly { readonly verb: string; readonly oneLiner: string }[] | undefined {
+  return commandSeeAlso.get(command);
 }
 
 /**

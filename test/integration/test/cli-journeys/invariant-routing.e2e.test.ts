@@ -212,7 +212,7 @@ withTempDir(({ createTempDir }) => {
 
         // O.09: status --ref prod surfaces the three invariant sets and the per-edge
         // invariants on the selected path.
-        const statusRef = await runMigrationStatus(ctx, ['--ref', 'prod', '--json']);
+        const statusRef = await runMigrationStatus(ctx, ['--to', 'prod', '--json']);
         expect(statusRef.exitCode, 'O.09: status --ref prod').toBe(0);
         const statusResult = parseJsonOutput<{
           requiredInvariants?: readonly string[];
@@ -324,7 +324,7 @@ withTempDir(({ createTempDir }) => {
         expect(offlineState.markerHash, 'P.05: marker did not advance to C2').not.toBe(c2Hash);
 
         // P.06: status --ref prod is fatal too (parity with apply).
-        const statusFail = await runMigrationStatus(ctx, ['--ref', 'prod', '--json']);
+        const statusFail = await runMigrationStatus(ctx, ['--to', 'prod', '--json']);
         expect(statusFail.exitCode, 'P.06: status exits 1').toBe(1);
         const statusEnvelope = parseJsonOutput<{ meta?: { code?: string } }>(statusFail);
         expect(statusEnvelope.meta?.code, 'P.06: status error code').toBe(
@@ -818,7 +818,7 @@ MigrationCLI.run(import.meta.url, M);
         );
 
         // T.05: status --ref must report INVARIANTS_PENDING, NOT UP_TO_DATE.
-        const statusResult = await runMigrationStatus(ctx, ['--ref', 'prod', '--json']);
+        const statusResult = await runMigrationStatus(ctx, ['--to', 'prod', '--json']);
         expect(statusResult.exitCode, 'T.05: status exits 0').toBe(0);
         const envelope = parseJsonOutput<{
           mode: string;

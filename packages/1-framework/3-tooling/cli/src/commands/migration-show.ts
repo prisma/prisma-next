@@ -36,6 +36,7 @@ import {
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
+  setCommandSeeAlso,
 } from '../utils/command-helpers';
 import { buildContractSpaceAggregate } from '../utils/contract-space-aggregate-loader';
 import { formatMigrationShowOutput } from '../utils/formatters/migrations';
@@ -433,6 +434,12 @@ export function createMigrationShowCommand(): Command {
   setCommandExamples(command, [
     'prisma-next migration show',
     'prisma-next migration show sha256:a1b2c3',
+  ]);
+  setCommandSeeAlso(command, [
+    { verb: 'migration status', oneLiner: 'Show migration path and pending status' },
+    { verb: 'migration log', oneLiner: 'Show executed migration history' },
+    { verb: 'migration list', oneLiner: 'List on-disk migrations' },
+    { verb: 'migration graph', oneLiner: 'Show the migration graph topology' },
   ]);
   addGlobalOptions(command)
     .argument(

@@ -118,6 +118,18 @@
       "types": "./dist/commands/migration-status.d.mts",
       "import": "./dist/commands/migration-status.mjs"
     },
+    "./commands/migration-log": {
+      "types": "./dist/commands/migration-log.d.mts",
+      "import": "./dist/commands/migration-log.mjs"
+    },
+    "./commands/migration-list": {
+      "types": "./dist/commands/migration-list.d.mts",
+      "import": "./dist/commands/migration-list.mjs"
+    },
+    "./commands/migration-graph": {
+      "types": "./dist/commands/migration-graph.d.mts",
+      "import": "./dist/commands/migration-graph.mjs"
+    },
     "./commands/migrate": {
       "types": "./dist/commands/migrate.d.mts",
       "import": "./dist/commands/migrate.mjs"

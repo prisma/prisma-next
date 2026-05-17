@@ -187,7 +187,7 @@ withTempDir(({ createTempDir }) => {
         expect(prodResult.markerHash, 'D.09: production marker at C5').toBe(c5Hash);
 
         // D.10: verify status shows distinct paths for each environment
-        const statusStaging = await runMigrationStatus(staging, ['--ref', 'staging', '--json']);
+        const statusStaging = await runMigrationStatus(staging, ['--to', 'staging', '--json']);
         expect(statusStaging.exitCode, 'D.10: staging status').toBe(0);
         const stagingStatusData = parseJsonOutput<{
           migrations: readonly { status: string }[];
@@ -197,7 +197,7 @@ withTempDir(({ createTempDir }) => {
         ).length;
         expect(stagingPending, 'D.10: staging 0 pending').toBe(0);
 
-        const statusProd = await runMigrationStatus(production, ['--ref', 'production', '--json']);
+        const statusProd = await runMigrationStatus(production, ['--to', 'production', '--json']);
         expect(statusProd.exitCode, 'D.10: production status').toBe(0);
         const prodStatusData = parseJsonOutput<{
           migrations: readonly { status: string }[];

@@ -58,4 +58,43 @@ describe('removed verb redirects', () => {
       expect(err.stderr).toContain('prisma-next ref set|list|delete');
     }
   });
+
+  it('`migration status --graph` exits 2 and suggests `migration graph`', async () => {
+    try {
+      await execFileAsync('node', [CLI_PATH, 'migration', 'status', '--graph'], {
+        timeout: 5000,
+      });
+      expect.unreachable('should have exited with non-zero');
+    } catch (error) {
+      const err = error as { code?: number; stderr?: string };
+      expect(err.code).toBe(2);
+      expect(err.stderr).toContain('migration graph');
+    }
+  });
+
+  it('`migration status --all` exits 2 and suggests `migration log`', async () => {
+    try {
+      await execFileAsync('node', [CLI_PATH, 'migration', 'status', '--all'], {
+        timeout: 5000,
+      });
+      expect.unreachable('should have exited with non-zero');
+    } catch (error) {
+      const err = error as { code?: number; stderr?: string };
+      expect(err.code).toBe(2);
+      expect(err.stderr).toContain('migration log');
+    }
+  });
+
+  it('`migration status --ref X` exits 2 and suggests `--to`', async () => {
+    try {
+      await execFileAsync('node', [CLI_PATH, 'migration', 'status', '--ref', 'prod'], {
+        timeout: 5000,
+      });
+      expect.unreachable('should have exited with non-zero');
+    } catch (error) {
+      const err = error as { code?: number; stderr?: string };
+      expect(err.code).toBe(2);
+      expect(err.stderr).toContain('--to');
+    }
+  });
 });
