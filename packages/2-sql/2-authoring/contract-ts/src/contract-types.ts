@@ -528,8 +528,8 @@ type BuiltStorageTables<Definition> = {
 
 type BuiltStorage<Definition> = {
   readonly storageHash: StorageHashBase<string>;
-  readonly tables: BuiltStorageTables<Definition>;
-  readonly types: DefinitionTypes<Definition>;
+  readonly tables: Readonly<Record<string, Readonly<BuiltStorageTables<Definition>>>>;
+  readonly types: Readonly<Record<string, Readonly<DefinitionTypes<Definition>>>>;
   readonly namespaces: Readonly<Record<string, Namespace>>;
 };
 

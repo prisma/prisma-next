@@ -4,6 +4,7 @@ import type {
   FamilyPackRef,
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
+import { findTableByName } from '@prisma-next/sql-contract/types';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { defineContract, rel } from '../src/contract-builder';
 
@@ -241,34 +242,34 @@ describe('contract DSL helper vocabulary', () => {
       }),
     );
 
-    expect(contract.storage.tables.audit_entry.primaryKey).toEqual({
+    expect(findTableByName(contract.storage, 'audit_entry')!.primaryKey).toEqual({
       columns: ['id'],
       name: 'audit_entry_pkey',
     });
-    expect(contract.storage.tables.audit_entry.uniques).toEqual([
+    expect(findTableByName(contract.storage, 'audit_entry')!.uniques).toEqual([
       {
         columns: ['email'],
         name: 'audit_entry_email_key',
       },
     ]);
-    expect(contract.storage.tables.audit_entry.columns.id).toMatchObject({
+    expect(findTableByName(contract.storage, 'audit_entry')!.columns['id']).toMatchObject({
       codecId: 'sql/char@1',
       nativeType: 'character',
       nullable: false,
       typeParams: { length: 36 },
     });
-    expect(contract.storage.tables.audit_entry.columns.email).toMatchObject({
+    expect(findTableByName(contract.storage, 'audit_entry')!.columns['email']).toMatchObject({
       codecId: 'sql/text@1',
       nativeType: 'text',
       nullable: false,
     });
-    expect(contract.storage.tables.audit_entry.columns.short_code).toMatchObject({
+    expect(findTableByName(contract.storage, 'audit_entry')!.columns['short_code']).toMatchObject({
       codecId: 'sql/char@1',
       nativeType: 'character',
       nullable: false,
       typeParams: { length: 16 },
     });
-    expect(contract.storage.tables.audit_entry.columns.created_at).toMatchObject({
+    expect(findTableByName(contract.storage, 'audit_entry')!.columns['created_at']).toMatchObject({
       codecId: 'sql/timestamp@1',
       nativeType: 'timestamp',
       nullable: false,
@@ -277,7 +278,7 @@ describe('contract DSL helper vocabulary', () => {
         expression: 'CURRENT_TIMESTAMP',
       },
     });
-    expect(contract.storage.tables.audit_entry.columns.reviewed_at).toMatchObject({
+    expect(findTableByName(contract.storage, 'audit_entry')!.columns['reviewed_at']).toMatchObject({
       codecId: 'sql/timestamp@1',
       nativeType: 'timestamp',
       nullable: true,
@@ -376,11 +377,11 @@ describe('contract DSL helper vocabulary', () => {
       }),
     );
 
-    expect(contract.storage.tables.short_link.primaryKey).toEqual({
+    expect(findTableByName(contract.storage, 'short_link')!.primaryKey).toEqual({
       columns: ['id'],
       name: 'short_link_pkey',
     });
-    expect(contract.storage.tables.short_link.columns.id).toMatchObject({
+    expect(findTableByName(contract.storage, 'short_link')!.columns['id']).toMatchObject({
       codecId: 'sql/char@1',
       nativeType: 'character',
       typeParams: { length: 16 },
@@ -413,13 +414,13 @@ describe('contract DSL helper vocabulary', () => {
       }),
     );
 
-    expect(contract.storage.tables.app_user.columns.role).toMatchObject({
+    expect(findTableByName(contract.storage, 'app_user')!.columns['role']).toMatchObject({
       codecId: 'pg/enum@1',
       nativeType: 'role',
       nullable: false,
       typeRef: 'Role',
     });
-    expectTypeOf(contract.storage.tables.app_user.columns.role.typeRef).toEqualTypeOf<'Role'>();
+    expect(findTableByName(contract.storage, 'app_user')!.columns['role']!.typeRef).toBe('Role');
   });
 
   it.each([
@@ -574,13 +575,13 @@ describe('contract DSL helper vocabulary', () => {
       },
     );
 
-    expect(contract.storage.types?.Role).toEqual({
+    expect(contract.storage.types?.['__unbound__']?.['Role']).toEqual({
       kind: 'codec-instance',
       codecId: 'pg/enum@1',
       nativeType: 'role',
       typeParams: { values: ['USER', 'ADMIN'] },
     });
-    expect(contract.storage.tables.app_user.columns.role).toMatchObject({
+    expect(findTableByName(contract.storage, 'app_user')!.columns['role']).toMatchObject({
       codecId: 'pg/enum@1',
       nativeType: 'role',
       typeRef: 'Role',
@@ -612,22 +613,24 @@ describe('contract DSL helper vocabulary', () => {
       }),
     );
 
-    expect(contract.storage.tables.audit_entry.primaryKey).toEqual({
+    expect(findTableByName(contract.storage, 'audit_entry')!.primaryKey).toEqual({
       columns: ['id'],
       name: 'audit_entry_pkey',
     });
-    expect(contract.storage.tables.audit_entry.uniques).toEqual([
+    expect(findTableByName(contract.storage, 'audit_entry')!.uniques).toEqual([
       {
         columns: ['email'],
         name: 'audit_entry_email_key',
       },
     ]);
-    expect(contract.storage.tables.audit_entry.columns.actor_id).toMatchObject({
+    expect(findTableByName(contract.storage, 'audit_entry')!.columns['actor_id']).toMatchObject({
       codecId: 'sql/char@1',
       nativeType: 'character',
       typeParams: { length: 36 },
     });
-    expect(contract.storage.tables.audit_entry.columns.created_at.default).toEqual({
+    expect(
+      findTableByName(contract.storage, 'audit_entry')!.columns['created_at']!.default,
+    ).toEqual({
       kind: 'function',
       expression: 'CURRENT_TIMESTAMP',
     });
@@ -662,13 +665,13 @@ describe('contract DSL helper vocabulary', () => {
       },
     );
 
-    expect(contract.storage.types?.Embedding1536).toEqual({
+    expect(contract.storage.types?.['__unbound__']?.['Embedding1536']).toEqual({
       kind: 'codec-instance',
       codecId: 'pg/vector@1',
       nativeType: 'vector',
       typeParams: { length: 1536 },
     });
-    expect(contract.storage.tables.document.columns.embedding).toMatchObject({
+    expect(findTableByName(contract.storage, 'document')!.columns['embedding']).toMatchObject({
       codecId: 'pg/vector@1',
       nativeType: 'vector',
       typeRef: 'Embedding1536',

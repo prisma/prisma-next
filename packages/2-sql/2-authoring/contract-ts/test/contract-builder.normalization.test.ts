@@ -1,4 +1,5 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import { findTableByName } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
@@ -36,7 +37,7 @@ describe('contract builder normalization', () => {
       },
     });
 
-    expect(contract.storage.tables.user.columns.id.nullable).toBe(false);
+    expect(findTableByName(contract.storage, 'user')!.columns['id']!.nullable).toBe(false);
   });
 
   it('normalizes nullable to provided value', () => {
@@ -53,8 +54,8 @@ describe('contract builder normalization', () => {
       },
     });
 
-    expect(contract.storage.tables.user.columns.id.nullable).toBe(false);
-    expect(contract.storage.tables.user.columns.email.nullable).toBe(true);
+    expect(findTableByName(contract.storage, 'user')!.columns['id']!.nullable).toBe(false);
+    expect(findTableByName(contract.storage, 'user')!.columns['email']!.nullable).toBe(true);
   });
 
   it('normalizes uniques to empty array when not provided', () => {
@@ -70,8 +71,8 @@ describe('contract builder normalization', () => {
       },
     });
 
-    expect(contract.storage.tables.user.uniques).toEqual([]);
-    expect(Array.isArray(contract.storage.tables.user.uniques)).toBe(true);
+    expect(findTableByName(contract.storage, 'user')!.uniques).toEqual([]);
+    expect(Array.isArray(findTableByName(contract.storage, 'user')!.uniques)).toBe(true);
   });
 
   it('normalizes indexes to empty array when not provided', () => {
@@ -87,8 +88,8 @@ describe('contract builder normalization', () => {
       },
     });
 
-    expect(contract.storage.tables.user.indexes).toEqual([]);
-    expect(Array.isArray(contract.storage.tables.user.indexes)).toBe(true);
+    expect(findTableByName(contract.storage, 'user')!.indexes).toEqual([]);
+    expect(Array.isArray(findTableByName(contract.storage, 'user')!.indexes)).toBe(true);
   });
 
   it('normalizes foreignKeys to empty array when not provided', () => {
@@ -104,8 +105,8 @@ describe('contract builder normalization', () => {
       },
     });
 
-    expect(contract.storage.tables.user.foreignKeys).toEqual([]);
-    expect(Array.isArray(contract.storage.tables.user.foreignKeys)).toBe(true);
+    expect(findTableByName(contract.storage, 'user')!.foreignKeys).toEqual([]);
+    expect(Array.isArray(findTableByName(contract.storage, 'user')!.foreignKeys)).toBe(true);
   });
 
   it('normalizes relations to empty object when not provided', () => {
@@ -149,12 +150,12 @@ describe('contract builder normalization', () => {
     });
 
     // Verify all tables have normalized fields
-    expect(contract.storage.tables.user.uniques).toEqual([]);
-    expect(contract.storage.tables.user.indexes).toEqual([]);
-    expect(contract.storage.tables.user.foreignKeys).toEqual([]);
-    expect(contract.storage.tables.post.uniques).toEqual([]);
-    expect(contract.storage.tables.post.indexes).toEqual([]);
-    expect(contract.storage.tables.post.foreignKeys).toEqual([]);
+    expect(findTableByName(contract.storage, 'user')!.uniques).toEqual([]);
+    expect(findTableByName(contract.storage, 'user')!.indexes).toEqual([]);
+    expect(findTableByName(contract.storage, 'user')!.foreignKeys).toEqual([]);
+    expect(findTableByName(contract.storage, 'post')!.uniques).toEqual([]);
+    expect(findTableByName(contract.storage, 'post')!.indexes).toEqual([]);
+    expect(findTableByName(contract.storage, 'post')!.foreignKeys).toEqual([]);
 
     // Verify all models have normalized relations
     const userModel = contract.models.User as { relations?: Record<string, unknown> };
@@ -163,8 +164,8 @@ describe('contract builder normalization', () => {
     expect(postModel.relations).toEqual({});
 
     // Verify nullable is normalized
-    expect(contract.storage.tables.user.columns.id.nullable).toBe(false);
-    expect(contract.storage.tables.user.columns.email.nullable).toBe(false);
+    expect(findTableByName(contract.storage, 'user')!.columns['id']!.nullable).toBe(false);
+    expect(findTableByName(contract.storage, 'user')!.columns['email']!.nullable).toBe(false);
   });
 
   it('passes type and options on indexes through to storage IR', () => {
@@ -195,7 +196,7 @@ describe('contract builder normalization', () => {
       }),
     );
 
-    const indexes = contract.storage.tables.items.indexes;
+    const indexes = findTableByName(contract.storage, 'items')!.indexes;
     expect(indexes).toHaveLength(1);
     expect(indexes[0]).toEqual({
       columns: ['description'],
@@ -222,7 +223,7 @@ describe('contract builder normalization', () => {
       },
     });
 
-    const idx = contract.storage.tables.user.indexes[0]!;
+    const idx = findTableByName(contract.storage, 'user')!.indexes[0]!;
     expect(idx.columns).toEqual(['email']);
     expect(idx).not.toHaveProperty('using');
     expect(idx).not.toHaveProperty('config');
