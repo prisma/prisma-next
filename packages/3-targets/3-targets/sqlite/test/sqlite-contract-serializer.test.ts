@@ -14,15 +14,18 @@ function makeContractWithTablesJson() {
     target: 'sqlite',
     storage: {
       tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'INTEGER', codecId: 'sqlite/integer@1', nullable: false },
-            email: { nativeType: 'TEXT', codecId: 'sqlite/text@1', nullable: false },
+        __unbound__: {
+          user: {
+            namespaceId: '__unbound__',
+            columns: {
+              id: { nativeType: 'INTEGER', codecId: 'sqlite/integer@1', nullable: false },
+              email: { nativeType: 'TEXT', codecId: 'sqlite/text@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     },

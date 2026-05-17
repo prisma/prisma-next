@@ -1,10 +1,14 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  SqlStorage,
+  type StorageTable,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import type { RecreateTableCall } from '../../src/core/migrations/op-factory-call';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   nullabilityTighteningBackfillStrategy,
   recreateTableStrategy,
@@ -12,16 +16,22 @@ import {
 } from '../../src/core/migrations/planner-strategies';
 
 function makeContract(
-  overrides: Partial<Contract<SqlStorage>['storage']> = {},
+  overrides: { tables?: Record<string, StorageTable | StorageTableInput> } = {},
 ): Contract<SqlStorage> {
+  const flatTables = overrides.tables ?? {};
+  const nestedTables: Record<string, Record<string, StorageTable | StorageTableInput>> = {};
+  for (const [name, t] of Object.entries(flatTables)) {
+    const ns = t.namespaceId;
+    if (nestedTables[ns] === undefined) nestedTables[ns] = {};
+    nestedTables[ns][name] = t;
+  }
   return {
     target: 'sqlite',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
       storageHash: coreHash('sha256:contract'),
-      tables: {},
-      ...overrides,
+      tables: nestedTables,
     }),
     roots: {},
     models: {},

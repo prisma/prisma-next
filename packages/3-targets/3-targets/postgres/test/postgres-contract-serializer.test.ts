@@ -25,32 +25,37 @@ function makeContractWithTablesJson() {
   return createSqlContract({
     storage: {
       tables: {
-        user: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        },
-        post: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-          },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [
-            {
-              source: { columns: ['userId'] },
-              target: { table: 'user', columns: ['id'] },
-              constraint: true,
-              index: true,
+        __unbound__: {
+          user: {
+            namespaceId: '__unbound__',
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
             },
-          ],
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+          post: {
+            namespaceId: '__unbound__',
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [
+              {
+                namespaceId: '__unbound__',
+                source: { columns: ['userId'] },
+                target: { namespaceId: '__unbound__', table: 'user', columns: ['id'] },
+                constraint: true,
+                index: true,
+              },
+            ],
+          },
         },
       },
     },

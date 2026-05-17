@@ -1,24 +1,41 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import { SqlStorage } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
+import {
+  SqlStorage,
+  type SqlStorageTypeEntry,
+  type StorageTable,
+  type StorageTableInput,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
 import { PostgresEnumType } from '../../src/exports/types';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 function makeContract(
-  overrides: Partial<Contract<SqlStorage>['storage']> = {},
+  overrides: {
+    tables?: Record<string, StorageTable | StorageTableInput>;
+    types?: Record<string, SqlStorageTypeEntry>;
+  } = {},
 ): Contract<SqlStorage> {
+  const flatTables = overrides.tables ?? {};
+  const nestedTables: Record<string, Record<string, StorageTable | StorageTableInput>> = {};
+  for (const [name, t] of Object.entries(flatTables)) {
+    const ns = t.namespaceId;
+    if (nestedTables[ns] === undefined) nestedTables[ns] = {};
+    nestedTables[ns][name] = t;
+  }
+  const nestedTypes =
+    overrides.types === undefined ? undefined : { [UNBOUND_NAMESPACE_ID]: overrides.types };
   return {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('sha256:test'),
     storage: new SqlStorage({
       storageHash: coreHash('sha256:contract'),
-      tables: {},
-      ...overrides,
+      tables: nestedTables,
+      ...(nestedTypes !== undefined ? { types: nestedTypes } : {}),
     }),
     roots: {},
     models: {},
