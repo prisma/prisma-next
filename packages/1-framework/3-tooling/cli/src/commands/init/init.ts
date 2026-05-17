@@ -457,11 +457,11 @@ export async function runInit(
   let skillRegistered = false;
   if (!inputs.installProjectSkill) {
     warnings.push(
-      `Skipped Prisma Next skills install (--no-skill). To install later, run ${manualProjectSkillSummary} in this project.`,
+      `Skipped Prisma Next agent-skill install (--no-skill). To install the skills later, run: ${manualProjectSkillSummary}`,
     );
   } else if (install.skipped) {
     warnings.push(
-      `Skipped Prisma Next skills install because --no-install was passed. Once you run install manually, register the skill with ${manualProjectSkillSummary}.`,
+      `Skipped Prisma Next agent-skill install because --no-install was passed. After you run install manually, install the skills with: ${manualProjectSkillSummary}`,
     );
   } else {
     const spinner = ui.spinner();

@@ -1486,7 +1486,7 @@ describe('runInit (--json output, FR1.5 / FR10.2)', { timeout: timeouts.database
     // The skip is surfaced via `warnings` with a manual-install hint.
     expect(nextStepsText).not.toContain('Prisma Next skills');
     const warnings = parsed['warnings'] as string[];
-    expect(warnings.join('\n')).toContain('Prisma Next skills');
+    expect(warnings.join('\n')).toContain('Prisma Next agent-skill');
   });
 
   it('writes a structured error to stdout in JSON mode when preconditions fail', async () => {
