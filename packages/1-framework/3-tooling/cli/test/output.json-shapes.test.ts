@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { MigrationApplyResult } from '../src/commands/migration-apply';
+import type { MigrateResult } from '../src/commands/migrate';
 import type { MigrationStatusResult } from '../src/commands/migration-status';
 
-describe('MigrationApplyResult JSON shape (aggregate-walking)', () => {
+describe('MigrateResult JSON shape (aggregate-walking)', () => {
   it('pins keys for an apply that touched both an extension and the app space', () => {
-    const result: MigrationApplyResult = {
+    const result: MigrateResult = {
       ok: true,
       migrationsApplied: 2,
       migrationsTotal: 2,
@@ -67,7 +67,7 @@ describe('MigrationApplyResult JSON shape (aggregate-walking)', () => {
   });
 
   it('pins per-space entry shape so per-space markers and ordering survive future refactors', () => {
-    const entry: MigrationApplyResult['perSpace'][number] = {
+    const entry: MigrateResult['perSpace'][number] = {
       spaceId: 'pgvector',
       kind: 'extension',
       operations: [{ id: 'op1', label: 'Install vector ext', operationClass: 'additive' }],

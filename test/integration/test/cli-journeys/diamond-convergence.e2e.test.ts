@@ -24,7 +24,7 @@ import {
   type JourneyContext,
   parseJsonOutput,
   runContractEmit,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlanAndEmit,
   runMigrationRef,
   runMigrationStatus,
@@ -64,9 +64,9 @@ withTempDir(({ createTempDir }) => {
         const c1Hash = parseJsonOutput<{ to: string }>(plan0).to;
 
         // D.02: apply init to both databases
-        const applyStaging0 = await runMigrationApply(staging);
+        const applyStaging0 = await runMigrate(staging);
         expect(applyStaging0.exitCode, 'D.02: apply init to staging').toBe(0);
-        const applyProd0 = await runMigrationApply(production);
+        const applyProd0 = await runMigrate(production);
         expect(applyProd0.exitCode, 'D.02: apply init to production').toBe(0);
 
         // D.03: set refs — staging and production both at C1
@@ -83,7 +83,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit1.exitCode, 'D.04: emit C2').toBe(0);
         const plan1 = await runMigrationPlanAndEmit(staging, ['--name', 'add-phone', '--json']);
         expect(plan1.exitCode, 'D.04: plan C1→C2').toBe(0);
-        const applyStaging1 = await runMigrationApply(staging);
+        const applyStaging1 = await runMigrate(staging);
         expect(applyStaging1.exitCode, 'D.04: apply C2 to staging').toBe(0);
 
         // D.05: swap to contract-phone-bio (C3) → emit → plan (C2→C3) → apply staging
@@ -93,7 +93,7 @@ withTempDir(({ createTempDir }) => {
         const plan2 = await runMigrationPlanAndEmit(staging, ['--name', 'add-bio', '--json']);
         expect(plan2.exitCode, 'D.05: plan C2→C3').toBe(0);
         const c3Hash = parseJsonOutput<{ to: string }>(plan2).to;
-        const applyStaging2 = await runMigrationApply(staging);
+        const applyStaging2 = await runMigrate(staging);
         expect(applyStaging2.exitCode, 'D.05: apply C3 to staging').toBe(0);
 
         // Update staging ref
@@ -121,7 +121,7 @@ withTempDir(({ createTempDir }) => {
         expect(refProd2.exitCode, 'D.06: ref set production=C4').toBe(0);
 
         // Apply C1→C4 to production DB
-        const applyProd1 = await runMigrationApply(production, ['--ref', 'production', '--json']);
+        const applyProd1 = await runMigrate(production, ['--to', 'production', '--json']);
         expect(applyProd1.exitCode, 'D.06: apply C4 to production').toBe(0);
         const applyProd1Result = parseJsonOutput<{ migrationsApplied: number }>(applyProd1);
         expect(applyProd1Result.migrationsApplied, 'D.06: production applied 1').toBe(1);
@@ -163,7 +163,7 @@ withTempDir(({ createTempDir }) => {
         expect(refProd3.exitCode, 'D.07: ref set production=C5').toBe(0);
 
         // D.08: apply merge to staging DB (C3→C5)
-        const applyStaging3 = await runMigrationApply(staging, ['--ref', 'staging', '--json']);
+        const applyStaging3 = await runMigrate(staging, ['--to', 'staging', '--json']);
         expect(applyStaging3.exitCode, 'D.08: apply merge to staging').toBe(0);
         const stagingResult = parseJsonOutput<{
           ok: boolean;
@@ -175,7 +175,7 @@ withTempDir(({ createTempDir }) => {
         expect(stagingResult.markerHash, 'D.08: staging marker at C5').toBe(c5Hash);
 
         // D.09: apply merge to production DB (C4→C5)
-        const applyProd2 = await runMigrationApply(production, ['--ref', 'production', '--json']);
+        const applyProd2 = await runMigrate(production, ['--to', 'production', '--json']);
         expect(applyProd2.exitCode, 'D.09: apply merge to production').toBe(0);
         const prodResult = parseJsonOutput<{
           ok: boolean;

@@ -46,29 +46,16 @@ import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
-interface MigrationApplyCommandOptions extends CommonCommandOptions {
+interface MigrateCommandOptions extends CommonCommandOptions {
   readonly db?: string;
   readonly config?: string;
-  readonly ref?: string;
+  readonly to?: string;
 }
 
-/**
- * Per-space breakdown of an apply run. The CLI command surfaces these
- * for both the JSON shape (`appliedSpaces[]`) and the human-readable
- * formatter (per-space block — same shape `db init` / `db update`
- * use, M6 sub-spec § Output shape contract).
- */
-export interface MigrationApplyResult {
+export interface MigrateResult {
   readonly ok: boolean;
-  /** Number of contract spaces that had non-zero pending operations applied. */
   readonly migrationsApplied: number;
-  /** Total contract spaces visible in the aggregate (pending + already-up-to-date). */
   readonly migrationsTotal: number;
-  /**
-   * Marker hash for the **app member** post-apply. Surfaced for
-   * back-compat with single-space callers; per-space markers live on
-   * `perSpace[].marker.storageHash`.
-   */
   readonly markerHash: string;
   readonly applied: readonly {
     readonly spaceId: string;
@@ -79,17 +66,7 @@ export interface MigrationApplyResult {
     readonly operationsExecuted: number;
   }[];
   readonly summary: string;
-  /**
-   * Per-space breakdown in canonical schedule order (extensions
-   * alphabetically, then app). Always present for the aggregate-walking
-   * apply path.
-   */
   readonly perSpace: readonly AggregatePerSpaceExecutionEntry[];
-  /**
-   * Path-decision data for the app member. Surfaced for back-compat
-   * with single-space callers (cli-journeys invariant tests).
-   * Absent for no-op applies where the app had nothing to do.
-   */
   readonly pathDecision?: MigrationApplyPathDecision;
   readonly timings: {
     readonly total: number;
@@ -99,17 +76,17 @@ export interface MigrationApplyResult {
 function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType {
   return errorRuntime(failure.summary, {
     why: failure.why ?? 'Migration runner failed',
-    fix: 'Fix the issue and re-run `prisma-next migration apply` — previously applied migrations are preserved.',
+    fix: 'Fix the issue and re-run `prisma-next migrate --to <contract>` — previously applied migrations are preserved.',
     meta: failure.meta ?? {},
   });
 }
 
-async function executeMigrationApplyCommand(
-  options: MigrationApplyCommandOptions,
+async function executeMigrateCommand(
+  options: MigrateCommandOptions,
   flags: GlobalFlags,
   ui: TerminalUI,
   startTime: number,
-): Promise<Result<MigrationApplyResult, CliStructuredErrorType>> {
+): Promise<Result<MigrateResult, CliStructuredErrorType>> {
   const config = await loadConfig(options.config);
   const { configPath, migrationsDir, appMigrationsDir, appMigrationsRelative, refsDir } =
     resolveMigrationPaths(options.config, config);
@@ -118,8 +95,8 @@ async function executeMigrationApplyCommand(
   if (!dbConnection) {
     return notOk(
       errorDatabaseConnectionRequired({
-        why: `Database connection is required for migration apply (set db.connection in ${configPath}, or pass --db <url>)`,
-        commandName: 'migration apply',
+        why: `Database connection is required for migrate (set db.connection in ${configPath}, or pass --db <url>)`,
+        commandName: 'migrate',
       }),
     );
   }
@@ -127,7 +104,7 @@ async function executeMigrationApplyCommand(
   if (!config.driver) {
     return notOk(
       errorDriverRequired({
-        why: 'Config.driver is required for migration apply',
+        why: 'Config.driver is required for migrate',
       }),
     );
   }
@@ -141,13 +118,13 @@ async function executeMigrationApplyCommand(
   }
 
   let refEntry: RefEntry | undefined;
-  const refName = options.ref;
+  const toArg = options.to;
 
-  if (refName) {
+  if (toArg) {
     try {
       const refs = await readRefs(refsDir);
       const { graph } = await loadMigrationPackages(appMigrationsDir);
-      const refResult = parseContractRef(refName, { graph, refs });
+      const refResult = parseContractRef(toArg, { graph, refs });
       if (!refResult.ok) {
         return notOk(mapRefResolutionError(refResult.failure));
       }
@@ -165,8 +142,6 @@ async function executeMigrationApplyCommand(
     }
   }
 
-  // Resolve and parse the contract envelope. The aggregate-walking
-  // operation needs the validated app contract to load the aggregate.
   const contractPathAbsolute = resolveContractPath(config);
   let contractRaw: Contract;
   try {
@@ -177,7 +152,7 @@ async function executeMigrationApplyCommand(
       return notOk(
         errorFileNotFound(contractPathAbsolute, {
           why: `Contract file not found at ${contractPathAbsolute}`,
-          fix: 'Run `prisma-next contract emit` to generate a valid contract.json, then retry apply.',
+          fix: 'Run `prisma-next contract emit` to generate a valid contract.json, then retry.',
         }),
       );
     }
@@ -200,21 +175,19 @@ async function executeMigrationApplyCommand(
         value: maskConnectionUrl(dbConnection),
       });
     }
-    if (refName) {
-      details.push({ label: 'ref', value: refName });
+    if (toArg) {
+      details.push({ label: 'to', value: toArg });
     }
     const header = formatStyledHeader({
-      command: 'migration apply',
-      description: 'Apply planned migrations to the database',
-      url: 'https://pris.ly/migration-apply',
+      command: 'migrate',
+      description: 'Apply planned migrations to advance the database',
+      url: 'https://pris.ly/migrate',
       details,
       flags,
     });
     ui.stderr(header);
   }
 
-  // Load app-space migration packages — the aggregate operation
-  // needs them to hydrate the app member's graph for graph-walk.
   let appPackages: Awaited<ReturnType<typeof loadMigrationPackages>>;
   try {
     appPackages = await loadMigrationPackages(appMigrationsDir);
@@ -236,13 +209,6 @@ async function executeMigrationApplyCommand(
   try {
     await client.connect(dbConnection);
 
-    // Pre-check unknown invariants against `(declared by app graph) ∪
-    // (already on the app marker)`. The marker side of the union
-    // catches the case where the ref carries an invariant whose
-    // declaring migration was retired (history rewritten) but whose
-    // id is recorded on the marker — surfacing UNKNOWN_INVARIANT
-    // there would be misleading because the database has already
-    // satisfied the requirement.
     if (refEntry && refEntry.invariants.length > 0) {
       const allMarkers = await client.readAllMarkers();
       const appMarker = allMarkers.get('app') ?? null;
@@ -254,7 +220,7 @@ async function executeMigrationApplyCommand(
         return notOk(
           mapMigrationToolsError(
             errorUnknownInvariant({
-              ...ifDefined('refName', refName),
+              ...ifDefined('refName', toArg),
               unknown,
               declared: [...declared].sort(),
             }),
@@ -273,7 +239,7 @@ async function executeMigrationApplyCommand(
       appMigrationPackages: appPackages.bundles,
       ...ifDefined('refHash', refEntry?.hash),
       ...(refEntry?.invariants ? { refInvariants: refEntry.invariants } : {}),
-      ...(refEntry !== undefined ? ifDefined('refName', refName) : {}),
+      ...(refEntry !== undefined ? ifDefined('refName', toArg) : {}),
     });
 
     if (!applyResult.ok) {
@@ -302,7 +268,7 @@ async function executeMigrationApplyCommand(
     }
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {
-        why: `Unexpected error during migration apply: ${error instanceof Error ? error.message : String(error)}`,
+        why: `Unexpected error during migrate: ${error instanceof Error ? error.message : String(error)}`,
       }),
     );
   } finally {
@@ -310,26 +276,29 @@ async function executeMigrationApplyCommand(
   }
 }
 
-export function createMigrationApplyCommand(): Command {
-  const command = new Command('apply');
+export function createMigrateCommand(): Command {
+  const command = new Command('migrate');
   setCommandDescriptions(
     command,
-    'Apply planned migrations to the database',
+    'Apply planned migrations to advance the database',
     'Walks every contract space (app + extensions) and applies pending\n' +
       'on-disk migrations in canonical order (extensions alphabetically,\n' +
-      'then app). Graph-walks the on-disk migration graph for every space —\n' +
-      "no introspection, no synth. Each space's marker advances inside its\n" +
-      "transaction; per-space failure rolls back every space's writes.",
+      'then app). Graph-walks the on-disk migration graph for every space.\n' +
+      'Use --to to target a specific contract (hash, ref name, migration dir).',
   );
-  setCommandExamples(command, ['prisma-next migration apply --db $DATABASE_URL']);
+  setCommandExamples(command, [
+    'prisma-next migrate --db $DATABASE_URL',
+    'prisma-next migrate --to production --db $DATABASE_URL',
+    'prisma-next migrate --to sha256:abc123 --db $DATABASE_URL',
+  ]);
   addGlobalOptions(command)
     .option('--db <url>', 'Database connection string')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .option(
-      '--ref <contract>',
-      'App-space target contract reference (hash, prefix, ref name, or migration dir name)',
+      '--to <contract>',
+      'Target contract reference (hash, prefix, ref name, or migration dir name)',
     )
-    .action(async (options: MigrationApplyCommandOptions) => {
+    .action(async (options: MigrateCommandOptions) => {
       const flags = parseGlobalFlags(options);
       const startTime = Date.now();
 
@@ -338,13 +307,13 @@ export function createMigrationApplyCommand(): Command {
         interactive: flags.interactive,
       });
 
-      const result = await executeMigrationApplyCommand(options, flags, ui, startTime);
+      const result = await executeMigrateCommand(options, flags, ui, startTime);
 
-      const exitCode = handleResult(result, flags, ui, (applyResult) => {
+      const exitCode = handleResult(result, flags, ui, (migrateResult) => {
         if (flags.json) {
-          ui.output(JSON.stringify(applyResult, null, 2));
+          ui.output(JSON.stringify(migrateResult, null, 2));
         } else if (!flags.quiet) {
-          ui.log(formatMigrationApplyCommandOutput(applyResult, flags));
+          ui.log(formatMigrationApplyCommandOutput(migrateResult, flags));
         }
       });
 

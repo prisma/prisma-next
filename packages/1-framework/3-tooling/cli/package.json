@@ -118,9 +118,9 @@
       "types": "./dist/commands/migration-status.d.mts",
       "import": "./dist/commands/migration-status.mjs"
     },
-    "./commands/migration-apply": {
-      "types": "./dist/commands/migration-apply.d.mts",
-      "import": "./dist/commands/migration-apply.mjs"
+    "./commands/migrate": {
+      "types": "./dist/commands/migrate.d.mts",
+      "import": "./dist/commands/migrate.mjs"
     },
     "./commands/migration-ref": {
       "types": "./dist/commands/migration-ref.d.mts",

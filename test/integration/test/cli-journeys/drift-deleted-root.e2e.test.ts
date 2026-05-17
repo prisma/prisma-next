@@ -17,7 +17,7 @@ import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
   runContractEmit,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlan,
   runMigrationPlanAndEmit,
   runMigrationStatus,
@@ -43,7 +43,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit0.exitCode, 'P4.pre: emit base').toBe(0);
         const planInit = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(planInit.exitCode, 'P4.pre: plan initial').toBe(0);
-        const applyInit = await runMigrationApply(ctx);
+        const applyInit = await runMigrate(ctx);
         expect(applyInit.exitCode, 'P4.pre: apply initial').toBe(0);
 
         swapContract(ctx, 'contract-additive');
@@ -51,7 +51,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit1.exitCode, 'P4.pre: emit v2').toBe(0);
         const plan1 = await runMigrationPlanAndEmit(ctx, ['--name', 'add-name']);
         expect(plan1.exitCode, 'P4.pre: plan add-name').toBe(0);
-        const apply1 = await runMigrationApply(ctx);
+        const apply1 = await runMigrate(ctx);
         expect(apply1.exitCode, 'P4.pre: apply add-name').toBe(0);
 
         // Delete the FIRST migration (root edge: empty → base)

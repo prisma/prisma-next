@@ -20,7 +20,7 @@ import {
   runContractEmit,
   runDbUpdate,
   runDbVerify,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlanAndEmit,
   runMigrationStatus,
   setupJourney,
@@ -46,7 +46,7 @@ withTempDir(({ createTempDir }) => {
         const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
         expect(plan0.exitCode, '1: plan init').toBe(0);
         const c1Hash = parseJsonOutput<{ to: string }>(plan0).to;
-        const apply0 = await runMigrationApply(ctx, ['--json']);
+        const apply0 = await runMigrate(ctx, ['--json']);
         expect(apply0.exitCode, '1: apply init').toBe(0);
         expect(parseJsonOutput<{ markerHash: string }>(apply0).markerHash, '1: marker at C1').toBe(
           c1Hash,
@@ -59,7 +59,7 @@ withTempDir(({ createTempDir }) => {
         const plan1 = await runMigrationPlanAndEmit(ctx, ['--name', 'add-phone', '--json']);
         expect(plan1.exitCode, '2: plan C1→C2').toBe(0);
         const c2Hash = parseJsonOutput<{ to: string }>(plan1).to;
-        const apply1 = await runMigrationApply(ctx, ['--json']);
+        const apply1 = await runMigrate(ctx, ['--json']);
         expect(apply1.exitCode, '2: apply C2').toBe(0);
         expect(parseJsonOutput<{ markerHash: string }>(apply1).markerHash, '2: marker at C2').toBe(
           c2Hash,
@@ -89,7 +89,7 @@ withTempDir(({ createTempDir }) => {
         expect(plan2Result.to, '4: to is C3 (current contract)').toBe(c3Hash);
 
         // 5. Apply is a noop: DB marker already at C3, destination is C3
-        const apply2 = await runMigrationApply(ctx, ['--json']);
+        const apply2 = await runMigrate(ctx, ['--json']);
         expect(apply2.exitCode, '5: apply noop').toBe(0);
         const apply2Result = parseJsonOutput<{
           migrationsApplied: number;
@@ -109,7 +109,7 @@ withTempDir(({ createTempDir }) => {
         expect(plan3Result.from, '6: from is C3 (new graph leaf)').toBe(c3Hash);
         const c4Hash = plan3Result.to;
 
-        const apply3 = await runMigrationApply(ctx, ['--json']);
+        const apply3 = await runMigrate(ctx, ['--json']);
         expect(apply3.exitCode, '6: apply C3→C4').toBe(0);
         const apply3Result = parseJsonOutput<{
           ok: boolean;

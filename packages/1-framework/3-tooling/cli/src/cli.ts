@@ -12,7 +12,7 @@ import { createDbSchemaCommand } from './commands/db-schema';
 import { createDbSignCommand } from './commands/db-sign';
 import { createDbUpdateCommand } from './commands/db-update';
 import { createDbVerifyCommand } from './commands/db-verify';
-import { createMigrationApplyCommand } from './commands/migration-apply';
+import { createMigrateCommand } from './commands/migrate';
 import { createMigrationNewCommand } from './commands/migration-new';
 import { createMigrationPlanCommand } from './commands/migration-plan';
 import { createMigrationRefCommand } from './commands/migration-ref';
@@ -247,13 +247,14 @@ migrationCommand.addCommand(migrationShowCommand);
 const migrationStatusCommand = createMigrationStatusCommand();
 migrationCommand.addCommand(migrationStatusCommand);
 
-const migrationApplyCommand = createMigrationApplyCommand();
-migrationCommand.addCommand(migrationApplyCommand);
-
 const migrationRefCommand = createMigrationRefCommand();
 migrationCommand.addCommand(migrationRefCommand);
 
 program.addCommand(migrationCommand);
+
+// Top-level migrate command (replaces `migration apply`)
+const migrateCommand = createMigrateCommand();
+program.addCommand(migrateCommand);
 
 // Register init command (top-level, not nested)
 const initCommand = createInitCommand();

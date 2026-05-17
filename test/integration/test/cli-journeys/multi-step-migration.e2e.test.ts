@@ -14,7 +14,7 @@ import {
   type JourneyContext,
   runContractEmit,
   runDbVerify,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlanAndEmit,
   runMigrationStatus,
   setupJourney,
@@ -67,7 +67,7 @@ withTempDir(({ createTempDir }) => {
         expect(pendingOutput, 'C.05: shows pending migrations').toContain('pending');
 
         // C.06: migration apply --db (applies both)
-        const apply = await runMigrationApply(ctx);
+        const apply = await runMigrate(ctx);
         expect(apply.exitCode, 'C.06: migration apply all').toBe(0);
 
         // C.07: migration status --db (all applied)

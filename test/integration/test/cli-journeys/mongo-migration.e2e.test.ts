@@ -37,7 +37,7 @@ import { rm } from 'node:fs/promises';
 import { basename, isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
-import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
+import { createMigrateCommand } from '@prisma-next/cli/commands/migrate';
 import { createMigrationNewCommand } from '@prisma-next/cli/commands/migration-new';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
 import { timeouts } from '@prisma-next/test-utils';
@@ -162,7 +162,7 @@ async function migrationEmit(ctx: JourneyCtx, args: readonly string[] = []): Pro
 }
 
 async function migrationApply(ctx: JourneyCtx, args: readonly string[] = []): Promise<RunResult> {
-  return runCli(createMigrationApplyCommand(), ctx.testDir, ['--config', ctx.configPath, ...args]);
+  return runCli(createMigrateCommand(), ctx.testDir, ['--config', ctx.configPath, ...args]);
 }
 
 function getLatestMigrationDir(ctx: JourneyCtx): string {

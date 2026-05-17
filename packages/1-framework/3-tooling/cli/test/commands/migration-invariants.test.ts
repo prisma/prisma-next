@@ -240,7 +240,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
   });
 
   it('migration apply --ref fails with UNKNOWN_INVARIANT when ref names an undeclared invariant', async () => {
-    const { createMigrationApplyCommand } = await import('../../src/commands/migration-apply');
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
     const fixture = await setupFixture({
       refInvariants: ['typo-id'],
       edgeInvariants: ['real-id'],
@@ -249,7 +249,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     const exitCode = await runAndCaptureExit(() =>
-      executeCommand(createMigrationApplyCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrateCommand(), ['--ref', 'prod', '--json']),
     );
 
     expect(exitCode).not.toBe(0);
@@ -295,7 +295,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     cleanupMocks = commandMocks.cleanup;
     setupConfigMock({ markerHash: TO_HASH, markerInvariants: ['retired-id'] });
 
-    const { createMigrationApplyCommand } = await import('../../src/commands/migration-apply');
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
     const fixture = await setupFixture({
       refInvariants: ['retired-id'],
       edgeInvariants: [],
@@ -304,7 +304,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     await runAndCaptureExit(() =>
-      executeCommand(createMigrationApplyCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrateCommand(), ['--ref', 'prod', '--json']),
     );
 
     // The contract under test is the pre-check: an invariant that
@@ -381,7 +381,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     // A ref with no invariants must not trip the pre-check. The command
     // continues to its next failure mode (driver no-op connect in this
     // mock setup); we just assert the error code is NOT UNKNOWN_INVARIANT.
-    const { createMigrationApplyCommand } = await import('../../src/commands/migration-apply');
+    const { createMigrateCommand } = await import('../../src/commands/migrate');
     const fixture = await setupFixture({
       refInvariants: [],
       edgeInvariants: ['real-id'],
@@ -390,7 +390,7 @@ describe('migration apply / status — invariant-routing pre-checks', {
     process.chdir(fixture.cwd);
 
     const exitCode = await runAndCaptureExit(() =>
-      executeCommand(createMigrationApplyCommand(), ['--ref', 'prod', '--json']),
+      executeCommand(createMigrateCommand(), ['--ref', 'prod', '--json']),
     );
 
     const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));

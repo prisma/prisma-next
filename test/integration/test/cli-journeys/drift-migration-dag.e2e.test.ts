@@ -14,7 +14,7 @@ import { withTempDir } from '../utils/cli-test-helpers';
 import {
   type JourneyContext,
   runContractEmit,
-  runMigrationApply,
+  runMigrate,
   runMigrationPlan,
   runMigrationPlanAndEmit,
   runMigrationStatus,
@@ -44,7 +44,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit0.exitCode, 'P3.pre: emit base').toBe(0);
         const planInit = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(planInit.exitCode, 'P3.pre: plan initial').toBe(0);
-        const applyInit = await runMigrationApply(ctx);
+        const applyInit = await runMigrate(ctx);
         expect(applyInit.exitCode, 'P3.pre: apply initial').toBe(0);
 
         swapContract(ctx, 'contract-additive');
@@ -52,7 +52,7 @@ withTempDir(({ createTempDir }) => {
         expect(emit1.exitCode, 'P3.pre: emit v2').toBe(0);
         const plan1 = await runMigrationPlanAndEmit(ctx, ['--name', 'add-name']);
         expect(plan1.exitCode, 'P3.pre: plan v2').toBe(0);
-        const apply1 = await runMigrationApply(ctx);
+        const apply1 = await runMigrate(ctx);
         expect(apply1.exitCode, 'P3.pre: apply v2').toBe(0);
 
         // Plan a second migration
@@ -76,7 +76,7 @@ withTempDir(({ createTempDir }) => {
         expect([0, 1], 'P3.01: status exits 0 or 1').toContain(statusBroken.exitCode);
 
         // P3.02: migration apply (fails — no path from marker to destination contract)
-        const applyFail = await runMigrationApply(ctx);
+        const applyFail = await runMigrate(ctx);
         expect(applyFail.exitCode, 'P3.02: migration apply fails').not.toBe(0);
 
         // P3.03: re-plan the missing edge (chain leaf is additive, contract is v3)
@@ -84,7 +84,7 @@ withTempDir(({ createTempDir }) => {
         expect(rePlan.exitCode, 'P3.03: migration plan recovery').toBe(0);
 
         // P3.04: migration apply (applies the re-planned additive→v3 migration)
-        const applyRecovery = await runMigrationApply(ctx);
+        const applyRecovery = await runMigrate(ctx);
         expect(applyRecovery.exitCode, 'P3.04: migration apply recovery').toBe(0);
       },
       timeouts.spinUpPpgDev,
