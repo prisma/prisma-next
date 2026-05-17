@@ -24,14 +24,17 @@ describe('SqlContractSerializer parameterized type fields', () => {
     storage: {
       storageHash: 'sha256:test',
       tables: {
-        User: {
-          columns: {
-            id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+        __unbound__: {
+          User: {
+            namespaceId: '__unbound__',
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
           },
-          primaryKey: { columns: ['id'] },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
         },
       },
     },
@@ -44,28 +47,32 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           storageHash: 'sha256:test',
           tables: {
-            Embedding: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                vector: {
-                  nativeType: 'vector(1536)',
-                  codecId: 'pg/vector@1',
-                  nullable: false,
-                  typeParams: { length: 1536 },
+            __unbound__: {
+              Embedding: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  vector: {
+                    nativeType: 'vector(1536)',
+                    codecId: 'pg/vector@1',
+                    nullable: false,
+                    typeParams: { length: 1536 },
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
       };
 
       const result = validateSqlContractFully<TestContract>(input);
-      const vectorCol = result.storage.tables['Embedding']?.columns['vector'];
-      expect(vectorCol?.typeParams).toEqual({ length: 1536 });
+      expect(result.storage.tables).toMatchObject({
+        __unbound__: { Embedding: { columns: { vector: { typeParams: { length: 1536 } } } } },
+      });
     });
 
     it('accepts column with empty typeParams object', () => {
@@ -74,31 +81,42 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           storageHash: 'sha256:test',
           tables: {
-            User: {
-              columns: {
-                id: {
-                  nativeType: 'int4',
-                  codecId: 'pg/int4@1',
-                  nullable: false,
-                  typeParams: {},
+            __unbound__: {
+              User: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: {
+                    nativeType: 'int4',
+                    codecId: 'pg/int4@1',
+                    nullable: false,
+                    typeParams: {},
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
       };
 
       const result = validateSqlContractFully<TestContract>(input);
-      expect(result.storage.tables['User']?.columns['id']?.typeParams).toEqual({});
+      expect(result.storage.tables).toMatchObject({
+        __unbound__: { User: { columns: { id: { typeParams: {} } } } },
+      });
     });
 
     it('accepts column without typeParams (optional field)', () => {
       const result = validateSqlContractFully<TestContract>(baseContractInput);
-      expect(result.storage.tables['User']?.columns['id']?.typeParams).toBeUndefined();
+      expect(result.storage.tables).not.toHaveProperty([
+        '__unbound__',
+        'User',
+        'columns',
+        'id',
+        'typeParams',
+      ]);
     });
 
     it('rejects non-object typeParams', () => {
@@ -107,19 +125,22 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           storageHash: 'sha256:test',
           tables: {
-            User: {
-              columns: {
-                id: {
-                  nativeType: 'int4',
-                  codecId: 'pg/int4@1',
-                  nullable: false,
-                  typeParams: 'invalid',
+            __unbound__: {
+              User: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: {
+                    nativeType: 'int4',
+                    codecId: 'pg/int4@1',
+                    nullable: false,
+                    typeParams: 'invalid',
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -134,19 +155,22 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           storageHash: 'sha256:test',
           tables: {
-            User: {
-              columns: {
-                id: {
-                  nativeType: 'int4',
-                  codecId: 'pg/int4@1',
-                  nullable: false,
-                  typeParams: [1, 2, 3],
+            __unbound__: {
+              User: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: {
+                    nativeType: 'int4',
+                    codecId: 'pg/int4@1',
+                    nullable: false,
+                    typeParams: [1, 2, 3],
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -161,29 +185,34 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           storageHash: 'sha256:test',
           tables: {
-            Embedding: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                vector: {
-                  nativeType: 'vector(1536)',
-                  codecId: 'pg/vector@1',
-                  nullable: false,
-                  typeParams: { length: 1536 },
-                  typeRef: 'Vector1536',
+            __unbound__: {
+              Embedding: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  vector: {
+                    nativeType: 'vector(1536)',
+                    codecId: 'pg/vector@1',
+                    nullable: false,
+                    typeParams: { length: 1536 },
+                    typeRef: 'Vector1536',
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            Vector1536: {
-              kind: 'codec-instance',
-              codecId: 'pg/vector@1',
-              nativeType: 'vector(1536)',
-              typeParams: { length: 1536 },
+            __unbound__: {
+              Vector1536: {
+                kind: 'codec-instance',
+                codecId: 'pg/vector@1',
+                nativeType: 'vector(1536)',
+                typeParams: { length: 1536 },
+              },
             },
           },
         },
@@ -202,36 +231,42 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           storageHash: 'sha256:test',
           tables: {
-            Embedding: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                vector: {
-                  nativeType: 'vector(1536)',
-                  codecId: 'pg/vector@1',
-                  nullable: false,
-                  typeRef: 'Vector1536',
+            __unbound__: {
+              Embedding: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  vector: {
+                    nativeType: 'vector(1536)',
+                    codecId: 'pg/vector@1',
+                    nullable: false,
+                    typeRef: 'Vector1536',
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            Vector1536: {
-              kind: 'codec-instance',
-              codecId: 'pg/vector@1',
-              nativeType: 'vector(1536)',
-              typeParams: { length: 1536 },
+            __unbound__: {
+              Vector1536: {
+                kind: 'codec-instance',
+                codecId: 'pg/vector@1',
+                nativeType: 'vector(1536)',
+                typeParams: { length: 1536 },
+              },
             },
           },
         },
       };
 
       const result = validateSqlContractFully<TestContract>(input);
-      const vectorCol = result.storage.tables['Embedding']?.columns['vector'];
-      expect(vectorCol?.typeRef).toBe('Vector1536');
+      expect(result.storage.tables).toMatchObject({
+        __unbound__: { Embedding: { columns: { vector: { typeRef: 'Vector1536' } } } },
+      });
     });
 
     it('rejects non-string typeRef', () => {
@@ -240,19 +275,22 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           storageHash: 'sha256:test',
           tables: {
-            User: {
-              columns: {
-                id: {
-                  nativeType: 'int4',
-                  codecId: 'pg/int4@1',
-                  nullable: false,
-                  typeRef: 123,
+            __unbound__: {
+              User: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: {
+                    nativeType: 'int4',
+                    codecId: 'pg/int4@1',
+                    nullable: false,
+                    typeRef: 123,
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -267,28 +305,33 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           storageHash: 'sha256:test',
           tables: {
-            Embedding: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                vector: {
-                  nativeType: 'vector(1536)',
-                  codecId: 'pg/vector@1',
-                  nullable: false,
-                  typeRef: 'NonExistent',
+            __unbound__: {
+              Embedding: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  vector: {
+                    nativeType: 'vector(1536)',
+                    codecId: 'pg/vector@1',
+                    nullable: false,
+                    typeRef: 'NonExistent',
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            Vector1536: {
-              kind: 'codec-instance',
-              codecId: 'pg/vector@1',
-              nativeType: 'vector(1536)',
-              typeParams: { length: 1536 },
+            __unbound__: {
+              Vector1536: {
+                kind: 'codec-instance',
+                codecId: 'pg/vector@1',
+                nativeType: 'vector(1536)',
+                typeParams: { length: 1536 },
+              },
             },
           },
         },
@@ -303,20 +346,23 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           storageHash: 'sha256:test',
           tables: {
-            Embedding: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                vector: {
-                  nativeType: 'vector(1536)',
-                  codecId: 'pg/vector@1',
-                  nullable: false,
-                  typeRef: 'Vector1536',
+            __unbound__: {
+              Embedding: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  vector: {
+                    nativeType: 'vector(1536)',
+                    codecId: 'pg/vector@1',
+                    nullable: false,
+                    typeRef: 'Vector1536',
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -333,11 +379,13 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           ...baseContractInput.storage,
           types: {
-            Vector1536: {
-              kind: 'codec-instance',
-              codecId: 'pg/vector@1',
-              nativeType: 'vector(1536)',
-              typeParams: { length: 1536 },
+            __unbound__: {
+              Vector1536: {
+                kind: 'codec-instance',
+                codecId: 'pg/vector@1',
+                nativeType: 'vector(1536)',
+                typeParams: { length: 1536 },
+              },
             },
           },
         },
@@ -345,11 +393,13 @@ describe('SqlContractSerializer parameterized type fields', () => {
 
       const result = validateSqlContractFully<TestContract>(input);
       expect(result.storage.types).toEqual({
-        Vector1536: {
-          kind: 'codec-instance',
-          codecId: 'pg/vector@1',
-          nativeType: 'vector(1536)',
-          typeParams: { length: 1536 },
+        __unbound__: {
+          Vector1536: {
+            kind: 'codec-instance',
+            codecId: 'pg/vector@1',
+            nativeType: 'vector(1536)',
+            typeParams: { length: 1536 },
+          },
         },
       });
     });
@@ -360,24 +410,26 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           ...baseContractInput.storage,
           types: {
-            Vector1536: {
-              kind: 'codec-instance',
-              codecId: 'pg/vector@1',
-              nativeType: 'vector(1536)',
-              typeParams: { length: 1536 },
-            },
-            Vector768: {
-              kind: 'codec-instance',
-              codecId: 'pg/vector@1',
-              nativeType: 'vector(768)',
-              typeParams: { length: 768 },
+            __unbound__: {
+              Vector1536: {
+                kind: 'codec-instance',
+                codecId: 'pg/vector@1',
+                nativeType: 'vector(1536)',
+                typeParams: { length: 1536 },
+              },
+              Vector768: {
+                kind: 'codec-instance',
+                codecId: 'pg/vector@1',
+                nativeType: 'vector(768)',
+                typeParams: { length: 768 },
+              },
             },
           },
         },
       };
 
       const result = validateSqlContractFully<TestContract>(input);
-      expect(Object.keys(result.storage.types!)).toHaveLength(2);
+      expect(Object.keys(result.storage.types!['__unbound__']!)).toHaveLength(2);
     });
 
     it('accepts storage without types (optional field)', () => {
@@ -391,10 +443,12 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           ...baseContractInput.storage,
           types: {
-            Vector1536: {
-              kind: 'codec-instance',
-              nativeType: 'vector(1536)',
-              typeParams: { length: 1536 },
+            __unbound__: {
+              Vector1536: {
+                kind: 'codec-instance',
+                nativeType: 'vector(1536)',
+                typeParams: { length: 1536 },
+              },
             },
           },
         },
@@ -409,10 +463,12 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           ...baseContractInput.storage,
           types: {
-            Vector1536: {
-              kind: 'codec-instance',
-              codecId: 'pg/vector@1',
-              typeParams: { length: 1536 },
+            __unbound__: {
+              Vector1536: {
+                kind: 'codec-instance',
+                codecId: 'pg/vector@1',
+                typeParams: { length: 1536 },
+              },
             },
           },
         },
@@ -427,10 +483,12 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           ...baseContractInput.storage,
           types: {
-            Vector1536: {
-              kind: 'codec-instance',
-              codecId: 'pg/vector@1',
-              nativeType: 'vector(1536)',
+            __unbound__: {
+              Vector1536: {
+                kind: 'codec-instance',
+                codecId: 'pg/vector@1',
+                nativeType: 'vector(1536)',
+              },
             },
           },
         },
@@ -457,11 +515,13 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           ...baseContractInput.storage,
           types: {
-            Vector1536: {
-              kind: 'codec-instance',
-              codecId: 'pg/vector@1',
-              nativeType: 'vector(1536)',
-              typeParams: [1536],
+            __unbound__: {
+              Vector1536: {
+                kind: 'codec-instance',
+                codecId: 'pg/vector@1',
+                nativeType: 'vector(1536)',
+                typeParams: [1536],
+              },
             },
           },
         },
@@ -478,28 +538,33 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           storageHash: 'sha256:test',
           tables: {
-            User: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                role: {
-                  nativeType: 'role',
-                  codecId: 'pg/int4@1',
-                  nullable: false,
-                  typeRef: 'Role',
+            __unbound__: {
+              User: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  role: {
+                    nativeType: 'role',
+                    codecId: 'pg/int4@1',
+                    nullable: false,
+                    typeRef: 'Role',
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            Role: {
-              kind: 'codec-instance',
-              codecId: 'pg/enum@1',
-              nativeType: 'role',
-              typeParams: { values: ['USER'] },
+            __unbound__: {
+              Role: {
+                kind: 'codec-instance',
+                codecId: 'pg/enum@1',
+                nativeType: 'role',
+                typeParams: { values: ['USER'] },
+              },
             },
           },
         },
@@ -514,28 +579,33 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           storageHash: 'sha256:test',
           tables: {
-            User: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                role: {
-                  nativeType: 'int4',
-                  codecId: 'pg/enum@1',
-                  nullable: false,
-                  typeRef: 'Role',
+            __unbound__: {
+              User: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  role: {
+                    nativeType: 'int4',
+                    codecId: 'pg/enum@1',
+                    nullable: false,
+                    typeRef: 'Role',
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            Role: {
-              kind: 'codec-instance',
-              codecId: 'pg/enum@1',
-              nativeType: 'role',
-              typeParams: { values: ['USER'] },
+            __unbound__: {
+              Role: {
+                kind: 'codec-instance',
+                codecId: 'pg/enum@1',
+                nativeType: 'role',
+                typeParams: { values: ['USER'] },
+              },
             },
           },
         },
@@ -550,35 +620,42 @@ describe('SqlContractSerializer parameterized type fields', () => {
         storage: {
           storageHash: 'sha256:test',
           tables: {
-            User: {
-              columns: {
-                id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-                role: {
-                  nativeType: 'role',
-                  codecId: 'pg/enum@1',
-                  nullable: false,
-                  typeRef: 'Role',
+            __unbound__: {
+              User: {
+                namespaceId: '__unbound__',
+                columns: {
+                  id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                  role: {
+                    nativeType: 'role',
+                    codecId: 'pg/enum@1',
+                    nullable: false,
+                    typeRef: 'Role',
+                  },
                 },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
           types: {
-            Role: {
-              kind: 'codec-instance',
-              codecId: 'pg/enum@1',
-              nativeType: 'role',
-              typeParams: { values: ['USER'] },
+            __unbound__: {
+              Role: {
+                kind: 'codec-instance',
+                codecId: 'pg/enum@1',
+                nativeType: 'role',
+                typeParams: { values: ['USER'] },
+              },
             },
           },
         },
       };
 
       const result = validateSqlContractFully<TestContract>(input);
-      expect(result.storage.tables['User']?.columns['role']?.typeRef).toBe('Role');
+      expect(result.storage.tables).toMatchObject({
+        __unbound__: { User: { columns: { role: { typeRef: 'Role' } } } },
+      });
     });
   });
 });
