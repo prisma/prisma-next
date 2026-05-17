@@ -39,19 +39,6 @@ const baseInput = {
 
 const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
 
-interface ProfileFk {
-  readonly source: { readonly columns: readonly string[] };
-  readonly target: {
-    readonly table: string;
-    readonly namespaceId?: string;
-    readonly columns: readonly string[];
-  };
-}
-
-interface ProfileTable {
-  readonly foreignKeys?: readonly ProfileFk[];
-}
-
 describe('FR16b cross-namespace FK lowering (PSL interpreter)', () => {
   it('resolves dot-qualified type references and populates target.namespaceId', () => {
     const document = parsePslDocument({
@@ -82,9 +69,7 @@ namespace public {
     expect(result.ok, JSON.stringify(result, null, 2)).toBe(true);
     if (!result.ok) return;
     const storage = result.value.storage as SqlStorage;
-    const profile = (
-      storage.tablesByNamespace?.['public'] as Record<string, ProfileTable> | undefined
-    )?.['profile'];
+    const profile = storage.tables['public']?.['profile'];
     expect(profile, JSON.stringify(storage, null, 2)).toBeDefined();
     const fk = profile?.foreignKeys?.[0];
     expect(fk).toBeDefined();
@@ -155,14 +140,9 @@ namespace public {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const storage = result.value.storage as SqlStorage;
-    const profile = (
-      storage.tablesByNamespace?.['public'] as Record<string, ProfileTable> | undefined
-    )?.['profile'];
+    const profile = storage.tables['public']?.['profile'];
     const fk = profile?.foreignKeys?.[0];
     expect(fk?.target.table).toBe('user');
-    // Same-namespace FK: target.namespaceId is auto-defaulted by the
-    // StorageTable constructor to source's namespace; the FK input
-    // emitted by the PSL interpreter does not write the field.
     expect(fk?.target.namespaceId).toBe('public');
   });
 });

@@ -4,7 +4,6 @@ import type {
   GenerateContractTypesOptions,
   ValidationContext,
 } from '@prisma-next/framework-components/emission';
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   findTableByName,
   findTypeByName,
@@ -405,14 +404,13 @@ function generateTablesType(storage: SqlStorage): string {
 }
 
 function generateStorageTypesType(storage: SqlStorage): string {
-  const typesByNamespace =
-    storage.typesByNamespace ?? (storage.types ? { [UNBOUND_NAMESPACE_ID]: storage.types } : {});
-  if (Object.keys(typesByNamespace).length === 0) {
+  const nestedTypes = storage.types ?? {};
+  if (Object.keys(nestedTypes).length === 0) {
     return 'Record<string, never>';
   }
 
   let totalTypes = 0;
-  for (const bucket of Object.values(typesByNamespace)) totalTypes += Object.keys(bucket).length;
+  for (const bucket of Object.values(nestedTypes)) totalTypes += Object.keys(bucket).length;
   if (totalTypes === 0) {
     return 'Record<string, never>';
   }

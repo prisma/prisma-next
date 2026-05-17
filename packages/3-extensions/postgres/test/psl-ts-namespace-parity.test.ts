@@ -100,19 +100,11 @@ namespace auth {
       expect(fromPsl).toEqual(fromTs);
     }
 
-    // Tables map: same names, same per-table namespaceId.
-    const pslTableNames = Object.keys(pslStorage.tables).sort();
-    const tsTableNames = Object.keys(tsStorage.tables).sort();
-    expect(pslTableNames).toEqual(tsTableNames);
-    for (const name of pslTableNames) {
-      expect(pslStorage.tables[name]?.namespaceId).toBe(tsStorage.tables[name]?.namespaceId);
-    }
-
-    // Nested-by-namespace view: same `(namespaceId, name)` coordinates.
-    const pslCoords = Object.entries(pslStorage.tablesByNamespace ?? {})
+    // Nested-by-namespace tables: same `(namespaceId, name)` coordinates.
+    const pslCoords = Object.entries(pslStorage.tables)
       .flatMap(([nsId, bucket]) => Object.keys(bucket).map((name) => `${nsId}/${name}`))
       .sort();
-    const tsCoords = Object.entries(tsStorage.tablesByNamespace ?? {})
+    const tsCoords = Object.entries(tsStorage.tables)
       .flatMap(([nsId, bucket]) => Object.keys(bucket).map((name) => `${nsId}/${name}`))
       .sort();
     expect(pslCoords).toEqual(tsCoords);
