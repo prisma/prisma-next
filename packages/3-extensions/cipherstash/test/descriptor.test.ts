@@ -46,7 +46,12 @@ describe('cipherstash extension descriptor (contract-space package layout)', () 
   it('exposes a contractSpace declaring the eql_v2_configuration table', () => {
     const space = cipherstashExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
-    expect(Object.keys(space!.contractJson.storage.tables)).toEqual([EQL_V2_CONFIGURATION_TABLE]);
+    const nestedTables = space!.contractJson.storage.tables as unknown as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const allTableNames = Object.values(nestedTables).flatMap((bucket) => Object.keys(bucket));
+    expect(allTableNames).toEqual([EQL_V2_CONFIGURATION_TABLE]);
   });
 
   it('publishes one baseline migration sourced from the on-disk emit pipeline', () => {

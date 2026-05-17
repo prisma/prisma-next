@@ -21,6 +21,7 @@ function createFkTestContract(fkConfig: {
       storageHash: coreHash('sha256:contract'),
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -31,6 +32,7 @@ function createFkTestContract(fkConfig: {
           foreignKeys: [],
         },
         post: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -42,7 +44,7 @@ function createFkTestContract(fkConfig: {
           foreignKeys: [
             {
               source: { columns: ['userId'] },
-              target: { table: 'user', columns: ['id'] },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
               constraint: fkConfig.constraint,
               index: fkConfig.index,
             },

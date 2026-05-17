@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   CodecDescriptor,
   CodecInstanceContext,
@@ -56,6 +57,7 @@ function createParamTypesTestContract(
       storageHash: coreHash('sha256:test'),
       tables: {
         test: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: options?.tableColumns ?? {
             id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           },

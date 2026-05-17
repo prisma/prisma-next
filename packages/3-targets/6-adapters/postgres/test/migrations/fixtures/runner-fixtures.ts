@@ -12,6 +12,7 @@ import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/pla
 import type { SqlStatement } from '@prisma-next/target-postgres/statement-builders';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import postgresAdapterDescriptor from '../../../src/exports/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 export const contract: Contract<SqlStorage> = {
   target: 'postgres',
@@ -21,6 +22,7 @@ export const contract: Contract<SqlStorage> = {
     storageHash: coreHash('sha256:contract'),
     tables: {
       user: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },

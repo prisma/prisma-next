@@ -4,6 +4,7 @@ import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 function makeContract(
   overrides: Partial<Contract<SqlStorage>['storage']> = {},
@@ -39,6 +40,7 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
       const toContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
               email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false },
@@ -81,6 +83,7 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
       const toContract = makeContract({
         tables: {
           post: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
               userId: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
@@ -91,7 +94,7 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
             foreignKeys: [
               {
                 source: { columns: ['userId'] },
-                target: { table: 'user', columns: ['id'] },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
                 index: true,
                 constraint: true,
               },
@@ -125,6 +128,7 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
       const toContract = makeContract({
         tables: {
           post: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
               userId: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
@@ -135,7 +139,7 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
             foreignKeys: [
               {
                 source: { columns: ['userId'] },
-                target: { table: 'user', columns: ['id'] },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
                 index: true,
                 constraint: true,
               },
@@ -207,6 +211,7 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
       const toContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
               bio: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
@@ -251,6 +256,7 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
       const toContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
             },
@@ -290,6 +296,7 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
       const toContract = makeContract({
         tables: {
           post: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               userId: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
             },
@@ -298,7 +305,7 @@ describe('planIssues — mapIssueToCall per issue kind', () => {
             foreignKeys: [
               {
                 source: { columns: ['userId'] },
-                target: { table: 'user', columns: ['id'] },
+                target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
                 index: true,
                 constraint: true,
               },
@@ -495,6 +502,7 @@ describe('planIssues — emission order and bucketing', () => {
     const toContract = makeContract({
       tables: {
         a: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
             email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
@@ -505,6 +513,7 @@ describe('planIssues — emission order and bucketing', () => {
           foreignKeys: [],
         },
         b: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
             new_col: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },

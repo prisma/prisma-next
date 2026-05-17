@@ -18,6 +18,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, describe, expect, it } from 'vitest';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   contract as appContract,
   createTestDatabase,
@@ -61,6 +62,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
       namespaces: {},
       tables: {
         _ext_helper: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
             ...(version === 2

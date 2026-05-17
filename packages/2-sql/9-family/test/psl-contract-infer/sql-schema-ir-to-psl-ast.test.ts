@@ -3,6 +3,7 @@ import { printPsl } from '@prisma-next/psl-printer';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { sqlSchemaIrToPslAst } from '../../src/core/psl-contract-infer/sql-schema-ir-to-psl-ast';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 function ir(partial: Partial<SqlSchemaIR> & Pick<SqlSchemaIR, 'tables'>): SqlSchemaIR {
   return {
@@ -61,6 +62,7 @@ describe('sqlSchemaIrToPslAst', () => {
             {
               columns: ['user_id'],
               referencedTable: 'user',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['id'],
             },
           ],
@@ -212,6 +214,7 @@ describe('sqlSchemaIrToPslAst', () => {
             {
               columns: ['user_id'],
               referencedTable: 'user',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['id'],
             },
           ],

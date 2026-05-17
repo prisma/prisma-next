@@ -28,6 +28,7 @@ const contractWithEnum: Contract<SqlStorage> = {
     storageHash: coreHash('sha256:test'),
     tables: {
       user: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           role: { nativeType: 'role', codecId: 'pg/enum@1', nullable: false, typeRef: 'Role' },

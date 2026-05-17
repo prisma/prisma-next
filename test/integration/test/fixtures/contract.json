@@ -54,34 +54,37 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:ce977703a2275503bb83a0322724795a3f85eff0f75a58c9cb50782a2e0bbd51",
+    "storageHash": "sha256:bec3cd8431232a6800853ce8dd5b8b1b926870077135c369b1e80587987be9e2",
     "tables": {
-      "user": {
-        "columns": {
-          "createdAt": {
-            "codecId": "pg/timestamptz@1",
-            "nativeType": "timestamptz",
-            "nullable": false
+      "__unbound__": {
+        "user": {
+          "columns": {
+            "createdAt": {
+              "codecId": "pg/timestamptz@1",
+              "nativeType": "timestamptz",
+              "nullable": false
+            },
+            "email": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "id": {
+              "codecId": "pg/int4@1",
+              "nativeType": "int4",
+              "nullable": false
+            }
           },
-          "email": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
+          "foreignKeys": [],
+          "indexes": [],
+          "namespaceId": "__unbound__",
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
           },
-          "id": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4",
-            "nullable": false
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": []
+          "uniques": []
+        }
       }
     }
   },

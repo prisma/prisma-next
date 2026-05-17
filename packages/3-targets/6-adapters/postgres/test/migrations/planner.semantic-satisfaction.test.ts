@@ -26,6 +26,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
           storageHash: coreHash('sha256:test'),
           tables: {
             user: {
+              namespaceId: UNBOUND_NAMESPACE_ID,
               columns: {
                 id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
                 email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -82,6 +83,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
           storageHash: coreHash('sha256:test'),
           tables: {
             user: {
+              namespaceId: UNBOUND_NAMESPACE_ID,
               columns: {
                 id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
                 email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -136,6 +138,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
           storageHash: coreHash('sha256:test'),
           tables: {
             user: {
+              namespaceId: UNBOUND_NAMESPACE_ID,
               columns: {
                 id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
                 email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -192,6 +195,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
           storageHash: coreHash('sha256:test'),
           tables: {
             user: {
+              namespaceId: UNBOUND_NAMESPACE_ID,
               columns: {
                 id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
                 email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },

@@ -46,9 +46,20 @@ describe('pgvector extension descriptor (contract-space package layout)', () => 
   it('exposes a contractSpace declaring the vector parameterised native type', () => {
     const space = pgvectorExtensionDescriptor.contractSpace;
     expect(space).toBeDefined();
-    expect(Object.keys(space!.contractJson.storage.tables)).toEqual([]);
+    const nestedTables = space!.contractJson.storage.tables as unknown as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const allTableNames = Object.values(nestedTables).flatMap((bucket) => Object.keys(bucket));
+    expect(allTableNames).toEqual([]);
     expect(space!.contractJson.storage.types).toBeDefined();
-    expect(space!.contractJson.storage.types?.[PGVECTOR_NATIVE_TYPE]).toMatchObject({
+    const nestedTypes = space!.contractJson.storage.types as unknown as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const allTypes: Record<string, unknown> = {};
+    for (const bucket of Object.values(nestedTypes)) Object.assign(allTypes, bucket);
+    expect(allTypes[PGVECTOR_NATIVE_TYPE]).toMatchObject({
       codecId: VECTOR_CODEC_ID,
       nativeType: PGVECTOR_NATIVE_TYPE,
     });

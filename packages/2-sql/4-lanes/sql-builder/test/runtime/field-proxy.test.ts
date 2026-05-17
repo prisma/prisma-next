@@ -61,6 +61,7 @@ describe('createFieldProxy', () => {
 
   it('tableToScope resolves codec by storage table name when alias differs', () => {
     const table: StorageTable = {
+      namespaceId: UNBOUND_NAMESPACE_ID,
       columns: {
         embedding: {
           codecId: 'pgvector/vector@1',

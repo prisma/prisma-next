@@ -501,17 +501,71 @@ function normaliseTypeEntry(
 }
 
 /**
- * Read the nested-by-namespace view of a storage's tables. Falls back
- * to wrapping the flat-by-name view under the unbound namespace when
- * the storage's nested view is absent — the case for user-facing
- * contract type structures the emitter / `defineContract` builds
- * bottom-up from the flat `tables` shape (these structurally satisfy
- * `SqlStorage` but don't round-trip through the runtime constructor).
+ * Read the nested-by-namespace view of a storage's tables.
+ *
+ * Class-instance storages (built via `new SqlStorage(...)`) expose the
+ * nested truth through the non-enumerable `tablesByNamespace`
+ * back-pointer; the helper returns it directly.
+ *
+ * Plain JSON-deserialised storages (`JSON.parse(contract.json)` without
+ * hydration through a target serializer) carry the FR15 nested envelope
+ * directly on `tables`. The helper detects that shape and returns it
+ * as-is.
+ *
+ * User-facing contract structures the emitter / `defineContract` builds
+ * bottom-up from a flat `tables` shape (each table carrying its
+ * `namespaceId` back-pointer) are re-bucketed into the nested view on
+ * read.
  */
 function nestedTablesView(
   storage: Pick<SqlStorage, 'tables' | 'tablesByNamespace'>,
 ): Readonly<Record<string, Readonly<Record<string, StorageTable>>>> {
-  return storage.tablesByNamespace ?? { [UNBOUND_NAMESPACE_ID]: storage.tables };
+  if (storage.tablesByNamespace !== undefined) return storage.tablesByNamespace;
+  const tables = storage.tables as Record<string, unknown>;
+  if (looksLikeNestedTablesMap(tables)) {
+    return tables as Readonly<Record<string, Readonly<Record<string, StorageTable>>>>;
+  }
+  return bucketFlatTablesByNamespace(storage.tables);
+}
+
+/**
+ * A nested tables map's values are namespace buckets — records whose
+ * own values look like tables (carry a `columns` field). A flat tables
+ * map's values are the tables themselves (also carrying `columns`).
+ * Detecting the nested shape requires peeking through the outer record:
+ * a value with a `columns` field is a table; a value that does not
+ * itself have `columns` but contains objects with `columns` is a
+ * namespace bucket.
+ */
+function looksLikeNestedTablesMap(tables: Record<string, unknown>): boolean {
+  for (const value of Object.values(tables)) {
+    if (typeof value !== 'object' || value === null) return false;
+    if ('columns' in (value as Record<string, unknown>)) return false;
+    for (const inner of Object.values(value as Record<string, unknown>)) {
+      if (
+        typeof inner === 'object' &&
+        inner !== null &&
+        'columns' in (inner as Record<string, unknown>)
+      ) {
+        return true;
+      }
+      return false;
+    }
+    return false;
+  }
+  return false;
+}
+
+function bucketFlatTablesByNamespace(
+  tables: Readonly<Record<string, StorageTable>>,
+): Readonly<Record<string, Readonly<Record<string, StorageTable>>>> {
+  const out: Record<string, Record<string, StorageTable>> = {};
+  for (const [name, table] of Object.entries(tables)) {
+    const nsId = table.namespaceId;
+    if (out[nsId] === undefined) out[nsId] = {};
+    out[nsId][name] = table;
+  }
+  return out;
 }
 
 function nestedTypesView(
@@ -520,8 +574,39 @@ function nestedTypesView(
   Record<string, Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>>
 > {
   if (storage.typesByNamespace !== undefined) return storage.typesByNamespace;
-  if (storage.types !== undefined) return { [UNBOUND_NAMESPACE_ID]: storage.types };
-  return {};
+  if (storage.types === undefined) return {};
+  const types = storage.types as Record<string, unknown>;
+  if (looksLikeNestedTypesMap(types)) {
+    return types as Readonly<
+      Record<string, Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>>
+    >;
+  }
+  return { [UNBOUND_NAMESPACE_ID]: storage.types };
+}
+
+function looksLikeNestedTypesMap(types: Record<string, unknown>): boolean {
+  for (const value of Object.values(types)) {
+    if (typeof value !== 'object' || value === null) return false;
+    if (
+      'kind' in (value as Record<string, unknown>) ||
+      'codecId' in (value as Record<string, unknown>)
+    ) {
+      return false;
+    }
+    for (const inner of Object.values(value as Record<string, unknown>)) {
+      if (
+        typeof inner === 'object' &&
+        inner !== null &&
+        ('kind' in (inner as Record<string, unknown>) ||
+          'codecId' in (inner as Record<string, unknown>))
+      ) {
+        return true;
+      }
+      return false;
+    }
+    return false;
+  }
+  return false;
 }
 
 /**

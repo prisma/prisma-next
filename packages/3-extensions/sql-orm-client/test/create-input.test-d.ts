@@ -6,6 +6,7 @@ type CreateInputContract = Contract<
     storageHash: StorageHashBase<string>;
     tables: {
       user: {
+        namespaceId: '__unbound__';
         columns: {
           id: {
             nativeType: 'int4';

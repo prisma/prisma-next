@@ -5,6 +5,7 @@ import type {
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -121,6 +122,7 @@ function createTestContract(
     Object.entries(tables).map(([tableName, columns]) => [
       tableName,
       {
+        namespaceId: UNBOUND_NAMESPACE_ID,
         columns,
         primaryKey: { columns: [Object.keys(columns)[0] ?? 'id'] },
         uniques: [],

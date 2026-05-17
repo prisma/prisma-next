@@ -1,5 +1,6 @@
 import type { Contract, StorageHashBase } from '@prisma-next/contract/types';
 import { profileHash } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
 import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
@@ -22,6 +23,7 @@ function col(overrides: Partial<StorageColumn> & { codecId: string }): StorageCo
 
 function table(columns: Record<string, StorageColumn>): StorageTable {
   return {
+    namespaceId: UNBOUND_NAMESPACE_ID,
     columns,
     uniques: [],
     indexes: [],

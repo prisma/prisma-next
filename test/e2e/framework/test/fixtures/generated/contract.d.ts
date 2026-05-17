@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:1d77849c5666d7f806783d38fb367a7b9db76cb043d15f4ed758f368279c457e'>;
+  StorageHashBase<'sha256:77419affe530fd1a2f785c32dc7ab94fc4d303464e3e3742d316b211a03b7aca'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:adc296c2bde14cd4e6a8a85ba202108dc7a320b5870a14d7dd8e2d2e2f5a7f27'>;
 export type ProfileHash =
@@ -172,6 +172,7 @@ type ContractBase = ContractType<
   {
     readonly tables: {
       readonly comment: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -207,6 +208,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly embedding: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -242,6 +244,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly event: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'character';
@@ -276,6 +279,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly literal_defaults: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -353,6 +357,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly param_types: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -421,6 +426,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly post: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -466,6 +472,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly user: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';

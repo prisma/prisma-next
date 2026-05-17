@@ -142,6 +142,7 @@ function buildAppContract(opts: { readonly withLength: boolean }): Contract<SqlS
       storageHash: APP_CONTRACT_HASH,
       tables: {
         [APP_TABLE]: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
             [APP_FIELD]: embeddingColumn,

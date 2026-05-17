@@ -26,6 +26,7 @@ import {
   planFieldEventOperations,
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
@@ -78,6 +79,7 @@ describe('cipherstash descriptor wiring', () => {
 describe('planFieldEventOperations driving the cipherstash hook', () => {
   function userTable(typeParams?: Record<string, unknown>): StorageTable {
     return {
+      namespaceId: UNBOUND_NAMESPACE_ID,
       columns: {
         id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
         email: {

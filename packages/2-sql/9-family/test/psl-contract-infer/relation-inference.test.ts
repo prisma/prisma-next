@@ -1,6 +1,7 @@
 import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { inferRelations } from '../../src/core/psl-contract-infer/relation-inference';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 describe('inferRelations', () => {
   it('infers 1:N relation from FK', () => {
@@ -20,7 +21,7 @@ describe('inferRelations', () => {
           user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
         },
         primaryKey: { columns: ['id'] },
-        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'], referencedNamespaceId: UNBOUND_NAMESPACE_ID }],
         uniques: [],
         indexes: [],
       },
@@ -67,7 +68,7 @@ describe('inferRelations', () => {
           user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
         },
         primaryKey: { columns: ['id'] },
-        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'], referencedNamespaceId: UNBOUND_NAMESPACE_ID }],
         uniques: [{ columns: ['user_id'] }],
         indexes: [],
       },
@@ -103,7 +104,7 @@ describe('inferRelations', () => {
           user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
         },
         primaryKey: { columns: ['user_id'] },
-        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'], referencedNamespaceId: UNBOUND_NAMESPACE_ID }],
         uniques: [],
         indexes: [],
       },
@@ -147,6 +148,7 @@ describe('inferRelations', () => {
           {
             columns: ['tenant_id', 'account_id'],
             referencedTable: 'account',
+            referencedNamespaceId: UNBOUND_NAMESPACE_ID,
             referencedColumns: ['tenant_id', 'id'],
           },
         ],
@@ -191,12 +193,14 @@ describe('inferRelations', () => {
             name: 'fk_sender',
             columns: ['sender_id'],
             referencedTable: 'user',
+            referencedNamespaceId: UNBOUND_NAMESPACE_ID,
             referencedColumns: ['id'],
           },
           {
             name: 'fk_receiver',
             columns: ['receiver_id'],
             referencedTable: 'user',
+            referencedNamespaceId: UNBOUND_NAMESPACE_ID,
             referencedColumns: ['id'],
           },
         ],
@@ -238,8 +242,8 @@ describe('inferRelations', () => {
         },
         primaryKey: { columns: ['id'] },
         foreignKeys: [
-          { columns: ['sender_id'], referencedTable: 'user', referencedColumns: ['id'] },
-          { columns: ['recipient_id'], referencedTable: 'user', referencedColumns: ['id'] },
+          { columns: ['sender_id'], referencedTable: 'user', referencedColumns: ['id'], referencedNamespaceId: UNBOUND_NAMESPACE_ID },
+          { columns: ['recipient_id'], referencedTable: 'user', referencedColumns: ['id'], referencedNamespaceId: UNBOUND_NAMESPACE_ID },
         ],
         uniques: [],
         indexes: [],
@@ -268,7 +272,7 @@ describe('inferRelations', () => {
         },
         primaryKey: { columns: ['id'] },
         foreignKeys: [
-          { columns: ['parent_id'], referencedTable: 'category', referencedColumns: ['id'] },
+          { columns: ['parent_id'], referencedTable: 'category', referencedColumns: ['id'], referencedNamespaceId: UNBOUND_NAMESPACE_ID },
         ],
         uniques: [],
         indexes: [],
@@ -317,6 +321,7 @@ describe('inferRelations', () => {
           {
             columns: ['parent_id'],
             referencedTable: 'parent',
+            referencedNamespaceId: UNBOUND_NAMESPACE_ID,
             referencedColumns: ['id'],
             onDelete: 'cascade',
             onUpdate: 'setNull',
@@ -349,7 +354,7 @@ describe('inferRelations', () => {
           marker: { name: 'marker', nativeType: 'text', nullable: false },
         },
         foreignKeys: [
-          { columns: ['owner_id'], referencedTable: 'user', referencedColumns: ['id'] },
+          { columns: ['owner_id'], referencedTable: 'user', referencedColumns: ['id'], referencedNamespaceId: UNBOUND_NAMESPACE_ID },
         ],
         uniques: [{ columns: ['marker'] }],
         indexes: [],
@@ -394,7 +399,7 @@ describe('inferRelations', () => {
           user2: { name: 'user2', nativeType: 'text', nullable: false },
         },
         primaryKey: { columns: ['id'] },
-        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'], referencedNamespaceId: UNBOUND_NAMESPACE_ID }],
         uniques: [],
         indexes: [],
       },

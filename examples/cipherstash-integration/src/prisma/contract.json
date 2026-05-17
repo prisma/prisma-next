@@ -117,77 +117,80 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:0045bd30f24af9a4ea4814d8c711afd5ceafe26b689454cfee15ad3117e10112",
+    "storageHash": "sha256:9ad615313b35345088904a2f9d2ce786d72b38abfcfc4c0ce70a71a1a3ce0772",
     "tables": {
-      "users": {
-        "columns": {
-          "accountid": {
-            "codecId": "cipherstash/bigint@1",
-            "nativeType": "eql_v2_encrypted",
-            "nullable": false,
-            "typeParams": {
-              "equality": true,
-              "orderAndRange": true
+      "__unbound__": {
+        "users": {
+          "columns": {
+            "accountid": {
+              "codecId": "cipherstash/bigint@1",
+              "nativeType": "eql_v2_encrypted",
+              "nullable": false,
+              "typeParams": {
+                "equality": true,
+                "orderAndRange": true
+              }
+            },
+            "birthday": {
+              "codecId": "cipherstash/date@1",
+              "nativeType": "eql_v2_encrypted",
+              "nullable": false,
+              "typeParams": {
+                "equality": true,
+                "orderAndRange": true
+              }
+            },
+            "email": {
+              "codecId": "cipherstash/string@1",
+              "nativeType": "eql_v2_encrypted",
+              "nullable": false,
+              "typeParams": {
+                "equality": true,
+                "freeTextSearch": true,
+                "orderAndRange": true
+              }
+            },
+            "emailverified": {
+              "codecId": "cipherstash/boolean@1",
+              "nativeType": "eql_v2_encrypted",
+              "nullable": false,
+              "typeParams": {
+                "equality": true
+              }
+            },
+            "id": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "preferences": {
+              "codecId": "cipherstash/json@1",
+              "nativeType": "eql_v2_encrypted",
+              "nullable": false,
+              "typeParams": {
+                "searchableJson": true
+              }
+            },
+            "salary": {
+              "codecId": "cipherstash/double@1",
+              "nativeType": "eql_v2_encrypted",
+              "nullable": false,
+              "typeParams": {
+                "equality": true,
+                "orderAndRange": true
+              }
             }
           },
-          "birthday": {
-            "codecId": "cipherstash/date@1",
-            "nativeType": "eql_v2_encrypted",
-            "nullable": false,
-            "typeParams": {
-              "equality": true,
-              "orderAndRange": true
-            }
+          "foreignKeys": [],
+          "indexes": [],
+          "namespaceId": "__unbound__",
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
           },
-          "email": {
-            "codecId": "cipherstash/string@1",
-            "nativeType": "eql_v2_encrypted",
-            "nullable": false,
-            "typeParams": {
-              "equality": true,
-              "freeTextSearch": true,
-              "orderAndRange": true
-            }
-          },
-          "emailverified": {
-            "codecId": "cipherstash/boolean@1",
-            "nativeType": "eql_v2_encrypted",
-            "nullable": false,
-            "typeParams": {
-              "equality": true
-            }
-          },
-          "id": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "preferences": {
-            "codecId": "cipherstash/json@1",
-            "nativeType": "eql_v2_encrypted",
-            "nullable": false,
-            "typeParams": {
-              "searchableJson": true
-            }
-          },
-          "salary": {
-            "codecId": "cipherstash/double@1",
-            "nativeType": "eql_v2_encrypted",
-            "nullable": false,
-            "typeParams": {
-              "equality": true,
-              "orderAndRange": true
-            }
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": []
+          "uniques": []
+        }
       }
     }
   },

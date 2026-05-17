@@ -1,6 +1,7 @@
 import type { Contract, ContractField, ContractModel } from '@prisma-next/contract/types';
 import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { type } from 'arktype';
 import {
   type ForeignKeyInput,
@@ -600,16 +601,12 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
  * counts match their referenced columns. Throws on the first mismatch.
  */
 export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): void {
-  const tableCoords = new Set<string>();
   const tableNames = new Set<string>();
-  for (const { namespaceId, name } of iterateTablesWithCoords(contract.storage)) {
-    tableCoords.add(`${namespaceId}\u0000${name}`);
+  for (const { name } of iterateTablesWithCoords(contract.storage)) {
     tableNames.add(name);
   }
 
-  for (const { namespaceId: sourceNamespaceId, name: tableName, table } of iterateTablesWithCoords(
-    contract.storage,
-  )) {
+  for (const { name: tableName, table } of iterateTablesWithCoords(contract.storage)) {
     const columnNames = new Set(Object.keys(table.columns));
 
     if (table.primaryKey) {
@@ -664,11 +661,12 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
         }
       }
 
-      // Cross-namespace FK lookup (FR16b): the target carries its own
-      // namespace coordinate so resolution is namespace-aware. Same-namespace
-      // FKs (the common case) leave `target.namespaceId` defaulted to the
-      // source's namespace via the StorageTable constructor.
-      const targetNamespaceId = fk.target.namespaceId ?? sourceNamespaceId;
+      // Cross-namespace FK lookup (FR16b): every `ForeignKeyReference`
+      // carries its own resolved namespace coordinate (the caller-normalises
+      // discipline stamps it at construction time), so the lookup is
+      // unambiguously namespace-aware whether the FK targets the same or a
+      // different namespace.
+      const targetNamespaceId = fk.target.namespaceId;
       const referencedTable = findTableByCoord(
         contract.storage,
         targetNamespaceId,
@@ -724,12 +722,28 @@ export function validateSqlContractFully<T extends Contract<SqlStorage>>(value: 
           return rest;
         })()
       : value;
-  const validated = validateSqlContract<T>(stripped);
+  // Production-emitted JSON (`SqlStorage.toJSON`) always lands in the
+  // FR15 nested-by-namespace shape. Hand-rolled fixtures historically
+  // used the flat `tables: { <name>: {...} }` short form; bucket those
+  // here for structural validation only. The hydrator downstream walks
+  // either input shape via `nestedTablesView`, and tests that read the
+  // pre-hydration contract continue to see the shape they passed in.
+  const normalizedForValidation = normalizeStorageEnvelopeShape(stripped);
+  validateSqlContract<T>(normalizedForValidation);
+  const validated = stripped as T;
   validateContractDomain({
     roots: validated.roots,
     models: validated.models,
     ...(validated.valueObjects ? { valueObjects: validated.valueObjects } : {}),
   });
+  // Storage consistency / semantics / model-ref checks operate on a
+  // contract whose `storage` exposes `iterateTablesWithCoords`-friendly
+  // shape — both the in-memory `SqlStorage` IR and the JSON-validated
+  // nested envelope satisfy that contract. Running them here means
+  // every caller of `validateSqlContractFully` gets the same diagnostic
+  // surface, including tests that bypass IR hydration. Hydration-only
+  // entry points may invoke `validateSqlContractHydrated` directly to
+  // re-validate after IR construction.
   validateSqlStorageConsistency(validated);
   const semanticErrors = validateStorageSemantics(validated.storage);
   if (semanticErrors.length > 0) {
@@ -740,4 +754,164 @@ export function validateSqlContractFully<T extends Contract<SqlStorage>>(value: 
   }
   validateModelStorageReferences(validated);
   return validated;
+}
+
+/**
+ * Backward-compatible input shape normaliser for the SQL contract JSON
+ * envelope. Production-emitted JSON (via `SqlStorage.toJSON`) is always
+ * the FR15 nested-by-namespace shape and validates directly. Hand-rolled
+ * test fixtures that wrote the flat shape (`storage.tables: { <name>: {
+ * columns: … } }`) are wrapped under the `__unbound__` namespace bucket
+ * here so the structural validator below sees a single nested shape.
+ *
+ * Detection heuristic: a flat entry has `columns` or other table fields
+ * directly under the entry. A nested entry's value is itself a record
+ * whose values look like tables (i.e. carry `columns`).
+ *
+ * The accommodation lives at the JSON-input boundary so the arktype
+ * `StorageSchema` (and any downstream IR check) can assume the canonical
+ * nested shape. Callers constructing IR classes directly are unaffected.
+ */
+function normalizeStorageEnvelopeShape(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) {
+    return value;
+  }
+  const root = value as Record<string, unknown>;
+  const storage = root['storage'];
+  if (typeof storage !== 'object' || storage === null) {
+    return value;
+  }
+  const storageRecord = storage as Record<string, unknown>;
+  const newStorage: Record<string, unknown> = { ...storageRecord };
+  let changed = false;
+
+  const tables = storageRecord['tables'];
+  if (tables !== undefined && typeof tables === 'object' && tables !== null) {
+    const tablesRecord = tables as Record<string, unknown>;
+    if (isFlatTablesShape(tablesRecord)) {
+      const wrappedTables: Record<string, unknown> = {};
+      const bucket: Record<string, unknown> = {};
+      for (const [name, entry] of Object.entries(tablesRecord)) {
+        bucket[name] = injectNamespaceId(entry, UNBOUND_NAMESPACE_ID);
+      }
+      wrappedTables[UNBOUND_NAMESPACE_ID] = bucket;
+      newStorage['tables'] = wrappedTables;
+      changed = true;
+    } else {
+      const rewrittenTables: Record<string, unknown> = {};
+      let nestedChanged = false;
+      for (const [namespaceId, namespaceEntry] of Object.entries(tablesRecord)) {
+        if (typeof namespaceEntry !== 'object' || namespaceEntry === null) {
+          rewrittenTables[namespaceId] = namespaceEntry;
+          continue;
+        }
+        const inner: Record<string, unknown> = {};
+        for (const [tableName, tableEntry] of Object.entries(
+          namespaceEntry as Record<string, unknown>,
+        )) {
+          inner[tableName] = injectNamespaceId(tableEntry, namespaceId);
+          if (inner[tableName] !== tableEntry) nestedChanged = true;
+        }
+        rewrittenTables[namespaceId] = inner;
+      }
+      if (nestedChanged) {
+        newStorage['tables'] = rewrittenTables;
+        changed = true;
+      }
+    }
+  }
+
+  const types = storageRecord['types'];
+  if (types !== undefined && typeof types === 'object' && types !== null) {
+    const typesRecord = types as Record<string, unknown>;
+    if (isFlatTypesShape(typesRecord)) {
+      newStorage['types'] = { [UNBOUND_NAMESPACE_ID]: typesRecord };
+      changed = true;
+    }
+  }
+
+  if (
+    changed &&
+    (newStorage['namespaces'] === undefined ||
+      typeof newStorage['namespaces'] !== 'object' ||
+      newStorage['namespaces'] === null)
+  ) {
+    newStorage['namespaces'] = { [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID } };
+  }
+
+  if (!changed) return value;
+  return { ...root, storage: newStorage };
+}
+
+function isFlatTablesShape(tables: Record<string, unknown>): boolean {
+  for (const entry of Object.values(tables)) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const e = entry as Record<string, unknown>;
+    if ('columns' in e) return true;
+    return false;
+  }
+  return false;
+}
+
+function isFlatTypesShape(types: Record<string, unknown>): boolean {
+  for (const entry of Object.values(types)) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const e = entry as Record<string, unknown>;
+    if ('codecId' in e || 'nativeType' in e || 'kind' in e) return true;
+    return false;
+  }
+  return false;
+}
+
+function injectNamespaceId(entry: unknown, namespaceId: string): unknown {
+  if (typeof entry !== 'object' || entry === null) return entry;
+  const e = entry as Record<string, unknown>;
+  const next: Record<string, unknown> =
+    typeof e['namespaceId'] === 'string' ? { ...e } : { namespaceId, ...e };
+  // FK targets carry their own `namespaceId` coordinate. Same-namespace
+  // FKs inherit the source table's coordinate; cross-namespace FKs
+  // already carry an explicit value. Fixtures that pre-date the
+  // required-coordinate IR may omit it — bucket those under the source
+  // table's namespace to keep the validator's nested-only schema happy.
+  const fks = next['foreignKeys'];
+  if (Array.isArray(fks)) {
+    const sourceNamespaceId =
+      typeof next['namespaceId'] === 'string' ? (next['namespaceId'] as string) : namespaceId;
+    next['foreignKeys'] = fks.map((fk) => {
+      if (typeof fk !== 'object' || fk === null) return fk;
+      const fkEntry = fk as Record<string, unknown>;
+      const target = fkEntry['target'];
+      if (
+        typeof target !== 'object' ||
+        target === null ||
+        typeof (target as Record<string, unknown>)['namespaceId'] === 'string'
+      ) {
+        return fk;
+      }
+      return {
+        ...fkEntry,
+        target: { namespaceId: sourceNamespaceId, ...(target as Record<string, unknown>) },
+      };
+    });
+  }
+  return next;
+}
+
+/**
+ * Post-hydration validation: the consistency / semantics / model-ref
+ * checks all operate on a hydrated `SqlStorage` IR instance (so they
+ * can share `iterateTablesWithCoords`, `findTableByCoord`, etc.). The
+ * caller is responsible for running structural validation
+ * (`validateSqlContractFully`) and target-specific hydration first.
+ */
+export function validateSqlContractHydrated<T extends Contract<SqlStorage>>(contract: T): void {
+  validateSqlStorageConsistency(contract);
+  const semanticErrors = validateStorageSemantics(contract.storage);
+  if (semanticErrors.length > 0) {
+    throw new ContractValidationError(
+      `Contract semantic validation failed: ${semanticErrors.join('; ')}`,
+      'storage',
+    );
+  }
+  validateModelStorageReferences(contract);
 }

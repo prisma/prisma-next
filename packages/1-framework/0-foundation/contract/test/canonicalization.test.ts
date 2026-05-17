@@ -260,12 +260,14 @@ describe('default omission', () => {
         storage: {
           storageHash: 'sha256:stub',
           tables: {
-            users: { columns: {}, uniques: [], indexes: [], foreignKeys: {} },
+            __unbound__: {
+              users: { columns: {}, uniques: [], indexes: [], foreignKeys: {} },
+            },
           },
         },
       }),
     );
-    const table = drill(result, 'storage', 'tables', 'users');
+    const table = drill(result, 'storage', 'tables', '__unbound__', 'users');
     expect(table['uniques']).toEqual([]);
     expect(table['indexes']).toEqual([]);
     expect(table['foreignKeys']).toEqual({});
@@ -277,16 +279,18 @@ describe('default omission', () => {
         storage: {
           storageHash: 'sha256:stub',
           tables: {
-            posts: {
-              foreignKeys: {
-                fk_user: { columns: ['user_id'], constraint: false, index: false },
+            __unbound__: {
+              posts: {
+                foreignKeys: {
+                  fk_user: { columns: ['user_id'], constraint: false, index: false },
+                },
               },
             },
           },
         },
       }),
     );
-    const fk = drill(result, 'storage', 'tables', 'posts', 'foreignKeys', 'fk_user');
+    const fk = drill(result, 'storage', 'tables', '__unbound__', 'posts', 'foreignKeys', 'fk_user');
     expect(fk).not.toHaveProperty('constraint');
     expect(fk).not.toHaveProperty('index');
   });
@@ -387,15 +391,17 @@ describe('index and unique sorting', () => {
         storage: {
           storageHash: 'sha256:stub',
           tables: {
-            users: {
-              columns: {},
-              indexes: [{ name: 'idx_z' }, { name: 'idx_a' }, { name: 'idx_m' }],
+            __unbound__: {
+              users: {
+                columns: {},
+                indexes: [{ name: 'idx_z' }, { name: 'idx_a' }, { name: 'idx_m' }],
+              },
             },
           },
         },
       }),
     );
-    const table = drill(result, 'storage', 'tables', 'users');
+    const table = drill(result, 'storage', 'tables', '__unbound__', 'users');
     const indexes = table['indexes'] as Array<{ name: string }>;
     expect(indexes.map((i) => i.name)).toEqual(['idx_a', 'idx_m', 'idx_z']);
   });
@@ -406,15 +412,17 @@ describe('index and unique sorting', () => {
         storage: {
           storageHash: 'sha256:stub',
           tables: {
-            users: {
-              columns: {},
-              uniques: [{ name: 'uq_z' }, { name: 'uq_a' }],
+            __unbound__: {
+              users: {
+                columns: {},
+                uniques: [{ name: 'uq_z' }, { name: 'uq_a' }],
+              },
             },
           },
         },
       }),
     );
-    const table = drill(result, 'storage', 'tables', 'users');
+    const table = drill(result, 'storage', 'tables', '__unbound__', 'users');
     const uniques = table['uniques'] as Array<{ name: string }>;
     expect(uniques.map((u) => u.name)).toEqual(['uq_a', 'uq_z']);
   });
@@ -595,11 +603,13 @@ describe('index and unique sorting', () => {
       minimal({
         storage: {
           storageHash: 'sha256:stub',
-          tables: { bad: null as unknown as Record<string, unknown> },
+          tables: {
+            __unbound__: { bad: null as unknown as Record<string, unknown> },
+          },
         },
       }),
     );
-    const tables = drill(result, 'storage', 'tables');
+    const tables = drill(result, 'storage', 'tables', '__unbound__');
     expect(tables['bad']).toBeNull();
   });
 });

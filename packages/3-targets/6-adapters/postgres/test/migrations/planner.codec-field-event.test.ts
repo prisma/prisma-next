@@ -3,6 +3,7 @@ import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { APP_SPACE_ID, type OpFactoryCall } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
@@ -19,7 +20,7 @@ function col(overrides: Partial<StorageColumn> & { codecId: string }): StorageCo
 }
 
 function table(columns: Record<string, StorageColumn>): StorageTable {
-  return { columns, uniques: [], indexes: [], foreignKeys: [] };
+  return { namespaceId: UNBOUND_NAMESPACE_ID, columns, uniques: [], indexes: [], foreignKeys: [] };
 }
 
 function contract(tables: Record<string, StorageTable>, hash = 'sha256:c'): Contract<SqlStorage> {

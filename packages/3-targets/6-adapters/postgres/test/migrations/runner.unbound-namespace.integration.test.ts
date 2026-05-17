@@ -49,6 +49,7 @@ function buildUnboundContract(): Contract<SqlStorage> {
       storageHash: coreHash('sha256:unbound-multi-tenant'),
       tables: {
         tenant: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
             label: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },

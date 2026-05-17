@@ -46,6 +46,7 @@ type GeneratedLikeContractBase = Contract<
     storageHash: StorageHashBase<string>;
     tables: {
       user: {
+        namespaceId: '__unbound__';
         columns: {
           id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
           name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
@@ -59,6 +60,7 @@ type GeneratedLikeContractBase = Contract<
         foreignKeys: [];
       };
       post: {
+        namespaceId: '__unbound__';
         columns: {
           id: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
           userId: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };
@@ -396,6 +398,7 @@ type VOContractBase = Contract<
     storageHash: StorageHashBase<string>;
     tables: {
       users: {
+        namespaceId: '__unbound__';
         columns: {
           id: { nativeType: 'int4'; codecId: 'pg/int4@1'; nullable: false };
           name: { nativeType: 'text'; codecId: 'pg/text@1'; nullable: false };

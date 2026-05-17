@@ -90,39 +90,49 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
       const isModelStorage =
         currentPath.length === 3 &&
         isArrayEqual([currentPath[0], currentPath[2]], ['models', 'storage']);
+      // FR15 nested envelope: `storage.tables.<namespaceId>.<tableName>.<field>`
+      // sits at depth 5; the table-level required-empty defaults
+      // (`uniques`, `indexes`, `foreignKeys`) must survive at that
+      // depth so the persisted shape stays schema-valid.
       const isTableUniques =
-        currentPath.length === 4 &&
+        currentPath.length === 5 &&
         isArrayEqual(
-          [currentPath[0], currentPath[1], currentPath[3]],
+          [currentPath[0], currentPath[1], currentPath[4]],
           ['storage', 'tables', 'uniques'],
         );
       const isTableIndexes =
-        currentPath.length === 4 &&
+        currentPath.length === 5 &&
         isArrayEqual(
-          [currentPath[0], currentPath[1], currentPath[3]],
+          [currentPath[0], currentPath[1], currentPath[4]],
           ['storage', 'tables', 'indexes'],
         );
       const isTableForeignKeys =
-        currentPath.length === 4 &&
+        currentPath.length === 5 &&
         isArrayEqual(
-          [currentPath[0], currentPath[1], currentPath[3]],
+          [currentPath[0], currentPath[1], currentPath[4]],
           ['storage', 'tables', 'foreignKeys'],
         );
+      // The namespace bucket itself (`storage.tables.<namespaceId>`)
+      // must survive even when its table map is empty — a namespace
+      // declared but unused is still legitimate.
+      const isNamespaceBucket =
+        currentPath.length === 3 && currentPath[0] === 'storage' && currentPath[1] === 'tables';
 
-      // `storage.types.<name>.typeParams` is part of the StorageTypeInstance
-      // shape (validators require it). Preserve it even when empty so the
-      // emitted contract.json remains structurally valid after a round-trip.
+      // `storage.types.<namespaceId>.<typeName>.typeParams` is part
+      // of the StorageTypeInstance shape (validators require it).
+      // Preserve it even when empty so the emitted contract.json
+      // remains structurally valid after a round-trip.
       const isStorageTypeTypeParams =
-        currentPath.length === 4 &&
+        currentPath.length === 5 &&
         currentPath[0] === 'storage' &&
         currentPath[1] === 'types' &&
         key === 'typeParams';
 
       const isFkBooleanField =
-        currentPath.length === 5 &&
+        currentPath.length === 6 &&
         currentPath[0] === 'storage' &&
         currentPath[1] === 'tables' &&
-        currentPath[3] === 'foreignKeys' &&
+        currentPath[4] === 'foreignKeys' &&
         (key === 'constraint' || key === 'index');
 
       const isNullableField = key === 'nullable';
@@ -143,6 +153,7 @@ function omitDefaults(obj: unknown, path: readonly string[]): unknown {
         !isTableUniques &&
         !isTableIndexes &&
         !isTableForeignKeys &&
+        !isNamespaceBucket &&
         !isFkBooleanField &&
         !isNullableField &&
         !isStorageTypeTypeParams
@@ -207,40 +218,6 @@ function sortTableIndexesAndUniques(table: unknown): unknown {
   return sortedTable;
 }
 
-/** Known keys on a flat `StorageTable` shape. Used to discriminate
- * flat-table entries from namespace buckets even after `omitDefaults`
- * has stripped an empty `columns: {}` field. */
-const FLAT_TABLE_KEYS: ReadonlySet<string> = new Set([
-  'columns',
-  'indexes',
-  'uniques',
-  'foreignKeys',
-  'primaryKey',
-  'namespaceId',
-]);
-
-/**
- * Distinguish the FR15 nested-by-namespace envelope (`storage.tables`
- * as `Record<NamespaceId, Record<TableName, StorageTable>>`) from the
- * legacy flat-by-name envelope (`Record<TableName, StorageTable>`).
- *
- * A flat-table entry carries at least one of the known flat-table
- * fields ({@link FLAT_TABLE_KEYS}); a namespace bucket does not — its
- * keys are table names. The check survives `omitDefaults` stripping an
- * empty `columns: {}` field because `uniques` / `indexes` /
- * `foreignKeys` always survive in the canonicalised flat-table shape
- * (the omit step keeps them as required empty defaults).
- */
-function isNestedTablesEnvelope(tables: Record<string, unknown>): boolean {
-  for (const entry of Object.values(tables)) {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
-    const entryKeys = Object.keys(entry);
-    if (entryKeys.some((k) => FLAT_TABLE_KEYS.has(k))) return false;
-    return true;
-  }
-  return false;
-}
-
 function sortIndexesAndUniques(storage: unknown): unknown {
   if (!storage || typeof storage !== 'object') {
     return storage;
@@ -254,33 +231,23 @@ function sortIndexesAndUniques(storage: unknown): unknown {
   const tables = storageObj.tables;
   const result: StorageObject = { ...storageObj };
 
-  // The canonicalisation walk runs after the per-target serialiser has
-  // emitted either the flat (single-namespace) or nested
-  // (cross-namespace name collisions) envelope. Sort `indexes` /
-  // `uniques` arrays at whichever depth they live: flat envelope has
-  // them at `storage.tables.<table>.indexes`; nested envelope has them
-  // at `storage.tables.<namespace>.<table>.indexes`.
-  if (isNestedTablesEnvelope(tables)) {
-    const sortedNamespaces: Record<string, Record<string, unknown>> = {};
-    for (const namespaceId of Object.keys(tables).sort()) {
-      const bucket = tables[namespaceId];
-      if (!bucket || typeof bucket !== 'object') continue;
-      const bucketRecord = bucket as Record<string, unknown>;
-      const sortedBucket: Record<string, unknown> = {};
-      for (const tableName of Object.keys(bucketRecord).sort()) {
-        sortedBucket[tableName] = sortTableIndexesAndUniques(bucketRecord[tableName]);
-      }
-      sortedNamespaces[namespaceId] = sortedBucket;
+  // After the reversal the persisted envelope is unconditionally the
+  // FR15 nested-by-namespace shape (`storage.tables` keyed by
+  // namespace id; each namespace bucket keyed by table name). The
+  // canonicaliser walks the nested map and sorts `indexes` /
+  // `uniques` arrays at the table-level depth in each bucket.
+  const sortedNamespaces: Record<string, Record<string, unknown>> = {};
+  for (const namespaceId of Object.keys(tables).sort()) {
+    const bucket = tables[namespaceId];
+    if (!bucket || typeof bucket !== 'object') continue;
+    const bucketRecord = bucket as Record<string, unknown>;
+    const sortedBucket: Record<string, unknown> = {};
+    for (const tableName of Object.keys(bucketRecord).sort()) {
+      sortedBucket[tableName] = sortTableIndexesAndUniques(bucketRecord[tableName]);
     }
-    result.tables = sortedNamespaces;
-    return result;
+    sortedNamespaces[namespaceId] = sortedBucket;
   }
-
-  const flatResult: Record<string, unknown> = {};
-  for (const tableName of Object.keys(tables).sort()) {
-    flatResult[tableName] = sortTableIndexesAndUniques(tables[tableName]);
-  }
-  result.tables = flatResult;
+  result.tables = sortedNamespaces;
   return result;
 }
 

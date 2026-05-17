@@ -293,7 +293,8 @@ export function buildSqlContractFromDefinition(
     // same-namespace targets. Omitted = `UNBOUND_NAMESPACE_ID` (the
     // late-bound sentinel); the Postgres default-resolution policy for
     // omitted-but-`public`-aware contracts is a separate concern.
-    const sourceNamespaceId = semanticModel.namespaceId ?? UNBOUND_NAMESPACE_ID;
+    const sourceNamespaceId: string =
+      semanticModel.namespaceId !== undefined ? semanticModel.namespaceId : UNBOUND_NAMESPACE_ID;
 
     // --- Build storage table ---
 
@@ -358,10 +359,16 @@ export function buildSqlContractFromDefinition(
         fk.references.table,
         'Foreign key',
       );
+      // Cross-namespace FKs carry an explicit target namespace; same-namespace
+      // FKs inherit the source table's coordinate. The conditional lives at
+      // the caller (this lowering site) so the constructed
+      // `ForeignKeyReference` always receives a fully-resolved coordinate.
+      const targetNamespaceId: string =
+        fk.references.namespaceId !== undefined ? fk.references.namespaceId : sourceNamespaceId;
       return {
         source: { columns: fk.columns },
         target: {
-          namespaceId: fk.references.namespaceId ?? sourceNamespaceId,
+          namespaceId: targetNamespaceId,
           table: fk.references.table,
           columns: fk.references.columns,
         },
@@ -495,12 +502,32 @@ export function buildSqlContractFromDefinition(
   });
   const storageWithoutHash = {
     tables: storageTables,
-    types: storageTypes,
+    // Only thread `types` through when at least one entry exists.
+    // `SqlStorage`'s `toJSON` projection emits `types` enumerably
+    // whenever the slot is constructed (even with an empty record),
+    // and the canonicaliser preserves the resulting `types: {}`
+    // wrapper. Pinning the same emptiness convention end-to-end keeps
+    // the storage hash recomputed by `assertDescriptorSelfConsistency`
+    // identical to the value `build-contract` pinned.
+    ...(Object.keys(storageTypes).length > 0 ? { types: storageTypes } : {}),
     namespaces,
   };
+  // The persisted contract envelope carries the FR15 nested-by-namespace
+  // shape (via `SqlStorage.toJSON`); the storage hash has to be computed
+  // against that same canonical form so the recomputed hash inside
+  // `assertDescriptorSelfConsistency` agrees with the value the emit
+  // pipeline pinned. Project through `JSON.parse(JSON.stringify(...))`
+  // — constructing `SqlStorage` first so `toJSON` runs over a hydrated
+  // IR — then strip the placeholder hash before recomputing.
+  const projectedStorage = JSON.parse(
+    JSON.stringify(
+      new SqlStorage({ ...storageWithoutHash, storageHash: 'sha256:0' as StorageHashBase<string> }),
+    ),
+  ) as Record<string, unknown>;
+  const { storageHash: _placeholder, ...storageForHash } = projectedStorage;
   const storageHash: StorageHashBase<string> = definition.storageHash
     ? coreHash(definition.storageHash)
-    : computeStorageHash({ target, targetFamily, storage: storageWithoutHash });
+    : computeStorageHash({ target, targetFamily, storage: storageForHash });
   const storage = new SqlStorage({ ...storageWithoutHash, storageHash });
 
   const executionSection =

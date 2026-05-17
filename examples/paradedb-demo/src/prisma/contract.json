@@ -64,53 +64,56 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:7db66b252d84f72d5353262913c0e5afe93e7cc07b99a8f7bfbf340e5295b88c",
+    "storageHash": "sha256:c6289a9e02235b9dc70d5cea0956036a245e5156752a1a5d737c02a14d053333",
     "tables": {
-      "item": {
-        "columns": {
-          "category": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "description": {
-            "codecId": "pg/text@1",
-            "nativeType": "text",
-            "nullable": false
-          },
-          "id": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4",
-            "nullable": false
-          },
-          "rating": {
-            "codecId": "pg/int4@1",
-            "nativeType": "int4",
-            "nullable": false
-          }
-        },
-        "foreignKeys": [],
-        "indexes": [
-          {
-            "columns": [
-              "id",
-              "description",
-              "category",
-              "rating"
-            ],
-            "name": "item_bm25_idx",
-            "options": {
-              "key_field": "id"
+      "__unbound__": {
+        "item": {
+          "columns": {
+            "category": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
             },
-            "type": "bm25"
-          }
-        ],
-        "primaryKey": {
-          "columns": [
-            "id"
-          ]
-        },
-        "uniques": []
+            "description": {
+              "codecId": "pg/text@1",
+              "nativeType": "text",
+              "nullable": false
+            },
+            "id": {
+              "codecId": "pg/int4@1",
+              "nativeType": "int4",
+              "nullable": false
+            },
+            "rating": {
+              "codecId": "pg/int4@1",
+              "nativeType": "int4",
+              "nullable": false
+            }
+          },
+          "foreignKeys": [],
+          "indexes": [
+            {
+              "columns": [
+                "id",
+                "description",
+                "category",
+                "rating"
+              ],
+              "name": "item_bm25_idx",
+              "options": {
+                "key_field": "id"
+              },
+              "type": "bm25"
+            }
+          ],
+          "namespaceId": "__unbound__",
+          "primaryKey": {
+            "columns": [
+              "id"
+            ]
+          },
+          "uniques": []
+        }
       }
     }
   },

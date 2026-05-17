@@ -120,6 +120,7 @@ describe('createExecutionContext — column codec integrity', () => {
       storageHash: coreHash('sha256:test'),
       tables: {
         Doc: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             field: {
               nativeType: column.nativeType,
@@ -266,6 +267,7 @@ describe('createExecutionContext — column codec integrity', () => {
       storageHash: coreHash('sha256:test'),
       tables: {
         Doc: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             embedding: {
               nativeType: 'vector',

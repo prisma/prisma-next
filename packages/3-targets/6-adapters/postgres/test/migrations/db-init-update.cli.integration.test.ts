@@ -10,6 +10,7 @@ import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
 import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   contract as appContract,
   createDriver,
@@ -51,6 +52,7 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
       storageHash: coreHash(`sha256:pg-ext-contract-v${version}`),
       tables: {
         _ext_helper: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
             ...(version === 2

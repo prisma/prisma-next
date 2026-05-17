@@ -17,6 +17,7 @@ import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/pla
 import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   const planner = createPostgresMigrationPlanner();
@@ -331,6 +332,7 @@ describe('NOT NULL column without default uses temporary default', () => {
   it('uses the empty-table fallback when the new column becomes a primary key later in the same plan', () => {
     const operations = planUserTableOperations(
       {
+        namespaceId: 'public',
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -362,6 +364,7 @@ describe('NOT NULL column without default uses temporary default', () => {
   it('uses the empty-table fallback when the new column becomes unique later in the same plan', () => {
     const operations = planUserTableOperations(
       {
+        namespaceId: 'public',
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -387,6 +390,7 @@ describe('NOT NULL column without default uses temporary default', () => {
   it('uses the empty-table fallback when the new column becomes a foreign key later in the same plan', () => {
     const operations = planUserTableOperations(
       {
+        namespaceId: 'public',
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           orgId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -397,7 +401,7 @@ describe('NOT NULL column without default uses temporary default', () => {
         foreignKeys: [
           {
             source: { columns: ['orgId'] },
-            target: { table: 'org', columns: ['id'] },
+            target: { namespaceId: 'public', table: 'org', columns: ['id'] },
             constraint: true,
             index: true,
           },
@@ -407,6 +411,7 @@ describe('NOT NULL column without default uses temporary default', () => {
       {
         extraContractTables: {
           org: {
+            namespaceId: 'public',
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             },
@@ -528,6 +533,7 @@ function createTestContract(
   const storage = overrides?.storage ?? {
     tables: {
       user: {
+        namespaceId: 'public',
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -538,6 +544,7 @@ function createTestContract(
         foreignKeys: [],
       },
       post: {
+        namespaceId: 'public',
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -549,7 +556,7 @@ function createTestContract(
         foreignKeys: [
           {
             source: { columns: ['userId'] },
-            target: { table: 'user', columns: ['id'] },
+            target: { namespaceId: 'public', table: 'user', columns: ['id'] },
             constraint: true,
             index: true,
           },
@@ -607,6 +614,7 @@ function planAddColumn(
 ) {
   const operations = planUserTableOperations(
     {
+      namespaceId: 'public',
       columns: {
         id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
         [columnName]: columnDef,
@@ -715,6 +723,7 @@ function buildPostTableSchema(): SqlSchemaIR['tables'][string] {
       {
         columns: ['userId'],
         referencedTable: 'user',
+        referencedNamespaceId: UNBOUND_NAMESPACE_ID,
         referencedColumns: ['id'],
         name: 'post_userId_fkey',
       },

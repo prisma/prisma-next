@@ -97,6 +97,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     const storage = storageWith({
       tables: {
         Doc: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             embedding: {
               nativeType: 'vector',
@@ -132,6 +133,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     const storage = storageWith({
       tables: {
         Doc: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             embedding: {
               nativeType: 'vector',
@@ -159,6 +161,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     const storage = storageWith({
       tables: {
         User: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             email: {
               nativeType: 'text',
@@ -184,6 +187,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     const storage = storageWith({
       tables: {
         User: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
           },
@@ -204,6 +208,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     const storage = storageWith({
       tables: {
         Doc: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             embedding: {
               nativeType: 'vector',

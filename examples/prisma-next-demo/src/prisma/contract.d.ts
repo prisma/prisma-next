@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:7d921ee2313b9aab5de241a6e0f2bde4f28e1e70fd44243f8d3b980a344ecc51'>;
+  StorageHashBase<'sha256:c3363610586d32fb9e7c3cb7576070c61c6475f2f27f4556dce3740d328a2eb2'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e'>;
 export type ProfileHash =
@@ -134,6 +134,7 @@ type ContractBase = ContractType<
   {
     readonly tables: {
       readonly bug: {
+        namespaceId: '__unbound__';
         columns: {
           readonly severity: {
             readonly nativeType: 'text';
@@ -151,6 +152,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly feature: {
+        namespaceId: '__unbound__';
         columns: {
           readonly priority: {
             readonly nativeType: 'text';
@@ -168,6 +170,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly post: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'character';
@@ -204,13 +207,18 @@ type ContractBase = ContractType<
         foreignKeys: readonly [
           {
             readonly source: { readonly columns: readonly ['userId'] };
-            readonly target: { readonly table: 'user'; readonly columns: readonly ['id'] };
+            readonly target: {
+              readonly namespaceId: '__unbound__';
+              readonly table: 'user';
+              readonly columns: readonly ['id'];
+            };
             readonly constraint: true;
             readonly index: true;
           },
         ];
       };
       readonly task: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'character';
@@ -260,13 +268,18 @@ type ContractBase = ContractType<
         foreignKeys: readonly [
           {
             readonly source: { readonly columns: readonly ['userId'] };
-            readonly target: { readonly table: 'user'; readonly columns: readonly ['id'] };
+            readonly target: {
+              readonly namespaceId: '__unbound__';
+              readonly table: 'user';
+              readonly columns: readonly ['id'];
+            };
             readonly constraint: true;
             readonly index: true;
           },
         ];
       };
       readonly user: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'character';

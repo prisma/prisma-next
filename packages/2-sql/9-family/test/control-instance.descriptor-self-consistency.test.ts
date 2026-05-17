@@ -19,6 +19,7 @@ const TARGET_FAMILY = 'sql' as const;
 const fixtureStorageBody = {
   tables: {
     fixture_box: {
+      namespaceId: UNBOUND_NAMESPACE_ID,
       columns: {
         x: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
         y: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },

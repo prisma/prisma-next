@@ -2,6 +2,7 @@ import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type {
   AnyQueryAst,
   LoweredStatement,
@@ -258,6 +259,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
         columns: Object.freeze([...fk.columns]) as readonly string[],
         referencedTable: fk.referencedTable,
         referencedColumns: Object.freeze([...fk.referencedColumns]) as readonly string[],
+        referencedNamespaceId: UNBOUND_NAMESPACE_ID,
         ...ifDefined('onDelete', mapSqliteReferentialAction(fk.onDelete)),
         ...ifDefined('onUpdate', mapSqliteReferentialAction(fk.onUpdate)),
       }));

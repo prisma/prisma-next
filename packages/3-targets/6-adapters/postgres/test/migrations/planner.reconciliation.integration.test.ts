@@ -8,6 +8,7 @@ import { SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { PostgresEnumType } from '@prisma-next/target-postgres/types';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   createDriver,
   createTestDatabase,
@@ -47,6 +48,7 @@ function makeContract(
 
 function makeTable(columns: Record<string, StorageTable['columns'][string]>): StorageTable {
   return {
+    namespaceId: UNBOUND_NAMESPACE_ID,
     columns,
     primaryKey: { columns: [Object.keys(columns)[0]!] },
     uniques: [],
@@ -298,6 +300,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     const baselineContract = makeContract(
       {
         item: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
@@ -334,6 +337,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     const baselineContract = makeContract(
       {
         item: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             code: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -377,6 +381,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
         }),
         child: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -387,7 +392,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           foreignKeys: [
             {
               source: { columns: ['parent_id'] },
-              target: { table: 'parent', columns: ['id'] },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'parent', columns: ['id'] },
               name: 'child_parent_id_fkey',
               constraint: true,
               index: true,
@@ -429,6 +434,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     const baselineContract = makeContract(
       {
         item: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
@@ -447,6 +453,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     const updatedContract = makeContract(
       {
         item: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
@@ -703,6 +710,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
         }),
         child: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -713,7 +721,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           foreignKeys: [
             {
               source: { columns: ['parent_id'] },
-              target: { table: 'parent', columns: ['id'] },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'parent', columns: ['id'] },
               name: 'child_parent_id_fkey',
               constraint: true,
               index: true,
@@ -757,6 +765,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     const baselineContract = makeContract(
       {
         item: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             name: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
@@ -853,6 +862,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     const baselineContract = makeContract(
       {
         item: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             value: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
@@ -871,6 +881,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
     const updatedContract = makeContract(
       {
         item: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             value: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: true },
@@ -977,6 +988,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
         storageHash: coreHash('sha256:reconciliation-integ-text-to-enum-updated'),
         tables: {
           item: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               status: {
@@ -1248,6 +1260,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
         storageHash: coreHash('sha256:reconciliation-integ-text-to-mixed-enum-updated'),
         tables: {
           item: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               status: {
@@ -1305,6 +1318,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
         }),
         child1: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -1315,7 +1329,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           foreignKeys: [
             {
               source: { columns: ['parent_id'] },
-              target: { table: 'parent', columns: ['id'] },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'parent', columns: ['id'] },
               name: 'fk_parent',
               constraint: true,
               index: true,
@@ -1323,6 +1337,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           ],
         },
         child2: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -1333,7 +1348,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           foreignKeys: [
             {
               source: { columns: ['parent_id'] },
-              target: { table: 'parent', columns: ['id'] },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'parent', columns: ['id'] },
               name: 'fk_parent',
               constraint: true,
               index: true,
@@ -1356,6 +1371,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
         }),
         child2: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             parent_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -1366,7 +1382,7 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
           foreignKeys: [
             {
               source: { columns: ['parent_id'] },
-              target: { table: 'parent', columns: ['id'] },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'parent', columns: ['id'] },
               name: 'fk_parent',
               constraint: true,
               index: true,

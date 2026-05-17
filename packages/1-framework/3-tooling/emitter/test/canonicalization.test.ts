@@ -190,14 +190,16 @@ describe('canonicalization', () => {
     const ir = createTestContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          __unbound__: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              },
+              indexes: [
+                { columns: ['id'], name: 'user_email_idx' },
+                { columns: ['id'], name: 'user_name_idx' },
+              ],
             },
-            indexes: [
-              { columns: ['id'], name: 'user_email_idx' },
-              { columns: ['id'], name: 'user_name_idx' },
-            ],
           },
         },
       },
@@ -206,8 +208,8 @@ describe('canonicalization', () => {
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown>;
-    const user = tables['user'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, Record<string, unknown>>;
+    const user = tables['__unbound__']!['user'] as Record<string, unknown>;
     const indexes = user['indexes'] as Array<{ name: string }>;
     const indexNames = indexes.map((idx) => idx.name);
     expect(indexNames).toEqual(['user_email_idx', 'user_name_idx']);
@@ -217,16 +219,18 @@ describe('canonicalization', () => {
     const ir = createTestContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              username: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+          __unbound__: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                username: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              uniques: [
+                { columns: ['username'], name: 'user_username_key' },
+                { columns: ['email'], name: 'user_email_key' },
+              ],
             },
-            uniques: [
-              { columns: ['username'], name: 'user_username_key' },
-              { columns: ['email'], name: 'user_email_key' },
-            ],
           },
         },
       },
@@ -235,8 +239,8 @@ describe('canonicalization', () => {
     const result = canonicalizeContract(ir);
     const parsed = JSON.parse(result) as Record<string, unknown>;
     const storage = parsed['storage'] as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown>;
-    const user = tables['user'] as Record<string, unknown>;
+    const tables = storage['tables'] as Record<string, Record<string, unknown>>;
+    const user = tables['__unbound__']!['user'] as Record<string, unknown>;
     const uniques = user['uniques'] as Array<{ name: string }>;
     const uniqueNames = uniques.map((u) => u.name);
     expect(uniqueNames).toEqual(['user_email_key', 'user_username_key']);

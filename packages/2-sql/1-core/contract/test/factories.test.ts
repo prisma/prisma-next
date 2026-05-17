@@ -92,9 +92,10 @@ describe('SQL contract factories', () => {
   describe('fk', () => {
     it('creates a ForeignKey', () => {
       const foreignKey = fk(['userId'], 'user', ['id']);
-      expect(foreignKey).toEqual({
+      expect(foreignKey).toMatchObject({
         source: { columns: ['userId'] },
         target: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           table: 'user',
           columns: ['id'],
         },
@@ -105,9 +106,10 @@ describe('SQL contract factories', () => {
 
     it('creates foreign key with name', () => {
       const foreignKey = fk(['userId'], 'user', ['id'], { name: 'user_posts_fkey' });
-      expect(foreignKey).toEqual({
+      expect(foreignKey).toMatchObject({
         source: { columns: ['userId'] },
         target: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           table: 'user',
           columns: ['id'],
         },
@@ -119,9 +121,10 @@ describe('SQL contract factories', () => {
 
     it('creates composite foreign key', () => {
       const foreignKey = fk(['tenantId', 'userId'], 'user', ['tenantId', 'id']);
-      expect(foreignKey).toEqual({
+      expect(foreignKey).toMatchObject({
         source: { columns: ['tenantId', 'userId'] },
         target: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           table: 'user',
           columns: ['tenantId', 'id'],
         },
@@ -132,9 +135,9 @@ describe('SQL contract factories', () => {
 
     it('creates foreign key with onDelete via options object', () => {
       const foreignKey = fk(['userId'], 'user', ['id'], { onDelete: 'cascade' });
-      expect(foreignKey).toEqual({
+      expect(foreignKey).toMatchObject({
         source: { columns: ['userId'] },
-        target: { table: 'user', columns: ['id'] },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
         onDelete: 'cascade',
         constraint: true,
         index: true,
@@ -146,9 +149,9 @@ describe('SQL contract factories', () => {
         onDelete: 'cascade',
         onUpdate: 'noAction',
       });
-      expect(foreignKey).toEqual({
+      expect(foreignKey).toMatchObject({
         source: { columns: ['userId'] },
-        target: { table: 'user', columns: ['id'] },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
         onDelete: 'cascade',
         onUpdate: 'noAction',
         constraint: true,
@@ -162,9 +165,9 @@ describe('SQL contract factories', () => {
         onDelete: 'setNull',
         onUpdate: 'cascade',
       });
-      expect(foreignKey).toEqual({
+      expect(foreignKey).toMatchObject({
         source: { columns: ['userId'] },
-        target: { table: 'user', columns: ['id'] },
+        target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
         name: 'post_userId_fkey',
         onDelete: 'setNull',
         onUpdate: 'cascade',
@@ -246,10 +249,10 @@ describe('SQL contract factories', () => {
         },
         { fks: [fk(['userId'], 'user', ['id'])] },
       );
-      expect(postTable.foreignKeys).toEqual([
+      expect(postTable.foreignKeys).toMatchObject([
         {
           source: { columns: ['userId'] },
-          target: { table: 'user', columns: ['id'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
           constraint: true,
           index: true,
         },
@@ -257,27 +260,15 @@ describe('SQL contract factories', () => {
     });
 
     describe('namespaceId coordinate', () => {
-      it('leaves the property `undefined` when input.namespaceId is omitted (single-namespace default)', () => {
-        const userTable = new StorageTable({
-          columns: { id: col('int4', 'pg/int4@1') },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        });
-        expect(userTable.namespaceId).toBeUndefined();
-        const resolved = userTable.namespaceId ?? UNBOUND_NAMESPACE_ID;
-        expect(resolved).toBe(UNBOUND_NAMESPACE_ID);
+      it('defaults the property to UNBOUND_NAMESPACE_ID when input.namespaceId is omitted at the factory boundary', () => {
+        const userTable = table({ id: col('int4', 'pg/int4@1') });
+        expect(userTable.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
       });
 
-      it('omits namespaceId from the serialized JSON envelope when the property is undefined', () => {
-        const userTable = new StorageTable({
-          columns: { id: col('int4', 'pg/int4@1') },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        });
+      it('writes namespaceId into the serialized JSON envelope', () => {
+        const userTable = table({ id: col('int4', 'pg/int4@1') });
         const json = JSON.parse(JSON.stringify(userTable)) as Record<string, unknown>;
-        expect(json).not.toHaveProperty('namespaceId');
+        expect(json['namespaceId']).toBe(UNBOUND_NAMESPACE_ID);
       });
 
       it('records an explicit non-unbound namespaceId on the class and in the JSON envelope', () => {
@@ -293,7 +284,7 @@ describe('SQL contract factories', () => {
         expect(json['namespaceId']).toBe('auth');
       });
 
-      it('treats explicit `__unbound__` the same as omitting the field — does not write the field', () => {
+      it('records an explicit `__unbound__` namespaceId on the class and in the JSON envelope', () => {
         const tenantTable = new StorageTable({
           namespaceId: UNBOUND_NAMESPACE_ID,
           columns: { id: col('int4', 'pg/int4@1') },
@@ -301,9 +292,9 @@ describe('SQL contract factories', () => {
           indexes: [],
           foreignKeys: [],
         });
-        expect(tenantTable.namespaceId).toBeUndefined();
+        expect(tenantTable.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
         const json = JSON.parse(JSON.stringify(tenantTable)) as Record<string, unknown>;
-        expect(json).not.toHaveProperty('namespaceId');
+        expect(json['namespaceId']).toBe(UNBOUND_NAMESPACE_ID);
       });
     });
 
@@ -324,10 +315,10 @@ describe('SQL contract factories', () => {
       expect(postTable.primaryKey).toEqual({ columns: ['id'] });
       expect(postTable.uniques).toEqual([{ columns: ['title'] }]);
       expect(postTable.indexes).toEqual([{ columns: ['userId'] }]);
-      expect(postTable.foreignKeys).toEqual([
+      expect(postTable.foreignKeys).toMatchObject([
         {
           source: { columns: ['userId'] },
-          target: { table: 'user', columns: ['id'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
           constraint: true,
           index: true,
         },

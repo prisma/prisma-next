@@ -11,14 +11,16 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:cd54e5c077cb602fadd5bc725effee5d1b0e2a0d970c1cfe65329c458a18b9e3",
+    "storageHash": "sha256:122f088a8542e8c19593d8cb5ab77a7b047061fdeabb09f17edeb12b2a38db3c",
     "tables": {},
     "types": {
-      "vector": {
-        "codecId": "pg/vector@1",
-        "kind": "codec-instance",
-        "nativeType": "vector",
-        "typeParams": {}
+      "__unbound__": {
+        "vector": {
+          "codecId": "pg/vector@1",
+          "kind": "codec-instance",
+          "nativeType": "vector",
+          "typeParams": {}
+        }
       }
     }
   },

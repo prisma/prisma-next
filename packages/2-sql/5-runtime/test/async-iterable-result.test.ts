@@ -4,6 +4,7 @@ import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import type { Runtime } from '../src/exports';
 import { createRuntime, createSqlExecutionStack } from '../src/exports';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   createStubAdapter,
   createTestAdapterDescriptor,
@@ -52,6 +53,7 @@ const fixtureContract = createTestContract({
   storage: {
     tables: {
       user: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
         columns: {
           id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
           email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },

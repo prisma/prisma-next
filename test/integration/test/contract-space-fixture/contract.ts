@@ -10,6 +10,7 @@ const TARGET_FAMILY = 'sql' as const;
 const storageBody = {
   tables: {
     [TEST_BOX_TABLE]: {
+      namespaceId: UNBOUND_NAMESPACE_ID,
       columns: {
         x: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
         y: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },

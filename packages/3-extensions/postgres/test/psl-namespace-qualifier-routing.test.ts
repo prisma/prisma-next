@@ -66,8 +66,8 @@ describe('PSL → SqlStorage.namespaces qualifier routing (FR15 slice 3 + FR16a 
     expect(tenant).toBeDefined();
 
     // The model lowered to the framework-reserved unbound slot.
-    const resolvedNamespaceId = tenant?.namespaceId ?? UNBOUND_NAMESPACE_ID;
-    expect(resolvedNamespaceId).toBe(UNBOUND_NAMESPACE_ID);
+    expect(tenant?.namespaceId).toBe(UNBOUND_NAMESPACE_ID);
+    const resolvedNamespaceId = UNBOUND_NAMESPACE_ID;
 
     // The storage map carries the Postgres target concretion (not the
     // SQL family placeholder) at the unbound slot.

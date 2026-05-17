@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { planIssues } from '../../src/core/migrations/issue-planner';
 import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
 import { PostgresEnumType } from '../../src/exports/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 function makeContract(
   overrides: Partial<Contract<SqlStorage>['storage']> = {},
@@ -58,6 +59,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -97,6 +99,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -138,6 +141,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -179,6 +183,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -193,6 +198,7 @@ describe('planIssues', () => {
       const fromContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               email: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
@@ -237,6 +243,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               age: { nativeType: 'int8', codecId: 'pg/int8@1', nullable: false },
@@ -251,6 +258,7 @@ describe('planIssues', () => {
       const fromContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               age: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -292,6 +300,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               age: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -306,6 +315,7 @@ describe('planIssues', () => {
       const fromContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               age: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -395,6 +405,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               status: {
@@ -420,6 +431,7 @@ describe('planIssues', () => {
       const fromContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               status: {
@@ -477,6 +489,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           doc: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               body: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -520,6 +533,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           doc: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               body: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -570,6 +584,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           doc: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               body: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -615,6 +630,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           order: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               user_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
@@ -659,6 +675,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -703,6 +720,7 @@ describe('planIssues', () => {
       const toContract = makeContract({
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               status: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },

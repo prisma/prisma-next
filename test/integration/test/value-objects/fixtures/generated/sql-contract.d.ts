@@ -35,6 +35,7 @@ type ContractBase = ContractShape<
   {
     readonly tables: {
       readonly shop: {
+        readonly namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -65,7 +66,7 @@ type ContractBase = ContractShape<
       };
     };
     readonly types: Record<string, never>;
-    readonly namespaces: { readonly __unspecified__: { readonly id: '__unspecified__' } };
+    readonly namespaces: { readonly __unbound__: { readonly id: '__unbound__' } };
     readonly storageHash: StorageHash;
   },
   {

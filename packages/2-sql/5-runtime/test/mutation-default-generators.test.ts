@@ -6,6 +6,7 @@ import {
   type SqlExecutionStack,
   type SqlRuntimeExtensionDescriptor,
 } from '../src/sql-context';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   createStubAdapter,
   createTestAdapterDescriptor,
@@ -22,6 +23,7 @@ const testContract: Contract<SqlStorage> = {
     storageHash: coreHash('sha256:test'),
     tables: {
       user: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
         columns: {
           id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
         },

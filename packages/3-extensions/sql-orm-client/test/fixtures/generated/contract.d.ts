@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:9e09547664341c1c79396ce82b0c422a351c836c99364b31e8eb8c2cc857f979'>;
+  StorageHashBase<'sha256:ef34ad1945f3d9fcff273b25eae983ab29620be2551edd92c3d6eace51615f95'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:e216decd356eea44980cf151c6044d85fb936e1fad093fbfb93ca34b96cf5847'>;
 export type ProfileHash =
@@ -131,6 +131,7 @@ type ContractBase = ContractType<
   {
     readonly tables: {
       readonly articles: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -154,6 +155,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly comments: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -177,13 +179,18 @@ type ContractBase = ContractType<
         foreignKeys: readonly [
           {
             readonly source: { readonly columns: readonly ['post_id'] };
-            readonly target: { readonly table: 'posts'; readonly columns: readonly ['id'] };
+            readonly target: {
+              readonly namespaceId: '__unbound__';
+              readonly table: 'posts';
+              readonly columns: readonly ['id'];
+            };
             readonly constraint: true;
             readonly index: true;
           },
         ];
       };
       readonly posts: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -218,13 +225,18 @@ type ContractBase = ContractType<
         foreignKeys: readonly [
           {
             readonly source: { readonly columns: readonly ['user_id'] };
-            readonly target: { readonly table: 'users'; readonly columns: readonly ['id'] };
+            readonly target: {
+              readonly namespaceId: '__unbound__';
+              readonly table: 'users';
+              readonly columns: readonly ['id'];
+            };
             readonly constraint: true;
             readonly index: true;
           },
         ];
       };
       readonly profiles: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -248,13 +260,18 @@ type ContractBase = ContractType<
         foreignKeys: readonly [
           {
             readonly source: { readonly columns: readonly ['user_id'] };
-            readonly target: { readonly table: 'users'; readonly columns: readonly ['id'] };
+            readonly target: {
+              readonly namespaceId: '__unbound__';
+              readonly table: 'users';
+              readonly columns: readonly ['id'];
+            };
             readonly constraint: true;
             readonly index: true;
           },
         ];
       };
       readonly tags: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'character';
@@ -274,6 +291,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly users: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -307,7 +325,11 @@ type ContractBase = ContractType<
         foreignKeys: readonly [
           {
             readonly source: { readonly columns: readonly ['invited_by_id'] };
-            readonly target: { readonly table: 'users'; readonly columns: readonly ['id'] };
+            readonly target: {
+              readonly namespaceId: '__unbound__';
+              readonly table: 'users';
+              readonly columns: readonly ['id'];
+            };
             readonly constraint: true;
             readonly index: true;
           },

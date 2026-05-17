@@ -10,6 +10,7 @@ import {
   type SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
 import { defineTestCodec } from './test-codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   createStubAdapter,
   createTestAdapterDescriptor,
@@ -295,6 +296,7 @@ describe('contract/stack validation errors', () => {
         storageHash: coreHash('sha256:test'),
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
             },
@@ -338,6 +340,7 @@ describe('contract/stack validation errors', () => {
         storageHash: coreHash('sha256:test'),
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
               slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -384,6 +387,7 @@ describe('contract/stack validation errors', () => {
         storageHash: coreHash('sha256:test'),
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
             },
@@ -419,6 +423,7 @@ describe('applyMutationDefaults', () => {
       storageHash: coreHash('sha256:test'),
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
             slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -531,6 +536,7 @@ describe('applyMutationDefaults', () => {
         storageHash: coreHash('sha256:test'),
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
               touchedAt: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -621,6 +627,7 @@ describe('applyMutationDefaults', () => {
         storageHash: coreHash('sha256:test'),
         tables: {
           event: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
               causation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
@@ -703,6 +710,7 @@ describe('applyMutationDefaults', () => {
         storageHash: coreHash('sha256:test'),
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
             },

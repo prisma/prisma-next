@@ -9,22 +9,12 @@ import { validateStorage } from '../src/validators';
  * Multi-namespace SqlStorage JSON round-trip coverage.
  *
  * Verifies that a multi-namespace contract authored via the nested
- * `SqlStorage` input shape serialises to a JSON envelope from which the
- * exact same `(namespaceId, tableName)` coordinates can be reconstructed.
- *
- * The flat `tables` view ships as the JSON-visible payload (the nested
- * `tablesByNamespace` projection is non-enumerable, preserving
- * byte-identical hashes for single-namespace contracts). Each table
- * carries its `namespaceId` back-pointer through the envelope, and the
- * constructor re-buckets the flat JSON input into the nested in-memory
- * truth — closing the authoring → emit → validate → hydrate loop for
- * multi-namespace contracts that don't collide on table name.
- *
- * Same-named-table-across-namespaces (e.g. auth.User + public.User) is
- * the F1 collision case; the flat JSON envelope cannot carry both
- * entries by design. That regression is pinned in
- * sql-storage-namespace-buckets.test.ts; this suite covers the
- * complementary "multi-namespace, distinct table names" case end-to-end.
+ * `SqlStorage` input shape serialises to the FR15 nested JSON envelope
+ * and round-trips back through `validateStorage`. The JSON envelope is
+ * unconditionally nested: `{ tables: { [namespaceId]: { [tableName]:
+ * ... } } }`. Same-named tables across distinct namespaces (e.g.
+ * `auth.User` + `public.User`) coexist in their own buckets without
+ * collision.
  */
 
 const sha = 'sha256:multi-ns-round-trip' as const;
@@ -55,23 +45,15 @@ describe('SqlStorage multi-namespace JSON round-trip', () => {
       },
     });
 
-    const serialised = JSON.stringify(source);
-    const parsed = JSON.parse(serialised) as { tables: Record<string, unknown> };
+    const envelope = JSON.parse(JSON.stringify(source)) as {
+      tables: Record<string, Record<string, unknown>>;
+    };
 
-    // The JSON envelope keeps the flat-by-name shape — the nested view
-    // is non-enumerable. Each table carries its `namespaceId`
-    // back-pointer, which the constructor uses to re-bucket the flat
-    // input into the nested truth on hydration.
-    expect(Object.keys(parsed.tables).sort()).toEqual(['Account', 'Comment', 'Post']);
+    expect(Object.keys(envelope.tables).sort()).toEqual(['auth', 'public']);
+    expect(Object.keys(envelope.tables['public']!).sort()).toEqual(['Comment', 'Post']);
+    expect(Object.keys(envelope.tables['auth']!)).toEqual(['Account']);
 
-    const rehydrated = new SqlStorage({
-      storageHash: sha as SqlStorage['storageHash'],
-      tables: {
-        Post: source.tables['Post']!,
-        Comment: source.tables['Comment']!,
-        Account: source.tables['Account']!,
-      },
-    });
+    const rehydrated = validateStorage(envelope);
 
     const coords = [...iterateTablesWithCoords(rehydrated)]
       .map(({ namespaceId, name }) => `${namespaceId}.${name}`)
@@ -84,7 +66,7 @@ describe('SqlStorage multi-namespace JSON round-trip', () => {
     expect(findTableByCoord(rehydrated, 'public', 'Account')).toBeUndefined();
   });
 
-  it('flattens single-namespace contracts to the legacy envelope shape (no nested key surfaces in JSON)', () => {
+  it('wraps single-namespace contracts under the bound namespace bucket (unconditional FR15 envelope)', () => {
     const storage = new SqlStorage({
       storageHash: sha as SqlStorage['storageHash'],
       tables: {
@@ -94,13 +76,10 @@ describe('SqlStorage multi-namespace JSON round-trip', () => {
     });
 
     const envelope = JSON.parse(JSON.stringify(storage)) as Record<string, unknown>;
-    // No nested view in the envelope — the canonical JSON shape stays
-    // flat for single-namespace contracts, anchoring byte-identical
-    // hashes for the existing fixture corpus.
-    expect(envelope).not.toHaveProperty('tablesByNamespace');
     expect(envelope).toHaveProperty('tables');
-    const tables = envelope['tables'] as Record<string, unknown>;
-    expect(Object.keys(tables).sort()).toEqual(['Post', 'User']);
+    const tables = envelope['tables'] as Record<string, Record<string, unknown>>;
+    expect(Object.keys(tables)).toEqual([UNBOUND_NAMESPACE_ID]);
+    expect(Object.keys(tables[UNBOUND_NAMESPACE_ID]!).sort()).toEqual(['Post', 'User']);
   });
 
   it("multi-namespace contracts surface each table's namespaceId in the JSON envelope", () => {
@@ -113,13 +92,13 @@ describe('SqlStorage multi-namespace JSON round-trip', () => {
     });
 
     const envelope = JSON.parse(JSON.stringify(storage)) as {
-      tables: Record<string, { namespaceId?: string }>;
+      tables: Record<string, Record<string, { namespaceId?: string }>>;
     };
-    expect(envelope.tables['Post']?.namespaceId).toBe('public');
-    expect(envelope.tables['Account']?.namespaceId).toBe('auth');
+    expect(envelope.tables['public']?.['Post']?.namespaceId).toBe('public');
+    expect(envelope.tables['auth']?.['Account']?.namespaceId).toBe('auth');
   });
 
-  it('escalates to the nested envelope when the same name lives in two namespaces (FR15)', () => {
+  it('expresses same-name-across-namespaces collisions via the nested buckets (FR15)', () => {
     const storage = new SqlStorage({
       storageHash: sha as SqlStorage['storageHash'],
       tables: {
@@ -158,7 +137,7 @@ describe('SqlStorage multi-namespace JSON round-trip', () => {
     expect(findTableByCoord(rehydrated, 'public', 'User')?.namespaceId).toBe('public');
   });
 
-  it('rehydrates the flat envelope back through validateStorage to a dual-view IR', () => {
+  it('rehydrates a multi-namespace envelope (no name collisions) back through validateStorage', () => {
     const original = new SqlStorage({
       storageHash: sha as SqlStorage['storageHash'],
       tables: {
@@ -168,9 +147,9 @@ describe('SqlStorage multi-namespace JSON round-trip', () => {
     });
 
     const envelope = JSON.parse(JSON.stringify(original)) as {
-      tables: Record<string, unknown>;
+      tables: Record<string, Record<string, unknown>>;
     };
-    expect(Object.keys(envelope.tables).sort()).toEqual(['Account', 'Post']);
+    expect(Object.keys(envelope.tables).sort()).toEqual(['auth', 'public']);
 
     const rehydrated = validateStorage(envelope);
     expect(findTableByCoord(rehydrated, 'auth', 'Account')?.namespaceId).toBe('auth');

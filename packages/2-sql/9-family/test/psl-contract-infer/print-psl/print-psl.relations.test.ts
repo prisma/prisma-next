@@ -2,6 +2,7 @@ import { printPsl } from '@prisma-next/psl-printer';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { sqlSchemaIrToPslAst } from '../../../src/core/psl-contract-infer/sql-schema-ir-to-psl-ast';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 function printPslFromSql(schemaIR: SqlSchemaIR): string {
   return printPsl(sqlSchemaIrToPslAst(schemaIR));
@@ -34,6 +35,7 @@ describe('printPsl', () => {
             {
               columns: ['user_id'],
               referencedTable: 'user',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['id'],
             },
           ],
@@ -92,6 +94,7 @@ describe('printPsl', () => {
             {
               columns: ['user_id'],
               referencedTable: 'user',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['id'],
             },
           ],
@@ -161,6 +164,7 @@ describe('printPsl', () => {
             {
               columns: ['tenant_id', 'account_id'],
               referencedTable: 'account',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['tenant_id', 'id'],
             },
           ],
@@ -214,6 +218,7 @@ describe('printPsl', () => {
             {
               columns: ['manager_id'],
               referencedTable: 'employee',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['id'],
             },
           ],
@@ -273,12 +278,14 @@ describe('printPsl', () => {
               name: 'message_sender_fk',
               columns: ['sender_id'],
               referencedTable: 'user',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['id'],
             },
             {
               name: 'message_recipient_fk',
               columns: ['recipient_id'],
               referencedTable: 'user',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['id'],
             },
           ],
@@ -354,6 +361,7 @@ describe('printPsl', () => {
             {
               columns: ['product_category_id', 'product_product_id'],
               referencedTable: 'product',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['category_id', 'product_id'],
             },
           ],
@@ -415,6 +423,7 @@ describe('printPsl', () => {
             {
               columns: ['parent_id'],
               referencedTable: 'parent',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['id'],
               onDelete: 'cascade',
               onUpdate: 'cascade',
@@ -472,6 +481,7 @@ describe('printPsl', () => {
               name: 'member_team_id_fkey',
               columns: ['team_id'],
               referencedTable: 'team',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['id'],
             },
           ],
@@ -514,7 +524,7 @@ describe('printPsl', () => {
           },
           primaryKey: { columns: ['id'] },
           foreignKeys: [
-            { columns: ['beta_id'], referencedTable: 'beta', referencedColumns: ['id'] },
+            { columns: ['beta_id'], referencedTable: 'beta', referencedColumns: ['id'], referencedNamespaceId: UNBOUND_NAMESPACE_ID },
           ],
           uniques: [],
           indexes: [],
@@ -531,7 +541,7 @@ describe('printPsl', () => {
           },
           primaryKey: { columns: ['id'] },
           foreignKeys: [
-            { columns: ['alpha_id'], referencedTable: 'alpha', referencedColumns: ['id'] },
+            { columns: ['alpha_id'], referencedTable: 'alpha', referencedColumns: ['id'], referencedNamespaceId: UNBOUND_NAMESPACE_ID },
           ],
           uniques: [],
           indexes: [],

@@ -7,6 +7,7 @@ import {
   hasUniqueConstraint,
 } from '@prisma-next/target-postgres/planner-schema-lookup';
 import { describe, expect, it } from 'vitest';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 function makeTable(
   overrides: Partial<SqlSchemaIR['tables'][string]> = {},
@@ -71,7 +72,12 @@ describe('buildSchemaLookupMap', () => {
       tables: {
         post: makeTable({
           foreignKeys: [
-            { columns: ['author_id'], referencedTable: 'user', referencedColumns: ['id'] },
+            {
+              columns: ['author_id'],
+              referencedTable: 'user',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
+              referencedColumns: ['id'],
+            },
           ],
         }),
       },
@@ -138,10 +144,16 @@ describe('hasForeignKey', () => {
     tables: {
       post: makeTable({
         foreignKeys: [
-          { columns: ['author_id'], referencedTable: 'user', referencedColumns: ['id'] },
+          {
+            columns: ['author_id'],
+            referencedTable: 'user',
+            referencedNamespaceId: UNBOUND_NAMESPACE_ID,
+            referencedColumns: ['id'],
+          },
           {
             columns: ['org_id', 'team_id'],
             referencedTable: 'team',
+            referencedNamespaceId: UNBOUND_NAMESPACE_ID,
             referencedColumns: ['org_id', 'id'],
           },
         ],
@@ -162,7 +174,10 @@ describe('hasForeignKey', () => {
     expect(
       hasForeignKey(
         lookup,
-        fk({ source: { columns: ['author_id'] }, target: { table: 'user', columns: ['id'] } }),
+        fk({
+          source: { columns: ['author_id'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
+        }),
       ),
     ).toBe(true);
   });
@@ -173,7 +188,7 @@ describe('hasForeignKey', () => {
         lookup,
         fk({
           source: { columns: ['org_id', 'team_id'] },
-          target: { table: 'team', columns: ['org_id', 'id'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'team', columns: ['org_id', 'id'] },
         }),
       ),
     ).toBe(true);
@@ -183,7 +198,10 @@ describe('hasForeignKey', () => {
     expect(
       hasForeignKey(
         lookup,
-        fk({ source: { columns: ['author_id'] }, target: { table: 'account', columns: ['id'] } }),
+        fk({
+          source: { columns: ['author_id'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'account', columns: ['id'] },
+        }),
       ),
     ).toBe(false);
   });
@@ -192,7 +210,10 @@ describe('hasForeignKey', () => {
     expect(
       hasForeignKey(
         lookup,
-        fk({ source: { columns: ['author_id'] }, target: { table: 'user', columns: ['uid'] } }),
+        fk({
+          source: { columns: ['author_id'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['uid'] },
+        }),
       ),
     ).toBe(false);
   });
@@ -201,7 +222,10 @@ describe('hasForeignKey', () => {
     expect(
       hasForeignKey(
         lookup,
-        fk({ source: { columns: ['user_id'] }, target: { table: 'user', columns: ['id'] } }),
+        fk({
+          source: { columns: ['user_id'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
+        }),
       ),
     ).toBe(false);
   });

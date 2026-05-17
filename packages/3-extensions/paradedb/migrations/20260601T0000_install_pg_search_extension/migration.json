@@ -2,7 +2,9 @@
   "from": null,
   "to": "sha256:c2d358c3ed7d4fee668cd5addfbca4c5cc4d1b8810fbf2f7c653f5795ccfea67",
   "labels": [],
-  "providedInvariants": ["paradedb:install-pg-search-v1"],
+  "providedInvariants": [
+    "paradedb:install-pg-search-v1"
+  ],
   "createdAt": "2026-06-01T00:00:00.000Z",
   "fromContract": null,
   "toContract": {

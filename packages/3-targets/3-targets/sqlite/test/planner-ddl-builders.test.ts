@@ -1,3 +1,4 @@
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
@@ -20,6 +21,7 @@ function makeColumn(overrides: Partial<StorageColumn> = {}): StorageColumn {
 
 function makeTable(overrides: Partial<StorageTable> = {}): StorageTable {
   return {
+    namespaceId: UNBOUND_NAMESPACE_ID,
     columns: {},
     foreignKeys: [],
     uniques: [],

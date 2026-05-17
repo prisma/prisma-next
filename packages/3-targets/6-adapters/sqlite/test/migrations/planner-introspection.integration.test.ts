@@ -10,6 +10,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageColumn, type StorageTable } from '@prisma-next/sql-contract/types';
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { describe, expect, it } from 'vitest';
@@ -44,6 +45,7 @@ function makeColumn(overrides: Partial<StorageColumn> = {}): StorageColumn {
 
 function makeTable(overrides: Partial<StorageTable> = {}): StorageTable {
   return {
+    namespaceId: UNBOUND_NAMESPACE_ID,
     columns: {},
     foreignKeys: [],
     uniques: [],
@@ -216,7 +218,7 @@ describe('SQLite planner + introspection round-trip', () => {
           foreignKeys: [
             {
               source: { columns: ['author_id'] },
-              target: { table: 'authors', columns: ['id'] },
+              target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'authors', columns: ['id'] },
               onDelete: 'cascade',
               constraint: true,
               index: true,

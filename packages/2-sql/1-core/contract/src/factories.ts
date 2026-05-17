@@ -1,4 +1,5 @@
 import type { ScalarFieldType } from '@prisma-next/contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   applyFkDefaults,
   ForeignKey,
@@ -33,12 +34,22 @@ export function fk(
   columns: readonly string[],
   refTable: string,
   refColumns: readonly string[],
-  opts?: ForeignKeyOptions & { constraint?: boolean; index?: boolean },
+  opts?: ForeignKeyOptions & {
+    constraint?: boolean;
+    index?: boolean;
+    namespaceId?: string;
+  },
 ): ForeignKey {
   const defaults = applyFkDefaults({ constraint: opts?.constraint, index: opts?.index });
+  const targetNamespaceId: string =
+    opts?.namespaceId !== undefined ? opts.namespaceId : UNBOUND_NAMESPACE_ID;
   return new ForeignKey({
     source: { columns },
-    target: { table: refTable, columns: refColumns },
+    target: {
+      namespaceId: targetNamespaceId,
+      table: refTable,
+      columns: refColumns,
+    },
     ...(opts?.name !== undefined && { name: opts.name }),
     ...(opts?.onDelete !== undefined && { onDelete: opts.onDelete }),
     ...(opts?.onUpdate !== undefined && { onUpdate: opts.onUpdate }),
@@ -54,9 +65,13 @@ export function table(
     uniques?: readonly UniqueConstraint[];
     indexes?: readonly Index[];
     fks?: readonly ForeignKey[];
+    namespaceId?: string;
   },
 ): StorageTable {
+  const namespaceId: string =
+    opts?.namespaceId !== undefined ? opts.namespaceId : UNBOUND_NAMESPACE_ID;
   return new StorageTable({
+    namespaceId,
     columns,
     ...(opts?.pk !== undefined && { primaryKey: opts.pk }),
     uniques: opts?.uniques ?? [],

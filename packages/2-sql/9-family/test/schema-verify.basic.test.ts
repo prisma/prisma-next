@@ -51,6 +51,7 @@ describe('verifySqlSchema - basic', () => {
           storageHash: 'sha256:test' as StorageHashBase<string>,
           tables: {
             user: {
+              namespaceId: UNBOUND_NAMESPACE_ID,
               columns: {
                 email: {
                   nativeType: 'character varying',
@@ -103,6 +104,7 @@ describe('verifySqlSchema - basic', () => {
       const contract = createTestContract(
         {
           document: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               embedding: {
                 nativeType: 'vector',
@@ -155,6 +157,7 @@ describe('verifySqlSchema - basic', () => {
     it('fails fast when a column typeRef points at a missing storage type', () => {
       const contract = createTestContract({
         document: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             embedding: {
               nativeType: 'vector',
@@ -204,6 +207,7 @@ describe('verifySqlSchema - basic', () => {
           storageHash: 'sha256:test' as StorageHashBase<string>,
           tables: {
             user: {
+              namespaceId: UNBOUND_NAMESPACE_ID,
               columns: {
                 email: {
                   nativeType: 'character varying',

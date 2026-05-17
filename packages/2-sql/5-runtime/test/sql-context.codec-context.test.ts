@@ -2,6 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type StorageTable } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -61,6 +62,7 @@ describe('buildContractCodecRegistry — per-column codec instance context', () 
     const tables: Record<string, StorageTable> = {};
     for (const [tableName, columnSpec] of Object.entries(columns)) {
       tables[tableName] = {
+        namespaceId: UNBOUND_NAMESPACE_ID,
         columns: {
           field: {
             nativeType: columnSpec.nativeType,
@@ -169,6 +171,7 @@ describe('buildContractCodecRegistry — forCodecRef content-keyed cache', () =>
     const tables: Record<string, StorageTable> = {};
     for (const [tableName, spec] of Object.entries(columns)) {
       tables[tableName] = {
+        namespaceId: UNBOUND_NAMESPACE_ID,
         columns: {
           embedding: {
             nativeType: 'vector',
@@ -412,6 +415,7 @@ describe('buildContractCodecRegistry — forColumn delegates to forCodecRef', ()
     const tables: Record<string, StorageTable> = {};
     for (const [tableName, columnSpec] of Object.entries(columns)) {
       tables[tableName] = {
+        namespaceId: UNBOUND_NAMESPACE_ID,
         columns: {
           field: {
             nativeType: columnSpec.nativeType,

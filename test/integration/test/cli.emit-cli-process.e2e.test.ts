@@ -22,6 +22,7 @@ type EmittedContract = Contract<
     readonly storageHash: StorageHashBase<string>;
     readonly tables: {
       readonly user: {
+        readonly namespaceId: '__unbound__';
         readonly columns: {
           readonly id: {
             readonly nativeType: 'int4';

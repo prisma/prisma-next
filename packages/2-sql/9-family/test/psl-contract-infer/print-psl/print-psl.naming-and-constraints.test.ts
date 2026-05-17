@@ -2,6 +2,7 @@ import { printPsl } from '@prisma-next/psl-printer';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import { sqlSchemaIrToPslAst } from '../../../src/core/psl-contract-infer/sql-schema-ir-to-psl-ast';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 function printPslFromSql(schemaIR: SqlSchemaIR): string {
   return printPsl(sqlSchemaIrToPslAst(schemaIR));
@@ -36,6 +37,7 @@ describe('printPsl', () => {
             {
               columns: ['2fa_id'],
               referencedTable: 'account',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['id'],
             },
           ],
@@ -103,6 +105,7 @@ describe('printPsl', () => {
             {
               columns: ['account_id'],
               referencedTable: 'account',
+              referencedNamespaceId: UNBOUND_NAMESPACE_ID,
               referencedColumns: ['user_id'],
             },
           ],

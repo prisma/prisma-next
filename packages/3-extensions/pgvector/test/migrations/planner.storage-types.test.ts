@@ -60,6 +60,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         storageHash: coreHash('sha256:test'),
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               role: {
@@ -228,6 +229,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         storageHash: coreHash('sha256:test'),
         tables: {
           user: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
               kind: {
@@ -291,6 +293,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         storageHash: coreHash('sha256:test'),
         tables: {
           document: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
               embedding: {
@@ -352,6 +355,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         storageHash: coreHash('sha256:test'),
         tables: {
           document: {
+            namespaceId: UNBOUND_NAMESPACE_ID,
             columns: {
               id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
               embedding: {

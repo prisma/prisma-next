@@ -7,6 +7,7 @@ import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { describe, expect, it } from 'vitest';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 const RECONCILIATION_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'],
@@ -22,6 +23,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
   it('plans destructive drop for extra column when policy allows destructive', () => {
     const contract = createContract({
       user: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -76,6 +78,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
   it('plans widening operation for nullability relaxation when policy allows widening', () => {
     const contract = createContract({
       user: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           email: { nativeType: 'text', codecId: 'pg/text@1', nullable: true },
@@ -129,6 +132,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
   it('returns conflict when destructive operation is required but policy forbids it', () => {
     const contract = createContract({
       user: {
+        namespaceId: UNBOUND_NAMESPACE_ID,
         columns: {
           id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
         },

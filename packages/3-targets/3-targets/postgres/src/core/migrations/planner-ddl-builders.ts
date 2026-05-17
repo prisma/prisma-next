@@ -7,6 +7,7 @@ import type {
   StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import { qualifyTableName } from './planner-sql-checks';
@@ -233,10 +234,15 @@ export function buildForeignKeySql(
 ): string {
   // Cross-namespace FKs (FR16b): the target carries its own namespace
   // coordinate so the rendered `REFERENCES` clause qualifies through the
-  // target's namespace, not the source's. Same-namespace FKs (the common
-  // case) leave `target.namespaceId` either equal to the source's
-  // namespace or undefined; both branches reduce to the source schema.
-  const targetSchema = foreignKey.target.namespaceId ?? schemaName;
+  // target's namespace, not the source's. Same-namespace FKs land here
+  // with `target.namespaceId` equal to the source coordinate (callers
+  // stamp the resolved value at construction time), so a direct
+  // assignment suffices. The unbound sentinel falls back to the source
+  // schema so SQL rendering stays grounded in the introspection scope.
+  const targetSchema =
+    foreignKey.target.namespaceId === UNBOUND_NAMESPACE_ID
+      ? schemaName
+      : foreignKey.target.namespaceId;
   let sql = `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
 ADD CONSTRAINT ${quoteIdentifier(fkName)}
 FOREIGN KEY (${foreignKey.source.columns.map(quoteIdentifier).join(', ')})

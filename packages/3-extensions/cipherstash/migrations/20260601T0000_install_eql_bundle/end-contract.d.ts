@@ -27,13 +27,12 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:efa685171bebbb8f078f08d12be3578bb5d96b71669dccc6cc9e4be96af8cdb4'>;
+  StorageHashBase<'sha256:70f6edb5b58beb5949d25c9a1d626bed271aa623ca940edbcbf279212f557487'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e'>;
 
 export type CodecTypes = PgTypes;
-export type OperationTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
@@ -56,7 +55,6 @@ export type FieldInputTypes = {
 };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
-  OperationTypes,
   QueryOperationTypes,
   FieldOutputTypes,
   FieldInputTypes
@@ -66,6 +64,7 @@ type ContractBase = ContractType<
   {
     readonly tables: {
       readonly eql_v2_configuration: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'text';
@@ -90,6 +89,7 @@ type ContractBase = ContractType<
       };
     };
     readonly types: Record<string, never>;
+    readonly namespaces: { readonly __unbound__: { readonly id: '__unbound__' } };
     readonly storageHash: StorageHash;
   },
   {

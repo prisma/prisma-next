@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:9340034f9aa95bf7bdffe60c777f6c96d8a093c3bd897ad733f36cc8b2d52ab1'>;
+  StorageHashBase<'sha256:5a1edf9f464cea9fda868bd93c2e920eaa8b39ceeca42b2e35860cabcbc264a9'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:4d09909b2e09a240919c201ce4a5e63c3a2ec70515932e145dccca82936d8be5'>;
 export type ProfileHash =
@@ -110,6 +110,7 @@ type ContractBase = ContractType<
   {
     readonly tables: {
       readonly articles: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'character';
@@ -129,6 +130,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly comments: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -152,6 +154,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly posts: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -186,6 +189,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly profiles: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';
@@ -209,6 +213,7 @@ type ContractBase = ContractType<
         foreignKeys: readonly [];
       };
       readonly users: {
+        namespaceId: '__unbound__';
         columns: {
           readonly id: {
             readonly nativeType: 'int4';

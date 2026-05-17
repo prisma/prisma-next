@@ -90,7 +90,8 @@ export function createContractTable(
     namespaceId?: string;
   },
 ): StorageTable {
-  const namespaceId = options?.namespaceId ?? UNBOUND_NAMESPACE_ID;
+  const namespaceId: string =
+    options?.namespaceId !== undefined ? options.namespaceId : UNBOUND_NAMESPACE_ID;
   const result: StorageTable = {
     namespaceId,
     columns: Object.fromEntries(
@@ -108,7 +109,7 @@ export function createContractTable(
       ...fk,
       target: {
         ...fk.target,
-        namespaceId: fk.target.namespaceId ?? namespaceId,
+        namespaceId: fk.target.namespaceId !== undefined ? fk.target.namespaceId : namespaceId,
       },
       ...applyFkDefaults(fk),
     })),

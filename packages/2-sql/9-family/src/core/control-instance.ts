@@ -375,7 +375,18 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     typeMetadataRegistry,
 
     validateContract(contractJson: unknown): Contract {
-      return deserializeWithTargetSerializer(contractJson);
+      // The caller may hand either a parsed JSON envelope or an
+      // in-memory contract instance (the emit pipeline calls
+      // `validateContract(enrichedIR)` after enrichment). Round-trip
+      // through JSON.stringify so any class instances (notably
+      // `SqlStorage`, which exposes the FR15 nested envelope through
+      // `toJSON`) are reduced to the persisted JSON shape before the
+      // family-level structural validator runs.
+      const json =
+        typeof contractJson === 'string'
+          ? JSON.parse(contractJson)
+          : JSON.parse(JSON.stringify(contractJson));
+      return deserializeWithTargetSerializer(json);
     },
 
     async verify(verifyOptions: {

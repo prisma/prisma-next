@@ -4,6 +4,7 @@ import { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import type { RecreateTableCall } from '../../src/core/migrations/op-factory-call';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   nullabilityTighteningBackfillStrategy,
   recreateTableStrategy,
@@ -68,6 +69,7 @@ describe('recreateTableStrategy', () => {
     const contract = makeContract({
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
             email: {
@@ -108,6 +110,7 @@ describe('recreateTableStrategy', () => {
     const contract = makeContract({
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
             email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
@@ -144,6 +147,7 @@ describe('recreateTableStrategy', () => {
     const contract = makeContract({
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
             email: {
@@ -188,6 +192,7 @@ describe('recreateTableStrategy', () => {
     const contract = makeContract({
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
             email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
@@ -241,6 +246,7 @@ describe('recreateTableStrategy', () => {
     const contract = makeContract({
       tables: {
         a: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: { id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false } },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -248,6 +254,7 @@ describe('recreateTableStrategy', () => {
           foreignKeys: [],
         },
         b: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: { id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false } },
           primaryKey: { columns: ['id'] },
           uniques: [],
@@ -335,6 +342,7 @@ describe('nullabilityTighteningBackfillStrategy', () => {
     const contract = makeContract({
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
             email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: true },
@@ -370,6 +378,7 @@ describe('nullabilityTighteningBackfillStrategy', () => {
     const contract = makeContract({
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'integer', codecId: 'sqlite/integer@1', nullable: false },
             email: { nativeType: 'text', codecId: 'sqlite/text@1', nullable: false }, // contract: NOT NULL

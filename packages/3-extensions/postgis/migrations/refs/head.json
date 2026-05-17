@@ -1,4 +1,4 @@
 {
-  "hash": "sha256:4531939920338420868e475b9a26c7ba06cc320e1e68a69e21075c07578d0e80",
+  "hash": "sha256:0af8a75cb656d383da1b98d8d107dfe8cef02165822e75692cc750b0b7fa6fc6",
   "invariants": ["postgis:install-postgis-v1"]
 }

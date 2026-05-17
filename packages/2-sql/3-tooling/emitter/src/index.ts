@@ -336,7 +336,10 @@ function emitTableType(table: StorageTable): string {
     );
   }
 
-  const tableParts: string[] = [`columns: { ${columns.join('; ')} }`];
+  const tableParts: string[] = [
+    `namespaceId: ${serializeValue(table.namespaceId)}`,
+    `columns: { ${columns.join('; ')} }`,
+  ];
 
   if (table.primaryKey) {
     const pkCols = table.primaryKey.columns.map((c) => serializeValue(c)).join(', ');
@@ -372,13 +375,7 @@ function emitTableType(table: StorageTable): string {
       const srcCols = fk.source.columns.map((c: string) => serializeValue(c)).join(', ');
       const tgtCols = fk.target.columns.map((c: string) => serializeValue(c)).join(', ');
       const name = fk.name ? `; readonly name: ${serializeValue(fk.name)}` : '';
-      // `target.namespaceId` is included in the emitted .d.ts type only
-      // when explicitly set to a named namespace (distinct from both
-      // `__unbound__` and `undefined`), matching the JSON envelope.
-      const tgtNs =
-        fk.target.namespaceId !== undefined && fk.target.namespaceId !== UNBOUND_NAMESPACE_ID
-          ? `readonly namespaceId: ${serializeValue(fk.target.namespaceId)}; `
-          : '';
+      const tgtNs = `readonly namespaceId: ${serializeValue(fk.target.namespaceId)}; `;
       return `{ readonly source: { readonly columns: readonly [${srcCols}] }; readonly target: { ${tgtNs}readonly table: ${serializeValue(fk.target.table)}; readonly columns: readonly [${tgtCols}] }${name}; readonly constraint: ${fk.constraint}; readonly index: ${fk.index} }`;
     })
     .join(', ');
@@ -388,49 +385,23 @@ function emitTableType(table: StorageTable): string {
 }
 
 /**
- * Single-namespace contracts (only `__unbound__` populated) emit a flat
- * `tables: { [tableName]: ... }` shape so single-namespace
- * contract.d.ts envelopes stay byte-identical post-FR15. Multi-namespace
- * contracts emit the FR15 nested-by-namespace shape required to express
- * cross-namespace same-named tables without collision.
+ * Tables are emitted as a flat `{ [tableName]: ... }` map keyed by table
+ * name. Each table entry carries `namespaceId` as a first-class field;
+ * the namespace coordinate is preserved in the type without nesting
+ * the map shape. Cross-namespace name collisions are forbidden by
+ * the same rule that disallows duplicate table names in any single
+ * SQL family contract.
  */
 function generateTablesType(storage: SqlStorage): string {
-  // Single-namespace contracts emit a flat `tables: { [tableName]: ... }`
-  // shape so existing single-namespace contract.d.ts envelopes stay
-  // byte-identical post-FR15. Multi-namespace contracts emit the FR15
-  // nested-by-namespace shape required to express cross-namespace
-  // same-named tables without collision.
-  const tablesByNamespace = storage.tablesByNamespace ?? {
-    [UNBOUND_NAMESPACE_ID]: storage.tables,
-  };
-  const namespaceIds = Object.keys(tablesByNamespace);
-  const isSingleNamespace =
-    namespaceIds.length <= 1 &&
-    (namespaceIds.length === 0 || namespaceIds[0] === UNBOUND_NAMESPACE_ID);
-
-  if (isSingleNamespace) {
-    const tableEntries: string[] = [];
-    for (const { name: tableName, table } of iterateTablesWithCoords(storage)) {
-      tableEntries.push(`readonly ${tableName}: ${emitTableType(table)}`);
-    }
-    tableEntries.sort();
-    return `{ ${tableEntries.join('; ')} }`;
+  const tableEntries: string[] = [];
+  for (const { name: tableName, table } of iterateTablesWithCoords(storage)) {
+    tableEntries.push(`readonly ${tableName}: ${emitTableType(table)}`);
   }
-
-  const namespaceEntries: string[] = [];
-  for (const namespaceId of [...namespaceIds].sort()) {
-    const bucket: Readonly<Record<string, StorageTable>> = tablesByNamespace[namespaceId] ?? {};
-    const tableEntries: string[] = [];
-    for (const tableName of Object.keys(bucket).sort()) {
-      const table = bucket[tableName];
-      if (!table) continue;
-      tableEntries.push(`readonly ${tableName}: ${emitTableType(table)}`);
-    }
-    namespaceEntries.push(
-      `readonly ${serializeObjectKey(namespaceId)}: { ${tableEntries.join('; ')} }`,
-    );
+  tableEntries.sort();
+  if (tableEntries.length === 0) {
+    return '{}';
   }
-  return `{ ${namespaceEntries.join('; ')} }`;
+  return `{ ${tableEntries.join('; ')} }`;
 }
 
 function generateStorageTypesType(storage: SqlStorage): string {
@@ -440,10 +411,6 @@ function generateStorageTypesType(storage: SqlStorage): string {
     return 'Record<string, never>';
   }
 
-  const namespaceIds = Object.keys(typesByNamespace);
-  const isSingleNamespace =
-    namespaceIds.length <= 1 &&
-    (namespaceIds.length === 0 || namespaceIds[0] === UNBOUND_NAMESPACE_ID);
   let totalTypes = 0;
   for (const bucket of Object.values(typesByNamespace)) totalTypes += Object.keys(bucket).length;
   if (totalTypes === 0) {
@@ -495,29 +462,11 @@ function generateStorageTypesType(storage: SqlStorage): string {
     return `readonly ${typeName}: { readonly kind: 'codec-instance'; readonly codecId: ${codecId}; readonly nativeType: ${nativeType}; readonly typeParams: ${typeParamsStr} }`;
   }
 
-  if (isSingleNamespace) {
-    const typeEntries: string[] = [];
-    for (const { name: typeName, entry: typeInstance } of iterateTypesWithCoords(storage)) {
-      typeEntries.push(emitTypeEntry(typeName, typeInstance));
-    }
-    return `{ ${typeEntries.join('; ')} }`;
+  const typeEntries: string[] = [];
+  for (const { name: typeName, entry: typeInstance } of iterateTypesWithCoords(storage)) {
+    typeEntries.push(emitTypeEntry(typeName, typeInstance));
   }
-
-  const namespaceEntries: string[] = [];
-  for (const namespaceId of [...namespaceIds].sort()) {
-    const bucket: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>> =
-      typesByNamespace[namespaceId] ?? {};
-    const typeEntries: string[] = [];
-    for (const typeName of Object.keys(bucket).sort()) {
-      const typeInstance = bucket[typeName];
-      if (typeInstance === undefined) continue;
-      typeEntries.push(emitTypeEntry(typeName, typeInstance));
-    }
-    namespaceEntries.push(
-      `readonly ${serializeObjectKey(namespaceId)}: { ${typeEntries.join('; ')} }`,
-    );
-  }
-  return `{ ${namespaceEntries.join('; ')} }`;
+  return `{ ${typeEntries.join('; ')} }`;
 }
 
 function generateStorageNamespacesType(namespaces: SqlStorage['namespaces']): string {

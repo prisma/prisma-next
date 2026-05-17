@@ -9,6 +9,7 @@ type TestContract = Contract<
     readonly storageHash: StorageHashBase<string>;
     readonly tables: {
       readonly document: {
+        readonly namespaceId: '__unbound__';
         readonly columns: {
           readonly id: {
             readonly nativeType: 'int4';

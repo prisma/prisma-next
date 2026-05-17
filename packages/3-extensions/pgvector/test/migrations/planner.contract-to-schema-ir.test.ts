@@ -24,6 +24,7 @@ import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/pla
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { describe, expect, it } from 'vitest';
 import pgvectorDescriptor from '../../src/exports/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
 const expandParameterizedNativeType: NativeTypeExpander = (input) => {
@@ -44,6 +45,7 @@ function table(
   overrides: Partial<StorageTable> & { columns: Record<string, StorageColumn> },
 ): StorageTable {
   return {
+    namespaceId: UNBOUND_NAMESPACE_ID,
     uniques: [],
     indexes: [],
     foreignKeys: [],
@@ -106,6 +108,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       storageHash: coreHash('sha256:test'),
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -146,6 +149,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       storageHash: coreHash('sha256:test'),
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -187,6 +191,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       storageHash: coreHash('sha256:test'),
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           },
@@ -202,6 +207,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       storageHash: coreHash('sha256:test'),
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           },
@@ -211,6 +217,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
           foreignKeys: [],
         },
         post: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             title: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
@@ -255,6 +262,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       storageHash: coreHash('sha256:test'),
       tables: {
         item: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             status: {
@@ -750,7 +758,7 @@ const DEMO_BASE_STORAGE: SqlStorageInput & { tables: SqlStorageTablesFlatInput }
       foreignKeys: [
         {
           source: { columns: ['userId'] },
-          target: { table: 'user', columns: ['id'] },
+          target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
           constraint: true,
           index: true,
         },

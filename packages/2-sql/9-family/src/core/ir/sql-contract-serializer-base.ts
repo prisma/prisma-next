@@ -1,10 +1,96 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { ContractSerializer } from '@prisma-next/framework-components/control';
+import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, type SqlStorageTypeEntry } from '@prisma-next/sql-contract/types';
 import { validateSqlContractFully } from '@prisma-next/sql-contract/validators';
 import type { JsonObject } from '@prisma-next/utils/json';
 
 export type SqlEntityHydrationFactory = (entry: unknown) => SqlStorageTypeEntry;
+
+/**
+ * Convert a JSON-validated storage envelope to the canonical FR15
+ * nested-by-namespace shape that `SqlStorage` expects. Production-emitted
+ * JSON (via `SqlStorage.toJSON`) already arrives nested and passes
+ * through. Legacy fixtures using the flat `tables: { <name>: { … } }`
+ * shape are bucketed under the unbound sentinel here, and FK targets
+ * missing a namespace coordinate inherit the source table's coordinate
+ * (the same rule the TS builder applies at the caller boundary).
+ */
+function normalizeStorageForHydration(
+  storage: Contract<SqlStorage>['storage'],
+): Contract<SqlStorage>['storage'] {
+  const record = storage as Record<string, unknown>;
+  const tables = record['tables'];
+  if (tables === undefined || typeof tables !== 'object' || tables === null) {
+    return storage;
+  }
+  const tablesRecord = tables as Record<string, unknown>;
+  if (looksLikeFlatTableMap(tablesRecord)) {
+    const bucket: Record<string, unknown> = {};
+    for (const [name, entry] of Object.entries(tablesRecord)) {
+      bucket[name] = stampNamespaceOnTable(entry, UNBOUND_NAMESPACE_ID);
+    }
+    return {
+      ...storage,
+      tables: { [UNBOUND_NAMESPACE_ID]: bucket },
+    } as Contract<SqlStorage>['storage'];
+  }
+  const rewrittenTables: Record<string, unknown> = {};
+  let changed = false;
+  for (const [namespaceId, namespaceEntry] of Object.entries(tablesRecord)) {
+    if (typeof namespaceEntry !== 'object' || namespaceEntry === null) {
+      rewrittenTables[namespaceId] = namespaceEntry;
+      continue;
+    }
+    const inner: Record<string, unknown> = {};
+    for (const [tableName, tableEntry] of Object.entries(
+      namespaceEntry as Record<string, unknown>,
+    )) {
+      inner[tableName] = stampNamespaceOnTable(tableEntry, namespaceId);
+      if (inner[tableName] !== tableEntry) changed = true;
+    }
+    rewrittenTables[namespaceId] = inner;
+  }
+  if (!changed) return storage;
+  return { ...storage, tables: rewrittenTables } as Contract<SqlStorage>['storage'];
+}
+
+function looksLikeFlatTableMap(tables: Record<string, unknown>): boolean {
+  for (const value of Object.values(tables)) {
+    if (typeof value !== 'object' || value === null) continue;
+    return 'columns' in (value as Record<string, unknown>);
+  }
+  return false;
+}
+
+function stampNamespaceOnTable(entry: unknown, namespaceId: string): unknown {
+  if (typeof entry !== 'object' || entry === null) return entry;
+  const e = entry as Record<string, unknown>;
+  const next: Record<string, unknown> =
+    typeof e['namespaceId'] === 'string' ? { ...e } : { namespaceId, ...e };
+  const sourceNamespaceId =
+    typeof next['namespaceId'] === 'string' ? (next['namespaceId'] as string) : namespaceId;
+  const fks = next['foreignKeys'];
+  if (Array.isArray(fks)) {
+    next['foreignKeys'] = fks.map((fk) => {
+      if (typeof fk !== 'object' || fk === null) return fk;
+      const fkEntry = fk as Record<string, unknown>;
+      const target = fkEntry['target'];
+      if (
+        typeof target !== 'object' ||
+        target === null ||
+        typeof (target as Record<string, unknown>)['namespaceId'] === 'string'
+      ) {
+        return fk;
+      }
+      return {
+        ...fkEntry,
+        target: { namespaceId: sourceNamespaceId, ...(target as Record<string, unknown>) },
+      };
+    });
+  }
+  return next;
+}
 
 /**
  * SQL family `ContractSerializer` abstract base. Carries the SQL-shared
@@ -38,17 +124,25 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
   ) {}
 
   deserializeContract(json: unknown): TContract {
+    // `parseSqlContractStructure` -> `validateSqlContractFully` runs
+    // arktype structural validation, framework-shared domain checks,
+    // and SQL storage consistency/semantic/model-ref checks against the
+    // validated JSON envelope (which the consistency helpers walk via
+    // `iterateTablesWithCoords`). Hydration below lifts the validated
+    // envelope into the IR class hierarchy without re-running checks.
     const validated = this.parseSqlContractStructure(json);
     const hydrated = this.hydrateSqlStorage(validated);
     return this.constructTargetContract(hydrated);
   }
 
   serializeContract(contract: TContract): JsonObject {
-    // Targets that ship enumerable runtime-only fields must override
-    // this method (mirroring `MongoTargetContractSerializer.serializeContract`)
-    // to construct the persisted envelope explicitly; the default identity
-    // works only when every enumerable own property belongs in the JSON.
-    return contract as unknown as JsonObject;
+    // Round-trip through JSON to invoke each IR class's `toJSON`
+    // projection (notably `SqlStorage.toJSON`, which emits the FR15
+    // nested-by-namespace envelope) and collapse the class instances
+    // to plain data the downstream canonicaliser can walk. Targets
+    // that need to strip target-only enumerable fields override this
+    // method directly.
+    return JSON.parse(JSON.stringify(contract)) as JsonObject;
   }
 
   /**
@@ -83,13 +177,30 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
    * stays codec-typed until `SqlStorage` normalises it).
    */
   protected hydrateSqlStorage(validated: Contract<SqlStorage>): Contract<SqlStorage> {
-    const types = validated.storage.types;
+    // Persisted `storage.types` is the FR15 nested-by-namespace shape
+    // (`Record<NamespaceId, Record<TypeName, …>>`); the hydrator walks
+    // it bucket-by-bucket so the discriminator dispatch sees each entry
+    // (not the enclosing namespace bucket). When the persisted envelope
+    // uses the legacy flat shape (legacy fixtures, hand-rolled JSON),
+    // the family-shared validator already normalised it for structural
+    // validation; we mirror that normalisation here so `SqlStorage`
+    // receives the canonical nested shape (with namespaceId stamped on
+    // every table) regardless of which input form arrived.
+    const normalizedStorage = normalizeStorageForHydration(validated.storage);
+    const types = normalizedStorage.types as
+      | Readonly<Record<string, Readonly<Record<string, SqlStorageTypeEntry>>>>
+      | undefined;
     const hydratedTypes =
       types !== undefined
         ? Object.fromEntries(
-            Object.entries(types).map(([name, entry]) => [
-              name,
-              this.hydrateStorageTypeEntry(entry),
+            Object.entries(types).map(([namespaceId, bucket]) => [
+              namespaceId,
+              Object.fromEntries(
+                Object.entries(bucket).map(([name, entry]) => [
+                  name,
+                  this.hydrateStorageTypeEntry(entry),
+                ]),
+              ),
             ]),
           )
         : undefined;
@@ -97,7 +208,7 @@ export abstract class SqlContractSerializerBase<TContract extends Contract<SqlSt
     return {
       ...validated,
       storage: new SqlStorage({
-        ...validated.storage,
+        ...normalizedStorage,
         ...(hydratedTypes !== undefined ? { types: hydratedTypes } : {}),
       }),
     };

@@ -492,6 +492,7 @@ type BuiltStorageTableColumns<Definition, ModelName extends ModelNames<Definitio
 
 type BuiltStorageTables<Definition> = {
   readonly [ModelName in ModelNames<Definition> as BuiltModelTableName<Definition, ModelName>]: {
+    readonly namespaceId: string;
     readonly columns: BuiltStorageTableColumns<Definition, ModelName>;
     readonly uniques: ReadonlyArray<{
       readonly columns: readonly string[];
@@ -501,7 +502,7 @@ type BuiltStorageTables<Definition> = {
     readonly foreignKeys: ReadonlyArray<{
       readonly source: { readonly columns: readonly string[] };
       readonly target: {
-        readonly namespaceId?: string;
+        readonly namespaceId: string;
         readonly table: string;
         readonly columns: readonly string[];
       };

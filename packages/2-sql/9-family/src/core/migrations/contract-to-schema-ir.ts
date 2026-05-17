@@ -150,6 +150,7 @@ function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
     columns: fk.source.columns,
     referencedTable: fk.target.table,
     referencedColumns: fk.target.columns,
+    referencedNamespaceId: fk.target.namespaceId,
     ...ifDefined('name', fk.name),
   };
 }

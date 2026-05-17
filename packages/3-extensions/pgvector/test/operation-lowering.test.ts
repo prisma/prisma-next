@@ -26,18 +26,22 @@ const contract = new SqlContractSerializer().deserializeContract({
   storage: {
     storageHash: 'test-hash',
     tables: {
-      user: {
-        columns: {
-          id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-          email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-          vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
-          otherVector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+      __unbound__: {
+        user: {
+          namespaceId: '__unbound__',
+          columns: {
+            id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+            email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            vector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+            otherVector: { codecId: 'pg/vector@1', nativeType: 'vector', nullable: false },
+          },
+          uniques: [],
+          indexes: [],
+          foreignKeys: [],
         },
-        uniques: [],
-        indexes: [],
-        foreignKeys: [],
       },
     },
+    namespaces: { __unbound__: { id: '__unbound__' } },
   },
   models: {},
 }) as PostgresContract;

@@ -14,7 +14,7 @@ function createRefActionContract(
 ): Contract<SqlStorage> {
   const fk: ForeignKey = {
     source: { columns: ['userId'] },
-    target: { table: 'user', columns: ['id'] },
+    target: { namespaceId: UNBOUND_NAMESPACE_ID, table: 'user', columns: ['id'] },
     constraint: true,
     index: true,
     ...(onDelete !== undefined && { onDelete }),
@@ -29,6 +29,7 @@ function createRefActionContract(
       storageHash: coreHash('sha256:contract'),
       tables: {
         user: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
           },
@@ -38,6 +39,7 @@ function createRefActionContract(
           foreignKeys: [],
         },
         post: {
+          namespaceId: UNBOUND_NAMESPACE_ID,
           columns: {
             id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
             userId: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
