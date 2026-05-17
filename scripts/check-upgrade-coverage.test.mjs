@@ -308,6 +308,12 @@ describe('check-upgrade-coverage — new-entries rule', () => {
     assert.match(result.stderr, /0\.6-to-0\.7\/new-script\.ts/);
     // Either of the allowed transitions should be mentioned.
     assert.match(result.stderr, /0\.7-to-0\.8|0\.8-to-0\.9/);
+    // The "move the new file under" diagnostic should name both cluster paths.
+    assert.match(result.stderr, /skills\/upgrade\/prisma-next-upgrade\/upgrades/);
+    assert.match(
+      result.stderr,
+      /skills\/extension-author\/prisma-next-extension-upgrade\/upgrades/,
+    );
   });
 
   it('publish mode: accepts an added file under either prev→head or head→head+1', () => {
@@ -363,6 +369,12 @@ describe('check-upgrade-coverage — new-entries rule', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /new-entries-stale-transition/);
     assert.match(result.stderr, /0\.7-to-0\.8/);
+    // The "move the new file under" diagnostic should name both cluster paths.
+    assert.match(result.stderr, /skills\/upgrade\/prisma-next-upgrade\/upgrades/);
+    assert.match(
+      result.stderr,
+      /skills\/extension-author\/prisma-next-extension-upgrade\/upgrades/,
+    );
   });
 
   it('accepts a modification to an existing file in a stale transition directory', () => {
