@@ -94,7 +94,14 @@ async function readPredecessorEndContract(
     }
     throw error;
   }
-  return validateContract(JSON.parse(raw) as unknown);
+  try {
+    return validateContract(JSON.parse(raw) as unknown);
+  } catch (error) {
+    throw errorContractValidationFailed(
+      `Contract validation failed: ${error instanceof Error ? error.message : String(error)}`,
+      { where: { path } },
+    );
+  }
 }
 
 export interface MigrationPlanResult {
