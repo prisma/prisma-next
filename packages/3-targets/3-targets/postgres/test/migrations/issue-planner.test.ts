@@ -2,10 +2,13 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
+  iterateTypesWithCoords,
+  type PostgresEnumStorageEntry,
   SqlStorage,
   type SqlStorageTypeEntry,
   type StorageTable,
   type StorageTableInput,
+  type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
@@ -43,6 +46,16 @@ function makeContract(
     extensionPacks: {},
     meta: {},
   };
+}
+
+function flattenStorageTypes(
+  storage: SqlStorage,
+): Record<string, StorageTypeInstance | PostgresEnumStorageEntry> {
+  const flat: Record<string, StorageTypeInstance | PostgresEnumStorageEntry> = {};
+  for (const { name, entry } of iterateTypesWithCoords(storage)) {
+    flat[name] = entry;
+  }
+  return flat;
 }
 
 const defaultCtx = {
@@ -97,7 +110,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
       });
 
       expect(result.ok).toBe(true);
@@ -142,7 +155,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
       });
 
       expect(result.ok).toBe(true);
@@ -184,7 +197,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
       });
 
       expect(result.ok).toBe(true);
@@ -243,7 +256,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
       });
 
       expect(result.ok).toBe(true);
@@ -303,7 +316,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
       });
 
       expect(result.ok).toBe(true);
@@ -360,7 +373,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
       });
 
       expect(result.ok).toBe(true);
@@ -407,7 +420,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
         schema: makeSchemaWithEnum('status', ['active', 'inactive']),
       });
 
@@ -486,7 +499,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
         schema: makeSchemaWithEnum('status', ['active', 'inactive']),
         policy: { allowedOperationClasses: ['additive', 'destructive', 'widening', 'data'] },
       });
@@ -532,7 +545,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
       });
 
       expect(result.ok).toBe(true);
@@ -583,7 +596,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
       });
 
       expect(result.ok).toBe(true);
@@ -627,7 +640,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
       });
 
       expect(result.ok).toBe(true);
@@ -673,7 +686,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
       });
 
       expect(result.ok).toBe(false);
@@ -718,7 +731,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
         strategies: [],
       });
 
@@ -763,7 +776,7 @@ describe('planIssues', () => {
         issues,
         toContract,
         fromContract: null,
-        storageTypes: toContract.storage.types ?? {},
+        storageTypes: flattenStorageTypes(toContract.storage),
       });
       if (!result.ok) throw new Error('expected ok');
 

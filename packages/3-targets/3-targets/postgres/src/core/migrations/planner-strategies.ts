@@ -30,8 +30,10 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
   findTableByName,
   isPostgresEnumStorageEntry,
+  iterateTablesWithCoords,
   type PostgresEnumStorageEntry,
   type SqlStorage,
+  type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -332,7 +334,7 @@ function enumRebuildCallRecipe(
   typeName: string,
   ctx: StrategyContext,
 ): readonly PostgresOpFactoryCall[] {
-  const toType = ctx.toContract.storage.types?.[typeName];
+  const toType = ctx.storageTypes[typeName];
   if (!toType) return [];
   const isEnum = isPostgresEnumStorageEntry(toType);
   const nativeType = toType.nativeType;
@@ -342,7 +344,7 @@ function enumRebuildCallRecipe(
   const tempName = `${nativeType}${REBUILD_SUFFIX}`;
 
   const columnRefs: { table: string; column: string }[] = [];
-  for (const [tableName, table] of Object.entries(ctx.toContract.storage.tables)) {
+  for (const { name: tableName, table } of iterateTablesWithCoords(ctx.toContract.storage)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
       if (column.typeRef === typeName) {
         columnRefs.push({ table: tableName, column: columnName });
@@ -408,7 +410,7 @@ function enumRebuildCallRecipe(
  * `CreateTableCall` that references the new enum.
  */
 export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
-  const enumTypes = collectPostgresEnumTypes(ctx.toContract.storage.types);
+  const enumTypes = collectPostgresEnumTypes(ctx.storageTypes);
   if (enumTypes.size === 0) return { kind: 'no_match' };
 
   const dataAllowed = ctx.policy.allowedOperationClasses.includes('data');
@@ -496,10 +498,10 @@ export const nativeEnumPlanCallStrategy: CallMigrationStrategy = (issues, ctx) =
 };
 
 function collectPostgresEnumTypes(
-  storageTypes: SqlStorage['types'],
+  storageTypes: Readonly<Record<string, StorageTypeInstance | PostgresEnumStorageEntry>>,
 ): ReadonlyMap<string, PostgresEnumType> {
   const result = new Map<string, PostgresEnumType>();
-  for (const [name, instance] of Object.entries(storageTypes ?? {}).sort(([a], [b]) =>
+  for (const [name, instance] of Object.entries(storageTypes).sort(([a], [b]) =>
     a.localeCompare(b),
   )) {
     if (instance instanceof PostgresEnumType) {
@@ -516,7 +518,7 @@ function collectPostgresEnumTypes(
  * `nativeEnumPlanCallStrategy` and no longer relies on codec hooks.
  */
 export const storageTypePlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
-  const storageTypes = ctx.toContract.storage.types ?? {};
+  const storageTypes = ctx.storageTypes;
   if (Object.keys(storageTypes).length === 0) return { kind: 'no_match' };
 
   const calls: PostgresOpFactoryCall[] = [];
@@ -604,7 +606,8 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
   for (const issue of issues) {
     if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
     const contractTable = findTableByName(ctx.toContract.storage, issue.table);
-    const column = contractTable?.columns[issue.column];
+    if (!contractTable) continue;
+    const column = contractTable.columns[issue.column];
     if (!column) continue;
 
     const notNull = column.nullable !== true;
@@ -715,7 +718,7 @@ export const notNullAddColumnCallStrategy: CallMigrationStrategy = (issues, ctx)
 // ============================================================================
 
 function canUseSharedTemporaryDefaultStrategy(options: {
-  readonly table: NonNullable<Contract<SqlStorage>['storage']['tables'][string]>;
+  readonly table: StorageTable;
   readonly schemaTable: SqlSchemaIR['tables'][string];
   readonly schemaLookup: ReturnType<typeof buildSchemaLookupMap> extends ReadonlyMap<
     string,

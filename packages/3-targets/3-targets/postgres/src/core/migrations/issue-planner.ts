@@ -564,7 +564,7 @@ function mapIssueToCall(
     case 'type_missing': {
       if (!issue.typeName)
         return notOk(issueConflict('unsupportedOperation', 'Type missing issue has no typeName'));
-      const typeInstance = ctx.toContract.storage.types?.[issue.typeName];
+      const typeInstance = storageTypes[issue.typeName];
       if (!typeInstance) {
         return notOk(
           issueConflict(
