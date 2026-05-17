@@ -261,7 +261,7 @@ The acceptance criteria in [Acceptance Criteria](#acceptance-criteria) name the 
 
 ### Published package — `@prisma-next/agent-skill`
 
-- **FR1. Distribution.** ~~A single npm package, `@prisma-next/agent-skill`, installable via `npx skills add @prisma-next/agent-skill`.~~ **Falsified — see § Falsified assumptions and the project spec's block.** The cluster is now distributed by git tag: installable via `npx skills add prisma/prisma-next#v<cli-version> --all`, where `<cli-version>` is read from the CLI's own `package.json` at module load. Source-controlled at `/skills/` at the monorepo root (moved from `packages/0-shared/skills/skills/` so the install URL has no subpath). Pinned lockstep with every PN release (FR2) by the git tag.
+- **FR1. Distribution.** ~~A single npm package, `@prisma-next/agent-skill`, installable via `npx skills add @prisma-next/agent-skill`.~~ **Falsified — see § Falsified assumptions and the project spec's block.** The cluster is now distributed by git tag with a `/skills` subpath: installable via `npx skills add prisma/prisma-next/skills#v<cli-version> --all`, where `<cli-version>` is read from the CLI's own `package.json` at module load. Source-controlled at `/skills/` at the monorepo root. The subpath roots upstream discovery at the user-facing cluster, isolating it from contributor skills under `/skills-contrib/` (see § Falsified assumptions, round 2). Pinned lockstep with every PN release (FR2) by the git tag.
 
 - **FR2. Version-locking.** Every PN release publishes the agent-skill package at the same version. The publish workflow refuses to ship without it (NFR8 from [`upgrade-skill.spec.md`](upgrade-skill.spec.md) extends to cover this package). Consumers at PN `0.7.x` get the `0.7.x`-tagged agent-skill set; the framework cannot ship without the skill, and the skill cannot ship without the framework.
 
@@ -471,7 +471,7 @@ Each skill's content is bounded by the inventory below. *Bullets are workflows* 
 
 ## Non-Functional Requirements
 
-- **NFR1. Source co-location.** Source-controlled in this monorepo (user-facing skills under `/skills/`, contributor skills under `.agents/skills/`). Distribution is by git tag, not by `publish.yml` — the original "ships via the existing `publish.yml` workflow" framing is falsified; see § Falsified assumptions.
+- **NFR1. Source co-location.** Source-controlled in this monorepo (user-facing skills under `/skills/`, contributor skills under `/skills-contrib/`). Distribution is by git tag, not by `publish.yml` — the original "ships via the existing `publish.yml` workflow" framing is falsified; see § Falsified assumptions.
 - **NFR2. Version-locked.** The skill set served by a given install URL is exactly the set of skills that existed in the repo at that tag. The CLI's own `package.json` version supplies the pin in the install command `prisma-next init` emits, so a user who just installed PN `0.x.y` runs an install URL pinned to `v0.x.y`. (Originally framed as "publishes at the same version as the rest of the PN packages"; corrected to "pins the same git tag" — the invariant holds, the mechanism changed.)
 - **NFR3. Progressive-disclosure load shape.** Each `SKILL.md` body fits within the FR4 budget. The agent should never need to load more than one `SKILL.md` plus its referenced `references/*.md` files to complete a single workflow.
 - **NFR4. Agent-tool-agnostic.** The skill set is read by every agent runtime that consumes the agentskills.io format. The published artifact does not include vendor-specific (`.cursor/` / `.claude/`) directory layouts; consumers' agent runtimes are responsible for their own discovery on top of the standard `SKILL.md` shape.
@@ -491,7 +491,7 @@ Each skill's content is bounded by the inventory below. *Bullets are workflows* 
 
 # Acceptance Criteria
 
-- **AC1. Cluster shape and pin.** ~~A stable release publishes `@prisma-next/agent-skill` to npm…~~ **Falsified — see § Falsified assumptions and the project spec's block.** The corrected criterion: at every published CLI version, `npx skills add prisma/prisma-next#v<cli-version> --all` (run from any directory) installs exactly the ten skill subdirectories named in FR12 – FR19b at `/skills/` and zero contributor skills from `.agents/skills/`. The pin in the install command `prisma-next init` emits matches the CLI's own `package.json` version. Verified by the integration test in [`../plans/distribution-fix-plan.md`](../plans/distribution-fix-plan.md) milestone 1 (TC-1, TC-2). Covers FR1, FR2, FR3, NFR1, NFR2.
+- **AC1. Cluster shape and pin.** ~~A stable release publishes `@prisma-next/agent-skill` to npm…~~ **Falsified — see § Falsified assumptions and the project spec's block.** The corrected criterion: at every published CLI version, `npx skills add prisma/prisma-next/skills#v<cli-version> --all` (run from any directory) installs exactly the ten skill subdirectories named in FR12 – FR19b at `/skills/` and zero contributor skills from `/skills-contrib/`. The pin in the install command `prisma-next init` emits matches the CLI's own `package.json` version. Verified by the integration test in [`../plans/distribution-fix-plan.md`](../plans/distribution-fix-plan.md) milestone 1 (TC-1, TC-2). Covers FR1, FR2, FR3, NFR1, NFR2.
 
 - **AC2. Per-skill structure conforms to the skeleton.** Each of the ten `SKILL.md` files has the sections from FR6 in order: frontmatter, title, preamble (with the FR7 headline as its first sentence), *When to Use*, *When Not to Use*, *Key Concepts*, *Workflow*, optional topic sections, *Common Pitfalls*, *What Prisma Next doesn't do yet*, *Reference Files*, *Checklist*. Verified by a structural check (a small script that asserts the section headings are present in order); part of `pnpm test --filter @prisma-next/agent-skill` if such a test is added, otherwise verified manually by the reviewer. Covers FR6, FR7, FR9.
 
@@ -646,10 +646,23 @@ This spec was drafted assuming the cluster would ship as an npm package (`@prism
 
 The corrected design lives in the project spec's [§ Falsified assumptions](../spec.md#falsified-assumptions) and the implementation contract in [`../plans/distribution-fix-plan.md`](../plans/distribution-fix-plan.md). The substantive change relative to this spec:
 
-- **Channel.** Git tag, not npm. Install URL is `prisma/prisma-next#v<cli-version> --all`. The CLI's `package.json` version supplies `<cli-version>`.
+- **Channel.** Git tag, not npm. Install URL is `prisma/prisma-next/skills#v<cli-version> --all` (subpath form — see § Falsified assumptions, round 2 below). The CLI's `package.json` version supplies `<cli-version>`.
 - **Repo layout.** User-facing skills move to `/skills/` at the monorepo root (no longer a workspace package).
-- **Internal-skill leakage.** Contributor skills under `.agents/skills/` are marked `metadata: { internal: true }` so the default `--all` install does not register them. Contributors run `INSTALL_INTERNAL_SKILLS=1 npx skills add prisma/prisma-next#<ref> --all` to opt-in.
 - **Test gate.** A new integration test boots `prisma-next init` end-to-end against branch HEAD via `PRISMA_NEXT_SKILLS_REF` and asserts the *exact* installed skill set; the original npm-channel design had no equivalent gate.
+
+### Falsified assumptions (round 2) — `metadata.internal` is not a defence
+
+The first round of corrections (above) said *"contributor skills under `.agents/skills/` are marked `metadata: { internal: true }` so the default `--all` install does not register them."* That mechanism does not work. Upstream's `--all` flag deliberately bypasses the `metadata.internal` filter (it sets `includeInternal=true` so users can install internal skills they explicitly request by name), so any skill discovered through one of the priority dirs (`.agents/skills/`, `.claude/skills/`, the bare `skills/` directory, etc.) leaks into a vanilla `npx skills add prisma/prisma-next --all`.
+
+The mechanism that does work is **directory placement plus subpath URL**:
+
+- Contributor skills move to a top-level `skills-contrib/` directory that is *not* on upstream's priority-discovery allowlist. A bare-repo install does not see them at all (the recursion fallback only fires when priority discovery returns zero hits, and there are always non-zero hits under `skills/`).
+- The init-time install URL gains a `/skills` subpath: `prisma/prisma-next/skills#v<cli-version>`. Discovery is rooted at `skills/`, so even if a future change accidentally tracks `.agents/skills/`, that path is invisible to the install.
+- The `metadata.internal: true` field is stripped from every contributor SKILL.md — it added zero protection and falsely implied a defence.
+
+The local-development install path is also reshaped. The original sketch dispatched `pnpm exec skills add file:./skills-contrib --all` from a `postinstall` hook to materialise contributor skills locally. That doesn't work either: upstream's `--all` installs to *every* detected agent target, including OpenClaw's bare-`skills/` directory, which would overlay our tracked user-facing cluster with contributor symlinks. The replacement (see [`../plans/distribution-fix-plan.md`](../plans/distribution-fix-plan.md)) is a direct symlink: `setup-contrib-skills.mjs` symlinks `.agents/skills/` and `.claude/skills/` straight at `skills-contrib/`, with no CLI dispatch and no risk of touching `skills/`.
+
+The integration test is also updated to use the *real* upstream CLI against a hermetic `git clone --depth 1` of the working tree. The previous fake-shim version happened to "pass" by modelling an idealised `--all` that respects `metadata.internal`; the real CLI does the opposite. The new test catches both the URL-form regression (must end in `/skills(?:#|$)`) and the leak (the installed skill set must be exactly the one user-facing cluster, with zero names from `skills-contrib/`).
 
 The cluster shape (router + nine workflow-scoped skills), `SKILL.md` skeleton, description-tuning convention, *"What Prisma Next doesn't do yet"* honesty pattern, and content-rotation policy from the rest of this spec are unchanged. Only the distribution mechanism — pinned in FR1, FR25, FR26, NFR1, NFR2, AC1 — has been edited.
 

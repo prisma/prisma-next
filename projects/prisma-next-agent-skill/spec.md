@@ -180,9 +180,33 @@ The original spec assumed the published skills would ship as npm packages, insta
 
 This section pins the corrected design and lists every requirement / acceptance criterion / non-functional invariant in the body that has been edited as a consequence. The implementation contract for the fix lives in [`plans/distribution-fix-plan.md`](plans/distribution-fix-plan.md).
 
-**Channel.** Distribution is by git tag, not by npm package. The install URL is `prisma/prisma-next#v<cli-version>` (`vercel-labs/skills`'s GitHub-shorthand form), where `<cli-version>` is read from the CLI's own `package.json` at module load. CLI and runtime ship lockstep, so the CLI's version is the right tag to pin.
+**Channel.** Distribution is by git tag, not by npm package. The install URL is `prisma/prisma-next/skills#v<cli-version>` — the GitHub shorthand from `vercel-labs/skills` with a `/skills` subpath — where `<cli-version>` is read from the CLI's own `package.json` at module load. CLI and runtime ship lockstep, so the CLI's version is the right tag to pin. (See § Falsified assumptions, round 2 below for why the subpath is load-bearing.)
 
-**Layout.** User-facing skills live at `/skills/` at the monorepo root (moved from `packages/0-shared/skills/skills/`) so the install URL has no subpath. Contributor skills under `.agents/skills/` are marked `metadata: { internal: true }` so the default `--all` install does not leak them; contributors opt-in with `INSTALL_INTERNAL_SKILLS=1`.
+**Layout.** User-facing skills live at `/skills/` at the monorepo root (moved from `packages/0-shared/skills/skills/`). Contributor skills live at `/skills-contrib/` — *not* `/.agents/skills/` (see round 2 below). Discovery rooted at `/skills/` (via the install URL's subpath) is the load-bearing isolation between the two clusters.
+
+### Falsified assumptions (round 2) — `metadata.internal: true` is not a defence
+
+The first round of corrections (above) said *"contributor skills under `.agents/skills/` are marked `metadata: { internal: true }` so the default `--all` install does not leak them; contributors opt-in with `INSTALL_INTERNAL_SKILLS=1`."* That mechanism does not work. Upstream's `--all` flag deliberately bypasses the `metadata.internal` filter (it sets `includeInternal=true` so users can install internal skills they explicitly request by name), so any skill discovered through one of upstream's priority dirs (`.agents/skills/`, `.claude/skills/`, the bare `skills/` directory, etc.) leaks into a vanilla `npx skills add prisma/prisma-next --all`.
+
+The mechanism that does work is **directory placement plus subpath URL**:
+
+- Contributor skills move to a top-level `/skills-contrib/` directory that is *not* on upstream's priority-discovery allowlist. A bare-repo install does not see them at all (the recursion fallback only fires when priority discovery returns zero hits, and there are always non-zero hits under `/skills/`).
+- The init-time install URL gains a `/skills` subpath: `prisma/prisma-next/skills#v<cli-version>`. Discovery is rooted at `/skills/`, so even if a future change accidentally tracks `.agents/skills/`, that path is invisible to the install.
+- The `metadata.internal: true` field is stripped from every contributor `SKILL.md` — it added zero protection and falsely advertised a defence.
+
+**Local-development install is also reshaped.** The original sketch dispatched `pnpm exec skills add file:./skills-contrib --all` from a `postinstall` hook. That doesn't work either: upstream's `--all` installs to *every* detected agent target, including OpenClaw's bare-`skills/` directory, which would overlay our tracked user-facing cluster with contributor symlinks. The replacement is a direct symlink — `setup-contrib-skills.mjs` symlinks `.agents/skills/` and `.claude/skills/` straight at `/skills-contrib/`, with no CLI dispatch and no risk of touching `/skills/`.
+
+**Test gate is also reshaped.** The integration test now uses the real upstream CLI against a hermetic `git clone --depth 1` of the working tree. The previous fake-shim version "passed" by modelling an idealised `--all` that respects `metadata.internal`; the real CLI does the opposite. The new test catches both the URL-form regression (must end in `/skills(?:#|$)`) and the leak (the installed skill set must be exactly the one user-facing cluster, with zero names from `/skills-contrib/`).
+
+**Read-everywhere mapping.** Anywhere this spec or sibling specs (`specs/usage-skill.spec.md`, `specs/init-integration.spec.md`, `plans/distribution-fix-plan.md`) reference the falsified strings, read them as their corrected forms:
+
+| Falsified | Read as |
+|-----|---|
+| `prisma/prisma-next#v<cli-version>` | `prisma/prisma-next/skills#v<cli-version>` |
+| Contributor skills at `.agents/skills/` | Contributor skills at `/skills-contrib/` |
+| `metadata: { internal: true }` (as a leak defence) | Directory placement + subpath URL (the actual defence) |
+| `INSTALL_INTERNAL_SKILLS=1` (as the contributor opt-in) | `npx skills add prisma/prisma-next/skills-contrib --all` (explicit subpath opt-in) |
+| Postinstall via `pnpm exec skills add file:./skills-contrib --all` | Postinstall via direct symlink (`scripts/setup-contrib-skills.mjs`) |
 
 **Workspace package.** The `@prisma-next/skills` workspace package and its publish workflow entry are deleted. The existing `@prisma-next/skills@0.8.0` published to npm before this falsification was discovered remains on npm in its broken state (no consumer is currently depending on it; deprecation messaging is intentionally out of scope for the fix PR).
 

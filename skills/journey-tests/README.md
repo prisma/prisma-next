@@ -7,23 +7,22 @@ Cross-runtime automation against a moving model surface is its own research proj
 ## How to run a journey test
 
 1. Check out the example app named at the top of the journey file.
-2. Install the skill at the project level. The command below must be run **from the `prisma-next` repo root** (not from the example app). `--all` installs every skill in the cluster to every detected agent without prompting (the cluster is meant to be installed as a unit):
+2. Install the user-facing skill cluster at the project level. The URL points at the `skills/` subpath of the Prisma Next repository, which is the same source `prisma-next init` uses. Contributor skills (which live under `skills-contrib/`) are *not* on upstream's priority-discovery allowlist and never reach end-users through this URL. `--all` installs every skill in the user-facing cluster to every detected agent without prompting (the cluster is meant to be installed as a unit):
 
    ```bash
-   # from the prisma-next repo root
-   pnpm dlx skills add file:. --all
+   pnpm dlx skills add prisma/prisma-next/skills#v<prisma-next-version> --all
    ```
 
-   To test the same distribution channel as `prisma-next init`, install from a tagged git ref:
+   To test against an in-flight branch or commit instead of a tagged release:
 
    ```bash
-   pnpm dlx skills add prisma/prisma-next#v<prisma-next-version> --all
+   pnpm dlx skills add prisma/prisma-next/skills#<branch-or-sha> --all
    ```
 
-   To test an in-flight branch or commit:
+   To test a local checkout, point the CLI at the `skills/` directory directly:
 
    ```bash
-   pnpm dlx skills add prisma/prisma-next#<branch-or-sha> --all
+   pnpm dlx skills add /absolute/path/to/prisma-next/skills --all
    ```
 
 3. Open the project in your agent's IDE (or attach the agent via its CLI).

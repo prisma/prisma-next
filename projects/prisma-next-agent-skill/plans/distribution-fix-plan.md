@@ -6,6 +6,17 @@ Fix the agent-skill distribution channel so `prisma-next init` actually installs
 
 **Spec:** [`../spec.md`](../spec.md) (project spec, amended on this branch — see § Falsified assumptions)
 
+> **Round 2 amendments (during execution).** The original plan relied on `metadata: { internal: true }` to filter contributor skills out of the default `--all` install. That mechanism is bypassed by upstream's `--all` (which sets `includeInternal=true`), so it is not a defence. The corrected plan, captured below in the task list and in the project spec's [§ Falsified assumptions, round 2](../spec.md#falsified-assumptions-round-2--metadatainternal-true-is-not-a-defence):
+>
+> - **Install URL is a subpath**, not bare-repo: `prisma/prisma-next/skills#v<cli-version>` (not `prisma/prisma-next#v<cli-version>`). The `/skills` subpath roots upstream's discovery at the user-facing cluster.
+> - **Contributor skills move to `/skills-contrib/`**, not `.agents/skills/`. The new path is *not* on upstream's priority-discovery allowlist, so a bare-repo install does not see them.
+> - **`metadata.internal: true` is stripped** from every contributor SKILL.md (it added zero protection).
+> - **Local-dev install is a direct symlink** (`scripts/setup-contrib-skills.mjs`), not a CLI dispatch. Upstream's `--all` would have polluted the user-facing `skills/` directory via OpenClaw's bare-`skills/` install target.
+> - **Contributor opt-in is the explicit subpath URL** `npx skills add prisma/prisma-next/skills-contrib --all`, not the env var `INSTALL_INTERNAL_SKILLS=1`.
+> - **Integration test uses the real upstream CLI** against a hermetic `git clone --depth 1` of the working tree, not a fake-pnpm shim that modelled an idealised `--all`.
+>
+> The test cases below (TC-2, TC-3, TC-5, task 2, task 8) should be read with these substitutions applied. The shape of the tests — set-equality on installed skills, snapshot on the install URL string, manual contributor-opt-in journey — is unchanged.
+
 ## Collaborators
 
 | Role         | Person/Team                                | Context                                                                                                                |
