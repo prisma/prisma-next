@@ -4,7 +4,7 @@ import { formatSkillInstallCommand } from '../../../src/commands/init/agent-skil
 import type { PackageManager } from '../../../src/commands/init/detect-package-manager';
 
 describe('formatSkillInstallCommand', () => {
-  const source = `prisma/prisma-next#v${cliVersion}`;
+  const source = `prisma/prisma-next/skills#v${cliVersion}`;
 
   it.each([
     ['npm', `npx skills add ${source} --all`],

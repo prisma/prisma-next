@@ -9,11 +9,19 @@ const exec = promisify(execFile);
 /**
  * Default skills source for published CLI builds.
  *
- * This points at the Prisma Next monorepo tag that matches the CLI's own
- * package version, so `prisma-next init` always installs a skill set aligned
- * with the CLI/runtime release.
+ * Points at the Prisma Next monorepo tag that matches the CLI's own
+ * package version, with the `skills/` subpath so discovery's `searchPath`
+ * is the user-facing cluster directly. Contributor skills live in a
+ * top-level `skills-contrib/` directory that's not on upstream's
+ * priority-discovery allowlist, so the subpath form gives consumers
+ * exactly the user-facing skills regardless of upstream's `--all`
+ * semantics.
+ *
+ * Background: upstream's `--all` flag deliberately bypasses the
+ * `metadata.internal: true` filter, so frontmatter is not a reliable
+ * defence against contributor-skill leakage. The subpath URL is.
  */
-export const DEFAULT_AGENT_SKILL_SOURCE = `prisma/prisma-next#v${cliVersion}`;
+export const DEFAULT_AGENT_SKILL_SOURCE = `prisma/prisma-next/skills#v${cliVersion}`;
 
 /**
  * Test-only escape hatch for pinning a local or in-flight skills source.
@@ -36,8 +44,9 @@ function resolveAgentSkillSource(): string {
  * shows by default. A non-interactive scaffold step cannot present
  * prompts, and the cluster is designed to be installed as a unit (the
  * router skill routes between the workflow-scoped siblings). Users who
- * want a narrower install run `npx skills add prisma/prisma-next#v<version>`
- * themselves after `init` with the flags they want.
+ * want a narrower install run
+ * `npx skills add prisma/prisma-next/skills#v<version>` themselves
+ * after `init` with the flags they want.
  *
  * Exported for unit tests so the per-PM dispatch can be asserted
  * without a live subprocess.
