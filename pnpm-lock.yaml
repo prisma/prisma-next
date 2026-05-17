@@ -83,6 +83,9 @@ importers:
       pkg-pr-new:
         specifier: 0.0.71
         version: 0.0.71
+      skills:
+        specifier: ^1.5.7
+        version: 1.5.7
       tslib:
         specifier: ^2.8.1
         version: 2.8.1
@@ -8601,6 +8604,11 @@ packages:
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
+  skills@1.5.7:
+    resolution: {integrity: sha512-Df/2bXm/5Glp7o6n2Ft5v5EmowaD0x8lbvDwionoIhS1sxnWTy5KwMsMPlu3fqhfIZj95m7CC4p+jNVkXNQGYQ==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   slice-ansi@7.1.2:
     resolution: {integrity: sha512-iOBWFgUX7caIZiuutICxVgX1SdxwAVFFKwt1EvMYYec/NWO5meOJ6K5uQxhrYBdQJne4KxiqZc+KptFOWFSI9w==}
     engines: {node: '>=18'}
@@ -12906,6 +12914,10 @@ snapshots:
   signal-exit@4.1.0: {}
 
   sisteransi@1.0.5: {}
+
+  skills@1.5.7:
+    dependencies:
+      yaml: 2.8.4
 
   slice-ansi@7.1.2:
     dependencies:
