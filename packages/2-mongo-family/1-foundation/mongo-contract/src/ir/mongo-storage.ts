@@ -65,10 +65,18 @@ function normaliseNamespaceEntry(
   return new MongoNamespacePayload(ns as MongoNamespaceTablesInput);
 }
 
+// Mongo concretions always store `MongoCollection` instances in `tables`.
+// Narrowing the namespace map here lets target/family-level consumers
+// iterate `namespaces[*].tables[*]` and recover the concrete collection type
+// without the framework's wider `object` value tripping them up.
+export type MongoNamespace = Namespace & {
+  readonly tables: Readonly<Record<string, MongoCollection>>;
+};
+
 export class MongoStorage<THash extends string = string> extends IRNodeBase implements Storage {
   readonly kind = 'mongo-storage' as const;
   readonly storageHash: StorageHashBase<THash>;
-  readonly namespaces: Readonly<Record<string, Namespace>>;
+  readonly namespaces: Readonly<Record<string, MongoNamespace>>;
 
   constructor(input: MongoStorageInput<THash>) {
     super();
@@ -77,7 +85,7 @@ export class MongoStorage<THash extends string = string> extends IRNodeBase impl
       Object.fromEntries(
         Object.entries(input.namespaces ?? DEFAULT_NAMESPACES).map(([nsKey, ns]) => [
           nsKey,
-          normaliseNamespaceEntry(nsKey, ns),
+          normaliseNamespaceEntry(nsKey, ns) as MongoNamespace,
         ]),
       ),
     );

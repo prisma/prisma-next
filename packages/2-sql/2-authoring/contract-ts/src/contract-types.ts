@@ -523,9 +523,16 @@ type BuiltStorageTables<Definition> = {
 
 type BuiltStorage<Definition> = {
   readonly storageHash: StorageHashBase<string>;
-  readonly tables: BuiltStorageTables<Definition>;
   readonly types: DefinitionTypes<Definition>;
-  readonly namespaces: Readonly<Record<string, Namespace>>;
+  // SQL contracts always carry a literal `__unbound__` namespace whose tables
+  // slot is narrowed to the actual built table shape, so downstream DSL
+  // surfaces (e.g. `TableProxyContract`, `Ref`, `SelectBuilder`) can address
+  // tables statically without an optional-narrowing dance.
+  readonly namespaces: Readonly<Record<string, Namespace>> & {
+    readonly __unbound__: Namespace & {
+      readonly tables: BuiltStorageTables<Definition>;
+    };
+  };
 };
 
 type FieldOutputType<
