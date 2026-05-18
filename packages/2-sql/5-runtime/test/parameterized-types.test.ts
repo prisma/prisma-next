@@ -88,7 +88,7 @@ describe('parameterized types', () => {
       const contract = createParamTypesTestContract({ types: {} });
       const context = createTestContext(contract, createStubAdapter());
 
-      expect(context.contract.storage.types).toEqual({});
+      expect(context.contract.storage.types).toEqual({ __unbound__: {} });
       expect(context.types).toEqual({});
     });
 
@@ -106,11 +106,13 @@ describe('parameterized types', () => {
       const context = createTestContext(contract, createStubAdapter());
 
       expect(context.contract.storage.types).toEqual({
-        Vector1536: {
-          kind: 'codec-instance',
-          codecId: 'pg/vector@1',
-          nativeType: 'vector',
-          typeParams: { length: 1536 },
+        __unbound__: {
+          Vector1536: {
+            kind: 'codec-instance',
+            codecId: 'pg/vector@1',
+            nativeType: 'vector',
+            typeParams: { length: 1536 },
+          },
         },
       });
       // types registry should contain the raw type instance (no init hook provided)

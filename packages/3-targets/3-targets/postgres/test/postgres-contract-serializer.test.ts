@@ -151,7 +151,7 @@ describe('PostgresContractSerializer', () => {
     }
 
     const contract = new RegistryDispatchProbeSerializer().deserializeContract({});
-    expect(contract.storage.types?.['fake_thing']).toBe(sentinel);
+    expect(contract.storage.types?.['__unbound__']?.['fake_thing']).toBe(sentinel);
   });
 });
 

@@ -61,15 +61,17 @@ describe('emitter', () => {
         },
         storage: {
           tables: {
-            user: {
-              columns: {
-                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+            __unbound__: {
+              user: {
+                columns: {
+                  id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                  email: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+                },
+                primaryKey: { columns: ['id'] },
+                uniques: [],
+                indexes: [],
+                foreignKeys: [],
               },
-              primaryKey: { columns: ['id'] },
-              uniques: [],
-              indexes: [],
-              foreignKeys: [],
             },
           },
         },
@@ -105,13 +107,15 @@ describe('emitter', () => {
     const ir = createTestContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          __unbound__: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -131,14 +135,16 @@ describe('emitter', () => {
     const ir = createTestContract({
       storage: {
         tables: {
-          data: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              value: { codecId: 'unknown/type@1', nativeType: 'custom', nullable: false },
+          __unbound__: {
+            data: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                value: { codecId: 'unknown/type@1', nativeType: 'custom', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -158,13 +164,15 @@ describe('emitter', () => {
     const ir = createTestContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          __unbound__: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -184,13 +192,15 @@ describe('emitter', () => {
     const ir = createTestContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+          __unbound__: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+              },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       },
@@ -251,19 +261,21 @@ describe('emitter', () => {
     const ir = createTestContract({
       storage: {
         tables: {
-          user: {
-            columns: {
-              id: {
-                codecId: 'pg/int4@1',
-                nativeType: 'int4',
-                nullable: false,
-                sourceId: 'schema.prisma',
+          __unbound__: {
+            user: {
+              columns: {
+                id: {
+                  codecId: 'pg/int4@1',
+                  nativeType: 'int4',
+                  nullable: false,
+                  sourceId: 'schema.prisma',
+                },
               },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
       } as unknown as Record<string, unknown>,
