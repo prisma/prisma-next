@@ -1,6 +1,7 @@
 import type { Contract, ContractField, ContractModel } from '@prisma-next/contract/types';
 import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { validateContractDomain } from '@prisma-next/contract/validate-domain';
+import type { Namespace } from '@prisma-next/framework-components/ir';
 import { type } from 'arktype';
 import {
   type ForeignKeyInput,
@@ -10,6 +11,7 @@ import {
   type SqlModelStorage,
   SqlStorage,
   type SqlStorageInput,
+  type StorageTable,
   type StorageTypeInstanceInput,
   type UniqueConstraintInput,
 } from './types';
@@ -180,25 +182,57 @@ const StorageTableSchema = type({
 });
 
 /**
- * Namespace entry under `storage.namespaces[id]`. SQL contracts honour
- * the framework `Storage.namespaces` invariant from PR1; today every
- * contract binds to the singleton placeholder
- * (`SqlUnboundNamespace.instance`) and the persisted shape carries
- * just the namespace id. Per-target namespace concretions
- * (`PostgresSchema`, `SqliteUnboundDatabase`) can additively grow
- * the persisted shape when they earn their slots.
+ * Namespace entry under `storage.namespaces[id]`. Tables live on each
+ * namespace; the unbound sentinel may appear as a plain `{ id }`
+ * envelope (normalised to `SqlUnboundNamespace.instance` by
+ * {@link SqlStorage}'s constructor) or carry a `tables` map when the
+ * late-bound slot holds authored tables.
  */
 const NamespaceEntrySchema = type({
   id: 'string',
+  'tables?': type({ '[string]': StorageTableSchema }),
 });
 
 const StorageSchema = type({
   '+': 'reject',
   storageHash: 'string',
-  tables: type({ '[string]': StorageTableSchema }),
   'types?': type({ '[string]': StorageTypeEntrySchema }),
   'namespaces?': type({ '[string]': NamespaceEntrySchema }),
 });
+
+type NamespacedStorageWalk = {
+  readonly namespaces: Readonly<Record<string, Namespace>>;
+};
+
+function eachStorageTable(storage: NamespacedStorageWalk) {
+  return Object.entries(storage.namespaces).flatMap(([namespaceId, ns]) =>
+    Object.entries(ns.tables).map(([tableName, table]) => ({
+      namespaceId,
+      tableName,
+      table,
+    })),
+  );
+}
+
+function findStorageTableByTableName(storage: NamespacedStorageWalk, tableName: string): unknown {
+  for (const ns of Object.values(storage.namespaces)) {
+    const t = ns.tables[tableName];
+    if (t !== undefined) {
+      return t;
+    }
+  }
+  return undefined;
+}
+
+function allStorageTableNames(storage: NamespacedStorageWalk): Set<string> {
+  const names = new Set<string>();
+  for (const ns of Object.values(storage.namespaces)) {
+    for (const k of Object.keys(ns.tables)) {
+      names.add(k);
+    }
+  }
+  return names;
+}
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -309,7 +343,7 @@ export function validateStorage(value: unknown): SqlStorage {
   }
   // The arktype-validated shape matches `SqlStorageInput`
   // structurally. Funnel through the constructor so nested IR fields
-  // (`tables`, `types`) are normalised into class instances and the
+  // (`types`) are normalised into class instances and the
   // branded `storageHash` is preserved on the returned `SqlStorage`.
   return new SqlStorage(result as SqlStorageInput);
 }
@@ -380,7 +414,8 @@ export function validateSqlContract<T extends Contract<SqlStorage>>(value: unkno
 export function validateStorageSemantics(storage: SqlStorage): string[] {
   const errors: string[] = [];
 
-  for (const [tableName, table] of Object.entries(storage.tables)) {
+  for (const { namespaceId, tableName, table: rawTable } of eachStorageTable(storage)) {
+    const table = rawTable as StorageTable;
     const namedObjects = new Map<string, string[]>();
     const registerNamedObject = (kind: string, name: string | undefined) => {
       if (!name) return;
@@ -401,7 +436,7 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
     for (const [name, kinds] of namedObjects) {
       if (kinds.length > 1) {
         errors.push(
-          `Table "${tableName}": named object "${name}" is declared multiple times (${kinds.join(', ')})`,
+          `Namespace "${namespaceId}" table "${tableName}": named object "${name}" is declared multiple times (${kinds.join(', ')})`,
         );
       }
     }
@@ -410,7 +445,7 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
       const duplicateColumn = findDuplicateValue(table.primaryKey.columns);
       if (duplicateColumn !== undefined) {
         errors.push(
-          `Table "${tableName}": primary key contains duplicate column "${duplicateColumn}"`,
+          `Namespace "${namespaceId}" table "${tableName}": primary key contains duplicate column "${duplicateColumn}"`,
         );
       }
 
@@ -418,7 +453,7 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
         const column = table.columns[columnName];
         if (column?.nullable === true) {
           errors.push(
-            `Table "${tableName}": primary key column "${columnName}" is nullable; primary key columns must be NOT NULL`,
+            `Namespace "${namespaceId}" table "${tableName}": primary key column "${columnName}" is nullable; primary key columns must be NOT NULL`,
           );
         }
       }
@@ -429,14 +464,14 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
       const duplicateColumn = findDuplicateValue(unique.columns);
       if (duplicateColumn !== undefined) {
         errors.push(
-          `Table "${tableName}": unique constraint contains duplicate column "${duplicateColumn}"`,
+          `Namespace "${namespaceId}" table "${tableName}": unique constraint contains duplicate column "${duplicateColumn}"`,
         );
       }
 
       const signature = JSON.stringify({ columns: unique.columns });
       if (seenUniqueDefinitions.has(signature)) {
         errors.push(
-          `Table "${tableName}": duplicate unique constraint definition on columns [${unique.columns.join(', ')}]`,
+          `Namespace "${namespaceId}" table "${tableName}": duplicate unique constraint definition on columns [${unique.columns.join(', ')}]`,
         );
         continue;
       }
@@ -450,7 +485,9 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
     for (const index of table.indexes) {
       const duplicateColumn = findDuplicateValue(index.columns);
       if (duplicateColumn !== undefined) {
-        errors.push(`Table "${tableName}": index contains duplicate column "${duplicateColumn}"`);
+        errors.push(
+          `Namespace "${namespaceId}" table "${tableName}": index contains duplicate column "${duplicateColumn}"`,
+        );
       }
 
       const signature = JSON.stringify({
@@ -460,7 +497,7 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
       });
       if (seenIndexDefinitions.has(signature)) {
         errors.push(
-          `Table "${tableName}": duplicate index definition on columns [${index.columns.join(', ')}]`,
+          `Namespace "${namespaceId}" table "${tableName}": duplicate index definition on columns [${index.columns.join(', ')}]`,
         );
         continue;
       }
@@ -479,7 +516,7 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
       });
       if (seenForeignKeyDefinitions.has(signature)) {
         errors.push(
-          `Table "${tableName}": duplicate foreign key definition on columns [${fk.columns.join(', ')}]`,
+          `Namespace "${namespaceId}" table "${tableName}": duplicate foreign key definition on columns [${fk.columns.join(', ')}]`,
         );
         continue;
       }
@@ -493,22 +530,22 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
 
         if (fk.onDelete === 'setNull' && !column.nullable) {
           errors.push(
-            `Table "${tableName}": onDelete setNull on foreign key column "${colName}" which is NOT NULL`,
+            `Namespace "${namespaceId}" table "${tableName}": onDelete setNull on foreign key column "${colName}" which is NOT NULL`,
           );
         }
         if (fk.onUpdate === 'setNull' && !column.nullable) {
           errors.push(
-            `Table "${tableName}": onUpdate setNull on foreign key column "${colName}" which is NOT NULL`,
+            `Namespace "${namespaceId}" table "${tableName}": onUpdate setNull on foreign key column "${colName}" which is NOT NULL`,
           );
         }
         if (fk.onDelete === 'setDefault' && !column.nullable && column.default === undefined) {
           errors.push(
-            `Table "${tableName}": onDelete setDefault on foreign key column "${colName}" which is NOT NULL and has no DEFAULT`,
+            `Namespace "${namespaceId}" table "${tableName}": onDelete setDefault on foreign key column "${colName}" which is NOT NULL and has no DEFAULT`,
           );
         }
         if (fk.onUpdate === 'setDefault' && !column.nullable && column.default === undefined) {
           errors.push(
-            `Table "${tableName}": onUpdate setDefault on foreign key column "${colName}" which is NOT NULL and has no DEFAULT`,
+            `Namespace "${namespaceId}" table "${tableName}": onUpdate setDefault on foreign key column "${colName}" which is NOT NULL and has no DEFAULT`,
           );
         }
       }
@@ -529,15 +566,15 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
   for (const [modelName, model] of Object.entries(models)) {
     const storageTable = model.storage.table;
 
-    const table = contract.storage.tables[storageTable] as
-      | (typeof contract.storage.tables)[string]
-      | undefined;
-    if (!table) {
+    const rawTable = findStorageTableByTableName(contract.storage, storageTable);
+    if (rawTable === undefined) {
       throw new ContractValidationError(
         `Model "${modelName}" references non-existent table "${storageTable}"`,
         'storage',
       );
     }
+
+    const table = rawTable as StorageTable;
 
     const columnNames = new Set(Object.keys(table.columns));
     for (const [fieldName, field] of Object.entries(model.storage.fields)) {
@@ -574,16 +611,17 @@ export function validateModelStorageReferences(contract: Contract<SqlStorage>): 
  * counts match their referenced columns. Throws on the first mismatch.
  */
 export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): void {
-  const tableNames = new Set(Object.keys(contract.storage.tables));
+  const tableNames = allStorageTableNames(contract.storage);
 
-  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
+  for (const { namespaceId, tableName, table: rawTable } of eachStorageTable(contract.storage)) {
+    const table = rawTable as StorageTable;
     const columnNames = new Set(Object.keys(table.columns));
 
     if (table.primaryKey) {
       for (const colName of table.primaryKey.columns) {
         if (!columnNames.has(colName)) {
           throw new ContractValidationError(
-            `Table "${tableName}" primaryKey references non-existent column "${colName}"`,
+            `Namespace "${namespaceId}" table "${tableName}" primaryKey references non-existent column "${colName}"`,
             'storage',
           );
         }
@@ -594,7 +632,7 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
       for (const colName of unique.columns) {
         if (!columnNames.has(colName)) {
           throw new ContractValidationError(
-            `Table "${tableName}" unique constraint references non-existent column "${colName}"`,
+            `Namespace "${namespaceId}" table "${tableName}" unique constraint references non-existent column "${colName}"`,
             'storage',
           );
         }
@@ -605,7 +643,7 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
       for (const colName of index.columns) {
         if (!columnNames.has(colName)) {
           throw new ContractValidationError(
-            `Table "${tableName}" index references non-existent column "${colName}"`,
+            `Namespace "${namespaceId}" table "${tableName}" index references non-existent column "${colName}"`,
             'storage',
           );
         }
@@ -615,7 +653,7 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
     for (const [colName, column] of Object.entries(table.columns)) {
       if (!column.nullable && column.default?.kind === 'literal' && column.default.value === null) {
         throw new ContractValidationError(
-          `Table "${tableName}" column "${colName}" is NOT NULL but has a literal null default`,
+          `Namespace "${namespaceId}" table "${tableName}" column "${colName}" is NOT NULL but has a literal null default`,
           'storage',
         );
       }
@@ -625,7 +663,7 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
       for (const colName of fk.columns) {
         if (!columnNames.has(colName)) {
           throw new ContractValidationError(
-            `Table "${tableName}" foreignKey references non-existent column "${colName}"`,
+            `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent column "${colName}"`,
             'storage',
           );
         }
@@ -633,18 +671,19 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
 
       if (!tableNames.has(fk.references.table)) {
         throw new ContractValidationError(
-          `Table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
+          `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent table "${fk.references.table}"`,
           'storage',
         );
       }
 
-      const referencedTable = contract.storage.tables[fk.references.table];
-      if (!referencedTable) continue;
+      const referencedRaw = findStorageTableByTableName(contract.storage, fk.references.table);
+      if (referencedRaw === undefined) continue;
+      const referencedTable = referencedRaw as StorageTable;
       const referencedColumnNames = new Set(Object.keys(referencedTable.columns));
       for (const colName of fk.references.columns) {
         if (!referencedColumnNames.has(colName)) {
           throw new ContractValidationError(
-            `Table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.references.table}"`,
+            `Namespace "${namespaceId}" table "${tableName}" foreignKey references non-existent column "${colName}" in table "${fk.references.table}"`,
             'storage',
           );
         }
@@ -652,7 +691,7 @@ export function validateSqlStorageConsistency(contract: Contract<SqlStorage>): v
 
       if (fk.columns.length !== fk.references.columns.length) {
         throw new ContractValidationError(
-          `Table "${tableName}" foreignKey column count (${fk.columns.length}) does not match referenced column count (${fk.references.columns.length})`,
+          `Namespace "${namespaceId}" table "${tableName}" foreignKey column count (${fk.columns.length}) does not match referenced column count (${fk.references.columns.length})`,
           'storage',
         );
       }

@@ -1,4 +1,3 @@
-import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { describe, expect, it } from 'vitest';
 import { col, fk, index, model, pk, table, unique } from '../src/factories';
 import { StorageTable } from '../src/ir/storage-table';
@@ -254,57 +253,6 @@ describe('SQL contract factories', () => {
           index: true,
         },
       ]);
-    });
-
-    describe('namespaceId coordinate', () => {
-      it('leaves the property `undefined` when input.namespaceId is omitted (single-namespace default)', () => {
-        const userTable = new StorageTable({
-          columns: { id: col('int4', 'pg/int4@1') },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        });
-        expect(userTable.namespaceId).toBeUndefined();
-        const resolved = userTable.namespaceId ?? UNBOUND_NAMESPACE_ID;
-        expect(resolved).toBe(UNBOUND_NAMESPACE_ID);
-      });
-
-      it('omits namespaceId from the serialized JSON envelope when the property is undefined', () => {
-        const userTable = new StorageTable({
-          columns: { id: col('int4', 'pg/int4@1') },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        });
-        const json = JSON.parse(JSON.stringify(userTable)) as Record<string, unknown>;
-        expect(json).not.toHaveProperty('namespaceId');
-      });
-
-      it('records an explicit non-unbound namespaceId on the class and in the JSON envelope', () => {
-        const authUserTable = new StorageTable({
-          namespaceId: 'auth',
-          columns: { id: col('int4', 'pg/int4@1') },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        });
-        expect(authUserTable.namespaceId).toBe('auth');
-        const json = JSON.parse(JSON.stringify(authUserTable)) as Record<string, unknown>;
-        expect(json['namespaceId']).toBe('auth');
-      });
-
-      it('treats explicit `__unbound__` the same as omitting the field — does not write the field', () => {
-        const tenantTable = new StorageTable({
-          namespaceId: UNBOUND_NAMESPACE_ID,
-          columns: { id: col('int4', 'pg/int4@1') },
-          uniques: [],
-          indexes: [],
-          foreignKeys: [],
-        });
-        expect(tenantTable.namespaceId).toBeUndefined();
-        const json = JSON.parse(JSON.stringify(tenantTable)) as Record<string, unknown>;
-        expect(json).not.toHaveProperty('namespaceId');
-      });
     });
 
     it('creates table with all constraints', () => {

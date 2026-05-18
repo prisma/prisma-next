@@ -23,6 +23,7 @@ export type {
   ResolveCodecTypes,
   SqlModelFieldStorage,
   SqlModelStorage,
+  SqlNamespaceTablesInput,
   SqlQueryOperationTypes,
   SqlStorageInput,
   SqlStorageTypeEntry,
